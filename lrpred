@@ -1,0 +1,265 @@
+#!/usr/bin/python
+
+import traceback
+import codecs
+from pylab import *
+import os.path
+import ocrolib
+import argparse
+import matplotlib
+from multiprocessing import Pool
+from ocrolib import edist
+from collections import Counter
+from ocrolib import minilstm as lstm
+# from ocrolib import lstm
+from scipy.ndimage import measurements
+
+parser = argparse.ArgumentParser("apply an RNN recognizer")
+
+# error checking
+parser.add_argument('-n','--nocheck',action="store_true",
+                    help="disable error checking on inputs")
+
+# line dewarping (usually contained in model)
+parser.add_argument("-e","--nolineest",action="store_true",
+                    help="target line height (overrides recognizer)")
+# parser.add_argument("-l","--height",default=-1,type=int,
+#                     help="target line height (overrides recognizer)")
+
+# recognition
+parser.add_argument('-m','--model',default="en-default.pyrnn.gz",
+                    help="line recognition model")
+
+parser.add_argument("--lineheight",type=int,default=48,
+                    help="# LSTM state units")
+parser.add_argument("-S","--hiddensize",type=int,default=100,
+                    help="# LSTM state units")
+
+parser.add_argument("-p","--pad",default=16,type=int,
+                    help="extra blank padding to the left and right of text line")
+parser.add_argument('-N',"--nonormalize",action="store_true",
+                    help="don't normalize the textual output from the recognizer")
+parser.add_argument('--llocs',action="store_true",
+                    help="output LSTM locations for characters")
+parser.add_argument('--alocs',action="store_true",
+                    help="output aligned LSTM locations for characters")
+
+# error measures
+parser.add_argument("-r","--estrate",action="store_true",
+                    help="estimate error rate only")
+parser.add_argument("-c","--estconf",type=int,default=20,
+                    help="estimate confusion matrix")
+parser.add_argument("-C","--compare",default="nospace",
+                    help="string comparison used for error rate estimate")
+parser.add_argument("--context",default=0,type=int,
+                    help="context for error reporting")
+
+# debugging
+parser.add_argument('-s','--show',default=-1,type=float,
+                    help="if >0, shows recognition output in a window and waits this many seconds")
+# parser.add_argument('-S','--save',default=None,
+#                     help="save debugging output image as PNG (for bug reporting)")
+parser.add_argument("-q","--quiet",action="store_true",
+                    help="turn off most output")
+
+# input files
+parser.add_argument("files",nargs="+",
+                    help="input files; glob and @ expansion performed")
+args = parser.parse_args()
+
+def check_line(image):
+    if len(image.shape)==3: return "input image is color image %s"%(image.shape,)
+    if mean(image)<median(image): return "image may be inverted"
+    h,w = image.shape
+    if h<20: return "image not tall enough for a text line %s"%(image.shape,)
+    if h>200: return "image too tall for a text line %s"%(image.shape,)
+    if w<1.5*h: return "line too short %s"%(image.shape,)
+    if w>4000: return "line too long %s"%(image.shape,)
+    ratio = w*1.0/h
+    _,ncomps = measurements.label(image>mean(image))
+    lo = int(0.5*ratio+0.5)
+    hi = int(4*ratio)+1
+    if ncomps<lo: return "too few connected components (got %d, wanted >=%d)"%(ncomps,lo)
+    if ncomps>hi*ratio: return "too many connected components (got %d, wanted <=%d)"%(ncomps,hi)
+    return None
+
+# compute the list of files to be classified
+
+if len(args.files)<1:
+    parser.print_help()
+    sys.exit(0)
+
+print 
+print "#"*10,(" ".join(sys.argv))[:60]
+print 
+
+
+inputs = ocrolib.glob_all(args.files)
+if not args.quiet: print "#inputs",len(inputs)
+
+import h5py
+import numpy
+import json
+
+f = h5py.File(args.model, "r")
+
+# load the network used for classification
+
+charset = sorted(list(set(list(lstm.ascii_labels) + list(ocrolib.chars.default))))
+charset = [""," ","~",]+[c for c in charset if c not in [" ","~"]]
+print json.dumps(charset)
+codec = lstm.Codec().init(charset)
+print "codec size", codec.size()
+
+network = lstm.SeqRecognizer(args.lineheight, args.hiddensize,
+        codec = codec,
+        normalize = lstm.normalize_nfkc)
+
+parallel, softmax = network.lstm.nets
+nornet, rev = parallel.nets
+revnet = rev.net
+
+js = open('images.js', 'w')
+
+weights = "WGI WGF WGO WCI WIP WFP WOP"
+for w in weights.split():
+    # js.write("fwd%s = %s;\n" % (w, json.dumps(f['.bidilstm.0.parallel.0.lstm.' + w][:].tolist())))
+    # js.write("rev%s = %s;\n\n" % (w, json.dumps(f['.bidilstm.0.parallel.1.reversed.0.lstm.' + w][:].tolist())))
+
+    # there's a difference between (50, 1) and (50,) in terms of np array shape
+    setattr(nornet, w, f['.bidilstm.0.parallel.0.lstm.' + w][:].reshape(getattr(nornet, w).shape))
+    setattr(revnet, w, f['.bidilstm.0.parallel.1.reversed.0.lstm.' + w][:].reshape(getattr(nornet, w).shape))
+
+# js.write("softW = %s;\n" % json.dumps(f['.bidilstm.1.softmax.W'][:].tolist()))
+# js.write("softB = %s;\n\n" % json.dumps(f['.bidilstm.1.softmax.w'][:].tolist()))
+# js.close()
+    
+# the first row is biases and the rest are weights
+softmax.W2 = numpy.hstack((f['.bidilstm.1.softmax.w'][:], f['.bidilstm.1.softmax.W'][:]))
+print 'softmax size', f['.bidilstm.1.softmax.w'][:].size
+# ocrolib.save_object("from-clstm.pyrnn",network)
+
+
+# network = ocrolib.load_object(args.model,verbose=1)
+# for x in network.walk(): x.postLoad()
+# for x in network.walk(): 
+#     if isinstance(x,lstm.LSTM):
+#         x.allocate(5000)
+
+
+# get the line normalizer from the loaded network, or optionally
+# let the user override it (this is not very useful)
+
+# lnorm = getattr(network,"lnorm",None)
+
+# if args.height>0:
+#     lnorm.setHeight(args.height)
+from ocrolib import lineest
+lnorm = lineest.CenterNormalizer(args.lineheight)
+
+
+from pylab import amax, vstack, zeros
+def prepare_line(line,pad=16):
+    """Prepare a line for recognition; this inverts it, transposes
+    it, and pads it."""
+    line = line * 1.0/amax(line)
+    line = amax(line)-line
+    line = line.T
+    if pad>0:
+        w = line.shape[1]
+        line = vstack([zeros((pad,w)),line,zeros((pad,w))])
+    return line
+
+# process one file
+
+def process1(arg):
+    (trial,fname) = arg
+    base,_ = ocrolib.allsplitext(fname)
+    line = ocrolib.read_image_gray(fname)
+    raw_line = line.copy()
+    if prod(line.shape)==0: return None
+    if amax(line)==amin(line): return None
+
+    if not args.nocheck:
+        check = check_line(amax(line)-line)
+        if check is not None:
+            print fname,"SKIPPED",check,"(use -n to disable this check)"
+            return (0,[],0,trial,fname)            
+
+    if not args.nolineest:
+        assert "dew.png" not in fname,"don't dewarp dewarped images"
+        temp = amax(line)-line
+        temp = temp*1.0/amax(temp)
+        lnorm.measure(temp)
+        line = lnorm.normalize(line,cval=amax(line))
+    else:
+        assert "dew.png" in fname,"only apply to dewarped images"
+
+    line = prepare_line(line,args.pad)
+    fb = os.path.basename(fname).split(".")[0]
+    js.write("img%s = %s;\n" % (fb, json.dumps(line.tolist())))
+
+    pred = network.predictString(line)
+    # if fb == "01000a":
+    #     js.write("out%s = %s;\n" % (fb, json.dumps(network.outputs.tolist())))
+
+    # if args.llocs:
+    #     # output recognized LSTM locations of characters
+    #     result = lstm.translate_back(network.outputs,pos=1)
+    #     scale = len(raw_line.T)*1.0/(len(network.outputs)-2*args.pad)
+    #     #ion(); imshow(raw_line,cmap=cm.gray)
+    #     with codecs.open(base+".llocs","w","utf-8") as locs:
+    #         for r,c in result:
+    #             c = network.l2s([c])
+    #             r = (r-args.pad)*scale
+    #             locs.write("%s\t%.1f\n"%(c,r))
+    #             #plot([r,r],[0,20],'r' if c==" " else 'b')
+    #     #ginput(1,1000)
+
+
+    if not args.nonormalize:
+        pred = ocrolib.normalize_text(pred)
+
+    if args.estrate:
+        try:
+            gt = ocrolib.read_text(base+".gt.txt")
+        except:
+            return (0,[],0,trial,fname)
+        pred0 = ocrolib.project_text(pred,args.compare)
+        gt0 = ocrolib.project_text(gt,args.compare)
+        if args.estconf>0:
+            err,conf = edist.xlevenshtein(pred0,gt0,context=args.context)
+        else:
+            err = edist.xlevenshtein(pred0,gt0)
+            conf = []
+        if not args.quiet:
+            print "%3d %3d"%(err,len(gt)),fname,":",pred
+            sys.stdout.flush()
+        return (err,conf,len(gt0),trial,fname)
+
+    if not args.quiet:
+        print fname,":",pred
+    ocrolib.write_text(base+".txt",pred)
+
+    return None
+
+result = []
+for trial,fname in enumerate(inputs):
+    result.append(process1((trial,fname)))
+
+# result = [x for x in result if x is not None]
+
+# confusions = []
+
+# if args.estrate:
+#     terr = 0
+#     total = 0
+#     for err,conf,n,trial,fname, in result:
+#         terr += err
+#         total += n
+#         confusions += conf
+#     print "%.5f"%(terr*1.0/total),terr,total,args.model
+#     if args.estconf>0:
+#         print "top",args.estconf,"confusions (count pred gt), comparison:",args.compare
+#         for ((u,v),n) in Counter(confusions).most_common(args.estconf):
+#             print "%6d %-4s %-4s"%(n,u,v)
