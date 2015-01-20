@@ -49,7 +49,7 @@ for w in "WGI WGF WGO WCI".split():
     js.write("rev%s = %s;\n\n" % (w, format(f['.bidilstm.0.parallel.1.reversed.0.lstm.' + w][:].tolist())))
 
 for w in "WIP WFP WOP".split():
-    js.write("fwd%s = %s;\n" % (w, format(f['.bidilstm.0.parallel.0.lstm.' + w][:,0].tolist())))
+    js.write("fwd%s = %s;\n" % (w, format(f['.bidilstm.0.parallel.0.lstm.' + w][:][:,0].tolist())))
     js.write("rev%s = %s;\n\n" % (w, format(f['.bidilstm.0.parallel.1.reversed.0.lstm.' + w][:,0].tolist())))
 
 
