@@ -1,4 +1,4 @@
-from ocrolib.native import *
+from kraken.lib.native import compile_and_load, I, A1D, A2D
 
 lstm_utils = r"""
 #include <math.h>
@@ -45,25 +45,32 @@ void sumprod(int r,int n,double u[r][n],double v[r][n],double a[n]) {
 """
 
 lstm_native = compile_and_load(lstm_utils)
-lstm_native.sigmoid.argtypes = [I,A1D,A1D]
-lstm_native.dotplus.argtypes = [I,I,A1D,A2D,A1D]
-lstm_native.prodplus.argtypes = [I,A1D,A1D,A1D]
-lstm_native.sumouter.argtypes = [I,I,I,A2D,A2D,A2D]
-lstm_native.sumprod.argtypes = [I,I,A1D,A2D,A2D]
+lstm_native.sigmoid.argtypes = [I, A1D, A1D]
+lstm_native.dotplus.argtypes = [I, I, A1D, A2D, A1D]
+lstm_native.prodplus.argtypes = [I, A1D, A1D, A1D]
+lstm_native.sumouter.argtypes = [I, I, I, A2D, A2D, A2D]
+lstm_native.sumprod.argtypes = [I, I, A1D, A2D, A2D]
 
-def sigmoid(u,out=None):
-    assert u.shape==out.shape and len(u.shape)==1
-    lstm_native.sigmoid(len(u),u,out)
+
+def sigmoid(u, out=None):
+    assert u.shape == out.shape and len(u.shape) == 1
+    lstm_native.sigmoid(len(u), u, out)
     return out
-def prodplus(u,v,out=None):
-    assert u.shape==v.shape and u.shape==out.shape and len(u.shape)==1
-    lstm_native.prodplus(len(out),out,u,v)
+
+
+def prodplus(u, v, out=None):
+    assert u.shape == v.shape and u.shape == out.shape and len(u.shape) == 1
+    lstm_native.prodplus(len(out), out, u, v)
     return out
-def sumouter(u,v,out=None):
-    assert out.shape==u.shape[1:]+v.shape[1:] and u.shape[:1]==v.shape[:1]
-    lstm_native.sumouter(u.shape[0],out.shape[0],out.shape[1],out,u,v)
+
+
+def sumouter(u, v, out=None):
+    assert out.shape == u.shape[1:] + v.shape[1:] and u.shape[:1] == v.shape[:1]
+    lstm_native.sumouter(u.shape[0], out.shape[0], out.shape[1], out, u, v)
     return out
-def sumprod(u,v,out=None):
-    assert out.shape==u.shape[1:] and out.shape==v.shape[1:] and u.shape[:1]==v.shape[:1]
-    lstm_native.sumprod(len(u),len(out),out,u,v)
+
+
+def sumprod(u, v, out=None):
+    assert out.shape == u.shape[1:] and out.shape == v.shape[1:] and u.shape[:1] == v.shape[:1]
+    lstm_native.sumprod(len(u), len(out), out, u, v)
     return out

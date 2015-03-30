@@ -1,9 +1,9 @@
-import common as ocrolib
-from collections import defaultdict
-from ocrolib.native import *
-from ocrolib import edist
 import nutils
 import unicodedata
+import numpy as np
+
+from scipy.ndimage import measurements,filters
+from collections import defaultdict
 
 initial_range = 0.1
 
@@ -14,31 +14,46 @@ class RangeError(Exception):
 def prepare_line(line,pad=16):
     """Prepare a line for recognition; this inverts it, transposes
     it, and pads it."""
-    line = line * 1.0/amax(line)
-    line = amax(line)-line
+    line = line * 1.0/np.amax(line)
+    line = np.amax(line)-line
     line = line.T
     if pad>0:
         w = line.shape[1]
-        line = vstack([zeros((pad,w)),line,zeros((pad,w))])
+        line = np.vstack([np.zeros((pad,w)),line,np.zeros((pad,w))])
     return line
+
+def levenshtein(a,b):
+    """Calculates the Levenshtein distance between a and b. 
+    (Clever compact Pythonic implementation from hetland.org)"""
+    n, m = len(a), len(b)
+    if n > m: a,b = b,a; n,m = m,n       
+    current = range(n+1)
+    for i in range(1,m+1):
+        previous,current = current,[i]+[0]*n
+        for j in range(1,n+1):
+            add,delete = previous[j]+1,current[j-1]+1
+            change = previous[j-1]
+            if a[j-1]!=b[i-1]: change = change+1
+            current[j] = min(add, delete, change)
+    return current[n]
 
 def randu(*shape):
     # ATTENTION: whether you use randu or randn can make a difference.
     """Generate uniformly random values in the range (-1,1).
     This can usually be used as a drop-in replacement for `randn`
     resulting in a different distribution."""
-    return 2*rand(*shape)-1
+    return 2*np.random.rand(*shape)-1
 
 def sigmoid(x):
     """Compute the sigmoid function.
     We don't bother with clipping the input value because IEEE floating
     point behaves reasonably with this function even for infinities."""
-    return 1.0/(1.0+exp(-x))
+    return 1.0/(1.0+np.exp(-x))
 
 def rownorm(a):
     """Compute a vector consisting of the Euclidean norm of the
     rows of the 2D array."""
-    return sum(array(a)**2,axis=1)**.5
+    return np.sum(array(a)**2,axis=1)**.5
 
 def check_nan(*args,**kw):
     "Check whether there are any NaNs in the argument arrays."
@@ -51,9 +66,9 @@ def sumouter(us,vs,lo=-1.0,hi=1.0,out=None):
     Values are clipped into the range `[lo,hi]`.
     This is mainly used for computing weight updates
     in logistic regression layers."""
-    result = zeros((len(us[0]),len(vs[0])))
+    result = np.zeros((len(us[0]),len(vs[0])))
     for u,v in zip(us,vs):
-        result += outer(clip(u,lo,hi),v)
+        result += np.outer(clip(u,lo,hi),v)
     return result
 
 def sumprod(us,vs,lo=-1.0,hi=1.0,out=None):
@@ -62,9 +77,9 @@ def sumprod(us,vs,lo=-1.0,hi=1.0,out=None):
     This is mainly used for computing weight updates
     in logistic regression layers."""
     assert len(us[0])==len(vs[0])
-    result = zeros(len(us[0]))
+    result = np.zeros(len(us[0]))
     for u,v in zip(us,vs):
-        result += clip(u,lo,hi)*v
+        result += np.clip(u,lo,hi)*v
     return result
 
 class Network:
@@ -73,9 +88,9 @@ class Network:
     def predict(self,xs):
         return self.forward(xs)
     def train(self,xs,ys,debug=0):
-        xs = array(xs)
-        ys = array(ys)
-        pred = array(self.forward(xs))
+        xs = np.array(xs)
+        ys = np.array(ys)
+        pred = np.array(self.forward(xs))
         deltas = ys - pred
         self.backward(deltas)
         self.update()
@@ -87,9 +102,9 @@ class Network:
         accelerated training using 1/pred as the error signal."""
         assert len(cs.shape)==1
         assert (cs==array(cs,'i')).all()
-        xs = array(xs)
-        pred = array(self.forward(xs))
-        deltas = zeros(pred.shape)
+        xs = np.array(xs)
+        pred = np.array(self.forward(xs))
+        deltas = np.zeros(pred.shape)
         assert len(deltas)==len(cs)
         # NB: these deltas are such that they can be used
         # directly to update the gradient; some other libraries
@@ -145,27 +160,27 @@ class Network:
         weights,derivs,names = zip(*aw)
         weights = [w.ravel() for w in weights]
         derivs = [d.ravel() for d in derivs]
-        return concatenate(weights),concatenate(derivs)
+        return np.concatenate(weights),np.concatenate(derivs)
     def update(self):
         """Update the weights using the deltas computed in the last forward/backward pass.
         Subclasses need not implement this, they should implement the `weights` method."""
         if not hasattr(self,"verbose"):
             self.verbose = 0
         if not hasattr(self,"deltas") or self.deltas is None:
-            self.deltas = [zeros(dw.shape) for w,dw,n in self.weights()]
+            self.deltas = [np.zeros(dw.shape) for w,dw,n in self.weights()]
         for ds,(w,dw,n) in zip(self.deltas,self.weights()):
             ds.ravel()[:] = self.momentum * ds.ravel()[:] + self.learning_rate * dw.ravel()[:]
             w.ravel()[:] += ds.ravel()[:]
             if self.verbose:
-                print n,(amin(w),amax(w)),(amin(dw),amax(dw))
+                print n,(np.amin(w),np.amax(w)),(np.amin(dw),np.amax(dw))
 
 class Logreg(Network):
     """A logistic regression network."""
-    def __init__(self,Nh,No,initial_range=initial_range,rand=rand):
+    def __init__(self,Nh,No,initial_range=initial_range,rand=np.random.rand):
         self.Nh = Nh
         self.No = No
         self.W2 = randu(No,Nh+1)*initial_range
-        self.DW2 = zeros((No,Nh+1))
+        self.DW2 = np.zeros((No,Nh+1))
     def ninputs(self):
         return self.Nh
     def noutputs(self):
@@ -174,8 +189,8 @@ class Logreg(Network):
         n = len(ys)
         inputs,zs = [None]*n,[None]*n
         for i in range(n):
-            inputs[i] = concatenate([ones(1),ys[i]])
-            zs[i] = sigmoid(dot(self.W2,inputs[i]))
+            inputs[i] = np.concatenate([np.ones(1),ys[i]])
+            zs[i] = sigmoid(np.dot(self.W2,inputs[i]))
         self.state = (inputs,zs)
         return zs
     def backward(self,deltas):
@@ -185,25 +200,25 @@ class Logreg(Network):
         dzspre,dys = [None]*n,[None]*n
         for i in reversed(range(len(zs))):
             dzspre[i] = deltas[i] * zs[i] * (1-zs[i])
-            dys[i] = dot(dzspre[i],self.W2)[1:]
+            dys[i] = np.dot(dzspre[i],self.W2)[1:]
         self.dzspre = dzspre
         self.DW2 = sumouter(dzspre,inputs)
         return dys
     def info(self):
         vars = sorted("W2".split())
         for v in vars:
-            a = array(getattr(self,v))
-            print v,a.shape,amin(a),amax(a)
+            a = np.array(getattr(self,v))
+            print v,a.shape,np.amin(a),np.amax(a)
     def weights(self):
         yield self.W2,self.DW2,"Logreg"
 
 class Softmax(Network):
     """A logistic regression network."""
-    def __init__(self,Nh,No,initial_range=initial_range,rand=rand):
+    def __init__(self,Nh,No,initial_range=initial_range,rand=np.random.rand):
         self.Nh = Nh
         self.No = No
         self.W2 = randu(No,Nh+1)*initial_range
-        self.DW2 = zeros((No,Nh+1))
+        self.DW2 = np.zeros((No,Nh+1))
     def ninputs(self):
         return self.Nh
     def noutputs(self):
@@ -212,10 +227,10 @@ class Softmax(Network):
         n = len(ys)
         inputs,zs = [None]*n,[None]*n
         for i in range(n):
-            inputs[i] = concatenate([ones(1),ys[i]])
-            temp = dot(self.W2,inputs[i])
-            temp = exp(clip(temp,-100,100))
-            temp /= sum(temp)
+            inputs[i] = np.concatenate([np.ones(1),ys[i]])
+            temp = np.dot(self.W2,inputs[i])
+            temp = np.exp(np.clip(temp,-100,100))
+            temp /= np.sum(temp)
             zs[i] = temp
         self.state = (inputs,zs)
         return zs
@@ -226,68 +241,30 @@ class Softmax(Network):
         dzspre,dys = [None]*n,[None]*n
         for i in reversed(range(len(zs))):
             dzspre[i] = deltas[i]
-            dys[i] = dot(dzspre[i],self.W2)[1:]
+            dys[i] = np.dot(dzspre[i],self.W2)[1:]
         self.DW2 = sumouter(dzspre,inputs)
         return dys
     def info(self):
         vars = sorted("W2".split())
         for v in vars:
-            a = array(getattr(self,v))
-            print v,a.shape,amin(a),amax(a)
+            a = np.array(getattr(self,v))
+            print v,a.shape,np.amin(a),np.amax(a)
     def weights(self):
         yield self.W2,self.DW2,"Softmax"
-
-class MLP(Network):
-    """A multilayer perceptron (direct implementation)."""
-    def __init__(self,Ni,Nh,No,initial_range=initial_range,rand=randu):
-        self.Ni = Ni
-        self.Nh = Nh
-        self.No = No
-        self.W1 = rand(Nh,Ni+1)*initial_range
-        self.W2 = rand(No,Nh+1)*initial_range
-    def ninputs(self):
-        return self.Ni
-    def noutputs(self):
-        return self.No
-    def forward(self,xs):
-        n = len(xs)
-        inputs,ys,zs = [None]*n,[None]*n,[None]*n
-        for i in range(n):
-            inputs[i] = concatenate([ones(1),xs[i]])
-            ys[i] = sigmoid(dot(self.W1,inputs[i]))
-            ys[i] = concatenate([ones(1),ys[i]])
-            zs[i] = sigmoid(dot(self.W2,ys[i]))
-        self.state = (inputs,ys,zs)
-        return zs
-    def backward(self,deltas):
-        xs,ys,zs = self.state
-        n = len(xs)
-        dxs,dyspre,dzspre,dys = [None]*n,[None]*n,[None]*n,[None]*n
-        for i in reversed(range(len(zs))):
-            dzspre[i] = deltas[i] * zs[i] * (1-zs[i])
-            dys[i] = dot(dzspre[i],self.W2)[1:]
-            dyspre[i] = dys[i] * (ys[i] * (1-ys[i]))[1:]
-            dxs[i] = dot(dyspre[i],self.W1)[1:]
-        self.DW2 = sumouter(dzspre,ys)
-        self.DW1 = sumouter(dyspre,xs)
-        return dxs
-    def weights(self):
-        yield self.W1,self.DW1,"MLP1"
-        yield self.W2,self.DW2,"MLP2"
 
 # These are the nonlinearities used by the LSTM network.
 # We don't bother parameterizing them here
 
 def ffunc(x):
     "Nonlinearity used for gates."
-    return 1.0/(1.0+exp(-x))
+    return 1.0/(1.0+np.exp(-x))
 def fprime(x,y=None):
     "Derivative of nonlinearity used for gates."
     if y is None: y = sigmoid(x)
     return y*(1.0-y)
 def gfunc(x):
     "Nonlinearity used for input to state."
-    return tanh(x)
+    return np.tanh(x)
 def gprime(x,y=None):
     "Derivative of nonlinearity used for input to state."
     if y is None: y = tanh(x)
@@ -295,10 +272,10 @@ def gprime(x,y=None):
 # ATTENTION: try linear for hfunc
 def hfunc(x):
     "Nonlinearity used for output."
-    return tanh(x)
+    return np.tanh(x)
 def hprime(x,y=None):
     "Derivative of nonlinearity used for output."
-    if y is None: y = tanh(x)
+    if y is None: y = np.tanh(x)
     return 1-y**2
 
 class LSTM(Network):
@@ -318,18 +295,18 @@ class LSTM(Network):
     def states(self):
         """Return the internal state array for the last forward
         propagation. This is mostly used for visualizations."""
-        return array(self.state[:self.last_n])
+        return np.array(self.state[:self.last_n])
     def init_weights(self,initial):
         "Initialize the weight matrices and derivatives"
         ni,ns,na = self.dims
         # gate weights
         for w in "WGI WGF WGO WCI".split():
             setattr(self,w,randu(ns,na)*initial)
-            setattr(self,"D"+w,zeros((ns,na)))
+            setattr(self,"D"+w,np.zeros((ns,na)))
         # peep weights
         for w in "WIP WFP WOP".split():
             setattr(self,w,randu(ns)*initial)
-            setattr(self,"D"+w,zeros(ns))
+            setattr(self,"D"+w,np.zeros(ns))
     def weights(self):
         "Yields all the weight and derivative matrices"
         weights = "WGI WGF WGO WCI WIP WFP WOP"
@@ -342,8 +319,8 @@ class LSTM(Network):
         vars = vars.split()
         vars = sorted(vars)
         for v in vars:
-            a = array(getattr(self,v))
-            print v,a.shape,amin(a),amax(a)
+            a = np.array(getattr(self,v))
+            print v,a.shape,np.amin(a),np.amax(a)
     def allocate(self,n):
         """Allocate space for the internal state variables.
         `n` is the maximum sequence length that can be processed."""
@@ -351,16 +328,16 @@ class LSTM(Network):
         vars = "cix ci gix gi gox go gfx gf"
         vars += " state output gierr gferr goerr cierr stateerr outerr"
         for v in vars.split():
-            setattr(self,v,nan*ones((n,ns)))
-        self.source = nan*ones((n,na))
-        self.sourceerr = nan*ones((n,na))
+            setattr(self,v,np.nan*np.ones((n,ns)))
+        self.source = np.nan*np.ones((n,na))
+        self.sourceerr = np.nan*np.ones((n,na))
     def reset(self,n):
         """Reset the contents of the internal state variables to `nan`"""
         vars = "cix ci gix gi gox go gfx gf"
         vars += " state output gierr gferr goerr cierr stateerr outerr"
         vars += " source sourceerr"
         for v in vars.split():
-            getattr(self,v)[:,:] = nan
+            getattr(self,v)[:,:] = np.nan
     def forward(self,xs):
         """Perform forward propagation of activations."""
         ni,ns,na = self.dims
@@ -369,14 +346,14 @@ class LSTM(Network):
         self.last_n = n
         self.reset(n)
         for t in range(n):
-            prev = zeros(ns) if t==0 else self.output[t-1]
+            prev = np.zeros(ns) if t==0 else self.output[t-1]
             self.source[t,0] = 1
             self.source[t,1:1+ni] = xs[t]
             self.source[t,1+ni:] = prev
-            dot(self.WGI,self.source[t],out=self.gix[t])
-            dot(self.WGF,self.source[t],out=self.gfx[t])
-            dot(self.WGO,self.source[t],out=self.gox[t])
-            dot(self.WCI,self.source[t],out=self.cix[t])
+            np.dot(self.WGI,self.source[t],out=self.gix[t])
+            np.dot(self.WGF,self.source[t],out=self.gfx[t])
+            np.dot(self.WGO,self.source[t],out=self.gox[t])
+            np.dot(self.WCI,self.source[t],out=self.cix[t])
             if t>0:
                 # ATTENTION: peep weights are diagonal matrices
                 self.gix[t] += self.WIP*self.state[t-1]
@@ -390,7 +367,7 @@ class LSTM(Network):
                 self.gox[t] += self.WOP*self.state[t]
             self.go[t] = ffunc(self.gox[t])
             self.output[t] = hfunc(self.state[t]) * self.go[t]
-        assert not isnan(self.output[:n]).any()
+        assert not np.isnan(self.output[:n]).any()
         return self.output[:n]
     def backward(self,deltas):
         """Perform backward propagation of deltas."""
@@ -412,11 +389,11 @@ class LSTM(Network):
                 self.gferr[t] = fprime(None,self.gf[t])*self.stateerr[t]*self.state[t-1]
             self.gierr[t] = fprime(None,self.gi[t])*self.stateerr[t]*self.ci[t] # gfunc(self.cix[t])
             self.cierr[t] = gprime(None,self.ci[t])*self.stateerr[t]*self.gi[t]
-            dot(self.gierr[t],self.WGI,out=self.sourceerr[t])
+            np.dot(self.gierr[t],self.WGI,out=self.sourceerr[t])
             if t>0:
-                self.sourceerr[t] += dot(self.gferr[t],self.WGF)
-            self.sourceerr[t] += dot(self.goerr[t],self.WGO)
-            self.sourceerr[t] += dot(self.cierr[t],self.WCI)
+                self.sourceerr[t] += np.dot(self.gferr[t],self.WGF)
+            self.sourceerr[t] += np.dot(self.goerr[t],self.WGO)
+            self.sourceerr[t] += np.dot(self.cierr[t],self.WCI)
         self.DWIP = nutils.sumprod(self.gierr[1:n],self.state[:n-1],out=self.DWIP)
         self.DWFP = nutils.sumprod(self.gferr[1:n],self.state[:n-1],out=self.DWFP)
         self.DWOP = nutils.sumprod(self.goerr[:n],self.state[:n],out=self.DWOP)
@@ -448,7 +425,7 @@ class Stacked(Network):
         self.ldeltas = [deltas]
         for i,net in reversed(list(enumerate(self.nets))):
             if deltas is not None:
-                self.dstats[i].append((amin(deltas),mean(deltas),amax(deltas)))
+                self.dstats[i].append((np.amin(deltas),np.mean(deltas),np.amax(deltas)))
             deltas = net.backward(deltas)
             self.ldeltas.append(deltas)
         self.ldeltas = self.ldeltas[::-1]
@@ -493,10 +470,10 @@ class Parallel(Network):
     def forward(self,xs):
         outputs = [net.forward(xs) for net in self.nets]
         outputs = zip(*outputs)
-        outputs = [concatenate(l) for l in outputs]
+        outputs = [np.concatenate(l) for l in outputs]
         return outputs
     def backward(self,deltas):
-        deltas = array(deltas)
+        deltas = np.array(deltas)
         start = 0
         for i,net in enumerate(self.nets):
             k = net.noutputs()
@@ -509,30 +486,12 @@ class Parallel(Network):
     def states(self):
         states = [net.states() for net in self.nets]
         outputs = zip(*outputs)
-        outputs = [concatenate(l) for l in outputs]
+        outputs = [np.concatenate(l) for l in outputs]
         return outputs
     def weights(self):
         for i,net in enumerate(self.nets):
             for w,dw,n in net.weights():
                 yield w,dw,"Parallel%d/%s"%(i,n)
-
-def MLP1(Ni,Ns,No):
-    """An MLP implementation by stacking two `Logreg` networks on top
-    of each other."""
-    lr1 = Logreg(Ni,Ns)
-    lr2 = Logreg(Ns,No)
-    stacked = Stacked([lr1,lr2])
-    return stacked
-
-def LSTM1(Ni,Ns,No):
-    """An LSTM layer with a `Logreg` layer for the output."""
-    lstm = LSTM(Ni,Ns)
-    if No==1:
-        logreg = Logreg(Ns,No)
-    else:
-        logreg = Softmax(Ns,No)
-    stacked = Stacked([lstm,logreg])
-    return stacked
 
 def BIDILSTM(Ni,Ns,No):
     """A bidirectional LSTM, constructed from regular and reversed LSTMs."""
@@ -554,7 +513,7 @@ def make_target(cs,nc):
     maximum number of classes, compute an array that has
     a `1` in each column and time step corresponding to the
     target class."""
-    result = zeros((2*len(cs)+1,nc))
+    result = np.zeros((2*len(cs)+1,nc))
     for i,j in enumerate(cs):
         result[2*i,0] = 1.0
         result[2*i+1,j] = 1.0
@@ -565,9 +524,9 @@ def translate_back0(outputs,threshold=0.25):
     """Simple code for translating output from a classifier
     back into a list of classes. TODO/ATTENTION: this can
     probably be improved."""
-    ms = amax(outputs,axis=1)
-    cs = argmax(outputs,axis=1)
-    cs[ms<threshold*amax(outputs)] = 0
+    ms = np.amax(outputs,axis=1)
+    cs = np.argmax(outputs,axis=1)
+    cs[ms<threshold*np.amax(outputs)] = 0
     result = []
     for i in range(1,len(cs)):
         if cs[i]!=cs[i-1]:
@@ -575,7 +534,6 @@ def translate_back0(outputs,threshold=0.25):
                 result.append(cs[i])
     return result
 
-from scipy.ndimage import measurements,filters
 
 def translate_back(outputs,threshold=0.5):
     """Translate back. Thresholds on class 0, then assigns
@@ -586,8 +544,8 @@ def translate_back(outputs,threshold=0.5):
     # doubles
     # for a while I stipulated 0.5, which might be a better compromise
     labels,n = measurements.label(outputs[:,0]<threshold)
-    mask = tile(labels.reshape(-1,1),(1,outputs.shape[1]))
-    maxima = measurements.maximum_position(outputs,mask,arange(1,amax(mask)+1))
+    mask = np.tile(labels.reshape(-1,1),(1,outputs.shape[1]))
+    maxima = measurements.maximum_position(outputs,mask,np.arange(1,np.amax(mask)+1))
     #print "maxima:"
     #for (r,c) in maxima:
     #    print r, c
@@ -600,19 +558,19 @@ def log_mul(x,y):
 def log_add(x,y):
     "Perform addition in the log domain."
     #return where(abs(x-y)>10,maximum(x,y),log(exp(x-y)+1)+y)
-    return where(abs(x-y)>10,maximum(x,y),log(exp(clip(x-y,-20,20))+1)+y)
+    return np.where(np.abs(x-y)>10,np.maximum(x,y),np.log(np.exp(np.clip(x-y,-20,20))+1)+y)
 
 def forward_algorithm(match,skip=-5.0):
     """Apply the forward algorithm to an array of log state
     correspondence probabilities."""
-    v = skip*arange(len(match[0]))
+    v = skip*np.arange(len(match[0]))
     result = []
     for i in range(0,len(match)):
-        w = roll(v,1).copy()
+        w = np.roll(v,1).copy()
         w[0] = skip*i
         v = log_add(log_mul(v,match[i]),log_mul(w,match[i]))
         result.append(v)
-    return array(result,'f')
+    return np.array(result,'f')
 
 def forwardbackward(lmatch):
     """Apply the forward-backward algorithm to an array of log state
@@ -625,22 +583,22 @@ def forwardbackward(lmatch):
 def ctc_align_targets(outputs,targets,threshold=100.0,verbose=0,debug=0,lo=1e-5):
     """Perform alignment between the `outputs` of a neural network
     classifier and a list of `targets`."""
-    outputs = maximum(lo,outputs)
+    outputs = np.maximum(lo,outputs)
     outputs = outputs * 1.0/sum(outputs,axis=1)[:,newaxis]
-    match = dot(outputs,targets.T)
-    lmatch = log(match)
+    match = np.dot(outputs,targets.T)
+    lmatch = np.log(match)
     if debug:
         figure("ctcalign"); clf();
         subplot(411); imshow(outputs.T,interpolation='nearest',cmap=cm.hot)
         subplot(412); imshow(lmatch.T,interpolation='nearest',cmap=cm.hot)
-    assert not isnan(lmatch).any()
+    assert not np.isnan(lmatch).any()
     both = forwardbackward(lmatch)
-    epath = exp(both-amax(both))
-    l = sum(epath,axis=0)[newaxis,:]
-    epath /= where(l==0.0,1e-9,l)
-    aligned = maximum(lo,dot(epath,targets))
-    l = sum(aligned,axis=1)[:,newaxis]
-    aligned /= where(l==0.0,1e-9,l)
+    epath = np.exp(both-np.amax(both))
+    l = np.sum(epath,axis=0)[newaxis,:]
+    epath /= np.where(l==0.0,1e-9,l)
+    aligned = np.maximum(lo,np.dot(epath,targets))
+    l = np.sum(aligned,axis=1)[:,newaxis]
+    aligned /= np.where(l==0.0,1e-9,l)
     if debug:
         subplot(413); imshow(epath.T,cmap=cm.hot,interpolation='nearest')
         subplot(414); imshow(aligned.T,cmap=cm.hot,interpolation='nearest')
@@ -687,16 +645,16 @@ class SeqRecognizer:
     def predictSequence(self,xs):
         "Predict an integer sequence of codes."
         assert xs.shape[1]==self.Ni,"wrong image height (image: %d, expected: %d)"%(xs.shape[1],self.Ni)
-        self.outputs = array(self.lstm.forward(xs))
+        self.outputs = np.array(self.lstm.forward(xs))
         return translate_back(self.outputs)
     def trainSequence(self,xs,cs,update=1,key=None):
         "Train with an integer sequence of codes."
         assert xs.shape[1]==self.Ni,"wrong image height"
         # forward step
-        self.outputs = array(self.lstm.forward(xs))
+        self.outputs = np.array(self.lstm.forward(xs))
         # CTC alignment
-        self.targets = array(make_target(cs,self.No))
-        self.aligned = array(ctc_align_targets(self.outputs,self.targets,debug=self.debug_align))
+        self.targets = np.array(make_target(cs,self.No))
+        self.aligned = np.array(ctc_align_targets(self.outputs,self.targets,debug=self.debug_align))
         # propagate the deltas back
         deltas = self.aligned-self.outputs
         self.lstm.backward(deltas)
@@ -704,10 +662,10 @@ class SeqRecognizer:
         # translate back into a sequence
         result = translate_back(self.outputs)
         # compute least square error
-        self.error = sum(deltas**2)
+        self.error = np.sum(deltas**2)
         self.error_log.append(self.error**.5/len(cs))
         # compute class error
-        self.cerror = edist.levenshtein(cs,result)
+        self.cerror = levenshtein(cs,result)
         self.cerror_log.append((self.cerror,len(cs)))
         # training keys
         self.key_log.append(key)

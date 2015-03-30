@@ -1,0 +1,59 @@
+ ┌────────────────────────────┐
+ │ Description                │
+ └────────────────────────────┘
+
+kraken is a fork of ocropus intended to rectify a number of issues while
+preserving (mostly) functional equivalence. Its main goals are:
+
+  • Explicit input/output handling.
+  • Clean public API
+  • Word bounding boxes in hOCR
+  • Tests
+  • Removal of runtime dependency on gcc
+  • Removal of unused spaghetti code
+
+Some of these have already been realized while others require some more work.
+
+ ┌────────────────────────────┐
+ │ Installation               │
+ └────────────────────────────┘
+
+As of now kraken still requires a working gcc on run-time so make sure to have
+build-essential or your distributions equivalent installed.
+
+Install kraken either from pypi:
+
+  $ pip install kraken
+
+or by running pip in the git repository:
+
+  $ pip install .
+
+Finally you'll have to scrounge up an RNN to do the actual recognition of
+characters. To download ocropus' default RNN and place it in the kraken
+directory for the current user:
+
+  $ kraken download
+
+ ┌────────────────────────────┐
+ │ Quickstart                 │
+ └────────────────────────────┘
+
+To binarize a single image using the nlbin algorithm:
+
+  $ kraken -i grey.png -o bw.png binarize
+
+To segment a binarized image into reading-order sorted lines:
+
+  $ kraken -i bw.png -o lines.txt segment
+
+To OCR a binarized image using the default RNN and the previously generated
+page segmentation:
+
+  $ kraken -i bw.png ocr -l lines.txt 
+
+ ┌────────────────────────────┐
+ │ Documentation              │
+ └────────────────────────────┘
+
+Have a look at http://mittagessen.github.io/kraken
