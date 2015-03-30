@@ -19,7 +19,11 @@ Some of these have already been realized while others require some more work.
  └────────────────────────────┘
 
 As of now kraken still requires a working gcc on run-time so make sure to have
-build-essential or your distributions equivalent installed.
+build-essential or your distributions equivalent installed. Because the build
+behavior of pip interferes with the scipy build process numpy has to be
+installed before doing the actual install:
+
+  # pip install numpy
 
 Install kraken either from pypi:
 

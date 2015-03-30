@@ -1,0 +1,3 @@
+# Numpy needs to be installed separately from scipy so we can't include them in
+# the same requirements file.
+numpy==1.9.2
