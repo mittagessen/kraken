@@ -45,16 +45,16 @@ directory for the current user:
 
 To binarize a single image using the nlbin algorithm:
 
-  $ kraken -i grey.png -o bw.png binarize
+  $ kraken binarize grey.png bw.png
 
 To segment a binarized image into reading-order sorted lines:
 
-  $ kraken -i bw.png -o lines.txt segment
+  $ kraken segment bw.png lines.txt
 
 To OCR a binarized image using the default RNN and the previously generated
 page segmentation:
 
-  $ kraken -i bw.png ocr -l lines.txt 
+  $ kraken ocr --lines lines.txt bw.png
 
  ┌────────────────────────────┐
  │ Documentation              │

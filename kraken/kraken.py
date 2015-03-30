@@ -19,20 +19,9 @@ DEFAULT_MODEL = 'en-default.pyrnn.gz'
 LEGACY_MODEL_DIR = '/usr/local/share/ocropus'
 
 
-@click.group(invoke_without_command=True)
-@click.option('-o', '--output', type=click.File(mode='w', encoding='utf-8'))
-@click.option('-i', '--input', type=click.File(mode='rb'))
-@click.pass_context
-def cli(ctx, input, output=None):
-    ctx.obj = {}
-    if ctx.invoked_subcommand == 'download':
-        ctx.obj['input'] = None
-    elif not input:
-        raise click.UsageError('Missing parameter -i/--input')
-    else:
-        ctx.obj['input'] = Image.open(input)
-    ctx.obj['output'] = output
-
+@click.group()
+def cli():
+    pass
 
 @click.command('binarize')
 @click.option('--threshold', default=0.5, type=click.FLOAT)
@@ -43,22 +32,27 @@ def cli(ctx, input, output=None):
 @click.option('--range', default=20, type=click.INT)
 @click.option('--low', default=5, type=click.IntRange(1, 100))
 @click.option('--high', default=90, type=click.IntRange(1, 100))
+@click.argument('input', type=click.File(mode='rb'))
+@click.argument('output', type=click.File(mode='wb'))
 @click.pass_context
-def binarize(ctx, threshold, zoom, escale, border, perc, range, low, high):
-    res = binarization.nlbin(ctx.obj['input'], threshold, zoom, escale, border,
-                             perc, range, low, high)
-    res.save(ctx.obj['output'])
+def binarize(ctx, threshold, zoom, escale, border, perc, range, low, high, input, output):
+    im = Image.open(input)
+    res = binarization.nlbin(im, threshold, zoom, escale, border, perc, range,
+                             low, high)
+    res.save(output)
 
 
 @click.command('segment')
 @click.option('--scale', default=None, type=click.FLOAT)
 @click.option('-b/-w', '--black_colseps/--white_colseps', default=False)
+@click.argument('input', type=click.File(mode='rb'))
+@click.argument('output', type=click.File(mode='wb'), required=False)
 @click.pass_context
-def segment(ctx, scale, black_colseps):
-    res = pageseg.segment(ctx.obj['input'], scale, black_colseps)
+def segment(ctx, scale, black_colseps, input, output):
+    im = Image.open(input)
+    res = pageseg.segment(im, scale, black_colseps)
     for box in res:
-        click.echo(','.join([str(c) for c in box]), file=ctx.obj['output'])
-    ctx.obj['segmentation'] = res
+        click.echo(u','.join([str(c) for c in box]), file=output)
 
 
 def find_model(ctx, param, value):
@@ -82,14 +76,17 @@ def find_model(ctx, param, value):
 @click.option('-s', '--stats', type=click.File(mode='wb'))
 @click.option('-h/-t', '--hocr/--text', default=False)
 @click.option('-l', '--lines', type=click.File(mode='rb'), required=True)
-def ocr(ctx, model, pad, stats, hocr, lines):
+@click.argument('input', type=click.File(mode='rb'))
+@click.argument('output', type=click.File(mode='w', encoding='utf-8'), required=False)
+def ocr(ctx, model, pad, stats, hocr, lines, input, output):
+    im = Image.open(input)
     lc = len(lines.readlines())
     lines.seek(0)
     with click.progressbar(csv.reader(lines), lc, label='Reading line bounds',
                            fill_char=click.style('#', fg='green'),) as b:
         bounds = [(int(x1), int(y1), int(x2), int(y2)) for x1, y1, x2, y2 in b]
 
-    it = rpred.rpred(model, ctx.obj['input'], bounds, pad)
+    it = rpred.rpred(model, im, bounds, pad)
     r = []
     with click.progressbar(it, len(bounds),
                            label='Recognizing lines',
@@ -99,8 +96,7 @@ def ocr(ctx, model, pad, stats, hocr, lines):
     if hocr:
         pass
     else:
-        click.echo(u'\n'.join([t[0] for t in r]), file=ctx.obj['output'],
-                   nl=False)
+        click.echo(u'\n'.join([t[0] for t in r]), file=output, nl=False)
 
 
 @click.command('download')
