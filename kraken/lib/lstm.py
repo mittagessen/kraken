@@ -534,22 +534,14 @@ def translate_back0(outputs,threshold=0.25):
                 result.append(cs[i])
     return result
 
-
-def translate_back(outputs,threshold=0.5):
+def translate_back(outputs, threshold=0.7, pos=0):
     """Translate back. Thresholds on class 0, then assigns
     the maximum class to each region."""
-    # BGR 
-    # here I tried changing threshold to 0.4 to make it more liberal
-    # but as the training set increased in size, it gave more uc erroneous
-    # doubles
-    # for a while I stipulated 0.5, which might be a better compromise
-    labels,n = measurements.label(outputs[:,0]<threshold)
-    mask = np.tile(labels.reshape(-1,1),(1,outputs.shape[1]))
-    maxima = measurements.maximum_position(outputs,mask,np.arange(1,np.amax(mask)+1))
-    #print "maxima:"
-    #for (r,c) in maxima:
-    #    print r, c
-    return maxima
+    labels, n = measurements.label(outputs[:,0] < threshold)
+    mask = np.tile(labels.reshape(-1,1), (1,outputs.shape[1]))
+    maxima = measurements.maximum_position(outputs, mask, np.arange(1, np.amax(mask)+1))
+    if pos: return maxima
+    return [c for (r,c) in maxima]
 
 def log_mul(x,y):
     "Perform multiplication in the log domain (i.e., addition)."

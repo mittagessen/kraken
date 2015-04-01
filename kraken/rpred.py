@@ -1,4 +1,4 @@
-from __future__ import absolute_import
+from __future__ import absolute_import, division
 
 import cPickle
 import gzip
@@ -60,30 +60,46 @@ def extract_boxes(im, bounds):
         (PIL.Image) the extracted subimage
     """
     for box in bounds:
-        yield im.crop(box)
+        yield im.crop(box), box
 
 
-def rpred(network, im, bounds, pad=16):
-    scale = 0
+def rpred(network, im, bounds, pad=16, stats=False):
+    """
+    Uses a RNN to recognize text
+
+    Args:
+        network (kraken.lib.lstm.SegRecognizer): A SegRecognizer object
+        im (PIL.Image): Image to extract text from
+        bounds (iterable): An iterable returning a tuple defining the absolute
+                           coordinates (x0, y0, x1, y1) of a text line in the
+                           Image.
+        pad (int): Extra blank padding to the left and right of text line
+        stats (bool): Switch to enable statistics calculation
+
+    Returns:
+        A generator returning a tuple containing the recognized text (0),
+        absolute character positions in the image (1), and miscellaneous
+        statistics if enabled (2).
+    """
+
     lnorm = getattr(network, 'lnorm', None)
 
-    for box in extract_boxes(im, bounds):
+    for box, coords in extract_boxes(im, bounds):
         line = pil2array(box)
+        raw_line = line.copy()
+        # dewarp line
         temp = np.amax(line)-line
         temp = temp*1.0/np.amax(temp)
-        before_x = len(line[0])
         lnorm.measure(temp)
         line = lnorm.normalize(line, cval=np.amax(line))
-        scale = before_x / float(len(line[0]))
-
         line = lstm.prepare_line(line, pad)
-        sequence = network.predictSequence(line)
-        sequence_char_only = [c for (r, c) in sequence]
-        sequence_x = [int(x*scale) for (x, c) in sequence if c != 0]
-        sequence_x_csv = ""
-        for x in sequence_x:
-            sequence_x_csv += str(x) + ","
-        if (len(sequence_x_csv) > 0):
-            sequence_x_csv = sequence_x_csv[:-1]
-        pred = network.l2s(sequence_char_only)
-        yield (pred,)
+        pred = network.predictString(line)
+
+        # calculate recognized LSTM locations of characters
+        scale = len(raw_line.T)/(len(network.outputs)-2 * pad)
+        result = lstm.translate_back(network.outputs, pos=1)
+        pos = [(coords[0], coords[1], coords[0], coords[3])]
+        for r,_ in result:
+            pos.append((pos[-1][2], coords[1], coords[0] + int((r-pad) * scale),
+                        coords[3]))
+        yield pred, pos[1:]
