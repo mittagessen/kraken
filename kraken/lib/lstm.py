@@ -534,7 +534,7 @@ def translate_back0(outputs,threshold=0.25):
                 result.append(cs[i])
     return result
 
-def translate_back(outputs, threshold=0.7, pos=0):
+def translate_back(outputs, threshold=0.5, pos=0):
     """Translate back. Thresholds on class 0, then assigns
     the maximum class to each region."""
     labels, n = measurements.label(outputs[:,0] < threshold)

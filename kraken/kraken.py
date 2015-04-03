@@ -12,6 +12,7 @@ from urlparse import urljoin
 from kraken import binarization
 from kraken import pageseg
 from kraken import rpred
+from kraken import html
 
 APP_NAME = 'kraken'
 MODEL_URL = 'http://www.tmbdev.net/ocropy/'
@@ -89,13 +90,15 @@ def ocr(ctx, model, pad, stats, hocr, lines, input, output):
 
     it = rpred.rpred(model, im, bounds, pad, stats=True if stats else False)
     r = []
+    p = []
     with click.progressbar(it, len(bounds),
                            label='Recognizing lines',
                            fill_char=click.style('#', fg='green')) as pred:
-        for res, pos in pred:
+        for res, pos, stats in pred:
             r.append(res)
+            p.append(pos)
     if hocr:
-        pass
+        click.echo(html.hocr(r, p, input.name, im.size), file=output, nl=False)
     else:
         click.echo(u'\n'.join(r), file=output, nl=False)
 

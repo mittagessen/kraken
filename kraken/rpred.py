@@ -63,7 +63,7 @@ def extract_boxes(im, bounds):
         yield im.crop(box), box
 
 
-def rpred(network, im, bounds, pad=16, stats=False):
+def rpred(network, im, bounds, pad=16, stats=None):
     """
     Uses a RNN to recognize text
 
@@ -85,6 +85,8 @@ def rpred(network, im, bounds, pad=16, stats=False):
     lnorm = getattr(network, 'lnorm', None)
 
     for box, coords in extract_boxes(im, bounds):
+        if stats:
+            stats = []
         line = pil2array(box)
         raw_line = line.copy()
         # dewarp line
@@ -99,7 +101,11 @@ def rpred(network, im, bounds, pad=16, stats=False):
         scale = len(raw_line.T)/(len(network.outputs)-2 * pad)
         result = lstm.translate_back(network.outputs, pos=1)
         pos = [(coords[0], coords[1], coords[0], coords[3])]
-        for r,_ in result:
-            pos.append((pos[-1][2], coords[1], coords[0] + int((r-pad) * scale),
+        for r, c in result:
+            conf = network.outputs[r, c]
+            pos.append((pos[-1][2], coords[1],
+                        coords[0] + int((r-pad) * scale),
                         coords[3]))
-        yield pred, pos[1:]
+            if stats:
+                stats.append(network.outputs[r, c])
+        yield pred, pos[1:], stats
