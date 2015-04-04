@@ -24,6 +24,7 @@ LEGACY_MODEL_DIR = '/usr/local/share/ocropus'
 def cli():
     pass
 
+
 @click.command('binarize')
 @click.option('--threshold', default=0.5, type=click.FLOAT)
 @click.option('--zoom', default=0.5, type=click.FLOAT)
@@ -36,7 +37,8 @@ def cli():
 @click.argument('input', type=click.File(mode='rb'))
 @click.argument('output', type=click.File(mode='wb'))
 @click.pass_context
-def binarize(ctx, threshold, zoom, escale, border, perc, range, low, high, input, output):
+def binarize(ctx, threshold, zoom, escale, border, perc, range, low, high,
+             input, output):
     im = Image.open(input)
     res = binarization.nlbin(im, threshold, zoom, escale, border, perc, range,
                              low, high)
@@ -74,12 +76,12 @@ def find_model(ctx, param, value):
 @click.pass_context
 @click.option('-m', '--model', callback=find_model, default=DEFAULT_MODEL)
 @click.option('-p', '--pad', type=click.INT, default=16)
-@click.option('-s', '--stats', type=click.File(mode='wb'))
 @click.option('-h/-t', '--hocr/--text', default=False)
 @click.option('-l', '--lines', type=click.File(mode='rb'), required=True)
 @click.argument('input', type=click.File(mode='rb'))
-@click.argument('output', type=click.File(mode='w', encoding='utf-8'), required=False)
-def ocr(ctx, model, pad, stats, hocr, lines, input, output):
+@click.argument('output', type=click.File(mode='w', encoding='utf-8'),
+                required=False)
+def ocr(ctx, model, pad, hocr, lines, input, output):
     im = Image.open(input)
     lc = len(lines.readlines())
     lines.seek(0)
@@ -87,20 +89,24 @@ def ocr(ctx, model, pad, stats, hocr, lines, input, output):
                            fill_char=click.style('#', fg='green'),) as b:
         bounds = [(int(x1), int(y1), int(x2), int(y2)) for x1, y1, x2, y2 in b]
 
-
-    it = rpred.rpred(model, im, bounds, pad, stats=True if stats else False)
+    it = rpred.rpred(model, im, bounds, pad)
     r = []
     p = []
+    c = []
     with click.progressbar(it, len(bounds),
                            label='Recognizing lines',
                            fill_char=click.style('#', fg='green')) as pred:
         for res, pos, stats in pred:
             r.append(res)
             p.append(pos)
+            c.append(stats)
+
     if hocr:
-        click.echo(html.hocr(r, p, input.name, im.size), file=output, nl=False)
+        click.echo(html.hocr(r, p, c, input.name, im.size), file=output,
+                   nl=False)
     else:
         click.echo(u'\n'.join(r), file=output, nl=False)
+
 
 @click.command('download')
 def download():

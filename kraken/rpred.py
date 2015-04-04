@@ -63,7 +63,7 @@ def extract_boxes(im, bounds):
         yield im.crop(box), box
 
 
-def rpred(network, im, bounds, pad=16, stats=None):
+def rpred(network, im, bounds, pad=16):
     """
     Uses a RNN to recognize text
 
@@ -74,19 +74,16 @@ def rpred(network, im, bounds, pad=16, stats=None):
                            coordinates (x0, y0, x1, y1) of a text line in the
                            Image.
         pad (int): Extra blank padding to the left and right of text line
-        stats (bool): Switch to enable statistics calculation
 
     Returns:
         A generator returning a tuple containing the recognized text (0),
-        absolute character positions in the image (1), and miscellaneous
-        statistics if enabled (2).
+        absolute character positions in the image (1), and confidence values
+        for each character(2).
     """
 
     lnorm = getattr(network, 'lnorm', None)
 
     for box, coords in extract_boxes(im, bounds):
-        if stats:
-            stats = []
         line = pil2array(box)
         raw_line = line.copy()
         # dewarp line
@@ -101,11 +98,10 @@ def rpred(network, im, bounds, pad=16, stats=None):
         scale = len(raw_line.T)/(len(network.outputs)-2 * pad)
         result = lstm.translate_back(network.outputs, pos=1)
         pos = [(coords[0], coords[1], coords[0], coords[3])]
+        conf = []
         for r, c in result:
-            conf = network.outputs[r, c]
             pos.append((pos[-1][2], coords[1],
                         coords[0] + int((r-pad) * scale),
                         coords[3]))
-            if stats:
-                stats.append(network.outputs[r, c])
-        yield pred, pos[1:], stats
+            conf.append(network.outputs[r, c])
+        yield pred, pos[1:], conf
