@@ -69,20 +69,15 @@ def delta(root=(0, 0, 0, 0), coordinates=None):
         root = box
 
 
-def hocr(predictions, positions, confidence, image_name=u'',
-         image_size=(0, 0), line_bbox=True, split_words=True, word_bbox=True,
-         char_cuts=True, confidence_vals=True):
+def hocr(records, image_name=u'', image_size=(0, 0), line_bbox=True,
+         split_words=True, word_bbox=True, char_cuts=True,
+         confidence_vals=True):
     """
     Merges a list of predictions and their corresponding character positions
     into an hOCR document.
 
     Args:
-        predictions (iterable): A list of unicode objects containing
-                                predictions of a single line
-        positions (iterable): A list of tuples containing the cuts of each
-                              character
-        confidence (iterable): A list of floats containing the confidence
-                               values for each recognized character
+        records (iterable): List of kraken.rpred.ocr_record
         image_name (unicode): Name of the source image
         image_size (tuple): Dimensions of the source image
         line_bbox (bool): Enable writing of line bounding boxes
@@ -110,28 +105,27 @@ def hocr(predictions, positions, confidence, image_name=u'',
         if image_name:
             hocr_title.add(u'image', image_name)
         with div(cls='ocr_page', title=str(hocr_title)):
-            for idx, line, pos, conf in zip(count(), predictions, positions,
-                                            confidence):
+            for idx, record in enumerate(records):
                 with span(cls='ocr_line', id='line_' + str(idx)) as line_span:
                     line_title = micro_hocr()
                     if line_bbox:
-                        line_title.add('bbox', *max_bbox(pos))
+                        line_title.add('bbox', *max_bbox(record.cuts))
                     if char_cuts:
-                        line_title.add('cuts', *list(delta(max_bbox(pos),
-                                                           pos)))
+                        line_title.add('cuts',
+                                       *list(delta(max_bbox(record.cuts),
+                                                   record.cuts)))
                     # only add if field contains text to avoid unseemly empty
                     # titles
                     if str(line_title):
                         line_span['title'] = str(line_title)
                     if split_words:
-                        splits = regex.split(u'(\w+)', line)
+                        splits = regex.split(u'(\w+)', unicode(record))
                         line_offset = 0
                         # operate on pairs of non-word character strings and
                         # words. The former are encoded in ocrx_cinfo classes
                         # while the latter is adorned with ocrx_word classes.
                         for w_idx, non_word, word in zip(count(), splits[0::2],
                                                          splits[1::2]):
-
                             # add non word blocks only if they contain actual
                             # text
                             if non_word:
@@ -141,12 +135,14 @@ def hocr(predictions, positions, confidence, image_name=u'',
                                 nw = micro_hocr()
                                 if word_bbox:
                                     nw.add('bbox',
-                                           *max_bbox(pos[line_offset:line_offset
-                                                         + len(non_word)]))
+                                           *max_bbox(record.cuts[line_offset:line_offset
+                                                                 +
+                                                                 len(non_word)]))
                                 if confidence_vals:
                                     nw.add('x_conf', *[str(int(100*v)) for v in
-                                                       conf[line_offset:line_offset
-                                                            + len(non_word)]])
+                                                       record.confidences[line_offset:line_offset
+                                                                          +
+                                                                          len(non_word)]])
                                 if str(nw):
                                     nw_span['title'] = str(nw)
                                 line_offset += len(non_word)
@@ -155,16 +151,17 @@ def hocr(predictions, positions, confidence, image_name=u'',
                             w = micro_hocr()
                             if word_bbox:
                                 w.add('bbox',
-                                      *max_bbox(pos[line_offset:line_offset +
-                                                    len(word)]))
+                                      *max_bbox(record.cuts[line_offset:line_offset
+                                                            + len(word)]))
                             if confidence_vals:
                                 w.add('x_conf', *[str(int(100*v)) for v in
-                                                  conf[line_offset:line_offset
-                                                       + len(word)]])
+                                                  record.confidences[line_offset:line_offset
+                                                                     +
+                                                                     len(word)]])
                             if str(w):
                                 w_span['title'] = str(w)
                             line_offset += len(word)
                     else:
-                        line_span.add(line)
+                        line_span.add(unicode(record))
                 br()
     return doc

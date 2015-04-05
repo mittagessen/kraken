@@ -3,9 +3,6 @@ import numpy as np
 from scipy.ndimage import interpolation, filters
 
 
-default_params = (0.5, 0.8, 1)
-
-
 def scale_to_h(img, target_height, order=1, dtype=np.dtype('f'), cval=0):
     h, w = img.shape
     scale = target_height*1.0/h

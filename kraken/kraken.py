@@ -90,22 +90,18 @@ def ocr(ctx, model, pad, hocr, lines, input, output):
         bounds = [(int(x1), int(y1), int(x2), int(y2)) for x1, y1, x2, y2 in b]
 
     it = rpred.rpred(model, im, bounds, pad)
-    r = []
-    p = []
-    c = []
     with click.progressbar(it, len(bounds),
                            label='Recognizing lines',
                            fill_char=click.style('#', fg='green')) as pred:
-        for res, pos, stats in pred:
-            r.append(res)
-            p.append(pos)
-            c.append(stats)
-
-    if hocr:
-        click.echo(html.hocr(r, p, c, input.name, im.size), file=output,
-                   nl=False)
-    else:
-        click.echo(u'\n'.join(r), file=output, nl=False)
+        records = []
+        for rec in pred:
+            records.append(rec)
+        if hocr:
+            click.echo(html.hocr(records, input.name, im.size), file=output,
+                       nl=False)
+        else:
+            click.echo(u'\n'.join([unicode(s) for s in records]), file=output,
+                                   nl=False)
 
 
 @click.command('download')
