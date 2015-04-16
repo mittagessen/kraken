@@ -1,3 +1,5 @@
+from __future__ import absolute_import
+
 from kraken.lib.native import compile_and_load, I, A1D, A2D
 
 lstm_utils = r"""

@@ -101,7 +101,7 @@ def ocr(ctx, model, pad, hocr, lines, input, output):
                        nl=False)
         else:
             click.echo(u'\n'.join([unicode(s) for s in records]), file=output,
-                                   nl=False)
+                       nl=False)
 
 
 @click.command('download')

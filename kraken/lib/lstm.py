@@ -1,9 +1,11 @@
-import nutils
+from __future__ import absolute_import
+
 import unicodedata
 import numpy as np
 
-from scipy.ndimage import measurements,filters
+from scipy.ndimage import measurements, filters
 from collections import defaultdict
+from kraken.lib import nutils
 
 initial_range = 0.1
 

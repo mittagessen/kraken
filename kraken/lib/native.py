@@ -17,7 +17,7 @@ for d in range(1, 4):
     for T, t in [("I", "int32"), ("F", "float32"),
                  ("D", "float64"), ("B", "int8"),
                  ("U", "uint8")]:
-        exec "A%d%s = ndpointer(dtype='%s', ndim=%d, flags='CONTIGUOUS, ALIGNED')" % (d, T, t, d)
+        exec("A%d%s = ndpointer(dtype='%s', ndim=%d, flags='CONTIGUOUS, ALIGNED')" % (d, T, t, d))
 
 
 @contextlib.contextmanager

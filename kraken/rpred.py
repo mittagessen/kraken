@@ -11,7 +11,7 @@ import kraken.lib.lineest
 from kraken.lib import lstm
 from kraken.lib.util import pil2array, array2pil
 from kraken.lib.lineest import CenterNormalizer
-from kraken.lib.exceptions import KrakenRecordException, KrakenInvalidModelException
+from kraken.lib.exceptions import KrakenInvalidModelException
 
 
 class ocr_record(object):
@@ -87,8 +87,8 @@ def load_rnn(fname):
     with of(fname, 'rb') as fp:
         unpickler = cPickle.Unpickler(fp)
         unpickler.find_global = find_global
-        try: 
-            rnn =  unpickler.load()
+        try:
+            rnn = unpickler.load()
         except cPickle.UnpicklingError as e:
             raise KrakenInvalidModelException(e.message)
         if not isinstance(rnn, kraken.lib.lstm.SeqRecognizer):
@@ -96,6 +96,7 @@ def load_rnn(fname):
                                               'SeqRecognizer' %
                                               type(rnn).__name__)
         return rnn
+
 
 def extract_boxes(im, bounds):
     """
