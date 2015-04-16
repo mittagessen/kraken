@@ -172,7 +172,7 @@ def propagate_labels(image, labels, conflict=0):
     to all the regions in the image that overlap a label.
     Assign the value `conflict` to any labels that have a conflict."""
     rlabels, _ = label(image)
-    cors = np.correspondences(rlabels, labels)
+    cors = correspondences(rlabels, labels)
     outputs = np.zeros(np.amax(rlabels) + 1, 'i')
     oops = -(1 << 30)
     for o, i in cors.T:
