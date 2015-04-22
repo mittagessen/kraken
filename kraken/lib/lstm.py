@@ -4,8 +4,8 @@ import unicodedata
 import numpy as np
 
 from scipy.ndimage import measurements, filters
+from scipy.special import expit
 from collections import defaultdict
-from kraken.lib import nutils
 
 initial_range = 0.1
 
@@ -47,10 +47,15 @@ def randu(*shape):
     return 2*np.random.rand(*shape)-1
 
 def sigmoid(x):
-    """Compute the sigmoid function.
-    We don't bother with clipping the input value because IEEE floating
-    point behaves reasonably with this function even for infinities."""
-    return 1.0/(1.0+np.exp(-x))
+    """
+    Compute the sigmoid function. We don't bother with clipping the input
+    value because IEEE floating point behaves reasonably with this function
+    even for infinities. 
+    
+    Further we use scipy's expit function which is ~50% faster for decently
+    sized arrays.
+    """
+    return expit(x)
 
 def rownorm(a):
     """Compute a vector consisting of the Euclidean norm of the
@@ -70,7 +75,7 @@ def sumouter(us,vs,lo=-1.0,hi=1.0,out=None):
     in logistic regression layers."""
     result = np.zeros((len(us[0]),len(vs[0])))
     for u,v in zip(us,vs):
-        result += np.outer(clip(u,lo,hi),v)
+        result += np.outer(np.clip(u,lo,hi),v)
     return result
 
 def sumprod(us,vs,lo=-1.0,hi=1.0,out=None):
@@ -396,13 +401,13 @@ class LSTM(Network):
                 self.sourceerr[t] += np.dot(self.gferr[t],self.WGF)
             self.sourceerr[t] += np.dot(self.goerr[t],self.WGO)
             self.sourceerr[t] += np.dot(self.cierr[t],self.WCI)
-        self.DWIP = nutils.sumprod(self.gierr[1:n],self.state[:n-1],out=self.DWIP)
-        self.DWFP = nutils.sumprod(self.gferr[1:n],self.state[:n-1],out=self.DWFP)
-        self.DWOP = nutils.sumprod(self.goerr[:n],self.state[:n],out=self.DWOP)
-        self.DWGI = nutils.sumouter(self.gierr[:n],self.source[:n],out=self.DWGI)
-        self.DWGF = nutils.sumouter(self.gferr[1:n],self.source[1:n],out=self.DWGF)
-        self.DWGO = nutils.sumouter(self.goerr[:n],self.source[:n],out=self.DWGO)
-        self.DWCI = nutils.sumouter(self.cierr[:n],self.source[:n],out=self.DWCI)
+        self.DWIP = sumprod(self.gierr[1:n],self.state[:n-1],out=self.DWIP)
+        self.DWFP = sumprod(self.gferr[1:n],self.state[:n-1],out=self.DWFP)
+        self.DWOP = sumprod(self.goerr[:n],self.state[:n],out=self.DWOP)
+        self.DWGI = sumouter(self.gierr[:n],self.source[:n],out=self.DWGI)
+        self.DWGF = sumouter(self.gferr[1:n],self.source[1:n],out=self.DWGF)
+        self.DWGO = sumouter(self.goerr[:n],self.source[:n],out=self.DWGO)
+        self.DWCI = sumouter(self.cierr[:n],self.source[:n],out=self.DWCI)
         return [s[1:1+ni] for s in self.sourceerr[:n]]
 
 ################################################################
