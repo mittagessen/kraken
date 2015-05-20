@@ -1,0 +1,45 @@
+language: python
+python:
+# This is not actually used. Because it would take an overly long time
+# to build scipy we cannot use the virtual env of travis. Instead, we
+# use miniconda.
+  - "2.7"
+
+sudo: false
+
+install:
+  # Install miniconda
+  # -----------------
+  - if [[ "$TRAVIS_PYTHON_VERSION" == 2* ]]; then
+      wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh;
+    else
+      wget http://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
+    fi
+  - bash miniconda.sh -b -p $HOME/miniconda
+  - export PATH="$HOME/miniconda/bin:$PATH"
+
+  # Create the basic testing environment
+  # ------------------------------------
+  - conda config --set always_yes yes --set changeps1 no --set show_channel_urls yes
+  - conda update conda
+  - conda create -n test-environment python=$TRAVIS_PYTHON_VERSION
+  - source activate test-environment
+
+  # Customise the testing environment
+  # ---------------------------------
+  - conda install pbr nose pip
+  - sed '/click\|dominate\|regex/d' requirements.txt | xargs conda install
+  # Conda does not package everything, so we install a couple others via pip.
+  - pip install -r requirements.txt
+
+  # Package debug
+  # -------------
+  - conda list
+  - pip freeze
+
+  # Install kraken
+  # --------------
+  - python setup.py install
+
+script:
+  - python setup.py nosetests
