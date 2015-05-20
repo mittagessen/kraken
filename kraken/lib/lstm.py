@@ -1,4 +1,4 @@
-from __future__ import absolute_import
+from __future__ import absolute_import, print_function
 
 import unicodedata
 import numpy as np
@@ -179,7 +179,7 @@ class Network:
             ds.ravel()[:] = self.momentum * ds.ravel()[:] + self.learning_rate * dw.ravel()[:]
             w.ravel()[:] += ds.ravel()[:]
             if self.verbose:
-                print n,(np.amin(w),np.amax(w)),(np.amin(dw),np.amax(dw))
+                print(n, (np.amin(w), np.amax(w)), (np.amin(dw), np.amax(dw)))
 
 class Logreg(Network):
     """A logistic regression network."""
@@ -215,7 +215,7 @@ class Logreg(Network):
         vars = sorted("W2".split())
         for v in vars:
             a = np.array(getattr(self,v))
-            print v,a.shape,np.amin(a),np.amax(a)
+            print(v, a.shape, np.amin(a), np.amax(a))
     def weights(self):
         yield self.W2,self.DW2,"Logreg"
 
@@ -255,7 +255,7 @@ class Softmax(Network):
         vars = sorted("W2".split())
         for v in vars:
             a = np.array(getattr(self,v))
-            print v,a.shape,np.amin(a),np.amax(a)
+            print(v, a.shape, np.amin(a), np.amax(a))
     def weights(self):
         yield self.W2,self.DW2,"Softmax"
 
@@ -327,7 +327,7 @@ class LSTM(Network):
         vars = sorted(vars)
         for v in vars:
             a = np.array(getattr(self,v))
-            print v,a.shape,np.amin(a),np.amax(a)
+            print(v, a.shape, np.amin(a), np.amax(a))
     def allocate(self,n):
         """Allocate space for the internal state variables.
         `n` is the maximum sequence length that can be processed."""
