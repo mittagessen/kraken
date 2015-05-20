@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from __future__ import absolute_import
+from __future__ import absolute_import, division
 
 import click
 import csv
@@ -117,7 +117,7 @@ def download():
     fs = int(default_model.info().getheaders("Content-Length")[0])
     with open(os.path.join(click.get_app_dir(APP_NAME, force_posix=True),
                            DEFAULT_MODEL), 'wb') as fp:
-        with click.progressbar(default_model, fs/256,
+        with click.progressbar(default_model, fs // 256,
                                label='Downloading default model',
                                fill_char=click.style('#', fg='green')) as dl:
             for buf in dl:
