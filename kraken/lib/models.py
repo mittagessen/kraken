@@ -21,14 +21,51 @@ import kraken.lib.lineest
 from kraken.lib.lineest import CenterNormalizer
 from kraken.lib.exceptions import KrakenInvalidModelException
 
-def load_hdf5(fname, hiddensize=100):
+def load_any(fname):
+    """
+    Loads anything that was, is, and will be a valid ocropus model and
+    instantiates a shiny new kraken.lib.lstm.SeqRecognizer from the RNN
+    configuration in the file.
+    
+    Currently it recognizes the following kinds of models:
+        * pyrnn models containing BIDILSTMs
+        * HDF5 models containing converted python BIDILSTMs
+
+    Additionally an attribute 'kind' will be added to the SeqRecognizer
+    containing a string representation of the source kind. Current known values
+    are:
+        * pyrnn for pickled BIDILSTMs
+        * hdf-pyrnn for HDF models converted from pickled objects
+
+    Args:
+        fname (unicode): Path to the model
+
+    Returns:
+        A kraken.lib.lstm.SeqRecognizer object.
+    """
+    seq = None
+    try:
+        seq = load_hdf5(fname)
+        seq.kind = 'hdf-pyrnn'
+        return seq
+    except:
+        try:
+            seq = load_pyrnn(fname)
+            seq.kind = 'pyrnn'
+            return seq
+        except:
+            pass
+
+
+def load_hdf5(fname, line_height=0):
     """
     Loads a model in HDF5 format and instantiates a
     kraken.lib.lstm.SeqRecognizer object.
 
     Args:
         fname (unicode): Path to the HDF5 file
-        hiddensize (int): # LSTM state units
+        line_height (int): Target height of input. Will be extracted from model
+        if set to 0.
 
     Returns:
         A kraken.lib.lstm.SeqRecognizer object
@@ -40,8 +77,13 @@ def load_hdf5(fname, hiddensize=100):
         charset[0] = ''
         codec = kraken.lib.lstm.Codec().init(charset)
 
-        # next build a line estimator 
-        lnorm = lineest.CenterNormalizer(lineheight)
+        # get number of states from shape of first array
+        hiddensize = rnn['.bidilstm.0.parallel.0.lstm.WGI'].shape[0]
+        if not line_height:
+            line_height = rnn['.bidilstm.0.parallel.0.lstm.WGI'].shape[1] - hiddensize - 1
+
+        # next build a line estimator
+        lnorm = kraken.lib.lineest.CenterNormalizer(line_height)
         network = kraken.lib.lstm.SeqRecognizer(lnorm.target_height, 
                                      hiddensize, 
                                      codec = codec, 
@@ -50,12 +92,12 @@ def load_hdf5(fname, hiddensize=100):
         nornet, rev = parallel.nets
         revnet = rev.net
         for w in ('WGI', 'WGF', 'WGO', 'WCI', 'WIP', 'WFP', 'WOP'):
-            setattr(nornet, w, f['.bidilstm.0.parallel.0.lstm.' +
+            setattr(nornet, w, rnn['.bidilstm.0.parallel.0.lstm.' +
                     w][:].reshape(getattr(nornet, w).shape))
-            setattr(revnet, w, f['.bidilstm.0.parallel.1.reversed.0.lstm.' +
+            setattr(revnet, w, rnn['.bidilstm.0.parallel.1.reversed.0.lstm.' +
                     w][:].reshape(getattr(nornet, w).shape))
-        softmax.W2 = numpy.hstack((f['.bidilstm.1.softmax.w'][:],
-                                   f['.bidilstm.1.softmax.W'][:]))
+        softmax.W2 = numpy.hstack((rnn['.bidilstm.1.softmax.w'][:],
+                                   rnn['.bidilstm.1.softmax.W'][:]))
         network.lnorm = lnorm
         return network
 
