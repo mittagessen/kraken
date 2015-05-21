@@ -55,49 +55,6 @@ class ocr_record(object):
             raise TypeError('Invalid argument type')
 
 
-def load_rnn(fname):
-    """
-    Loads a pickled lstm rnn.
-
-    Args:
-        fname (unicode): Path to the pickle object
-
-    Returns:
-        Unpickled object
-
-    Raises:
-
-    """
-
-    def find_global(mname, cname):
-        aliases = {
-            'lstm.lstm': kraken.lib.lstm,
-            'ocrolib.lstm': kraken.lib.lstm,
-            'ocrolib.lineest': kraken.lib.lineest,
-        }
-        if mname in aliases:
-            return getattr(aliases[mname], cname)
-        return getattr(sys.modules[mname], cname)
-
-    of = open
-    if fname.endswith(u'.gz'):
-        of = gzip.open
-    elif fname.endswith(u'.bz2'):
-        of = bz2.BZ2File
-    with of(fname, 'rb') as fp:
-        unpickler = cPickle.Unpickler(fp)
-        unpickler.find_global = find_global
-        try:
-            rnn = unpickler.load()
-        except cPickle.UnpicklingError as e:
-            raise KrakenInvalidModelException(e.message)
-        if not isinstance(rnn, kraken.lib.lstm.SeqRecognizer):
-            raise KrakenInvalidModelException('Pickle is %s instead of '
-                                              'SeqRecognizer' %
-                                              type(rnn).__name__)
-        return rnn
-
-
 def extract_boxes(im, bounds):
     """
     Yields the subimages of image im defined in the list of bounding boxes in
@@ -112,7 +69,6 @@ def extract_boxes(im, bounds):
     """
     for box in bounds:
         yield im.crop(box), box
-
 
 def dewarp(normalizer, im):
     """
