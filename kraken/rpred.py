@@ -5,8 +5,6 @@ import gzip
 import bz2
 import sys
 import numpy as np
-import kraken.lib.lstm
-import kraken.lib.lineest
 
 from kraken.lib import lstm
 from kraken.lib.util import pil2array, array2pil
@@ -70,6 +68,7 @@ def extract_boxes(im, bounds):
     for box in bounds:
         yield im.crop(box), box
 
+
 def dewarp(normalizer, im):
     """
     Dewarps an image of a line using a kraken.lib.lineest.CenterNormalizer
@@ -105,10 +104,9 @@ def rpred(network, im, bounds, pad=16, line_normalization=True):
         line_normalization (bool): Dewarp line using the line estimator
                                    contained in the network. If no normalizer
                                    is available one using the default
-                                   parameters is created. If a custom line
-                                   dewarping is desired set to false and dewarp
-                                   manually using the dewarp function.
-
+                                   parameters is created. By aware that you may
+                                   have to scale lines manually to the target
+                                   line height if disabled.
     Yields:
         A tuple containing the recognized text (0), absolute character
         positions in the image (1), and confidence values for each
@@ -118,7 +116,7 @@ def rpred(network, im, bounds, pad=16, line_normalization=True):
     lnorm = getattr(network, 'lnorm', CenterNormalizer())
 
     for box, coords in extract_boxes(im, bounds):
-        if dewarp:
+        if line_normalization:
             box = dewarp(lnorm, box)
         line = pil2array(box)
         raw_line = line.copy()
