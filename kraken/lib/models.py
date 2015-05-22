@@ -156,6 +156,9 @@ def pyrnn_to_hdf5(pyrnn=None, output='en-default.hdf5'):
     fwdnet, revnet = parallel.nets
     
     with h5py.File(output, 'w') as nf:
+        # write metadata first
+        nf.attrs['kind'] = 'pyrnn-bidi'
+
         for w in ('WGI', 'WGF', 'WGO', 'WCI'):
             dset = nf.create_dataset(".bidilstm.0.parallel.0.lstm." + w,
                                      getattr(fwdnet, w).shape, dtype='f')
@@ -185,5 +188,5 @@ def pyrnn_to_hdf5(pyrnn=None, output='en-default.hdf5'):
         cvals = pyrnn.codec.code2char.itervalues()
         cvals.next()
         codec = numpy.array([0]+[ord(x) for x in cvals], dtype='f').reshape((-1, 1))
-        dset = nf.create_dataset("codec", codec, dtype='f')
+        dset = nf.create_dataset("codec", codec.shape, dtype='f')
         dset[:] = codec
