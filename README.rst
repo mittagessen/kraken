@@ -1,7 +1,8 @@
 Description
 ===========
 
-[![Build Status](https://travis-ci.org/mittagessen/kraken.svg)](https://travis-ci.org/mittagessen/kraken)
+.. image:: https://travis-ci.org/mittagessen/kraken.svg
+    :target: https://travis-ci.org/mittagessen/kraken
 
 kraken is a fork of ocropus intended to rectify a number of issues while
 preserving (mostly) functional equivalence. Its main goals are:
@@ -74,4 +75,4 @@ page segmentation:
 Documentation
 =============
 
-Have a look at <http://mittagessen.github.io/kraken>`_
+Have a look at the `documentation <http://mittagessen.github.io/kraken>`_
