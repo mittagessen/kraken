@@ -6,7 +6,7 @@
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     
-    <title>Advanced usage &mdash; kraken 0.3.3
+    <title>Advanced usage &mdash; kraken 0.3.3-7-g017daa8
  documentation</title>
     
     <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
@@ -15,7 +15,7 @@
     <script type="text/javascript">
       var DOCUMENTATION_OPTIONS = {
         URL_ROOT:    './',
-        VERSION:     '0.3.3
+        VERSION:     '0.3.3-7-g017daa8
 ',
         COLLAPSE_INDEX: false,
         FILE_SUFFIX: '.html',
@@ -25,7 +25,7 @@
     <script type="text/javascript" src="_static/jquery.js"></script>
     <script type="text/javascript" src="_static/underscore.js"></script>
     <script type="text/javascript" src="_static/doctools.js"></script>
-    <link rel="top" title="kraken 0.3.3
+    <link rel="top" title="kraken 0.3.3-7-g017daa8
  documentation" href="index.html" />
     <link rel="next" title="kraken API" href="api.html" />
     <link rel="prev" title="kraken" href="index.html" />
@@ -50,7 +50,7 @@
         <li class="right" >
           <a href="index.html" title="kraken"
              accesskey="P">previous</a> |</li>
-        <li class="nav-item nav-item-0"><a href="index.html">kraken 0.3.3
+        <li class="nav-item nav-item-0"><a href="index.html">kraken 0.3.3-7-g017daa8
  documentation</a> &raquo;</li> 
       </ul>
     </div>  
@@ -64,15 +64,73 @@
 <h1>Advanced usage<a class="headerlink" href="#advanced-usage" title="Permalink to this headline">¶</a></h1>
 <div class="section" id="binarization">
 <h2>Binarization<a class="headerlink" href="#binarization" title="Permalink to this headline">¶</a></h2>
+<p>The binarization subcommand accepts almost the same parameters as
+<code class="docutils literal"><span class="pre">ocropus-nlbin</span></code>. Only options not related to binarization, e.g. skew
+detection are missing. In addition, error checking (image sizes, inversion
+detection, grayscale enforcement) is always disabled and kraken will happily
+binarize any image that is thrown at it.</p>
+<p>Available parameters are:</p>
+<blockquote>
+<div>&#8211;threshold FLOAT
+&#8211;zoom FLOAT
+&#8211;escale FLOAT
+&#8211;border FLOAT
+&#8211;perc INTEGER RANGE
+&#8211;range INTEGER
+&#8211;low INTEGER RANGE
+&#8211;high INTEGER RANGE</div></blockquote>
 </div>
 <div class="section" id="page-segmentation">
 <h2>Page segmentation<a class="headerlink" href="#page-segmentation" title="Permalink to this headline">¶</a></h2>
+<p>Page segmentation is mostly parameterless, although a switch to change the
+color of column separators has been retained. The segmentation is written as a
+plain text CSV file. Each record corresponds to a single line bounding box in
+the format (x0, y0, x1, y1). Lines are printed in reading order:</p>
+<div class="highlight-python"><div class="highlight"><pre>(kraken)~/OCR/test&gt; kraken segment 14.tif
+422,188,2158,327
+421,328,2158,430
+415,464,2153,599
+412,604,2153,745
+406,744,2152,882
+405,877,2144,1020
+403,1020,2139,1150
+399,1160,2136,1297
+394,1292,2137,1435
+391,1431,2131,1572
+385,1566,2128,1709
+379,1710,2128,1830
+383,1854,2126,1986
+370,1985,2125,2127
+369,2123,2118,2268
+369,2268,2111,2407
+366,2401,2116,2514
+363,2541,2107,2682
+364,2677,2109,2819
+358,2815,2106,2956
+354,2955,2098,3092
+355,3092,2094,3230
+1859,3233,2084,3354
+</pre></div>
+</div>
 </div>
 <div class="section" id="recognition">
 <h2>Recognition<a class="headerlink" href="#recognition" title="Permalink to this headline">¶</a></h2>
-</div>
-<div class="section" id="hocr-output">
-<h2>hOCR output<a class="headerlink" href="#hocr-output" title="Permalink to this headline">¶</a></h2>
+<p>Recognition requires a binarized image, a page segmentation for that image, and
+a pyrnn or HDF5 model. In particular there is no requirement to use the page
+segmentation algorithm contained in the <code class="docutils literal"><span class="pre">segment</span></code> subcommand or the
+binarization provided by kraken.</p>
+<p>The <code class="docutils literal"><span class="pre">ocr</span></code> subcommand is able to print the recognition results either as plain
+text (default) or as <a class="reference external" href="https://docs.google.com/document/d/1QQnIQtvdAC_8n92-LhwPcjtAUFwBlzE8EWnKAxlgVf0/preview">hOCR</a>
+containing additional information about the results.</p>
+<p>hOCR output is slightly different from hOCR files produced by ocropus. Each
+<code class="docutils literal"><span class="pre">ocr_line</span></code> span contains not only the bounding box of the line but also
+character cuts (<code class="docutils literal"><span class="pre">cuts</span></code> attribute) indicating the coordinates of each
+character. In each line sequences of alphanumeric (in the unicode sense)
+character are put into <code class="docutils literal"><span class="pre">ocrx_word</span></code> spans. Non-alphanumeric sequences are
+described by <code class="docutils literal"><span class="pre">ocrx_word</span></code> spans. Both have bounding boxes as attributes and
+the recognition confidence for each character in the <code class="docutils literal"><span class="pre">x_conf</span></code> attribute.</p>
+<p>Paragraph detection has been removed as it was deemed to be unduly dependent on
+certain typographic features which may not be valid for your input.</p>
 </div>
 </div>
 
@@ -91,7 +149,6 @@
 <li><a class="reference internal" href="#binarization">Binarization</a></li>
 <li><a class="reference internal" href="#page-segmentation">Page segmentation</a></li>
 <li><a class="reference internal" href="#recognition">Recognition</a></li>
-<li><a class="reference internal" href="#hocr-output">hOCR output</a></li>
 </ul>
 </li>
 </ul>

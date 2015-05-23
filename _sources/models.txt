@@ -32,7 +32,7 @@ pickle models is saved as well, while the line normalizer isn't stashed for
 now.
 
 HDF5 models have several advantages over pickled ones. They are noticeably
-smaller (40Mb vs 1.8Mb for the default model), don't allow arbitrary code
+smaller (80Mb vs 1.8Mb for the default model), don't allow arbitrary code
 execution, and are upward compatible. Because they are so much more lightweight
 they are also loaded much faster (~17s vs ~200ms). 
 
