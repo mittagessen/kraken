@@ -1,0 +1,157 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Models &mdash; kraken 0.3.3
+ documentation</title>
+    
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '0.3.3
+',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="kraken 0.3.3
+ documentation" href="index.html" />
+    <link rel="prev" title="kraken API" href="api.html" />
+   
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9">
+
+  </head>
+  <body role="document">
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="api.html" title="kraken API"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">kraken 0.3.3
+ documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="models">
+<span id="id1"></span><h1>Models<a class="headerlink" href="#models" title="Permalink to this headline">¶</a></h1>
+<p>There are currently two kinds of models containing the recurrent neural
+networks doing all the character recognition supported by kraken: traditional
+pyrnn models that are just pickled instances of python objects and a new format
+serializing data in HDF5 files.</p>
+<div class="section" id="pyrnn">
+<h2>pyrnn<a class="headerlink" href="#pyrnn" title="Permalink to this headline">¶</a></h2>
+<p>These are serialized instances of python <code class="docutils literal"><span class="pre">lstm.SeqRecognizer</span></code> objects. Using
+such a model just entails loading the pickle and calling the appropriate
+functions to perform recognition much like a shared library in other
+programming languages.</p>
+<p>Several drawbacks exist when using pickled models. First they inherently allow
+arbitrary code execution with relative ease. Additionally, they are not upward
+compatible between python 2.x and 3.x and significantly larger than the newer
+HDF5 models.</p>
+</div>
+<div class="section" id="hdf5">
+<h2>HDF5<a class="headerlink" href="#hdf5" title="Permalink to this headline">¶</a></h2>
+<p><a class="reference external" href="https://www.hdfgroup.org/HDF5/">HDF5</a> is a file format designed to store
+large amounts of numerical data efficiently. We currently serialize ocropus&#8217;s
+models as a group with attribute <code class="docutils literal"><span class="pre">kind</span></code> set to <code class="docutils literal"><span class="pre">pyrnn-bidi</span></code> containing the
+weights of each neural network in a separate data set. The codec included in
+pickle models is saved as well, while the line normalizer isn&#8217;t stashed for
+now.</p>
+<p>HDF5 models have several advantages over pickled ones. They are noticeably
+smaller (40Mb vs 1.8Mb for the default model), don&#8217;t allow arbitrary code
+execution, and are upward compatible. Because they are so much more lightweight
+they are also loaded much faster (~17s vs ~200ms).</p>
+</div>
+<div class="section" id="conversion">
+<h2>Conversion<a class="headerlink" href="#conversion" title="Permalink to this headline">¶</a></h2>
+<p>Per default pyrnn models are automatically converted to the new HDF5 format
+when explicitely defined using the <code class="docutils literal"><span class="pre">-m</span></code> option to the <code class="docutils literal"><span class="pre">ocr</span></code> utility on the
+command line. They are stored in the user kraken directory (default is
+~/.kraken) and will be automatically substituted in future runs.</p>
+<p>This substitution process is extremely fast, in fact loading the pickle is
+usually several magnitudes slower than converting it once loaded.</p>
+<p>If conversion is not desired, e.g. because there is a bug in the conversion
+routine, it can be disabled using the <code class="docutils literal"><span class="pre">--disable-autoconversion</span></code> switch.</p>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="index.html">
+              <img class="logo" src="_static/kraken.png" alt="Logo"/>
+            </a></p>
+  <h3><a href="index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Models</a><ul>
+<li><a class="reference internal" href="#pyrnn">pyrnn</a></li>
+<li><a class="reference internal" href="#hdf5">HDF5</a></li>
+<li><a class="reference internal" href="#conversion">Conversion</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="api.html"
+                        title="previous chapter">kraken API</a></p>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2015, mittagessen.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.3.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.4</a>
+      
+      |
+      <a href="_sources/models.txt"
+          rel="nofollow">Page source</a></li>
+    </div>
+
+    
+
+    
+  </body>
+</html>

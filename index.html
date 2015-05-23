@@ -1,106 +1,204 @@
-<!doctype html>
-<html>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
   <head>
-    <meta charset="utf-8">
-    <meta http-equiv="X-UA-Compatible" content="chrome=1">
-    <title>Kraken by mittagessen</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>kraken &mdash; kraken 0.3.3
+ documentation</title>
+    
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '0.3.3
+',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="kraken 0.3.3
+ documentation" href="#" />
+    <link rel="next" title="Advanced usage" href="advanced.html" />
+   
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9">
 
-    <link rel="stylesheet" href="stylesheets/styles.css">
-    <link rel="stylesheet" href="stylesheets/github-light.css">
-    <script src="javascripts/scale.fix.js"></script>
-    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
-    <!--[if lt IE 9]>
-    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
-    <![endif]-->
   </head>
-  <body>
-    <div class="wrapper">
-      <header>
-        <h1 class="header">Kraken</h1>
-        <p class="header">Ocropus fork with sane defaults</p>
+  <body role="document">
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="advanced.html" title="Advanced usage"
+             accesskey="N">next</a> |</li>
+        <li class="nav-item nav-item-0"><a href="#">kraken 0.3.3
+ documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
 
-        <ul>
-          <li class="download"><a class="buttons" href="https://github.com/mittagessen/kraken/zipball/master">Download ZIP</a></li>
-          <li class="download"><a class="buttons" href="https://github.com/mittagessen/kraken/tarball/master">Download TAR</a></li>
-          <li><a class="buttons github" href="https://github.com/mittagessen/kraken">View On GitHub</a></li>
-        </ul>
-
-        <p class="header">This project is maintained by <a class="header name" href="https://github.com/mittagessen">mittagessen</a></p>
-
-
-      </header>
-      <section>
-        <h2>
-<a id="description" class="anchor" href="#description" aria-hidden="true"><span class="octicon octicon-link"></span></a>Description</h2>
-
-<p><a href="https://travis-ci.org/mittagessen/kraken"><img src="https://travis-ci.org/mittagessen/kraken.svg" alt="Build Status"></a></p>
-
-<p>kraken is a fork of ocropus intended to rectify a number of issues while
-preserving (mostly) functional equivalence. Its main goals are:</p>
-
-<ul>
-<li>Explicit input/output handling ✓</li>
-<li>Clean public API </li>
-<li>Word bounding boxes in hOCR ✓</li>
-<li>Tests</li>
-<li>Removal of runtime dependency on gcc ✓</li>
-<li>Removal of unused spaghetti code ✓</li>
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="kraken">
+<h1>kraken<a class="headerlink" href="#kraken" title="Permalink to this headline">¶</a></h1>
+<div class="toctree-wrapper compound">
+</div>
+<p>kraken is a turn-key OCR system forked from <a class="reference external" href="https://github.com/tmbdev/ocropy">ocropus</a>. It is intended to rectify a number of
+issues while preserving (mostly) functional equivalence.</p>
+<p>If you already got a model trained for ocropus you can always expect it to work
+with kraken without all the fuss of the original ocropus tools.</p>
+</div>
+<div class="section" id="features">
+<h1>Features<a class="headerlink" href="#features" title="Permalink to this headline">¶</a></h1>
+<p>kraken&#8217;s main features are:</p>
+<blockquote>
+<div><ul class="simple">
+<li>Explicit input/output handling</li>
+<li>Word bounding boxes and character cuts in hOCR</li>
+<li>Removal of runtime dependency on gcc</li>
+<li>Removal of unused spaghetti code</li>
+<li><a class="reference internal" href="models.html#models"><span>Lightweight model files</span></a></li>
 </ul>
-
-<p>Ticked of goals have been realized while some others still require further
-work. Pull requests and code contributions are always welcome.</p>
-
-<h2>
-<a id="installation" class="anchor" href="#installation" aria-hidden="true"><span class="octicon octicon-link"></span></a>Installation</h2>
-
+</div></blockquote>
+<p>Currently missing or underdocumented are:</p>
+<blockquote>
+<div><ul class="simple">
+<li>Clean public API</li>
+<li>Tests</li>
+<li>CLSTM compatibility</li>
+<li>New training interface (possibly only for CLSTM)</li>
+</ul>
+</div></blockquote>
+<p>All functionality not pertaining to OCR and prerequisite steps has been
+removed, i.e. no more ground truth editing, error rate measuring, etc.</p>
+<p>Pull requests and code contributions are always welcome.</p>
+</div>
+<div class="section" id="installation">
+<h1>Installation<a class="headerlink" href="#installation" title="Permalink to this headline">¶</a></h1>
 <p>While kraken does not require a working C compiler on run-time anymore numpy
 and scipy compilation still requires build-essential or your distributions
-equivalent. Because the build behavior of pip versions older than 6.1.0
-interferes with the scipy build process numpy has to be installed before doing
-the actual install:</p>
-
-<p># pip install numpy</p>
-
+equivalent and some dependencies. Additionally we require require a <a class="reference external" href="https://www.hdfgroup.org/HDF5/">HDF5</a> library for <a class="reference external" href="http://h5py.org">h5py</a> to
+link against.</p>
+<div class="highlight-console"><div class="highlight"><pre><span class="gp">#</span> apt-get install gcc gfortran python-dev libblas-dev liblapack-dev
+<span class="go">cython libhdf5-dev</span>
+</pre></div>
+</div>
+<p>Because the build behavior of pip versions older than 6.1.0 interferes with the
+scipy build process numpy has to be installed before doing the actual install:</p>
+<div class="highlight-console"><div class="highlight"><pre><span class="gp">#</span> pip install numpy
+</pre></div>
+</div>
 <p>Install kraken either from pypi:</p>
-
-<p>$ pip install kraken</p>
-
+<div class="highlight-console"><div class="highlight"><pre><span class="gp">$</span> pip install kraken
+</pre></div>
+</div>
 <p>or by running pip in the git repository:</p>
-
-<p>$ pip install .</p>
-
-<p>Finally you'll have to scrounge up an RNN to do the actual recognition of
-characters. To download ocropus' default RNN and place it in the kraken
-directory for the current user:</p>
-
-<p>$ kraken download</p>
-
-<h2>
-<a id="quickstart" class="anchor" href="#quickstart" aria-hidden="true"><span class="octicon octicon-link"></span></a>Quickstart</h2>
-
+<div class="highlight-console"><div class="highlight"><pre><span class="gp">$</span> pip install .
+</pre></div>
+</div>
+<p>Finally you&#8217;ll have to scrounge up an RNN to do the actual recognition of
+characters. To download ocropus&#8217; default RNN converted to the new format and
+place it in the kraken directory for the current user:</p>
+<div class="highlight-console"><div class="highlight"><pre><span class="gp">$</span> kraken download
+</pre></div>
+</div>
+</div>
+<div class="section" id="quickstart">
+<h1>Quickstart<a class="headerlink" href="#quickstart" title="Permalink to this headline">¶</a></h1>
 <p>To binarize a single image using the nlbin algorithm:</p>
-
-<p>$ kraken binarize grey.png bw.png</p>
-
+<div class="highlight-console"><div class="highlight"><pre><span class="gp">$</span> kraken binarize grey.png bw.png
+</pre></div>
+</div>
 <p>To segment a binarized image into reading-order sorted lines:</p>
-
-<p>$ kraken segment bw.png lines.txt</p>
-
+<div class="highlight-console"><div class="highlight"><pre><span class="gp">$</span> kraken segment bw.png lines.txt
+</pre></div>
+</div>
 <p>To OCR a binarized image using the default RNN and the previously generated
 page segmentation:</p>
+<div class="highlight-console"><div class="highlight"><pre><span class="gp">$</span> kraken ocr --lines lines.txt bw.png
+<span class="go">Loading RNN     ✓</span>
+<span class="go">Reading line bounds  [####################################]  100%</span>
+<span class="go">Recognizing lines  [######------------------------------]   17%  00:00:17</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="license">
+<span id="id1"></span><h1>License<a class="headerlink" href="#license" title="Permalink to this headline">¶</a></h1>
+<p><code class="docutils literal"><span class="pre">Kraken</span></code> is provided under the terms and conditions of the <a class="reference external" href="https://github.com/mittagessen/kraken/blob/master/LICENSE">Apache 2.0
+License</a> retained
+from the original <code class="docutils literal"><span class="pre">ocropus</span></code> distribution.</p>
+</div>
 
-<p>$ kraken ocr --lines lines.txt bw.png</p>
 
-<h2>
-<a id="documentation" class="anchor" href="#documentation" aria-hidden="true"><span class="octicon octicon-link"></span></a>Documentation</h2>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="#">
+              <img class="logo" src="_static/kraken.png" alt="Logo"/>
+            </a></p><h3>Useful Links</h3>
+<ul>
+  <li><a href="http://mittagessen.github.io/kraken/">The Kraken Website</a></li>
+  <li><a href="http://pypi.python.org/pypi/kraken">kraken @ PyPI</a></li>
+  <li><a href="http://github.com/mittagessen/kraken">kraken @ github</a></li>
+  <li><a href="http://github.com/mittagessen/kraken/issues">Issue Tracker</a></li>
+</ul><h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="advanced.html">Advanced usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="models.html">Models</a></li>
+</ul>
 
-<p>Have a look at <a href="http://mittagessen.github.io/kraken">http://mittagessen.github.io/kraken</a></p>
-      </section>
-      <footer>
-        <p><small>Hosted on <a href="https://pages.github.com">GitHub Pages</a> using the Dinky theme</small></p>
-      </footer>
+
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
     </div>
-    <!--[if !IE]><script>fixScale(document);</script><![endif]-->
-		
+    <div class="footer">
+      &copy;2015, mittagessen.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.3.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.4</a>
+      
+      |
+      <a href="_sources/index.txt"
+          rel="nofollow">Page source</a></li>
+    </div>
+
+    
+
+    
   </body>
 </html>
