@@ -17,8 +17,8 @@ from kraken import html
 from kraken.lib import models
 
 APP_NAME = 'kraken'
-MODEL_URL = 'http://www.tmbdev.net/ocropy/'
-DEFAULT_MODEL = 'en-default.pyrnn.gz'
+MODEL_URL = 'http://l.unchti.me/'
+DEFAULT_MODEL = 'en-default.pyrnn.hdf5'
 LEGACY_MODEL_DIR = '/usr/local/share/ocropus'
 
 
