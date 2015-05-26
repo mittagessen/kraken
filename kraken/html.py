@@ -1,5 +1,5 @@
 
-from __future__ import absolute_import, print_function
+from __future__ import absolute_import, division, print_function
 
 import dominate
 import regex
@@ -41,7 +41,7 @@ def max_bbox(boxes):
     Returns:
         A box covering all bounding boxes in the input argument
     """
-    sbox = map(sorted, zip(*boxes))
+    sbox = list(map(sorted, zip(*boxes)))
     return (sbox[0][0], sbox[1][0], sbox[2][-1], sbox[3][-1])
 
 

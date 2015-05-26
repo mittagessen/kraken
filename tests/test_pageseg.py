@@ -1,9 +1,13 @@
 # -*- coding: utf-8 -*-
+
+from __future__ import absolute_import, division, print_function
+
 import unittest
 import os
 
 from PIL import Image
 from nose.tools import raises
+
 from kraken.pageseg import segment
 from kraken.lib.exceptions import KrakenInputException
 
