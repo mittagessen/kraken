@@ -7,7 +7,7 @@ from scipy.ndimage.filters import (gaussian_filter, uniform_filter,
                                    maximum_filter)
 from kraken.lib import morph, sl
 from kraken.lib.util import pil2array
-
+from kraken.lib.exceptions import KrakenInputException
 
 class record:
     def __init__(self, **kw):
@@ -295,7 +295,7 @@ def segment(im, scale=None, black_colseps=False):
     each line in reading order.
 
     Args:
-        im (PIL.Image): A page of mode '1'
+        im (PIL.Image): A bi-level page of mode '1' or 'L'
         scale (float): Scale of the image
         black_colseps (bool): Whether column separators are assumed to be
                               vertical black lines or not
@@ -303,8 +303,13 @@ def segment(im, scale=None, black_colseps=False):
     Returns:
         [(x1, y1, x2, y2),...]: A list of tuples containing the bounding boxes
                                 of the segmented lines in reading order.
+
+    Raises:
+        KrakenInputException if the input image is not binarized
     """
 
+    if im.mode != '1' and im.histogram().count(0) != 254:
+        raise KrakenInputException('Image is not bi-level')
     # honestly I've got no idea what's going on here. In theory a simple
     # np.array(im, 'i') should suffice here but for some reason the
     # tostring/fromstring magic in pil2array alters the array in a way that is
