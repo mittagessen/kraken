@@ -96,7 +96,7 @@ def translate_back(outputs, threshold=0.5, pos=0):
     if pos: return maxima
     return [c for (r,c) in maxima]
 
-class Network(object):
+class Network:
     def predict(self,xs):
         """Prediction is the same as forward propagation."""
         return self.forward(xs)
@@ -253,7 +253,7 @@ def BIDILSTM(Ni,Ns,No):
     return stacked
 
 
-class SeqRecognizer(object):
+class SeqRecognizer(Network):
     """Perform sequence recognition using BIDILSTM and alignment."""
     def __init__(self,ninput,nstates,noutput=-1,codec=None,normalize=normalize_nfkc):
         self.Ni = ninput
