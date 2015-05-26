@@ -63,7 +63,8 @@ def segment(ctx, scale, black_colseps, input, output):
         click.BadParameter(e.message)
     res = pageseg.segment(im, scale, black_colseps)
     for box in res:
-        click.echo(','.join([str(c) for c in box]), file=output)
+        click.echo(u','.join([str(c) for c in box]) + u'\n', file=output,
+                   nl=False)
 
 
 @click.command('ocr')

@@ -15,7 +15,6 @@ from builtins import chr
 
 import h5py
 import numpy
-import pickle
 import gzip
 import bz2
 import sys
@@ -129,7 +128,7 @@ def load_pyrnn(fname):
     if six.PY3:
         raise KrakenInvalidModelException('Loading pickle models is not '
                                           'supported on python 3')
-
+    import cPickle
     def find_global(mname, cname):
         aliases = {
             'lstm.lstm': kraken.lib.lstm,
@@ -146,11 +145,11 @@ def load_pyrnn(fname):
     elif fname.endswith(u'.bz2'):
         of = bz2.BZ2File
     with of(fname, 'rb') as fp:
-        unpickler = pickle.Unpickler(fp)
+        unpickler = cPickle.Unpickler(fp)
         unpickler.find_global = find_global
         try:
             rnn = unpickler.load()
-        except pickle.UnpicklingError as e:
+        except cPickle.UnpicklingError as e:
             raise KrakenInvalidModelException(str(e))
         if not isinstance(rnn, kraken.lib.lstm.SeqRecognizer):
             raise KrakenInvalidModelException('Pickle is %s instead of '
