@@ -8,6 +8,8 @@ networks doing all the character recognition supported by kraken: traditional
 pyrnn models that are just pickled instances of python objects and a new format
 serializing data in HDF5 files.
 
+.. _pyrnn:
+
 pyrnn
 -----
 
