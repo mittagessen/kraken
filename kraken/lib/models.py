@@ -193,7 +193,7 @@ def pyrnn_to_hdf5(pyrnn=None, output='en-default.hdf5'):
                                  dtype='f')
         dset[:] = softmax.W2[:,1:]
         cvals = pyrnn.codec.code2char.itervalues()
-        cvals.next()
+        next(cvals)
         codec = numpy.array([0]+[ord(x) for x in cvals], dtype='f').reshape((-1, 1))
         dset = nf.create_dataset("codec", codec.shape, dtype='f')
         dset[:] = codec
