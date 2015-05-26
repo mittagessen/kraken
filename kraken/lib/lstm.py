@@ -1,4 +1,4 @@
-from __future__ import absolute_import
+from __future__ import absolute_import, division, print_function
 
 import unicodedata
 import numpy as np
@@ -133,7 +133,7 @@ class Softmax(Network):
         vars = sorted("W2".split())
         for v in vars:
             a = np.array(getattr(self,v))
-            print v,a.shape,np.amin(a),np.amax(a)
+            print(v, a.shape, np.amin(a), np.amax(a))
     def weights(self):
         yield self.W2,self.DW2,"Softmax"
 

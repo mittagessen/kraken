@@ -1,14 +1,17 @@
 # -*- coding: utf-8 -*-
-import unittest
+
+from __future__ import absolute_import, division, print_function
+
 import os
+import unittest
 
 from PIL import Image
+from nose.tools import raises
 
 from kraken.lib import lstm
 from kraken.rpred import rpred
 from kraken.lib.exceptions import KrakenInputException
 
-from nose.tools import raises
 
 thisfile = os.path.abspath(os.path.dirname(__file__))
 resources = os.path.abspath(os.path.join(thisfile, 'resources'))
