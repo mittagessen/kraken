@@ -91,6 +91,7 @@ def ocr(ctx, model, pad, hocr, lines, conv, input, output):
                        force_posix=True),
                        os.path.basename(os.path.splitext(model)[0]) +
                        '.hdf5'))
+    location = None
     for loc in search:
         if os.path.isfile(loc):
             location = loc
