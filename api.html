@@ -6,7 +6,7 @@
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     
-    <title>kraken API &mdash; kraken 0.3.3-7-g017daa8
+    <title>kraken API &mdash; kraken 0.4.0
  documentation</title>
     
     <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
@@ -15,7 +15,7 @@
     <script type="text/javascript">
       var DOCUMENTATION_OPTIONS = {
         URL_ROOT:    './',
-        VERSION:     '0.3.3-7-g017daa8
+        VERSION:     '0.4.0
 ',
         COLLAPSE_INDEX: false,
         FILE_SUFFIX: '.html',
@@ -25,7 +25,7 @@
     <script type="text/javascript" src="_static/jquery.js"></script>
     <script type="text/javascript" src="_static/underscore.js"></script>
     <script type="text/javascript" src="_static/doctools.js"></script>
-    <link rel="top" title="kraken 0.3.3-7-g017daa8
+    <link rel="top" title="kraken 0.4.0
  documentation" href="index.html" />
     <link rel="next" title="Models" href="models.html" />
     <link rel="prev" title="Advanced usage" href="advanced.html" />
@@ -50,7 +50,7 @@
         <li class="right" >
           <a href="advanced.html" title="Advanced usage"
              accesskey="P">previous</a> |</li>
-        <li class="nav-item nav-item-0"><a href="index.html">kraken 0.3.3-7-g017daa8
+        <li class="nav-item nav-item-0"><a href="index.html">kraken 0.4.0
  documentation</a> &raquo;</li> 
       </ul>
     </div>  
@@ -80,13 +80,13 @@ garantueed.</p>
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
 <li><strong>im</strong> (<em>PIL.Image</em>) &#8211; </li>
 <li><strong>threshold</strong> (<em>float</em>) &#8211; </li>
-<li><strong>zoom</strong> (<em>float</em>) &#8211; </li>
-<li><strong>escale</strong> (<em>float</em>) &#8211; </li>
-<li><strong>border</strong> (<em>float</em>) &#8211; </li>
-<li><strong>perc</strong> (<em>int</em>) &#8211; </li>
-<li><strong>range</strong> (<em>int</em>) &#8211; </li>
-<li><strong>low</strong> (<em>int</em>) &#8211; </li>
-<li><strong>high</strong> (<em>int</em>) &#8211; </li>
+<li><strong>zoom</strong> (<em>float</em>) &#8211; Zoom for background page estimation</li>
+<li><strong>escale</strong> (<em>float</em>) &#8211; Scale for estimating a mask over the text region</li>
+<li><strong>border</strong> (<em>float</em>) &#8211; Ignore this much of the border</li>
+<li><strong>perc</strong> (<em>int</em>) &#8211; Percentage for filters</li>
+<li><strong>range</strong> (<em>int</em>) &#8211; Range for filters</li>
+<li><strong>low</strong> (<em>int</em>) &#8211; Percentile for black estimation</li>
+<li><strong>high</strong> (<em>int</em>) &#8211; Percentile for white estimation</li>
 </ul>
 </td>
 </tr>
@@ -124,7 +124,7 @@ coordinates for character bounding boxes.</td>
 
 <dl class="function">
 <dt id="kraken.html.hocr">
-<code class="descclassname">kraken.html.</code><code class="descname">hocr</code><span class="sig-paren">(</span><em>records</em>, <em>image_name=u''</em>, <em>image_size=(0</em>, <em>0)</em>, <em>line_bbox=True</em>, <em>split_words=True</em>, <em>word_bbox=True</em>, <em>char_cuts=True</em>, <em>confidence_vals=True</em><span class="sig-paren">)</span><a class="headerlink" href="#kraken.html.hocr" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">kraken.html.</code><code class="descname">hocr</code><span class="sig-paren">(</span><em>records</em>, <em>image_name=''</em>, <em>image_size=(0</em>, <em>0)</em>, <em>line_bbox=True</em>, <em>split_words=True</em>, <em>word_bbox=True</em>, <em>char_cuts=True</em>, <em>confidence_vals=True</em><span class="sig-paren">)</span><a class="headerlink" href="#kraken.html.hocr" title="Permalink to this definition">¶</a></dt>
 <dd><p>Merges a list of predictions and their corresponding character positions
 into an hOCR document.</p>
 <table class="docutils field-list" frame="void" rules="none">
@@ -335,7 +335,8 @@ in reading order.</p>
 <dl class="class">
 <dt id="kraken.pageseg.record">
 <em class="property">class </em><code class="descclassname">kraken.pageseg.</code><code class="descname">record</code><span class="sig-paren">(</span><em>**kw</em><span class="sig-paren">)</span><a class="headerlink" href="#kraken.pageseg.record" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">object</span></code></p>
+</dd></dl>
 
 <dl class="function">
 <dt id="kraken.pageseg.remove_hlines">
@@ -364,7 +365,7 @@ each line in reading order.</p>
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>im</strong> (<em>PIL.Image</em>) &#8211; A page of mode &#8216;1&#8217;</li>
+<li><strong>im</strong> (<em>PIL.Image</em>) &#8211; A bi-level page of mode &#8216;1&#8217; or &#8216;L&#8217;</li>
 <li><strong>scale</strong> (<em>float</em>) &#8211; Scale of the image</li>
 <li><strong>black_colseps</strong> (<em>bool</em>) &#8211; Whether column separators are assumed to be
 vertical black lines or not</li>
@@ -375,7 +376,10 @@ vertical black lines or not</li>
 of the segmented lines in reading order.</p>
 </td>
 </tr>
-<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">[(x1, y1, x2, y2),...]</p>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first">[(x1, y1, x2, y2),...]</p>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Raises:</th><td class="field-body"><p class="first last"><strong>KrakenInputException if the input image is not binarized</strong> &#8211;</p>
 </td>
 </tr>
 </tbody>
@@ -443,11 +447,6 @@ bounds preserving order.</p>
 <em class="property">class </em><code class="descclassname">kraken.rpred.</code><code class="descname">ocr_record</code><span class="sig-paren">(</span><em>prediction</em>, <em>cuts</em>, <em>confidences</em><span class="sig-paren">)</span><a class="headerlink" href="#kraken.rpred.ocr_record" title="Permalink to this definition">¶</a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">object</span></code></p>
 <p>A record object containing the recognition result of a single line</p>
-<dl class="method">
-<dt id="kraken.rpred.ocr_record.next">
-<code class="descname">next</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#kraken.rpred.ocr_record.next" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
 </dd></dl>
 
 <dl class="function">

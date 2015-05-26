@@ -6,7 +6,7 @@
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     
-    <title>kraken &mdash; kraken 0.3.3-7-g017daa8
+    <title>kraken &mdash; kraken 0.4.0
  documentation</title>
     
     <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
@@ -15,7 +15,7 @@
     <script type="text/javascript">
       var DOCUMENTATION_OPTIONS = {
         URL_ROOT:    './',
-        VERSION:     '0.3.3-7-g017daa8
+        VERSION:     '0.4.0
 ',
         COLLAPSE_INDEX: false,
         FILE_SUFFIX: '.html',
@@ -25,7 +25,7 @@
     <script type="text/javascript" src="_static/jquery.js"></script>
     <script type="text/javascript" src="_static/underscore.js"></script>
     <script type="text/javascript" src="_static/doctools.js"></script>
-    <link rel="top" title="kraken 0.3.3-7-g017daa8
+    <link rel="top" title="kraken 0.4.0
  documentation" href="#" />
     <link rel="next" title="Advanced usage" href="advanced.html" />
    
@@ -46,7 +46,7 @@
         <li class="right" >
           <a href="advanced.html" title="Advanced usage"
              accesskey="N">next</a> |</li>
-        <li class="nav-item nav-item-0"><a href="#">kraken 0.3.3-7-g017daa8
+        <li class="nav-item nav-item-0"><a href="#">kraken 0.4.0
  documentation</a> &raquo;</li> 
       </ul>
     </div>  
@@ -112,6 +112,12 @@ scipy build process numpy has to be installed before doing the actual install:</
 <p>or by running pip in the git repository:</p>
 <div class="highlight-console"><div class="highlight"><pre><span class="gp">$</span> pip install .
 </pre></div>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">While kraken is Python 2/3 compliant, there are limits to its compatibility.
+For various reasons it is not possible to use <a class="reference internal" href="models.html#pyrnn"><span>pickled models</span></a> under Python 3. As the vast majority of models are still in
+the legacy format it is recommended to use Python 2.7.</p>
 </div>
 <p>Finally you&#8217;ll have to scrounge up an RNN to do the actual recognition of
 characters. To download ocropus&#8217; default RNN converted to the new format and

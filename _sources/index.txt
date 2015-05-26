@@ -72,6 +72,13 @@ or by running pip in the git repository:
 
   $ pip install .
 
+.. note::
+
+  While kraken is Python 2/3 compliant, there are limits to its compatibility.
+  For various reasons it is not possible to use :ref:`pickled models
+  <pyrnn>` under Python 3. As the vast majority of models are still in
+  the legacy format it is recommended to use Python 2.7.
+
 Finally you'll have to scrounge up an RNN to do the actual recognition of
 characters. To download ocropus' default RNN converted to the new format and
 place it in the kraken directory for the current user:
