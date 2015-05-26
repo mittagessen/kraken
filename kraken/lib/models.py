@@ -10,6 +10,7 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 from future import standard_library
 standard_library.install_aliases()
+from future.utils import PY3
 from builtins import next
 from builtins import chr
 
@@ -18,7 +19,6 @@ import numpy
 import gzip
 import bz2
 import sys
-import six
 
 import kraken.lib.lstm
 import kraken.lib.lineest
@@ -125,7 +125,7 @@ def load_pyrnn(fname):
 
     """
     
-    if six.PY3:
+    if PY3:
         raise KrakenInvalidModelException('Loading pickle models is not '
                                           'supported on python 3')
     import cPickle
