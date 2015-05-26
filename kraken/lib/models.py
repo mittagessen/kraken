@@ -70,34 +70,41 @@ def load_hdf5(fname, line_height=0):
     Returns:
         A kraken.lib.lstm.SeqRecognizer object
     """
+    known_hdf5 = ['pyrnn-bidi']
     with h5py.File(fname, 'r') as rnn:
-        # first extract the codec character set
-        charset = [unichr(x) for x in rnn.get('codec')]
-        # code 0 is handled separately by the model
-        charset[0] = ''
-        codec = kraken.lib.lstm.Codec().init(charset)
+        try: 
+            if rnn.attrs['kind'] not in known_hdf5:
+                raise KrakenInvalidModelException('Unknown model kind ' +
+                                                  rnn.attrs['kind'])
+            # first extract the codec character set
+            charset = [unichr(x) for x in rnn.get('codec')]
+            # code 0 is handled separately by the model
+            charset[0] = ''
+            codec = kraken.lib.lstm.Codec().init(charset)
 
-        # get number of states from shape of first array
-        hiddensize = rnn['.bidilstm.0.parallel.0.lstm.WGI'].shape[0]
-        if not line_height:
-            line_height = rnn['.bidilstm.0.parallel.0.lstm.WGI'].shape[1] - hiddensize - 1
+            # get number of states from shape of first array
+            hiddensize = rnn['.bidilstm.0.parallel.0.lstm.WGI'].shape[0]
+            if not line_height:
+                line_height = rnn['.bidilstm.0.parallel.0.lstm.WGI'].shape[1] - hiddensize - 1
 
-        # next build a line estimator
-        lnorm = kraken.lib.lineest.CenterNormalizer(line_height)
-        network = kraken.lib.lstm.SeqRecognizer(lnorm.target_height, 
-                                     hiddensize, 
-                                     codec = codec, 
-                                     normalize = kraken.lib.lstm.normalize_nfkc)
-        parallel, softmax = network.lstm.nets
-        nornet, rev = parallel.nets
-        revnet = rev.net
-        for w in ('WGI', 'WGF', 'WGO', 'WCI', 'WIP', 'WFP', 'WOP'):
-            setattr(nornet, w, rnn['.bidilstm.0.parallel.0.lstm.' +
-                    w][:].reshape(getattr(nornet, w).shape))
-            setattr(revnet, w, rnn['.bidilstm.0.parallel.1.reversed.0.lstm.' +
-                    w][:].reshape(getattr(nornet, w).shape))
-        softmax.W2 = numpy.hstack((rnn['.bidilstm.1.softmax.w'][:],
-                                   rnn['.bidilstm.1.softmax.W'][:]))
+            # next build a line estimator
+            lnorm = kraken.lib.lineest.CenterNormalizer(line_height)
+            network = kraken.lib.lstm.SeqRecognizer(lnorm.target_height, 
+                                         hiddensize, 
+                                         codec = codec, 
+                                         normalize = kraken.lib.lstm.normalize_nfkc)
+            parallel, softmax = network.lstm.nets
+            nornet, rev = parallel.nets
+            revnet = rev.net
+            for w in ('WGI', 'WGF', 'WGO', 'WCI', 'WIP', 'WFP', 'WOP'):
+                setattr(nornet, w, rnn['.bidilstm.0.parallel.0.lstm.' +
+                        w][:].reshape(getattr(nornet, w).shape))
+                setattr(revnet, w, rnn['.bidilstm.0.parallel.1.reversed.0.lstm.' +
+                        w][:].reshape(getattr(nornet, w).shape))
+            softmax.W2 = numpy.hstack((rnn['.bidilstm.1.softmax.w'][:],
+                                       rnn['.bidilstm.1.softmax.W'][:]))
+        except (KeyError, TypeError) as e:
+            raise KrakenInvalidModelException(e.message)
         network.lnorm = lnorm
         return network
 
