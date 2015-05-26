@@ -1,4 +1,8 @@
 from __future__ import absolute_import, division, print_function
+from __future__ import unicode_literals
+from builtins import zip
+from builtins import range
+from builtins import object
 
 import unicodedata
 import numpy as np

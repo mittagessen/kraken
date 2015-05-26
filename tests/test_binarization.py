@@ -20,17 +20,15 @@ class TestBinarization(unittest.TestCase):
         """
         Test that mode '1' images aren't binarized again.
         """
-        im = Image.new('1', (1000,1000))
-        self.assertEqual(im, nlbin(im))
+        with Image.new('1', (1000,1000)) as im:
+            self.assertEqual(im, nlbin(im))
 
     def test_binarize(self):
         """
         Tests binarization of JPG image.
         """
-        im = Image.open(os.path.join(resources, 'input.jpg'))
-        res = nlbin(im)
-        # calculate histogram and check if only pixels of value 0/255 exist
-        self.assertEqual(254, res.histogram().count(0), msg='Output not '
-                         'binarized')
-
-
+        with Image.open(os.path.join(resources, 'input.jpg')) as im:
+            res = nlbin(im)
+            # calculate histogram and check if only pixels of value 0/255 exist
+            self.assertEqual(254, res.histogram().count(0), msg='Output not '
+                             'binarized')

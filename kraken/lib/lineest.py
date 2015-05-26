@@ -1,4 +1,7 @@
 from __future__ import absolute_import, division, print_function
+from __future__ import unicode_literals
+from builtins import range
+from builtins import object
 
 import numpy as np
 
@@ -18,7 +21,7 @@ def scale_to_h(img, target_height, order=1, dtype=np.dtype('f'), cval=0):
     return output
 
 
-class CenterNormalizer:
+class CenterNormalizer(object):
     def __init__(self, target_height=48, params=(4, 1.0, 0.3)):
         self.target_height = target_height
         self.range, self.smoothness, self.extra = params

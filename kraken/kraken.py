@@ -1,14 +1,17 @@
 # -*- coding: utf-8 -*-
 
 from __future__ import absolute_import, division, print_function, unicode_literals
+from future import standard_library
+standard_library.install_aliases()
+from builtins import str
 
 import click
 import csv
 import os
-import urllib2
+import urllib.request, urllib.error, urllib.parse
 
 from PIL import Image
-from urlparse import urljoin
+from urllib.parse import urljoin
 
 from kraken import binarization
 from kraken import pageseg
@@ -51,7 +54,7 @@ def binarize(ctx, threshold, zoom, escale, border, perc, range, low, high,
 @click.option('--scale', default=None, type=click.FLOAT)
 @click.option('-b/-w', '--black_colseps/--white_colseps', default=False)
 @click.argument('input', type=click.File(mode='rb'))
-@click.argument('output', type=click.File(mode='wb'), required=False)
+@click.argument('output', type=click.File(mode='w', encoding='utf-8'), required=False)
 @click.pass_context
 def segment(ctx, scale, black_colseps, input, output):
     try:
@@ -60,7 +63,7 @@ def segment(ctx, scale, black_colseps, input, output):
         click.BadParameter(e.message)
     res = pageseg.segment(im, scale, black_colseps)
     for box in res:
-        click.echo(u','.join([str(c) for c in box]), file=output)
+        click.echo(','.join([str(c) for c in box]), file=output)
 
 
 @click.command('ocr')
@@ -71,8 +74,8 @@ def segment(ctx, scale, black_colseps, input, output):
               'padding around lines')
 @click.option('-h/-t', '--hocr/--text', default=False, help='Switch between '
               'hOCR and plain text output')
-@click.option('-l', '--lines', type=click.File(mode='rb'), required=True,
-              help='JSON file containing line coordinates')
+@click.option('-l', '--lines', type=click.File(mode='r', encoding='utf-8'),
+              required=True, help='JSON file containing line coordinates')
 @click.option('--enable-autoconversion/--disable-autoconversion', 'conv',
               default=True, help='Automatically convert pyrnn models zu HDF5')
 @click.argument('input', type=click.File(mode='rb'))
@@ -138,7 +141,7 @@ def ocr(ctx, model, pad, hocr, lines, conv, input, output):
 
 @click.command('download')
 def download():
-    default_model = urllib2.urlopen(urljoin(MODEL_URL, DEFAULT_MODEL))
+    default_model = urllib.request.urlopen(urljoin(MODEL_URL, DEFAULT_MODEL))
     try:
         os.makedirs(click.get_app_dir(APP_NAME, force_posix=True))
     except OSError:

@@ -21,11 +21,16 @@ class TestRecognition(unittest.TestCase):
     """
     Tests of the recognition facility and associated routines.
     """
+    def setUp(self):
+        self.im = Image.open(os.path.join(resources, 'bw.png'))
+
+    def tearDown(self):
+        self.im.close()
+
     @raises(KrakenInputException)
     def test_rpred_outbounds(self):
         """
         Tests correct handling of invalid line coordinates.
         """
-        im = Image.open(os.path.join(resources, 'bw.png'))
-        pred = rpred(None, im, [(-1, -1, 10000, 10000)])
-        pred.next()
+        pred = rpred(None, self.im, [(-1, -1, 10000, 10000)])
+        next(pred)

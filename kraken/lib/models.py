@@ -7,13 +7,19 @@ future it will also include support for clstm models.
 """
 
 from __future__ import absolute_import
+from __future__ import unicode_literals
+from future import standard_library
+standard_library.install_aliases()
+from builtins import next
+from builtins import chr
 
 import h5py
 import numpy
-import cPickle
+import pickle
 import gzip
 import bz2
 import sys
+import six
 
 import kraken.lib.lstm
 import kraken.lib.lineest
@@ -70,14 +76,14 @@ def load_hdf5(fname, line_height=0):
     Returns:
         A kraken.lib.lstm.SeqRecognizer object
     """
-    known_hdf5 = ['pyrnn-bidi']
+    known_hdf5 = [b'pyrnn-bidi']
     with h5py.File(fname, 'r') as rnn:
         try: 
             if rnn.attrs['kind'] not in known_hdf5:
-                raise KrakenInvalidModelException('Unknown model kind ' +
+                raise KrakenInvalidModelException(b'Unknown model kind ' +
                                                   rnn.attrs['kind'])
             # first extract the codec character set
-            charset = [unichr(x) for x in rnn.get('codec')]
+            charset = [chr(x) for x in rnn.get('codec')]
             # code 0 is handled separately by the model
             charset[0] = ''
             codec = kraken.lib.lstm.Codec().init(charset)
@@ -103,8 +109,8 @@ def load_hdf5(fname, line_height=0):
                         w][:].reshape(getattr(nornet, w).shape))
             softmax.W2 = numpy.hstack((rnn['.bidilstm.1.softmax.w'][:],
                                        rnn['.bidilstm.1.softmax.W'][:]))
-        except (KeyError, TypeError) as e:
-            raise KrakenInvalidModelException(e.message)
+        except (KeyError, TypeError):
+            raise KrakenInvalidModelException('Model incomplete')
         network.lnorm = lnorm
         return network
 
@@ -119,6 +125,10 @@ def load_pyrnn(fname):
         Unpickled object
 
     """
+    
+    if six.PY3:
+        raise KrakenInvalidModelException('Loading pickle models is not '
+                                          'supported on python 3')
 
     def find_global(mname, cname):
         aliases = {
@@ -136,12 +146,12 @@ def load_pyrnn(fname):
     elif fname.endswith(u'.bz2'):
         of = bz2.BZ2File
     with of(fname, 'rb') as fp:
-        unpickler = cPickle.Unpickler(fp)
+        unpickler = pickle.Unpickler(fp)
         unpickler.find_global = find_global
         try:
             rnn = unpickler.load()
-        except cPickle.UnpicklingError as e:
-            raise KrakenInvalidModelException(e.message)
+        except pickle.UnpicklingError as e:
+            raise KrakenInvalidModelException(str(e))
         if not isinstance(rnn, kraken.lib.lstm.SeqRecognizer):
             raise KrakenInvalidModelException('Pickle is %s instead of '
                                               'SeqRecognizer' %
@@ -192,7 +202,7 @@ def pyrnn_to_hdf5(pyrnn=None, output='en-default.hdf5'):
         dset = nf.create_dataset(".bidilstm.1.softmax.W", softmax.W2[:,1:].shape,
                                  dtype='f')
         dset[:] = softmax.W2[:,1:]
-        cvals = pyrnn.codec.code2char.itervalues()
+        cvals = iter(pyrnn.codec.code2char.values())
         next(cvals)
         codec = numpy.array([0]+[ord(x) for x in cvals], dtype='f').reshape((-1, 1))
         dset = nf.create_dataset("codec", codec.shape, dtype='f')

@@ -1,5 +1,10 @@
 
 from __future__ import absolute_import, division, print_function
+from __future__ import unicode_literals
+from builtins import map
+from builtins import zip
+from builtins import str
+from builtins import object
 
 import dominate
 import regex
@@ -21,7 +26,7 @@ class micro_hocr(object):
         if self.output:
             self.output += u'; '
         for arg in args:
-            if isinstance(arg, basestring):
+            if isinstance(arg, str):
                 self.output += arg + ' '
             elif isinstance(arg, tuple):
                 self.output += u','.join([str(v) for v in arg]) + u' '

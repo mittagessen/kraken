@@ -25,14 +25,14 @@ class TestPageSeg(unittest.TestCase):
         """
         Test correct handling of color input.
         """
-        im = Image.open(os.path.join(resources, 'input.jpg'))
-        segment(im)
+        with Image.open(os.path.join(resources, 'input.jpg')) as im:
+            segment(im)
 
     def test_segment_bw(self):
         """
         Tests segmentation of bi-level input.
         """
-        im = Image.open(os.path.join(resources, 'bw.png'))
-        lines = segment(im)
-        self.assertAlmostEqual(len(segment(im)), 30, msg='Segmentation differs'
-                               'wildly from true line count', delta=5)
+        with Image.open(os.path.join(resources, 'bw.png')) as im:
+            lines = segment(im)
+            self.assertAlmostEqual(len(lines), 30, msg='Segmentation differs '
+                                   'wildly from true line count', delta=5)
