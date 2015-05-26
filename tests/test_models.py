@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import unittest
 import os
 import tempfile
 import pickle
@@ -9,7 +10,7 @@ from nose.tools import raises
 from kraken.lib import models
 from kraken.lib.exceptions import KrakenInvalidModelException
 
-class TestModels(object):
+class TestModels(unittest.TestCase):
 
     """
     Testing model loading routines
