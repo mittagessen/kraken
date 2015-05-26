@@ -24,9 +24,9 @@ class micro_hocr(object):
             if isinstance(arg, basestring):
                 self.output += arg + ' '
             elif isinstance(arg, tuple):
-                self.output += u','.join([unicode(v) for v in arg]) + u' '
+                self.output += u','.join([str(v) for v in arg]) + u' '
             else:
-                self.output += unicode(arg) + u' '
+                self.output += str(arg) + u' '
         self.output = self.output.strip()
 
 
@@ -41,7 +41,7 @@ def max_bbox(boxes):
     Returns:
         A box covering all bounding boxes in the input argument
     """
-    sbox = list(map(sorted, zip(*boxes)))
+    sbox = list(map(sorted, list(zip(*boxes))))
     return (sbox[0][0], sbox[1][0], sbox[2][-1], sbox[3][-1])
 
 
@@ -119,7 +119,7 @@ def hocr(records, image_name=u'', image_size=(0, 0), line_bbox=True,
                     if str(line_title):
                         line_span['title'] = str(line_title)
                     if split_words:
-                        splits = regex.split(u'(\w+)', unicode(record))
+                        splits = regex.split(u'(\w+)', record.prediction)
                         line_offset = 0
                         # operate on pairs of non-word character strings and
                         # words. The former are encoded in ocrx_cinfo classes
@@ -162,6 +162,6 @@ def hocr(records, image_name=u'', image_size=(0, 0), line_bbox=True,
                                 w_span['title'] = str(w)
                             line_offset += len(word)
                     else:
-                        line_span.add(unicode(record))
+                        line_span.add(record.prediction)
                 br()
     return doc

@@ -9,7 +9,7 @@ from kraken.lib import morph, sl
 from kraken.lib.util import pil2array
 from kraken.lib.exceptions import KrakenInputException
 
-class record:
+class record(object):
     def __init__(self, **kw):
         self.__dict__.update(kw)
 

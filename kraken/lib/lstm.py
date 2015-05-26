@@ -9,7 +9,7 @@ from collections import defaultdict
 
 initial_range = 0.1
 
-class Codec:
+class Codec(object):
     """Translate between integer codes and characters."""
     def init(self,charset):
         charset = sorted(list(set(charset)))
@@ -92,7 +92,7 @@ def translate_back(outputs, threshold=0.5, pos=0):
     if pos: return maxima
     return [c for (r,c) in maxima]
 
-class Network:
+class Network(object):
     def predict(self,xs):
         """Prediction is the same as forward propagation."""
         return self.forward(xs)
@@ -124,7 +124,7 @@ class Softmax(Network):
         n = len(zs)
         assert len(deltas)==len(inputs)
         dzspre,dys = [None]*n,[None]*n
-        for i in reversed(range(len(zs))):
+        for i in reversed(list(range(len(zs)))):
             dzspre[i] = deltas[i]
             dys[i] = np.dot(dzspre[i],self.W2)[1:]
         self.DW2 = sumouter(dzspre,inputs)
@@ -234,7 +234,7 @@ class Parallel(Network):
         self.nets = nets
     def forward(self,xs):
         outputs = [net.forward(xs) for net in self.nets]
-        outputs = zip(*outputs)
+        outputs = list(zip(*outputs))
         outputs = [np.concatenate(l) for l in outputs]
         return outputs
 
@@ -249,7 +249,7 @@ def BIDILSTM(Ni,Ns,No):
     return stacked
 
 
-class SeqRecognizer:
+class SeqRecognizer(object):
     """Perform sequence recognition using BIDILSTM and alignment."""
     def __init__(self,ninput,nstates,noutput=-1,codec=None,normalize=normalize_nfkc):
         self.Ni = ninput

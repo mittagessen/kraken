@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from __future__ import absolute_import, division, print_function
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import click
 import csv
@@ -131,8 +131,9 @@ def ocr(ctx, model, pad, hocr, lines, conv, input, output):
             click.echo(html.hocr(records, input.name, im.size), file=output,
                        nl=False)
         else:
-            click.echo(u'\n'.join([unicode(s) for s in records]), file=output,
-                       nl=False)
+            click.echo(u'\n')
+            click.echo(u'\n'.join([s.prediction for s in records]),
+                       file=output, nl=False)
 
 
 @click.command('download')
@@ -152,7 +153,7 @@ def download():
                                label='Downloading default model',
                                fill_char=click.style('#', fg='green')) as dl:
             for buf in dl:
-                if not buffer:
+                if not buf:
                     raise StopIteration()
                 fp.write(buf)
 
