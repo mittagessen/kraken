@@ -1,6 +1,11 @@
 from __future__ import absolute_import, division, print_function
+from __future__ import unicode_literals
+from future import standard_library
+standard_library.install_aliases()
+from builtins import range
+from builtins import object
 
-import cPickle
+import pickle
 import gzip
 import bz2
 import sys
@@ -31,7 +36,7 @@ class ocr_record(object):
         self.idx = -1
         return self
 
-    def next(self):
+    def __next__(self):
         if self.idx < len(self):
             self.idx += 1
             return (self.prediction[self.idx], self.cuts[self.idx],

@@ -1,4 +1,8 @@
 from __future__ import absolute_import, division, print_function
+from __future__ import unicode_literals
+from builtins import zip
+from builtins import range
+from builtins import object
 
 import unicodedata
 import numpy as np
@@ -9,7 +13,7 @@ from collections import defaultdict
 
 initial_range = 0.1
 
-class Codec:
+class Codec(object):
     """Translate between integer codes and characters."""
     def init(self,charset):
         charset = sorted(list(set(charset)))
@@ -124,7 +128,7 @@ class Softmax(Network):
         n = len(zs)
         assert len(deltas)==len(inputs)
         dzspre,dys = [None]*n,[None]*n
-        for i in reversed(range(len(zs))):
+        for i in reversed(list(range(len(zs)))):
             dzspre[i] = deltas[i]
             dys[i] = np.dot(dzspre[i],self.W2)[1:]
         self.DW2 = sumouter(dzspre,inputs)
@@ -234,7 +238,7 @@ class Parallel(Network):
         self.nets = nets
     def forward(self,xs):
         outputs = [net.forward(xs) for net in self.nets]
-        outputs = zip(*outputs)
+        outputs = list(zip(*outputs))
         outputs = [np.concatenate(l) for l in outputs]
         return outputs
 
@@ -249,7 +253,7 @@ def BIDILSTM(Ni,Ns,No):
     return stacked
 
 
-class SeqRecognizer:
+class SeqRecognizer(Network):
     """Perform sequence recognition using BIDILSTM and alignment."""
     def __init__(self,ninput,nstates,noutput=-1,codec=None,normalize=normalize_nfkc):
         self.Ni = ninput
