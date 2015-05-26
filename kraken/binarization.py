@@ -14,17 +14,19 @@ def nlbin(im, threshold=0.5, zoom=0.5, escale=1.0, border=0.1, perc=80,
     Args:
         im (PIL.Image):
         threshold (float):
-        zoom (float):
-        escale (float):
-        border (float):
-        perc (int):
-        range (int):
-        low (int):
-        high (int):
+        zoom (float): Zoom for background page estimation
+        escale (float): Scale for estimating a mask over the text region
+        border (float): Ignore this much of the border
+        perc (int): Percentage for filters
+        range (int): Range for filters
+        low (int): Percentile for black estimation
+        high (int): Percentile for white estimation
 
     Returns:
         PIL.Image containing the binarized image
     """
+    if im.mode == '1':
+        return im
     raw = pil2array(im)
     # rescale image to between -1 or 0 and 1
     raw = raw/np.float(np.iinfo(raw.dtype).max)
