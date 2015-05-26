@@ -9,7 +9,7 @@ import numpy as np
 from kraken.lib import lstm
 from kraken.lib.util import pil2array, array2pil
 from kraken.lib.lineest import CenterNormalizer
-from kraken.lib.exceptions import KrakenInvalidModelException
+from kraken.lib.exceptions import KrakenInvalidModelException, KrakenInputException
 
 
 class ocr_record(object):
@@ -66,6 +66,9 @@ def extract_boxes(im, bounds):
         (PIL.Image) the extracted subimage
     """
     for box in bounds:
+        if (box < (0, 0, 0, 0) or box[::2] > (im.size[0], im.size[0]) or
+            box[1::2] > (im.size[1], im.size[1])):
+            raise KrakenInputException('Line outside of image bounds')
         yield im.crop(box), box
 
 

@@ -1,17 +1,28 @@
 # -*- coding: utf-8 -*-
-from nose.tools import raises 
+import unittest
+import os
 
-from kraken import rpred
+from PIL import Image
 
-class TestRecognition(object):
+from kraken.lib import lstm
+from kraken.rpred import rpred
+from kraken.lib.exceptions import KrakenInputException
+
+from nose.tools import raises
+
+thisfile = os.path.abspath(os.path.dirname(__file__))
+resources = os.path.abspath(os.path.join(thisfile, 'resources'))
+
+class TestRecognition(unittest.TestCase):
 
     """
     Tests of the recognition facility and associated routines.
     """
-
-    def setUp(self):
-        self.temp = tempfile.NamedTemporaryFile(delete=False)
-
-    def tearDown(self):
-        self.temp.close()
-        os.unlink(self.temp.name)
+    @raises(KrakenInputException)
+    def test_rpred_outbounds(self):
+        """
+        Tests correct handling of invalid line coordinates.
+        """
+        im = Image.open(os.path.join(resources, 'bw.png'))
+        pred = rpred(None, im, [(-1, -1, 10000, 10000)])
+        pred.next()
