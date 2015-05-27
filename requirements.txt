@@ -1,4 +1,3 @@
-six==1.9.0
 future==0.14.3
 click==4.0
 dominate==2.1.12
