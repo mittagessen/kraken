@@ -4,5 +4,5 @@ dominate==2.1.12
 numpy==1.9.2
 Pillow==2.8.1
 regex==2015.3.18
-scipy==0.15.1
-h5py==2.5.0
+scipy==0.14.0
+h5py==2.4.0
