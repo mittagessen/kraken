@@ -19,7 +19,7 @@ def label(image, **kw):
         return measurements.label(image, **kw)
     except:
         pass
-    types = ["int32", "uint32", "int64", "unit64", "int16", "uint16"]
+    types = ["int32", "uint32", "int64", "uint64", "int16", "uint16"]
     for t in types:
         try:
             return measurements.label(np.array(image, dtype=t), **kw)
@@ -39,7 +39,7 @@ def find_objects(image, **kw):
         return measurements.find_objects(image, **kw)
     except:
         pass
-    types = ["int32", "uint32", "int64", "unit64", "int16", "uint16"]
+    types = ["int32", "uint32", "int64", "uint64", "int16", "uint16"]
     for t in types:
         try:
             return measurements.find_objects(np.array(image, dtype=t), **kw)
