@@ -113,6 +113,10 @@ def ocr(ctx, model, pad, hocr, lines, conv, input, output):
     if conv and rnn.kind == 'pyrnn':
         name, _ = os.path.splitext(os.path.basename(model))
         op = os.path.join(click.get_app_dir(APP_NAME, force_posix=True), name + '.hdf5')
+        try:
+            os.makedirs(click.get_app_dir(APP_NAME, force_posix=True))
+        except OSError:
+            pass
         models.pyrnn_to_hdf5(rnn, op)
     try:
         im = Image.open(input)
