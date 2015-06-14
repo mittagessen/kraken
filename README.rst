@@ -75,4 +75,4 @@ page segmentation:
 Documentation
 =============
 
-Have a look at the `documentation <http://mittagessen.github.io/kraken>`_
+Have a look at the `documentation <http://kraken.re>`_
