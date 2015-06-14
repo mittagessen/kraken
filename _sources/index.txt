@@ -50,7 +50,8 @@ link against.
 
 .. code-block:: console
 
-        # apt-get install gcc gfortran python-dev libblas-dev liblapack-dev cython libhdf5-dev
+        # apt-get install gcc gfortran python-dev libblas-dev liblapack-dev
+        cython libhdf5-dev
 
 Because the build behavior of pip versions older than 6.1.0 interferes with the
 scipy build process numpy has to be installed before doing the actual install:
