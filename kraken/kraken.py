@@ -176,13 +176,12 @@ def ocr(ctx, model=DEFAULT_MODEL, pad=16, hocr=False, lines=None, conv=True):
     # first we try to find the model in the absolue path, then ~/.kraken, then
     # LEGACY_MODEL_DIR
     search = [model,
-              os.path.join(click.get_app_dir(APP_NAME, force_posix=True), model),
+              os.path.join(click.get_app_dir(APP_NAME), model),
               os.path.join(LEGACY_MODEL_DIR, model)]
     # if automatic conversion is enabled we look for an converted model in
     # ~/.kraken
     if conv is True:
-        search.insert(0, os.path.join(click.get_app_dir(APP_NAME,
-                                      force_posix=True),
+        search.insert(0, os.path.join(click.get_app_dir(APP_NAME),
                       os.path.basename(os.path.splitext(model)[0]) + '.hdf5'))
     location = None
     for loc in search:
@@ -203,10 +202,9 @@ def ocr(ctx, model=DEFAULT_MODEL, pad=16, hocr=False, lines=None, conv=True):
     # convert input model to HDF5
     if conv and rnn.kind == 'pyrnn':
         name, _ = os.path.splitext(os.path.basename(model))
-        op = os.path.join(click.get_app_dir(APP_NAME, force_posix=True), name +
-                          '.hdf5')
+        op = os.path.join(click.get_app_dir(APP_NAME), name + '.hdf5')
         try:
-            os.makedirs(click.get_app_dir(APP_NAME, force_posix=True))
+            os.makedirs(click.get_app_dir(APP_NAME))
         except OSError:
             pass
         models.pyrnn_to_hdf5(rnn, op)
@@ -245,11 +243,7 @@ def list(ctx):
 @click.pass_context
 @click.argument('model_id')
 def get(ctx, model_id):
-    try:
-        os.mkdir(click.get_app_dir(APP_NAME, force_posix=True))
-    except:
-        pass
-    repo.get_model(model_id, click.get_app_dir(APP_NAME, force_posix=True),
+    repo.get_model(model_id, click.get_app_dir(APP_NAME),
                    partial(spin, 'Retrieving model'))
     click.secho(u'\b\u2713', fg='green', nl=False)
     click.echo('\033[?25h\n', nl=False)
