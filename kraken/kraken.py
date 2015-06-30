@@ -154,7 +154,7 @@ def download():
     # overwrite next function for iterator to return 8192 octets instead of
     # line
     default_model.next = lambda: default_model.read(8192)
-    fs = int(default_model.info().getheaders("Content-Length")[0])
+    fs = int(default_model.info()["Content-Length"])
     with open(os.path.join(click.get_app_dir(APP_NAME, force_posix=True),
                            DEFAULT_MODEL), 'wb') as fp:
         with click.progressbar(default_model, fs // 256,
