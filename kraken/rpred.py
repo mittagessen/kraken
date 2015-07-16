@@ -37,7 +37,7 @@ class ocr_record(object):
         return self
 
     def __next__(self):
-        if self.idx < len(self):
+        if self.idx + 1 < len(self):
             self.idx += 1
             return (self.prediction[self.idx], self.cuts[self.idx],
                     self.confidences[self.idx])
