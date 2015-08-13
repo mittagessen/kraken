@@ -59,7 +59,7 @@ def load_any(fname):
             seq.kind = 'pyrnn'
             return seq
         except:
-            pass
+            raise 
 
 
 def load_hdf5(fname, line_height=0):
