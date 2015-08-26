@@ -131,6 +131,7 @@ def rpred(network, im, bounds, pad=16, line_normalization=True):
                 box = dewarp(lnorm, box)
             except ValueError as e:
                 yield ocr_record('', [], [])
+                continue
         line = pil2array(box)
         raw_line = line.copy()
         line = lstm.prepare_line(line, pad)
