@@ -125,7 +125,12 @@ def rpred(network, im, bounds, pad=16, line_normalization=True):
 
     for box, coords in extract_boxes(im, bounds):
         if line_normalization:
-            box = dewarp(lnorm, box)
+            # fail gracefully and return no recognition result in case the
+            # input line can not be normalized.
+            try:
+                box = dewarp(lnorm, box)
+            except ValueError as e:
+                yield ocr_record('', [], [])
         line = pil2array(box)
         raw_line = line.copy()
         line = lstm.prepare_line(line, pad)
