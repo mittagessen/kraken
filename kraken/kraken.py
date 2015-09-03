@@ -157,12 +157,13 @@ def download():
     fs = int(default_model.info()["Content-Length"])
     with open(os.path.join(click.get_app_dir(APP_NAME, force_posix=True),
                            DEFAULT_MODEL), 'wb') as fp:
-        with click.progressbar(default_model, fs // 256,
+        with click.progressbar(length=fs,
                                label='Downloading default model',
                                fill_char=click.style('#', fg='green')) as dl:
-            for buf in dl:
+            for buf in default_model:
                 if not buf:
                     raise StopIteration()
+                dl.update(len(buf))
                 fp.write(buf)
 
 
