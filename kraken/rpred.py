@@ -5,16 +5,12 @@ standard_library.install_aliases()
 from builtins import range
 from builtins import object
 
-import pickle
-import gzip
-import bz2
-import sys
 import numpy as np
 
 from kraken.lib import lstm
 from kraken.lib.util import pil2array, array2pil
 from kraken.lib.lineest import CenterNormalizer
-from kraken.lib.exceptions import KrakenInvalidModelException, KrakenInputException
+from kraken.lib.exceptions import KrakenInputException
 
 
 class ocr_record(object):
@@ -72,7 +68,7 @@ def extract_boxes(im, bounds):
     """
     for box in bounds:
         if (box < (0, 0, 0, 0) or box[::2] > (im.size[0], im.size[0]) or
-            box[1::2] > (im.size[1], im.size[1])):
+           box[1::2] > (im.size[1], im.size[1])):
             raise KrakenInputException('Line outside of image bounds')
         yield im.crop(box), box
 
@@ -129,7 +125,7 @@ def rpred(network, im, bounds, pad=16, line_normalization=True):
             # input line can not be normalized.
             try:
                 box = dewarp(lnorm, box)
-            except ValueError as e:
+            except ValueError:
                 yield ocr_record('', [], [])
                 continue
         line = pil2array(box)

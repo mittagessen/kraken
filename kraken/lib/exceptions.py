@@ -22,6 +22,7 @@ class KrakenInvalidModelException(Exception):
     def __init__(self, message=None):
         Exception.__init__(self, message)
 
+
 class KrakenInputException(Exception):
 
     def __init__(self, message=None):

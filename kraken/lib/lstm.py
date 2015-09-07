@@ -7,15 +7,15 @@ from builtins import object
 import unicodedata
 import numpy as np
 
-from scipy.ndimage import measurements, filters
+from scipy.ndimage import measurements
 from scipy.special import expit
-from collections import defaultdict
 
 initial_range = 0.1
 
+
 class Codec(object):
     """Translate between integer codes and characters."""
-    def init(self,charset):
+    def init(self, charset):
         charset = sorted(list(set(charset)))
         self.code2char = {}
         self.char2code = {}
@@ -27,20 +27,22 @@ class Codec(object):
         """The total number of codes (use this for the number of output
         classes when training a classifier."""
         return len(list(self.code2char.keys()))
-    def encode(self,s):
+    def encode(self, s):
         "Encode the string `s` into a code sequence."
         tab = self.char2code
         dflt = self.char2code["~"]
         return [self.char2code.get(c,dflt) for c in s]
-    def decode(self,l):
+    def decode(self, l):
         "Decode a code sequence into a string."
         s = [self.code2char.get(c,"~") for c in l]
         return s
 
+
 def normalize_nfkc(s):
     return unicodedata.normalize('NFKC',s)
 
-def prepare_line(line,pad=16):
+
+def prepare_line(line, pad=16):
     """Prepare a line for recognition; this inverts it, transposes
     it, and pads it."""
     line = line * 1.0/np.amax(line)
@@ -51,12 +53,14 @@ def prepare_line(line,pad=16):
         line = np.vstack([np.zeros((pad,w)),line,np.zeros((pad,w))])
     return line
 
+
 def randu(*shape):
     # ATTENTION: whether you use randu or randn can make a difference.
     """Generate uniformly random values in the range (-1,1).
     This can usually be used as a drop-in replacement for `randn`
     resulting in a different distribution."""
     return 2*np.random.rand(*shape)-1
+
 
 def sigmoid(x):
     """

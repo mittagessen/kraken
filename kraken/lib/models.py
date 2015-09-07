@@ -10,7 +10,7 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 from future import standard_library
 standard_library.install_aliases()
-from future.utils import PY3
+from future.utils import PY2
 from builtins import next
 from builtins import chr
 
@@ -23,15 +23,15 @@ import sys
 import kraken.lib.lstm
 import kraken.lib.lineest
 
-from kraken.lib.lineest import CenterNormalizer
 from kraken.lib.exceptions import KrakenInvalidModelException
+
 
 def load_any(fname):
     """
     Loads anything that was, is, and will be a valid ocropus model and
     instantiates a shiny new kraken.lib.lstm.SeqRecognizer from the RNN
     configuration in the file.
-    
+
     Currently it recognizes the following kinds of models:
         * pyrnn models containing BIDILSTMs
         * HDF5 models containing converted python BIDILSTMs
@@ -47,6 +47,9 @@ def load_any(fname):
 
     Returns:
         A kraken.lib.lstm.SeqRecognizer object.
+
+    Raises:
+        KrakenInvalidModelException if the model file could not be recognized.
     """
     seq = None
     try:
@@ -58,8 +61,8 @@ def load_any(fname):
             seq = load_pyrnn(fname)
             seq.kind = 'pyrnn'
             return seq
-        except:
-            raise 
+        except Exception as e:
+            raise KrakenInvalidModelException(e.message)
 
 
 def load_hdf5(fname, line_height=0):
@@ -77,7 +80,7 @@ def load_hdf5(fname, line_height=0):
     """
     known_hdf5 = [b'pyrnn-bidi']
     with h5py.File(fname, 'r') as rnn:
-        try: 
+        try:
             if rnn.attrs['kind'] not in known_hdf5:
                 raise KrakenInvalidModelException(b'Unknown model kind ' +
                                                   rnn.attrs['kind'])
@@ -94,10 +97,10 @@ def load_hdf5(fname, line_height=0):
 
             # next build a line estimator
             lnorm = kraken.lib.lineest.CenterNormalizer(line_height)
-            network = kraken.lib.lstm.SeqRecognizer(lnorm.target_height, 
-                                         hiddensize, 
-                                         codec = codec, 
-                                         normalize = kraken.lib.lstm.normalize_nfkc)
+            network = kraken.lib.lstm.SeqRecognizer(lnorm.target_height,
+                                                    hiddensize,
+                                                    codec=codec,
+                                                    normalize=kraken.lib.lstm.normalize_nfkc)
             parallel, softmax = network.lstm.nets
             nornet, rev = parallel.nets
             revnet = rev.net
@@ -113,6 +116,7 @@ def load_hdf5(fname, line_height=0):
         network.lnorm = lnorm
         return network
 
+
 def load_pyrnn(fname):
     """
     Loads a legacy RNN from a pickle file.
@@ -124,11 +128,12 @@ def load_pyrnn(fname):
         Unpickled object
 
     """
-    
-    if PY3:
+
+    if not PY2:
         raise KrakenInvalidModelException('Loading pickle models is not '
                                           'supported on python 3')
     import cPickle
+
     def find_global(mname, cname):
         aliases = {
             'lstm.lstm': kraken.lib.lstm,
@@ -157,6 +162,7 @@ def load_pyrnn(fname):
                                               type(rnn).__name__)
         return rnn
 
+
 def pyrnn_to_hdf5(pyrnn=None, output='en-default.hdf5'):
     """
     Converts a legacy python RNN to the new HDF5 format. Benefits of the new
@@ -170,7 +176,7 @@ def pyrnn_to_hdf5(pyrnn=None, output='en-default.hdf5'):
 
     parallel, softmax = pyrnn.lstm.nets
     fwdnet, revnet = parallel.nets
-    
+
     with h5py.File(output, 'w') as nf:
         # write metadata first
         nf.attrs['kind'] = 'pyrnn-bidi'
@@ -188,19 +194,19 @@ def pyrnn_to_hdf5(pyrnn=None, output='en-default.hdf5'):
             dset = nf.create_dataset(".bidilstm.0.parallel.0.lstm." + w,
                                      data.shape, dtype='f')
             dset[...] = data
-            
+
             data = getattr(revnet.net, w).reshape((-1, 1))
             dset = nf.create_dataset(".bidilstm.0.parallel.1.reversed.0.lstm." + w,
                                      data.shape, dtype='f')
             dset[...] = data
 
         dset = nf.create_dataset(".bidilstm.1.softmax.w",
-                                 (softmax.W2[:,0].shape[0], 1), dtype='f')
-        dset[:] = softmax.W2[:,0].reshape((-1, 1))
+                                 (softmax.W2[:, 0].shape[0], 1), dtype='f')
+        dset[:] = softmax.W2[:, 0].reshape((-1, 1))
 
-        dset = nf.create_dataset(".bidilstm.1.softmax.W", softmax.W2[:,1:].shape,
+        dset = nf.create_dataset(".bidilstm.1.softmax.W", softmax.W2[:, 1:].shape,
                                  dtype='f')
-        dset[:] = softmax.W2[:,1:]
+        dset[:] = softmax.W2[:, 1:]
         cvals = iter(pyrnn.codec.code2char.values())
         next(cvals)
         codec = numpy.array([0]+[ord(x) for x in cvals], dtype='f').reshape((-1, 1))

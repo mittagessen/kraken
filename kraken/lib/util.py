@@ -35,10 +35,10 @@ def array2pil(a):
     if a.dtype == np.dtype("B"):
         if a.ndim == 2:
             return Image.frombytes("L", (a.shape[1], a.shape[0]),
-                                    a.tostring())
+                                   a.tostring())
         elif a.ndim == 3:
             return Image.frombytes("RGB", (a.shape[1], a.shape[0]),
-                                    a.tostring())
+                                   a.tostring())
         else:
             raise Exception("bad image rank")
     elif a.dtype == np.dtype('float32'):
