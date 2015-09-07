@@ -7,8 +7,13 @@ import h5py
 
 from nose.tools import raises 
 
+import kraken.lib.lstm
+
 from kraken.lib import models
 from kraken.lib.exceptions import KrakenInvalidModelException
+
+thisfile = os.path.abspath(os.path.dirname(__file__))
+resources = os.path.abspath(os.path.join(thisfile, 'resources'))
 
 class TestModels(unittest.TestCase):
 
@@ -69,31 +74,53 @@ class TestModels(unittest.TestCase):
         self.temp.close()
         models.load_pyrnn(self.temp.name)
 
+    @raises(KrakenInvalidModelException)
+    def test_load_any_invalid(self):
+        """
+        Test load_any raises the proper exception if object is neither pickle
+        nor HDF5.
+        """
+        models.load_any(self.temp.name)
+
     def test_load_pyrnn_gz(self):
         """
         Test correct handling of gzipped models.
         """
+        rnn = models.load_pyrnn(os.path.join(resources, 'model.pyrnn.gz'))
+        self.assertIsInstance(rnn, kraken.lib.lstm.SeqRecognizer)
 
     def test_load_pyrnn_bz2(self):
         """
         Test correct handling of bzip2 compressed models.
         """
-        pass
+        rnn = models.load_pyrnn(os.path.join(resources, 'model.pyrnn.bz2'))
+        self.assertIsInstance(rnn, kraken.lib.lstm.SeqRecognizer)
 
     def test_load_pyrnn_uncompressed(self):
         """
         Test correct handling of uncompressed models.
         """
-        pass
-
-    def test_load_pyrnn_aliasing(self):
-        """
-        Test correct aliasing of ocrolib classes.
-        """
-        pass
+        rnn = models.load_pyrnn(os.path.join(resources, 'model.pyrnn'))
+        self.assertIsInstance(rnn, kraken.lib.lstm.SeqRecognizer)
 
     def test_load_pyrnn_aliasing_old(self):
         """
         Test correct aliasing of pre-ocrolib classes.
         """
         pass
+
+    def test_load_any_pyrnn(self):
+        """
+        Test load_any loads pickled models.
+        """
+        rnn = models.load_any(os.path.join(resources, 'model.pyrnn.gz'))
+        self.assertIsInstance(rnn, kraken.lib.lstm.SeqRecognizer)
+
+    def test_load_any_hdf5(self):
+        """
+        Test load_any loads HDF5 models.
+        """
+        rnn = models.load_any(os.path.join(resources, 'model.hdf5'))
+        self.assertIsInstance(rnn, kraken.lib.lstm.SeqRecognizer)
+
+
