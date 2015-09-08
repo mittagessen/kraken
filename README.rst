@@ -9,7 +9,7 @@ preserving (mostly) functional equivalence. Its main goals are:
 
   - Explicit input/output handling ✓
   - Clean public API 
-  - Word bounding boxes in hOCR ✓
+  - Word and character bounding boxes in hOCR ✓
   - Tests
   - Removal of runtime dependency on gcc ✓
   - Removal of unused spaghetti code ✓
@@ -53,24 +53,31 @@ directory for the current user:
 Quickstart
 ==========
 
+Recognizing text on an image using the default parameters including the
+prerequisite steps of binarization and page segmentation:
+
+::
+
+  $ kraken -i image.tif image.txt
+
 To binarize a single image using the nlbin algorithm:
 
 ::
 
-  $ kraken binarize grey.png bw.png
+  $ kraken -i image.tif bw.tif binarize
 
 To segment a binarized image into reading-order sorted lines:
 
 ::
 
-  $ kraken segment bw.png lines.txt
+  $ kraken -i bw.tif lines.txt segment bw.png
 
 To OCR a binarized image using the default RNN and the previously generated
 page segmentation:
 
 ::
 
-  $ kraken ocr --lines lines.txt bw.png
+  $ kraken -i bw.tif image.txt ocr --lines lines.txt
 
 Documentation
 =============
