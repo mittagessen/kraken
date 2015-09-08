@@ -21,7 +21,7 @@ programming languages.
 Several drawbacks exist when using pickled models. First they inherently allow
 arbitrary code execution with relative ease. Additionally, they are not upward
 compatible between python 2.x and 3.x and significantly larger than the newer
-HDF5 models.
+HDF5 models (roughly 6.5Mb per state).
 
 HDF5
 ----
