@@ -5,6 +5,7 @@ import tempfile
 import pickle
 import h5py
 
+from future.utils import PY2
 from nose.tools import raises 
 
 import kraken.lib.lstm
@@ -56,6 +57,7 @@ class TestModels(unittest.TestCase):
         models.load_hdf5(self.temp.name)
        
     @raises(KrakenInvalidModelException)
+    @unittest.skipIf(not PY2, "not supported in this version")
     def test_load_pyrnn_invalid(self):
         """
         Test correct handling of non-pickle files.
@@ -75,6 +77,7 @@ class TestModels(unittest.TestCase):
         models.load_pyrnn(self.temp.name)
 
     @raises(KrakenInvalidModelException)
+    @unittest.skipIf(not PY2, "not supported in this version")
     def test_load_any_invalid(self):
         """
         Test load_any raises the proper exception if object is neither pickle
@@ -82,6 +85,7 @@ class TestModels(unittest.TestCase):
         """
         models.load_any(self.temp.name)
 
+    @unittest.skipIf(not PY2, "not supported in this version")
     def test_load_pyrnn_gz(self):
         """
         Test correct handling of gzipped models.
@@ -89,6 +93,7 @@ class TestModels(unittest.TestCase):
         rnn = models.load_pyrnn(os.path.join(resources, 'model.pyrnn.gz'))
         self.assertIsInstance(rnn, kraken.lib.lstm.SeqRecognizer)
 
+    @unittest.skipIf(not PY2, "not supported in this version")
     def test_load_pyrnn_bz2(self):
         """
         Test correct handling of bzip2 compressed models.
@@ -96,6 +101,7 @@ class TestModels(unittest.TestCase):
         rnn = models.load_pyrnn(os.path.join(resources, 'model.pyrnn.bz2'))
         self.assertIsInstance(rnn, kraken.lib.lstm.SeqRecognizer)
 
+    @unittest.skipIf(not PY2, "not supported in this version")
     def test_load_pyrnn_uncompressed(self):
         """
         Test correct handling of uncompressed models.
@@ -103,12 +109,14 @@ class TestModels(unittest.TestCase):
         rnn = models.load_pyrnn(os.path.join(resources, 'model.pyrnn'))
         self.assertIsInstance(rnn, kraken.lib.lstm.SeqRecognizer)
 
+    @unittest.skipIf(not PY2, "not supported in this version")
     def test_load_pyrnn_aliasing_old(self):
         """
         Test correct aliasing of pre-ocrolib classes.
         """
         pass
 
+    @unittest.skipIf(not PY2, "not supported in this version")
     def test_load_any_pyrnn(self):
         """
         Test load_any loads pickled models.
