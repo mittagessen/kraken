@@ -100,7 +100,7 @@ def recognizer(model, pad, input, output, queue, result_queue, remainder,
                          'result', next(it)))
 
 
-@click.group(chain=True)
+@click.group(chain=True, invoke_without_command=True)
 @click.option('-i', '--input', type=(click.Path(exists=True),
                                      click.Path(writable=True)), multiple=True)
 @click.option('-c', '--concurrency', default=cpu_count(), type=click.INT)
@@ -111,6 +111,10 @@ def cli(input, concurrency, verbose):
 
 @cli.resultcallback()
 def process_pipeline(subcommands, input, concurrency, verbose):
+    if not len(subcommands):
+        subcommands = [binarize.callback(),
+                       segment.callback(),
+                       ocr.callback()]
     q = Queue()
     rq = Queue()
 
@@ -203,16 +207,17 @@ def process_pipeline(subcommands, input, concurrency, verbose):
 @click.option('--range', default=20, type=click.INT)
 @click.option('--low', default=5, type=click.IntRange(1, 100))
 @click.option('--high', default=90, type=click.IntRange(1, 100))
-def binarize(**kwargs):
-    return partial(binarizer, **kwargs)
+def binarize(threshold=0.5, zoom=0.5, escale=1.0, border=0.1, perc=80,
+             range=20, low=5, high=90):
+    return partial(binarizer, threshold, zoom, escale, border, perc, range,
+                   low, high)
 
 
 @click.command('segment')
 @click.option('--scale', default=None, type=click.FLOAT)
 @click.option('-b/-w', '--black_colseps/--white_colseps', default=False)
-def segment(**kwargs):
-    return partial(segmenter, **kwargs)
-
+def segment(scale=None, black_colseps=False):
+    return partial(segmenter, scale, black_colseps)
 
 @click.command('ocr')
 @click.pass_context
@@ -226,19 +231,18 @@ def segment(**kwargs):
               help='JSON file containing line coordinates')
 @click.option('--enable-autoconversion/--disable-autoconversion', 'conv',
               default=True, help='Automatically convert pyrnn models zu HDF5')
-def ocr(ctx, **kwargs):
+def ocr(ctx, model=DEFAULT_MODEL, pad=16, hocr=False, lines=None, conv=True):
     # we do the locating and loading of the model here to spare us the overhead
     # in each worker.
 
     # first we try to find the model in the absolue path, then ~/.kraken, then
     # LEGACY_MODEL_DIR
-    model = kwargs['model']
     search = [model,
               os.path.join(click.get_app_dir(APP_NAME, force_posix=True), model),
               os.path.join(LEGACY_MODEL_DIR, model)]
     # if automatic conversion is enabled we look for an converted model in
     # ~/.kraken
-    if kwargs['conv'] is True:
+    if conv is True:
         search.insert(0, os.path.join(click.get_app_dir(APP_NAME,
                                       force_posix=True),
                       os.path.basename(os.path.splitext(model)[0]) + '.hdf5'))
@@ -258,7 +262,7 @@ def ocr(ctx, **kwargs):
     click.secho(u'\u2713', fg='green')
 
     # convert input model to HDF5
-    if kwargs['conv'] and rnn.kind == 'pyrnn':
+    if conv and rnn.kind == 'pyrnn':
         name, _ = os.path.splitext(os.path.basename(model))
         op = os.path.join(click.get_app_dir(APP_NAME, force_posix=True), name +
                           '.hdf5')
@@ -269,14 +273,11 @@ def ocr(ctx, **kwargs):
         models.pyrnn_to_hdf5(rnn, op)
 
     # set output mode
-    if kwargs['hocr']:
+    if hocr:
         ctx.meta['mode'] = 'hocr'
     else:
         ctx.meta['mode'] = 'text'
-    kwargs['model'] = rnn
-    del kwargs['conv']
-    del kwargs['hocr']
-    return partial(recognizer, **kwargs)
+    return partial(recognizer, model=rnn, pad=pad, lines=lines)
 
 
 @click.command('download')
