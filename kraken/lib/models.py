@@ -57,11 +57,14 @@ def load_any(fname):
         seq.kind = 'hdf-pyrnn'
         return seq
     except:
-        try:
-            seq = load_pyrnn(fname)
-            seq.kind = 'pyrnn'
-            return seq
-        except Exception as e:
+        if PY2:
+            try:
+                seq = load_pyrnn(fname)
+                seq.kind = 'pyrnn'
+                return seq
+            except Exception as e:
+                raise
+        else:
             raise
 
 
@@ -78,11 +81,11 @@ def load_hdf5(fname, line_height=0):
     Returns:
         A kraken.lib.lstm.SeqRecognizer object
     """
-    known_hdf5 = [b'pyrnn-bidi']
+    known_hdf5 = ['pyrnn-bidi']
     with h5py.File(fname, 'r') as rnn:
         try:
             if rnn.attrs['kind'] not in known_hdf5:
-                raise KrakenInvalidModelException(b'Unknown model kind ' +
+                raise KrakenInvalidModelException('Unknown model kind ' +
                                                   rnn.attrs['kind'])
             # first extract the codec character set
             charset = [chr(x) for x in rnn.get('codec')]
