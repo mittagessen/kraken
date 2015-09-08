@@ -90,28 +90,33 @@ place it in the kraken directory for the current user:
 Quickstart
 ==========
 
+Recognizing text on an image using the default parameters including the
+prerequisite steps of binarization and page segmentation:
+
+::
+
+  $ kraken -i image.tif image.txt
+  Loading RNN     ✓
+  Processing      ⣻
+
 To binarize a single image using the nlbin algorithm:
 
-.. code-block:: console
+::
 
-  $ kraken binarize grey.png bw.png
+  $ kraken -i image.tif bw.tif binarize
 
 To segment a binarized image into reading-order sorted lines:
 
-.. code-block:: console
+::
 
-  $ kraken segment bw.png lines.txt
+  $ kraken -i bw.tif lines.txt segment bw.png
 
 To OCR a binarized image using the default RNN and the previously generated
 page segmentation:
 
-.. code-block:: console
+::
 
-  $ kraken ocr --lines lines.txt bw.png
-  Loading RNN     ✓
-  Reading line bounds  [####################################]  100%
-  Recognizing lines  [######------------------------------]   17%  00:00:17
-
+  $ kraken -i bw.tif image.txt ocr --lines lines.txt
 
 .. _license:
 

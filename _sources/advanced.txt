@@ -30,7 +30,8 @@ color of column separators has been retained. The segmentation is written as a
 plain text CSV file. Each record corresponds to a single line bounding box in
 the format (x0, y0, x1, y1). Lines are printed in reading order::
 
-        (kraken)~/OCR/test> kraken segment 14.tif
+        $ kraken -i 14.tif lines.txt segment
+        $ cat lines.txt
         422,188,2158,327
         421,328,2158,430
         415,464,2153,599
@@ -58,10 +59,10 @@ the format (x0, y0, x1, y1). Lines are printed in reading order::
 Recognition
 -----------
 
-Recognition requires a binarized image, a page segmentation for that image, and
-a pyrnn or HDF5 model. In particular there is no requirement to use the page
-segmentation algorithm contained in the ``segment`` subcommand or the
-binarization provided by kraken. 
+Recognition requires a grey-scale or binarized image, a page segmentation for
+that image, and a pyrnn or HDF5 model. In particular there is no requirement to
+use the page segmentation algorithm contained in the ``segment`` subcommand or
+the binarization provided by kraken. 
 
 The ``ocr`` subcommand is able to print the recognition results either as plain
 text (default) or as `hOCR
@@ -78,3 +79,12 @@ the recognition confidence for each character in the ``x_conf`` attribute.
 
 Paragraph detection has been removed as it was deemed to be unduly dependent on
 certain typographic features which may not be valid for your input.
+
+Parallelization
+---------------
+
+Per default execution is parallelized to some extend. Binarization and
+segmentation are atomic operations, while recognition is parallelized with each
+process operating on a line separately. The default number of processes in the
+worker pool is equal to the number of CPU cores, although it may be necessary
+to reduce this as kraken is mostly memory-bound on modern system.
