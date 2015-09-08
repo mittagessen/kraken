@@ -62,7 +62,7 @@ def load_any(fname):
             seq.kind = 'pyrnn'
             return seq
         except Exception as e:
-            raise KrakenInvalidModelException(e.message)
+            raise
 
 
 def load_hdf5(fname, line_height=0):
@@ -154,7 +154,7 @@ def load_pyrnn(fname):
         unpickler.find_global = find_global
         try:
             rnn = unpickler.load()
-        except cPickle.UnpicklingError as e:
+        except Exception as e:
             raise KrakenInvalidModelException(str(e))
         if not isinstance(rnn, kraken.lib.lstm.SeqRecognizer):
             raise KrakenInvalidModelException('Pickle is %s instead of '
