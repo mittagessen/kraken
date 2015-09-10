@@ -158,6 +158,7 @@ def process_pipeline(subcommands, input, concurrency, verbose):
             continue
         elif st.state == 'error':
             if not verbose:
+                click.secho(u'\b\u2717', fg='red', nl=False)
                 click.echo('\033[?25h\n', nl=False)
                 for f in temps:
                     os.unlink(f)
@@ -256,7 +257,7 @@ def ocr(ctx, model=DEFAULT_MODEL, pad=16, hocr=False, lines=None, conv=True):
     click.echo('Loading RNN\t', nl=False)
     try:
         rnn = models.load_any(location)
-    except Exception:
+    except:
         click.secho(u'\u2717', fg='red')
         ctx.exit(1)
     click.secho(u'\u2713', fg='green')
