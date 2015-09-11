@@ -22,6 +22,7 @@ import numpy
 import gzip
 import bz2
 import sys
+import io
 
 import kraken.lib.lstm
 import kraken.lib.lineest
@@ -220,7 +221,7 @@ def load_pyrnn(fname):
         of = gzip.open
     elif fname.endswith(u'.bz2'):
         of = bz2.BZ2File
-    with of(fname, 'rb') as fp:
+    with io.BufferedReader(of(fname, 'rb')) as fp:
         unpickler = cPickle.Unpickler(fp)
         unpickler.find_global = find_global
         try:
