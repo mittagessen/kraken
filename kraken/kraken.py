@@ -33,71 +33,67 @@ spinner = cycle([u'⣾', u'⣽', u'⣻', u'⢿', u'⡿', u'⣟', u'⣯', u'⣷']
 message = namedtuple('message', 'func args remainder')
 result_message = namedtuple('result_message', 'func args state data')
 
-
-def binarizer(threshold, zoom, escale, border, perc, range, low, high, input,
-              output, queue, result_queue, remainder):
+def binarizer(threshold, zoom, escale, border, perc, range, low, high, base_image, input, output):
     try:
         im = Image.open(input)
     except IOError as e:
         raise click.BadParameter(e.message)
-    res = binarization.nlbin(im, threshold, zoom, escale, border, perc, range,
-                             low, high)
-    res.save(output, format='png')
-    if remainder:
-        args = {'input': remainder[0][1], 'output': remainder[0][2]}
-        queue.put(message(remainder[0][0], args, remainder[1:]))
+    click.echo('Binarizing\t', nl=False)
+    try:
+        res = binarization.nlbin(im, threshold, zoom, escale, border, perc, range,
+                                 low, high)
+        res.save(output, format='png')
+    except:
+        click.secho(u'\u2717', fg='red')
+        raise
+    click.secho(u'\u2713', fg='green')
 
 
-def segmenter(scale, black_colseps, input, output, queue, result_queue,
-              remainder):
+def segmenter(scale, black_colseps, base_image, input, output):
     try:
         im = Image.open(input)
     except IOError as e:
         raise click.BadParameter(e.message)
-    res = pageseg.segment(im, scale, black_colseps)
-    if remainder:
-        result_queue.put(result_message(partial(segmenter),
-                                        {},
-                                        'new',
-                                        len(res) - 1))
+    click.echo('Segmenting\t', nl=False)
+    try:
+        res = pageseg.segment(im, scale, black_colseps)
+    except:
+        click.secho(u'\u2717', fg='red')
+        raise
     with open_file(output, 'w') as fp:
-        for box in enumerate(res):
-            if remainder:
-                args = {'input': input,
-                        'box_id': box[0],
-                        'box': box[1],
-                        'output': remainder[0][2]}
-                queue.put(message(remainder[0][0], args, remainder[1:]))
-            else:
-                fp.write(u'{},{},{},{}\n'.format(*box[1]).encode('utf-8'))
+        for box in res:
+            fp.write(u'{},{},{},{}\n'.format(*box).encode('utf-8'))
+    click.secho(u'\u2713', fg='green')
 
 
-def recognizer(model, pad, input, output, queue, result_queue, remainder,
-               lines=None, box=None, box_id=0):
+def recognizer(model, pad, base_image, input, output, lines):
     try:
-        im = Image.open(input)
+        im = Image.open(base_image)
     except IOError as e:
         raise click.BadParameter(e.message)
 
-    # if a line file is given (and no specific boxes to recognize) we split it
-    # into a bounding box array and reschedule recognition for each box
-    if lines and not box:
-        with open_file(lines, 'r') as fp:
-            bounds = [(int(x1), int(y1), int(x2), int(y2)) for x1, y1, x2, y2
-                      in csv.reader(fp)]
-            result_queue.put(result_message(partial(recognizer), {}, 'new',
-                                            len(bounds)))
-            for box in enumerate(bounds):
-                args = {'input': input,
-                        'box_id': box[0],
-                        'box': box[1],
-                        'output': remainder[0][2]}
-                queue.put(message(remainder[0][0], args, remainder[1:]))
-    else:
-        it = rpred.rpred(model, im, [box], pad)
-        result_queue.put(result_message(partial(recognizer),
-                         {'box_id': box_id, 'input': input, 'output': output},
-                         'result', next(it)))
+    if not lines:
+        lines = input
+    with open_file(lines, 'r') as fp:
+        bounds = [(int(x1), int(y1), int(x2), int(y2)) for x1, y1, x2, y2
+                  in csv.reader(fp)]
+        it = rpred.rpred(model, im, bounds, pad)
+    preds = []
+    for pred in it:
+        click.echo(u'\r\033[?25lProcessing\t{}'.format(next(spinner)), nl=False)
+        preds.append(pred)
+    click.secho(u'\b\u2713', fg='green', nl=False)
+    click.echo('\033[?25h\n', nl=False)
+
+    ctx = click.get_current_context()
+    with open_file(output, 'w', encoding='utf-8') as fp:
+        click.echo('Writing recognition results for {}\t'.format(base_image), nl=False)
+        if ctx.meta['mode'] == 'hocr':
+            fp.write(unicode(html.hocr(preds, base_image)))
+        else:
+            fp.write(u'\n'.join(s.prediction for s in preds))
+        click.secho(u'\u2713', fg='green')
+
 
 
 @click.group(chain=True, invoke_without_command=True)
@@ -115,89 +111,17 @@ def process_pipeline(subcommands, input, concurrency, verbose):
         subcommands = [binarize.callback(),
                        segment.callback(),
                        ocr.callback()]
-    q = Queue()
-    rq = Queue()
-
-    def pipeline_worker(queue, result_queue):
-        while True:
-            msg = queue.get(block=True, timeout=None)
-            rq.put(result_message(*msg[:2], state='running', data=None))
-            try:
-                msg.func(queue=queue, result_queue=rq, remainder=msg.remainder,
-                         **msg.args)
-            except Exception as e:
-                rq.put(result_message(*msg[:2], state='error', data=e))
-                continue
-            rq.put(result_message(*msg[:2], state='finished', data=None))
-
-    Pool(processes=concurrency, initializer=pipeline_worker, initargs=(q, rq))
-
-    expected = 0
-    temps = []
     for io_pair in input:
-        # create temporary files for intermediate results
-        fc = [io_pair[0]] + [tempfile.mkstemp()[1] for cmd in subcommands[1:]] + [io_pair[1]]
-        temps.extend(fc[1:-1])
-        chain = zip(subcommands, fc, fc[1:])
-        # we expect len(chain) finished/failed tasks
-        expected += len(chain)
-        q.put(message(chain[0][0], {'input': chain[0][1], 'output': chain[0][2]}, chain[1:]))
+        try:
+            base_image = io_pair[0]
+            fc = [io_pair[0]] + [tempfile.mkstemp()[1] for cmd in subcommands[1:]] + [io_pair[1]]
+            for task, input, output in zip(subcommands, fc, fc[1:]):
+                task(base_image=base_image, input=input, output=output)
+                base_image = input
+        finally:
+            for f in fc[1:-1]:
+                os.unlink(f)
 
-    finished = 0
-    results = {}
-    if verbose == 1:
-        click.echo('Waiting for {} finished processes.'.format(expected))
-    while expected != finished:
-        st = rq.get(block=True, timeout=None)
-        if st.state == 'finished':
-            finished += 1
-        elif st.state == 'new':
-            expected += st.data
-            if verbose == 1:
-                click.echo('Spawned {} new tasks'.format(st.data))
-            continue
-        elif st.state == 'error':
-            if not verbose:
-                click.secho(u'\b\u2717', fg='red', nl=False)
-                click.echo('\033[?25h\n', nl=False)
-                for f in temps:
-                    os.unlink(f)
-            raise st.data
-        elif st.state == 'result':
-            if st.args['output'] not in results:
-                results[st.args['output']] = []
-            results[st.args['output']].append((st.args['box_id'], st.data))
-
-        if not verbose:
-            click.echo(u'\r\033[?25lProcessing\t{}'.format(next(spinner)), nl=False)
-        elif verbose == 1:
-            click.echo('{} {} on {}'.format(st.state.title(),
-                                            st.func.func.__name__,
-                                            st.args['input']), nl=False)
-            if 'box_id' in st.args:
-                click.echo(':line {}'.format(st.args['box_id']),
-                           nl=False)
-            click.echo()
-
-    if not verbose:
-        click.secho(u'\b\u2713', fg='green', nl=False)
-        click.echo('\033[?25h\n', nl=False)
-
-    # sort results for each output and create final document
-    ctx = click.get_current_context()
-    for dest, preds in results.items():
-        preds = sorted(preds, key=lambda pred: pred[0])
-        with open_file(dest, 'w', encoding='utf-8')as fp:
-            iopair = next(iopair for iopair in input if iopair[1] == dest)
-            click.echo('Writing recognition results for {}\t'.format(iopair[0]), nl=False)
-            if ctx.meta['mode'] == 'hocr':
-                fp.write(unicode(html.hocr((x[1] for x in preds), iopair[0])))
-            else:
-                fp.write(u'\n'.join(s[1].prediction for s in preds))
-            click.secho(u'\u2713', fg='green')
-
-    for f in temps:
-        os.unlink(f)
 
 @click.command('binarize')
 @click.option('--threshold', default=0.5, type=click.FLOAT)
@@ -210,8 +134,7 @@ def process_pipeline(subcommands, input, concurrency, verbose):
 @click.option('--high', default=90, type=click.IntRange(1, 100))
 def binarize(threshold=0.5, zoom=0.5, escale=1.0, border=0.1, perc=80,
              range=20, low=5, high=90):
-    return partial(binarizer, threshold, zoom, escale, border, perc, range,
-                   low, high)
+    return partial(binarizer, threshold, zoom, escale, border, perc, range, low, high)
 
 
 @click.command('segment')
@@ -219,6 +142,7 @@ def binarize(threshold=0.5, zoom=0.5, escale=1.0, border=0.1, perc=80,
 @click.option('-b/-w', '--black_colseps/--white_colseps', default=False)
 def segment(scale=None, black_colseps=False):
     return partial(segmenter, scale, black_colseps)
+
 
 @click.command('ocr')
 @click.pass_context
