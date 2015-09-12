@@ -216,11 +216,9 @@ def load_pyrnn(fname):
             return getattr(aliases[mname], cname)
         return getattr(sys.modules[mname], cname)
 
-    of = open
+    of = io.open
     if fname.endswith(u'.gz'):
         of = gzip.open
-    elif fname.endswith(u'.bz2'):
-        of = bz2.BZ2File
     with io.BufferedReader(of(fname, 'rb')) as fp:
         unpickler = cPickle.Unpickler(fp)
         unpickler.find_global = find_global

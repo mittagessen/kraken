@@ -94,14 +94,6 @@ class TestModels(unittest.TestCase):
         self.assertIsInstance(rnn, kraken.lib.lstm.SeqRecognizer)
 
     @unittest.skipIf(not PY2, "not supported in this version")
-    def test_load_pyrnn_bz2(self):
-        """
-        Test correct handling of bzip2 compressed models.
-        """
-        rnn = models.load_pyrnn(os.path.join(resources, 'model.pyrnn.bz2'))
-        self.assertIsInstance(rnn, kraken.lib.lstm.SeqRecognizer)
-
-    @unittest.skipIf(not PY2, "not supported in this version")
     def test_load_pyrnn_uncompressed(self):
         """
         Test correct handling of uncompressed models.
