@@ -6,7 +6,7 @@
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     
-    <title>Models &mdash; kraken 0.6
+    <title>Models &mdash; kraken 0.6.1
  documentation</title>
     
     <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
@@ -15,7 +15,7 @@
     <script type="text/javascript">
       var DOCUMENTATION_OPTIONS = {
         URL_ROOT:    './',
-        VERSION:     '0.6
+        VERSION:     '0.6.1
 ',
         COLLAPSE_INDEX: false,
         FILE_SUFFIX: '.html',
@@ -25,7 +25,7 @@
     <script type="text/javascript" src="_static/jquery.js"></script>
     <script type="text/javascript" src="_static/underscore.js"></script>
     <script type="text/javascript" src="_static/doctools.js"></script>
-    <link rel="top" title="kraken 0.6
+    <link rel="top" title="kraken 0.6.1
  documentation" href="index.html" />
     <link rel="prev" title="kraken API" href="api.html" />
    
@@ -42,10 +42,10 @@
             
   <div class="section" id="models">
 <span id="id1"></span><h1>Models<a class="headerlink" href="#models" title="Permalink to this headline">¶</a></h1>
-<p>There are currently two kinds of models containing the recurrent neural
+<p>There are currently three kinds of models containing the recurrent neural
 networks doing all the character recognition supported by kraken: traditional
-pyrnn models that are just pickled instances of python objects and a new format
-serializing data in HDF5 files.</p>
+pyrnn models that are just pickled instances of python objects, a new format
+serializing data in HDF5 files, and clstm&#8217;s native <a class="reference external" href="https://developers.google.com/protocol-buffers/">protocol buffer</a> serialization.</p>
 <div class="section" id="pyrnn">
 <span id="id2"></span><h2>pyrnn<a class="headerlink" href="#pyrnn" title="Permalink to this headline">¶</a></h2>
 <p>These are serialized instances of python <code class="docutils literal"><span class="pre">lstm.SeqRecognizer</span></code> objects. Using
@@ -69,6 +69,15 @@ now.</p>
 smaller (80Mb vs 1.8Mb for the default model), don&#8217;t allow arbitrary code
 execution, and are upward compatible. Because they are so much more lightweight
 they are also loaded much faster (~17s vs ~200ms).</p>
+</div>
+<div class="section" id="clstm">
+<h2>clstm<a class="headerlink" href="#clstm" title="Permalink to this headline">¶</a></h2>
+<p><a class="reference external" href="https://github.com/tmbdev/clstm">clstm</a>, a small and fast implementation of
+LSTM networks, creates neural networks serialized as protocol buffers. These
+are usually slightly smaller than HDF5 models and require clstm&#8217;s python
+extension to load and run. While they are significantly faster than the native
+python models clstm is still in early development and there aren&#8217;t many trained
+models available, yet.</p>
 </div>
 <div class="section" id="conversion">
 <h2>Conversion<a class="headerlink" href="#conversion" title="Permalink to this headline">¶</a></h2>
@@ -97,6 +106,7 @@ routine, it can be disabled using the <code class="docutils literal"><span class
 <li><a class="reference internal" href="#">Models</a><ul>
 <li><a class="reference internal" href="#pyrnn">pyrnn</a></li>
 <li><a class="reference internal" href="#hdf5">HDF5</a></li>
+<li><a class="reference internal" href="#clstm">clstm</a></li>
 <li><a class="reference internal" href="#conversion">Conversion</a></li>
 </ul>
 </li>

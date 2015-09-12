@@ -26,13 +26,13 @@ kraken's main features are:
   - Removal of runtime dependency on gcc
   - Removal of unused spaghetti code
   - :ref:`Lightweight model files <models>`
+  - Support for `clstm <https://github.com/tmbdev/clstm>`_ models
 
 Currently missing or underdocumented are:
 
   - Clean public API 
   - Tests
-  - CLSTM compatibility
-  - New training interface (possibly only for CLSTM)
+  - New training interface (certainly only for CLSTM)
 
 All functionality not pertaining to OCR and prerequisite steps has been
 removed, i.e. no more ground truth editing, error rate measuring, etc.
@@ -50,8 +50,11 @@ link against.
 
 .. code-block:: console
 
-        # apt-get install gcc gfortran python-dev libblas-dev liblapack-dev
+        # apt-get install gcc gfortran python-dev libblas-dev liblapack-dev \
         cython libhdf5-dev
+
+If `clstm <https://github.com/tmbdev/clstm>`_ support is desired (highly
+recommended) the associated python extension has to be build and installed.
 
 Because the build behavior of pip versions older than 6.1.0 interferes with the
 scipy build process numpy has to be installed before doing the actual install:

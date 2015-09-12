@@ -6,7 +6,7 @@
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     
-    <title>kraken &mdash; kraken 0.6
+    <title>kraken &mdash; kraken 0.6.1
  documentation</title>
     
     <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
@@ -15,7 +15,7 @@
     <script type="text/javascript">
       var DOCUMENTATION_OPTIONS = {
         URL_ROOT:    './',
-        VERSION:     '0.6
+        VERSION:     '0.6.1
 ',
         COLLAPSE_INDEX: false,
         FILE_SUFFIX: '.html',
@@ -25,7 +25,7 @@
     <script type="text/javascript" src="_static/jquery.js"></script>
     <script type="text/javascript" src="_static/underscore.js"></script>
     <script type="text/javascript" src="_static/doctools.js"></script>
-    <link rel="top" title="kraken 0.6
+    <link rel="top" title="kraken 0.6.1
  documentation" href="#" />
     <link rel="next" title="Advanced usage" href="advanced.html" />
    
@@ -59,6 +59,7 @@ with kraken without all the fuss of the original ocropus tools.</p>
 <li>Removal of runtime dependency on gcc</li>
 <li>Removal of unused spaghetti code</li>
 <li><a class="reference internal" href="models.html#models"><span>Lightweight model files</span></a></li>
+<li>Support for <a class="reference external" href="https://github.com/tmbdev/clstm">clstm</a> models</li>
 </ul>
 </div></blockquote>
 <p>Currently missing or underdocumented are:</p>
@@ -66,8 +67,7 @@ with kraken without all the fuss of the original ocropus tools.</p>
 <div><ul class="simple">
 <li>Clean public API</li>
 <li>Tests</li>
-<li>CLSTM compatibility</li>
-<li>New training interface (possibly only for CLSTM)</li>
+<li>New training interface (certainly only for CLSTM)</li>
 </ul>
 </div></blockquote>
 <p>All functionality not pertaining to OCR and prerequisite steps has been
@@ -80,10 +80,12 @@ removed, i.e. no more ground truth editing, error rate measuring, etc.</p>
 and scipy compilation still requires build-essential or your distributions
 equivalent and some dependencies. Additionally we require require a <a class="reference external" href="https://www.hdfgroup.org/HDF5/">HDF5</a> library for <a class="reference external" href="http://h5py.org">h5py</a> to
 link against.</p>
-<div class="highlight-console"><div class="highlight"><pre><span class="gp">#</span> apt-get install gcc gfortran python-dev libblas-dev liblapack-dev
+<div class="highlight-console"><div class="highlight"><pre><span class="gp">#</span> apt-get install gcc gfortran python-dev libblas-dev liblapack-dev <span class="se">\</span>
 <span class="go">cython libhdf5-dev</span>
 </pre></div>
 </div>
+<p>If <a class="reference external" href="https://github.com/tmbdev/clstm">clstm</a> support is desired (highly
+recommended) the associated python extension has to be build and installed.</p>
 <p>Because the build behavior of pip versions older than 6.1.0 interferes with the
 scipy build process numpy has to be installed before doing the actual install:</p>
 <div class="highlight-console"><div class="highlight"><pre><span class="gp">#</span> pip install numpy
@@ -134,7 +136,7 @@ page segmentation:</p>
 </div>
 </div>
 <div class="section" id="license">
-<span id="id1"></span><h1>License<a class="headerlink" href="#license" title="Permalink to this headline">¶</a></h1>
+<span id="id2"></span><h1>License<a class="headerlink" href="#license" title="Permalink to this headline">¶</a></h1>
 <p><code class="docutils literal"><span class="pre">Kraken</span></code> is provided under the terms and conditions of the <a class="reference external" href="https://github.com/mittagessen/kraken/blob/master/LICENSE">Apache 2.0
 License</a> retained
 from the original <code class="docutils literal"><span class="pre">ocropus</span></code> distribution.</p>
