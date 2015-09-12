@@ -13,6 +13,7 @@ preserving (mostly) functional equivalence. Its main goals are:
   - Tests
   - Removal of runtime dependency on gcc ✓
   - Removal of unused spaghetti code ✓
+  - `clstm <https://github.com/tmbdev/clstm>`_ compatibility ✓
 
 Ticked of goals have been realized while some others still require further
 work. Pull requests and code contributions are always welcome.
@@ -29,6 +30,9 @@ the actual install:
 ::
 
   # pip install numpy
+
+If ``clstm`` support is desired (highly recommended) the associated python
+extension has to be build and installed.
 
 Install kraken either from pypi:
 
