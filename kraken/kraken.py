@@ -9,6 +9,7 @@ import csv
 import os
 import urllib.request
 import tempfile
+import time
 
 from PIL import Image
 from click import open_file
@@ -72,6 +73,8 @@ def recognizer(model, pad, base_image, input, output, lines):
     except IOError as e:
         raise click.BadParameter(e.message)
 
+    ctx = click.get_current_context()
+
     if not lines:
         lines = input
     with open_file(lines, 'r') as fp:
@@ -79,12 +82,20 @@ def recognizer(model, pad, base_image, input, output, lines):
                   in csv.reader(fp)]
         it = rpred.rpred(model, im, bounds, pad)
     preds = []
-    for pred in it:
-        click.echo(u'\r\033[?25lProcessing\t{}'.format(next(spinner)), nl=False)
-        preds.append(pred)
-    click.secho(u'\b\u2713', fg='green', nl=False)
-    click.echo('\033[?25h\n', nl=False)
 
+    st_time = time.time()
+    for pred in it:
+        if ctx.meta['verbose'] > 0:
+            click.echo(u'[{:2.4f}] {}'.format(time.time() - st_time, pred.prediction))
+        else:
+            click.echo(u'\r\033[?25lProcessing\t{}'.format(next(spinner)), nl=False)
+        preds.append(pred)
+    if ctx.meta['verbose'] > 0:
+        click.echo(u'Execution time: {}s'.format(time.time() - st_time))
+    else:
+        click.secho(u'\b\u2713', fg='green', nl=False)
+        click.echo('\033[?25h\n', nl=False)
+    
     ctx = click.get_current_context()
     with open_file(output, 'w', encoding='utf-8') as fp:
         click.echo('Writing recognition results for {}\t'.format(base_image), nl=False)
@@ -100,8 +111,10 @@ def recognizer(model, pad, base_image, input, output, lines):
 @click.option('-i', '--input', type=(click.Path(exists=True),
                                      click.Path(writable=True)), multiple=True)
 @click.option('-c', '--concurrency', default=cpu_count(), type=click.INT)
-@click.option('-v', '--verbose', count=True)
+@click.option('-v', '--verbose', default=0, count=True)
 def cli(input, concurrency, verbose):
+    ctx = click.get_current_context()
+    ctx.meta['verbose'] = verbose
     pass
 
 
