@@ -24,7 +24,6 @@ kraken's main features are:
   - Explicit input/output handling
   - Word bounding boxes and character cuts in hOCR
   - Removal of runtime dependency on gcc
-  - Removal of unused spaghetti code
   - :ref:`Lightweight model files <models>`
   - Support for `clstm <https://github.com/tmbdev/clstm>`_ models
 

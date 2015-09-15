@@ -12,7 +12,6 @@ preserving (mostly) functional equivalence. Its main goals are:
   - Word and character bounding boxes in hOCR ✓
   - Tests
   - Removal of runtime dependency on gcc ✓
-  - Removal of unused spaghetti code ✓
   - `clstm <https://github.com/tmbdev/clstm>`_ compatibility ✓
 
 Ticked of goals have been realized while some others still require further
