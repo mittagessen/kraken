@@ -56,6 +56,57 @@ the format (x0, y0, x1, y1). Lines are printed in reading order::
         355,3092,2094,3230
         1859,3233,2084,3354
 
+Model Repository
+----------------
+
+There is a semi-curated `repository
+<https://github.com/mittagessen/kraken-models>`_ of freely licensed recognition
+models that can be accessed from the command line using a few subcommands. For
+evaluating a series of models it is also possible to just clone the repository
+using the normal git client. 
+
+The ``list`` subcommand retrieves a list of all models available and prints
+them including some additional information (identifier, type, and a short
+description):
+
+.. code-block:: console
+
+        $ kraken list
+        Retrieving model list   ✓
+        default (pyrnn) - A converted version of en-default.pyrnn.gz
+        toy (clstm) - A toy model trained on 400 lines of the UW3 data set.
+
+
+To access more detailed information the ``show`` subcommand may be used:
+
+.. code-block:: console
+
+        $ kraken show toy
+        name: toy.clstm
+
+        A toy model trained on 400 lines of the UW3 data set.
+
+        author: Benjamin Kiessling (mittagessen@l.unchti.me)
+        http://kraken.re
+
+If a suitable model has been decided upon it can be retrieved using the ``get``
+subcommand:
+
+.. code-block:: console
+
+        $ kraken get toy
+        Retrieving model        ✓
+
+Models will be placed in ~/.kraken and can be accessed using their name as
+shown by the ``show`` command, e.g.:
+
+.. code-block:: console
+
+        $ kraken -i ... ... ocr -m toy.clstm
+
+Additions and updates to existing models are always welcome! Just open a pull
+request or write an email.
+
 Recognition
 -----------
 
@@ -80,11 +131,4 @@ the recognition confidence for each character in the ``x_conf`` attribute.
 Paragraph detection has been removed as it was deemed to be unduly dependent on
 certain typographic features which may not be valid for your input.
 
-Parallelization
----------------
 
-Per default execution is parallelized to some extend. Binarization and
-segmentation are atomic operations, while recognition is parallelized with each
-process operating on a line separately. The default number of processes in the
-worker pool is equal to the number of CPU cores, although it may be necessary
-to reduce this as kraken is mostly memory-bound on modern system.

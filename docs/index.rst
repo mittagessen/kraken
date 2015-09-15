@@ -24,6 +24,7 @@ kraken's main features are:
   - Explicit input/output handling
   - Word bounding boxes and character cuts in hOCR
   - Removal of runtime dependency on gcc
+  - `Public repository <https://github.com/mittagessen/kraken-models>`_ of model files
   - :ref:`Lightweight model files <models>`
   - Support for `clstm <https://github.com/tmbdev/clstm>`_ models
 
@@ -87,7 +88,7 @@ place it in the kraken directory for the current user:
 
 .. code-block:: console
 
-  $ kraken download
+  $ kraken get default
 
 Quickstart
 ==========

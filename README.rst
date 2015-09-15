@@ -51,7 +51,7 @@ directory for the current user:
 
 ::
 
-  $ kraken download
+  $ kraken get default
 
 Quickstart
 ==========
