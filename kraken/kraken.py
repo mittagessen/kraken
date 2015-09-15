@@ -196,6 +196,7 @@ def ocr(ctx, model=DEFAULT_MODEL, pad=16, hocr=False, lines=None, conv=True):
         rnn = models.load_any(location)
     except:
         click.secho(u'\u2717', fg='red')
+        raise
         ctx.exit(1)
     click.secho(u'\u2713', fg='green')
 
@@ -232,7 +233,7 @@ def show(ctx, model_id):
 
 @cli.command('list')
 @click.pass_context
-def models(ctx):
+def list(ctx):
     model_list = repo.get_listing(partial(spin, 'Retrieving model list'))
     click.secho(u'\b\u2713', fg='green', nl=False)
     click.echo('\033[?25h\n', nl=False)
