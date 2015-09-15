@@ -7,10 +7,12 @@ from builtins import str
 from builtins import object
 
 import dominate
+import logging
 import regex
 from dominate.tags import div, span, meta, br
 from itertools import count
 
+logger = logging.getLogger(__name__)
 
 class micro_hocr(object):
     """
@@ -111,6 +113,7 @@ def hocr(records, image_name=u'', image_size=(0, 0), line_bbox=True,
             hocr_title.add(u'image', image_name)
         with div(cls='ocr_page', title=str(hocr_title)):
             for idx, record in enumerate(records):
+                logger.debug('Adding record {} - {} to hocr'.format(idx, record.prediction))
                 with span(cls='ocr_line', id='line_' + str(idx)) as line_span:
                     line_title = micro_hocr()
                     if line_bbox:
@@ -124,6 +127,7 @@ def hocr(records, image_name=u'', image_size=(0, 0), line_bbox=True,
                     if str(line_title):
                         line_span['title'] = str(line_title)
                     if split_words:
+                        logger.debug('Splitting record into words')
                         splits = regex.split(u'(\w+)', record.prediction)
                         line_offset = 0
                         # operate on pairs of non-word character strings and

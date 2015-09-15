@@ -7,13 +7,12 @@ standard_library.install_aliases()
 import click
 import csv
 import os
-import urllib.request
 import tempfile
+import requests
 import time
 
 from PIL import Image
 from click import open_file
-from urllib.parse import urljoin
 from itertools import cycle
 from collections import namedtuple
 from functools import partial
@@ -22,6 +21,7 @@ from kraken import binarization
 from kraken import pageseg
 from kraken import rpred
 from kraken import html
+from kraken import repo
 from kraken.lib import models
 
 APP_NAME = 'kraken'
@@ -31,14 +31,15 @@ LEGACY_MODEL_DIR = '/usr/local/share/ocropus'
 
 spinner = cycle([u'⣾', u'⣽', u'⣻', u'⢿', u'⡿', u'⣟', u'⣯', u'⣷'])
 
-message = namedtuple('message', 'func args remainder')
-result_message = namedtuple('result_message', 'func args state data')
+def spin(msg):
+    click.echo(u'\r\033[?25l{}\t{}'.format(msg, next(spinner)), nl=False)
+
 
 def binarizer(threshold, zoom, escale, border, perc, range, low, high, base_image, input, output):
     try:
         im = Image.open(input)
     except IOError as e:
-        raise click.BadParameter(e.message)
+        raise click.BadParameter(str(e))
     click.echo('Binarizing\t', nl=False)
     try:
         res = binarization.nlbin(im, threshold, zoom, escale, border, perc, range,
@@ -54,7 +55,7 @@ def segmenter(scale, black_colseps, base_image, input, output):
     try:
         im = Image.open(input)
     except IOError as e:
-        raise click.BadParameter(e.message)
+        raise click.BadParameter(str(e))
     click.echo('Segmenting\t', nl=False)
     try:
         res = pageseg.segment(im, scale, black_colseps)
@@ -71,7 +72,7 @@ def recognizer(model, pad, base_image, input, output, lines):
     try:
         im = Image.open(base_image)
     except IOError as e:
-        raise click.BadParameter(e.message)
+        raise click.BadParameter(str(e))
 
     ctx = click.get_current_context()
 
@@ -88,7 +89,7 @@ def recognizer(model, pad, base_image, input, output, lines):
         if ctx.meta['verbose'] > 0:
             click.echo(u'[{:2.4f}] {}'.format(time.time() - st_time, pred.prediction))
         else:
-            click.echo(u'\r\033[?25lProcessing\t{}'.format(next(spinner)), nl=False)
+            spin('Processing')
         preds.append(pred)
     if ctx.meta['verbose'] > 0:
         click.echo(u'Execution time: {}s'.format(time.time() - st_time))
@@ -115,7 +116,6 @@ def recognizer(model, pad, base_image, input, output, lines):
 def cli(input, concurrency, verbose):
     ctx = click.get_current_context()
     ctx.meta['verbose'] = verbose
-    pass
 
 
 @cli.resultcallback()
@@ -136,7 +136,7 @@ def process_pipeline(subcommands, input, concurrency, verbose):
                 os.unlink(f)
 
 
-@click.command('binarize')
+@cli.command('binarize')
 @click.option('--threshold', default=0.5, type=click.FLOAT)
 @click.option('--zoom', default=0.5, type=click.FLOAT)
 @click.option('--escale', default=1.0, type=click.FLOAT)
@@ -150,14 +150,14 @@ def binarize(threshold=0.5, zoom=0.5, escale=1.0, border=0.1, perc=80,
     return partial(binarizer, threshold, zoom, escale, border, perc, range, low, high)
 
 
-@click.command('segment')
+@cli.command('segment')
 @click.option('--scale', default=None, type=click.FLOAT)
 @click.option('-b/-w', '--black_colseps/--white_colseps', default=False)
 def segment(scale=None, black_colseps=False):
     return partial(segmenter, scale, black_colseps)
 
 
-@click.command('ocr')
+@cli.command('ocr')
 @click.pass_context
 @click.option('-m', '--model', default=DEFAULT_MODEL, help='Path to an '
               'recognition model')
@@ -218,34 +218,37 @@ def ocr(ctx, model=DEFAULT_MODEL, pad=16, hocr=False, lines=None, conv=True):
     return partial(recognizer, model=rnn, pad=pad, lines=lines)
 
 
-@click.command('download')
+@cli.command('show')
 @click.pass_context
-def download(ctx):
-    default_model = urllib.request.urlopen(urljoin(MODEL_URL, DEFAULT_MODEL))
-    try:
-        os.makedirs(click.get_app_dir(APP_NAME, force_posix=True))
-    except OSError:
-        pass
-    # overwrite next function for iterator to return 8192 octets instead of
-    # line
-    default_model.next = lambda: default_model.read(8192)
-    fs = int(default_model.info()["Content-Length"])
-    with open_file(os.path.join(click.get_app_dir(APP_NAME, force_posix=True),
-                                DEFAULT_MODEL), 'wb') as fp:
-        with click.progressbar(length=fs,
-                               label='Downloading default model',
-                               fill_char=click.style('#', fg='green')) as dl:
-            for buf in default_model:
-                if not buf:
-                    raise StopIteration()
-                dl.update(len(buf))
-                fp.write(buf)
+@click.argument('model_id')
+def show(ctx, model_id):
+    desc = repo.get_description(model_id)
+    click.echo('name: {}\n\n{}\n\nauthor: {} ({})\n{}'.format(desc['name'],
+                                                              desc['summary'],
+                                                              desc['author'],
+                                                              desc['author-email'],
+                                                              desc['url']))
     ctx.exit(0)
 
-cli.add_command(binarize)
-cli.add_command(segment)
-cli.add_command(ocr)
-cli.add_command(download)
+@cli.command('list')
+@click.pass_context
+def models(ctx):
+    model_list = repo.get_listing(partial(spin, 'Retrieving model list'))
+    click.secho(u'\b\u2713', fg='green', nl=False)
+    click.echo('\033[?25h\n', nl=False)
+    for m in model_list:
+        click.echo('{} ({}) - {}'.format(m, model_list[m]['type'], model_list[m]['summary']))
+    ctx.exit(0)
+
+@cli.command('get')
+@click.pass_context
+@click.argument('model_id')
+def get(ctx, model_id):
+    repo.get_model(model_id, click.get_app_dir(APP_NAME, force_posix=True),
+                   partial(spin, 'Retrieving model'))
+    click.secho(u'\b\u2713', fg='green', nl=False)
+    click.echo('\033[?25h\n', nl=False)
+    ctx.exit(0)
 
 if __name__ == '__main__':
     cli()

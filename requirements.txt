@@ -1,4 +1,5 @@
 future
+requests
 click
 dominate
 numpy

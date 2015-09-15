@@ -27,3 +27,9 @@ class KrakenInputException(Exception):
 
     def __init__(self, message=None):
         Exception.__init__(self, message)
+
+
+class KrakenRepoException(Exception):
+
+    def __init__(self, message=None):
+        Exception.__init__(self, message)
