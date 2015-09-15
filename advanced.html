@@ -6,7 +6,7 @@
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     
-    <title>Advanced usage &mdash; kraken 0.6.1
+    <title>Advanced usage &mdash; kraken 0.6.3-3-ga5f9441
  documentation</title>
     
     <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
@@ -15,7 +15,7 @@
     <script type="text/javascript">
       var DOCUMENTATION_OPTIONS = {
         URL_ROOT:    './',
-        VERSION:     '0.6.1
+        VERSION:     '0.6.3-3-ga5f9441
 ',
         COLLAPSE_INDEX: false,
         FILE_SUFFIX: '.html',
@@ -25,7 +25,7 @@
     <script type="text/javascript" src="_static/jquery.js"></script>
     <script type="text/javascript" src="_static/underscore.js"></script>
     <script type="text/javascript" src="_static/doctools.js"></script>
-    <link rel="top" title="kraken 0.6.1
+    <link rel="top" title="kraken 0.6.3-3-ga5f9441
  documentation" href="index.html" />
     <link rel="next" title="kraken API" href="api.html" />
     <link rel="prev" title="kraken" href="index.html" />
@@ -95,6 +95,45 @@ $ cat lines.txt
 </pre></div>
 </div>
 </div>
+<div class="section" id="model-repository">
+<h2>Model Repository<a class="headerlink" href="#model-repository" title="Permalink to this headline">¶</a></h2>
+<p>There is a semi-curated <a class="reference external" href="https://github.com/mittagessen/kraken-models">repository</a> of freely licensed recognition
+models that can be accessed from the command line using a few subcommands. For
+evaluating a series of models it is also possible to just clone the repository
+using the normal git client.</p>
+<p>The <code class="docutils literal"><span class="pre">list</span></code> subcommand retrieves a list of all models available and prints
+them including some additional information (identifier, type, and a short
+description):</p>
+<div class="highlight-console"><div class="highlight"><pre><span class="gp">$</span> kraken list
+<span class="go">Retrieving model list   ✓</span>
+<span class="go">default (pyrnn) - A converted version of en-default.pyrnn.gz</span>
+<span class="go">toy (clstm) - A toy model trained on 400 lines of the UW3 data set.</span>
+</pre></div>
+</div>
+<p>To access more detailed information the <code class="docutils literal"><span class="pre">show</span></code> subcommand may be used:</p>
+<div class="highlight-console"><div class="highlight"><pre><span class="gp">$</span> kraken show toy
+<span class="go">name: toy.clstm</span>
+
+<span class="go">A toy model trained on 400 lines of the UW3 data set.</span>
+
+<span class="go">author: Benjamin Kiessling (mittagessen@l.unchti.me)</span>
+<span class="go">http://kraken.re</span>
+</pre></div>
+</div>
+<p>If a suitable model has been decided upon it can be retrieved using the <code class="docutils literal"><span class="pre">get</span></code>
+subcommand:</p>
+<div class="highlight-console"><div class="highlight"><pre><span class="gp">$</span> kraken get toy
+<span class="go">Retrieving model        ✓</span>
+</pre></div>
+</div>
+<p>Models will be placed in ~/.kraken and can be accessed using their name as
+shown by the <code class="docutils literal"><span class="pre">show</span></code> command, e.g.:</p>
+<div class="highlight-console"><div class="highlight"><pre><span class="gp">$</span> kraken -i ... ... ocr -m toy.clstm
+</pre></div>
+</div>
+<p>Additions and updates to existing models are always welcome! Just open a pull
+request or write an email.</p>
+</div>
 <div class="section" id="recognition">
 <h2>Recognition<a class="headerlink" href="#recognition" title="Permalink to this headline">¶</a></h2>
 <p>Recognition requires a grey-scale or binarized image, a page segmentation for
@@ -114,14 +153,6 @@ the recognition confidence for each character in the <code class="docutils liter
 <p>Paragraph detection has been removed as it was deemed to be unduly dependent on
 certain typographic features which may not be valid for your input.</p>
 </div>
-<div class="section" id="parallelization">
-<h2>Parallelization<a class="headerlink" href="#parallelization" title="Permalink to this headline">¶</a></h2>
-<p>Per default execution is parallelized to some extend. Binarization and
-segmentation are atomic operations, while recognition is parallelized with each
-process operating on a line separately. The default number of processes in the
-worker pool is equal to the number of CPU cores, although it may be necessary
-to reduce this as kraken is mostly memory-bound on modern system.</p>
-</div>
 </div>
 
 
@@ -138,8 +169,8 @@ to reduce this as kraken is mostly memory-bound on modern system.</p>
 <li><a class="reference internal" href="#">Advanced usage</a><ul>
 <li><a class="reference internal" href="#binarization">Binarization</a></li>
 <li><a class="reference internal" href="#page-segmentation">Page segmentation</a></li>
+<li><a class="reference internal" href="#model-repository">Model Repository</a></li>
 <li><a class="reference internal" href="#recognition">Recognition</a></li>
-<li><a class="reference internal" href="#parallelization">Parallelization</a></li>
 </ul>
 </li>
 </ul>

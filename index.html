@@ -6,7 +6,7 @@
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     
-    <title>kraken &mdash; kraken 0.6.1
+    <title>kraken &mdash; kraken 0.6.3-3-ga5f9441
  documentation</title>
     
     <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
@@ -15,7 +15,7 @@
     <script type="text/javascript">
       var DOCUMENTATION_OPTIONS = {
         URL_ROOT:    './',
-        VERSION:     '0.6.1
+        VERSION:     '0.6.3-3-ga5f9441
 ',
         COLLAPSE_INDEX: false,
         FILE_SUFFIX: '.html',
@@ -25,7 +25,7 @@
     <script type="text/javascript" src="_static/jquery.js"></script>
     <script type="text/javascript" src="_static/underscore.js"></script>
     <script type="text/javascript" src="_static/doctools.js"></script>
-    <link rel="top" title="kraken 0.6.1
+    <link rel="top" title="kraken 0.6.3-3-ga5f9441
  documentation" href="#" />
     <link rel="next" title="Advanced usage" href="advanced.html" />
    
@@ -57,7 +57,7 @@ with kraken without all the fuss of the original ocropus tools.</p>
 <li>Explicit input/output handling</li>
 <li>Word bounding boxes and character cuts in hOCR</li>
 <li>Removal of runtime dependency on gcc</li>
-<li>Removal of unused spaghetti code</li>
+<li><a class="reference external" href="https://github.com/mittagessen/kraken-models">Public repository</a> of model files</li>
 <li><a class="reference internal" href="models.html#models"><span>Lightweight model files</span></a></li>
 <li>Support for <a class="reference external" href="https://github.com/tmbdev/clstm">clstm</a> models</li>
 </ul>
@@ -108,7 +108,7 @@ the legacy format it is recommended to use Python 2.7.</p>
 <p>Finally you&#8217;ll have to scrounge up an RNN to do the actual recognition of
 characters. To download ocropus&#8217; default RNN converted to the new format and
 place it in the kraken directory for the current user:</p>
-<div class="highlight-console"><div class="highlight"><pre><span class="gp">$</span> kraken download
+<div class="highlight-console"><div class="highlight"><pre><span class="gp">$</span> kraken get default
 </pre></div>
 </div>
 </div>
