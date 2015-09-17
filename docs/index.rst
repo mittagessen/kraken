@@ -44,14 +44,11 @@ Installation
 
 While kraken does not require a working C compiler on run-time anymore numpy
 and scipy compilation still requires build-essential or your distributions
-equivalent and some dependencies. Additionally we require require a `HDF5
-<https://www.hdfgroup.org/HDF5/>`_ library for `h5py <http://h5py.org>`_ to
-link against.
+equivalent and some dependencies.
 
 .. code-block:: console
 
-        # apt-get install gcc gfortran python-dev libblas-dev liblapack-dev \
-        cython libhdf5-dev
+        # apt-get install gcc gfortran python-dev libblas-dev liblapack-dev
 
 If `clstm <https://github.com/tmbdev/clstm>`_ support is desired (highly
 recommended) the associated python extension has to be build and installed.
@@ -80,7 +77,9 @@ or by running pip in the git repository:
   While kraken is Python 2/3 compliant, there are limits to its compatibility.
   For various reasons it is not possible to use :ref:`pickled models
   <pyrnn>` under Python 3. As the vast majority of models are still in
-  the legacy format it is recommended to use Python 2.7.
+  the legacy format it is recommended to use Python 2.7. On the other hand all
+  models in the central repository are converted to the fully upward compatible
+  pronn format.
 
 Finally you'll have to scrounge up an RNN to do the actual recognition of
 characters. To download ocropus' default RNN converted to the new format and

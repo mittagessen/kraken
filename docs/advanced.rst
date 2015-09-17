@@ -111,9 +111,9 @@ Recognition
 -----------
 
 Recognition requires a grey-scale or binarized image, a page segmentation for
-that image, and a pyrnn or HDF5 model. In particular there is no requirement to
-use the page segmentation algorithm contained in the ``segment`` subcommand or
-the binarization provided by kraken. 
+that image, and a pyrnn or protobuf model. In particular there is no
+requirement to use the page segmentation algorithm contained in the ``segment``
+subcommand or the binarization provided by kraken. 
 
 The ``ocr`` subcommand is able to print the recognition results either as plain
 text (default) or as `hOCR
@@ -130,5 +130,3 @@ the recognition confidence for each character in the ``x_conf`` attribute.
 
 Paragraph detection has been removed as it was deemed to be unduly dependent on
 certain typographic features which may not be valid for your input.
-
-
