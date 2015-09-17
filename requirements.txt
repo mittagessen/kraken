@@ -6,4 +6,4 @@ numpy
 Pillow
 regex
 scipy
-h5py
+protobuf
