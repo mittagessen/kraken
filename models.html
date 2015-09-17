@@ -6,7 +6,7 @@
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     
-    <title>Models &mdash; kraken 0.6.3-3-ga5f9441
+    <title>Models &mdash; kraken 0.7
  documentation</title>
     
     <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
@@ -15,7 +15,7 @@
     <script type="text/javascript">
       var DOCUMENTATION_OPTIONS = {
         URL_ROOT:    './',
-        VERSION:     '0.6.3-3-ga5f9441
+        VERSION:     '0.7
 ',
         COLLAPSE_INDEX: false,
         FILE_SUFFIX: '.html',
@@ -25,7 +25,7 @@
     <script type="text/javascript" src="_static/jquery.js"></script>
     <script type="text/javascript" src="_static/underscore.js"></script>
     <script type="text/javascript" src="_static/doctools.js"></script>
-    <link rel="top" title="kraken 0.6.3-3-ga5f9441
+    <link rel="top" title="kraken 0.7
  documentation" href="index.html" />
     <link rel="prev" title="kraken API" href="api.html" />
    
@@ -44,8 +44,8 @@
 <span id="id1"></span><h1>Models<a class="headerlink" href="#models" title="Permalink to this headline">¶</a></h1>
 <p>There are currently three kinds of models containing the recurrent neural
 networks doing all the character recognition supported by kraken: traditional
-pyrnn models that are just pickled instances of python objects, a new format
-serializing data in HDF5 files, and clstm&#8217;s native <a class="reference external" href="https://developers.google.com/protocol-buffers/">protocol buffer</a> serialization.</p>
+<code class="docutils literal"><span class="pre">pyrnn</span></code> models that are just pickled instances of python objects, a new
+format serializing data in <code class="docutils literal"><span class="pre">pronn</span></code> files, and clstm&#8217;s native <a class="reference external" href="https://developers.google.com/protocol-buffers/">protocol buffer</a> serialization.</p>
 <div class="section" id="pyrnn">
 <span id="id2"></span><h2>pyrnn<a class="headerlink" href="#pyrnn" title="Permalink to this headline">¶</a></h2>
 <p>These are serialized instances of python <code class="docutils literal"><span class="pre">lstm.SeqRecognizer</span></code> objects. Using
@@ -57,31 +57,37 @@ arbitrary code execution with relative ease. Additionally, they are not upward
 compatible between python 2.x and 3.x and significantly larger than the newer
 HDF5 models (roughly 6.5Mb per state).</p>
 </div>
+<div class="section" id="pronn">
+<h2>pronn<a class="headerlink" href="#pronn" title="Permalink to this headline">¶</a></h2>
+<p>Legacy python models can be converted to a protobuf based serialization. By
+default this conversion step happens automatically every time a pickled model
+is used.</p>
+<p>Protobuf models have several advantages over pickled ones. They are noticeably
+smaller (80Mb vs 1.8Mb for the default model), don&#8217;t allow arbitrary code
+execution, and are upward compatible with python 3. Because they are so much
+more lightweight they are also loaded much faster.</p>
+</div>
 <div class="section" id="hdf5">
 <h2>HDF5<a class="headerlink" href="#hdf5" title="Permalink to this headline">¶</a></h2>
 <p><a class="reference external" href="https://www.hdfgroup.org/HDF5/">HDF5</a> is a file format designed to store
-large amounts of numerical data efficiently. We currently serialize ocropus&#8217;s
-models as a group with attribute <code class="docutils literal"><span class="pre">kind</span></code> set to <code class="docutils literal"><span class="pre">pyrnn-bidi</span></code> containing the
-weights of each neural network in a separate data set. The codec included in
-pickle models is saved as well, while the line normalizer isn&#8217;t stashed for
-now.</p>
-<p>HDF5 models have several advantages over pickled ones. They are noticeably
-smaller (80Mb vs 1.8Mb for the default model), don&#8217;t allow arbitrary code
-execution, and are upward compatible. Because they are so much more lightweight
-they are also loaded much faster (~17s vs ~200ms).</p>
+large amounts of numerical data efficiently. It was used in the past to handle
+<code class="docutils literal"><span class="pre">pyrnn</span></code> models without incurring the deserialization and code execution
+penalty of pickled objects. As no training facility was included in kraken at
+the time, hence no HDF5-only models should exist, support for them has been
+removed.</p>
 </div>
 <div class="section" id="clstm">
 <h2>clstm<a class="headerlink" href="#clstm" title="Permalink to this headline">¶</a></h2>
 <p><a class="reference external" href="https://github.com/tmbdev/clstm">clstm</a>, a small and fast implementation of
 LSTM networks, creates neural networks serialized as protocol buffers. These
-are usually slightly smaller than HDF5 models and require clstm&#8217;s python
+are usually slightly smaller than converted models and require clstm&#8217;s python
 extension to load and run. While they are significantly faster than the native
 python models clstm is still in early development and there aren&#8217;t many trained
 models available, yet.</p>
 </div>
 <div class="section" id="conversion">
 <h2>Conversion<a class="headerlink" href="#conversion" title="Permalink to this headline">¶</a></h2>
-<p>Per default pyrnn models are automatically converted to the new HDF5 format
+<p>Per default pyrnn models are automatically converted to the new protobuf format
 when explicitely defined using the <code class="docutils literal"><span class="pre">-m</span></code> option to the <code class="docutils literal"><span class="pre">ocr</span></code> utility on the
 command line. They are stored in the user kraken directory (default is
 ~/.kraken) and will be automatically substituted in future runs.</p>
@@ -105,6 +111,7 @@ routine, it can be disabled using the <code class="docutils literal"><span class
   <ul>
 <li><a class="reference internal" href="#">Models</a><ul>
 <li><a class="reference internal" href="#pyrnn">pyrnn</a></li>
+<li><a class="reference internal" href="#pronn">pronn</a></li>
 <li><a class="reference internal" href="#hdf5">HDF5</a></li>
 <li><a class="reference internal" href="#clstm">clstm</a></li>
 <li><a class="reference internal" href="#conversion">Conversion</a></li>
