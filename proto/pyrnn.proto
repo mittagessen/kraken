@@ -1,0 +1,33 @@
+syntax = "proto2";
+
+package kraken;
+
+message array {
+	repeated uint32 dim = 1;
+	repeated float value = 2 [packed=true];
+}
+
+message lstm {
+	required array wgi = 1;
+	required array wgf = 2;
+	required array wgo = 3;
+	required array wci = 4;
+	required array wip = 5;
+	required array wfp = 6;
+	required array wop = 7;
+}
+
+message softmax {
+	required array w2 = 1;
+}
+
+message pyrnn {
+    required string kind = 1;
+    optional string name = 2;
+    required uint32 ninput = 10;
+    required uint32 noutput = 11;
+    repeated string codec = 12;
+    required lstm fwdnet = 13;
+    required lstm revnet = 14;
+    required softmax softmax = 15;
+}

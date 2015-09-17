@@ -11,6 +11,7 @@ from nose.tools import raises
 import kraken.lib.lstm
 
 from kraken.lib import models
+from kraken.lib import pyrnn_pb2
 from kraken.lib.exceptions import KrakenInvalidModelException
 
 thisfile = os.path.abspath(os.path.dirname(__file__))
@@ -30,31 +31,11 @@ class TestModels(unittest.TestCase):
         os.unlink(self.temp.name)
 
     @raises(KrakenInvalidModelException)
-    def test_load_hdf5_unknown(self):
+    def test_load_pronn_invalid(self):
         """
-        Test correct handling of unknown HDF5 files.
+        Test correct handling of invalid files.
         """
-        b = h5py.File(self.temp.name, 'w')
-        b.attrs['kind'] = 'not-an-rnn'
-        b.close()
-        models.load_hdf5(self.temp.name)
-
-    @raises(KrakenInvalidModelException)
-    def test_load_hdf5_incomplete(self):
-        """
-        Test correct handling of incomplete HDF5 files.
-        """
-        b = h5py.File(self.temp.name, 'w')
-        b.attrs['kind'] = 'pyrnn-bidi'
-        b.close()
-        models.load_hdf5(self.temp.name)
-
-    @raises(IOError)
-    def test_load_hdf5_invalid(self):
-        """
-        Test correct handling of invalid HDF5 files.
-        """
-        models.load_hdf5(self.temp.name)
+        models.load_pronn(self.temp.name)
        
     @raises(KrakenInvalidModelException)
     @unittest.skipIf(not PY2, "not supported in this version")
@@ -62,9 +43,7 @@ class TestModels(unittest.TestCase):
         """
         Test correct handling of non-pickle files.
         """
-        b = h5py.File(self.temp.name, 'w')
-        b.attrs['kind'] = 'pyrnn-bidi'
-        b.close()
+        self.temp.write('adfhewf')
         models.load_pyrnn(self.temp.name)
 
     @raises(KrakenInvalidModelException)
@@ -81,7 +60,7 @@ class TestModels(unittest.TestCase):
     def test_load_any_invalid(self):
         """
         Test load_any raises the proper exception if object is neither pickle
-        nor HDF5.
+        nor protobuf.
         """
         models.load_any(self.temp.name)
 
@@ -116,11 +95,11 @@ class TestModels(unittest.TestCase):
         rnn = models.load_any(os.path.join(resources, 'model.pyrnn.gz'))
         self.assertIsInstance(rnn, kraken.lib.lstm.SeqRecognizer)
 
-    def test_load_any_hdf5(self):
+    def test_load_any_proto(self):
         """
-        Test load_any loads HDF5 models.
+        Test load_any loads protobuf models.
         """
-        rnn = models.load_any(os.path.join(resources, 'model.hdf5'))
+        rnn = models.load_any(os.path.join(resources, 'model.pronn'))
         self.assertIsInstance(rnn, kraken.lib.lstm.SeqRecognizer)
 
 
