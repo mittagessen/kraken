@@ -26,7 +26,7 @@ from kraken.lib import models
 
 APP_NAME = 'kraken'
 MODEL_URL = 'http://l.unchti.me/'
-DEFAULT_MODEL = 'en-default.pyrnn.hdf5'
+DEFAULT_MODEL = 'en-default.pronn'
 LEGACY_MODEL_DIR = '/usr/local/share/ocropus'
 
 spinner = cycle([u'⣾', u'⣽', u'⣻', u'⢿', u'⡿', u'⣟', u'⣯', u'⣷'])
