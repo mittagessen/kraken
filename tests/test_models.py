@@ -3,7 +3,6 @@ import unittest
 import os
 import tempfile
 import pickle
-import h5py
 
 from future.utils import PY2
 from nose.tools import raises 

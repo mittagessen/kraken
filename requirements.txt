@@ -6,4 +6,4 @@ numpy
 Pillow
 regex
 scipy
-protobuf
+protobuf>=3.0.0a3

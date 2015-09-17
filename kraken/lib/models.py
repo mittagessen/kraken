@@ -17,7 +17,6 @@ from os.path import expandvars, expanduser, abspath
 from builtins import next
 from builtins import chr
 
-import h5py
 import numpy
 import gzip
 import bz2
