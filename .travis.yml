@@ -29,9 +29,7 @@ install:
   # Customise the testing environment
   # ---------------------------------
   - conda install pbr nose pip
-  # h5py has a false dependency on Cython, so we install it until it's fixed.
-  - conda install cython
-  - sed '/click\|dominate\|regex/d' requirements.txt | xargs conda install
+  - sed '/click\|dominate\|regex\|protobuf/d' requirements.txt | xargs conda install
   # Conda does not package everything, so we install a couple others via pip.
   - pip install -r requirements.txt
 
