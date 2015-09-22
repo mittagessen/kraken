@@ -40,7 +40,7 @@ def get_model(model_id, path, callback):
         components = el['path'].split('/')
         if len(components) > 2 and components[1] == model_id and components[2] == 'DESCRIPTION':
             logger.info('Retrieving description for {}'.format(components[1]))
-            raw = base64.b64decode(requests.get(el['url']).json()['content'])
+            raw = base64.b64decode(requests.get(el['url']).json()['content']).decode('utf-8')
             desc = json.loads(raw)
             spath = os.path.join(path, desc['name'])
         elif len(components) > 2 and components[1] == model_id:
@@ -71,7 +71,7 @@ def get_description(model_id):
         components = el['path'].split('/')
         if len(components) > 2 and components[1] == model_id and components[2] == 'DESCRIPTION':
             logger.info('Retrieving description for {}'.format(components[1]))
-            raw = base64.b64decode(requests.get(el['url']).json()['content'])
+            raw = base64.b64decode(requests.get(el['url']).json()['content']).decode('utf-8')
             return defaultdict(str, json.loads(raw))
 
 
@@ -97,7 +97,7 @@ def get_listing(callback):
             models[components[1]] = {'type': components[0]}
         if len(components) > 2 and components[2] == 'DESCRIPTION':
             logger.info('Retrieving description for {}'.format(components[1]))
-            raw = base64.b64decode(requests.get(el['url']).json()['content'])
+            raw = base64.b64decode(requests.get(el['url']).json()['content']).decode('utf-8')
             callback()
             try:
                 models[components[1]].update(json.loads(raw))
