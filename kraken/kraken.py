@@ -245,6 +245,10 @@ def list(ctx):
 @click.pass_context
 @click.argument('model_id')
 def get(ctx, model_id):
+    try:
+        os.mkdir(click.get_app_dir(APP_NAME, force_posix=True))
+    except:
+        pass
     repo.get_model(model_id, click.get_app_dir(APP_NAME, force_posix=True),
                    partial(spin, 'Retrieving model'))
     click.secho(u'\b\u2713', fg='green', nl=False)
