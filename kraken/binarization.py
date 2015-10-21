@@ -4,6 +4,7 @@ from __future__ import unicode_literals
 import numpy as np
 
 from kraken.lib.util import pil2array, array2pil
+from kraken.lib.exceptions import KrakenInputException
 from scipy.ndimage import filters, interpolation, morphology
 
 
@@ -34,6 +35,8 @@ def nlbin(im, threshold=0.5, zoom=0.5, escale=1.0, border=0.1, perc=80,
     if raw.ndim == 3:
         raw = np.mean(raw, 2)
     # perform image normalization
+    if np.amax(raw) == np.amin(raw):
+        raise KrakenInputException('Image is empty')
     image = raw-np.amin(raw)
     image /= np.amax(image)
 
