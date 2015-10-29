@@ -120,6 +120,7 @@ def rpred(network, im, bounds, pad=16, line_normalization=True):
     lnorm = getattr(network, 'lnorm', CenterNormalizer())
 
     for box, coords in extract_boxes(im, bounds):
+        raw_line = pil2array(box)
         if line_normalization:
             # fail gracefully and return no recognition result in case the
             # input line can not be normalized.
@@ -129,7 +130,6 @@ def rpred(network, im, bounds, pad=16, line_normalization=True):
                 yield ocr_record('', [], [])
                 continue
         line = pil2array(box)
-        raw_line = line.copy()
         line = lstm.prepare_line(line, pad)
         pred = network.predictString(line)
 
