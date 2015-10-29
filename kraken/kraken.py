@@ -200,16 +200,16 @@ def ocr(ctx, model=DEFAULT_MODEL, pad=16, hocr=False, lines=None, conv=True):
         ctx.exit(1)
     click.secho(u'\u2713', fg='green')
 
-    # convert input model to HDF5
+    # convert input model to protobuf
     if conv and rnn.kind == 'pyrnn':
         name, _ = os.path.splitext(os.path.basename(model))
         op = os.path.join(click.get_app_dir(APP_NAME, force_posix=True), name +
-                          '.hdf5')
+                          '.pronn')
         try:
             os.makedirs(click.get_app_dir(APP_NAME, force_posix=True))
         except OSError:
             pass
-        models.pyrnn_to_hdf5(rnn, op)
+        models.pyrnn_to_pronn(rnn, op)
 
     # set output mode
     if hocr:
