@@ -143,4 +143,5 @@ def rpred(network, im, bounds, pad=16, line_normalization=True):
                         coords[0] + int((r-pad) * scale),
                         coords[3]))
             conf.append(network.outputs[r, c])
-        yield ocr_record(pred, pos[1:], conf)
+        pos.append((pos[-1][2], coords[1], coords[2], coords[3]))
+        yield ocr_record(pred, pos[2:], conf)
