@@ -139,7 +139,12 @@ def rpred(network, im, bounds, pad=16, line_normalization=True):
         pos = [(coords[0], coords[1], coords[0], coords[3])]
         conf = []
         for r, c in result:
-            pos.append((pos[-1][2], coords[1],
+            if c == 0:
+                last_x = coords[0] + int((r-pad) * scale)
+                continue
+            else:
+                last_x = pos[-1][2]
+            pos.append((last_x, coords[1],
                         coords[0] + int((r-pad) * scale),
                         coords[3]))
             conf.append(network.outputs[r, c])
