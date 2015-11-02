@@ -137,16 +137,16 @@ def rpred(network, im, bounds, pad=16, line_normalization=True):
         scale = len(raw_line.T)/(len(network.outputs)-2 * pad)
         result = lstm.translate_back(network.outputs, pos=1)
         pos = [(coords[0], coords[1], coords[0], coords[3])]
-        conf = []
-        for r, c in result:
-            if c == 0:
-                last_x = coords[0] + int((r-pad) * scale)
-                continue
-            else:
-                last_x = pos[-1][2]
-            pos.append((last_x, coords[1],
-                        coords[0] + int((r-pad) * scale),
-                        coords[3]))
-            conf.append(network.outputs[r, c])
-        pos.append((pos[-1][2], coords[1], coords[2], coords[3]))
-        yield ocr_record(pred, pos[2:], conf)
+        conf = [network.outputs[r, c] for r, c in result]
+        cuts = [int((r-pad)*scale) for (r, c) in result if c != 0]
+        if len(cuts) != len(pred):
+            raise KrakenInputException('character cuts and result not of same length!')
+        # append last offset to end of line
+        cuts.append(coords[2] - coords[0])
+        pos = []
+        for i, d in enumerate(cuts):
+            try:
+                pos.append((coords[0] + d, coords[1], coords[0] + cuts[i+1], coords[3]))
+            except:
+                break
+        yield ocr_record(pred, pos, conf)
