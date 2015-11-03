@@ -137,7 +137,7 @@ def rpred(network, im, bounds, pad=16, line_normalization=True):
         scale = len(raw_line.T)/(len(network.outputs)-2 * pad)
         result = lstm.translate_back(network.outputs, pos=1)
         pos = [(coords[0], coords[1], coords[0], coords[3])]
-        conf = [network.outputs[r, c] for r, c in result]
+        conf = [network.outputs[r, c] for r, c in result if c != 0]
         cuts = [int((r-pad)*scale) for (r, c) in result if c != 0]
         if len(cuts) != len(pred):
             raise KrakenInputException('character cuts and result not of same length!')
