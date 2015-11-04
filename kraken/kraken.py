@@ -64,7 +64,7 @@ def segmenter(scale, black_colseps, base_image, input, output):
         raise
     with open_file(output, 'w') as fp:
         for box in res:
-            fp.write(u'{},{},{},{}\n'.format(*box).encode('utf-8'))
+            fp.write(u'{},{},{},{}\n'.format(*box))
     click.secho(u'\u2713', fg='green')
 
 
