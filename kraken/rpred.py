@@ -120,13 +120,17 @@ def rpred(network, im, bounds, pad=16, line_normalization=True):
     lnorm = getattr(network, 'lnorm', CenterNormalizer())
 
     for box, coords in extract_boxes(im, bounds):
+        # check if boxes are non-zero in any dimension
+        if sum(coords[::2]) == False or coords[3] - coords[1] == False:
+            yield ocr_record('', [], [])
+            continue
         raw_line = pil2array(box)
         if line_normalization:
             # fail gracefully and return no recognition result in case the
             # input line can not be normalized.
             try:
                 box = dewarp(lnorm, box)
-            except ValueError:
+            except:
                 yield ocr_record('', [], [])
                 continue
         line = pil2array(box)
