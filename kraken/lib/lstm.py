@@ -189,6 +189,9 @@ class LSTM(Network):
         ni,ns,na = self.dims
         assert len(xs[0])==ni
         n = len(xs)
+        # grow internal state arrays if len(xs) > maxlen
+        if n > self.gi.shape[0]:
+            self.allocate(n)
         self.last_n = n
         self.reset(n)
         for t in range(n):
