@@ -140,17 +140,19 @@ def rpred(network, im, bounds, pad=16, line_normalization=True):
         # calculate recognized LSTM locations of characters
         scale = len(raw_line.T)/(len(network.outputs)-2 * pad)
         result = lstm.translate_back(network.outputs, pos=1)
-        pos = [(coords[0], coords[1], coords[0], coords[3])]
         conf = [network.outputs[r, c] for r, c in result if c != 0]
-        cuts = [int((r-pad)*scale) for (r, c) in result if c != 0]
-        if len(cuts) != len(pred):
-            raise KrakenInputException('character cuts and result not of same length!')
+        cuts = [(int((r-pad)*scale), c) for (r, c) in result]
         # append last offset to end of line
-        cuts.append(coords[2] - coords[0])
+        cuts.append((coords[2] - coords[0], 0))
         pos = []
+        lx = 0
         for i, d in enumerate(cuts):
+            if d[1] == 0:
+                lx = d[0]
+                continue
             try:
-                pos.append((coords[0] + d, coords[1], coords[0] + cuts[i+1], coords[3]))
+                pos.append((coords[0] + lx, coords[1], coords[0] + d[0], coords[3]))
             except:
                 break
+            lx = d[0]
         yield ocr_record(pred, pos, conf)
