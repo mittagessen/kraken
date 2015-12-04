@@ -14,11 +14,16 @@
 		</script>
 		<script>
 			$(document).ready(function() {
+				// resize image map based on scaled
 				$('map').imageMapResize();
+
 				$('img[usemap]').maphilight({"fill": false});
+
+				// focus text fields when lines/words are clicked
 				$('area').click(function(e) {
 					$('#' + $(this).attr('alt')).focus();
 				});
+				// create mouseover effect 
 				$('li[contenteditable=true], span').mouseover(function(e) {
 					$('area[alt=' + this.id + ']').mouseover();
 				}).mouseout(function(e) {
@@ -35,15 +40,33 @@
 						$els.eq($els.index(this) + 1).focus();
 					}
 				});
+			
+				// smooth scrolling between anchor links
+				$('a[href*=#]').on('click', function(event){     
+					    event.preventDefault();
+					        $('html,body').animate({scrollTop:$(this.hash).offset().top}, 500);
+				});
+
+				$('#download').on('click', function(event) {
+					document.documentElement.outerHTML
+					$(this).attr('href', 'data:text/html,;charset=utf-8,%EF%BB%BF' + $('html'));
+				});
 			});
 		</script>
+		<nav>
+			<ul>
+			{% for page in pages %}
+				<li><a href='#page_{{ page.index }}'>{{ page.index }}</a></li>
+			{% endfor %}
+			</ul>
+			<a id="download_button" href="#">Download</a>
+		</nav>
 		{% for page in pages %}
-		<div class="container page" id="page_{{ page.index }}">
+		<section class="page container" id="page_{{ page.index }}">
 			<div class="column">
 				<img class="page_image" usemap="#elements_{{ page.index }}" src='{{ page.img }}' alt="photo"/>
 			</div>
 			<div class="column">
-				<div class='text_fields'>
 				<ul>
 				{% for line in page.lines %}
 					{% if line.recognition %}
@@ -57,10 +80,7 @@
 					{% endif %}
 				{% endfor %}
 				</ul>
-				</div>
-
 			</div>
-
 			<map name="elements_{{ page.index}}">
 				{% for line in page.lines %}
 					{% if line.recognition %}
@@ -72,7 +92,7 @@
 					{% endif %}
 				{% endfor %}
 			</map>
-		</div>
+		</section>
 		{% endfor %}
 	</body>
 </html>

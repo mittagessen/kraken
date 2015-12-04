@@ -1,10 +1,16 @@
+body {
+	background: #f3f3f3;
+	margin: 0;
+	padding: 0;
+}
+
 [contenteditable=true]:empty:before {
 	content: attr(data-placeholder);
 	display: block; /* For Firefox */
 }
 
 li[contenteditable=true] {
-	border: 1px dashed #AAA;
+	border: 1px dashed #000;
 	width: 100%;
 	padding: 2px;
 	margin: 0 0 5px 0;
@@ -14,17 +20,42 @@ ul {
 	list-style-type:none;
 }
 
+nav {
+	position: fixed;
+	top: 0;
+	left: 0;
+	height: 100%;
+	width: 10%;
+}
+
+nav ul {
+	list-style: none;
+}
+
+nav li {
+	display : inline-block;
+}
+
+nav a {
+	text-decoration: none;
+}
+
+nav a:hover {
+	text-decoration: underline;	
+}
+
 .container {
+	position: relative;
+	margin-left: 15%;
 	display: table;
 	height: 100%;
-	width: 100%;
+	width: 90%;
 }
 
 .column {
 	display: table-cell;
-	text-align: top;
 	vertical-align: top;
-	width: 50%;
+	width: 45%;
 	padding: 1rem;
 }
 
@@ -32,6 +63,14 @@ ul {
 	width: 100%;
 }
 
+#download_button {
+	position: fixed;
+	display: block;
+	margin: auto;
+	bottom: 15px;
+	padding: 8px 5% 8px 5%;
+}
+
 .corrected {
-	    background-color: #88CC88;
+	background-color: #73AD21;
 }
