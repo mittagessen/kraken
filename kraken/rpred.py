@@ -125,6 +125,10 @@ def rpred(network, im, bounds, pad=16, line_normalization=True):
             yield ocr_record('', [], [])
             continue
         raw_line = pil2array(box)
+        # check if line is non-zero
+        if np.amax(raw_line) == np.amin(raw_line):
+            yield ocr_record('', [], [])
+            continue
         if line_normalization:
             # fail gracefully and return no recognition result in case the
             # input line can not be normalized.
