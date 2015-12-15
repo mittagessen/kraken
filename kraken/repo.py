@@ -30,7 +30,7 @@ def get_model(model_id, path, callback):
         raise KrakenRepoException(resp['message'])
     head = resp['object']['sha']
     logger.info('Retrieving tree of model repository')
-    r = requests.get('{}{}{}'.format(MODEL_REPO, 'git/trees/', head), {'recursive': 1})
+    r = requests.get('{}{}{}'.format(MODEL_REPO, 'git/trees/', head), params={'recursive': 1})
     callback()
     resp = r.json()
     if 'tree' not in resp:
