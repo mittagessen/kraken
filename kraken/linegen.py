@@ -32,16 +32,20 @@ standard_library.install_aliases()
 from builtins import range
 from builtins import object
 
-from PIL import Image
 from jinja2 import Environment, PackageLoader
 
+from scipy.ndimage.filters import gaussian_filter
+from scipy.ndimage.interpolation import affine_transform, geometric_transform
+from PIL import Image
+
+import numpy as np
+import pangocairo
 import tempfile
 import shutil
-import os
-
 import cairo
 import pango
-import pangocairo
+
+from kraken.lib.util import pil2array, array2pil
 
 def set_fonts(font_file):
     """
@@ -142,4 +146,40 @@ def render_line(text, family, font_size=32, language=None, rtl=False, vertical=F
     draw_on_surface(real_surface, text, family, font_size, language, rtl, vertical)
     return Image.frombuffer("RGBA", (width, height), real_surface.get_data(), "raw", "BGRA", 0, 1)
 
-def degrade_line():
+
+def degrade_line(im, sigma=0.5, threshold=0.5, delta=0.3, eps=0.03):
+    """
+
+    """
+    line = pil2array(im.convert('L'))
+    a = np.asarray(line, 'f')
+    a = a*1.0/np.amax(a)
+    a = gaussian_filter(a, sigma)
+    a += np.clip(np.random.randn(*a.shape)*0.2, -0.25, 0.25)
+    m = np.array([[1+eps*np.random.randn(), 0.0], [eps*np.random.randn(), 1.0+eps*np.random.randn()]])
+    w, h = line.shape
+    c = np.array([w/2.0, h/2])
+    d = c - np.dot(m, c) + np.array([np.random.randn()*delta, np.random.randn()*delta])
+    return array2pil(affine_transform(line, m, offset=d, order=1, mode='nearest'))
+
+
+def distort_line(im, distort=3.0, sigma=10.0):
+    """
+    Distorts a line image.
+
+    Args:
+        im (PIL.Image): Input image
+        distort (float):
+        sigma (float):
+    """
+    w, h = im.size
+    line = pil2array(im.convert('L'))
+    hs = gaussian_filter(np.random.randn(h, w), sigma)
+    ws = gaussian_filter(np.random.randn(h, w), sigma)
+    hs *= distort/np.amax(hs)
+    ws *= distort/np.amax(ws)
+
+    def f(p):
+        return (p[0]+hs[p[0],p[1]],p[1]+ws[p[0],p[1]])
+
+    return array2pil(geometric_transform(line, f, output_shape=(h, w), order=1, mode='nearest'))
