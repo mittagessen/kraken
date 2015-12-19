@@ -47,6 +47,7 @@ import pango
 
 from kraken.lib.util import pil2array, array2pil
 
+
 def set_fonts(font_file):
     """
     Activates a temporary fontconfig environment and loads pango.
@@ -147,20 +148,57 @@ def render_line(text, family, font_size=32, language=None, rtl=False, vertical=F
     return Image.frombuffer("RGBA", (width, height), real_surface.get_data(), "raw", "BGRA", 0, 1)
 
 
-def degrade_line(im, sigma=0.5, threshold=0.5, delta=0.3, eps=0.03):
+def degrade_line(im, mean=0.0, sigma=0.001, density=0.02):
     """
+    Degrades a line image by adding several kinds of noise.
 
+    Args:
+        im (PIL.Image): Input image
+        mean (float): Mean of distribution for Gaussian noise
+        sigma (float): Standard deviation for Gaussian noise
+        density (float): Noise density for Salt and Pepper noise
+
+    Returns:
+        PIL.Image in mode 'L'
     """
-    line = pil2array(im.convert('L'))
-    a = np.asarray(line, 'f')
-    a = a*1.0/np.amax(a)
-    a = gaussian_filter(a, sigma)
-    a += np.clip(np.random.randn(*a.shape)*0.2, -0.25, 0.25)
-    m = np.array([[1+eps*np.random.randn(), 0.0], [eps*np.random.randn(), 1.0+eps*np.random.randn()]])
-    w, h = line.shape
-    c = np.array([w/2.0, h/2])
-    d = c - np.dot(m, c) + np.array([np.random.randn()*delta, np.random.randn()*delta])
-    return array2pil(affine_transform(line, m, offset=d, order=1, mode='nearest'))
+    def add_gaussian(im, mean, sigma):
+        """
+        Adds Gaussian white noise.
+    
+        Args:
+            im (PIL.Image): Input image
+            mean (float): Mean value
+            sigma (float): Standard deviation
+    
+        Returns:
+            PIL.Image in 'L' mode.
+        """
+        a = pil2array(im)
+        b = a.astype('f')/np.amax(a) + np.random.normal(mean, sigma, a.shape)
+        return array2pil(np.clip(b * np.amax(a), 0, 255).astype('uint8'))
+    
+    
+    def add_salt_and_pepper(im, d):
+        """
+        Adds (symmetric) salt and pepper noise.
+    
+        Args:
+            im (PIL.Image): Input image
+            d (float): Noise density
+    
+        Returns:
+            PIL.Image in 'L' mode.
+        """
+        a = pil2array(im.convert('L'))
+        flipped = np.ceil(d/2 * a.size)
+        coords = [np.random.randint(0, i - 1, int(flipped)) for i in a.shape]
+        a[coords] = 255
+        coords = [np.random.randint(0, i - 1, int(flipped)) for i in a.shape]
+        a[coords] = 0
+        return array2pil(a)
+
+    im = add_gaussian(im, mean, sigma)
+    return add_salt_and_pepper(im, density)
 
 
 def distort_line(im, distort=3.0, sigma=10.0):
