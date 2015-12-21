@@ -159,8 +159,10 @@ def process_pipeline(subcommands, input, concurrency, verbose):
 @click.option('--range', default=20, type=click.INT)
 @click.option('--low', default=5, type=click.IntRange(1, 100))
 @click.option('--high', default=90, type=click.IntRange(1, 100))
-def binarize(threshold=0.5, zoom=0.5, escale=1.0, border=0.1, perc=80,
-             range=20, low=5, high=90):
+def binarize(threshold, zoom, escale, border, perc, range, low, high):
+    """
+    Binarizes page images.
+    """
     return partial(binarizer, threshold, zoom, escale, border, perc, range, low, high)
 
 
@@ -168,6 +170,9 @@ def binarize(threshold=0.5, zoom=0.5, escale=1.0, border=0.1, perc=80,
 @click.option('--scale', default=None, type=click.FLOAT)
 @click.option('-b/-w', '--black_colseps/--white_colseps', default=False)
 def segment(scale=None, black_colseps=False):
+    """
+    Segments page images into text lines.
+    """
     return partial(segmenter, scale, black_colseps)
 
 
@@ -183,7 +188,10 @@ def segment(scale=None, black_colseps=False):
               help='JSON file containing line coordinates')
 @click.option('--enable-autoconversion/--disable-autoconversion', 'conv',
               default=True, help='Automatically convert pyrnn models zu HDF5')
-def ocr(ctx, model=DEFAULT_MODEL, pad=16, hocr=False, lines=None, conv=True):
+def ocr(ctx, model, pad, hocr, lines, conv):
+    """
+    Recognizes text in line images.
+    """
     # we do the locating and loading of the model here to spare us the overhead
     # in each worker.
 
@@ -231,10 +239,14 @@ def ocr(ctx, model=DEFAULT_MODEL, pad=16, hocr=False, lines=None, conv=True):
     return partial(recognizer, model=rnn, pad=pad, lines=lines)
 
 
+
 @cli.command('show')
 @click.pass_context
 @click.argument('model_id')
 def show(ctx, model_id):
+    """
+    Retrieves model metadata from the repository.
+    """
     desc = repo.get_description(model_id)
     click.echo('name: {}\n\n{}\n\nauthor: {} ({})\n{}'.format(desc['name'],
                                                               desc['summary'],
@@ -246,6 +258,9 @@ def show(ctx, model_id):
 @cli.command('list')
 @click.pass_context
 def list(ctx):
+    """
+    Lists repositories in the repository.
+    """
     model_list = repo.get_listing(partial(spin, 'Retrieving model list'))
     click.secho(u'\b\u2713', fg='green', nl=False)
     click.echo('\033[?25h\n', nl=False)
@@ -257,6 +272,9 @@ def list(ctx):
 @click.pass_context
 @click.argument('model_id')
 def get(ctx, model_id):
+    """
+    Retrieves a model from the repository.
+    """
     repo.get_model(model_id, click.get_app_dir(APP_NAME),
                    partial(spin, 'Retrieving model'))
     click.secho(u'\b\u2713', fg='green', nl=False)
