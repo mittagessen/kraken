@@ -45,8 +45,8 @@ import shutil
 import cairo
 import pango
 
+from kraken.lib.exceptions import KrakenCairoSurfaceException
 from kraken.lib.util import pil2array, array2pil
-
 
 def set_fonts(font_file):
     """
@@ -138,12 +138,18 @@ def render_line(text, family, font_size=32, language=None, rtl=False, vertical=F
 
     Returns:
         (B/W) PIL.Image in RGBA mode
+
+    Raises:
+        KrakenCairoSurfaceException if the CairoSurface couldn't be created
+        (usually caused by invalid dimensions.
     """
     temp_surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, 0, 0)
     height, width = draw_on_surface(temp_surface, text, family,
                                     font_size,language, rtl, vertical)
-    
-    real_surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, width, height)
+    try:
+        real_surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, width, height)
+    except cairo.Error as e:
+        raise KrakenCairoSurfaceException(e.message, width, height)
     draw_on_surface(real_surface, text, family, font_size, language, rtl, vertical)
     return Image.frombuffer("RGBA", (width, height), real_surface.get_data(), "raw", "BGRA", 0, 1)
 
@@ -161,44 +167,16 @@ def degrade_line(im, mean=0.0, sigma=0.001, density=0.02):
     Returns:
         PIL.Image in mode 'L'
     """
-    def add_gaussian(im, mean, sigma):
-        """
-        Adds Gaussian white noise.
-    
-        Args:
-            im (PIL.Image): Input image
-            mean (float): Mean value
-            sigma (float): Standard deviation
-    
-        Returns:
-            PIL.Image in 'L' mode.
-        """
-        a = pil2array(im)
-        b = a.astype('f')/np.amax(a) + np.random.normal(mean, sigma, a.shape)
-        return array2pil(np.clip(b * np.amax(a), 0, 255).astype('uint8'))
-    
-    
-    def add_salt_and_pepper(im, d):
-        """
-        Adds (symmetric) salt and pepper noise.
-    
-        Args:
-            im (PIL.Image): Input image
-            d (float): Noise density
-    
-        Returns:
-            PIL.Image in 'L' mode.
-        """
-        a = pil2array(im.convert('L'))
-        flipped = np.ceil(d/2 * a.size)
-        coords = [np.random.randint(0, i - 1, int(flipped)) for i in a.shape]
-        a[coords] = 255
-        coords = [np.random.randint(0, i - 1, int(flipped)) for i in a.shape]
-        a[coords] = 0
-        return array2pil(a)
-
-    im = add_gaussian(im, mean, sigma)
-    return add_salt_and_pepper(im, density)
+    im = pil2array(im)
+    m = np.amax(im)
+    im = gaussian_filter(im.astype('f')/m, 0.5)
+    im += np.random.normal(mean, sigma, im.shape)
+    flipped = np.ceil(density/2 * im.size)
+    coords = [np.random.randint(0, i - 1, int(flipped)) for i in im.shape]
+    im[coords] = 255
+    coords = [np.random.randint(0, i - 1, int(flipped)) for i in im.shape]
+    im[coords] = 0
+    return array2pil(np.clip(im * m, 0, 255).astype('uint8'))
 
 
 def distort_line(im, distort=3.0, sigma=10.0):
@@ -212,6 +190,7 @@ def distort_line(im, distort=3.0, sigma=10.0):
     """
     w, h = im.size
     line = pil2array(im.convert('L'))
+
     hs = gaussian_filter(np.random.randn(h, w), sigma)
     ws = gaussian_filter(np.random.randn(h, w), sigma)
     hs *= distort/np.amax(hs)
