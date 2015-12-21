@@ -36,7 +36,7 @@ from jinja2 import Environment, PackageLoader
 
 from scipy.ndimage.filters import gaussian_filter
 from scipy.ndimage.interpolation import affine_transform, geometric_transform
-from PIL import Image
+from PIL import Image, ImageOps
 
 import numpy as np
 import pangocairo
@@ -151,10 +151,16 @@ def render_line(text, family, font_size=32, language=None, rtl=False, vertical=F
     except cairo.Error as e:
         raise KrakenCairoSurfaceException(e.message, width, height)
     draw_on_surface(real_surface, text, family, font_size, language, rtl, vertical)
-    return Image.frombuffer("RGBA", (width, height), real_surface.get_data(), "raw", "BGRA", 0, 1)
+    im = Image.frombuffer("RGBA", (width, height), real_surface.get_data(), "raw", "BGRA", 0, 1)
+    # there's a bug in get_pixel_extents not returning the correct height, so
+    # recrop using PIL facilities.
+    im = im.convert('L')
+    im = im.crop(ImageOps.invert(im).getbbox())
+    # add border 
+    im = ImageOps.expand(im, 5, 255)
+    return im
 
-
-def degrade_line(im, mean=0.0, sigma=0.001, density=0.02):
+def degrade_line(im, mean=0.0, sigma=0.001, density=0.002):
     """
     Degrades a line image by adding several kinds of noise.
 
