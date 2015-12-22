@@ -19,7 +19,6 @@ from future import standard_library
 standard_library.install_aliases()
 
 import os
-import io
 import time
 import click
 import errno
@@ -97,15 +96,22 @@ def line_generator(ctx, font, maxlines, encoding, normalization, font_size, lang
     lines = set()
     if not text:
         return
+    st_time = time.time()
     for t in text:
         with click.open_file(t, encoding=encoding) as fp:
-            spin('Reading texts')
+            if ctx.meta['verbose'] > 0:
+                click.echo(u'[{:2.4f}] Reading {}'.format(time.time() - st_time, t))
+            else:
+                spin('Reading texts')
             lines.update(fp.readlines())
     if normalization:
         lines = set([unicodedata.normalize(normalization, line) for line in lines])
-    click.secho(u'\b\u2713', fg='green', nl=False)
-    click.echo('\033[?25h\n', nl=False)
-    click.echo('Read {} unique lines'.format(len(lines)))
+    if ctx.meta['verbose'] > 0:
+        click.echo(u'[{:2.4f}] Read {} lines'.format(time.time() - st_time, len(lines)))
+    else:
+        click.secho(u'\b\u2713', fg='green', nl=False)
+        click.echo('\033[?25h\n', nl=False)
+        click.echo('Read {} unique lines'.format(len(lines)))
     if maxlines and maxlines < len(lines):
         click.echo('Sampling {} lines\t'.format(maxlines), nl=False)
         lines = list(lines)
@@ -116,22 +122,47 @@ def line_generator(ctx, font, maxlines, encoding, normalization, font_size, lang
     except OSError as e:
         if e.errno != errno.EEXIST:
             raise
+
+    lines = [line.strip() for line in lines]
+
+    # calculate the alphabet and print it for verification purposes
+    alphabet = set()
+    for line in lines:
+        alphabet.update(line)
+    chars = []
+    combining = []
+    for char in sorted(alphabet):
+        if unicodedata.combining(char):
+            combining.append(unicodedata.name(char))
+        else:
+            chars.append(char)
+    click.echo(u'Σ (len: {})'.format(len(alphabet)))
+    click.echo(u'Symbols: {}'.format(''.join(chars)))
+    if combining:
+        click.echo(u'Combining Characters: {}'.format(', '.join(combining)))
     for idx, line in enumerate(lines):
-        spin('Writing images')
+        if ctx.meta['verbose'] > 0:
+            click.echo(u'[{:2.4f}] {}'.format(time.time() - st_time, line))
+        else:
+            spin('Writing images')
         try:
             im = linegen.render_line(line, family=font, font_size=font_size,
                                 language=language, rtl=rtl, vertical=vertical)
         except KrakenCairoSurfaceException as e:
-            click.secho(u'\b\u2717', fg='red')
-            click.echo('{}: {} {}'.format(e.message, e.width, e.height))
+            if ctx.meta['verbose'] > 0:
+                click.echo('[{:2.4f}] {}: {} {}'.format(time.time() - st_time, e.message, e.width, e.height))
+            else:
+                click.secho(u'\b\u2717', fg='red')
+                click.echo('{}: {} {}'.format(e.message, e.width, e.height))
             continue
-        im = linegen.degrade_line(im, mean, sigma, density)
         im = linegen.distort_line(im, distort, distortion_sigma)
+        im = linegen.degrade_line(im, mean, sigma, density)
         im.save('{}/{:06d}.png'.format(output, idx))
         with open('{}/{:06d}.gt.txt'.format(output, idx), 'wb') as fp:
             fp.write(line.encode('utf-8'))
-    click.secho(u'\b\u2713', fg='green', nl=False)
-    click.echo('\033[?25h\n', nl=False)
+    if ctx.meta['verbose'] == 0:
+        click.secho(u'\b\u2713', fg='green', nl=False)
+        click.echo('\033[?25h\n', nl=False)
 
 if __name__ == '__main__':
     cli()

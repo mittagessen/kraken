@@ -146,6 +146,8 @@ def render_line(text, family, font_size=32, language=None, rtl=False, vertical=F
     temp_surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, 0, 0)
     height, width = draw_on_surface(temp_surface, text, family,
                                     font_size,language, rtl, vertical)
+    if width == 0 or height == 0:
+        raise KrakenCairoSurfaceException('Surface zero pixels in at least one dimension', width, height)
     try:
         real_surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, width, height)
     except cairo.Error as e:
@@ -185,24 +187,45 @@ def degrade_line(im, mean=0.0, sigma=0.001, density=0.002):
     return array2pil(np.clip(im * m, 0, 255).astype('uint8'))
 
 
-def distort_line(im, distort=3.0, sigma=10.0):
+def distort_line(im, distort=3.0, sigma=10.0, eps=0.03, delta=0.3):
     """
     Distorts a line image.
+
+    Run BEFORE degrade_line as a white border of 5 pixels will be added.
 
     Args:
         im (PIL.Image): Input image
         distort (float):
         sigma (float):
+        eps (float):
+        delta (float):
+
+    Returns:
+        PIL.Image in mode 'L'
     """
     w, h = im.size
-    line = pil2array(im.convert('L'))
+    # XXX: determine correct output shape from transformation matrices instead
+    # of guesstimating.
+    image = Image.new('L', (int(1.5*w), 4*h), 255)
+    image.paste(im, (int((image.size[0] - w) / 2), int((image.size[1] - h) / 2)))
+    line = pil2array(image.convert('L'))
 
-    hs = gaussian_filter(np.random.randn(h, w), sigma)
-    ws = gaussian_filter(np.random.randn(h, w), sigma)
+    # shear in y direction with factor eps * randn(), scaling with 1 + eps *
+    # randn() in x/y axis (all offset at d)
+    m = np.array([[1 + eps * np.random.randn(), 0.0], [eps * np.random.randn(), 1.0 + eps * np.random.randn()]])
+    c = np.array([w/2.0, h/2])
+    d = c - np.dot(m, c) + np.array([np.random.randn() * delta, np.random.randn() * delta])
+    line = affine_transform(line, m, offset=d, order=1, mode='constant', cval=255)
+
+    hs = gaussian_filter(np.random.randn(4*h, 1.5*w), sigma)
+    ws = gaussian_filter(np.random.randn(4*h, 1.5*w), sigma)
     hs *= distort/np.amax(hs)
     ws *= distort/np.amax(ws)
 
     def f(p):
         return (p[0]+hs[p[0],p[1]],p[1]+ws[p[0],p[1]])
 
-    return array2pil(geometric_transform(line, f, output_shape=(h, w), order=1, mode='nearest'))
+    im = array2pil(geometric_transform(line, f, order=1, mode='nearest'))
+    im = im.crop(ImageOps.invert(im).getbbox())
+    im = ImageOps.expand(im, 5, 255)
+    return im
