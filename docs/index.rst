@@ -6,6 +6,7 @@ kraken
    :maxdepth: 2
 
    advanced
+   Training <ketos>
    API <api>
    Models <models>
 
