@@ -1,0 +1,226 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Training &mdash; kraken 0.7.5-6-g09dd4a3
+ documentation</title>
+    
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '0.7.5-6-g09dd4a3
+',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="kraken 0.7.5-6-g09dd4a3
+ documentation" href="index.html" />
+    <link rel="next" title="kraken API" href="api.html" />
+    <link rel="prev" title="Advanced usage" href="advanced.html" />
+   
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body role="document">  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="training">
+<h1>Training<a class="headerlink" href="#training" title="Permalink to this headline">¶</a></h1>
+<p>Thanks to the magic of <a class="reference external" href="ftp://ftp.idsia.ch/pub/juergen/icml2006.pdf">Connectionist Temporal Classification</a> prerequisites for creating a
+new recognition model are quite modest. The basic requirement is a number of
+text lines (<code class="docutils literal"><span class="pre">ground</span> <span class="pre">truth</span></code>) that correspond to line images and some time for
+training.</p>
+<p>Training tasks are covered by subcommands attached to the <code class="docutils literal"><span class="pre">ketos</span></code> command.</p>
+<div class="section" id="artificial-training-data">
+<h2>Artificial Training Data<a class="headerlink" href="#artificial-training-data" title="Permalink to this headline">¶</a></h2>
+<p>It is possible to rely on artificially created training data, instead of
+laborously creating ground truth by manual means. A proper typeface and some
+text in the target language will be needed.</p>
+<p>For many popular historical fonts there are free reproductions which quite
+closely match printed editions. Most are available in your distribution&#8217;s
+repositories and often shipped with TeX Live.</p>
+<p>Some good places to start for non-Latin scripts are:</p>
+<ul class="simple">
+<li><a class="reference external" href="http://www.amirifont.org/">Amiri</a>, a classical Arabic typeface by Khaled
+Hosny</li>
+<li>The <a class="reference external" href="http://www.greekfontsociety.gr/">Greek Font Society</a> offers freely
+licensed (historical) typefaces for polytonic Greek.</li>
+<li>The friendly religious fanatics from <a class="reference external" href="http://scripts.sil.org/">SIL</a>
+assemble a wide variety of fonts for non-Latin scripts.</li>
+</ul>
+<p>Next we need some text to generate artificial line images from. It should be a
+typical example of the type of printed works you want to recognize and at least
+500-1000 lines in length.</p>
+<p>A minimal invocation to the line generation tool will look like this:</p>
+<div class="highlight-console"><div class="highlight"><pre><span class="gp">$</span> ketos linegen -f Amiri da1.txt da2.txt
+<span class="go">Reading texts   ✓</span>
+<span class="go">Read 3692 unique lines</span>
+<span class="go">Σ (len: 99)</span>
+<span class="go">Symbols:  !(),-./0123456789:ABEFGHILMNPRS[]_acdefghiklmnoprstuvyz«»،؟ءآأؤإئابةتثجحخدذرزسشصضطظعغـفقكلمنهوىيپ</span>
+<span class="go">Writing images  ✓</span>
+</pre></div>
+</div>
+<p>The output will be written to a directory called <code class="docutils literal"><span class="pre">training_data</span></code>, although
+this may be changed using the <code class="docutils literal"><span class="pre">-o</span></code> option. Each text line is rendered using
+the Amiri typeface.</p>
+<div class="section" id="alphabet-and-normalization">
+<h3>Alphabet and Normalization<a class="headerlink" href="#alphabet-and-normalization" title="Permalink to this headline">¶</a></h3>
+<p>Let&#8217;s take a look at important information in the preamble:</p>
+<div class="highlight-console"><div class="highlight"><pre><span class="go">Read 3692 unique lines</span>
+<span class="go">Σ (len: 99)</span>
+<span class="go">Symbols:  !(),-./0123456789:ABEFGHILMNPRS[]_acdefghiklmnoprstuvyz«»،؟ﺀﺁﺃﺅﺈﺋﺎﺑﺔﺘﺜﺠﺤﺧﺩﺫﺭﺰﺴﺸﺼﻀﻄﻈﻌﻐـﻔﻘﻜﻠﻤﻨﻫﻭﻰﻳپ</span>
+</pre></div>
+</div>
+<p>ketos tells us that it found 3692 unique lines which contained 99 different
+<code class="docutils literal"><span class="pre">symbols</span></code> or <code class="docutils literal"><span class="pre">code</span> <span class="pre">points</span></code>. The important part is to remember that one can
+encode a string of printed characters, i.e. a series of what a human would
+consider a single character (in Unicode jargon <code class="docutils literal"><span class="pre">grapheme</span> <span class="pre">clusters</span></code>) in
+multiple ways. Crucially, accented characters marks may either be a single code
+point (<code class="docutils literal"><span class="pre">precomposed</span></code>) or two or more separate symbols (<code class="docutils literal"><span class="pre">decomposed</span></code>). Many
+texts contain a mixture of both. A text that is maximally
+decomposed/precomposed as said to be in normalization form (NF) D/C.  There is
+a <a class="reference external" href="https://en.wikipedia.org/wiki/Unicode_equivalence">Wikipedia</a> lemma on
+this phenomenon.</p>
+<p>With that in mind we can see the training data contains all of the Arabic
+script including accented precomposed characters, but only a subset of Latin
+characters, numerals, and punctuation. A trained model will be able to
+recognize only these exact symbols, e.g. a <code class="docutils literal"><span class="pre">C</span></code> or <code class="docutils literal"><span class="pre">j</span></code> on the page will
+never be recognized. Either accept this limitation or add additional text lines
+to the training corpus until the alphabet matches your needs.</p>
+<p>We can also force a normalization form using the <code class="docutils literal"><span class="pre">-u</span></code> option; per default
+none is applied. For example:</p>
+<div class="highlight-console"><div class="highlight"><pre><span class="gp">$</span> ketos linegen -u NFC -f Amiri da2.txt
+<span class="go">Read 3692 lines</span>
+<span class="go">Σ (len: 99)</span>
+<span class="go">Symbols:  !(),-./0123456789:ABEFGHILMNPRS[]_acdefghiklmnoprstuvyz«»،؟ءآأؤإئابةتثجحخدذرزسشصضطظعغـفقكلمنهوىيپ</span>
+
+<span class="gp">$</span> ketos linegen -u NFD -f Amiri da2.txt
+<span class="go">Σ (len: 97)</span>
+<span class="go">Symbols:  !(),-./0123456789:ABEFGHILMNPRS[]_acdefghiklmnoprstuvyz«»،؟ءابةتثجحخدذرزسشصضطظعغـفقكلمنهوىيپ</span>
+<span class="go">Combining Characters: ARABIC MADDAH ABOVE, ARABIC HAMZA ABOVE, ARABIC HAMZA BELOW</span>
+</pre></div>
+</div>
+<p>While there hasn&#8217;t been any study on the effect of different normalizations on
+recognition accuracy there are some benefits to NFD, namely decreased model
+size and easier validation of the alphabet.</p>
+</div>
+<div class="section" id="other-parameters">
+<h3>Other Parameters<a class="headerlink" href="#other-parameters" title="Permalink to this headline">¶</a></h3>
+<p>Sometimes it is desirable to draw a certain number of lines randomly from one
+or more large texts. The <code class="docutils literal"><span class="pre">-n</span></code> option does just that:</p>
+<div class="highlight-console"><div class="highlight"><pre><span class="gp">$</span> ketos linegen -u NFD -n <span class="m">100</span> -f Amiri da1.txt da2.txt da3.txt da4.txt
+<span class="go">Reading texts   ✓</span>
+<span class="go">Read 114265 unique lines</span>
+<span class="go">Sampling 100 lines      ✓</span>
+<span class="go">Σ (len: 64)</span>
+<span class="go">Symbols:  !(),-./0123456789:[]{}«»،؛؟ءابةتثجحخدذرزسشصضطظعغـفقكلمنهوىي–</span>
+<span class="go">Combining Characters: ARABIC MADDAH ABOVE, ARABIC HAMZA ABOVE, ARABIC HAMZA BELOW</span>
+<span class="go">Writing images ⢿</span>
+</pre></div>
+</div>
+<p>It is also possible to adjust to amount of degradation/distortion of line
+images by using the <code class="docutils literal"><span class="pre">-s/-r/-d/-ds</span></code> switches:</p>
+<div class="highlight-console"><div class="highlight"><pre><span class="gp">$</span> ketos linegen -m 0.2 -s 0.002 -r 0.001 -d <span class="m">3</span> Downloads/D/A/da1.txt
+<span class="go">Reading texts   ✓</span>
+<span class="go">Read 859 unique lines</span>
+<span class="go">Σ (len: 46)</span>
+<span class="go">Symbols:  !&quot;-.:،؛؟ءآأؤإئابةتثجحخدذرزسشصضطظعغفقكلمنهوىي﻿</span>
+<span class="go">Writing images  ⣽</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="ground-truth-editing">
+<h2>Ground Truth Editing<a class="headerlink" href="#ground-truth-editing" title="Permalink to this headline">¶</a></h2>
+</div>
+<div class="section" id="id1">
+<h2>Training<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h2>
+</div>
+<div class="section" id="validation">
+<h2>Validation<a class="headerlink" href="#validation" title="Permalink to this headline">¶</a></h2>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="index.html">
+              <img class="logo" src="_static/kraken.png" alt="Logo"/>
+            </a></p>
+  <h3><a href="index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Training</a><ul>
+<li><a class="reference internal" href="#artificial-training-data">Artificial Training Data</a><ul>
+<li><a class="reference internal" href="#alphabet-and-normalization">Alphabet and Normalization</a></li>
+<li><a class="reference internal" href="#other-parameters">Other Parameters</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#ground-truth-editing">Ground Truth Editing</a></li>
+<li><a class="reference internal" href="#id1">Training</a></li>
+<li><a class="reference internal" href="#validation">Validation</a></li>
+</ul>
+</li>
+</ul>
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="advanced.html" title="previous chapter">Advanced usage</a></li>
+      <li>Next: <a href="api.html" title="next chapter">kraken API</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2015, mittagessen.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.3.3</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.7</a>
+      
+      |
+      <a href="_sources/ketos.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

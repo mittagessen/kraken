@@ -41,3 +41,18 @@ kraken.rpred module
     :undoc-members:
     :show-inheritance:
 
+kraken.transcrib module
+-----------------------
+
+.. automodule:: kraken.transcrib
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+kraken.linegen module
+---------------------
+
+.. automodule:: kraken.linegen
+    :members:
+    :undoc-members:
+    :show-inheritance:
