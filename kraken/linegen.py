@@ -32,135 +32,134 @@ standard_library.install_aliases()
 from builtins import range
 from builtins import object
 
-from jinja2 import Environment, PackageLoader
-
 from scipy.ndimage.filters import gaussian_filter
 from scipy.ndimage.interpolation import affine_transform, geometric_transform
 from PIL import Image, ImageOps
 
 import numpy as np
-import pangocairo
-import tempfile
+import ctypes.util
 import shutil
-import cairo
-import pango
+import ctypes
 
 from kraken.lib.exceptions import KrakenCairoSurfaceException
 from kraken.lib.util import pil2array, array2pil
 
-def set_fonts(font_file):
+pangocairo = ctypes.CDLL(ctypes.util.find_library('pangocairo-1.0'))
+pango = ctypes.CDLL(ctypes.util.find_library('pango-1.0'))
+cairo = ctypes.CDLL(ctypes.util.find_library('cairo'))
+
+class PangoFontDescription(ctypes.Structure):
+    pass
+
+class PangoLayout(ctypes.Structure):
+    pass
+
+class PangoContext(ctypes.Structure):
+    pass
+
+class PangoRectangle(ctypes.Structure):
+    _fields_ = [('x', ctypes.c_int), 
+                ('y', ctypes.c_int), 
+                ('width', ctypes.c_int), 
+                ('height', ctypes.c_int)]
+
+class ensureBytes(object):
     """
-    Activates a temporary fontconfig environment and loads pango.
-
-    Writes a temporary fontconfig configuration with ``font_file`` being the
-    only font in the cache. It is then activated by setting the FONTCONFIG_FILE
-    environment variable and loading pango/cairo.
-
-    .. warning::
-        This function can only be executed once as letting pango/cairo
-        reinitialize fontconfig doesn't seem to be possible.
-
-    Args:
-        font_file (unicode): Location of an font file understood by pango
+    Simple class ensuring the arguments of type char * are actually a series of
+    bytes.
     """
-    global cairo
-    global pango
-    global pangocairo
-    font_dir = tempfile.mkdtemp()
-    shutil.copy(font_file, font_dir)
+    @classmethod
+    def from_param(cls, value):
+        if isinstance(value, bytes):
+            return value
+        else:
+            return value.encode('utf-8')
 
-    env = Environment(loader=PackageLoader('kraken', 'templates'))
-    template = env.get_template('fonts.conf')
+cairo.cairo_image_surface_get_data.restype = ctypes.c_void_p
 
-    fp = tempfile.NamedTemporaryFile(delete=False)
-    fp.write(template.render(font_dir=font_dir, font_file=fp.name).encode('utf-8'))
-    os.putenv("FONTCONFIG_FILE", fp.name)
-    
+pango.pango_language_from_string.argtypes = [ensureBytes]
+pango.pango_context_set_language.argtypes = [ctypes.POINTER(PangoContext), ensureBytes]
+pangocairo.pango_cairo_create_context.restype = ctypes.POINTER(PangoContext)
 
-def draw_on_surface(surface, text, family, font_size, language, rtl, vertical):
-    pangocairo_ctx = pangocairo.CairoContext(cairo.Context(surface))
-    layout = pangocairo_ctx.create_layout()
+pango.pango_layout_new.restype = ctypes.POINTER(PangoLayout)
+pango.pango_font_description_new.restype = ctypes.POINTER(PangoFontDescription)
+pango.pango_font_description_set_family.argtypes = [ctypes.POINTER(PangoFontDescription), ensureBytes]
+pango.pango_layout_set_markup.argtypes = [ctypes.POINTER(PangoLayout), ensureBytes, ctypes.c_int]
 
-    pango_ctx = layout.get_context()
+
+class LineGenerator(object):
+    """
+    Produces degraded line images using a single collection of font families.
+    """
+    def __init__(self, family='Sans', font_size=32, language=None):
+        self.language = language
+        self.font = pango.pango_font_description_new()
+        # XXX: get PANGO_SCALE programatically from somewhere
+        pango.pango_font_description_set_size(self.font, font_size * 1024)
+        pango.pango_font_description_set_family(self.font, family)
+
+    def render_line(self, text):
+        """
+        Draws a line onto a Cairo surface which will be converted to an pillow
+        Image.
+
+        Args:
+            text (unicode): A string which will be rendered as a single line.
+
+        Returns:
+            PIL.Image of mode 'L'.
+
+        Raises:
+            KrakenCairoSurfaceException if the Cairo surface couldn't be created
+            (usually caused by invalid dimensions.
+        """
+        temp_surface = cairo.cairo_image_surface_create(0, 0, 0)
+        width, height = _draw_on_surface(temp_surface, self.font, self.language, text)
+        cairo.cairo_surface_destroy(temp_surface)
+        if width == 0 or height == 0:
+            raise KrakenCairoSurfaceException('Surface zero pixels in at least one dimension', width, height)
+        real_surface = cairo.cairo_image_surface_create(0, width, height)
+        _draw_on_surface(real_surface, self.font, self.language, text)
+        data = cairo.cairo_image_surface_get_data(real_surface)
+        size = int(4 * width * height)
+        buffer = ctypes.create_string_buffer(size)
+        ctypes.memmove(buffer, data, size)
+        im = Image.frombuffer("RGBA", (width, height), buffer, "raw", "BGRA", 0, 1)
+        cairo.cairo_surface_destroy(real_surface)
+        im = im.convert('L')
+        return im
+
+
+def _draw_on_surface(surface, font, language, text):
+
+    cr = cairo.cairo_create(surface)
+    pangocairo_ctx = pangocairo.pango_cairo_create_context(cr)
+    layout = pango.pango_layout_new(pangocairo_ctx)
+
+    pango_ctx = pango.pango_layout_get_context(layout)
     if language is not None:
-        pango_ctx.set_language(pango.Language(language))
+        pango_language = pango.pango_language_from_string(language)
+        pango.pango_context_set_language(pango_ctx, pango_language)
+    
+    pango.pango_layout_set_font_description(layout, font)
 
-    if rtl:
-        if vertical:
-            base_dir = pango.DIRECTION_TTB_RTL
-        else:
-            base_dir = pango.DIRECTION_RTL
-    else:
-        if vertical:
-            base_dir = pango.DIRECTION_TTB_LTR
-        else:
-            base_dir = pango.DIRECTION_LTR
+    cairo.cairo_set_source_rgb(cr, ctypes.c_double(1.0), ctypes.c_double(1.0), ctypes.c_double(1.0))
+    cairo.cairo_paint(cr)
 
-    pango_ctx.set_base_dir(base_dir)
+    pango.pango_layout_set_markup(layout, text, -1)
 
-    font = pango.FontDescription()
-    font.set_family(family)
-    font.set_size(font_size * pango.SCALE)
+    cairo.cairo_set_source_rgb(cr, ctypes.c_double(0.0), ctypes.c_double(0.0), ctypes.c_double(0.0))
+    pangocairo.pango_cairo_update_layout(cr, layout)
+    pangocairo.pango_cairo_show_layout(cr, layout)
 
-    layout.set_font_description(font)
-    layout.set_text(text)
+    cairo.cairo_destroy(cr)
 
-    extents = layout.get_pixel_extents()
-    top_usage = min(extents[0][1], extents[1][1], 0)
-    bottom_usage = max(extents[0][3], extents[1][3])
+    ink_rect = PangoRectangle()
+    logical_rect = PangoRectangle()
+    pango.pango_layout_get_pixel_extents(layout, ctypes.byref(ink_rect), ctypes.byref(logical_rect))
 
-    width = max(extents[0][2], extents[1][2])
+    return max(ink_rect.width, logical_rect.width), max(ink_rect.height, logical_rect.height)
 
-    pangocairo_ctx.set_antialias(cairo.ANTIALIAS_GRAY)
-    pangocairo_ctx.set_source_rgb(1, 1, 1)  # White background
-    pangocairo_ctx.paint()
-
-    pangocairo_ctx.translate(0, -top_usage)
-    pangocairo_ctx.set_source_rgb(0, 0, 0)  # Black text color
-    pangocairo_ctx.show_layout(layout)
-
-    return bottom_usage - top_usage, width
-
-
-def render_line(text, family, font_size=32, language=None, rtl=False, vertical=False):
-    """
-    Renders ``text`` into a PIL Image using pango and cairo.
-
-    Args:
-        text (unicode): A unicode string to be rendered
-        family (unicode): Font family to use for rendering
-        font_size (unicode): Font size in points
-        language (unicode): RFC-3066 language tag
-        rtl (bool): Set base horizontal text direction. The BiDi algorithm will
-                    still apply so it's usually not necessary to touch this
-                    option.
-        vertical (bool): Set vertical text direction (True = Top-to-Bottom)
-
-    Returns:
-        (B/W) PIL.Image in RGBA mode
-
-    Raises:
-        KrakenCairoSurfaceException if the CairoSurface couldn't be created
-        (usually caused by invalid dimensions.
-    """
-    temp_surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, 0, 0)
-    height, width = draw_on_surface(temp_surface, text, family,
-                                    font_size,language, rtl, vertical)
-    if width == 0 or height == 0:
-        raise KrakenCairoSurfaceException('Surface zero pixels in at least one dimension', width, height)
-    try:
-        real_surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, width, height)
-    except cairo.Error as e:
-        raise KrakenCairoSurfaceException(e.message, width, height)
-    draw_on_surface(real_surface, text, family, font_size, language, rtl, vertical)
-    im = Image.frombuffer("RGBA", (width, height), real_surface.get_data(), "raw", "BGRA", 0, 1)
-    # there's a bug in get_pixel_extents not returning the correct height, so
-    # recrop using PIL facilities.
-    im = im.convert('L')
-    im = im.crop(ImageOps.invert(im).getbbox())
-    # add border 
-    im = ImageOps.expand(im, 5, 255)
-    return im
 
 def degrade_line(im, mean=0.0, sigma=0.001, density=0.002):
     """

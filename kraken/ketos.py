@@ -65,11 +65,6 @@ def transcription(ctx):
               help='Font size to render texts in.')
 @click.option('-l', '--language', 
               help='RFC-3066 language tag for language-dependent font shaping')
-@click.option('-r', '--rtl/--ltr', default=False,
-              help='Base horizontal text direction. The BiDi algorithm will '
-              'still apply.')
-@click.option('-v', '--vertical/--horizontal', 
-              help='Set text direction to Top-To-Bottom')
 @click.option('-m', '--mean', type=click.FLOAT, default=0.0,
               help='Mean of distribution to take means for gaussian noise '
               'from.')
@@ -87,8 +82,8 @@ def transcription(ctx):
 @click.option('-o', '--output', type=click.Path(), default='training_data',
               help='Output directory')
 @click.argument('text', nargs=-1, type=click.Path(exists=True))
-def line_generator(ctx, font, maxlines, encoding, normalization, font_size, language,
-                   rtl, vertical, mean, sigma, density, distort, distortion_sigma,
+def line_generator(ctx, font, maxlines, encoding, normalization, font_size,
+                   language, mean, sigma, density, distort, distortion_sigma,
                    output, text):
     """
     Generates artificial text line training data.
@@ -140,14 +135,14 @@ def line_generator(ctx, font, maxlines, encoding, normalization, font_size, lang
     click.echo(u'Symbols: {}'.format(''.join(chars)))
     if combining:
         click.echo(u'Combining Characters: {}'.format(', '.join(combining)))
+    lg = linegen.LineGenerator(font, font_size, language)
     for idx, line in enumerate(lines):
         if ctx.meta['verbose'] > 0:
             click.echo(u'[{:2.4f}] {}'.format(time.time() - st_time, line))
         else:
             spin('Writing images')
         try:
-            im = linegen.render_line(line, family=font, font_size=font_size,
-                                language=language, rtl=rtl, vertical=vertical)
+            im = lg.render_line(line)
         except KrakenCairoSurfaceException as e:
             if ctx.meta['verbose'] > 0:
                 click.echo('[{:2.4f}] {}: {} {}'.format(time.time() - st_time, e.message, e.width, e.height))
