@@ -61,6 +61,9 @@ def transcription(ctx):
 @click.option('-u', '--normalization', 
               type=click.Choice(['NFD', 'NFKD', 'NFC', 'NFKC']), default=None,
               help='Normalize ground truth')
+@click.option('-ur', '--renormalize', 
+              type=click.Choice(['NFD', 'NFKD', 'NFC', 'NFKC']), default=None,
+              help='Renormalize text for rendering purposes.')
 @click.option('-fs', '--font-size', type=click.INT, default=32,
               help='Font size to render texts in.')
 @click.option('-l', '--language', 
@@ -82,9 +85,9 @@ def transcription(ctx):
 @click.option('-o', '--output', type=click.Path(), default='training_data',
               help='Output directory')
 @click.argument('text', nargs=-1, type=click.Path(exists=True))
-def line_generator(ctx, font, maxlines, encoding, normalization, font_size,
-                   language, mean, sigma, density, distort, distortion_sigma,
-                   output, text):
+def line_generator(ctx, font, maxlines, encoding, normalization, renormalize,
+                   font_size, language, mean, sigma, density, distort,
+                   distortion_sigma, output, text):
     """
     Generates artificial text line training data.
     """
@@ -142,7 +145,10 @@ def line_generator(ctx, font, maxlines, encoding, normalization, font_size,
         else:
             spin('Writing images')
         try:
-            im = lg.render_line(line)
+            if renormalize:
+                im = lg.render_line(unicodedata.normalize(renormalize, line))
+            else:
+                im = lg.render_line(line)
         except KrakenCairoSurfaceException as e:
             if ctx.meta['verbose'] > 0:
                 click.echo('[{:2.4f}] {}: {} {}'.format(time.time() - st_time, e.message, e.width, e.height))
