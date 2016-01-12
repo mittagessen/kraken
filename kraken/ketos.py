@@ -68,6 +68,10 @@ def transcription(ctx):
               help='Font size to render texts in.')
 @click.option('-l', '--language', 
               help='RFC-3066 language tag for language-dependent font shaping')
+@click.option('-ll', '--max_length', type=click.INT, default=None, 
+              help="Discard lines above length (in Unicode codepoints).")
+@click.option('--strip/--no-strip', help="Remove whitespace from start and end "
+              "of lines.")
 @click.option('-m', '--mean', type=click.FLOAT, default=0.0,
               help='Mean of distribution to take means for gaussian noise '
               'from.')
@@ -86,8 +90,8 @@ def transcription(ctx):
               help='Output directory')
 @click.argument('text', nargs=-1, type=click.Path(exists=True))
 def line_generator(ctx, font, maxlines, encoding, normalization, renormalize,
-                   font_size, language, mean, sigma, density, distort,
-                   distortion_sigma, output, text):
+                   font_size, language, max_length, strip, mean, sigma,
+                   density, distort, distortion_sigma, output, text):
     """
     Generates artificial text line training data.
     """
@@ -104,6 +108,10 @@ def line_generator(ctx, font, maxlines, encoding, normalization, renormalize,
             lines.update(fp.readlines())
     if normalization:
         lines = set([unicodedata.normalize(normalization, line) for line in lines])
+    if strip:
+        lines = set([line.strip() for line in lines])
+    if max_length:
+        lines = set([line for line in lines if len(line) < max_length])
     if ctx.meta['verbose'] > 0:
         click.echo(u'[{:2.4f}] Read {} lines'.format(time.time() - st_time, len(lines)))
     else:
