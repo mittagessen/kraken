@@ -28,7 +28,7 @@ import numpy as np
 from PIL import Image
 from itertools import cycle
 from kraken import linegen
-
+from kraken import binarization
 from kraken.lib.exceptions import KrakenCairoSurfaceException
 
 APP_NAME = 'kraken'
@@ -68,10 +68,14 @@ def transcription(ctx):
               help='Font size to render texts in.')
 @click.option('-l', '--language', 
               help='RFC-3066 language tag for language-dependent font shaping')
-@click.option('-ll', '--max_length', type=click.INT, default=None, 
+@click.option('-ll', '--max-length', type=click.INT, default=None, 
               help="Discard lines above length (in Unicode codepoints).")
 @click.option('--strip/--no-strip', help="Remove whitespace from start and end "
               "of lines.")
+@click.option('-d', '--disable-degradation', is_flag=True, help='Dont degrade '
+              'output lines.')
+@click.option('-b/-nb', '--binarize/--no-binarize', default=True,
+              help='Binarize output using nlbin.')
 @click.option('-m', '--mean', type=click.FLOAT, default=0.0,
               help='Mean of distribution to take means for gaussian noise '
               'from.')
@@ -83,15 +87,16 @@ def transcription(ctx):
               'from.')
 @click.option('-d', '--distort', type=click.FLOAT, default=1.0,
               help='Mean of distribution to take distortion values from')
-@click.option('-ds', '--distortion_sigma', type=click.FLOAT, default=20.0,
+@click.option('-ds', '--distortion-sigma', type=click.FLOAT, default=20.0,
               help='Mean of distribution to take standard deviations for the '
               'Gaussian kernel from')
 @click.option('-o', '--output', type=click.Path(), default='training_data',
               help='Output directory')
 @click.argument('text', nargs=-1, type=click.Path(exists=True))
 def line_generator(ctx, font, maxlines, encoding, normalization, renormalize,
-                   font_size, language, max_length, strip, mean, sigma,
-                   density, distort, distortion_sigma, output, text):
+                   font_size, language, max_length, strip, disable_degradation,
+                   binarize, mean, sigma, density, distort, distortion_sigma,
+                   output, text):
     """
     Generates artificial text line training data.
     """
@@ -164,8 +169,11 @@ def line_generator(ctx, font, maxlines, encoding, normalization, renormalize,
                 click.secho(u'\b\u2717', fg='red')
                 click.echo('{}: {} {}'.format(e.message, e.width, e.height))
             continue
-        im = linegen.distort_line(im, distort, distortion_sigma)
-        im = linegen.degrade_line(im, mean, sigma, density)
+        if not disable_degradation:
+            im = linegen.distort_line(im, np.random.normal(distort), np.random.normal(distortion_sigma))
+            im = linegen.degrade_line(im, np.random.normal(mean), np.random.normal(sigma), np.random.normal(density))
+        if binarize:
+            im = binarization.nlbin(im)
         im.save('{}/{:06d}.png'.format(output, idx))
         with open('{}/{:06d}.gt.txt'.format(output, idx), 'wb') as fp:
             fp.write(line.encode('utf-8'))

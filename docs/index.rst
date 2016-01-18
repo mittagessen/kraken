@@ -49,7 +49,7 @@ equivalent and some dependencies.
 
 .. code-block:: console
 
-        # apt-get install gcc gfortran python-dev libblas-dev liblapack-dev
+        # apt-get install gcc gfortran python-dev libblas-dev liblapack-dev libpangocairo-1.0
 
 If `clstm <https://github.com/tmbdev/clstm>`_ support is desired (highly
 recommended) the associated python extension has to be build and installed.

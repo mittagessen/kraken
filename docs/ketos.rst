@@ -82,15 +82,20 @@ none is applied. For example:
 
 .. code-block:: console
 
-        $ ketos linegen -u NFC -f Amiri da2.txt
-        Read 3692 lines
-        Σ (len: 99)
-        Symbols:  !(),-./0123456789:ABEFGHILMNPRS[]_acdefghiklmnoprstuvyz«»،؟ءآأؤإئابةتثجحخدذرزسشصضطظعغـفقكلمنهوىيپ
+        $ ketos linegen -u NFD -f "GFS Philostratos" grc.txt
+        Reading texts   ✓
+        Read 2860 unique lines
+        Σ (len: 132)
+        Symbols:  #&'()*,-./0123456789:;ABCDEGHILMNOPQRSTVWXZ]abcdefghiklmnopqrstuvxy §·ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩαβγδεζηθικλμνξοπρςστυφχψω—‘’“
+        Combining Characters: COMBINING GRAVE ACCENT, COMBINING ACUTE ACCENT, COMBINING DIAERESIS, COMBINING COMMA ABOVE, COMBINING REVERSED COMMA ABOVE, COMBINING DOT BELOW, COMBINING GREEK PERISPOMENI, COMBINING GREEK YPOGEGRAMMENI
 
-        $ ketos linegen -u NFD -f Amiri da2.txt
-        Σ (len: 97)
-        Symbols:  !(),-./0123456789:ABEFGHILMNPRS[]_acdefghiklmnoprstuvyz«»،؟ءابةتثجحخدذرزسشصضطظعغـفقكلمنهوىيپ
-        Combining Characters: ARABIC MADDAH ABOVE, ARABIC HAMZA ABOVE, ARABIC HAMZA BELOW
+
+        $ ketos linegen -u NFC -f "GFS Philostratos" grc.txt
+        Reading texts   ✓
+        Read 2860 unique lines
+        Σ (len: 231)
+        Symbols:  #&'()*,-./0123456789:;ABCDEGHILMNOPQRSTVWXZ]abcdefghiklmnopqrstuvxy §·ΐΑΒΓΔΕΖΘΙΚΛΜΝΞΟΠΡΣΤΦΧΨΩάέήίαβγδεζηθικλμνξοπρςστυφχψωϊϋόύώἀἁἂἃἄἅἈἌἎἐἑἓἔἕἘἙἜἝἠἡἢἣἤἥἦἧἩἭἮἰἱἳἴἵἶἷἸἹἼὀὁὂὃὄὅὈὉὌὐὑὓὔὕὖὗὙὝὠὡὢὤὥὦὧὨὩὰὲὴὶὸὺὼᾄᾐᾑᾔᾗᾠᾤᾧᾳᾶᾷῃῄῆῇῒῖῥῦῬῳῴῶῷ—‘’“
+        Combining Characters: COMBINING ACUTE ACCENT, COMBINING DOT BELOW
 
 
 While there hasn't been any study on the effect of different normalizations on
@@ -125,6 +130,17 @@ images by using the ``-s/-r/-d/-ds`` switches:
         Σ (len: 46)
         Symbols:  !"-.:،؛؟ءآأؤإئابةتثجحخدذرزسشصضطظعغفقكلمنهوىي﻿
         Writing images  ⣽
+
+
+Sometimes the shaping engine misbehaves using some fonts (notably ``GFS
+Philostratos``) by rendering texts in certain normalizations incorrectly if the
+font does not contain glyphs for decomposed characters. One sign are misplaced
+diacritics and glyphs in different fonts. A workaround is renormalizing the
+text for rendering purposes (here to NFC):
+
+.. code-block:: console
+
+        $ ketos linegen -ur NFC -u NFD -f "GFS Philostratos" grc.txt
 
 Ground Truth Editing
 --------------------

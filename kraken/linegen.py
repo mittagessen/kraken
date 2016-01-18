@@ -127,6 +127,7 @@ class LineGenerator(object):
         im = Image.frombuffer("RGBA", (width, height), buffer, "raw", "BGRA", 0, 1)
         cairo.cairo_surface_destroy(real_surface)
         im = im.convert('L')
+        im = ImageOps.expand(im, 5, 255)
         return im
 
 

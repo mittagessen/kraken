@@ -6,5 +6,4 @@ numpy
 Pillow
 regex
 scipy
-protobuf==3.0.0a3
-vext.gi
+protobuf==3.0.0b2
