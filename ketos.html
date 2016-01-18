@@ -106,15 +106,20 @@ never be recognized. Either accept this limitation or add additional text lines
 to the training corpus until the alphabet matches your needs.</p>
 <p>We can also force a normalization form using the <code class="docutils literal"><span class="pre">-u</span></code> option; per default
 none is applied. For example:</p>
-<div class="highlight-console"><div class="highlight"><pre><span class="gp">$</span> ketos linegen -u NFC -f Amiri da2.txt
-<span class="go">Read 3692 lines</span>
-<span class="go">Σ (len: 99)</span>
-<span class="go">Symbols:  !(),-./0123456789:ABEFGHILMNPRS[]_acdefghiklmnoprstuvyz«»،؟ءآأؤإئابةتثجحخدذرزسشصضطظعغـفقكلمنهوىيپ</span>
+<div class="highlight-console"><div class="highlight"><pre><span class="gp">$</span> ketos linegen -u NFD -f <span class="s2">&quot;GFS Philostratos&quot;</span> grc.txt
+<span class="go">Reading texts   ✓</span>
+<span class="go">Read 2860 unique lines</span>
+<span class="go">Σ (len: 132)</span>
+<span class="go">Symbols:  #&amp;&#39;()*,-./0123456789:;ABCDEGHILMNOPQRSTVWXZ]abcdefghiklmnopqrstuvxy §·ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩαβγδεζηθικλμνξοπρςστυφχψω—‘’“</span>
+<span class="go">Combining Characters: COMBINING GRAVE ACCENT, COMBINING ACUTE ACCENT, COMBINING DIAERESIS, COMBINING COMMA ABOVE, COMBINING REVERSED COMMA ABOVE, COMBINING DOT BELOW, COMBINING GREEK PERISPOMENI, COMBINING GREEK YPOGEGRAMMENI</span>
 
-<span class="gp">$</span> ketos linegen -u NFD -f Amiri da2.txt
-<span class="go">Σ (len: 97)</span>
-<span class="go">Symbols:  !(),-./0123456789:ABEFGHILMNPRS[]_acdefghiklmnoprstuvyz«»،؟ءابةتثجحخدذرزسشصضطظعغـفقكلمنهوىيپ</span>
-<span class="go">Combining Characters: ARABIC MADDAH ABOVE, ARABIC HAMZA ABOVE, ARABIC HAMZA BELOW</span>
+
+<span class="gp">$</span> ketos linegen -u NFC -f <span class="s2">&quot;GFS Philostratos&quot;</span> grc.txt
+<span class="go">Reading texts   ✓</span>
+<span class="go">Read 2860 unique lines</span>
+<span class="go">Σ (len: 231)</span>
+<span class="go">Symbols:  #&amp;&#39;()*,-./0123456789:;ABCDEGHILMNOPQRSTVWXZ]abcdefghiklmnopqrstuvxy §·ΐΑΒΓΔΕΖΘΙΚΛΜΝΞΟΠΡΣΤΦΧΨΩάέήίαβγδεζηθικλμνξοπρςστυφχψωϊϋόύώἀἁἂἃἄἅἈἌἎἐἑἓἔἕἘἙἜἝἠἡἢἣἤἥἦἧἩἭἮἰἱἳἴἵἶἷἸἹἼὀὁὂὃὄὅὈὉὌὐὑὓὔὕὖὗὙὝὠὡὢὤὥὦὧὨὩὰὲὴὶὸὺὼᾄᾐᾑᾔᾗᾠᾤᾧᾳᾶᾷῃῄῆῇῒῖῥῦῬῳῴῶῷ—‘’“</span>
+<span class="go">Combining Characters: COMBINING ACUTE ACCENT, COMBINING DOT BELOW</span>
 </pre></div>
 </div>
 <p>While there hasn&#8217;t been any study on the effect of different normalizations on
@@ -143,6 +148,14 @@ images by using the <code class="docutils literal"><span class="pre">-s/-r/-d/-d
 <span class="go">Σ (len: 46)</span>
 <span class="go">Symbols:  !&quot;-.:،؛؟ءآأؤإئابةتثجحخدذرزسشصضطظعغفقكلمنهوىي﻿</span>
 <span class="go">Writing images  ⣽</span>
+</pre></div>
+</div>
+<p>Sometimes the shaping engine misbehaves using some fonts (notably <code class="docutils literal"><span class="pre">GFS</span>
+<span class="pre">Philostratos</span></code>) by rendering texts in certain normalizations incorrectly if the
+font does not contain glyphs for decomposed characters. One sign are misplaced
+diacritics and glyphs in different fonts. A workaround is renormalizing the
+text for rendering purposes (here to NFC):</p>
+<div class="highlight-console"><div class="highlight"><pre><span class="gp">$</span> ketos linegen -ur NFC -u NFD -f <span class="s2">&quot;GFS Philostratos&quot;</span> grc.txt
 </pre></div>
 </div>
 </div>

@@ -520,6 +520,86 @@ linegen
 actual drawing code was adapted from the create_image utility from nototools
 available at [0].</p>
 <p>[0] <a class="reference external" href="https://github.com/googlei18n/nototools">https://github.com/googlei18n/nototools</a></p>
+<dl class="class">
+<dt id="kraken.linegen.LineGenerator">
+<em class="property">class </em><code class="descclassname">kraken.linegen.</code><code class="descname">LineGenerator</code><span class="sig-paren">(</span><em>family='Sans'</em>, <em>font_size=32</em>, <em>language=None</em><span class="sig-paren">)</span><a class="headerlink" href="#kraken.linegen.LineGenerator" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">future.types.newobject.newobject</span></code></p>
+<p>Produces degraded line images using a single collection of font families.</p>
+<dl class="method">
+<dt id="kraken.linegen.LineGenerator.render_line">
+<code class="descname">render_line</code><span class="sig-paren">(</span><em>text</em><span class="sig-paren">)</span><a class="headerlink" href="#kraken.linegen.LineGenerator.render_line" title="Permalink to this definition">¶</a></dt>
+<dd><p>Draws a line onto a Cairo surface which will be converted to an pillow
+Image.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><p class="first"><strong>text</strong> (<em>unicode</em>) &#8211; A string which will be rendered as a single line.</p>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">PIL.Image of mode &#8216;L&#8217;.</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Raises:</th><td class="field-body"><ul class="first last simple">
+<li>KrakenCairoSurfaceException if the Cairo surface couldn&#8217;t be created</li>
+<li>(usually caused by invalid dimensions.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="kraken.linegen.PangoContext">
+<em class="property">class </em><code class="descclassname">kraken.linegen.</code><code class="descname">PangoContext</code><a class="headerlink" href="#kraken.linegen.PangoContext" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">_ctypes.Structure</span></code></p>
+</dd></dl>
+
+<dl class="class">
+<dt id="kraken.linegen.PangoFontDescription">
+<em class="property">class </em><code class="descclassname">kraken.linegen.</code><code class="descname">PangoFontDescription</code><a class="headerlink" href="#kraken.linegen.PangoFontDescription" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">_ctypes.Structure</span></code></p>
+</dd></dl>
+
+<dl class="class">
+<dt id="kraken.linegen.PangoLayout">
+<em class="property">class </em><code class="descclassname">kraken.linegen.</code><code class="descname">PangoLayout</code><a class="headerlink" href="#kraken.linegen.PangoLayout" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">_ctypes.Structure</span></code></p>
+</dd></dl>
+
+<dl class="class">
+<dt id="kraken.linegen.PangoRectangle">
+<em class="property">class </em><code class="descclassname">kraken.linegen.</code><code class="descname">PangoRectangle</code><a class="headerlink" href="#kraken.linegen.PangoRectangle" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">_ctypes.Structure</span></code></p>
+<dl class="attribute">
+<dt id="kraken.linegen.PangoRectangle.height">
+<code class="descname">height</code><a class="headerlink" href="#kraken.linegen.PangoRectangle.height" title="Permalink to this definition">¶</a></dt>
+<dd><p>Structure/Union member</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="kraken.linegen.PangoRectangle.width">
+<code class="descname">width</code><a class="headerlink" href="#kraken.linegen.PangoRectangle.width" title="Permalink to this definition">¶</a></dt>
+<dd><p>Structure/Union member</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="kraken.linegen.PangoRectangle.x">
+<code class="descname">x</code><a class="headerlink" href="#kraken.linegen.PangoRectangle.x" title="Permalink to this definition">¶</a></dt>
+<dd><p>Structure/Union member</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="kraken.linegen.PangoRectangle.y">
+<code class="descname">y</code><a class="headerlink" href="#kraken.linegen.PangoRectangle.y" title="Permalink to this definition">¶</a></dt>
+<dd><p>Structure/Union member</p>
+</dd></dl>
+
+</dd></dl>
+
 <dl class="function">
 <dt id="kraken.linegen.degrade_line">
 <code class="descclassname">kraken.linegen.</code><code class="descname">degrade_line</code><span class="sig-paren">(</span><em>im</em>, <em>mean=0.0</em>, <em>sigma=0.001</em>, <em>density=0.002</em><span class="sig-paren">)</span><a class="headerlink" href="#kraken.linegen.degrade_line" title="Permalink to this definition">¶</a></dt>
@@ -568,64 +648,17 @@ available at [0].</p>
 </table>
 </dd></dl>
 
-<dl class="function">
-<dt id="kraken.linegen.draw_on_surface">
-<code class="descclassname">kraken.linegen.</code><code class="descname">draw_on_surface</code><span class="sig-paren">(</span><em>surface</em>, <em>text</em>, <em>family</em>, <em>font_size</em>, <em>language</em>, <em>rtl</em>, <em>vertical</em><span class="sig-paren">)</span><a class="headerlink" href="#kraken.linegen.draw_on_surface" title="Permalink to this definition">¶</a></dt>
+<dl class="class">
+<dt id="kraken.linegen.ensureBytes">
+<em class="property">class </em><code class="descclassname">kraken.linegen.</code><code class="descname">ensureBytes</code><a class="headerlink" href="#kraken.linegen.ensureBytes" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">future.types.newobject.newobject</span></code></p>
+<p>Simple class ensuring the arguments of type char * are actually a series of
+bytes.</p>
+<dl class="classmethod">
+<dt id="kraken.linegen.ensureBytes.from_param">
+<em class="property">classmethod </em><code class="descname">from_param</code><span class="sig-paren">(</span><em>value</em><span class="sig-paren">)</span><a class="headerlink" href="#kraken.linegen.ensureBytes.from_param" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
-<dl class="function">
-<dt id="kraken.linegen.render_line">
-<code class="descclassname">kraken.linegen.</code><code class="descname">render_line</code><span class="sig-paren">(</span><em>text</em>, <em>family</em>, <em>font_size=32</em>, <em>language=None</em>, <em>rtl=False</em>, <em>vertical=False</em><span class="sig-paren">)</span><a class="headerlink" href="#kraken.linegen.render_line" title="Permalink to this definition">¶</a></dt>
-<dd><p>Renders <code class="docutils literal"><span class="pre">text</span></code> into a PIL Image using pango and cairo.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>text</strong> (<em>unicode</em>) &#8211; A unicode string to be rendered</li>
-<li><strong>family</strong> (<em>unicode</em>) &#8211; Font family to use for rendering</li>
-<li><strong>font_size</strong> (<em>unicode</em>) &#8211; Font size in points</li>
-<li><strong>language</strong> (<em>unicode</em>) &#8211; RFC-3066 language tag</li>
-<li><strong>rtl</strong> (<em>bool</em>) &#8211; Set base horizontal text direction. The BiDi algorithm will
-still apply so it&#8217;s usually not necessary to touch this
-option.</li>
-<li><strong>vertical</strong> (<em>bool</em>) &#8211; Set vertical text direction (True = Top-to-Bottom)</li>
-</ul>
-</td>
-</tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">(B/W) PIL.Image in RGBA mode</p>
-</td>
-</tr>
-<tr class="field-odd field"><th class="field-name">Raises:</th><td class="field-body"><ul class="first last simple">
-<li>KrakenCairoSurfaceException if the CairoSurface couldn&#8217;t be created</li>
-<li>(usually caused by invalid dimensions.</li>
-</ul>
-</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="function">
-<dt id="kraken.linegen.set_fonts">
-<code class="descclassname">kraken.linegen.</code><code class="descname">set_fonts</code><span class="sig-paren">(</span><em>font_file</em><span class="sig-paren">)</span><a class="headerlink" href="#kraken.linegen.set_fonts" title="Permalink to this definition">¶</a></dt>
-<dd><p>Activates a temporary fontconfig environment and loads pango.</p>
-<p>Writes a temporary fontconfig configuration with <code class="docutils literal"><span class="pre">font_file</span></code> being the
-only font in the cache. It is then activated by setting the FONTCONFIG_FILE
-environment variable and loading pango/cairo.</p>
-<div class="admonition warning">
-<p class="first admonition-title">Warning</p>
-<p class="last">This function can only be executed once as letting pango/cairo
-reinitialize fontconfig doesn&#8217;t seem to be possible.</p>
-</div>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>font_file</strong> (<em>unicode</em>) &#8211; Location of an font file understood by pango</td>
-</tr>
-</tbody>
-</table>
 </dd></dl>
 
 </div>
