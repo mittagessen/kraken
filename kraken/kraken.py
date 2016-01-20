@@ -275,6 +275,11 @@ def get(ctx, model_id):
     """
     Retrieves a model from the repository.
     """
+    try:
+        os.makedirs(click.get_app_dir(APP_NAME))
+    except OSError:
+        pass
+
     repo.get_model(model_id, click.get_app_dir(APP_NAME),
                    partial(spin, 'Retrieving model'))
     click.secho(u'\b\u2713', fg='green', nl=False)
