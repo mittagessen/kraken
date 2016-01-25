@@ -122,7 +122,7 @@ def recognizer(model, pad, base_image, input, output, lines):
 
 
 
-@click.group(chain=True, invoke_without_command=True)
+@click.group(chain=True)
 @click.option('-i', '--input', type=(click.Path(exists=True),
                                      click.Path(writable=True)), multiple=True)
 @click.option('-c', '--concurrency', default=cpu_count(), type=click.INT)
@@ -134,10 +134,6 @@ def cli(input, concurrency, verbose):
 
 @cli.resultcallback()
 def process_pipeline(subcommands, input, concurrency, verbose):
-    if not len(subcommands):
-        subcommands = [binarize.callback(),
-                       segment.callback(),
-                       ocr.callback()]
     for io_pair in input:
         try:
             base_image = io_pair[0]
