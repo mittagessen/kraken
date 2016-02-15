@@ -7,3 +7,4 @@ Pillow
 regex
 scipy
 protobuf==3.0.0b2
+jinja2

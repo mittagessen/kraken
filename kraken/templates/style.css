@@ -1,7 +1,14 @@
 body {
 	background: #f3f3f3;
-	margin: 0;
-	padding: 0;
+	{% if font.family %}
+	font-family: {{ font.family }};
+	{% endif %}
+	{% if font.style %}
+	font-style: {{ font.style }};
+	{% endif %}
+	{% if font.weight %}
+	font-style: {{ font.weight }};
+	{% endif %}
 }
 
 [contenteditable=true]:empty:before {
@@ -9,7 +16,15 @@ body {
 	display: block; /* For Firefox */
 }
 
-li[contenteditable=true] {
+li[contenteditable=true]:hover, li[contenteditable=true].hovered {
+	border: 1px solid #ff0000;
+}
+
+span:hover, span.hovered {
+	box-shadow: inset 0 0 0 1px #ff0000;
+}
+
+li[contenteditable=true]{
 	border: 1px dashed #000;
 	width: 100%;
 	padding: 2px;
@@ -21,15 +36,18 @@ ul {
 }
 
 nav {
+	background: #444;
 	position: fixed;
 	top: 0;
 	left: 0;
 	height: 100%;
 	width: 10%;
+	font-family: "Helvetica Neue", Arial, sans-serif;
 }
 
 nav ul {
 	list-style: none;
+	margin-right: 1em;
 }
 
 nav li {
@@ -37,6 +55,7 @@ nav li {
 }
 
 nav a {
+	color: white;
 	text-decoration: none;
 }
 
@@ -49,13 +68,13 @@ nav a:hover {
 	margin-left: 15%;
 	display: table;
 	height: 100%;
-	width: 90%;
+	width: 85%;
 }
 
 .column {
 	display: table-cell;
 	vertical-align: top;
-	width: 45%;
+	width: 50%;
 	padding: 1rem;
 }
 
@@ -65,12 +84,13 @@ nav a:hover {
 
 #download_button {
 	position: fixed;
-	display: block;
-	margin: auto;
-	bottom: 15px;
-	padding: 8px 5% 8px 5%;
+	padding: 0;
+	text-align: center;
+	width: 10%;
+	bottom: 50px;
 }
 
 .corrected {
 	background-color: #73AD21;
 }
+

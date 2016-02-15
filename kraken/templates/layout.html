@@ -16,14 +16,17 @@
 			$(document).ready(function() {
 				// resize image map based on scaled
 				$('map').imageMapResize();
-
 				$('img[usemap]').maphilight({"fill": false});
 
-				// focus text fields when lines/words are clicked
+				// focus text fields when lines/words are clicked + mouseover
 				$('area').click(function(e) {
 					$('#' + $(this).attr('alt')).focus();
+				}).mouseover(function(e) {
+					$('#' + $(this).attr('alt')).toggleClass("hovered");;
+				}).mouseout(function(e) {
+					$('#' + $(this).attr('alt')).toggleClass("hovered");;
 				});
-				// create mouseover effect 
+				// create mouseover effect on text fields
 				$('li[contenteditable=true], span').mouseover(function(e) {
 					$('area[alt=' + this.id + ']').mouseover();
 				}).mouseout(function(e) {
@@ -42,14 +45,15 @@
 				});
 			
 				// smooth scrolling between anchor links
-				$('a[href*=#]').on('click', function(event){     
-					    event.preventDefault();
-					        $('html,body').animate({scrollTop:$(this.hash).offset().top}, 500);
+				$('a[href*=#]').on('click', function(event) {     
+					event.preventDefault();
+					$('html,body').animate({scrollTop:$(this.hash).offset().top}, 500);
 				});
 
-				$('#download').on('click', function(event) {
-					document.documentElement.outerHTML
-					$(this).attr('href', 'data:text/html,;charset=utf-8,%EF%BB%BF' + $('html'));
+				$('#download_button').on('click', function(event) {
+					path = window.location.pathname
+					$(this).attr('download', path.substr(path.lastIndexOf('/') + 1))
+					$(this).attr('href', 'data:text/html,;charset=utf-8,' + $('html')[0].outerHTML);
 				});
 			});
 		</script>

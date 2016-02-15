@@ -28,7 +28,11 @@ import numpy as np
 from PIL import Image
 from itertools import cycle
 from kraken import linegen
+from kraken import transcrib
 from kraken import binarization
+from kraken import pageseg
+from kraken.lib import models
+from kraken import rpred
 from kraken.lib.exceptions import KrakenCairoSurfaceException
 
 APP_NAME = 'kraken'
@@ -47,8 +51,58 @@ def cli(verbose):
 
 @cli.command('transcrib')
 @click.pass_context
-def transcription(ctx):
-    pass
+@click.option('-f', '--font', default='', 
+              help='Font family to use')
+@click.option('-f', '--font-style', default=None, 
+              help='Font style to use')
+@click.option('-f', '--font-style', default=None, 
+              help='Font style to use')
+@click.option('-p', '--prefill', default=None, 
+              help='Use given model for prefill mode.')
+@click.option('-o', '--output', type=click.File(mode='wb'), default='transcrib.html',
+              help='Output file')
+@click.argument('images', nargs=-1, type=click.File(lazy=True))
+def transcription(ctx, font, font_style, prefill, output, images):
+    st_time = time.time()
+    ti = transcrib.TranscriptionInterface(font, font_style)
+
+    if prefill:
+        if ctx.meta['verbose'] > 0:
+            click.echo(u'[{:2.4f}] Loading model {}'.format(time.time() - st_time, prefill))
+        else:
+            click.echo('Loading RNN\t', nl=False)
+        prefill = models.load_any(prefill)
+        click.secho(u'\b\u2713', fg='green', nl=False)
+        click.echo('\033[?25h\n', nl=False)
+
+    for fp in images:
+        if ctx.meta['verbose'] > 0:
+            click.echo(u'[{:2.4f}] Reading {}'.format(time.time() - st_time, fp.name))
+        else:
+            spin('Reading images')
+        im = Image.open(fp)
+        if ctx.meta['verbose'] > 0:
+            click.echo(u'[{:2.4f}] Segmenting page'.format(time.time() - st_time))
+        res = pageseg.segment(im)
+        if prefill:
+            it = rpred.rpred(prefill, im, res)
+            preds = []
+	    for pred in it: 
+	        if ctx.meta['verbose'] > 0:
+	            click.echo(u'[{:2.4f}] {}'.format(time.time() - st_time, pred.prediction))
+	        else:
+	            spin('Recognizing')
+	        preds.append(pred)
+	    if ctx.meta['verbose'] > 0:
+	        click.echo(u'Execution time: {}s'.format(time.time() - st_time))
+	    else:
+	        click.secho(u'\b\u2713', fg='green', nl=False)
+	        click.echo('\033[?25h\n', nl=False)
+            ti.add_page(im, records=preds)
+        else:
+            ti.add_page(im, res)
+    ti.write(output)
+
 
 @cli.command('linegen')
 @click.pass_context

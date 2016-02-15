@@ -35,10 +35,11 @@ import os
 
 class TranscriptionInterface(object):
 
-    def __init__(self):
+    def __init__(self, font=None, font_style=None):
         env = Environment(loader=PackageLoader('kraken', 'templates'))
         self.tmpl = env.get_template('layout.html')
         self.pages = []
+        self.font = {'font': font, 'style': font_style}
         self.page_idx = 1
         self.line_idx = 1
         self.seg_idx = 1
@@ -94,4 +95,4 @@ class TranscriptionInterface(object):
         Args:
             fd (File): File descriptor to write to.
         """
-        fd.write(self.tmpl.render(pages=self.pages).encode('utf-8'))
+        fd.write(self.tmpl.render(pages=self.pages, font=self.font).encode('utf-8'))
