@@ -22,6 +22,7 @@ from builtins import range
 from builtins import object
 
 import numpy as np
+import bidi.algorithm as bd
 
 from kraken.lib import lstm
 from kraken.lib.util import pil2array, array2pil
@@ -68,6 +69,42 @@ class ocr_record(object):
                     self.confidences[key])
         else:
             raise TypeError('Invalid argument type')
+
+
+def bidi_record(record):
+    """
+    Reorders a record using the Unicode BiDi algorithm. 
+    
+    Models trained for RTL or mixed scripts still emit classes in LTR order
+    requiring reordering for proper display.
+
+    Args:
+        record (kraken.rpred.ocr_record)
+
+    Returns:
+        kraken.rpred.ocr_record 
+    """
+    storage = bd.get_empty_storage()
+    storage['base_level'] = bd.get_base_level(record.prediction)
+    storage['base_dir'] = ('L', 'R')[base_level]
+
+    bd.get_embedding_levels(record.prediction, storage)
+    bd.explicit_embed_and_overrides(storage)
+    bd.resolve_weak_types(storage)
+    bd.resolve_neutral_types(storage)
+    bd.resolve_implicit_levels(storage)
+
+    for i, j in enumerate(pred):
+        storage['chars'][i]['record'] = j
+    bd.reorder_resolved_levels(storage)
+    prediction = u''
+    cuts = []
+    confidences = []
+    for ch in storage['chars']:
+        prediction = prediction + ch['record'][0]
+        cuts.append(ch['record'][1])
+        confidences.append(ch['record'][2])
+    return ocr_record(prediction, cuts, confidences)
 
 
 def extract_boxes(im, bounds):
