@@ -98,7 +98,40 @@ def translate_back(outputs, threshold=0.5, pos=0):
     mask = np.tile(labels.reshape(-1,1), (1,outputs.shape[1]))
     maxima = measurements.maximum_position(outputs, mask, np.arange(1, np.amax(mask)+1))
     if pos: return maxima
-    return [c for (r,c) in maxima]
+    return [c for (r,c) in maxima if c != 0]
+
+def translate_back_locations(outputs, threshold=0.5):
+    """
+    Translates back the network output to a class sequence.
+
+    Thresholds on class 0, then assigns the maximum (non-zero) class to each
+    region. Difference to translate_back is the output region not just the
+    maximum's position is returned.
+
+    Args:
+
+    Returns:
+        A list with tuples (class, start, end, max). max is the maximum value
+        of the softmax layer in the region.
+    """
+    labels, n = measurements.label(outputs[:,0] < threshold)
+    mask = np.tile(labels.reshape(-1,1), (1,outputs.shape[1]))
+    maxima = measurements.maximum_position(outputs, mask, np.arange(1, np.amax(mask)+1))
+    p = 0
+    start = None
+    x = []
+    for idx, val in enumerate(labels):
+        if val != 0 and start is None:
+            start = idx
+            p += 1
+        if val == 0 and start:
+            if maxima[p-1][1] == 0:
+                start = None
+            else:
+                x.append((maxima[p-1][1], start, idx, maxima[p-1][0]))
+                start = None
+    return x
+
 
 class Network:
     def predict(self,xs):
