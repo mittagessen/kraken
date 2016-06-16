@@ -41,15 +41,12 @@ class ClstmSeqRecognizer(kraken.lib.lstm.SeqRecognizer):
         self.normalize = normalize
         global clstm
         import clstm
+        self.load_model()
 
     def load_model(self):
         self.rnn = clstm.load_net(self.fname.encode('utf-8'))
 
     def predictString(self, line):
-        # we defer loading as SWIG interfaced objects are not pickleable.
-        # fortunately loading protobufs is fast.
-        if not self.rnn:
-            self.load_model()
         line = line.reshape(-1, self.rnn.ninput(), 1)
         self.rnn.inputs.aset(line.astype('float32'))
         self.rnn.forward()
@@ -60,8 +57,6 @@ class ClstmSeqRecognizer(kraken.lib.lstm.SeqRecognizer):
         for i, v in enumerate(codes):
             cls[i] = v
         res = self.rnn.decode(cls)
-        # and delete again for pickleability
-        self.rnn = None
         return res
 
 
