@@ -51,7 +51,7 @@ class TranscriptionInterface(object):
 
         Args:
             im (PIL.Image): Input image
-            records (lis): A list of ocr_record objects.
+            records (list): A list of ocr_record objects.
         """
         page = {}
         fd = StringIO()
