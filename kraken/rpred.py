@@ -85,18 +85,18 @@ def bidi_record(record):
         kraken.rpred.ocr_record 
     """
     storage = bd.get_empty_storage()
-    storage['base_level'] = bd.get_base_level(record.prediction)
+    base_level = bd.get_base_level(record.prediction)
+    storage['base_level'] = base_level
     storage['base_dir'] = ('L', 'R')[base_level]
 
     bd.get_embedding_levels(record.prediction, storage)
     bd.explicit_embed_and_overrides(storage)
     bd.resolve_weak_types(storage)
-    bd.resolve_neutral_types(storage)
-    bd.resolve_implicit_levels(storage)
-
-    for i, j in enumerate(pred):
+    bd.resolve_neutral_types(storage, False)
+    bd.resolve_implicit_levels(storage, False)
+    for i, j in enumerate(record):
         storage['chars'][i]['record'] = j
-    bd.reorder_resolved_levels(storage)
+    bd.reorder_resolved_levels(storage, False)
     prediction = u''
     cuts = []
     confidences = []
@@ -147,7 +147,7 @@ def dewarp(normalizer, im):
     return array2pil(line)
 
 
-def rpred(network, im, bounds, pad=16, line_normalization=True):
+def rpred(network, im, bounds, pad=16, line_normalization=True, bidi_reordering=True):
     """
     Uses a RNN to recognize text
 
@@ -164,10 +164,12 @@ def rpred(network, im, bounds, pad=16, line_normalization=True):
                                    parameters is created. By aware that you may
                                    have to scale lines manually to the target
                                    line height if disabled.
+        bidi_reordering (bool): Reorder classes in the ocr_record according to
+                                the Unicode bidirectional algorithm for correct
+                                display.
     Yields:
-        A tuple containing the recognized text (0), absolute character
-        positions in the image (1), and confidence values for each
-        character(2).
+        An ocr_record containing the recognized text, absolute character
+        positions, and confidence values for each character. 
     """
 
     lnorm = getattr(network, 'lnorm', CenterNormalizer())
@@ -196,20 +198,14 @@ def rpred(network, im, bounds, pad=16, line_normalization=True):
 
         # calculate recognized LSTM locations of characters
         scale = len(raw_line.T)/(len(network.outputs)-2 * pad)
-        result = lstm.translate_back(network.outputs, pos=1)
-        conf = [network.outputs[r, c] for r, c in result if c != 0]
-        cuts = [(int((r-pad)*scale), c) for (r, c) in result]
-        # append last offset to end of line
-        cuts.append((coords[2] - coords[0], 0))
+        result = lstm.translate_back_locations(network.outputs)
         pos = []
-        lx = 0
-        for i, d in enumerate(cuts):
-            if d[1] == 0:
-                lx = d[0]
-                continue
-            try:
-                pos.append((coords[0] + lx, coords[1], coords[0] + d[0], coords[3]))
-            except:
-                break
-            lx = d[0]
-        yield ocr_record(pred, pos, conf)
+        conf = []
+
+        for _, start, end, c in result:
+            pos.append((coords[0] + int((start-pad)*scale), coords[1], coords[0] + int((end-pad/2)*scale), coords[3]))
+            conf.append(c)
+        if bidi_reordering:
+            yield bidi_record(ocr_record(pred, pos, conf))
+        else:
+            yield ocr_record(pred, pos, conf)
