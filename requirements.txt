@@ -1,7 +1,6 @@
 future
 requests
 click>=5.0
-dominate
 numpy
 Pillow
 regex
