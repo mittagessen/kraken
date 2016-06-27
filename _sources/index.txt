@@ -98,7 +98,7 @@ prerequisite steps of binarization and page segmentation:
 
 ::
 
-  $ kraken -i image.tif image.txt
+  $ kraken -i image.tif image.txt binarize segment ocr
   Loading RNN     ✓
   Processing      ⣻
 
