@@ -53,9 +53,7 @@ def cli(verbose):
 @click.pass_context
 @click.option('-f', '--font', default='', 
               help='Font family to use')
-@click.option('-f', '--font-style', default=None, 
-              help='Font style to use')
-@click.option('-f', '--font-style', default=None, 
+@click.option('-fs', '--font-style', default=None, 
               help='Font style to use')
 @click.option('-p', '--prefill', default=None, 
               help='Use given model for prefill mode.')
@@ -144,13 +142,15 @@ def transcription(ctx, font, font_style, prefill, output, images):
 @click.option('-ds', '--distortion-sigma', type=click.FLOAT, default=20.0,
               help='Mean of distribution to take standard deviations for the '
               'Gaussian kernel from')
+@click.option('--legacy/--no-legacy', default=False,
+              help='Use ocropy-style degradations')
 @click.option('-o', '--output', type=click.Path(), default='training_data',
               help='Output directory')
 @click.argument('text', nargs=-1, type=click.Path(exists=True))
 def line_generator(ctx, font, maxlines, encoding, normalization, renormalize,
                    font_size, language, max_length, strip, disable_degradation,
                    binarize, mean, sigma, density, distort, distortion_sigma,
-                   output, text):
+                   legacy, output, text):
     """
     Generates artificial text line training data.
     """
@@ -223,9 +223,11 @@ def line_generator(ctx, font, maxlines, encoding, normalization, renormalize,
                 click.secho(u'\b\u2717', fg='red')
                 click.echo('{}: {} {}'.format(e.message, e.width, e.height))
             continue
-        if not disable_degradation:
+        if not disable_degradation and not legacy:
             im = linegen.distort_line(im, np.random.normal(distort), np.random.normal(distortion_sigma))
             im = linegen.degrade_line(im, np.random.normal(mean), np.random.normal(sigma), np.random.normal(density))
+        elif legacy:
+            im = linegen.ocropy_degrade(im)
         if binarize:
             im = binarization.nlbin(im)
         im.save('{}/{:06d}.png'.format(output, idx))

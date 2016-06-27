@@ -33,6 +33,7 @@ from builtins import range
 from builtins import object
 
 from scipy.ndimage.filters import gaussian_filter
+from scipy.ndimage.measurements import find_objects
 from scipy.ndimage.interpolation import affine_transform, geometric_transform
 from PIL import Image, ImageOps
 
@@ -162,6 +163,63 @@ def _draw_on_surface(surface, font, language, text):
     return max(ink_rect.width, logical_rect.width), max(ink_rect.height, logical_rect.height)
 
 
+def ocropy_degrade(im, distort=1.0, dsigma=20.0, eps=0.03, delta=0.3, degradations=[(0.5, 0.0, 0.5, 0.0)]):
+    """
+    Degrades and distorts a line using the same noise model used by ocropus.
+
+    Args:
+        im (PIL.Image): Input image
+        distort (float):
+        dsigma (float):
+        eps (float):
+        delta (float): 
+        degradations (list): list returning 4-tuples corresponding to
+                             the degradations argument of ocropus-linegen.
+
+    Returns:
+        PIL.Image in mode 'L'
+    """
+    w, h = im.size
+    # XXX: determine correct output shape from transformation matrices instead
+    # of guesstimating.
+    image = Image.new('L', (int(1.5*w), 4*h), 255)
+    image.paste(im, (int((image.size[0] - w) / 2), int((image.size[1] - h) / 2)))
+    a = pil2array(image.convert('L'))
+    (sigma,ssigma,threshold,sthreshold) = degradations[np.random.choice(len(degradations))]
+    sigma += (2*np.random.rand()-1)*ssigma
+    threshold += (2*np.random.rand()-1)*sthreshold
+    a = a*1.0/np.amax(a)
+    if sigma>0.0:
+        a = gaussian_filter(a,sigma)
+    a += np.clip(np.random.randn(*a.shape)*0.2,-0.25,0.25)
+    m = np.array([[1+eps*np.random.randn(),0.0],[eps*np.random.randn(),1.0+eps*np.random.randn()]])
+    w,h = a.shape
+    c = np.array([w/2.0,h/2])
+    d = c-np.dot(m, c)+np.array([np.random.randn()*delta, np.random.randn()*delta])
+    a = affine_transform(a, m, offset=d, order=1, mode='constant', cval=a[0,0])
+    a = np.array(a>threshold,'f')
+    [[r,c]] = find_objects(np.array(a==0,'i'))
+    r0 = r.start
+    r1 = r.stop
+    c0 = c.start
+    c1 = c.stop
+    a = a[r0-5:r1+5,c0-5:c1+5]
+    if distort > 0:
+        h,w = a.shape
+        hs = np.random.randn(h,w)
+        ws = np.random.randn(h,w)
+        hs = gaussian_filter(hs, dsigma)
+        ws = gaussian_filter(ws, dsigma)
+        hs *= distort/np.amax(hs)
+        ws *= distort/np.amax(ws)
+        def f(p):
+            return (p[0]+hs[p[0],p[1]],p[1]+ws[p[0],p[1]])
+        a = geometric_transform(a, f, output_shape=(h,w), order=1, mode='constant', cval=np.amax(a))
+    im = array2pil(a).convert('L')
+    return im
+
+
+
 def degrade_line(im, mean=0.0, sigma=0.001, density=0.002):
     """
     Degrades a line image by adding several kinds of noise.
@@ -170,7 +228,7 @@ def degrade_line(im, mean=0.0, sigma=0.001, density=0.002):
         im (PIL.Image): Input image
         mean (float): Mean of distribution for Gaussian noise
         sigma (float): Standard deviation for Gaussian noise
-        density (float): Noise density for Salt and Pepper noise
+        density (float): Noise density for Salt and Pepper noiase
 
     Returns:
         PIL.Image in mode 'L'
