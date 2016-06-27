@@ -17,6 +17,7 @@
 from __future__ import absolute_import, division, print_function
 from __future__ import unicode_literals
 
+import warnings
 import numpy as np
 
 from kraken.lib.util import pil2array, array2pil
@@ -56,10 +57,12 @@ def nlbin(im, threshold=0.5, zoom=0.5, escale=1.0, border=0.1, perc=80,
     image = raw-np.amin(raw)
     image /= np.amax(image)
 
-    m = interpolation.zoom(image, zoom)
-    m = filters.percentile_filter(m, perc, size=(range, 2))
-    m = filters.percentile_filter(m, perc, size=(2, range))
-    m = interpolation.zoom(m, 1.0/zoom)
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore', UserWarning)
+        m = interpolation.zoom(image, zoom)
+        m = filters.percentile_filter(m, perc, size=(range, 2))
+        m = filters.percentile_filter(m, perc, size=(2, range))
+        m = interpolation.zoom(m, 1.0/zoom)
     w, h = np.minimum(np.array(image.shape), np.array(m.shape))
     flat = np.clip(image[:w, :h]-m[:w, :h]+1, 0, 1)
 
