@@ -43,16 +43,10 @@
 						$els.eq($els.index(this) + 1).focus();
 					}
 				});
-			
-				// smooth scrolling between anchor links
-				$('a[href*=#]').on('click', function(event) {     
-					event.preventDefault();
-					$('html,body').animate({scrollTop:$(this.hash).offset().top}, 500);
-				});
 
 				$('#download_button').on('click', function(event) {
-					path = window.location.pathname
-					$(this).attr('download', path.substr(path.lastIndexOf('/') + 1))
+					path = window.location.pathname;
+					$(this).attr('download', path.substr(path.lastIndexOf('/') + 1));
 					$(this).attr('href', 'data:text/html,;charset=utf-8,' + $('html')[0].outerHTML);
 				});
 			});
@@ -60,7 +54,7 @@
 		<nav>
 			<ul>
 			{% for page in pages %}
-				<li><a href='#page_{{ page.index }}'>{{ page.index }}</a></li>
+				<li><a class="page_anchor" href='#page_{{ page.index }}'>{{ page.index }}</a></li>
 			{% endfor %}
 			</ul>
 			<a id="download_button" href="#">Download</a>
