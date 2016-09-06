@@ -18,17 +18,18 @@ from __future__ import absolute_import, division, print_function
 from future import standard_library
 standard_library.install_aliases()
 
-import click
-import csv
 import os
+import csv
+import click
+import time
 import tempfile
 import requests
-import time
+import unicodedata
 
 from PIL import Image
 from click import open_file
 from itertools import cycle
-from collections import namedtuple
+from collections import namedtuple, defaultdict
 from functools import partial
 from multiprocessing import Queue, Pool, cpu_count
 from kraken import binarization
@@ -244,11 +245,23 @@ def show(ctx, model_id):
     Retrieves model metadata from the repository.
     """
     desc = repo.get_description(model_id)
-    click.echo('name: {}\n\n{}\n\nauthor: {} ({})\n{}'.format(desc['name'],
-                                                              desc['summary'],
-                                                              desc['author'],
-                                                              desc['author-email'],
-                                                              desc['url']))
+
+    chars = []
+    combining = []
+    for char in sorted(desc['graphemes']):
+        if unicodedata.combining(char):
+            combining.append(unicodedata.name(char))
+        else:
+            chars.append(char)
+    click.echo(u'name: {}\n\n{}\n\n{}\nalphabet: {} {}\nlicense: {}\nauthor: {} ({})\n{}'.format(desc['name'],
+                                                                                              desc['summary'],
+                                                                                              desc['description'],
+                                                                                              ''.join(chars),
+                                                                                              ', '.join(combining),
+                                                                                              desc['license'],
+                                                                                              desc['author'],
+                                                                                              desc['author-email'],
+                                                                                              desc['url']))
     ctx.exit(0)
 
 @cli.command('list')
