@@ -46,8 +46,8 @@
 
 				$('#download_button').on('click', function(event) {
 					path = window.location.pathname;
+					$(this).attr('href', 'data:text/html,' + encodeURIComponent($('html')[0].outerHTML));
 					$(this).attr('download', path.substr(path.lastIndexOf('/') + 1));
-					$(this).attr('href', 'data:text/html,;charset=utf-8,' + $('html')[0].outerHTML);
 				});
 			});
 		</script>
