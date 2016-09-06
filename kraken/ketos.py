@@ -22,11 +22,16 @@ import os
 import time
 import click
 import errno
+import base64
+import StringIO
 import unicodedata
 import numpy as np
 
 from PIL import Image
+from lxml import html
 from itertools import cycle
+from bidi.algorithm import get_display
+
 from kraken import linegen
 from kraken import transcrib
 from kraken import binarization
@@ -48,6 +53,61 @@ def spin(msg):
 def cli(verbose):
     ctx = click.get_current_context()
     ctx.meta['verbose'] = verbose
+
+@cli.command('extract')
+@click.pass_context
+@click.option('-u', '--normalization',
+              type=click.Choice(['NFD', 'NFKD', 'NFC', 'NFKC']), default=None,
+              help='Normalize ground truth')
+@click.option('-o', '--output', type=click.Path(), default='training',
+              help='Output directory')
+@click.argument('transcribs', nargs=-1, type=click.File(lazy=True))
+def extract(ctx, normalization, output, transcribs):
+    """
+    Extracts image-text pairs from a transcription environment created using
+    ``ketos transcrib``.
+    """
+    st_time = time.time()
+    try:
+        os.mkdir(output)
+    except:
+        pass
+    idx = 0
+    manifest = []
+    for fp in transcribs:
+        if ctx.meta['verbose'] > 0:
+            click.echo(u'[{:2.4f}] Reading {}'.format(time.time() - st_time, fp.name))
+        else:
+            spin('Reading transcription')
+        doc = html.parse(fp)
+        im = None
+        for part in doc.xpath('//div[@class="page_image"]')[0].get('style').split(';'):
+            if part.startswith('base64,'):
+                fd = StringIO.StringIO(base64.b64decode(part[7:-2]))
+                im = Image.open(fd)
+                if not im:
+                    if ctx.meta['verbose'] > 0:
+                        click.echo(u'[{:2.4f}] Skipping {} because image not found'.format(time.time() - st_time, fp.name))
+                    break
+        for line in doc.iter('li'):
+            if line.get('contenteditable') and u''.join(line.itertext()):
+                l = im.crop([int(x) for x in line.get('data-bbox').split(',')])
+                l.save('{}/{:06d}.png'.format(output, idx))
+                manifest.append('{:06d}.png'.format(idx))
+                text = u''.join(line.itertext())
+                if normalization:
+                    text = unicodedata.normalize(normalization, text)
+                with open('{}/{:06d}.gt.txt'.format(output, idx), 'wb') as t:
+                    t.write(get_display(text).encode('utf-8'))
+                idx += 1
+    if ctx.meta['verbose'] > 0:
+        click.echo(u'[{:2.4f}] Extracted {} lines'.format(time.time() - st_time, idx))
+    with open('{}/manifest.txt'.format(output), 'wb') as fp:
+        fp.write('\n'.join(manifest))
+    if ctx.meta['verbose'] == 0:
+        click.secho(u'\b\u2713', fg='green', nl=False)
+        click.echo('\033[?25h\n', nl=False)
+
 
 @cli.command('transcrib')
 @click.pass_context
