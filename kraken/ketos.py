@@ -59,10 +59,12 @@ def cli(verbose):
 @click.option('-u', '--normalization',
               type=click.Choice(['NFD', 'NFKD', 'NFC', 'NFKC']), default=None,
               help='Normalize ground truth')
+@click.option('-n', '--reorder/--no-reorder', default=True,
+              help='Skip application of BiDi algorithm to transcribed lines')
 @click.option('-o', '--output', type=click.Path(), default='training',
               help='Output directory')
 @click.argument('transcribs', nargs=-1, type=click.File(lazy=True))
-def extract(ctx, normalization, output, transcribs):
+def extract(ctx, normalization, reorder, output, transcribs):
     """
     Extracts image-text pairs from a transcription environment created using
     ``ketos transcrib``.
@@ -98,7 +100,10 @@ def extract(ctx, normalization, output, transcribs):
                 if normalization:
                     text = unicodedata.normalize(normalization, text)
                 with open('{}/{:06d}.gt.txt'.format(output, idx), 'wb') as t:
-                    t.write(get_display(text).encode('utf-8'))
+                    if reorder:
+                        t.write(get_display(text).encode('utf-8'))
+                    else:
+                        t.write(text.encode('utf-8'))
                 idx += 1
     if ctx.meta['verbose'] > 0:
         click.echo(u'[{:2.4f}] Extracted {} lines'.format(time.time() - st_time, idx))
