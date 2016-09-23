@@ -76,8 +76,8 @@ def nlbin(im, threshold=0.5, zoom=0.5, escale=1.0, border=0.1, perc=80,
     v = est-filters.gaussian_filter(est, escale*20.0)
     v = filters.gaussian_filter(v**2, escale*20.0)**0.5
     v = (v > 0.3*np.amax(v))
-    v = morphology.binary_dilation(v, structure=np.ones((escale*50, 1)))
-    v = morphology.binary_dilation(v, structure=np.ones((1, escale*50)))
+    v = morphology.binary_dilation(v, structure=np.ones((int(escale * 50), 1)))
+    v = morphology.binary_dilation(v, structure=np.ones((1, int(escale * 50))))
     est = est[v]
     lo = np.percentile(est.ravel(), low)
     hi = np.percentile(est.ravel(), high)
