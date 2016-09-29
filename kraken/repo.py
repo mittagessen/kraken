@@ -118,7 +118,7 @@ def get_listing(callback):
             try:
                 models[components[1]].update(json.loads(raw))
             except:
-                del models[components[0]][components[1]]
+                del models[components[1]]
         elif len(components) > 2 and components[1] in models:
             models[components[1]]['model'] = el['url']
     return models
