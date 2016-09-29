@@ -4,8 +4,8 @@ python:
 # to build scipy we cannot use the virtual env of travis. Instead, we
 # use miniconda.
   - 2.7
-  - 3.3
   - 3.4
+  - 3.5
 
 notifications:
   email: false
@@ -29,7 +29,7 @@ install:
   # Customise the testing environment
   # ---------------------------------
   - conda install pbr nose pip
-  - sed '/click\|python-bidi\|regex\|protobuf/d' requirements.txt | xargs conda install
+  - sed '/python-bidi\|regex/d' requirements.txt | xargs conda install
   # Conda does not package everything, so we install a couple others via pip.
   - pip install -r requirements.txt
 
