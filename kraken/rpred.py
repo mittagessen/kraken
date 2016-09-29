@@ -97,6 +97,7 @@ def bidi_record(record):
     for i, j in enumerate(record):
         storage['chars'][i]['record'] = j
     bd.reorder_resolved_levels(storage, False)
+    bd.apply_mirroring(storage, False)
     prediction = u''
     cuts = []
     confidences = []
