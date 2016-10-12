@@ -7,14 +7,14 @@ Description
 kraken is a fork of ocropus intended to rectify a number of issues while
 preserving (mostly) functional equivalence. Its main goals are:
 
-  - explicit input/output handling ✓
-  - word and character bounding boxes in hOCR ✓
-  - removal of runtime dependency on gcc ✓
+  - Explicit input/output handling ✓
+  - Word and character bounding boxes in hOCR ✓
+  - Removal of runtime dependency on gcc ✓
   - `clstm <https://github.com/tmbdev/clstm>`_ compatibility ✓
-  - right-to-left/BiDi support ✓
+  - Right-to-left/BiDi support ✓
   - ALTO
-  - clean public API 
-  - tests
+  - Clean public API 
+  - Tests
 
 Ticked of goals have been realized while some others still require further
 work. Pull requests and code contributions are always welcome.
