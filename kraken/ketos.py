@@ -116,6 +116,7 @@ def extract(ctx, normalization, reorder, output, transcribs):
 
 @cli.command('transcrib')
 @click.pass_context
+@click.option('--external/--inline', help="Link images instead of inlining them using data URIs")
 @click.option('-f', '--font', default='', 
               help='Font family to use')
 @click.option('-fs', '--font-style', default=None, 
@@ -125,7 +126,7 @@ def extract(ctx, normalization, reorder, output, transcribs):
 @click.option('-o', '--output', type=click.File(mode='wb'), default='transcrib.html',
               help='Output file')
 @click.argument('images', nargs=-1, type=click.File(lazy=True))
-def transcription(ctx, font, font_style, prefill, output, images):
+def transcription(ctx, external, font, font_style, prefill, output, images):
     st_time = time.time()
     ti = transcrib.TranscriptionInterface(font, font_style)
 
@@ -144,6 +145,10 @@ def transcription(ctx, font, font_style, prefill, output, images):
         else:
             spin('Reading images')
         im = Image.open(fp)
+        if not binarization.is_bitonal(im):
+            if ctx.meta['verbose'] > 0:
+                click.echo(u'[{:2.4f}] Binarizing page'.format(time.time() - st_time))
+            im = binarization.nlbin(im)
         if ctx.meta['verbose'] > 0:
             click.echo(u'[{:2.4f}] Segmenting page'.format(time.time() - st_time))
         res = pageseg.segment(im)
