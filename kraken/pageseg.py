@@ -24,8 +24,10 @@ import numpy as np
 
 from scipy.ndimage.filters import (gaussian_filter, uniform_filter,
                                    maximum_filter)
+
 from kraken.lib import morph, sl
 from kraken.lib.util import pil2array
+from kraken.binarization import is_bitonal
 from kraken.lib.exceptions import KrakenInputException
 
 
@@ -328,7 +330,7 @@ def segment(im, scale=None, black_colseps=False):
         KrakenInputException if the input image is not binarized
     """
 
-    if im.mode != '1' and im.histogram().count(0) != 254:
+    if im.mode != '1' and not is_bitonal(im):
         raise KrakenInputException('Image is not bi-level')
     # honestly I've got no idea what's going on here. In theory a simple
     # np.array(im, 'i') should suffice here but for some reason the
