@@ -35,7 +35,7 @@ def is_bitonal(im):
         True if the image contains only two different color values. False
         otherwise.
     """
-    if len(im.getcolors()) == 2:
+    if im.getcolors(2):
         return True
     else:
         return False
