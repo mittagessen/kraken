@@ -24,6 +24,21 @@ from kraken.lib.util import pil2array, array2pil
 from kraken.lib.exceptions import KrakenInputException
 from scipy.ndimage import filters, interpolation, morphology
 
+def is_bitonal(im):
+    """
+    Tests a PIL.Image for bitonality.
+
+    Args:
+        im (PIL.Image): Image to test
+
+    Returns:
+        True if the image contains only two different color values. False
+        otherwise.
+    """
+    if len(im.getcolors()) == 2:
+        return True
+    else:
+        return False
 
 def nlbin(im, threshold=0.5, zoom=0.5, escale=1.0, border=0.1, perc=80,
           range=20, low=5, high=90):
