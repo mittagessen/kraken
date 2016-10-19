@@ -67,16 +67,20 @@ def delta(root=(0, 0, 0, 0), coordinates=None):
                max(box[1], box[3]) - max(root[1], root[3]))
         root = box
 
-
-def hocr(records, image_name=u'', image_size=(0, 0)):
+def serialize(records, image_name=u'', image_size=(0, 0), template='hocr'):
     """
-    Merges a list of predictions and their corresponding character positions
-    into an hOCR document.
+    Serializes a list of ocr_records into an output document.
+
+    Serializes a list of predictions and their corresponding character
+    positions by doing some hOCR-specific preprocessing and then renders them
+    through one of several jinja2 template.
 
     Args:
         records (iterable): List of kraken.rpred.ocr_record
         image_name (unicode): Name of the source image
         image_size (tuple): Dimensions of the source image
+        template (unicode): Selector for the serialization format. May be
+                            'hocr' or 'alto'. 
     """
     page = {'lines': [], 'size': image_size, 'name': image_name}
     seg_idx = 0
@@ -101,6 +105,7 @@ def hocr(records, image_name=u'', image_size=(0, 0)):
             seg_idx += 1
             line_offset += len(segment)
         page['lines'].append(line)
-    env = Environment(loader=PackageLoader('kraken', 'templates'))
-    tmpl = env.get_template('hocr.html')
+    env = Environment(loader=PackageLoader('kraken', 'templates'), trim_blocks=True, lstrip_blocks=True)
+    print(template)
+    tmpl = env.get_template(template)
     return tmpl.render(page=page)

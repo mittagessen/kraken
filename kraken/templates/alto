@@ -1,0 +1,50 @@
+<alto xmlns="http://www.loc.gov/standards/alto/ns-v3#">
+	<Description>
+		<MeasurementUnit>pixel</MeasurementUnit>
+		<sourceImageInformation>
+			<fileName>{{ page.name }}</fileName>
+		</sourceImageInformation>
+		<OCRProcessing ID="OCR_0">
+			<ocrProcessingStep>
+				<processingSoftware>
+					<softwareName>kraken</softwareName>
+				</processingSoftware>
+			</ocrProcessingStep>
+		</OCRProcessing>
+	</Description>
+
+	<Layout>
+		<Page WIDTH="{{ page.size[0] }}" HEIGHT="{{ page.size[1] }}" PHYSICAL_IMG_NR="0" ID="page_0">
+			<PrintSpace HPOS="0" VPOS="0" WIDTH="{{ page.size[0] }}" HEIGHT="{{ page.size[1] }}">
+				<TextBlock HPOS="0" VPOS="0" ID="textblock_0" WIDTH="{{ page.size[0] }}" HEIGHT="{{ page.size[1] }}">
+					{% for line in page.lines %}
+					<TextLine ID="line_{{ line.index }}"
+						  HPOS="{{ line.bbox[0] }}"
+						  VPOS="{{ line.bbox[1] }}" 
+						  WIDTH="{{ line.bbox[2] - line.bbox[0] }}" 
+						  HEIGHT="{{ line.bbox[3] - line.bbox[1] }}">
+						{% for segment in line.recognition %}
+							{# a crude hack to check if a string contains only whitespace and is to be encoded in <SP> #}
+							{% if segment.text|trim|length == 0 %}
+							<SP ID="segment_{{ segment.index }}"
+							    HPOS="{{ segment.bbox[0]}}" 
+							    VPOS="{{ segment.bbox[1] }}"
+							    WIDTH="{{ segment.bbox[2] - segment.bbox[0] }}" 
+							    HEIGHT="{{ segment.bbox[3] - segment.bbox[1] }}"/>
+							{% else %}
+							<String ID="segment_{{ segment.index }}"
+								CONTENT="{{ segment.text|e }}" 
+								HPOS="{{ segment.bbox[0]}}" 
+								VPOS="{{ segment.bbox[1] }}"
+								WIDTH="{{ segment.bbox[2] - segment.bbox[0] }}" 
+								HEIGHT="{{ segment.bbox[3] - segment.bbox[1] }}" 
+								CC=""/>
+							{% endif %}
+						{% endfor %}
+					</Textline>
+					{% endfor %}
+				</TextBlock>
+			</PrintSpace>
+		</Page>
+	</Layout>
+</alto>

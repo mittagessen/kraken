@@ -115,8 +115,9 @@ def recognizer(model, pad, base_image, input, output, lines):
     ctx = click.get_current_context()
     with open_file(output, 'w', encoding='utf-8') as fp:
         click.echo('Writing recognition results for {}\t'.format(base_image), nl=False)
-        if ctx.meta['mode'] == 'hocr':
-            fp.write(unicode(html.hocr(preds, base_image)))
+        if ctx.meta['mode'] != 'text':
+
+            fp.write(html.serialize(preds, base_image, Image.open(base_image).size, ctx.meta['mode']))
         else:
             fp.write(u'\n'.join(s.prediction for s in preds))
         click.secho(u'\u2713', fg='green')
@@ -179,13 +180,16 @@ def segment(scale=None, black_colseps=False):
               'recognition model')
 @click.option('-p', '--pad', type=click.INT, default=16, help='Left and right '
               'padding around lines')
-@click.option('-h/-t', '--hocr/--text', default=False, help='Switch between '
-              'hOCR and plain text output')
+@click.option('-h', '--hocr', 'serialization', help='Switch between hOCR, '
+              'ALTO, and plain text output', flag_value='hocr')
+@click.option('-a', '--alto', 'serialization', flag_value='alto')
+@click.option('-t', '--text', 'serialization', flag_value='text', default=True)
+
 @click.option('-l', '--lines', type=click.Path(exists=True),
               help='JSON file containing line coordinates')
 @click.option('--enable-autoconversion/--disable-autoconversion', 'conv',
-              default=True, help='Automatically convert pyrnn models zu HDF5')
-def ocr(ctx, model, pad, hocr, lines, conv):
+              default=True, help='Automatically convert pyrnn models to protobuf')
+def ocr(ctx, model, pad, serialization, lines, conv):
     """
     Recognizes text in line images.
     """
@@ -229,10 +233,7 @@ def ocr(ctx, model, pad, hocr, lines, conv):
         models.pyrnn_to_pronn(rnn, op)
 
     # set output mode
-    if hocr:
-        ctx.meta['mode'] = 'hocr'
-    else:
-        ctx.meta['mode'] = 'text'
+    ctx.meta['mode'] = serialization
     return partial(recognizer, model=rnn, pad=pad, lines=lines)
 
 
