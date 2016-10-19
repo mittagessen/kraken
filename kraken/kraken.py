@@ -269,7 +269,7 @@ def show(ctx, model_id):
 @click.pass_context
 def list(ctx):
     """
-    Lists repositories in the repository.
+    Lists models in the repository.
     """
     model_list = repo.get_listing(partial(spin, 'Retrieving model list'))
     click.secho(u'\b\u2713', fg='green', nl=False)
