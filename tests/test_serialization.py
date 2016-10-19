@@ -19,7 +19,7 @@ class TestSerializations(object):
     Tests for output serialization
     """
     def setUp(self):
-        with open(os.path.join(resources, 'records.pkl')) as fp:
+        with open(os.path.join(resources, 'records.pkl'), 'rb') as fp:
             self.records = pickle.load(fp)
 
     def test_hocr_serialization(self):
