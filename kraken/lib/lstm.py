@@ -128,11 +128,11 @@ def translate_back_locations(outputs, threshold=0.5):
             if maxima[p-1][1] == 0:
                 start = None
             else:
-                x.append((maxima[p-1][1], start, idx, maxima[p-1][0]))
+                x.append((maxima[p-1][1], start, idx, outputs[maxima[p-1]]))
                 start = None
     # append last non-zero region to list of no zero region occurs after it
     if start:
-        x.append((maxima[p-1][1], start, len(outputs), maxima[p-1][0]))
+        x.append((maxima[p-1][1], start, len(outputs), outputs[maxima[p-1]]))
     return x
 
 
