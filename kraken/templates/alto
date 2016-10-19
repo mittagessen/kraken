@@ -38,7 +38,8 @@
 								VPOS="{{ segment.bbox[1] }}"
 								WIDTH="{{ segment.bbox[2] - segment.bbox[0] }}" 
 								HEIGHT="{{ segment.bbox[3] - segment.bbox[1] }}" 
-								CC=""/>
+								WC="{{ (segment.confidences|sum / segment.confidences|length)|round(4) }}"
+								CC="{{ segment.confidences|rescale(9, 0)|map('round')|map('int')|join(' ') }}"/>
 							{% endif %}
 						{% endfor %}
 					</Textline>

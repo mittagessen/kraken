@@ -23,11 +23,23 @@ from builtins import str
 from builtins import object
 
 from jinja2 import Environment, PackageLoader
-from itertools import izip_longest
-import logging
+
 import regex
 
-logger = logging.getLogger(__name__)
+def _rescale(val, low, high):
+    """
+    Rescales a list of confidence value between 0 and 1 to an interval [low,
+    high].
+
+    Args:
+        val (float): List of values in interval (0,1)
+        low (float): Lower bound of rescaling interval
+        high (float): Upper bound of rescaling interval
+
+    Returns:
+        Rescaled value (float).
+    """
+    return [(high - low) * x + low for x in val]
 
 def max_bbox(boxes):
     """
@@ -71,9 +83,9 @@ def serialize(records, image_name=u'', image_size=(0, 0), template='hocr'):
     """
     Serializes a list of ocr_records into an output document.
 
-    Serializes a list of predictions and their corresponding character
-    positions by doing some hOCR-specific preprocessing and then renders them
-    through one of several jinja2 template.
+    Serializes a list of predictions and their corresponding positions by doing
+    some hOCR-specific preprocessing and then renders them through one of
+    several jinja2 templates.
 
     Args:
         records (iterable): List of kraken.rpred.ocr_record
@@ -106,6 +118,7 @@ def serialize(records, image_name=u'', image_size=(0, 0), template='hocr'):
             line_offset += len(segment)
         page['lines'].append(line)
     env = Environment(loader=PackageLoader('kraken', 'templates'), trim_blocks=True, lstrip_blocks=True)
-    print(template)
+    env.tests['whitespace'] = str.isspace
+    env.filters['rescale'] = _rescale
     tmpl = env.get_template(template)
     return tmpl.render(page=page)

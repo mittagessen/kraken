@@ -35,7 +35,7 @@ from multiprocessing import Queue, Pool, cpu_count
 from kraken import binarization
 from kraken import pageseg
 from kraken import rpred
-from kraken import html
+from kraken import serialization 
 from kraken import repo
 from kraken.lib import models
 
@@ -117,7 +117,7 @@ def recognizer(model, pad, base_image, input, output, lines):
         click.echo('Writing recognition results for {}\t'.format(base_image), nl=False)
         if ctx.meta['mode'] != 'text':
 
-            fp.write(html.serialize(preds, base_image, Image.open(base_image).size, ctx.meta['mode']))
+            fp.write(serialization.serialize(preds, base_image, Image.open(base_image).size, ctx.meta['mode']))
         else:
             fp.write(u'\n'.join(s.prediction for s in preds))
         click.secho(u'\u2713', fg='green')
