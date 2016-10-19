@@ -3,7 +3,7 @@
 from __future__ import absolute_import, division, print_function
 
 import unittest
-import pickle
+import json
 import os
 
 from lxml import etree
@@ -19,8 +19,8 @@ class TestSerializations(object):
     Tests for output serialization
     """
     def setUp(self):
-        with open(os.path.join(resources, 'records.pkl'), 'rb') as fp:
-            self.records = pickle.load(fp)
+        with open(os.path.join(resources, 'records.json'), 'rb') as fp:
+            self.records = [rpred.ocr_record(**x) for x in json.load(fp)]
 
     def test_hocr_serialization(self):
         """
