@@ -24,8 +24,8 @@
 						  WIDTH="{{ line.bbox[2] - line.bbox[0] }}" 
 						  HEIGHT="{{ line.bbox[3] - line.bbox[1] }}">
 						{% for segment in line.recognition %}
-							{# a crude hack to check if a string contains only whitespace and is to be encoded in <SP> #}
-							{% if segment.text|trim|length == 0 %}
+							{# ALTO forbids encoding whitespace before any String/Shape tags #}
+							{% if segment.text is whitespace and loop.index > 1 %}
 							<SP ID="segment_{{ segment.index }}"
 							    HPOS="{{ segment.bbox[0]}}" 
 							    VPOS="{{ segment.bbox[1] }}"
@@ -42,7 +42,7 @@
 								CC="{{ segment.confidences|rescale(9, 0)|map('round')|map('int')|join(' ') }}"/>
 							{% endif %}
 						{% endfor %}
-					</Textline>
+					</TextLine>
 					{% endfor %}
 				</TextBlock>
 			</PrintSpace>
