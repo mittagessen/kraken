@@ -17,10 +17,10 @@ kraken.binarization module
     :undoc-members:
     :show-inheritance:
 
-kraken.html module
+kraken.serialize module
 ------------------
 
-.. automodule:: kraken.html
+.. automodule:: kraken.serialize
     :members:
     :undoc-members:
     :show-inheritance:

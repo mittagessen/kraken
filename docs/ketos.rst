@@ -9,6 +9,15 @@ training.
 
 Training tasks are covered by subcommands attached to the ``ketos`` command.
 
+Ground Truth Editing
+--------------------
+
+Training
+--------
+ 
+Validation
+----------
+
 Artificial Training Data
 ------------------------
 
@@ -142,11 +151,4 @@ text for rendering purposes (here to NFC):
 
         $ ketos linegen -ur NFC -u NFD -f "GFS Philostratos" grc.txt
 
-Ground Truth Editing
---------------------
 
-Training
---------
- 
-Validation
-----------

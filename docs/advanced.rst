@@ -1,6 +1,25 @@
 Advanced usage
 ==============
 
+Optical character recognition is the serial execution of multiple steps, in the
+case of kraken binarization (converting color and grayscale images into bitonal
+ones), layout analysis/page segmentation (extracting topological text lines
+from an image), recognition (feeding text lines images into an classifiers),
+and finally serialization of results into an appropriate format such as hOCR or
+ALTO.
+
+Input specification
+-------------------
+
+All kraken subcommands operating on input-output pairs, i.e. producing one
+output document for one input document follow the basic syntax:
+
+.. code-block:: console
+
+        $ kraken -i input_1 output_1 -i input_2 output_2 ... subcommand_1 subcommand_2 ... subcommand_n
+
+In particular subcommands may be chained.
+
 Binarization
 ------------
 
@@ -28,7 +47,9 @@ Page segmentation
 Page segmentation is mostly parameterless, although a switch to change the
 color of column separators has been retained. The segmentation is written as a
 plain text CSV file. Each record corresponds to a single line bounding box in
-the format (x0, y0, x1, y1). Lines are printed in reading order::
+the format (x0, y0, x1, y1). Lines are printed in reading order:
+
+.. code-block:: console
 
         $ kraken -i 14.tif lines.txt segment
         $ cat lines.txt
@@ -56,7 +77,7 @@ the format (x0, y0, x1, y1). Lines are printed in reading order::
         355,3092,2094,3230
         1859,3233,2084,3354
 
-Model Repository
+Model repository
 ----------------
 
 There is a semi-curated `repository
@@ -97,12 +118,12 @@ subcommand:
         $ kraken get toy
         Retrieving model        ✓
 
-Models will be placed in ~/.kraken and can be accessed using their name as
+Models will be placed in $XDG_BASE_DIR and can be accessed using their name as
 shown by the ``show`` command, e.g.:
 
 .. code-block:: console
 
-        $ kraken -i ... ... ocr -m toy.clstm
+        $ kraken -i ... ... ocr -m toy
 
 Additions and updates to existing models are always welcome! Just open a pull
 request or write an email.
@@ -115,10 +136,17 @@ that image, and a pyrnn or protobuf model. In particular there is no
 requirement to use the page segmentation algorithm contained in the ``segment``
 subcommand or the binarization provided by kraken. 
 
-The ``ocr`` subcommand is able to print the recognition results either as plain
-text (default) or as `hOCR
-<https://docs.google.com/document/d/1QQnIQtvdAC_8n92-LhwPcjtAUFwBlzE8EWnKAxlgVf0/preview>`_
-containing additional information about the results.
+The ``ocr`` subcommand is able to serialize the recognitino results either as
+plain text (default), as `hOCR
+<https://docs.google.com/document/d/1QQnIQtvdAC_8n92-LhwPcjtAUFwBlzE8EWnKAxlgVf0/preview>`_,
+or into `ALTO <http://www.loc.gov/standards/alto/>`_ containing additional
+metadata such as bounding boxes and confidences:
+
+.. code-block:: console
+
+        $ kraken -i ... ... ocr -t # text output
+        $ kraken -i ... ... ocr -h # hOCR output
+        $ kraken -i ... ... ocr -a # ALTO output
 
 hOCR output is slightly different from hOCR files produced by ocropus. Each
 ``ocr_line`` span contains not only the bounding box of the line but also

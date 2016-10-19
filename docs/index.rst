@@ -23,7 +23,7 @@ Features
 kraken's main features are:
 
   - Explicit input/output handling
-  - Word bounding boxes and character cuts in hOCR
+  - Word bounding boxes and character cuts
   - Removal of runtime dependency on gcc
   - `Public repository <https://github.com/mittagessen/kraken-models>`_ of model files
   - :ref:`Lightweight model files <models>`
@@ -36,20 +36,19 @@ Currently missing or underdocumented are:
   - New training interface (certainly only for CLSTM)
 
 All functionality not pertaining to OCR and prerequisite steps has been
-removed, i.e. no more ground truth editing, error rate measuring, etc.
+removed, i.e. no more error rate measuring, etc.
 
 Pull requests and code contributions are always welcome. 
 
 Installation
 ============
 
-While kraken does not require a working C compiler on run-time anymore numpy
-and scipy compilation still requires build-essential or your distributions
-equivalent and some dependencies.
+kraken requires some external libraries to run. On Debian/Ubuntu they may be
+installed using:
 
 .. code-block:: console
 
-        # apt-get install gcc gfortran python-dev libblas-dev liblapack-dev libpangocairo-1.0
+        # apt-get install libpangocairo-1.0 libxml2 libblas3 liblapack3
 
 If `clstm <https://github.com/tmbdev/clstm>`_ support is desired (highly
 recommended) the associated python extension has to be build and installed.
@@ -120,6 +119,9 @@ page segmentation:
 ::
 
   $ kraken -i bw.tif image.txt ocr --lines lines.txt
+
+All commands and their parameters are documented, just add the standard
+``--help`` flag for further information.
 
 .. _license:
 
