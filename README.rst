@@ -12,7 +12,6 @@ preserving (mostly) functional equivalence. Its main goals are:
   - Removal of runtime dependency on gcc ✓
   - `clstm <https://github.com/tmbdev/clstm>`_ compatibility ✓
   - Right-to-left/BiDi support ✓
-  - ALTO
   - Clean public API 
   - Tests
 
@@ -22,15 +21,10 @@ work. Pull requests and code contributions are always welcome.
 Installation
 ============
 
-While kraken does not require a working C compiler on run-time anymore numpy
-and scipy compilation still requires build-essential or your distributions
-equivalent. Because the build behavior of pip versions older than 6.1.0
-interferes with the scipy build process numpy has to be installed before doing
-the actual install:
-
-::
-
-  # pip install numpy
+kraken does not require a working C compiler on run-time anymore. When using a
+recent version of pip all dependencies will be installed from binary wheel
+packages, so installing build-essential or your distributions equivalent is
+often unnecessary.
 
 If ``clstm`` support is desired (highly recommended) the associated python
 extension has to be build and installed.
@@ -55,6 +49,13 @@ directory for the current user:
 
   $ kraken get default
 
+A list of libre models available in the central repository can be retrieved by
+running:
+
+::
+
+  $ kraken list
+
 Quickstart
 ==========
 
@@ -63,7 +64,7 @@ prerequisite steps of binarization and page segmentation:
 
 ::
 
-  $ kraken -i image.tif image.txt
+  $ kraken -i image.tif image.txt binarize segment ocr
 
 To binarize a single image using the nlbin algorithm:
 
@@ -83,6 +84,9 @@ page segmentation:
 ::
 
   $ kraken -i bw.tif image.txt ocr --lines lines.txt
+
+All subcommands and options are documented. Use the ``help`` option to get more
+information.
 
 Documentation
 =============
