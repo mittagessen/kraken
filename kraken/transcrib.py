@@ -22,7 +22,7 @@ Utility functions for ground truth transcription.
 from __future__ import absolute_import, division, print_function
 from __future__ import unicode_literals
 
-from kraken.html import max_bbox
+from kraken.serialization import max_bbox
 from kraken.lib.exceptions import KrakenInputException
 
 from jinja2 import Environment, PackageLoader
