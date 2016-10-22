@@ -10,7 +10,7 @@
 			{% for line in page.lines %}
 			<span class="ocr_line" id="line_{{ line.index }}" title="bbox {{ line.bbox|join(' ') }}; cuts {{ line.deltas }}">
 			{% for segment in line.recognition %}
-				<span class="ocrx_word" id="segment_{{ segment.index }}" title="bbox {{ segment.bbox|join(' ') }}, x_conf {{ segment.confidences|join(' ') }}">{{ segment.text }}</span>
+				<span class="ocrx_word" id="segment_{{ segment.index }}" title="bbox {{ segment.bbox|join(' ') }}, x_confs {{ segment.confidences|join(' ') }}">{{ segment.text }}</span>
 			{% endfor %}
 			</span>
 			<br/>
