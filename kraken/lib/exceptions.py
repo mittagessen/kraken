@@ -10,6 +10,17 @@ always define their exceptions here.
 from __future__ import absolute_import, division, print_function
 from __future__ import unicode_literals
 
+class KrakenDecodeException(Exception):
+
+    def __init__(self, message=None):
+        Exception.__init__(self, message)
+
+
+class KrakenEncodeException(Exception):
+
+    def __init__(self, message=None):
+        Exception.__init__(self, message)
+
 
 class KrakenRecordException(Exception):
 
