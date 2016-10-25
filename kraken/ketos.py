@@ -32,12 +32,13 @@ from lxml import html
 from itertools import cycle
 from bidi.algorithm import get_display
 
+from kraken import rpred
 from kraken import linegen
+from kraken import pageseg
 from kraken import transcrib
 from kraken import binarization
-from kraken import pageseg
 from kraken.lib import models
-from kraken import rpred
+from kraken.train import GroundTruthContainer, compute_error
 from kraken.lib.exceptions import KrakenCairoSurfaceException
 
 APP_NAME = 'kraken'
@@ -53,6 +54,92 @@ def spin(msg):
 def cli(verbose):
     ctx = click.get_current_context()
     ctx.meta['verbose'] = verbose
+
+
+@cli.command('train')
+@click.pass_context
+@click.option('-l', '--lineheight', default=48, help='Line image height after normalization')
+@click.option('-p', '--pad', type=click.INT, default=16, help='Left and right '
+                      'padding around lines')
+@click.option('-S', '--hiddensize', default=100, help='LSTM units in hidden layer')
+@click.option('-o', '--output', type=click.Path(), default='model.clstm', help='Output model file')
+@click.option('-i', '--load', type=click.Path(exists=True, readable=True), help='Load existing file to continue training')
+@click.option('-F', '--savefreq', default=1000, help='Model save frequency during training')
+@click.option('-R', '--report', default=1000, help='Report creation frequency')
+@click.option('-N', '--ntrain', default=1000000, help='Iterations to train.')
+
+@click.option('-r', '--lrate', default=1e-4, help='LSTM learning rate')
+@click.option('-m', '--momentum', default=0.9, help='LSTM momentum')
+@click.option('-p', '--partition', default=0.9, help='Ground truth data partition ratio between train/test set')
+@click.option('-u', '--normalization', type=click.Choice(['NFD', 'NFKD', 'NFC', 'NFKC']), default=None, help='Normalize ground truth')
+@click.option('-n', '--reorder/--no-reorder', default=True, help='Reorder code points in LTR direction')
+@click.argument('ground_truth', nargs=-1, type=click.Path(exists=True, dir_okay=False))
+def train(ctx, lineheight, pad, hiddensize, output, load, savefreq, report,
+          ntrain, lrate, momentum, partition, normalization, reorder,
+          ground_truth):
+    """
+    Trains a model from image-text pairs.
+    """
+    st_time = time.time()
+    if ctx.meta['verbose'] > 0:
+        click.echo(u'[{:2.4f}] Building ground truth set from {} line images'.format(time.time() - st_time, len(ground_truth)))
+    else:
+        spin('Building ground truth set')
+
+    gt_set = GroundTruthContainer()
+
+    for line in ground_truth:
+        gt_set.add(line, normalization=normalization, reorder=reorder)
+        if ctx.meta['verbose'] > 2:
+            click.echo(u'[{:2.4f}] Adding {}'.format(time.time() - st_time, line))
+        else:
+            spin('Building ground truth set')
+    gt_set.repartition(partition)
+
+    if ctx.meta['verbose'] < 3:
+        click.secho(u'\b\u2713', fg='green', nl=False)
+        click.echo('\033[?25h\n', nl=False)
+
+    if load:
+        if ctx.meta['verbose'] > 0:
+            click.echo(u'[{:2.4f}] Loading existing model from {} '.format(time.time() - st_time, load))
+        else:
+            spin('Loading model')
+
+        rnn = models.ClstmSeqRecognizer(load)
+
+        if not ctx.meta['verbose'] > 0:
+            click.secho(u'\b\u2713', fg='green', nl=False)
+            click.echo('\033[?25h\n', nl=False)
+
+    else:
+        rnn = models.ClstmSeqRecognizer.init_model(lineheight, hiddensize, codec)
+
+    if ctx.meta['verbose'] > 0:
+            click.echo(u'[{:2.4f}] Setting learning rate ({}) and momentum ({}) '.format(time.time() - st_time, lrate, momentum))
+    rnn.setLearningRate(lrate, momentum)
+
+    for trial in xrange(ntrain):
+        line, s = gt_set.sample()
+        res = rnn.trainString(line, s)
+        if ctx.meta['verbose'] > 2:
+            click.echo(u'[{0:2.4f}] TRU: {1}\n[{0:2.4f}] OUT: {2}'.format(time.time() - st_time, s, res))
+        else:
+            spin('Training')
+
+        if trial and not trial % savefreq:
+            rnn.save_model('{}_{}'.format(output, trial))
+            if ctx.meta['verbose'] < 3:
+                click.echo('')
+            if ctx.meta['verbose'] > 0:
+                click.echo(u'[{:2.4f}] Saving to {}_{}'.format(time.time() - st_time, output, trial))
+
+        if trial and not trial % report:
+            c, e = compute_error(rnn, gt_set.test_set)
+            if ctx.meta['verbose'] < 3:
+                click.echo('')
+            click.echo(u'[{:2.4f}] Accuracy report ({}) {} {}'.format(time.time() - st_time, trial, c, e))
+
 
 @cli.command('extract')
 @click.pass_context
@@ -109,7 +196,7 @@ def extract(ctx, normalization, reorder, output, transcribs):
         click.echo(u'[{:2.4f}] Extracted {} lines'.format(time.time() - st_time, idx))
     with open('{}/manifest.txt'.format(output), 'wb') as fp:
         fp.write('\n'.join(manifest))
-    if ctx.meta['verbose'] == 0:
+    if not ctx.meta['verbose']:
         click.secho(u'\b\u2713', fg='green', nl=False)
         click.echo('\033[?25h\n', nl=False)
 
@@ -136,8 +223,9 @@ def transcription(ctx, external, font, font_style, prefill, output, images):
         else:
             click.echo('Loading RNN\t', nl=False)
         prefill = models.load_any(prefill)
-        click.secho(u'\b\u2713', fg='green', nl=False)
-        click.echo('\033[?25h\n', nl=False)
+        if not ctx.meta['verbose']:
+            click.secho(u'\b\u2713', fg='green', nl=False)
+            click.echo('\033[?25h\n', nl=False)
 
     for fp in images:
         if ctx.meta['verbose'] > 0:
