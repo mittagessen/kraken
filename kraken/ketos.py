@@ -95,8 +95,12 @@ def train(ctx, lineheight, pad, hiddensize, output, load, savefreq, report,
         else:
             spin('Building ground truth set')
     gt_set.repartition(partition)
-
     if ctx.meta['verbose'] < 3:
+        click.echo('')
+    if ctx.meta['verbose'] > 0:
+        click.echo(u'[{:2.4f}] Training set {} lines, test set {} lines, alphabet {} symbols'.format(time.time() - st_time, len(gt_set.training_set), len(gt_set.test_set), len(gt_set.alphabet)))
+
+    if not ctx.meta['verbose']:
         click.secho(u'\b\u2713', fg='green', nl=False)
         click.echo('\033[?25h\n', nl=False)
 
@@ -113,7 +117,15 @@ def train(ctx, lineheight, pad, hiddensize, output, load, savefreq, report,
             click.echo('\033[?25h\n', nl=False)
 
     else:
-        rnn = models.ClstmSeqRecognizer.init_model(lineheight, hiddensize, codec)
+        if ctx.meta['verbose'] > 0:
+            click.echo(u'[{:2.4f}] Creating new model with line height {}, {} hidden units, and {} outputs'.format(time.time() - st_time, lineheight, hiddensize, codec))
+        else:
+            spin('Initializing model')
+        rnn = models.ClstmSeqRecognizer.init_model(lineheight, hiddensize, gt_set.alphabet)
+        if not ctx.meta['verbose']:
+            click.secho(u'\b\u2713', fg='green', nl=False)
+            click.echo('\033[?25h\n', nl=False)
+
 
     if ctx.meta['verbose'] > 0:
             click.echo(u'[{:2.4f}] Setting learning rate ({}) and momentum ({}) '.format(time.time() - st_time, lrate, momentum))
@@ -138,7 +150,7 @@ def train(ctx, lineheight, pad, hiddensize, output, load, savefreq, report,
             c, e = compute_error(rnn, gt_set.test_set)
             if ctx.meta['verbose'] < 3:
                 click.echo('')
-            click.echo(u'[{:2.4f}] Accuracy report ({}) {} {}'.format(time.time() - st_time, trial, c, e))
+            click.echo(u'[{:2.4f}] Accuracy report ({}) {:0.4f} {} {}'.format(time.time() - st_time, trial, (c-e)/c, c, e))
 
 
 @cli.command('extract')
