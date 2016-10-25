@@ -38,6 +38,44 @@ from kraken.lib import models
 from kraken.lib.util import pil2array, array2pil
 from kraken.lib.lineest import CenterNormalizer
 
+
+def _fast_levenshtein(seq1, seq2):
+
+    oneago = None
+    thisrow = range(1, len(seq2) + 1) + [0]
+    for x in xrange(len(seq1)):
+        oneago, thisrow = thisrow, [0] * len(seq2) + [x + 1]
+        for y in xrange(len(seq2)):
+            delcost = oneago[y] + 1
+            addcost = thisrow[y - 1] + 1
+            subcost = oneago[y - 1] + (seq1[x] != seq2[y])
+            thisrow[y] = min(delcost, addcost, subcost)
+    return thisrow[len(seq2) - 1]
+
+
+def compute_error(model, test_set):
+    """
+    Computes detailed error report from a model and a list of line image-text
+    pairs.
+
+    Args:
+        model (kraken.lib.models.ClstmSeqRecognizer): Model used for
+                                                      recognition
+        test_set (list): List of tuples (imae, text) for testing
+
+    Returns:
+        A tuple with total number of characters and edit distance across the
+        whole test set.
+    """
+    total_chars = 0
+    error = 0
+    for im, text in test_set:
+        pred = model.predictString(im)
+        total_chars += len(text)
+        error += _fast_levenshtein(pred, text)
+    return total_chars, error
+
+
 class GroundTruthContainer(object):
     """
     Container for ground truth used during training.
