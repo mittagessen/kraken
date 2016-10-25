@@ -41,12 +41,50 @@ class ClstmSeqRecognizer(kraken.lib.lstm.SeqRecognizer):
         self.normalize = normalize
         global clstm
         import clstm
-        self.load_model()
+        self._load_model()
 
-    def load_model(self):
+    @classmethod
+    def init_model(cls, ninput, nhidden, codec):
+        """
+        Initialize a new neural network.
+
+        Args:
+            ninput (int): Dimension of input vector
+            nhidden (int): Number of nodes in hidden layer
+            codec (list): List mapping n-th entry in output matrix to glyph
+        """
+        self = cls()
+        self.rnn = clstm.make_net_init('bidi',
+                                       'ninput={}:nhidden={}:noutput={}'.format(ninput,
+                                                                                nhidden, 
+                                                                                len(codec)))
+        self.rnn.initialize()
+
+    def save_model(self, path):
+        """
+        Serializes a CLSTM model to protobuf.
+
+        Args:
+            path (str): Path to serialize model to.
+
+        Raises:
+            IndexError if serialization failed for any reason.
+        """
+        clstm.save_net(path, self.rnn)
+
+    def _load_model(self):
         self.rnn = clstm.load_net(self.fname.encode('utf-8'))
 
     def predictString(self, line):
+        """
+        Predicts a string from an input image.
+
+        Args:
+            line (numpy.array): Input image
+
+        Returns:
+            A unicode string containing the recognition result.
+        """
         line = line.reshape(-1, self.rnn.ninput(), 1)
         self.rnn.inputs.aset(line.astype('float32'))
         self.rnn.forward()
@@ -58,6 +96,76 @@ class ClstmSeqRecognizer(kraken.lib.lstm.SeqRecognizer):
             cls[i] = v
         res = self.rnn.decode(cls)
         return res
+
+    def trainSequence(self, line, labels, update=1):
+        """
+        Trains the network using an input numpy array and a series of labels.
+
+        Args:
+            line (numpy.array): Input image
+            labels (clstm.Classes): Label sequence
+            update (bool): Switch to disable weight updates
+
+        Returns:
+            clstm.Classes containing the recognized label sequence.
+        """
+        line = line.reshape(-1, self.rnn.ninput(), 1)
+        self.rnn.inputs.aset(line.astype('float32'))
+        self.rnn.forward()
+        self.outputs = self.rnn.outputs.array().reshape(line.shape[0], self.rnn.noutput())
+
+        # build CTC alignment
+        targets = clstm.Sequence()
+        aligned = clstm.Sequence()
+        clstm.mktargets(targets, labels, self.rnn.noutput())
+        clstm.seq_ctc_align(aligned, self.rnn.outputs, targets)
+
+        # calculate deltas, backpropagate and update weights
+        deltas = aligned.array() - self.rnn.outputs.array()
+        self.rnn.d_outputs.aset(deltas)
+        self.rnn.backward()
+        if update:
+            self.rnn.update()
+
+        codes = kraken.lib.lstm.translate_back(self.outputs)
+        cls = clstm.Classes()
+        cls.resize(len(codes))
+        for i, v in enumerate(codes):
+            cls[i] = v
+
+        return cls
+
+    def trainString(self, line, s, update=1):
+        """
+        Trains the network using an input numpy array and a unicode string.
+
+        Strings are assumed to be in ``display`` order as produced as the
+        result of the BiDi algorithm.
+
+        Args:
+            line (numpy.array): Input image
+            s (str): Expected output string
+            update (bool): Switch to disable weight updates
+
+        Returns:
+            An unicode string containing the recognized sequence.
+        """
+        labels = clstm.Classes()
+        self.rnn.encode(labels, s)
+
+        cls = self.trainSequence(line, labels)
+        return self.rnn.decode(cls)
+
+    def setLearningRate(self, rate=1e-4, momentum=0.9):
+        """
+        Sets learning rate and momentum on the model.
+
+        Args:
+            rate (float): Learning rate
+            momentum (float): Momentum
+        """
+        self.rnn.learning_rate = rate
+        self.rnn.momentum = momentum
 
 
 def load_any(fname):
