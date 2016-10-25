@@ -120,8 +120,8 @@ def recognizer(model, pad, base_image, input, output, lines):
             fp.write(serialization.serialize(preds, base_image, Image.open(base_image).size, ctx.meta['mode']))
         else:
             fp.write(u'\n'.join(s.prediction for s in preds))
-        click.secho(u'\u2713', fg='green')
-
+        if not ctx.meta['verbose']:
+            click.secho(u'\u2713', fg='green')
 
 
 @click.group(chain=True)
