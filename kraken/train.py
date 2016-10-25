@@ -154,6 +154,9 @@ class GroundTruthContainer(object):
         self.test_set = self.training_set
         self.training_set = tmp_set
 
+        self.alphabet = sorted(set(''.join(t for _, t in self.training_set)))
+
+
     def sample(self):
         """
         Samples a line image-text pair from the training set.
