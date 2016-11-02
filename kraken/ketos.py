@@ -182,28 +182,28 @@ def extract(ctx, normalization, reorder, output, transcribs):
             spin('Reading transcription')
         doc = html.parse(fp)
         im = None
-        for part in doc.xpath('//div[@class="page_image"]')[0].get('style').split(';'):
-            if part.startswith('base64,'):
-                fd = StringIO.StringIO(base64.b64decode(part[7:-2]))
-                im = Image.open(fd)
-                if not im:
-                    if ctx.meta['verbose'] > 0:
-                        click.echo(u'[{:2.4f}] Skipping {} because image not found'.format(time.time() - st_time, fp.name))
-                    break
-        for line in doc.iter('li'):
-            if line.get('contenteditable') and u''.join(line.itertext()):
-                l = im.crop([int(x) for x in line.get('data-bbox').split(',')])
-                l.save('{}/{:06d}.png'.format(output, idx))
-                manifest.append('{:06d}.png'.format(idx))
-                text = u''.join(line.itertext())
-                if normalization:
-                    text = unicodedata.normalize(normalization, text)
-                with open('{}/{:06d}.gt.txt'.format(output, idx), 'wb') as t:
-                    if reorder:
-                        t.write(get_display(text).encode('utf-8'))
-                    else:
-                        t.write(text.encode('utf-8'))
-                idx += 1
+        for section in doc.xpath('//section'):
+            img = section.xpath('.//img')[0].get('src')
+            fd = StringIO.StringIO(base64.b64decode(img.split(',')[1]))
+            im = Image.open(fd)
+            if not im:
+                if ctx.meta['verbose'] > 0:
+                    click.echo(u'[{:2.4f}] Skipping {} because image not found'.format(time.time() - st_time, fp.name))
+                break
+            for line in section.iter('li'):
+                if line.get('contenteditable') and u''.join(line.itertext()):
+                    l = im.crop([int(x) for x in line.get('data-bbox').split(',')])
+                    l.save('{}/{:06d}.png'.format(output, idx))
+                    manifest.append('{:06d}.png'.format(idx))
+                    text = u''.join(line.itertext())
+                    if normalization:
+                        text = unicodedata.normalize(normalization, text)
+                    with open('{}/{:06d}.gt.txt'.format(output, idx), 'wb') as t:
+                        if reorder:
+                            t.write(get_display(text).encode('utf-8'))
+                        else:
+                            t.write(text.encode('utf-8'))
+                    idx += 1
     if ctx.meta['verbose'] > 0:
         click.echo(u'[{:2.4f}] Extracted {} lines'.format(time.time() - st_time, idx))
     with open('{}/manifest.txt'.format(output), 'wb') as fp:
@@ -215,7 +215,6 @@ def extract(ctx, normalization, reorder, output, transcribs):
 
 @cli.command('transcrib')
 @click.pass_context
-@click.option('--external/--inline', help="Link images instead of inlining them using data URIs")
 @click.option('-f', '--font', default='', 
               help='Font family to use')
 @click.option('-fs', '--font-style', default=None, 
@@ -225,7 +224,7 @@ def extract(ctx, normalization, reorder, output, transcribs):
 @click.option('-o', '--output', type=click.File(mode='wb'), default='transcrib.html',
               help='Output file')
 @click.argument('images', nargs=-1, type=click.File(lazy=True))
-def transcription(ctx, external, font, font_style, prefill, output, images):
+def transcription(ctx, font, font_style, prefill, output, images):
     st_time = time.time()
     ti = transcrib.TranscriptionInterface(font, font_style)
 
@@ -233,7 +232,7 @@ def transcription(ctx, external, font, font_style, prefill, output, images):
         if ctx.meta['verbose'] > 0:
             click.echo(u'[{:2.4f}] Loading model {}'.format(time.time() - st_time, prefill))
         else:
-            click.echo('Loading RNN\t', nl=False)
+            spin('Loading RNN')
         prefill = models.load_any(prefill)
         if not ctx.meta['verbose']:
             click.secho(u'\b\u2713', fg='green', nl=False)
@@ -269,7 +268,17 @@ def transcription(ctx, external, font, font_style, prefill, output, images):
             ti.add_page(im, records=preds)
         else:
             ti.add_page(im, res)
+    if not ctx.meta['verbose']:
+        click.secho(u'\b\u2713', fg='green', nl=False)
+        click.echo('\033[?25h\n', nl=False)
+    if ctx.meta['verbose'] > 0:
+        click.echo(u'[{:2.4f}] Writing transcription to {}'.format(time.time() - st_time, output.name))
+    else:
+        spin('Writing output')
     ti.write(output)
+    if not ctx.meta['verbose']:
+        click.secho(u'\b\u2713', fg='green', nl=False)
+        click.echo('\033[?25h\n', nl=False)
 
 
 @cli.command('linegen')
