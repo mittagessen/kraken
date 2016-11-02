@@ -20,7 +20,7 @@ li[contenteditable=true]:hover, li[contenteditable=true].hovered {
 	border: 1px solid #ff0000;
 }
 
-span:hover, span.hovered {
+.rect:hover, a.hovered {
 	box-shadow: inset 0 0 0 1px #ff0000;
 }
 
@@ -71,15 +71,16 @@ nav a:hover {
 	width: 85%;
 }
 
+.img_container {
+	position: relative;
+}
+
 .column {
 	display: table-cell;
 	vertical-align: top;
 	width: 50%;
+	height: 100%;
 	padding: 1rem;
-}
-
-.page_image {
-	width: 100%;
 }
 
 #download_button {
