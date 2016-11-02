@@ -22,12 +22,15 @@ Utility functions for ground truth transcription.
 from __future__ import absolute_import, division, print_function
 from __future__ import unicode_literals
 
+from future.standard_library import install_aliases
+install_aliases()
+
 from kraken.serialization import max_bbox
 from kraken.lib.exceptions import KrakenInputException
 
 from jinja2 import Environment, PackageLoader
-from itertools import izip_longest
-from StringIO import StringIO
+from itertools import zip_longest
+from io import BytesIO 
 
 import os
 import uuid
@@ -55,11 +58,11 @@ class TranscriptionInterface(object):
             records (list): A list of ocr_record objects.
         """
         page = {}
-        fd = StringIO()
+        fd = BytesIO()
         im.save(fd, format='png', optimize=True)
         page['index'] = self.page_idx
         self.page_idx += 1
-        page['img'] = 'data:image/png;base64,' + base64.b64encode(fd.getvalue())
+        page['img'] = 'data:image/png;base64,' + base64.b64encode(fd.getvalue()).decode('ascii')
         page['lines'] = []
         if records:
             for record in records:
@@ -67,7 +70,7 @@ class TranscriptionInterface(object):
                 bbox = max_bbox(record.cuts)
                 line_offset = 0
                 segments = []
-                for segment, whitespace in izip_longest(splits[0::2], splits[1::2]):
+                for segment, whitespace in zip_longest(splits[0::2], splits[1::2]):
                     if len(segment):
                         seg_bbox = max_bbox(record.cuts[line_offset:line_offset + len(segment)])
                         segments.append({'bbox': '{}, {}, {}, {}'.format(*seg_bbox), 'text': segment, 'index': self.seg_idx})

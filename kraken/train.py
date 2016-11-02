@@ -86,7 +86,7 @@ class GroundTruthContainer(object):
         alphabet (str): Sorted string of all codepoint found in the ground
                         truth
     """
-    def __init__(self, images=None, split=lambda(x): os.path.splitext(x)[0],
+    def __init__(self, images=None, split=lambda x: os.path.splitext(x)[0],
                  suffix='.gt.txt', normalization=None, reorder=True,
                  partition=0.9, pad=16):
         """
@@ -120,7 +120,7 @@ class GroundTruthContainer(object):
         self.alphabet = sorted(set(''.join(t for _, t in self.training_set)))
 
 
-    def add(self, image, split=lambda(x): os.path.splitext(x)[0],
+    def add(self, image, split=lambda x: os.path.splitext(x)[0],
                  suffix='.gt.txt', normalization=None, reorder=True,
                  pad=16):
         """

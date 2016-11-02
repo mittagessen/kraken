@@ -23,12 +23,12 @@ import time
 import click
 import errno
 import base64
-import StringIO
 import unicodedata
 import numpy as np
 
 from PIL import Image
 from lxml import html
+from io import BytesIO 
 from itertools import cycle
 from bidi.algorithm import get_display
 
@@ -184,7 +184,7 @@ def extract(ctx, normalization, reorder, output, transcribs):
         im = None
         for section in doc.xpath('//section'):
             img = section.xpath('.//img')[0].get('src')
-            fd = StringIO.StringIO(base64.b64decode(img.split(',')[1]))
+            fd = BytesIO(base64.b64decode(img.split(',')[1]))
             im = Image.open(fd)
             if not im:
                 if ctx.meta['verbose'] > 0:
@@ -206,7 +206,7 @@ def extract(ctx, normalization, reorder, output, transcribs):
                     idx += 1
     if ctx.meta['verbose'] > 0:
         click.echo(u'[{:2.4f}] Extracted {} lines'.format(time.time() - st_time, idx))
-    with open('{}/manifest.txt'.format(output), 'wb') as fp:
+    with open('{}/manifest.txt'.format(output), 'w') as fp:
         fp.write('\n'.join(manifest))
     if not ctx.meta['verbose']:
         click.secho(u'\b\u2713', fg='green', nl=False)
@@ -223,7 +223,7 @@ def extract(ctx, normalization, reorder, output, transcribs):
               help='Use given model for prefill mode.')
 @click.option('-o', '--output', type=click.File(mode='wb'), default='transcrib.html',
               help='Output file')
-@click.argument('images', nargs=-1, type=click.File(lazy=True))
+@click.argument('images', nargs=-1, type=click.File(mode='rb', lazy=True))
 def transcription(ctx, font, font_style, prefill, output, images):
     st_time = time.time()
     ti = transcrib.TranscriptionInterface(font, font_style)
@@ -254,17 +254,17 @@ def transcription(ctx, font, font_style, prefill, output, images):
         if prefill:
             it = rpred.rpred(prefill, im, res)
             preds = []
-	    for pred in it: 
-	        if ctx.meta['verbose'] > 0:
-	            click.echo(u'[{:2.4f}] {}'.format(time.time() - st_time, pred.prediction))
-	        else:
-	            spin('Recognizing')
-	        preds.append(pred)
-	    if ctx.meta['verbose'] > 0:
-	        click.echo(u'Execution time: {}s'.format(time.time() - st_time))
-	    else:
-	        click.secho(u'\b\u2713', fg='green', nl=False)
-	        click.echo('\033[?25h\n', nl=False)
+            for pred in it: 
+                if ctx.meta['verbose'] > 0:
+                    click.echo(u'[{:2.4f}] {}'.format(time.time() - st_time, pred.prediction))
+                else:
+                    spin('Recognizing')
+                preds.append(pred)
+            if ctx.meta['verbose'] > 0:
+                click.echo(u'Execution time: {}s'.format(time.time() - st_time))
+            else:
+                click.secho(u'\b\u2713', fg='green', nl=False)
+                click.echo('\033[?25h\n', nl=False)
             ti.add_page(im, records=preds)
         else:
             ti.add_page(im, res)
