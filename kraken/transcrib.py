@@ -29,9 +29,10 @@ from jinja2 import Environment, PackageLoader
 from itertools import izip_longest
 from StringIO import StringIO
 
+import os
+import uuid
 import regex
 import base64
-import os
 
 class TranscriptionInterface(object):
 
@@ -55,7 +56,7 @@ class TranscriptionInterface(object):
         """
         page = {}
         fd = StringIO()
-        im.save(fd, format='png')
+        im.save(fd, format='png', optimize=True)
         page['index'] = self.page_idx
         self.page_idx += 1
         page['img'] = 'data:image/png;base64,' + base64.b64encode(fd.getvalue())
@@ -69,20 +70,33 @@ class TranscriptionInterface(object):
                 for segment, whitespace in izip_longest(splits[0::2], splits[1::2]):
                     if len(segment):
                         seg_bbox = max_bbox(record.cuts[line_offset:line_offset + len(segment)])
-                        segments.append({'bbox': '{}, {}. {}, {}'.format(*seg_bbox), 'text': segment, 'index': self.seg_idx})
+                        segments.append({'bbox': '{}, {}, {}, {}'.format(*seg_bbox), 'text': segment, 'index': self.seg_idx})
                         self.seg_idx += 1
                         line_offset += len(segment)
                     if whitespace:
                         line_offset += len(whitespace)
-                page['lines'].append({'index': self.line_idx, 'recognition': segments, 
-                                      'bbox': '{}, {}, {}, {}'.format(int(bbox[0]), 
+                page['lines'].append({'index': self.line_idx, 'recognition': segments,
+                                      'left': 100*int(bbox[0]) / im.size[0],
+                                      'top': 100*int(bbox[1]) / im.size[1],
+                                      'width': 100*(bbox[2] - bbox[0])/im.size[0],
+                                      'height': 100*(int(bbox[3]) - int(bbox[1]))/im.size[1],
+                                      'bbox': '{}, {}, {}, {}'.format(int(bbox[0]),
                                                                       int(bbox[1]),
                                                                       int(bbox[2]),
                                                                       int(bbox[3]))})
+
                 self.line_idx += 1
         elif segmentation:
             for bbox in segmentation:
-                page['lines'].append({'index': self.line_idx, 'bbox': '{}, {}, {}, {}'.format(int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3]))})
+                page['lines'].append({'index': self.line_idx, 
+                                      'left': 100*int(bbox[0]) / im.size[0],
+                                      'top': 100*int(bbox[1]) / im.size[1],
+                                      'width': 100*(bbox[2] - bbox[0])/im.size[0],
+                                      'height': 100*(int(bbox[3]) - int(bbox[1]))/im.size[1],
+                                      'bbox': '{}, {}, {}, {}'.format(int(bbox[0]),
+                                                                      int(bbox[1]),
+                                                                      int(bbox[2]),
+                                                                      int(bbox[3]))})
                 self.line_idx += 1
         else:
             raise KrakenInputException('Neither segmentations nor records given')
@@ -95,4 +109,4 @@ class TranscriptionInterface(object):
         Args:
             fd (File): File descriptor to write to.
         """
-        fd.write(self.tmpl.render(pages=self.pages, font=self.font).encode('utf-8'))
+        fd.write(self.tmpl.render(uuid=str(uuid.uuid4()), pages=self.pages, font=self.font).encode('utf-8'))
