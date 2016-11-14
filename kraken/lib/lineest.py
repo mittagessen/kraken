@@ -12,7 +12,7 @@ def scale_to_h(img, target_height, order=1, dtype=np.dtype('f'), cval=0):
     h, w = img.shape
     scale = target_height*1.0/h
     target_width = int(scale*w)
-    output = interpolation.affine_transform(1.0*img, np.eye(2)/scale,
+    output = interpolation.affine_transform(1.0*img, np.ones(2)/scale,
                                             order=order,
                                             output_shape=(target_height,
                                                           target_width),
