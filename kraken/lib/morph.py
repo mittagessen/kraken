@@ -156,18 +156,6 @@ def correspondences(labels1, labels2):
     return result
 
 
-def propagate_labels_simple(regions, labels):
-    """Given an image and a set of labels, apply the labels
-    to all the regions in the image that overlap a label."""
-    rlabels, _ = label(regions)
-    cors = correspondences(rlabels, labels)
-    outputs = np.zeros(np.amax(rlabels) + 1, 'i')
-    for o, i in cors.T:
-        outputs[o] = i
-    outputs[0] = 0
-    return outputs[rlabels]
-
-
 def propagate_labels(image, labels, conflict=0):
     """Given an image and a set of labels, apply the labels
     to all the regions in the image that overlap a label.
