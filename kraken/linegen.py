@@ -245,7 +245,7 @@ def degrade_line(im, mean=0.0, sigma=0.001, density=0.002):
     return array2pil(np.clip(im * m, 0, 255).astype('uint8'))
 
 
-def distort_line(im, distort=3.0, sigma=10.0, eps=0.03, delta=0.3):
+def distort_line(im, distort=3.0, sigma=10, eps=0.03, delta=0.3):
     """
     Distorts a line image.
 
@@ -274,9 +274,9 @@ def distort_line(im, distort=3.0, sigma=10.0, eps=0.03, delta=0.3):
     c = np.array([w/2.0, h/2])
     d = c - np.dot(m, c) + np.array([np.random.randn() * delta, np.random.randn() * delta])
     line = affine_transform(line, m, offset=d, order=1, mode='constant', cval=255)
-
-    hs = gaussian_filter(np.random.randn(4*h, 1.5*w), sigma)
-    ws = gaussian_filter(np.random.randn(4*h, 1.5*w), sigma)
+    
+    hs = gaussian_filter(np.random.randn(4*h, int(1.5*w)), sigma)
+    ws = gaussian_filter(np.random.randn(4*h, int(1.5*w)), sigma)
     hs *= distort/np.amax(hs)
     ws *= distort/np.amax(ws)
 

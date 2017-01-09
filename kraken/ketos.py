@@ -98,7 +98,15 @@ def train(ctx, lineheight, pad, hiddensize, output, load, savefreq, report,
     if ctx.meta['verbose'] < 3:
         click.echo('')
     if ctx.meta['verbose'] > 0:
-        click.echo(u'[{:2.4f}] Training set {} lines, test set {} lines, alphabet {} symbols'.format(time.time() - st_time, len(gt_set.training_set), len(gt_set.test_set), len(gt_set.alphabet)))
+        click.echo(u'[{:2.4f}] Training set {} lines, test set {} lines, alphabet {} symbols'.format(time.time() - st_time, len(gt_set.training_set), len(gt_set.test_set), len(gt_set.training_alphabet)))
+    if ctx.meta['verbose'] > 1:
+        click.echo(u'[{:2.4f}] grapheme\tcount'.format(time.time() - st_time))
+        for k, v in sorted(gt_set.training_alphabet.iteritems(), key=lambda(x): x[1], reverse=True):
+            if unicodedata.combining(k) or k.isspace():
+                k = unicodedata.name(k)
+            else:
+                k = '\t' + k
+            click.echo(u'[{:2.4f}] {}\t{}'.format(time.time() - st_time, k, v))
 
     if not ctx.meta['verbose']:
         click.secho(u'\b\u2713', fg='green', nl=False)
@@ -121,7 +129,7 @@ def train(ctx, lineheight, pad, hiddensize, output, load, savefreq, report,
             click.echo(u'[{:2.4f}] Creating new model with line height {}, {} hidden units, and {} outputs'.format(time.time() - st_time, lineheight, hiddensize, codec))
         else:
             spin('Initializing model')
-        rnn = models.ClstmSeqRecognizer.init_model(lineheight, hiddensize, gt_set.alphabet)
+        rnn = models.ClstmSeqRecognizer.init_model(lineheight, hiddensize, gt_set.training_alphabet.keys())
         if not ctx.meta['verbose']:
             click.secho(u'\b\u2713', fg='green', nl=False)
             click.echo('\033[?25h\n', nl=False)
@@ -403,8 +411,8 @@ def line_generator(ctx, font, maxlines, encoding, normalization, renormalize,
                 click.echo('{}: {} {}'.format(e.message, e.width, e.height))
             continue
         if not disable_degradation and not legacy:
-            im = linegen.distort_line(im, np.random.normal(distort), np.random.normal(distortion_sigma))
-            im = linegen.degrade_line(im, np.random.normal(mean), np.random.normal(sigma), np.random.normal(density))
+            im = linegen.distort_line(im, abs(np.random.normal(distort)), abs(np.random.normal(distortion_sigma)))
+            im = linegen.degrade_line(im, abs(np.random.normal(mean)), abs(np.random.normal(sigma)), abs(np.random.normal(density)))
         elif legacy:
             im = linegen.ocropy_degrade(im)
         if binarize:
