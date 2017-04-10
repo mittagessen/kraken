@@ -79,7 +79,7 @@ def delta(root=(0, 0, 0, 0), coordinates=None):
                max(box[1], box[3]) - max(root[1], root[3]))
         root = box
 
-def serialize(records, image_name=u'', image_size=(0, 0), template='hocr'):
+def serialize(records, image_name=u'', image_size=(0, 0), writing_mode='horizontal-tb', template='hocr'):
     """
     Serializes a list of ocr_records into an output document.
 
@@ -89,12 +89,15 @@ def serialize(records, image_name=u'', image_size=(0, 0), template='hocr'):
 
     Args:
         records (iterable): List of kraken.rpred.ocr_record
-        image_name (unicode): Name of the source image
+        image_name (str): Name of the source image
         image_size (tuple): Dimensions of the source image
-        template (unicode): Selector for the serialization format. May be
-                            'hocr' or 'alto'. 
+        writing_mode (str): Sets the principal layout of lines and the
+                            direction in which blocks progress. Valid values
+                            are horizontal-tb, vertical-rl, and vertical-lr.
+        template (str): Selector for the serialization format. May be
+                        'hocr' or 'alto'. 
     """
-    page = {'lines': [], 'size': image_size, 'name': image_name}
+    page = {'lines': [], 'size': image_size, 'name': image_name, 'writing_mode': writing_mode}
     seg_idx = 0
     for idx, record in enumerate(records):
         line = {'index': idx,
