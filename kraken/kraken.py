@@ -116,8 +116,9 @@ def recognizer(model, pad, base_image, input, output, lines):
     with open_file(output, 'w', encoding='utf-8') as fp:
         click.echo('Writing recognition results for {}\t'.format(base_image), nl=False)
         if ctx.meta['mode'] != 'text':
-
-            fp.write(serialization.serialize(preds, base_image, Image.open(base_image).size, ctx.meta['mode']))
+            fp.write(serialization.serialize(preds, base_image,
+                     Image.open(base_image).size, ctx.meta['text_direction'],
+                     ctx.meta['mode']))
         else:
             fp.write(u'\n'.join(s.prediction for s in preds))
         if not ctx.meta['verbose']:
@@ -184,12 +185,14 @@ def segment(scale=None, black_colseps=False):
               'ALTO, and plain text output', flag_value='hocr')
 @click.option('-a', '--alto', 'serialization', flag_value='alto')
 @click.option('-t', '--text', 'serialization', flag_value='text', default=True)
-
+@click.option('-d', '--text-direction', default='horizontal-tb',
+               type=click.Choice(['horizontal-tb','vertical-lr', 'vertical-rl']),
+               help='Sets principal text direction')
 @click.option('-l', '--lines', type=click.Path(exists=True),
               help='JSON file containing line coordinates')
 @click.option('--enable-autoconversion/--disable-autoconversion', 'conv',
               default=True, help='Automatically convert pyrnn models to protobuf')
-def ocr(ctx, model, pad, serialization, lines, conv):
+def ocr(ctx, model, pad, serialization, text_direction, lines, conv):
     """
     Recognizes text in line images.
     """
@@ -234,6 +237,7 @@ def ocr(ctx, model, pad, serialization, lines, conv):
 
     # set output mode
     ctx.meta['mode'] = serialization
+    ctx.meta['text_direction'] = text_direction
     return partial(recognizer, model=rnn, pad=pad, lines=lines)
 
 
