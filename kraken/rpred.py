@@ -212,7 +212,10 @@ def rpred(network, im, bounds, pad=16, line_normalization=True, bidi_reordering=
         conf = []
 
         for _, start, end, c in result:
-            pos.append((coords[0] + int((start-pad)*scale), coords[1], coords[0] + int((end-pad/2)*scale), coords[3]))
+            if bounds['text_direction'].startswith('horizontal'):
+                pos.append((coords[0] + int((start-pad)*scale), coords[1], coords[0] + int((end-pad/2)*scale), coords[3]))
+            else:
+                pos.append((coords[0], coords[1] + int((start-pad)*scale), coords[2], coords[1] + int((end-pad/2)*scale)))
             conf.append(c)
         if bidi_reordering:
             yield bidi_record(ocr_record(pred, pos, conf))
