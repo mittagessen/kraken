@@ -183,8 +183,9 @@ def select_regions(binary, f, min=0, nbest=100000):
     scores = [f(o) for o in objects]
     best = np.argsort(scores)
     keep = np.zeros(len(objects) + 1, 'i')
-    for i in best[-nbest:]:
-        if scores[i] <= min:
-            continue
-        keep[i+1] = 1
+    if nbest > 0:
+        for i in best[-nbest:]:
+            if scores[i] <= min:
+                continue
+            keep[i+1] = 1
     return keep[labels]

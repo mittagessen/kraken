@@ -192,11 +192,11 @@ def compute_colseps_conv(binary, scale=1.0, minheight=10, maxcolseps=2):
     seps = maximum_filter(seps, (int(2*scale), 1))
     # select only the biggest column separators
     seps = morph.select_regions(seps, sl.dim0, min=minheight*scale,
-                                nbest=maxcolseps+1)
+                                nbest=maxcolseps)
     return seps
 
 
-def compute_black_colseps(binary, scale):
+def compute_black_colseps(binary, scale, maxcolseps):
     """
     Computes column separators from vertical black lines.
 
@@ -207,13 +207,13 @@ def compute_black_colseps(binary, scale):
     Returns:
         (colseps, binary):
     """
-    seps = compute_separators_morph(binary, scale)
-    colseps = np.maximum(compute_colseps_conv(binary, scale), seps)
+    seps = compute_separators_morph(binary, scale, maxcolseps)
+    colseps = np.maximum(compute_colseps_conv(binary, scale, maxcolseps), seps)
     binary = np.minimum(binary, 1-seps)
     return colseps, binary
 
 
-def compute_white_colseps(binary, scale):
+def compute_white_colseps(binary, scale, maxcolseps):
     """
     Computes column separators either from vertical black lines or whitespace.
 
@@ -224,7 +224,7 @@ def compute_white_colseps(binary, scale):
     Returns:
         colseps:
     """
-    return compute_colseps_conv(binary, scale)
+    return compute_colseps_conv(binary, scale, maxcolseps)
 
 
 def norm_max(v):
@@ -321,7 +321,7 @@ def rotate_lines(lines, angle, offset):
     return np.column_stack((x.flatten(), y.flatten())).reshape(-1, 4)
 
 
-def segment(im, text_direction='horizontal-lr', scale=None, black_colseps=False):
+def segment(im, text_direction='horizontal-lr', scale=None, maxcolseps=2, black_colseps=False):
     """
     Segments a page into text lines.
 
@@ -333,6 +333,7 @@ def segment(im, text_direction='horizontal-lr', scale=None, black_colseps=False)
         text_direction (str): Principal direction of the text
                               (horizontal/vertical-lr/rl)
         scale (float): Scale of the image
+        maxcolseps (int): Maximum number of whitespace column separators
         black_colseps (bool): Whether column separators are assumed to be
                               vertical black lines or not
 
@@ -375,9 +376,9 @@ def segment(im, text_direction='horizontal-lr', scale=None, black_colseps=False)
 
     binary = remove_hlines(binary, scale)
     if black_colseps:
-        colseps, binary = compute_black_colseps(binary, scale)
+        colseps, binary = compute_black_colseps(binary, scale, maxcolseps)
     else:
-        colseps = compute_white_colseps(binary, scale)
+        colseps = compute_white_colseps(binary, scale, maxcolseps)
     bottom, top, boxmap = compute_gradmaps(binary, scale)
     seeds = compute_line_seeds(binary, bottom, top, colseps, scale)
     llabels = morph.propagate_labels(boxmap, seeds, conflict=0)
