@@ -162,7 +162,7 @@ def rpred(network, im, bounds, pad=16, line_normalization=True, bidi_reordering=
         bounds (dict): A dictionary containing a 'boxes' entry with a list of
                        coordinates (x0, y0, x1, y1) of a text line in the image
                        and an entry 'text_direction' containing
-                       'horizontal/vertical-lr/rl'.
+                       'horizontal-tb/vertical-lr/rl'.
         bounds (iterable): An iterable returning a tuple defining the absolute
                            coordinates (x0, y0, x1, y1) of a text line in the
                            Image.
