@@ -321,7 +321,7 @@ def rotate_lines(lines, angle, offset):
     return np.column_stack((x.flatten(), y.flatten())).reshape(-1, 4)
 
 
-def segment(im, text_direction='horizontal-lr', scale=None, maxcolseps=2, black_colseps=False):
+def segment(im, text_direction='horizontal-tb', scale=None, maxcolseps=2, black_colseps=False):
     """
     Segments a page into text lines.
 
@@ -331,7 +331,7 @@ def segment(im, text_direction='horizontal-lr', scale=None, maxcolseps=2, black_
     Args:
         im (PIL.Image): A bi-level page of mode '1' or 'L'
         text_direction (str): Principal direction of the text
-                              (horizontal/vertical-lr/rl)
+                              (horizontal-tb/vertical-lr/rl)
         scale (float): Scale of the image
         maxcolseps (int): Maximum number of whitespace column separators
         black_colseps (bool): Whether column separators are assumed to be
@@ -350,9 +350,10 @@ def segment(im, text_direction='horizontal-lr', scale=None, maxcolseps=2, black_
         raise KrakenInputException('Image is not bi-level')
 
     # rotate input image for vertical lines
-    if text_direction == 'horizontal-lr':
+    if text_direction == 'horizontal-tb':
         angle = 0
-    if text_direction == 'vertical-lr':
+        offset = (0, 0)
+    elif text_direction == 'vertical-lr':
         angle = 270
         offset = (0, im.size[1])
     elif text_direction == 'vertical-rl':
