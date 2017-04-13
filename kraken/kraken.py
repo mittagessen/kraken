@@ -66,14 +66,14 @@ def binarizer(threshold, zoom, escale, border, perc, range, low, high, base_imag
     click.secho(u'\u2713', fg='green')
 
 
-def segmenter(text_direction, scale, black_colseps, base_image, input, output):
+def segmenter(text_direction, scale, maxcolseps, black_colseps, base_image, input, output):
     try:
         im = Image.open(input)
     except IOError as e:
         raise click.BadParameter(str(e))
     click.echo('Segmenting\t', nl=False)
     try:
-        res = pageseg.segment(im, text_direction, scale, black_colseps)
+        res = pageseg.segment(im, text_direction, scale, maxcolseps, black_colseps)
     except:
         click.secho(u'\u2717', fg='red')
         raise
@@ -168,12 +168,13 @@ def binarize(threshold, zoom, escale, border, perc, range, low, high):
                type=click.Choice(['horizontal-tb','vertical-lr', 'vertical-rl']),
                help='Sets principal text direction')
 @click.option('--scale', default=None, type=click.FLOAT)
+@click.option('-m', '--maxcolseps', default=2, type=click.INT)
 @click.option('-b/-w', '--black_colseps/--white_colseps', default=False)
-def segment(text_direction, scale, black_colseps):
+def segment(text_direction, scale, maxcolseps, black_colseps):
     """
     Segments page images into text lines.
     """
-    return partial(segmenter, text_direction, scale, black_colseps)
+    return partial(segmenter, text_direction, scale, maxcolseps, black_colseps)
 
 
 @cli.command('ocr')
