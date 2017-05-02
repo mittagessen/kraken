@@ -91,7 +91,7 @@ def recognizer(model, pad, bidi_reordering, base_image, input, output, lines):
     if not lines:
         lines = input
     with open_file(lines, 'r') as fp:
-        bounds = json.loads(fp)
+        bounds = json.load(fp)
         it = rpred.rpred(model, im, bounds, pad, bidi_reordering)
     preds = []
 
