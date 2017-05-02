@@ -39,6 +39,7 @@ from kraken import binarization
 from kraken.lib import models
 from kraken.train import GroundTruthContainer, compute_error
 from kraken.lib.exceptions import KrakenCairoSurfaceException
+from kraken.lib.exceptions import KrakenInputException
 
 standard_library.install_aliases()
 
@@ -434,7 +435,11 @@ def line_generator(ctx, font, maxlines, encoding, normalization, renormalize,
         elif legacy:
             im = linegen.ocropy_degrade(im)
         if binarize:
-            im = binarization.nlbin(im)
+            try:
+                im = binarization.nlbin(im)
+            except KrakenInputException as e:
+                click.echo('{}'.format(e.message))
+                continue
         im.save('{}/{:06d}.png'.format(output, idx))
         with open('{}/{:06d}.gt.txt'.format(output, idx), 'wb') as fp:
             if reorder:
