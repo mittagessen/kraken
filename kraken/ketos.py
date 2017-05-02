@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 #
 # Copyright 2015 Benjamin Kiessling
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 # http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
@@ -16,7 +16,6 @@
 
 from __future__ import absolute_import, division, print_function
 from future import standard_library
-standard_library.install_aliases()
 
 import os
 import time
@@ -28,7 +27,7 @@ import numpy as np
 
 from PIL import Image
 from lxml import html
-from io import BytesIO 
+from io import BytesIO
 from itertools import cycle
 from bidi.algorithm import get_display
 
@@ -41,10 +40,13 @@ from kraken.lib import models
 from kraken.train import GroundTruthContainer, compute_error
 from kraken.lib.exceptions import KrakenCairoSurfaceException
 
+standard_library.install_aliases()
+
 APP_NAME = 'kraken'
-          
+
 spinner = cycle([u'⣾', u'⣽', u'⣻', u'⢿', u'⡿', u'⣟', u'⣯', u'⣷'])
-              
+
+
 def spin(msg):
     click.echo(u'\r\033[?25l{}\t{}'.format(msg, next(spinner)), nl=False)
 
@@ -60,14 +62,13 @@ def cli(verbose):
 @click.pass_context
 @click.option('-l', '--lineheight', default=48, help='Line image height after normalization')
 @click.option('-p', '--pad', type=click.INT, default=16, help='Left and right '
-                      'padding around lines')
+              'padding around lines')
 @click.option('-S', '--hiddensize', default=100, help='LSTM units in hidden layer')
 @click.option('-o', '--output', type=click.Path(), default='model.clstm', help='Output model file')
 @click.option('-i', '--load', type=click.Path(exists=True, readable=True), help='Load existing file to continue training')
 @click.option('-F', '--savefreq', default=1000, help='Model save frequency during training')
 @click.option('-R', '--report', default=1000, help='Report creation frequency')
 @click.option('-N', '--ntrain', default=1000000, help='Iterations to train.')
-
 @click.option('-r', '--lrate', default=1e-4, help='LSTM learning rate')
 @click.option('-m', '--momentum', default=0.9, help='LSTM momentum')
 @click.option('-p', '--partition', default=0.9, help='Ground truth data partition ratio between train/test set')
@@ -133,7 +134,6 @@ def train(ctx, lineheight, pad, hiddensize, output, load, savefreq, report,
         if not ctx.meta['verbose']:
             click.secho(u'\b\u2713', fg='green', nl=False)
             click.echo('\033[?25h\n', nl=False)
-
 
     if ctx.meta['verbose'] > 0:
             click.echo(u'[{:2.4f}] Setting learning rate ({}) and momentum ({}) '.format(time.time() - st_time, lrate, momentum))
@@ -234,16 +234,16 @@ def extract(ctx, normalization, reorder, rotate, output, transcribs):
 @cli.command('transcrib')
 @click.pass_context
 @click.option('-d', '--text-direction', default='horizontal-tb',
-                       type=click.Choice(['horizontal-tb','vertical-lr', 'vertical-rl']),
-                                      help='Sets principal text direction')
+              type=click.Choice(['horizontal-tb', 'vertical-lr', 'vertical-rl']),
+              help='Sets principal text direction')
 @click.option('--scale', default=None, type=click.FLOAT)
 @click.option('-m', '--maxcolseps', default=2, type=click.INT)
 @click.option('-b/-w', '--black_colseps/--white_colseps', default=False)
-@click.option('-f', '--font', default='', 
+@click.option('-f', '--font', default='',
               help='Font family to use')
-@click.option('-fs', '--font-style', default=None, 
+@click.option('-fs', '--font-style', default=None,
               help='Font style to use')
-@click.option('-p', '--prefill', default=None, 
+@click.option('-p', '--prefill', default=None,
               help='Use given model for prefill mode.')
 @click.option('-o', '--output', type=click.File(mode='wb'), default='transcrib.html',
               help='Output file')
@@ -308,23 +308,24 @@ def transcription(ctx, text_direction, scale, maxcolseps, black_colseps, font,
 
 @cli.command('linegen')
 @click.pass_context
-@click.option('-f', '--font', default='sans', 
+@click.option('-f', '--font', default='sans',
               help='Font family to render texts in.')
 @click.option('-n', '--maxlines', type=click.INT, default=0,
               help='Maximum number of lines to generate')
-@click.option('-e', '--encoding', default='utf-8', 
+@click.option('-e', '--encoding', default='utf-8',
               help='Decode text files with given codec.')
-@click.option('-u', '--normalization', 
+@click.option('-u', '--normalization',
               type=click.Choice(['NFD', 'NFKD', 'NFC', 'NFKC']), default=None,
               help='Normalize ground truth')
-@click.option('-ur', '--renormalize', 
+@click.option('-ur', '--renormalize',
               type=click.Choice(['NFD', 'NFKD', 'NFC', 'NFKC']), default=None,
               help='Renormalize text for rendering purposes.')
+@click.option('--reorder/--no-reorder', default=True, help='Reorder code points in LTR direction')
 @click.option('-fs', '--font-size', type=click.INT, default=32,
               help='Font size to render texts in.')
-@click.option('-l', '--language', 
+@click.option('-l', '--language',
               help='RFC-3066 language tag for language-dependent font shaping')
-@click.option('-ll', '--max-length', type=click.INT, default=None, 
+@click.option('-ll', '--max-length', type=click.INT, default=None,
               help="Discard lines above length (in Unicode codepoints).")
 @click.option('--strip/--no-strip', help="Remove whitespace from start and end "
               "of lines.")
@@ -352,9 +353,9 @@ def transcription(ctx, text_direction, scale, maxcolseps, black_colseps, font,
               help='Output directory')
 @click.argument('text', nargs=-1, type=click.Path(exists=True))
 def line_generator(ctx, font, maxlines, encoding, normalization, renormalize,
-                   font_size, language, max_length, strip, disable_degradation,
-                   binarize, mean, sigma, density, distort, distortion_sigma,
-                   legacy, output, text):
+                   reorder, font_size, language, max_length, strip,
+                   disable_degradation, binarize, mean, sigma, density,
+                   distort, distortion_sigma, legacy, output, text):
     """
     Generates artificial text line training data.
     """
@@ -436,10 +437,14 @@ def line_generator(ctx, font, maxlines, encoding, normalization, renormalize,
             im = binarization.nlbin(im)
         im.save('{}/{:06d}.png'.format(output, idx))
         with open('{}/{:06d}.gt.txt'.format(output, idx), 'wb') as fp:
-            fp.write(line.encode('utf-8'))
+            if reorder:
+                fp.write(get_display(line).encode('utf-8'))
+            else:
+                fp.write(line.encode('utf-8'))
     if ctx.meta['verbose'] == 0:
         click.secho(u'\b\u2713', fg='green', nl=False)
         click.echo('\033[?25h\n', nl=False)
+
 
 if __name__ == '__main__':
     cli()
