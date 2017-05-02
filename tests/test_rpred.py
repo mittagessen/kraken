@@ -32,5 +32,5 @@ class TestRecognition(unittest.TestCase):
         """
         Tests correct handling of invalid line coordinates.
         """
-        pred = rpred(None, self.im, [(-1, -1, 10000, 10000)])
+        pred = rpred(None, self.im, {'boxes': [[-1, -1, 10000, 10000]], 'text_direction': 'horizontal'}, True)
         next(pred)
