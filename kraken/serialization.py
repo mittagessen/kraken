@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 #
 # Copyright 2015 Benjamin Kiessling
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 # http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
@@ -20,11 +20,11 @@ from __future__ import unicode_literals
 from builtins import map
 from builtins import zip
 from builtins import str
-from builtins import object
 
 from jinja2 import Environment, PackageLoader
 
 import regex
+
 
 def _rescale(val, low, high):
     """
@@ -40,6 +40,7 @@ def _rescale(val, low, high):
         Rescaled value (float).
     """
     return [(high - low) * x + low for x in val]
+
 
 def max_bbox(boxes):
     """
@@ -79,6 +80,7 @@ def delta(root=(0, 0, 0, 0), coordinates=None):
                max(box[1], box[3]) - max(root[1], root[3]))
         root = box
 
+
 def serialize(records, image_name=u'', image_size=(0, 0), writing_mode='horizontal-tb', template='hocr'):
     """
     Serializes a list of ocr_records into an output document.
@@ -95,7 +97,7 @@ def serialize(records, image_name=u'', image_size=(0, 0), writing_mode='horizont
                             direction in which blocks progress. Valid values
                             are horizontal-tb, vertical-rl, and vertical-lr.
         template (str): Selector for the serialization format. May be
-                        'hocr' or 'alto'. 
+                        'hocr' or 'alto'.
     """
     page = {'lines': [], 'size': image_size, 'name': image_name, 'writing_mode': writing_mode}
     seg_idx = 0
@@ -107,7 +109,6 @@ def serialize(records, image_name=u'', image_size=(0, 0), writing_mode='horizont
                 }
 
         splits = regex.split(u'(\s+)', record.prediction)
-        bbox = max_bbox(record.cuts)
         line_offset = 0
         for segment in splits:
             if len(segment) == 0:

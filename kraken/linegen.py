@@ -2,7 +2,7 @@
 #
 # Copyright 2014 Google Inc. All rights reserved.
 # Copyright 2015 Benjamin Kiessling
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""= 
+"""
 linegen
 ~~~~~~~
 
@@ -28,8 +28,6 @@ available at [0].
 
 from __future__ import absolute_import, division, print_function
 from future import standard_library
-standard_library.install_aliases()
-from builtins import range
 from builtins import object
 
 from scipy.ndimage.filters import gaussian_filter
@@ -39,30 +37,36 @@ from PIL import Image, ImageOps
 
 import numpy as np
 import ctypes.util
-import shutil
 import ctypes
 
 from kraken.lib.exceptions import KrakenCairoSurfaceException
 from kraken.lib.util import pil2array, array2pil
 
+standard_library.install_aliases()
+
 pangocairo = ctypes.CDLL(ctypes.util.find_library('pangocairo-1.0'))
 pango = ctypes.CDLL(ctypes.util.find_library('pango-1.0'))
 cairo = ctypes.CDLL(ctypes.util.find_library('cairo'))
 
+
 class PangoFontDescription(ctypes.Structure):
     pass
+
 
 class PangoLayout(ctypes.Structure):
     pass
 
+
 class PangoContext(ctypes.Structure):
     pass
 
+
 class PangoRectangle(ctypes.Structure):
-    _fields_ = [('x', ctypes.c_int), 
-                ('y', ctypes.c_int), 
-                ('width', ctypes.c_int), 
+    _fields_ = [('x', ctypes.c_int),
+                ('y', ctypes.c_int),
+                ('width', ctypes.c_int),
                 ('height', ctypes.c_int)]
+
 
 class ensureBytes(object):
     """
@@ -75,6 +79,7 @@ class ensureBytes(object):
             return value
         else:
             return value.encode('utf-8')
+
 
 cairo.cairo_image_surface_get_data.restype = ctypes.c_void_p
 
@@ -142,7 +147,7 @@ def _draw_on_surface(surface, font, language, text):
     if language is not None:
         pango_language = pango.pango_language_from_string(language)
         pango.pango_context_set_language(pango_ctx, pango_language)
-    
+
     pango.pango_layout_set_font_description(layout, font)
 
     cairo.cairo_set_source_rgb(cr, ctypes.c_double(1.0), ctypes.c_double(1.0), ctypes.c_double(1.0))
@@ -172,7 +177,7 @@ def ocropy_degrade(im, distort=1.0, dsigma=20.0, eps=0.03, delta=0.3, degradatio
         distort (float):
         dsigma (float):
         eps (float):
-        delta (float): 
+        delta (float):
         degradations (list): list returning 4-tuples corresponding to
                              the degradations argument of ocropus-linegen.
 
@@ -185,39 +190,40 @@ def ocropy_degrade(im, distort=1.0, dsigma=20.0, eps=0.03, delta=0.3, degradatio
     image = Image.new('L', (int(1.5*w), 4*h), 255)
     image.paste(im, (int((image.size[0] - w) / 2), int((image.size[1] - h) / 2)))
     a = pil2array(image.convert('L'))
-    (sigma,ssigma,threshold,sthreshold) = degradations[np.random.choice(len(degradations))]
-    sigma += (2*np.random.rand()-1)*ssigma
-    threshold += (2*np.random.rand()-1)*sthreshold
-    a = a*1.0/np.amax(a)
-    if sigma>0.0:
-        a = gaussian_filter(a,sigma)
-    a += np.clip(np.random.randn(*a.shape)*0.2,-0.25,0.25)
-    m = np.array([[1+eps*np.random.randn(),0.0],[eps*np.random.randn(),1.0+eps*np.random.randn()]])
-    w,h = a.shape
-    c = np.array([w/2.0,h/2])
-    d = c-np.dot(m, c)+np.array([np.random.randn()*delta, np.random.randn()*delta])
-    a = affine_transform(a, m, offset=d, order=1, mode='constant', cval=a[0,0])
-    a = np.array(a>threshold,'f')
-    [[r,c]] = find_objects(np.array(a==0,'i'))
+    (sigma, ssigma, threshold, sthreshold) = degradations[np.random.choice(len(degradations))]
+    sigma += (2 * np.random.rand() - 1) * ssigma
+    threshold += (2 * np.random.rand() - 1) * sthreshold
+    a = a * 1.0 / np.amax(a)
+    if sigma > 0.0:
+        a = gaussian_filter(a, sigma)
+    a += np.clip(np.random.randn(*a.shape) * 0.2, -0.25, 0.25)
+    m = np.array([[1 + eps * np.random.randn(), 0.0], [eps * np.random.randn(), 1.0 + eps * np.random.randn()]])
+    w, h = a.shape
+    c = np.array([w / 2.0, h / 2])
+    d = c - np.dot(m, c) + np.array([np.random.randn() * delta, np.random.randn() * delta])
+    a = affine_transform(a, m, offset=d, order=1, mode='constant', cval=a[0, 0])
+    a = np.array(a > threshold, 'f')
+    [[r, c]] = find_objects(np.array(a == 0, 'i'))
     r0 = r.start
     r1 = r.stop
     c0 = c.start
     c1 = c.stop
-    a = a[r0-5:r1+5,c0-5:c1+5]
+    a = a[r0 - 5:r1 + 5, c0 - 5:c1 + 5]
     if distort > 0:
-        h,w = a.shape
-        hs = np.random.randn(h,w)
-        ws = np.random.randn(h,w)
+        h, w = a.shape
+        hs = np.random.randn(h, w)
+        ws = np.random.randn(h, w)
         hs = gaussian_filter(hs, dsigma)
         ws = gaussian_filter(ws, dsigma)
-        hs *= distort/np.amax(hs)
-        ws *= distort/np.amax(ws)
+        hs *= distort / np.amax(hs)
+        ws *= distort / np.amax(ws)
+
         def f(p):
-            return (p[0]+hs[p[0],p[1]],p[1]+ws[p[0],p[1]])
-        a = geometric_transform(a, f, output_shape=(h,w), order=1, mode='constant', cval=np.amax(a))
+            return (p[0] + hs[p[0], p[1]], p[1] + ws[p[0], p[1]])
+
+        a = geometric_transform(a, f, output_shape=(h, w), order=1, mode='constant', cval=np.amax(a))
     im = array2pil(a).convert('L')
     return im
-
 
 
 def degrade_line(im, mean=0.0, sigma=0.001, density=0.002):
@@ -274,14 +280,14 @@ def distort_line(im, distort=3.0, sigma=10, eps=0.03, delta=0.3):
     c = np.array([w/2.0, h/2])
     d = c - np.dot(m, c) + np.array([np.random.randn() * delta, np.random.randn() * delta])
     line = affine_transform(line, m, offset=d, order=1, mode='constant', cval=255)
-    
+
     hs = gaussian_filter(np.random.randn(4*h, int(1.5*w)), sigma)
     ws = gaussian_filter(np.random.randn(4*h, int(1.5*w)), sigma)
     hs *= distort/np.amax(hs)
     ws *= distort/np.amax(ws)
 
     def f(p):
-        return (p[0]+hs[p[0],p[1]],p[1]+ws[p[0],p[1]])
+        return (p[0] + hs[p[0], p[1]], p[1] + ws[p[0], p[1]])
 
     im = array2pil(geometric_transform(line, f, order=1, mode='nearest'))
     im = im.crop(ImageOps.invert(im).getbbox())

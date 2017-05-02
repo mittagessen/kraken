@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
 #
 # Copyright 2015 Benjamin Kiessling
-# 
+#           2014 Thomas M. Breuel
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 # http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
@@ -24,6 +25,7 @@ from kraken.lib.util import pil2array, array2pil
 from kraken.lib.exceptions import KrakenInputException
 from scipy.ndimage import filters, interpolation, morphology
 
+
 def is_bitonal(im):
     """
     Tests a PIL.Image for bitonality.
@@ -39,6 +41,7 @@ def is_bitonal(im):
         return True
     else:
         return False
+
 
 def nlbin(im, threshold=0.5, zoom=0.5, escale=1.0, border=0.1, perc=80,
           range=20, low=5, high=90):

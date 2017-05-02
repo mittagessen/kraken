@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 #
 # Copyright 2015 Benjamin Kiessling
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 # http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
@@ -17,7 +17,6 @@
 from __future__ import absolute_import, division, print_function
 from __future__ import unicode_literals
 from future import standard_library
-standard_library.install_aliases()
 from builtins import range
 from builtins import object
 
@@ -28,6 +27,8 @@ from kraken.lib import lstm
 from kraken.lib.util import pil2array, array2pil
 from kraken.lib.lineest import CenterNormalizer
 from kraken.lib.exceptions import KrakenInputException
+
+standard_library.install_aliases()
 
 
 class ocr_record(object):
@@ -73,8 +74,8 @@ class ocr_record(object):
 
 def bidi_record(record):
     """
-    Reorders a record using the Unicode BiDi algorithm. 
-    
+    Reorders a record using the Unicode BiDi algorithm.
+
     Models trained for RTL or mixed scripts still emit classes in LTR order
     requiring reordering for proper display.
 
@@ -82,7 +83,7 @@ def bidi_record(record):
         record (kraken.rpred.ocr_record)
 
     Returns:
-        kraken.rpred.ocr_record 
+        kraken.rpred.ocr_record
     """
     storage = bd.get_empty_storage()
     base_level = bd.get_base_level(record.prediction)
@@ -178,14 +179,14 @@ def rpred(network, im, bounds, pad=16, line_normalization=True, bidi_reordering=
                                 display.
     Yields:
         An ocr_record containing the recognized text, absolute character
-        positions, and confidence values for each character. 
+        positions, and confidence values for each character.
     """
 
     lnorm = getattr(network, 'lnorm', CenterNormalizer())
 
     for box, coords in extract_boxes(im):
         # check if boxes are non-zero in any dimension
-        if sum(coords[::2]) == False or coords[3] - coords[1] == False:
+        if sum(coords[::2]) == 0 or coords[3] - coords[1] == 0:
             yield ocr_record('', [], [])
             continue
         raw_line = pil2array(box)
