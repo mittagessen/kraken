@@ -6,7 +6,7 @@
 		<meta name="ocr-capabilities" ccontent="ocr_page ocr_line ocrx_word"/>
 	</head>
 	<body>
-		<div class="ocr_page" title="bbox 0 0 {{ page.size|join(' ') }}, image {{ page.name }}">
+		<div class="ocr_page" title="bbox 0 0 {{ page.size|join(' ') }}, image {{ page.name }}" style="writing-mode: {{ page.writing_mode }};">
 			{% for line in page.lines %}
 			<span class="ocr_line" id="line_{{ line.index }}" title="bbox {{ line.bbox|join(' ') }}; cuts {{ line.deltas }}">
 			{% for segment in line.recognition %}

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # Copyright 2015 Benjamin Kiessling
+#           2014 Thomas M. Breuel
 # 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -191,11 +192,11 @@ def compute_colseps_conv(binary, scale=1.0, minheight=10, maxcolseps=2):
     seps = maximum_filter(seps, (int(2*scale), 1))
     # select only the biggest column separators
     seps = morph.select_regions(seps, sl.dim0, min=minheight*scale,
-                                nbest=maxcolseps+1)
+                                nbest=maxcolseps)
     return seps
 
 
-def compute_black_colseps(binary, scale):
+def compute_black_colseps(binary, scale, maxcolseps):
     """
     Computes column separators from vertical black lines.
 
@@ -206,13 +207,13 @@ def compute_black_colseps(binary, scale):
     Returns:
         (colseps, binary):
     """
-    seps = compute_separators_morph(binary, scale)
-    colseps = np.maximum(compute_colseps_conv(binary, scale), seps)
+    seps = compute_separators_morph(binary, scale, maxcolseps)
+    colseps = np.maximum(compute_colseps_conv(binary, scale, maxcolseps), seps)
     binary = np.minimum(binary, 1-seps)
     return colseps, binary
 
 
-def compute_white_colseps(binary, scale):
+def compute_white_colseps(binary, scale, maxcolseps):
     """
     Computes column separators either from vertical black lines or whitespace.
 
@@ -223,7 +224,7 @@ def compute_white_colseps(binary, scale):
     Returns:
         colseps:
     """
-    return compute_colseps_conv(binary, scale)
+    return compute_colseps_conv(binary, scale, maxcolseps)
 
 
 def norm_max(v):
@@ -309,7 +310,18 @@ def remove_hlines(binary, scale, maxsize=10):
     return np.array(labels != 0, 'B')
 
 
-def segment(im, scale=None, black_colseps=False):
+def rotate_lines(lines, angle, offset):
+    angle = np.radians(angle)
+    r = np.array([[np.cos(angle), -np.sin(angle)], [np.sin(angle), np.cos(angle)]])
+    p = np.array(lines).reshape((-1, 2))
+    offset = np.array([2*offset])
+    p = p.dot(r).reshape((-1, 4)).astype(int) + offset
+    x = np.sort(p[:,[0,2]])
+    y = np.sort(p[:,[1,3]])
+    return np.column_stack((x.flatten(), y.flatten())).reshape(-1, 4)
+
+
+def segment(im, text_direction='horizontal-tb', scale=None, maxcolseps=2, black_colseps=False):
     """
     Segments a page into text lines.
 
@@ -318,7 +330,10 @@ def segment(im, scale=None, black_colseps=False):
 
     Args:
         im (PIL.Image): A bi-level page of mode '1' or 'L'
+        text_direction (str): Principal direction of the text
+                              (horizontal-tb/vertical-lr/rl)
         scale (float): Scale of the image
+        maxcolseps (int): Maximum number of whitespace column separators
         black_colseps (bool): Whether column separators are assumed to be
                               vertical black lines or not
 
@@ -327,11 +342,28 @@ def segment(im, scale=None, black_colseps=False):
                                 of the segmented lines in reading order.
 
     Raises:
-        KrakenInputException if the input image is not binarized
+        KrakenInputException if the input image is not binarized or the text
+        direction is invalid.
     """
 
     if im.mode != '1' and not is_bitonal(im):
         raise KrakenInputException('Image is not bi-level')
+
+    # rotate input image for vertical lines
+    if text_direction == 'horizontal-tb':
+        angle = 0
+        offset = (0, 0)
+    elif text_direction == 'vertical-lr':
+        angle = 270
+        offset = (0, im.size[1])
+    elif text_direction == 'vertical-rl':
+        angle = 90
+        offset = (im.size[0], 0)
+    else:
+        raise KrakenInputException('Invalid text direction')
+
+    im = im.rotate(angle, expand=True)
+
     # honestly I've got no idea what's going on here. In theory a simple
     # np.array(im, 'i') should suffice here but for some reason the
     # tostring/fromstring magic in pil2array alters the array in a way that is
@@ -345,9 +377,9 @@ def segment(im, scale=None, black_colseps=False):
 
     binary = remove_hlines(binary, scale)
     if black_colseps:
-        colseps, binary = compute_black_colseps(binary, scale)
+        colseps, binary = compute_black_colseps(binary, scale, maxcolseps)
     else:
-        colseps = compute_white_colseps(binary, scale)
+        colseps = compute_white_colseps(binary, scale, maxcolseps)
     bottom, top, boxmap = compute_gradmaps(binary, scale)
     seeds = compute_line_seeds(binary, bottom, top, colseps, scale)
     llabels = morph.propagate_labels(boxmap, seeds, conflict=0)
@@ -359,4 +391,5 @@ def segment(im, scale=None, black_colseps=False):
     order = reading_order([l.bounds for l in lines])
     lsort = topsort(order)
     lines = [lines[i].bounds for i in lsort]
-    return [(s2.start, s1.start, s2.stop, s1.stop) for s1, s2 in lines]
+    lines = [(s2.start, s1.start, s2.stop, s1.stop) for s1, s2 in lines]
+    return {'text_direction': text_direction, 'boxes':  rotate_lines(lines, 360-angle, offset).tolist()}

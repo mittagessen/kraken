@@ -2,8 +2,8 @@
 kraken.lib.models
 ~~~~~~~~~~~~~~~~~
 
-Wraps around legacy pyrnn and HDF5 models to provide a single interface. In the
-future it will also include support for clstm models.
+Wraps around legacy pyrnn and protobuf models to provide a single interface. In
+the future it will also include support for clstm models.
 """
 
 from __future__ import absolute_import

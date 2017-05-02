@@ -120,11 +120,15 @@ def extract_boxes(im, bounds):
     Yields:
         (PIL.Image) the extracted subimage
     """
-    for box in bounds:
-        if (box < (0, 0, 0, 0) or box[::2] > (im.size[0], im.size[0]) or
-           box[1::2] > (im.size[1], im.size[1])):
+    if bounds['text_direction'].startswith('vertical'):
+        angle = 90
+    else:
+        angle = 0
+    for box in bounds['boxes']:
+        if (box < [0, 0, 0, 0] or box[::2] > [im.size[0], im.size[0]] or
+           box[1::2] > [im.size[1], im.size[1]]):
             raise KrakenInputException('Line outside of image bounds')
-        yield im.crop(box), box
+        yield im.crop(box).rotate(angle, expand=True), box
 
 
 def dewarp(normalizer, im):
@@ -155,6 +159,10 @@ def rpred(network, im, bounds, pad=16, line_normalization=True, bidi_reordering=
     Args:
         network (kraken.lib.lstm.SegRecognizer): A SegRecognizer object
         im (PIL.Image): Image to extract text from
+        bounds (dict): A dictionary containing a 'boxes' entry with a list of
+                       coordinates (x0, y0, x1, y1) of a text line in the image
+                       and an entry 'text_direction' containing
+                       'horizontal-tb/vertical-lr/rl'.
         bounds (iterable): An iterable returning a tuple defining the absolute
                            coordinates (x0, y0, x1, y1) of a text line in the
                            Image.
@@ -175,7 +183,7 @@ def rpred(network, im, bounds, pad=16, line_normalization=True, bidi_reordering=
 
     lnorm = getattr(network, 'lnorm', CenterNormalizer())
 
-    for box, coords in extract_boxes(im, bounds):
+    for box, coords in extract_boxes(im):
         # check if boxes are non-zero in any dimension
         if sum(coords[::2]) == False or coords[3] - coords[1] == False:
             yield ocr_record('', [], [])
@@ -204,7 +212,10 @@ def rpred(network, im, bounds, pad=16, line_normalization=True, bidi_reordering=
         conf = []
 
         for _, start, end, c in result:
-            pos.append((coords[0] + int((start-pad)*scale), coords[1], coords[0] + int((end-pad/2)*scale), coords[3]))
+            if bounds['text_direction'].startswith('horizontal'):
+                pos.append((coords[0] + int((start-pad)*scale), coords[1], coords[0] + int((end-pad/2)*scale), coords[3]))
+            else:
+                pos.append((coords[0], coords[1] + int((start-pad)*scale), coords[2], coords[1] + int((end-pad/2)*scale)))
             conf.append(c)
         if bidi_reordering:
             yield bidi_record(ocr_record(pred, pos, conf))

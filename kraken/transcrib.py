@@ -44,6 +44,7 @@ class TranscriptionInterface(object):
         self.tmpl = env.get_template('layout.html')
         self.pages = []
         self.font = {'font': font, 'style': font_style}
+        self.text_direction = 'horizontal-tb'
         self.page_idx = 1
         self.line_idx = 1
         self.seg_idx = 1
@@ -90,7 +91,8 @@ class TranscriptionInterface(object):
 
                 self.line_idx += 1
         elif segmentation:
-            for bbox in segmentation:
+            self.text_direction = segmentation['text_direction']
+            for bbox in segmentation['boxes']:
                 page['lines'].append({'index': self.line_idx, 
                                       'left': 100*int(bbox[0]) / im.size[0],
                                       'top': 100*int(bbox[1]) / im.size[1],
@@ -112,4 +114,6 @@ class TranscriptionInterface(object):
         Args:
             fd (File): File descriptor to write to.
         """
-        fd.write(self.tmpl.render(uuid=str(uuid.uuid4()), pages=self.pages, font=self.font).encode('utf-8'))
+        fd.write(self.tmpl.render(uuid=str(uuid.uuid4()), pages=self.pages,
+                                  font=self.font,
+                                  text_direction=self.text_direction).encode('utf-8'))

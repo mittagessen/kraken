@@ -19,7 +19,7 @@ from future import standard_library
 standard_library.install_aliases()
 
 import os
-import csv
+import json
 import click
 import time
 import tempfile
@@ -66,20 +66,19 @@ def binarizer(threshold, zoom, escale, border, perc, range, low, high, base_imag
     click.secho(u'\u2713', fg='green')
 
 
-def segmenter(scale, black_colseps, base_image, input, output):
+def segmenter(text_direction, scale, maxcolseps, black_colseps, base_image, input, output):
     try:
         im = Image.open(input)
     except IOError as e:
         raise click.BadParameter(str(e))
     click.echo('Segmenting\t', nl=False)
     try:
-        res = pageseg.segment(im, scale, black_colseps)
+        res = pageseg.segment(im, text_direction, scale, maxcolseps, black_colseps)
     except:
         click.secho(u'\u2717', fg='red')
         raise
-    with open_file(output, 'w') as fp:
-        for box in res:
-            fp.write(u'{},{},{},{}\n'.format(*box))
+    with open_file(output, 'wb') as fp:
+        json.dump(res, fp)
     click.secho(u'\u2713', fg='green')
 
 
@@ -94,8 +93,7 @@ def recognizer(model, pad, base_image, input, output, lines):
     if not lines:
         lines = input
     with open_file(lines, 'r') as fp:
-        bounds = [(int(x1), int(y1), int(x2), int(y2)) for x1, y1, x2, y2
-                  in csv.reader(fp)]
+        bounds = json.loads(fp)
         it = rpred.rpred(model, im, bounds, pad)
     preds = []
 
@@ -116,8 +114,9 @@ def recognizer(model, pad, base_image, input, output, lines):
     with open_file(output, 'w', encoding='utf-8') as fp:
         click.echo('Writing recognition results for {}\t'.format(base_image), nl=False)
         if ctx.meta['mode'] != 'text':
-
-            fp.write(serialization.serialize(preds, base_image, Image.open(base_image).size, ctx.meta['mode']))
+            fp.write(serialization.serialize(preds, base_image,
+                     Image.open(base_image).size, ctx.meta['text_direction'],
+                     ctx.meta['mode']))
         else:
             fp.write(u'\n'.join(s.prediction for s in preds))
         if not ctx.meta['verbose']:
@@ -165,13 +164,17 @@ def binarize(threshold, zoom, escale, border, perc, range, low, high):
 
 
 @cli.command('segment')
+@click.option('-d', '--text-direction', default='horizontal-tb',
+               type=click.Choice(['horizontal-tb','vertical-lr', 'vertical-rl']),
+               help='Sets principal text direction')
 @click.option('--scale', default=None, type=click.FLOAT)
+@click.option('-m', '--maxcolseps', default=2, type=click.INT)
 @click.option('-b/-w', '--black_colseps/--white_colseps', default=False)
-def segment(scale=None, black_colseps=False):
+def segment(text_direction, scale, maxcolseps, black_colseps):
     """
     Segments page images into text lines.
     """
-    return partial(segmenter, scale, black_colseps)
+    return partial(segmenter, text_direction, scale, maxcolseps, black_colseps)
 
 
 @cli.command('ocr')
@@ -184,12 +187,14 @@ def segment(scale=None, black_colseps=False):
               'ALTO, and plain text output', flag_value='hocr')
 @click.option('-a', '--alto', 'serialization', flag_value='alto')
 @click.option('-t', '--text', 'serialization', flag_value='text', default=True)
-
+@click.option('-d', '--text-direction', default='horizontal-tb',
+               type=click.Choice(['horizontal-tb','vertical-lr', 'vertical-rl']),
+               help='Sets principal text direction')
 @click.option('-l', '--lines', type=click.Path(exists=True),
               help='JSON file containing line coordinates')
 @click.option('--enable-autoconversion/--disable-autoconversion', 'conv',
               default=True, help='Automatically convert pyrnn models to protobuf')
-def ocr(ctx, model, pad, serialization, lines, conv):
+def ocr(ctx, model, pad, serialization, text_direction, lines, conv):
     """
     Recognizes text in line images.
     """
@@ -234,6 +239,7 @@ def ocr(ctx, model, pad, serialization, lines, conv):
 
     # set output mode
     ctx.meta['mode'] = serialization
+    ctx.meta['text_direction'] = text_direction
     return partial(recognizer, model=rnn, pad=pad, lines=lines)
 
 

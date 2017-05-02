@@ -169,10 +169,12 @@ def train(ctx, lineheight, pad, hiddensize, output, load, savefreq, report,
               help='Normalize ground truth')
 @click.option('-n', '--reorder/--no-reorder', default=True,
               help='Skip application of BiDi algorithm to transcribed lines')
+@click.option('-r', '--rotate/--no-rotate', default=True,
+              help='Skip rotation of vertical lines')
 @click.option('-o', '--output', type=click.Path(), default='training',
               help='Output directory')
 @click.argument('transcribs', nargs=-1, type=click.File(lazy=True))
-def extract(ctx, normalization, reorder, output, transcribs):
+def extract(ctx, normalization, reorder, rotate, output, transcribs):
     """
     Extracts image-text pairs from a transcription environment created using
     ``ketos transcrib``.
@@ -190,6 +192,12 @@ def extract(ctx, normalization, reorder, output, transcribs):
         else:
             spin('Reading transcription')
         doc = html.parse(fp)
+        td = doc.find(".//meta[@itemprop='text_direction']")
+        if not td:
+            td = 'horizontal-tb'
+        else:
+            td = td.attrib['content']
+
         im = None
         for section in doc.xpath('//section'):
             img = section.xpath('.//img')[0].get('src')
@@ -202,6 +210,8 @@ def extract(ctx, normalization, reorder, output, transcribs):
             for line in section.iter('li'):
                 if line.get('contenteditable') and u''.join(line.itertext()):
                     l = im.crop([int(x) for x in line.get('data-bbox').split(',')])
+                    if rotate and td.startswith('vertical'):
+                        im.rotate(90, expand=True)
                     l.save('{}/{:06d}.png'.format(output, idx))
                     manifest.append('{:06d}.png'.format(idx))
                     text = u''.join(line.itertext())
@@ -224,6 +234,12 @@ def extract(ctx, normalization, reorder, output, transcribs):
 
 @cli.command('transcrib')
 @click.pass_context
+@click.option('-d', '--text-direction', default='horizontal-tb',
+                       type=click.Choice(['horizontal-tb','vertical-lr', 'vertical-rl']),
+                                      help='Sets principal text direction')
+@click.option('--scale', default=None, type=click.FLOAT)
+@click.option('-m', '--maxcolseps', default=2, type=click.INT)
+@click.option('-b/-w', '--black_colseps/--white_colseps', default=False)
 @click.option('-f', '--font', default='', 
               help='Font family to use')
 @click.option('-fs', '--font-style', default=None, 
@@ -233,7 +249,8 @@ def extract(ctx, normalization, reorder, output, transcribs):
 @click.option('-o', '--output', type=click.File(mode='wb'), default='transcrib.html',
               help='Output file')
 @click.argument('images', nargs=-1, type=click.File(mode='rb', lazy=True))
-def transcription(ctx, font, font_style, prefill, output, images):
+def transcription(ctx, text_direction, scale, maxcolseps, black_colseps, font,
+                  font_style, prefill, output, images):
     st_time = time.time()
     ti = transcrib.TranscriptionInterface(font, font_style)
 
@@ -259,7 +276,7 @@ def transcription(ctx, font, font_style, prefill, output, images):
             im = binarization.nlbin(im)
         if ctx.meta['verbose'] > 0:
             click.echo(u'[{:2.4f}] Segmenting page'.format(time.time() - st_time))
-        res = pageseg.segment(im)
+        res = pageseg.segment(im, text_direction, scale, maxcolseps, black_colseps)
         if prefill:
             it = rpred.rpred(prefill, im, res)
             preds = []
