@@ -74,7 +74,7 @@ def cli(verbose):
 @click.option('-m', '--momentum', default=0.9, help='LSTM momentum')
 @click.option('-p', '--partition', default=0.9, help='Ground truth data partition ratio between train/test set')
 @click.option('-u', '--normalization', type=click.Choice(['NFD', 'NFKD', 'NFC', 'NFKC']), default=None, help='Normalize ground truth')
-@click.option('-n', '--reorder/--no-reorder', default=True, help='Reorder code points in LTR direction')
+@click.option('-n', '--reorder/--no-reorder', default=True, help='Reorder code points to display order')
 @click.argument('ground_truth', nargs=-1, type=click.Path(exists=True, dir_okay=False))
 def train(ctx, lineheight, pad, hiddensize, output, load, savefreq, report,
           ntrain, lrate, momentum, partition, normalization, reorder,
@@ -168,7 +168,7 @@ def train(ctx, lineheight, pad, hiddensize, output, load, savefreq, report,
               type=click.Choice(['NFD', 'NFKD', 'NFC', 'NFKC']), default=None,
               help='Normalize ground truth')
 @click.option('-n', '--reorder/--no-reorder', default=True,
-              help='Skip application of BiDi algorithm to transcribed lines')
+              help='Reorder transcribed lines to display order')
 @click.option('-r', '--rotate/--no-rotate', default=True,
               help='Skip rotation of vertical lines')
 @click.option('-o', '--output', type=click.Path(), default='training',
@@ -321,7 +321,7 @@ def transcription(ctx, text_direction, scale, maxcolseps, black_colseps, font,
 @click.option('-ur', '--renormalize',
               type=click.Choice(['NFD', 'NFKD', 'NFC', 'NFKC']), default=None,
               help='Renormalize text for rendering purposes.')
-@click.option('--reorder/--no-reorder', default=False, help='Reorder code points in LTR direction')
+@click.option('--reorder/--no-reorder', default=False, help='Reorder code points to display order')
 @click.option('-fs', '--font-size', type=click.INT, default=32,
               help='Font size to render texts in.')
 @click.option('-l', '--language',
