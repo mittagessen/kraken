@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 #
 # Copyright 2015 Benjamin Kiessling
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 # http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
@@ -16,35 +16,33 @@
 
 from __future__ import absolute_import, division, print_function
 from future import standard_library
-standard_library.install_aliases()
 
 import os
 import json
 import click
 import time
 import tempfile
-import requests
 import unicodedata
 
 from PIL import Image
 from click import open_file
 from itertools import cycle
-from collections import namedtuple, defaultdict
 from functools import partial
-from multiprocessing import Queue, Pool, cpu_count
 from kraken import binarization
 from kraken import pageseg
 from kraken import rpred
-from kraken import serialization 
+from kraken import serialization
 from kraken import repo
 from kraken.lib import models
 
+standard_library.install_aliases()
+
 APP_NAME = 'kraken'
-MODEL_URL = 'http://l.unchti.me/'
 DEFAULT_MODEL = 'en-default.pronn'
 LEGACY_MODEL_DIR = '/usr/local/share/ocropus'
 
 spinner = cycle([u'⣾', u'⣽', u'⣻', u'⢿', u'⡿', u'⣟', u'⣯', u'⣷'])
+
 
 def spin(msg):
     click.echo(u'\r\033[?25l{}\t{}'.format(msg, next(spinner)), nl=False)
@@ -82,7 +80,7 @@ def segmenter(text_direction, scale, maxcolseps, black_colseps, base_image, inpu
     click.secho(u'\u2713', fg='green')
 
 
-def recognizer(model, pad, base_image, input, output, lines):
+def recognizer(model, pad, bidi_reordering, base_image, input, output, lines):
     try:
         im = Image.open(base_image)
     except IOError as e:
@@ -94,7 +92,7 @@ def recognizer(model, pad, base_image, input, output, lines):
         lines = input
     with open_file(lines, 'r') as fp:
         bounds = json.loads(fp)
-        it = rpred.rpred(model, im, bounds, pad)
+        it = rpred.rpred(model, im, bounds, pad, bidi_reordering)
     preds = []
 
     st_time = time.time()
@@ -109,7 +107,7 @@ def recognizer(model, pad, base_image, input, output, lines):
     else:
         click.secho(u'\b\u2713', fg='green', nl=False)
         click.echo('\033[?25h\n', nl=False)
-    
+
     ctx = click.get_current_context()
     with open_file(output, 'w', encoding='utf-8') as fp:
         click.echo('Writing recognition results for {}\t'.format(base_image), nl=False)
@@ -126,15 +124,14 @@ def recognizer(model, pad, base_image, input, output, lines):
 @click.group(chain=True)
 @click.option('-i', '--input', type=(click.Path(exists=True),
                                      click.Path(writable=True)), multiple=True)
-@click.option('-c', '--concurrency', default=cpu_count(), type=click.INT)
 @click.option('-v', '--verbose', default=0, count=True)
-def cli(input, concurrency, verbose):
+def cli(input, verbose):
     ctx = click.get_current_context()
     ctx.meta['verbose'] = verbose
 
 
 @cli.resultcallback()
-def process_pipeline(subcommands, input, concurrency, verbose):
+def process_pipeline(subcommands, input, verbose):
     for io_pair in input:
         try:
             base_image = io_pair[0]
@@ -165,8 +162,8 @@ def binarize(threshold, zoom, escale, border, perc, range, low, high):
 
 @cli.command('segment')
 @click.option('-d', '--text-direction', default='horizontal-tb',
-               type=click.Choice(['horizontal-tb','vertical-lr', 'vertical-rl']),
-               help='Sets principal text direction')
+              type=click.Choice(['horizontal-tb', 'vertical-lr', 'vertical-rl']),
+              help='Sets principal text direction')
 @click.option('--scale', default=None, type=click.FLOAT)
 @click.option('-m', '--maxcolseps', default=2, type=click.INT)
 @click.option('-b/-w', '--black_colseps/--white_colseps', default=False)
@@ -183,18 +180,20 @@ def segment(text_direction, scale, maxcolseps, black_colseps):
               'recognition model')
 @click.option('-p', '--pad', type=click.INT, default=16, help='Left and right '
               'padding around lines')
+@click.option('-n', '--reorder/--no-reorder', default=True,
+              help='Reorder code points to logical order')
 @click.option('-h', '--hocr', 'serialization', help='Switch between hOCR, '
               'ALTO, and plain text output', flag_value='hocr')
 @click.option('-a', '--alto', 'serialization', flag_value='alto')
 @click.option('-t', '--text', 'serialization', flag_value='text', default=True)
 @click.option('-d', '--text-direction', default='horizontal-tb',
-               type=click.Choice(['horizontal-tb','vertical-lr', 'vertical-rl']),
-               help='Sets principal text direction')
+              type=click.Choice(['horizontal-tb', 'vertical-lr', 'vertical-rl']),
+              help='Sets principal text direction')
 @click.option('-l', '--lines', type=click.Path(exists=True),
               help='JSON file containing line coordinates')
 @click.option('--enable-autoconversion/--disable-autoconversion', 'conv',
               default=True, help='Automatically convert pyrnn models to protobuf')
-def ocr(ctx, model, pad, serialization, text_direction, lines, conv):
+def ocr(ctx, model, pad, reorder, serialization, text_direction, lines, conv):
     """
     Recognizes text in line images.
     """
@@ -240,8 +239,7 @@ def ocr(ctx, model, pad, serialization, text_direction, lines, conv):
     # set output mode
     ctx.meta['mode'] = serialization
     ctx.meta['text_direction'] = text_direction
-    return partial(recognizer, model=rnn, pad=pad, lines=lines)
-
+    return partial(recognizer, model=rnn, pad=pad, lines=lines, bidi_reordering=reorder)
 
 
 @cli.command('show')
@@ -261,15 +259,16 @@ def show(ctx, model_id):
         else:
             chars.append(char)
     click.echo(u'name: {}\n\n{}\n\n{}\nalphabet: {} {}\nlicense: {}\nauthor: {} ({})\n{}'.format(desc['name'],
-                                                                                              desc['summary'],
-                                                                                              desc['description'],
-                                                                                              ''.join(chars),
-                                                                                              ', '.join(combining),
-                                                                                              desc['license'],
-                                                                                              desc['author'],
-                                                                                              desc['author-email'],
-                                                                                              desc['url']))
+                                                                                                 desc['summary'],
+                                                                                                 desc['description'],
+                                                                                                 ''.join(chars),
+                                                                                                 ', '.join(combining),
+                                                                                                 desc['license'],
+                                                                                                 desc['author'],
+                                                                                                 desc['author-email'],
+                                                                                                 desc['url']))
     ctx.exit(0)
+
 
 @cli.command('list')
 @click.pass_context
@@ -283,6 +282,7 @@ def list(ctx):
     for m in model_list:
         click.echo('{} ({}) - {}'.format(m, model_list[m]['type'], model_list[m]['summary']))
     ctx.exit(0)
+
 
 @cli.command('get')
 @click.pass_context
@@ -301,6 +301,7 @@ def get(ctx, model_id):
     click.secho(u'\b\u2713', fg='green', nl=False)
     click.echo('\033[?25h\n', nl=False)
     ctx.exit(0)
+
 
 if __name__ == '__main__':
     cli()
