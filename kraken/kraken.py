@@ -92,7 +92,7 @@ def recognizer(model, pad, bidi_reordering, base_image, input, output, lines):
         lines = input
     with open_file(lines, 'r') as fp:
         bounds = json.load(fp)
-        it = rpred.rpred(model, im, bounds, pad, bidi_reordering)
+        it = rpred.rpred(model, im, bounds, pad, bidi_reordering=bidi_reordering)
     preds = []
 
     st_time = time.time()
@@ -239,7 +239,7 @@ def ocr(ctx, model, pad, reorder, serialization, text_direction, lines, conv):
     # set output mode
     ctx.meta['mode'] = serialization
     ctx.meta['text_direction'] = text_direction
-    return partial(recognizer, model=rnn, pad=pad, lines=lines, bidi_reordering=reorder)
+    return partial(recognizer, model=rnn, pad=pad, bidi_reordering=reorder, lines=lines)
 
 
 @cli.command('show')
