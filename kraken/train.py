@@ -28,9 +28,11 @@ from builtins import str
 import os
 import click
 import numpy as np
+import unicodedata
 import bidi.algorithm as bd
 
 from PIL import Image
+from collections import Counter
 
 from kraken import rpred
 from kraken.lib import lstm
@@ -108,7 +110,8 @@ class GroundTruthContainer(object):
         self.lnorm = CenterNormalizer()
         self.training_set = []
         self.test_set = []
-        self.alphabet = set()
+        self.training_alphabet = Counter()
+        self.test_alphabet = Counter()
 
         if not images:
             return
@@ -116,9 +119,6 @@ class GroundTruthContainer(object):
             self.add(line, split, suffix, normalization, reorder, pad)
 
         self.repartition(partition)
-   
-        self.alphabet = sorted(set(''.join(t for _, t in self.training_set)))
-
 
     def add(self, image, split=lambda x: os.path.splitext(x)[0],
                  suffix='.gt.txt', normalization=None, reorder=True,
@@ -154,8 +154,8 @@ class GroundTruthContainer(object):
         self.test_set = self.training_set
         self.training_set = tmp_set
 
-        self.alphabet = sorted(set(''.join(t for _, t in self.training_set)))
-
+        self.training_alphabet = Counter(''.join(t for _, t in self.training_set))
+        self.test_alphabet = Counter(''.join(t for _, t in self.test_set))
 
     def sample(self):
         """
