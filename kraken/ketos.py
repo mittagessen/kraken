@@ -320,7 +320,7 @@ def transcription(ctx, text_direction, scale, maxcolseps, black_colseps, font,
 @click.option('-ur', '--renormalize',
               type=click.Choice(['NFD', 'NFKD', 'NFC', 'NFKC']), default=None,
               help='Renormalize text for rendering purposes.')
-@click.option('--reorder/--no-reorder', default=True, help='Reorder code points in LTR direction')
+@click.option('--reorder/--no-reorder', default=False, help='Reorder code points in LTR direction')
 @click.option('-fs', '--font-size', type=click.INT, default=32,
               help='Font size to render texts in.')
 @click.option('-l', '--language',
