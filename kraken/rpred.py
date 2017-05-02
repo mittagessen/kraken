@@ -184,7 +184,7 @@ def rpred(network, im, bounds, pad=16, line_normalization=True, bidi_reordering=
 
     lnorm = getattr(network, 'lnorm', CenterNormalizer())
 
-    for box, coords in extract_boxes(im):
+    for box, coords in extract_boxes(im, bounds):
         # check if boxes are non-zero in any dimension
         if sum(coords[::2]) == 0 or coords[3] - coords[1] == 0:
             yield ocr_record('', [], [])
