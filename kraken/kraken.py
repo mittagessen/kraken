@@ -22,6 +22,7 @@ import json
 import click
 import time
 import tempfile
+import warnings
 import unicodedata
 
 from PIL import Image
@@ -36,6 +37,7 @@ from kraken import repo
 from kraken.lib import models
 
 standard_library.install_aliases()
+warnings.simplefilter('ignore', UserWarning)
 
 APP_NAME = 'kraken'
 DEFAULT_MODEL = 'en-default.pronn'
