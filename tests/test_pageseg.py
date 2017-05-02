@@ -35,10 +35,10 @@ class TestPageSeg(unittest.TestCase):
         with Image.open(os.path.join(resources, 'bw.png')) as im:
             lines = segment(im)
             # test if line count is roughly correct
-            self.assertAlmostEqual(len(lines), 30, msg='Segmentation differs '
+            self.assertAlmostEqual(len(lines['boxes']), 30, msg='Segmentation differs '
                                    'wildly from true line count', delta=5)
             # check if lines do not extend beyond image
-            for box in lines:
+            for box in lines['boxes']:
                 self.assertLess(0, box[0], msg='Line x0 < 0')
                 self.assertLess(0, box[1], msg='Line y0 < 0')
                 self.assertGreater(im.size[0], box[2], msg='Line x1 > {}'.format(im.size[0]))
