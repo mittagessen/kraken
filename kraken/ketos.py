@@ -83,6 +83,9 @@ def train(ctx, lineheight, pad, hiddensize, output, load, savefreq, report,
     Trains a model from image-text pairs.
     """
     st_time = time.time()
+    if load is None:
+        click.echo('Training from scratch not yet supported.')
+        ctx.exit(1)
     if ctx.meta['verbose'] > 0:
         click.echo(u'[{:2.4f}] Building ground truth set from {} line images'.format(time.time() - st_time, len(ground_truth)))
     else:
