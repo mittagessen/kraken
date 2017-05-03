@@ -56,31 +56,6 @@ def max_bbox(boxes):
     sbox = list(map(sorted, list(zip(*boxes))))
     return (sbox[0][0], sbox[1][0], sbox[2][-1], sbox[3][-1])
 
-
-def delta(root=(0, 0, 0, 0), coordinates=None):
-    """Calculates the running delta from a root coordinate according to the
-    hOCR standard.
-
-    It uses a root bounding box (x0, y0, x1, y1) and calculates the delta from
-    the points (min(x0, x1), min(y0, y1)) and (min(x0, x1), max(y0, y1)) for
-    the first and second pair of values in a delta (dx0, dy0, dx1, dy1)
-    respectively.
-
-    Args:
-        coordinates (list): List of tuples of length 4 containing absolute
-                            coordinates for character bounding boxes.
-
-    Returns:
-        A tuple dx0, dy0, dx1, dy1
-    """
-    for box in coordinates:
-        yield (min(box[0], box[2]) - min(root[0], root[2]),
-               min(box[1], box[3]) - min(root[1], root[3]),
-               max(box[0], box[2]) - min(root[0], root[2]),
-               max(box[1], box[3]) - max(root[1], root[3]))
-        root = box
-
-
 def serialize(records, image_name=u'', image_size=(0, 0), writing_mode='horizontal-tb', template='hocr'):
     """
     Serializes a list of ocr_records into an output document.
@@ -104,7 +79,7 @@ def serialize(records, image_name=u'', image_size=(0, 0), writing_mode='horizont
     for idx, record in enumerate(records):
         line = {'index': idx,
                 'bbox': max_bbox(record.cuts),
-                'deltas': ' '.join(['{},{},{},{}'.format(*x) for x in delta(max_bbox(record.cuts), record.cuts)]),
+                'deltas': record.cuts,
                 'recognition': []
                 }
 
