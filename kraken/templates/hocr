@@ -3,7 +3,7 @@
 	<head>
 		<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
 		<meta name="ocr-system" content="kraken"/>
-		<meta name="ocr-capabilities" ccontent="ocr_page ocr_line ocrx_word"/>
+		<meta name="ocr-capabilities" content="ocr_page ocr_line ocrx_word"/>
 	</head>
 	<body>
 		<div class="ocr_page" title="bbox 0 0 {{ page.size|join(' ') }}, image {{ page.name }}" style="writing-mode: {{ page.writing_mode }};">
