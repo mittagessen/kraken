@@ -260,9 +260,10 @@ def show(ctx, model_id):
             combining.append(unicodedata.name(char))
         else:
             chars.append(char)
-    click.echo(u'name: {}\n\n{}\n\n{}\nalphabet: {} {}\nlicense: {}\nauthor: {} ({})\n{}'.format(desc['name'],
+    click.echo(u'name: {}\n\n{}\n\n{}\nscripts: {}\nalphabet: {} {}\nlicense: {}\nauthor: {} ({})\n{}'.format(desc['name'],
                                                                                                  desc['summary'],
                                                                                                  desc['description'],
+                                                                                                 ' '.join(desc['script']),
                                                                                                  ''.join(chars),
                                                                                                  ', '.join(combining),
                                                                                                  desc['license'],
