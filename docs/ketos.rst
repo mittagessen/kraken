@@ -9,14 +9,103 @@ training.
 
 Training tasks are covered by subcommands attached to the ``ketos`` command.
 
-Ground Truth Editing
---------------------
+Transcription
+-------------
+
+Transcription is done through local browser based HTML transcription
+environments. These are created by the ``ketos transcrib`` command line util.
+Its basic input is just a number of image files and an output path to write the
+HTML file to:
+
+.. code-block:: console
+
+        $ ketos transcrib -o output.html image_1.png image_2.png ...
+
+While it is possible to put multiple images into a single transcription
+environment splitting into one-image-per-HTML will ease parallel transcription
+by multiple people.
+
+The above command reads in the image files, converts them to black and white if
+necessary, tries to split them into line images, and puts an editable text
+field next to the image in the HTML.
+
+Transcription has to be diplomatic, i.e. contain the exact character sequence
+in the line image, including original orthography. Some deviations, such as
+consistently omitting vocalization in Arabic texts, is possible as long as they
+are systematic and relatively minor.
+
+.. note::
+
+        The page segmentation algorithm extracting lines from images is
+        optimized for ``western`` page layouts and may recognize lines
+        erroneously, lumping multiple lines together or cutting them in half.
+        The most efficient way to deal with these errors is just skipping the
+        affected lines by leaving the text box empty.
+
+.. tip::
+
+        Copy-paste transcription can significantly speed up the whole process.
+        Either transcribe scans of a work where a digital edition already
+        exists (but does not for typographically similar prints) or find a
+        sufficiently similar edition as a base.
+
+After transcribing a number of lines the results have to be saved, either using
+the ``Download`` button on the lower right or through the regular ``Save Page
+As`` function of the browser. All the work done is contained directly in the
+saved files and it is possible to save partially transcribed files and continue
+work later.
+
+Next the contents of the filled transcription environments have to be
+extracted through the ``ketos extract`` command:
+
+.. code-block:: console 
+
+        $ ketos extract --reorder --output output_directory --normalization NFD *.html
+
+with
+
+--reorder
+        Tells ketos to reorder the code point for each line into left-to-right
+        order. Unicode code points are always in reading order, e.g. the first
+        code point in an Arabic line will be the rightmost character. This
+        option reorders them into ``display order``, i.e. the first code point
+        is the leftmost, the second one the next from the left and so on. As
+        the neural network does not know beforehand if part of an image
+        contains left-to-right or right-to-left text, all glyphs are assumed to
+        be left-to-right and later reordered for correct display.
+--output
+        The output directory where all line image-text pairs (training data)
+        are written.
+--normalization
+        Unicode has code points to encode most glyphs encountered in the wild.
+        A lesser known feature is that there usually are multiple ways to
+        encode a string of printed characters, i.e. a series of what a human
+        would consider a single character (in Unicode jargon ``grapheme
+        clusters``) in multiple ways. Crucially, accented characters marks may
+        either be a single code point (``precomposed``) or two or more separate
+        symbols (``decomposed``). Many texts contain a mixture of both.
+        `Unicode normalization <http://www.unicode.org/reports/tr15/>`_ ensures
+        that equal grapheme cluster are encoded in the same way, i.e. that the
+        encoded representation across the training data set is consistent and
+        there is only one way the network can recognize a particular feature on
+        the page. Usually it is sufficient to set the normalization to
+        Normalization Form Decomposed (NFD), as it reduces the the size of the
+        overall script to be recognized slightly.
+
+The result will be a directory filled with line image text pairs ``NNNNNN.png``
+and ``NNNNNN.gt.txt`` and a ``manifest.txt`` containing a list of all extracted
+lines.
 
 Training
 --------
- 
+
+Currently kraken does not contain a training interface. Use the
+``clstmocrtrain`` command contained in the CLSTM distribution.
+
 Validation
 ----------
+
+TODO
 
 Artificial Training Data
 ------------------------
@@ -69,19 +158,9 @@ Let's take a look at important information in the preamble:
         Symbols:  !(),-./0123456789:ABEFGHILMNPRS[]_acdefghiklmnoprstuvyz«»،؟ﺀﺁﺃﺅﺈﺋﺎﺑﺔﺘﺜﺠﺤﺧﺩﺫﺭﺰﺴﺸﺼﻀﻄﻈﻌﻐـﻔﻘﻜﻠﻤﻨﻫﻭﻰﻳپ
 
 ketos tells us that it found 3692 unique lines which contained 99 different
-``symbols`` or ``code points``. The important part is to remember that one can
-encode a string of printed characters, i.e. a series of what a human would
-consider a single character (in Unicode jargon ``grapheme clusters``) in
-multiple ways. Crucially, accented characters marks may either be a single code
-point (``precomposed``) or two or more separate symbols (``decomposed``). Many
-texts contain a mixture of both. A text that is maximally
-decomposed/precomposed as said to be in normalization form (NF) D/C.  There is
-a `Wikipedia <https://en.wikipedia.org/wiki/Unicode_equivalence>`_ lemma on
-this phenomenon.
-
-With that in mind we can see the training data contains all of the Arabic
-script including accented precomposed characters, but only a subset of Latin
-characters, numerals, and punctuation. A trained model will be able to
+``symbols`` or ``code points``.  We can see the training data contains all of
+the Arabic script including accented precomposed characters, but only a subset
+of Latin characters, numerals, and punctuation. A trained model will be able to
 recognize only these exact symbols, e.g. a ``C`` or ``j`` on the page will
 never be recognized. Either accept this limitation or add additional text lines
 to the training corpus until the alphabet matches your needs.
@@ -105,7 +184,6 @@ none is applied. For example:
         Σ (len: 231)
         Symbols:  #&'()*,-./0123456789:;ABCDEGHILMNOPQRSTVWXZ]abcdefghiklmnopqrstuvxy §·ΐΑΒΓΔΕΖΘΙΚΛΜΝΞΟΠΡΣΤΦΧΨΩάέήίαβγδεζηθικλμνξοπρςστυφχψωϊϋόύώἀἁἂἃἄἅἈἌἎἐἑἓἔἕἘἙἜἝἠἡἢἣἤἥἦἧἩἭἮἰἱἳἴἵἶἷἸἹἼὀὁὂὃὄὅὈὉὌὐὑὓὔὕὖὗὙὝὠὡὢὤὥὦὧὨὩὰὲὴὶὸὺὼᾄᾐᾑᾔᾗᾠᾤᾧᾳᾶᾷῃῄῆῇῒῖῥῦῬῳῴῶῷ—‘’“
         Combining Characters: COMBINING ACUTE ACCENT, COMBINING DOT BELOW
-
 
 While there hasn't been any study on the effect of different normalizations on
 recognition accuracy there are some benefits to NFD, namely decreased model

@@ -43,12 +43,18 @@ Pull requests and code contributions are always welcome.
 Installation
 ============
 
+.. note::
+
+  A vagrant virtual machine is also available on the hashicorp atlas. Run
+  ``vagrant init openphilology/kraken && vagrant up`` to install without doing
+  any compiling yourself.
+
 kraken requires some external libraries to run. On Debian/Ubuntu they may be
 installed using:
 
 .. code-block:: console
 
-        # apt-get install libpangocairo-1.0 libxml2 libblas3 liblapack3
+        # apt-get install libpangocairo-1.0 libxml2 libblas3 liblapack3 python-dev
 
 If `clstm <https://github.com/tmbdev/clstm>`_ support is desired (highly
 recommended) the associated python extension has to be build and installed.
@@ -58,7 +64,7 @@ scipy build process numpy has to be installed before doing the actual install:
 
 .. code-block:: console
 
-  # pip install numpy
+  $ pip install numpy
 
 Install kraken either from pypi:
 
@@ -88,6 +94,34 @@ place it in the kraken directory for the current user:
 .. code-block:: console
 
   $ kraken get default
+
+A list of libre models available in the central repository can be retrieved by
+running:
+
+::
+
+  $ kraken list
+
+Model metadata can be extracted using:
+
+::
+
+  $ kraken show arabic-alam-al-kutub
+  name: arabic-alam-al-kutub.clstm
+
+  An experimental model for Classical Arabic texts.
+
+  Network trained on 889 lines of [0] as a test case for a general Classical
+  Arabic model. Ground truth was prepared by Sarah Savant
+  <sarah.savant@aku.edu> and Maxim Romanov <maxim.romanov@uni-leipzig.de>.
+
+  Vocalization was omitted in the ground truth. Training was stopped at ~35000
+  iterations with an accuracy of 97%.
+
+  [0] Ibn al-Faqīh (d. 365 AH). Kitāb al-buldān. Edited by Yūsuf al-Hādī, 1st
+  edition. Bayrūt: ʿĀlam al-kutub, 1416 AH/1996 CE.
+  alphabet:  !()-.0123456789:[] «»،؟ءابةتثجحخدذرزسشصضطظعغفقكلمنهوىي ARABIC
+  MADDAH ABOVE, ARABIC HAMZA ABOVE, ARABIC HAMZA BELOW
 
 Quickstart
 ==========

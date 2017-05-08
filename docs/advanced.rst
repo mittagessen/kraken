@@ -31,14 +31,22 @@ binarize any image that is thrown at it.
 
 Available parameters are:
 
-  --threshold FLOAT
-  --zoom FLOAT
-  --escale FLOAT
-  --border FLOAT
-  --perc INTEGER RANGE
-  --range INTEGER
-  --low INTEGER RANGE
-  --high INTEGER RANGE
+--threshold FLOAT
+        TODO
+--zoom FLOAT
+        TODO
+--escale FLOAT
+        TODO
+--border FLOAT
+        TODO
+--perc INTEGER RANGE
+        TODO
+--range INTEGER
+        TODO
+--low INTEGER RANGE
+        TODO
+--high INTEGER RANGE
+        TODO
 
 
 Page segmentation
@@ -136,11 +144,10 @@ that image, and a pyrnn or protobuf model. In particular there is no
 requirement to use the page segmentation algorithm contained in the ``segment``
 subcommand or the binarization provided by kraken. 
 
-The ``ocr`` subcommand is able to serialize the recognitino results either as
-plain text (default), as `hOCR
-<https://docs.google.com/document/d/1QQnIQtvdAC_8n92-LhwPcjtAUFwBlzE8EWnKAxlgVf0/preview>`_,
-or into `ALTO <http://www.loc.gov/standards/alto/>`_ containing additional
-metadata such as bounding boxes and confidences:
+The ``ocr`` subcommand is able to serialize the recognition results either as
+plain text (default), as `hOCR <http://hocr.info>`_, or into `ALTO
+<http://www.loc.gov/standards/alto/>`_ containing additional metadata such as
+bounding boxes and confidences:
 
 .. code-block:: console
 

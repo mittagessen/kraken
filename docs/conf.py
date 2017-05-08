@@ -12,6 +12,8 @@
 # All configuration values have a default; values that are commented out
 # serve to show the default.
 
+from __future__ import absolute_import
+
 import sys
 import os
 import shlex
@@ -20,7 +22,7 @@ from subprocess import Popen, PIPE
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
-#sys.path.insert(0, os.path.abspath('.'))
+#sys.path.insert(0, os.path.abspath('../kraken'))
 
 # -- General configuration ------------------------------------------------
 

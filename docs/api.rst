@@ -18,7 +18,7 @@ kraken.binarization module
     :show-inheritance:
 
 kraken.serialize module
-------------------
+-----------------------
 
 .. automodule:: kraken.serialize
     :members:
@@ -45,6 +45,14 @@ kraken.transcrib module
 -----------------------
 
 .. automodule:: kraken.transcrib
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+kraken.train module
+-----------------------
+
+.. automodule:: kraken.train
     :members:
     :undoc-members:
     :show-inheritance:
