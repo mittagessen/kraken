@@ -8,19 +8,34 @@ import os
 
 from lxml import etree
 from io import StringIO
+from hocr_spec import HocrValidator
+
 from kraken import rpred
 from kraken import serialization
 
 thisfile = os.path.abspath(os.path.dirname(__file__))
 resources = os.path.abspath(os.path.join(thisfile, 'resources'))
 
-class TestSerializations(object):
+class TestSerializations(unittest.TestCase):
     """
     Tests for output serialization
     """
     def setUp(self):
         with open(os.path.join(resources, 'records.json'), 'r') as fp:
             self.records = [rpred.ocr_record(**x) for x in json.load(fp)]
+        self.validator = HocrValidator('standard')
+
+    def test_vertical_hocr_serialization(self):
+        """
+        Test vertical line hOCR  serialization
+        """
+        fp = StringIO()
+
+        fp.write(serialization.serialize(self.records, image_name='foo.png', writing_mode='vertical-lr', template='hocr'))
+        fp.seek(0)
+
+        report = self.validator.validate(fp, parse_strict=True)
+        self.assertTrue(report.is_valid())
 
     def test_hocr_serialization(self):
         """
@@ -29,8 +44,10 @@ class TestSerializations(object):
         fp = StringIO()
 
         fp.write(serialization.serialize(self.records, image_name='foo.png', template='hocr'))
+        fp.seek(0)
 
-        doc = etree.fromstring(fp.getvalue())
+        report = self.validator.validate(fp, parse_strict=True)
+        self.assertTrue(report.is_valid())
 
     def test_alto_serialization_validation(self):
         """
