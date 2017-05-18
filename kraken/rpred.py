@@ -126,6 +126,7 @@ def extract_boxes(im, bounds):
     else:
         angle = 0
     for box in bounds['boxes']:
+        box = list(box)
         if (box < [0, 0, 0, 0] or box[::2] > [im.size[0], im.size[0]] or
            box[1::2] > [im.size[1], im.size[1]]):
             raise KrakenInputException('Line outside of image bounds')
