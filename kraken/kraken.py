@@ -77,7 +77,7 @@ def segmenter(text_direction, scale, maxcolseps, black_colseps, base_image, inpu
     except:
         click.secho(u'\u2717', fg='red')
         raise
-    with open_file(output, 'wb') as fp:
+    with open_file(output, 'w') as fp:
         json.dump(res, fp)
     click.secho(u'\u2713', fg='green')
 
