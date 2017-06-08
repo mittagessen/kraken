@@ -94,7 +94,7 @@ class ClstmSeqRecognizer(kraken.lib.lstm.SeqRecognizer):
         cls.resize(len(codes))
         for i, v in enumerate(codes):
             cls[i] = v
-        res = self.rnn.decode(cls)
+        res = self.rnn.codec.decode(cls)
         return res
 
     def trainSequence(self, line, labels, update=1):
@@ -122,10 +122,10 @@ class ClstmSeqRecognizer(kraken.lib.lstm.SeqRecognizer):
 
         # calculate deltas, backpropagate and update weights
         deltas = aligned.array() - self.rnn.outputs.array()
-        self.rnn.d_outputs.aset(deltas)
+        self.rnn.outputs.dset(deltas)
         self.rnn.backward()
         if update:
-            self.rnn.update()
+            clstm.sgd_update(self.rnn)
 
         codes = kraken.lib.lstm.translate_back(self.outputs)
         cls = clstm.Classes()
@@ -151,10 +151,10 @@ class ClstmSeqRecognizer(kraken.lib.lstm.SeqRecognizer):
             An unicode string containing the recognized sequence.
         """
         labels = clstm.Classes()
-        self.rnn.encode(labels, s)
+        self.rnn.codec.encode(labels, s)
 
         cls = self.trainSequence(line, labels)
-        return self.rnn.decode(cls)
+        return self.rnn.codec.decode(cls)
 
     def setLearningRate(self, rate=1e-4, momentum=0.9):
         """
