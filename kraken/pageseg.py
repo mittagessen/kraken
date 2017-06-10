@@ -339,8 +339,9 @@ def segment(im, text_direction='horizontal-tb', scale=None, maxcolseps=2, black_
                               vertical black lines or not
 
     Returns:
-        [(x1, y1, x2, y2),...]: A list of tuples containing the bounding boxes
-                                of the segmented lines in reading order.
+        {'text_direction': '$dir', 'boxes': [(x1, y1, x2, y2),...]}: A
+        dictionary containing the text direction and a list of reading order
+        sorted bounding boxes under the key 'boxes'.
 
     Raises:
         KrakenInputException if the input image is not binarized or the text
