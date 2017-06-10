@@ -48,6 +48,7 @@ pangocairo = ctypes.CDLL(ctypes.util.find_library('pangocairo-1.0'))
 pango = ctypes.CDLL(ctypes.util.find_library('pango-1.0'))
 cairo = ctypes.CDLL(ctypes.util.find_library('cairo'))
 
+__all__ = ['LineGenerator', 'ocropy_degrade', 'degrade_line', 'distort_line']
 
 class PangoFontDescription(ctypes.Structure):
     pass

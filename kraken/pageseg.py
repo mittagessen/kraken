@@ -31,6 +31,7 @@ from kraken.lib.util import pil2array
 from kraken.binarization import is_bitonal
 from kraken.lib.exceptions import KrakenInputException
 
+__all__ = ['segment']
 
 class record(object):
     def __init__(self, **kw):

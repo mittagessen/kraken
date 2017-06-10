@@ -40,6 +40,7 @@ from kraken.lib import models
 from kraken.lib.util import pil2array, array2pil
 from kraken.lib.lineest import CenterNormalizer
 
+__all__ = ['GroundTruthContainer']
 
 def _fast_levenshtein(seq1, seq2):
 
