@@ -53,6 +53,7 @@ def spin(msg):
 
 
 @click.group()
+@click.version_option()
 @click.option('-v', '--verbose', default=0, count=True)
 def cli(verbose):
     ctx = click.get_current_context()

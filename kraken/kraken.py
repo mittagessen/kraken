@@ -124,6 +124,7 @@ def recognizer(model, pad, bidi_reordering, base_image, input, output, lines):
 
 
 @click.group(chain=True)
+@click.version_option()
 @click.option('-i', '--input', type=(click.Path(exists=True),
                                      click.Path(writable=True)), multiple=True)
 @click.option('-v', '--verbose', default=0, count=True)
