@@ -98,12 +98,13 @@ class LineGenerator(object):
     """
     Produces degraded line images using a single collection of font families.
     """
-    def __init__(self, family='Sans', font_size=32, language=None):
+    def __init__(self, family='Sans', font_size=32, font_weight=400, language=None):
         self.language = language
         self.font = pango.pango_font_description_new()
         # XXX: get PANGO_SCALE programatically from somewhere
         pango.pango_font_description_set_size(self.font, font_size * 1024)
         pango.pango_font_description_set_family(self.font, family)
+        pango.pango_font_description_set_weight(self.font, font_weight)
 
     def render_line(self, text):
         """
