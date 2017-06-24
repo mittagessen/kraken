@@ -329,6 +329,8 @@ def transcription(ctx, text_direction, scale, maxcolseps, black_colseps, font,
 @click.option('--reorder/--no-reorder', default=False, help='Reorder code points to display order')
 @click.option('-fs', '--font-size', type=click.INT, default=32,
               help='Font size to render texts in.')
+@click.option('-fw', '--font-weight', type=click.INT, default=400,
+              help='Font weight to render texts in.')
 @click.option('-l', '--language',
               help='RFC-3066 language tag for language-dependent font shaping')
 @click.option('-ll', '--max-length', type=click.INT, default=None,
@@ -359,7 +361,7 @@ def transcription(ctx, text_direction, scale, maxcolseps, black_colseps, font,
               help='Output directory')
 @click.argument('text', nargs=-1, type=click.Path(exists=True))
 def line_generator(ctx, font, maxlines, encoding, normalization, renormalize,
-                   reorder, font_size, language, max_length, strip,
+                   reorder, font_size, font_weight, language, max_length, strip,
                    disable_degradation, binarize, mean, sigma, density,
                    distort, distortion_sigma, legacy, output, text):
     """
@@ -416,7 +418,7 @@ def line_generator(ctx, font, maxlines, encoding, normalization, renormalize,
     click.echo(u'Symbols: {}'.format(''.join(chars)))
     if combining:
         click.echo(u'Combining Characters: {}'.format(', '.join(combining)))
-    lg = linegen.LineGenerator(font, font_size, language)
+    lg = linegen.LineGenerator(font, font_size, font_weight, language)
     for idx, line in enumerate(lines):
         if ctx.meta['verbose'] > 0:
             click.echo(u'[{:2.4f}] {}'.format(time.time() - st_time, line))
