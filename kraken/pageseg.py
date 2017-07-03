@@ -377,6 +377,7 @@ def segment(im, text_direction='horizontal-tb', scale=None, maxcolseps=2, black_
 
     binary = remove_hlines(binary, scale)
     # emptyish images wll cause exceptions here.
+    
     try:
         if black_colseps:
             colseps, binary = compute_black_colseps(binary, scale, maxcolseps)
@@ -384,7 +385,7 @@ def segment(im, text_direction='horizontal-tb', scale=None, maxcolseps=2, black_
             colseps = compute_white_colseps(binary, scale, maxcolseps)
     except ValueError:
         return {'text_direction': text_direction, 'boxes':  []}
-
+    
     bottom, top, boxmap = compute_gradmaps(binary, scale)
     seeds = compute_line_seeds(binary, bottom, top, colseps, scale)
     llabels = morph.propagate_labels(boxmap, seeds, conflict=0)

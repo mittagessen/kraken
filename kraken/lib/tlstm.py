@@ -1,3 +1,16 @@
+import torch
+import torch.nn as nn
+from torch.autograd import Variable
+
+import numpy as np
+
+import clstm_pb2
+
+
+from warpctc_pytorch import CTCLoss
+
+
+
 class TBIDILSTM(nn.Module):
     """
     A torch module implementing a bidirectional LSTM with a linear layer as decoder.
