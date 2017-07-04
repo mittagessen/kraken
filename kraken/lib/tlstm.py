@@ -10,19 +10,18 @@ import clstm_pb2
 from warpctc_pytorch import CTCLoss
 
 
-
 class TBIDILSTM(nn.Module):
     """
     A torch module implementing a bidirectional LSTM with a linear layer as decoder.
-    Very much the same as ocropy BIDILSTM but without the softmax layer at the output.
-    The serialization format, let's call it tlstm, is the same as clstm's.
+    Very much the same as ocropy BIDILSTM but with logsoftmax instead of softmax at 
+    the output (needed for warp_ctc). The serialization format is the same as clstm's.
     """
     def __init__(self, ninp, nhid, nop):
         super(TBIDILSTM, self).__init__()
         
         self.rnn = nn.LSTM(ninp+1, nhid, 1, bias=False, bidirectional=True)
         self.decoder = nn.Linear(2*nhid+1, nop, bias=False)
-        #self.softmax = nn.Softmax()
+        self.softmax = nn.LogSoftmax()
         
         self.init_weights()
         
@@ -33,8 +32,7 @@ class TBIDILSTM(nn.Module):
         self.momentum = 0
         
         
-    def init_weights(self):
-        initrange = 0.1
+    def init_weights(self, initrange=0.1):
         self.decoder.weight.data.uniform_(-initrange, initrange)
         for p in self.rnn.parameters():
             p.data.uniform_(-initrange, initrange)
@@ -48,46 +46,42 @@ class TBIDILSTM(nn.Module):
         if cuda:
             ones1 = ones1.cuda()
         inp_oneup = torch.cat([ones1, inp], 2)
-        lstm_out, hidden = self.rnn(inp_oneup, hidden)
 
+        lstm_out, hidden = self.rnn(inp_oneup, hidden)
+        
         ones2 = Variable(torch.ones(lstm_out.size(0)*lstm_out.size(1),1))
         if cuda:
             ones2 = ones2.cuda()
         lstm_out_oneup = torch.cat([ ones2, 
                             lstm_out.view(lstm_out.size(0)*lstm_out.size(1), lstm_out.size(2)) ], 1)
-        decoded = self.decoder(lstm_out_oneup) # self.softmax(...) 
+        decoded = self.softmax(self.decoder(lstm_out_oneup))
         
         return decoded.view(lstm_out.size(0), lstm_out.size(1), decoded.size(1)), hidden
 
     
     def init_hidden(self, bsz=1):
         if self.rnn.weight_hh_l0.is_cuda:
-            return (Variable(torch.randn(2, bsz, self.nhidden)).cuda(),
-                    Variable(torch.randn(2, bsz, self.nhidden)).cuda())           
-        return (Variable(torch.randn(2, bsz, self.nhidden)),
-                Variable(torch.randn(2, bsz, self.nhidden)))
+            return (Variable(torch.zeros(2, bsz, self.nhidden)).cuda(),
+                    Variable(torch.zeros(2, bsz, self.nhidden)).cuda())           
+        return (Variable(torch.zeros(2, bsz, self.nhidden)),
+                Variable(torch.zeros(2, bsz, self.nhidden)))
     
     
 
 class TlstmSeqRecognizer(kraken.lib.lstm.SeqRecognizer):
     """
     Something like ClstmSeqRecognizer, using pytorch instead of clstm.
-    Somehow the softmax function prevented learning, so I got rid of it.
-    The drawback ist that kraken.lib.lstm.translate_back doesn't work.
-    Networks generated in tlstm can be read and used in clstm but they don't
-    perfectly well. If someone manages to put the softmax function in the
-    right place here, it would be much appreciated.
     """
-    def __init__(self, fname='', normalize=kraken.lib.lstm.normalize_nfkc):
+    def __init__(self, fname='', normalize=kraken.lib.lstm.normalize_nfkc, cuda=torch.cuda.is_available()):
         self.fname = fname
         self.rnn = None
         self.normalize = normalize
-        self.cuda_available = True if torch.cuda.is_available() else False
+        self.cuda_available = cuda
         if fname:
             self._load_model()
     
     @classmethod
-    def init_model(cls, ninput, nhidden, noutput, codec, normalize=kraken.lib.lstm.normalize_nfkc):
+    def init_model(cls, ninput, nhidden, noutput, codec, normalize=kraken.lib.lstm.normalize_nfkc, cuda=torch.cuda.is_available()):
         self = cls()
         self.codec = codec
         self.normalize = normalize
@@ -95,7 +89,7 @@ class TlstmSeqRecognizer(kraken.lib.lstm.SeqRecognizer):
         self.setLearningRate()
         self.trial = 0
         self.criterion = CTCLoss()
-        self.cuda_available = True if torch.cuda.is_available() else False
+        self.cuda_available = cuda
         if self.cuda_available:
             self.cuda()
         return self
@@ -233,7 +227,7 @@ class TlstmSeqRecognizer(kraken.lib.lstm.SeqRecognizer):
             self.cuda()
         
     def translate_back(self, output):
-        _, preds = output.max(2)
+        _, preds = output.cpu().max(2) # max() outputs values +1 when on gpu. why?
         dec = preds.squeeze(2).transpose(1,0).contiguous().view(-1).data
         char_list = []
         for i in range(len(dec)):
@@ -248,8 +242,9 @@ class TlstmSeqRecognizer(kraken.lib.lstm.SeqRecognizer):
             line = line.cuda()
         
         out, _ = self.rnn.forward(line, self.rnn.init_hidden())
-        
+
         codes = self.translate_back(out)
+        #codes = lstm.translate_back(out.exp().cpu().squeeze().data.numpy())
         res = ''.join(self.codec.decode(codes))
         return res.strip()
     
@@ -265,7 +260,6 @@ class TlstmSeqRecognizer(kraken.lib.lstm.SeqRecognizer):
         # repackage hidden
         self.hidden = tuple(Variable(h.data) for h in self.hidden)
         
-        self.inp = line
         out, self.hidden = self.rnn.forward(line, self.hidden)
         
         tlabels = Variable(torch.IntTensor(labels))
@@ -274,6 +268,7 @@ class TlstmSeqRecognizer(kraken.lib.lstm.SeqRecognizer):
         loss = self.criterion(out, tlabels, probs_sizes, label_sizes)
         
         self.rnn.zero_grad()
+
         loss.backward()
         
         if update:
@@ -292,3 +287,5 @@ class TlstmSeqRecognizer(kraken.lib.lstm.SeqRecognizer):
         self.rnn.learning_rate = rate
         self.rnn.momentum = momentum
         self.optim = torch.optim.RMSprop(self.rnn.parameters(), lr=self.rnn.learning_rate, momentum=self.rnn.momentum)
+        
+        
