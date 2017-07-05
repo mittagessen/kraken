@@ -424,10 +424,11 @@ def detect_scripts(im, bounds, model=None):
         model (str): Location of the script classification model or None for default.
 
     Returns:
-        {'text_direction': '$dir', 'boxes': [(script, (x1, y1, x2, y2)),...]}: A
-        dictionary containing the text direction and a list of reading order
-        sorted bounding boxes under the key 'boxes'. Script is a ISO15924 4
-        character identifier.
+        {'text_direction': '$dir', 'boxes': [[(script, (x1, y1, x2, y2)),...]]}: A
+        dictionary containing the text direction and a list of lists of reading
+        order sorted bounding boxes under the key 'boxes' with each list
+        containing the script segmentation of a single line. Script is a
+        ISO15924 4 character identifier.
 
     Raises:
         KrakenInputException if the input image is not binarized or the text
@@ -456,10 +457,12 @@ def detect_scripts(im, bounds, model=None):
         # do a reverse run to fix leading inherited scripts
         pred.prediction = ''.join(reversed(subs([u'\U000f03e6', u'\U000f03e6'], reversed(p))))
         # group by grapheme
+        t = []
         for k, g in groupby(pred, key=lambda x: x[0]):
             # convert to ISO15924 numerical identifier
             k = ord(k) - 0xF0000
             b = max_bbox(x[1] for x in g)
-            preds.append((n2s[str(k)], b))
+            t.append((n2s[str(k)], b))
+        preds.append(t)
 
     return {'boxes': preds, 'text_direction': bounds['text_direction']}
