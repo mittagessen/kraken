@@ -23,6 +23,7 @@ from builtins import object
 
 import json
 import numpy as np
+import pkg_resources
 
 from itertools import groupby
 from scipy.ndimage.filters import (gaussian_filter, uniform_filter,
@@ -408,7 +409,7 @@ def segment(im, text_direction='horizontal-tb', scale=None, maxcolseps=2, black_
     return {'text_direction': text_direction, 'boxes':  rotate_lines(lines, 360-angle, offset).tolist()}
 
 
-def detect_scripts(im, bounds, model='script.clstm'):
+def detect_scripts(im, bounds, model=None):
     """
     Detects scripts in a segmented page.
 
@@ -420,7 +421,7 @@ def detect_scripts(im, bounds, model='script.clstm'):
                        coordinates (x0, y0, x1, y1) of a text line in the image
                        and an entry 'text_direction' containing
                        'horizontal-tb/vertical-lr/rl'.
-        model (str): Location of the classification model
+        model (str): Location of the script classification model or None for default.
 
     Returns:
         {'text_direction': '$dir', 'boxes': [(script, (x1, y1, x2, y2)),...]}: A
@@ -433,9 +434,11 @@ def detect_scripts(im, bounds, model='script.clstm'):
         direction is invalid.
         KrakenInvalidModelException if no clstm module is available.
     """
+    if not model:
+        model = pkg_resources.resource_filename(__name__, 'script.clstm')
     rnn = models.load_clstm(model)
     # load numerical to 4 char identifier map
-    with open('iso15924.json') as fp:
+    with pkg_resources.resource_stream(__name__, 'iso15924.json') as fp:
         n2s = json.load(fp)
     it = rpred(rnn, im, bounds)
     preds = []
