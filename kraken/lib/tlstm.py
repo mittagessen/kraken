@@ -1,3 +1,9 @@
+"""
+clstm in pytorch.
+Pytorch bindings for warp-ctc: https://github.com/SeanNaren/warp-ctc/tree/pytorch_bindings/pytorch_binding
+"""
+
+
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
