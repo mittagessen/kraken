@@ -241,6 +241,21 @@ class TlstmSeqRecognizer(kraken.lib.lstm.SeqRecognizer):
                 char_list.append(dec[i])
         return char_list
 
+    def translate_back_locations(self, output):
+        val, preds = out.cpu().exp().max(2) # max() outputs values +1 when on gpu. why?
+        dec = preds.squeeze(2).transpose(1,0).contiguous().view(-1).data
+        char_list = []
+        start = 0
+        for i in range(len(dec)):
+            if dec[i] != 0 and (not (i > 0 and dec[i-1] == dec[i])):
+                start = i
+                code = dec[i]
+            if not dec[i] and start:
+                char_list.append((code, start, i, val[start:i].max().data[-1]))
+                start = 0
+        return char_list
+
+
     def predictString(self, line):
         line = Variable(torch.from_numpy(line.reshape(-1, 1, self.rnn.ninput).astype('float32')))
         
