@@ -473,8 +473,9 @@ class TlstmSeqRecognizer_legacy(kraken.lib.lstm.SeqRecognizer):
         
         out, _ = self.rnn.forward(line, self.rnn.init_hidden())
         
-        #codes = self.translate_back(out)
-        codes = lstm.translate_back(out.cpu().contiguous().squeeze().data.numpy())
+	self.outputs = out.cpu().contiguous().squeeze().data.numpy()
+
+        codes = lstm.translate_back(self.outputs)
         res = ''.join(self.codec.decode(codes))
         return res.strip()
         
