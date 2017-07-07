@@ -21,16 +21,24 @@ from __future__ import unicode_literals
 from builtins import range
 from builtins import object
 
+import json
 import numpy as np
+import pkg_resources
 
+from itertools import groupby
 from scipy.ndimage.filters import (gaussian_filter, uniform_filter,
                                    maximum_filter)
 
+from kraken.lib import models
 from kraken.lib import morph, sl
 from kraken.lib.util import pil2array
-from kraken.binarization import is_bitonal
 from kraken.lib.exceptions import KrakenInputException
 
+from kraken.rpred import rpred
+from kraken.serialization import max_bbox
+from kraken.binarization import is_bitonal
+
+__all__ = ['segment', 'detect_scripts']
 
 class record(object):
     def __init__(self, **kw):
@@ -338,8 +346,9 @@ def segment(im, text_direction='horizontal-tb', scale=None, maxcolseps=2, black_
                               vertical black lines or not
 
     Returns:
-        [(x1, y1, x2, y2),...]: A list of tuples containing the bounding boxes
-                                of the segmented lines in reading order.
+        {'text_direction': '$dir', 'boxes': [(x1, y1, x2, y2),...]}: A
+        dictionary containing the text direction and a list of reading order
+        sorted bounding boxes under the key 'boxes'.
 
     Raises:
         KrakenInputException if the input image is not binarized or the text
@@ -399,3 +408,62 @@ def segment(im, text_direction='horizontal-tb', scale=None, maxcolseps=2, black_
     lines = [lines[i].bounds for i in lsort]
     lines = [(s2.start, s1.start, s2.stop, s1.stop) for s1, s2 in lines]
     return {'text_direction': text_direction, 'boxes':  rotate_lines(lines, 360-angle, offset).tolist()}
+
+
+def detect_scripts(im, bounds, model=None):
+    """
+    Detects scripts in a segmented page.
+
+    Classifies lines returned by the page segmenter into runs of scripts/writing systems.
+
+    Args:
+        im (PIL.Image): A bi-level page of mode '1' or 'L'
+        bounds (dict): A dictionary containing a 'boxes' entry with a list of
+                       coordinates (x0, y0, x1, y1) of a text line in the image
+                       and an entry 'text_direction' containing
+                       'horizontal-tb/vertical-lr/rl'.
+        model (str): Location of the script classification model or None for default.
+
+    Returns:
+        {'text_direction': '$dir', 'boxes': [[(script, (x1, y1, x2, y2)),...]]}: A
+        dictionary containing the text direction and a list of lists of reading
+        order sorted bounding boxes under the key 'boxes' with each list
+        containing the script segmentation of a single line. Script is a
+        ISO15924 4 character identifier.
+
+    Raises:
+        KrakenInputException if the input image is not binarized or the text
+        direction is invalid.
+        KrakenInvalidModelException if no clstm module is available.
+    """
+    if not model:
+        model = pkg_resources.resource_filename(__name__, 'script.clstm')
+    rnn = models.load_clstm(model)
+    # load numerical to 4 char identifier map
+    with pkg_resources.resource_stream(__name__, 'iso15924.json') as fp:
+        n2s = json.load(fp)
+    it = rpred(rnn, im, bounds)
+    preds = []
+    for pred in it:
+        # substitute inherited scripts with neighboring runs
+        def subs(m, s):
+            p = u''
+            for c in s:
+                if c in m and p:
+                    p += p[-1]
+                else:
+                    p += c
+            return p
+        p = subs([u'\U000f03e6', u'\U000f03e6'], pred.prediction)
+        # do a reverse run to fix leading inherited scripts
+        pred.prediction = ''.join(reversed(subs([u'\U000f03e6', u'\U000f03e6'], reversed(p))))
+        # group by grapheme
+        t = []
+        for k, g in groupby(pred, key=lambda x: x[0]):
+            # convert to ISO15924 numerical identifier
+            k = ord(k) - 0xF0000
+            b = max_bbox(x[1] for x in g)
+            t.append((n2s[str(k)], b))
+        preds.append(t)
+
+    return {'boxes': preds, 'text_direction': bounds['text_direction']}

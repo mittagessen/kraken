@@ -25,6 +25,7 @@ from jinja2 import Environment, PackageLoader
 
 import regex
 
+__all__ = ['serialize']
 
 def _rescale(val, low, high):
     """

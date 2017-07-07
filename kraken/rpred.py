@@ -154,6 +154,83 @@ def dewarp(normalizer, im):
     return array2pil(line)
 
 
+def mm_rpred(nets, im, bounds, pad=16, line_normaliztion=True, bidi_reordering=True):
+    """
+    Multi-model version of kraken.rpred.rpred.
+
+    Takes a dictionary of ISO15924 script identifiers->models and an
+    script-annotated segmentation to dynamically select appropriate models for
+    these lines.
+
+    Args:
+        nets (dict): A dict mapping ISO15924 identifiers to SegRecognizer
+                     objects. Recommended to be an defaultdict.
+        im (PIL.Image): Image to extract text from
+                        bounds (dict): A dictionary containing a 'boxes' entry
+                        with a list of lists of coordinates (script, (x0, y0,
+                        x1, y1)) of a text line in the image and an entry
+                        'text_direction' containing
+                        'horizontal-tb/vertical-lr/rl'.
+        pad (int): Extra blank padding to the left and right of text line
+        line_normalization (bool): Dewarp line using the line estimator
+                                   contained in the network. If no normalizer
+                                   is available one using the default
+                                   parameters is created. By aware that you may
+                                   have to scale lines manually to the target
+                                   line height if disabled.
+        bidi_reordering (bool): Reorder classes in the ocr_record according to
+                                the Unicode bidirectional algorithm for correct
+                                display.
+    Yields:
+        An ocr_record containing the recognized text, absolute character
+        positions, and confidence values for each character.
+    """
+
+    for line in bounds['boxes']:
+        rec = ocr_record('', [], [])
+        for script, (box, coords) in zip(map(lambda x: x[0], line),
+                                         extract_boxes(im, {'text_direction': bounds['text_direction'], 
+                                                            'boxes': [map(lambda x: x[1], line)]})):
+            # check if boxes are non-zero in any dimension
+            if sum(coords[::2]) == 0 or coords[3] - coords[1] == 0:
+                continue
+            raw_line = pil2array(box)
+            # check if line is non-zero
+            if np.amax(raw_line) == np.amin(raw_line):
+                continue
+            if line_normalization:
+                # fail gracefully and return no recognition result in case the
+                # input line can not be normalized.
+                try:
+                    lnorm = getattr(nets[script], 'lnorm', CenterNormalizer())
+                    box = dewarp(lnorm, box)
+                except:
+                    continue
+            line = pil2array(box)
+            line = lstm.prepare_line(line, pad)
+            pred = nets[script].predictString(line)
+    
+            # calculate recognized LSTM locations of characters
+            scale = len(raw_line.T)/(len(network.outputs)-2 * pad)
+            result = lstm.translate_back_locations(network.outputs)
+            pos = []
+            conf = []
+    
+            for _, start, end, c in result:
+                if bounds['text_direction'].startswith('horizontal'):
+                    pos.append((coords[0] + int((start-pad)*scale), coords[1], coords[0] + int((end-pad/2)*scale), coords[3]))
+                else:
+                    pos.append((coords[0], coords[1] + int((start-pad)*scale), coords[2], coords[1] + int((end-pad/2)*scale)))
+                conf.append(c)
+            rec.prediction += pred
+            rec.cuts.append(cuts)
+            rec.confidences.append(conf)
+        if bidi_reordering:
+            yield bidi_record(rec)
+        else:
+            yield rec
+
+
 def rpred(network, im, bounds, pad=16, line_normalization=True, bidi_reordering=True):
     """
     Uses a RNN to recognize text
@@ -165,9 +242,6 @@ def rpred(network, im, bounds, pad=16, line_normalization=True, bidi_reordering=
                        coordinates (x0, y0, x1, y1) of a text line in the image
                        and an entry 'text_direction' containing
                        'horizontal-tb/vertical-lr/rl'.
-        bounds (iterable): An iterable returning a tuple defining the absolute
-                           coordinates (x0, y0, x1, y1) of a text line in the
-                           Image.
         pad (int): Extra blank padding to the left and right of text line
         line_normalization (bool): Dewarp line using the line estimator
                                    contained in the network. If no normalizer
