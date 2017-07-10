@@ -27,6 +27,7 @@ import kraken.lib.lstm
 import kraken.lib.lineest
 
 from kraken.lib import pyrnn_pb2
+from kraken.lib.tlstm import TlstmSeqRecognizer
 from kraken.lib.exceptions import KrakenInvalidModelException
 
 
@@ -204,8 +205,7 @@ def load_any(fname):
         return seq
     except:
         try:
-            seq = load_clstm(fname)
-            seq.kind = 'clstm'
+            seq = load_tlstm(fname)
             return seq
         except Exception as e:
             if PY2:
@@ -239,6 +239,9 @@ def load_clstm(fname):
     except Exception as e:
         raise KrakenInvalidModelException(str(e))
     return ClstmSeqRecognizer(fname)
+
+def load_tlstm(fname):
+    return TlstmSeqRecognizer(fname)
 
 
 def load_pronn(fname):

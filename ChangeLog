@@ -1,0 +1,414 @@
+CHANGES
+=======
+
+* Legacy clstm now integrated
+* added network.outputs for compatibility
+* New TlstmSeqRecognizer\_legacy for compatibility with the ancient clstm version used in kraken
+* new translate\_back\_locations
+* Add mm\_rpred function
+* Add script detection data to package
+* Add detect\_script to pageseg
+* Dependency info added
+* CLSTM Protobuf
+* Log-Softmax added, issue with max() on cuda avoided
+* Imports
+* New SeqRecognizer based on pytorch
+* \* added a weight field to the line generator and a parameter to change it
+* Close opened files in ketos transcrib
+* Update pageseg docstring
+* Explicitely set exports through \_\_all\_\_
+* Add version switch to kraken/ketos
+* Adapted to current clstm code
+* Catch exception caused by empty images in pageseg
+* Fix python 3.6 segmentation result regression
+* Allow more data types in extract\_boxes
+
+0.9.2
+-----
+
+* Accumulated documentation changes
+* Add hocr-spec-python to test requirements
+* Validate hOCR output usin hocr\_spec\_python
+* Add scripts to \`\`kraken show\`\` output
+* Remove daft running delta cuts from hOCR output
+* Bring hOCR output in line with hOCR 1.2 spec
+* Remove typo in hocr template
+* Output error when trying to train from scratch
+* Disable UserWarnings in kraken
+* Make reorder switch in ocr cmd work
+* Aaand another regression from 5eeba707
+* finally fix tests
+* Fix regression in rpred introduced by @5eeba707
+* Make segmentation tests work with new segmenter output
+* Add training alphabet field to GT class
+* PEP8 compliance
+* Change help messages regarding code point ordering
+* Add display/logical order switch for ocr cmd
+* Switch default to no reorder for linegen
+* Add no-reorder/reorder switch to ketos linegen
+* \* added exception handling (exception is thrown at binarization.py:nlbin)
+* Add rotation switch to ketos extract
+* Add vertical line support to transcription UI
+* s/horizontal-lr/horizontal-tb
+* Correct docstring
+* Add maxcolseps to segment subcommand again
+* Support 0 columns separators in pageseg
+* Fixes #28
+* Add correct bounding boxes to vertical recognition output
+* Add vertical text support to page segmentation
+* Add text direction option to kraken command
+* Add writing\_mode arg to output serialization
+* Fixes #32
+* Remove unused function in morph module
+
+0.9.1
+-----
+
+* Change affine transformation matrix to 1d array in normalizer
+
+0.9.0
+-----
+
+* Make ketos great(er than python2) again
+* Adapt extractor to new template
+* New template using CSS image maps
+* Change transcription interface code
+* More descriptive (verbose) output during training
+* Recalculate alphabet after repartitioning
+* Add \`\`train\`\` subcommand to ketos
+* Add rudimentary error report computation methods
+* Add trainSequence/trainString to ClstmSeqRecognizer
+* Add KrakenEncodeException/KrakenDecodeException
+* Add correct check mark to kraken output
+* Add GroundTruthContainer for training data
+* s/x\_conf/x\_confs
+* Fix import broken by s/html/serialization
+* Various documentation updates
+* Use json instead of pickle for serialization data
+* Open pickle in binary mode
+* Make README reflect some minor syntax changes
+* Make hOCR output XML compliant
+* Minimal tests for output serialization
+* Skip initial whitespace in records for ALTO serialization
+* Correct output of translate\_back\_locations to output highest value
+* Add character/word confidences to ALTO output
+* typo: repositories -> models
+* Add preliminary support for more serialization formats
+* Use is\_bitonal in page segmentation sanity check
+* Binarize images in transcription()
+* Robustness change in is\_bitonal
+* Add is\_bitonal function to binarization module
+* README: Capitalize the first letter in a sentence
+* Fix exception in repository index retrieval
+* Add mirroring to the prediction output
+* Update README
+* Switch 3.3 for 3.5 in Travis testing
+* Use new packages available in conda
+* Raise protobuf requirement to final release
+* Use proper integral shape in binarization
+* Add option to skip codepoint reordering for transcription extractor
+* Add lxml to requirements file
+* Add alphabet view to repository metadata display
+* Remove unused template
+* Add extractor for GT interface
+* Escape data when downloading ground truth
+* Correctly extract last class from output array
+* Fix CI
+
+0.8.0
+-----
+
+* Update documentation for new "default" case
+* Jinja templating for hOCR output
+* Remove smooth scrolling and make saving work
+* Add legacy degradation to linegen module
+* Catch UserWarning in binarization module
+* Typo in transcription docstring
+* Don't unload clstm model after recognition
+* Make rpred BiDi- and RTL-compatible
+* Add new back translation routine
+* Add python-bidi to requirements
+* Add helper function for proper RTL codepoint ordering
+* Add transcription interface to CLI
+* Remove subcommand-less invocation
+
+0.7.7
+-----
+
+* Fix example in the documentation
+* Correctly create app\_dir for retrieval
+* advanced\_linegen stuff from the stash
+* Add strip and max\_length option to linegen
+* Add renormalization switch to ketos linegen
+* Reimplement line renderers using ctypes
+* Add vext.gi for linegen
+* Documentation for ketos linegen
+* Deal with affine transformation changing image dims
+* Crop image using pillow as get\_pixel\_extents is buggy
+* fontconfig template for custom fonts
+* Add preliminary line degradation code
+* Add ketos command for training related tasks
+* Add KrakenCairoSurfaceException
+* Add help texts to subcommands
+* Add degradation function to linegen module
+* Add per-file license headers
+* Add distortion/degradation from ocropy-linegen
+* First draft of pango based artifical line generation utility
+* Header for linegen work
+
+0.7.6
+-----
+
+* requests needs 'params' argument when passing parameters in url
+* Check input lines for emptyness
+
+0.7.5
+-----
+
+* Pin protobuf version
+* More transcription interfac work
+* Finally fix bounding boxes
+* Rough transcription interface
+
+0.7.4
+-----
+
+* Increased robustness for recognition
+* Ignore the LSTM maxlen parameter
+
+0.7.3
+-----
+
+* Correctly select confidences
+* Calculate bounding boxes correctly once and for all
+* Don't include class 0 cuts for bounding boxes
+* Fix output location properly this time
+* Fix automatic conversion of models
+* Fix calculation of bounding boxes
+* Fix output of segmenter
+* Use app dir storage instead of "POSIX"
+* Really check that image is not empty
+* Ensure model directory exists before writing to it
+
+0.7.2
+-----
+
+* Remove in-place modification causing an exception
+
+0.7.1
+-----
+
+* Correctly decode incoming data on python 3
+* Add correct click version to requirements.txt
+
+0.7
+---
+
+* Change default model
+* Make CI work again
+* Update documentation for new protobuf models
+* Fix tests and python 3 compatibility
+* Remove h5py from requirements
+* Delete erroneous protoc output
+* Get rid of HDF5 models and introduce new protobuf serialization
+* Add documentation to public repository
+* Rename subcommand function because of collisions
+* Add subcommands dealing with the model repository
+* ocropy got rid of a lot of spagetti code, too
+
+0.6.3
+-----
+
+* Make verbose output switch do something again
+* Revert "Add 3.5 to CI"
+* Add 3.5 to CI
+
+0.6.2
+-----
+
+* Remove support for bz2ipped models
+* Update docs
+
+0.6.1
+-----
+
+* Rip out the parallelization code
+* Buffer reads off gzipped/bzipped pyrnn model
+* Add support for CLSTM models
+
+0.6
+---
+
+* Document new behavior
+* Update README with new CLI syntax
+* Default to binarize/segment/ocr without subcommands
+* Skip tests only supported in python 2.7 on python 3
+* Raise correct exception when using python 3
+* Catch all exceptions in load\_pyrnn
+
+0.5
+---
+
+* Paralellize execution of subcommands and make them chainable
+* Add Flake8 section to setup.cfg
+* Armin seems to be able to keep an API consistent across releases
+* Making everything PEP8 compatible again
+* Smallest possible test models (6.8MB o.O)
+* More tests
+* Replace Lovecraftian horror that was the old download progress bar
+
+0.4.7
+-----
+
+* Actually skip line if normalization fails
+* Yield empty records when line can't be normalized
+
+0.4.6
+-----
+
+* Raise exception when loading models failed
+
+0.4.5
+-----
+
+* Fix off-by-one error in ocr\_record class
+* Fix exception in download command
+
+0.4.4
+-----
+
+* Unpin dependencies
+
+0.4.3
+-----
+
+* Link to new website
+* Create model directory if it doesn't already exist
+* Fix minor unit64->uint64 typo
+* Reduce requirements a little
+
+0.4.2
+-----
+
+* Temporarily install Cython on Travis
+* Drop six requirement
+
+0.4.1
+-----
+
+* Add we support python 3.3. too
+* Update travis file
+
+0.4.0
+-----
+
+* Add trove classifier
+* Explanatory note on python 3
+* Fix version number with python 3
+* Yay we're universal now
+* Make unpickling on python2 possible again
+* And fix python 2 bugs in click
+* Futurize stage 2
+* Stage 1 futurizing
+
+0.3.4
+-----
+
+* s/.next/next()
+* Remove all methods related to training as we'll switch to CLSTM soonish
+* Lonely test for rpred
+* Fix unbound error when no model could be found
+* Add image needed for segmentation test harness
+* Correct inheritance of test harness
+* Tests for page segmentation/error handling
+* Binarization tests
+* Update .gitignore
+* Error handling/tests on model loading
+* Tests never worked
+* Some notes on advanced use
+* Revert "Tell pbr to skip stuff"
+* Tell pbr to skip stuff
+* gitignore
+* Download HDF5 model with download command
+* default model is even larger
+* Docs
+
+0.3.3
+-----
+
+* Add h5py to requirements file
+
+0.3.2
+-----
+
+* Fix links in readme
+* command line usage of HDF5 models
+* Fix line normalization parameter
+* Convert README to rst
+* New load\_any function
+* First work on an unified interface to trained models
+* new tool for converting pyrnns to clstm format
+* some utilities
+* py3k: Add \_\_future\_\_ imports on remaining files
+* py3k: Enable true division
+* py3k: Wrap range, map and zip in list when necessary
+* Use print function instead of statement
+* Add Travis badge to readme
+* Enable testing on Travis using Miniconda
+
+0.3.1
+-----
+
+* Our wheel is not universal
+
+0.3
+---
+
+* Remove the abomination that is native.py/nutils.py
+
+0.2.5
+-----
+
+* Update requirements file
+
+0.2.4
+-----
+
+* Hotfix for stupidity
+
+0.2.3
+-----
+
+* Refactor some more code
+* Preinstall of numpy is no longer necessary
+
+0.2.2
+-----
+
+* Update requirements file
+
+0.2.1
+-----
+
+* Add some error detection and handling to load\_rnn
+* Rename invalid model exception
+* Create test files
+* Refactor output of rpred, add separate dewarp function
+
+0.2.0
+-----
+
+* Complete but relatively untested hocr output
+* Some preliminary hOCR output
+* Calculate character bounding boxes
+
+0.1.0
+-----
+
+* Build wheel
+* Add license
+* Change behavior of cli
+* Update requirements.txt
+* Note that python package building is a serious case of wtf
+* Some more initial work
+* Initial commit

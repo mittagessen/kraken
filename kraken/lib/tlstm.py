@@ -16,7 +16,8 @@ from torch.autograd import Variable
 
 import numpy as np
 
-import clstm_pb2
+import kraken.lib.lstm
+from kraken.lib import clstm_pb2
 
 
 from warpctc_pytorch import CTCLoss
@@ -101,7 +102,7 @@ class TlstmSeqRecognizer(kraken.lib.lstm.SeqRecognizer):
         self.rnn = TBIDILSTM(ninput, nhidden, noutput)
         self.setLearningRate()
         self.trial = 0
-	self.mode = 'clstm'
+        self.mode = 'clstm'
         self.criterion = CTCLoss()
         self.cuda_available = cuda
         if self.cuda_available:
@@ -255,7 +256,7 @@ class TlstmSeqRecognizer(kraken.lib.lstm.SeqRecognizer):
         
     def translate_back(self, output):
         if self.mode == 'clstm_compatibility':
-            return lstm.translate_back(output.exp().cpu().squeeze().data.numpy())
+            return kraken.lib.lstm.translate_back(output.exp().cpu().squeeze().data.numpy())
 
         _, preds = output.cpu().max(2) # max() outputs values +1 when on gpu. why?
         dec = preds.squeeze(2).transpose(1,0).contiguous().view(-1).data
@@ -267,19 +268,18 @@ class TlstmSeqRecognizer(kraken.lib.lstm.SeqRecognizer):
 
     def translate_back_locations(self, output):
         if self.mode == 'clstm_compatibility':
-            return lstm.translate_back_locations(output.exp().cpu().squeeze().data.numpy())
+            return kraken.lib.lstm.translate_back_locations(output.exp().cpu().squeeze().data.numpy())
 
-        val, preds = out.cpu().max(2) # max() outputs values +1 when on gpu. why?
+        val, preds = output.cpu().max(2) # max() outputs values +1 when on gpu. why?
         dec = preds.squeeze(2).transpose(1,0).contiguous().view(-1).data
         char_list = []
-        start = 0
+        start = None
         for i in range(len(dec)):
-            if dec[i] != 0 and (not (i > 0 and dec[i-1] == dec[i])):
+            if start is None and dec[i] != 0 and (not (i > 0 and dec[i-1] == dec[i])):
                 start = i
                 code = dec[i]
-            if not dec[i] and start:
-                char_list.append((code, start, i, val[start:i].max().exp().data[-1]))
-                start = 0
+            if start is not None and (dec[i-1] != dec[i]):
+                char_list.append((code, start, i, val[start:i+1].max().exp().data[-1]))
         return char_list
 
 
@@ -294,7 +294,7 @@ class TlstmSeqRecognizer(kraken.lib.lstm.SeqRecognizer):
         codes = self.translate_back(out)
         #codes = lstm.translate_back(out.exp().cpu().squeeze().data.numpy())
         res = ''.join(self.codec.decode(codes))
-        return res.strip()
+        return res
     
     def trainSequence(self, line, labels, update=1):        
         line = Variable(torch.from_numpy(line.reshape(-1, 1, self.rnn.ninput).astype('float32')), requires_grad=True)
@@ -332,7 +332,7 @@ class TlstmSeqRecognizer(kraken.lib.lstm.SeqRecognizer):
     def trainString(self, line, s, update=1):
         labels = self.codec.encode(s)
         cls = self.trainSequence(line, labels)
-        return ''.join(self.codec.decode(cls)).strip()
+        return ''.join(self.codec.decode(cls))
     
     def setLearningRate(self, rate=1e-4, momentum=0.9):
         self.rnn.learning_rate = rate
