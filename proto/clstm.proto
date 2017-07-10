@@ -1,0 +1,26 @@
+syntax = "proto2";
+
+package clstm;
+
+message KeyValue {
+    required string key = 1;
+    required string value = 2;
+}
+
+message Array {
+    optional string name = 1;
+    repeated int32 dim = 2;
+    repeated float value = 3;
+}
+
+message NetworkProto {
+    required string kind = 1;
+    optional string name = 2;
+    required int32 ninput = 10;
+    required int32 noutput = 11;
+    repeated int32 icodec = 12;
+    repeated int32 codec = 13;
+    repeated KeyValue attribute = 20;
+    repeated Array weights = 30;
+    repeated NetworkProto sub = 40;
+}
