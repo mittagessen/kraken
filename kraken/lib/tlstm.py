@@ -119,7 +119,7 @@ class TlstmSeqRecognizer(kraken.lib.lstm.SeqRecognizer):
     def save_model(self, path):
         network = clstm_pb2.NetworkProto(kind='Stacked', ninput=self.rnn.ninput, noutput = self.rnn.noutput)
         
-        network.codec.extend([0]+[ord(c) for c in newmodel.codec.code2char.values()][1:])
+        network.codec.extend([0]+[ord(c) for c in self.codec.code2char.values()][1:])
         
         network.attribute.extend([
             clstm_pb2.KeyValue(key='kind', value='bidi'),
