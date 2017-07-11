@@ -233,7 +233,7 @@ def ocr(ctx, model, multi_model, pad, reorder, serialization, text_direction, li
     # ~/.kraken
     if conv is True:
         search.insert(0, os.path.join(click.get_app_dir(APP_NAME),
-                      os.path.basename(os.path.splitext(model)[0]) + '.hdf5'))
+                      os.path.basename(os.path.splitext(model)[0]) + '.pronn'))
     location = None
     for loc in search:
         if os.path.isfile(loc):
