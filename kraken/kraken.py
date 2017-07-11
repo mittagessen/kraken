@@ -66,7 +66,7 @@ def binarizer(threshold, zoom, escale, border, perc, range, low, high, base_imag
     click.secho(u'\u2713', fg='green')
 
 
-def segmenter(text_direction, scale, maxcolseps, black_colseps, base_image, input, output):
+def segmenter(text_direction, script_detect, scale, maxcolseps, black_colseps, base_image, input, output):
     try:
         im = Image.open(input)
     except IOError as e:
@@ -74,6 +74,8 @@ def segmenter(text_direction, scale, maxcolseps, black_colseps, base_image, inpu
     click.echo('Segmenting\t', nl=False)
     try:
         res = pageseg.segment(im, text_direction, scale, maxcolseps, black_colseps)
+        if script_detect:
+            res = detect_scripts(im, res)
     except:
         click.secho(u'\u2717', fg='red')
         raise
@@ -167,20 +169,37 @@ def binarize(threshold, zoom, escale, border, perc, range, low, high):
 @click.option('-d', '--text-direction', default='horizontal-tb',
               type=click.Choice(['horizontal-tb', 'vertical-lr', 'vertical-rl']),
               help='Sets principal text direction')
+@click.option('-s/-n', '--script-detect/--no-script-detect', default=True,
+              help='Enable script detection on segmenter output')
 @click.option('--scale', default=None, type=click.FLOAT)
 @click.option('-m', '--maxcolseps', default=2, type=click.INT)
 @click.option('-b/-w', '--black_colseps/--white_colseps', default=False)
-def segment(text_direction, scale, maxcolseps, black_colseps):
+def segment(text_direction, script_detect, scale, maxcolseps, black_colseps):
     """
     Segments page images into text lines.
     """
-    return partial(segmenter, text_direction, scale, maxcolseps, black_colseps)
+    return partial(segmenter, text_direction, script_detect, scale, maxcolseps, black_colseps)
 
+
+def validate_mm(ctx, param, value):
+    model_dict = {}
+    try:
+        for m in value.split():
+            k, v =  m.split(':')
+            model_dict[k] = v
+    except:
+        raise click.BadParameter('Mappings must be in format script:model')
+    return model_dict
+        
 
 @cli.command('ocr')
 @click.pass_context
 @click.option('-m', '--model', default=DEFAULT_MODEL, help='Path to an '
               'recognition model')
+@click.option('-mm', '--multi-model', callback=validate_mm, help='Mapping of '
+              'the form $script1:$model1 $script2:$model2 default:$modelN to '
+              'run multi-model recognition based on detected scripts. Overrides '
+              '-m parameter.')
 @click.option('-p', '--pad', type=click.INT, default=16, help='Left and right '
               'padding around lines')
 @click.option('-n', '--reorder/--no-reorder', default=True,
@@ -196,10 +215,12 @@ def segment(text_direction, scale, maxcolseps, black_colseps):
               help='JSON file containing line coordinates')
 @click.option('--enable-autoconversion/--disable-autoconversion', 'conv',
               default=True, help='Automatically convert pyrnn models to protobuf')
-def ocr(ctx, model, pad, reorder, serialization, text_direction, lines, conv):
+def ocr(ctx, model, multi_model, pad, reorder, serialization, text_direction, lines, conv):
     """
     Recognizes text in line images.
     """
+
+
     # we do the locating and loading of the model here to spare us the overhead
     # in each worker.
 
