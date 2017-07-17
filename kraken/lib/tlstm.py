@@ -149,9 +149,9 @@ class TlstmSeqRecognizer(kraken.lib.lstm.SeqRecognizer):
         weights['lstm2'] = {}
         weights['softm'] = {}
         weights['lstm1']['WGI'], weights['lstm1']['WGF'], weights['lstm1']['WCI'], weights['lstm1']['WGO'] = \
-            torch.cat([self.rnn.rnn.weight_ih_l0, self.rnn.rnn.weight_hh_l0], 1).split(100, 0)
+            torch.cat([self.rnn.rnn.weight_ih_l0, self.rnn.rnn.weight_hh_l0], 1).split(self.rnn.nhidden, 0)
         weights['lstm2']['WGI'], weights['lstm2']['WGF'], weights['lstm2']['WCI'], weights['lstm2']['WGO'] = \
-            torch.cat([self.rnn.rnn.weight_ih_l0_reverse, self.rnn.rnn.weight_hh_l0_reverse], 1).split(100, 0)
+            torch.cat([self.rnn.rnn.weight_ih_l0_reverse, self.rnn.rnn.weight_hh_l0_reverse], 1).split(self.rnn.nhidden, 0)
         weights['softm']['W1'] = self.rnn.decoder.weight
         
         for n in weights.keys():
