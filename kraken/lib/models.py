@@ -89,7 +89,7 @@ class ClstmSeqRecognizer(kraken.lib.lstm.SeqRecognizer):
         self.rnn.inputs.aset(line.astype('float32'))
         self.rnn.forward()
         self.outputs = self.rnn.outputs.array().reshape(line.shape[0], self.rnn.noutput())
-        codes = kraken.lib.lstm.translate_back(self.outputs)
+        codes = [x[0] for x in kraken.lib.lstm.translate_back_locations(self.outputs)]
         cls = clstm.Classes()
         cls.resize(len(codes))
         for i, v in enumerate(codes):
