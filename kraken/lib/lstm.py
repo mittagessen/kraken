@@ -124,7 +124,7 @@ def translate_back_locations(outputs, threshold=0.5):
         if val != 0 and start is None:
             start = idx
             p += 1
-        if val == 0 and start:
+        if val == 0 and start is not None:
             if maxima[p-1][1] == 0:
                 start = None
             else:
