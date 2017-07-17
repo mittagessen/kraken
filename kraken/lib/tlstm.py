@@ -280,6 +280,7 @@ class TlstmSeqRecognizer(kraken.lib.lstm.SeqRecognizer):
                 code = dec[i]
             if start is not None and (dec[i-1] != dec[i]):
                 char_list.append((code, start, i, val[start:i+1].max().exp().data[-1]))
+                start = None
         return char_list
 
 
@@ -291,7 +292,7 @@ class TlstmSeqRecognizer(kraken.lib.lstm.SeqRecognizer):
         
         out, _ = self.rnn.forward(line, self.rnn.init_hidden())
         self.outputs = out
-        codes = self.translate_back(out)
+        codes = [x[0] for x in self.translate_back_locations(out)]
         #codes = lstm.translate_back(out.exp().cpu().squeeze().data.numpy())
         res = ''.join(self.codec.decode(codes))
         return res

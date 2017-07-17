@@ -1,6 +1,7 @@
 CHANGES
 =======
 
+* workaround for diverging output of translate\_back and translate\_back\_locations
 * Training and OCR in Torch now enabled in the CLI
 * translate\_back\_locations; tlstm now in rpred
 * Legacy clstm now integrated
