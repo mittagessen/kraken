@@ -29,12 +29,14 @@ from PIL import Image
 from click import open_file
 from itertools import cycle
 from functools import partial
-from kraken import binarization
-from kraken import pageseg
-from kraken import rpred
-from kraken import serialization
+from collections import defaultdict
+
 from kraken import repo
+from kraken import rpred
+from kraken import pageseg
 from kraken.lib import models
+from kraken import binarization
+from kraken import serialization
 
 standard_library.install_aliases()
 warnings.simplefilter('ignore', UserWarning)
@@ -75,7 +77,7 @@ def segmenter(text_direction, script_detect, scale, maxcolseps, black_colseps, b
     try:
         res = pageseg.segment(im, text_direction, scale, maxcolseps, black_colseps)
         if script_detect:
-            res = detect_scripts(im, res)
+            res = pageseg.detect_scripts(im, res)
     except:
         click.secho(u'\u2717', fg='red')
         raise
@@ -96,7 +98,7 @@ def recognizer(model, pad, bidi_reordering, base_image, input, output, lines):
         lines = input
     with open_file(lines, 'r') as fp:
         bounds = json.load(fp)
-        it = rpred.rpred(model, im, bounds, pad, bidi_reordering=bidi_reordering)
+        it = rpred.mm_rpred(model, im, bounds, pad, bidi_reordering=bidi_reordering)
     preds = []
 
     st_time = time.time()
@@ -183,10 +185,12 @@ def segment(text_direction, script_detect, scale, maxcolseps, black_colseps):
 
 def validate_mm(ctx, param, value):
     model_dict = {}
+    if len(value) == 1 and len(value[0].split(':')) == 1:
+        return {'default': value[0]}
     try:
-        for m in value.split():
+        for m in value:
             k, v =  m.split(':')
-            model_dict[k] = v
+            model_dict[k] = os.path.expanduser(v)
     except:
         raise click.BadParameter('Mappings must be in format script:model')
     return model_dict
@@ -194,12 +198,10 @@ def validate_mm(ctx, param, value):
 
 @cli.command('ocr')
 @click.pass_context
-@click.option('-m', '--model', default=DEFAULT_MODEL, help='Path to an '
-              'recognition model')
-@click.option('-mm', '--multi-model', callback=validate_mm, help='Mapping of '
-              'the form $script1:$model1 $script2:$model2 default:$modelN to '
-              'run multi-model recognition based on detected scripts. Overrides '
-              '-m parameter.')
+@click.option('-m', '--model', default=DEFAULT_MODEL, multiple=True, callback=validate_mm,
+              help='Path to an recognition model or mapping of the form '
+              '$script1:$model1. Add multiple mappings to run multi-model '
+              'recognition based on detected scripts.')
 @click.option('-p', '--pad', type=click.INT, default=16, help='Left and right '
               'padding around lines')
 @click.option('-n', '--reorder/--no-reorder', default=True,
@@ -215,55 +217,60 @@ def validate_mm(ctx, param, value):
               help='JSON file containing line coordinates')
 @click.option('--enable-autoconversion/--disable-autoconversion', 'conv',
               default=True, help='Automatically convert pyrnn models to protobuf')
-def ocr(ctx, model, multi_model, pad, reorder, serialization, text_direction, lines, conv):
+def ocr(ctx, model, pad, reorder, serialization, text_direction, lines, conv):
     """
     Recognizes text in line images.
     """
-
-
     # we do the locating and loading of the model here to spare us the overhead
     # in each worker.
 
     # first we try to find the model in the absolue path, then ~/.kraken, then
     # LEGACY_MODEL_DIR
-    search = [model,
-              os.path.join(click.get_app_dir(APP_NAME), model),
-              os.path.join(LEGACY_MODEL_DIR, model)]
-    # if automatic conversion is enabled we look for an converted model in
-    # ~/.kraken
-    if conv is True:
-        search.insert(0, os.path.join(click.get_app_dir(APP_NAME),
-                      os.path.basename(os.path.splitext(model)[0]) + '.pronn'))
-    location = None
-    for loc in search:
-        if os.path.isfile(loc):
-            location = loc
-            break
-    if not location:
-        raise click.BadParameter('No model found')
-    click.echo('Loading RNN\t', nl=False)
-    try:
-        rnn = models.load_any(location)
-    except:
-        click.secho(u'\u2717', fg='red')
-        raise
-        ctx.exit(1)
-    click.secho(u'\u2713', fg='green')
-
-    # convert input model to protobuf
-    if conv and rnn.kind == 'pyrnn':
-        name, _ = os.path.splitext(os.path.basename(model))
-        op = os.path.join(click.get_app_dir(APP_NAME), name + '.pronn')
+    nm = {}
+    for k, v in model.iteritems():
+        search = [v,
+                  os.path.join(click.get_app_dir(APP_NAME), v),
+                  os.path.join(LEGACY_MODEL_DIR, v)]
+        # if automatic conversion is enabled we look for an converted model in
+        # ~/.kraken
+        if conv is True:
+            search.insert(0, os.path.join(click.get_app_dir(APP_NAME),
+                          os.path.basename(os.path.splitext(v)[0]) + '.pronn'))
+        location = None
+        for loc in search:
+            if os.path.isfile(loc):
+                location = loc
+                break
+        if not location:
+            raise click.BadParameter('No model for {} found'.format(k))
+        click.echo('Loading RNN {}\t'.format(k), nl=False)
         try:
-            os.makedirs(click.get_app_dir(APP_NAME))
-        except OSError:
-            pass
-        models.pyrnn_to_pronn(rnn, op)
+            rnn = models.load_any(location)
+            nm[k] = rnn
+        except:
+            click.secho(u'\u2717', fg='red')
+            raise
+            ctx.exit(1)
+        click.secho(u'\u2713', fg='green')
 
+        # convert input model to protobuf
+        if conv and rnn.kind == 'pyrnn':
+            name, _ = os.path.splitext(os.path.basename(v))
+            op = os.path.join(click.get_app_dir(APP_NAME), name + '.pronn')
+            try:
+                os.makedirs(click.get_app_dir(APP_NAME))
+            except OSError:
+                pass
+            models.pyrnn_to_pronn(rnn, op)
+
+    if 'default' in nm:
+        nn = defaultdict(lambda: nm['default'])
+        nn.update(nm)
+        nm = nn
     # set output mode
     ctx.meta['mode'] = serialization
     ctx.meta['text_direction'] = text_direction
-    return partial(recognizer, model=rnn, pad=pad, bidi_reordering=reorder, lines=lines)
+    return partial(recognizer, model=nm, pad=pad, bidi_reordering=reorder, lines=lines)
 
 
 @cli.command('show')

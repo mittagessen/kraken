@@ -126,7 +126,8 @@ def extract_boxes(im, bounds):
     else:
         angle = 0
     for box in bounds['boxes']:
-        box = list(box)
+        if isinstance(box, tuple):
+            box = list(box)
         if (box < [0, 0, 0, 0] or box[::2] > [im.size[0], im.size[0]] or
            box[1::2] > [im.size[1], im.size[1]]):
             raise KrakenInputException('Line outside of image bounds')
@@ -154,7 +155,7 @@ def dewarp(normalizer, im):
     return array2pil(line)
 
 
-def mm_rpred(nets, im, bounds, pad=16, line_normaliztion=True, bidi_reordering=True):
+def mm_rpred(nets, im, bounds, pad=16, line_normalization=True, bidi_reordering=True):
     """
     Multi-model version of kraken.rpred.rpred.
 
@@ -185,12 +186,11 @@ def mm_rpred(nets, im, bounds, pad=16, line_normaliztion=True, bidi_reordering=T
         An ocr_record containing the recognized text, absolute character
         positions, and confidence values for each character.
     """
-
     for line in bounds['boxes']:
         rec = ocr_record('', [], [])
         for script, (box, coords) in zip(map(lambda x: x[0], line),
                                          extract_boxes(im, {'text_direction': bounds['text_direction'], 
-                                                            'boxes': [map(lambda x: x[1], line)]})):
+                                                            'boxes': map(lambda x: x[1], line)})):
             # check if boxes are non-zero in any dimension
             if sum(coords[::2]) == 0 or coords[3] - coords[1] == 0:
                 continue
@@ -204,15 +204,14 @@ def mm_rpred(nets, im, bounds, pad=16, line_normaliztion=True, bidi_reordering=T
                 try:
                     lnorm = getattr(nets[script], 'lnorm', CenterNormalizer())
                     box = dewarp(lnorm, box)
-                except:
+                except Exception as e:
                     continue
             line = pil2array(box)
             line = lstm.prepare_line(line, pad)
             pred = nets[script].predictString(line)
-    
             # calculate recognized LSTM locations of characters
-            scale = len(raw_line.T)/(len(network.outputs)-2 * pad)
-            result = lstm.translate_back_locations(network.outputs)
+            scale = len(raw_line.T)/(len(nets[script].outputs)-2 * pad)
+            result = lstm.translate_back_locations(nets[script].outputs)
             pos = []
             conf = []
     
@@ -223,8 +222,8 @@ def mm_rpred(nets, im, bounds, pad=16, line_normaliztion=True, bidi_reordering=T
                     pos.append((coords[0], coords[1] + int((start-pad)*scale), coords[2], coords[1] + int((end-pad/2)*scale)))
                 conf.append(c)
             rec.prediction += pred
-            rec.cuts.append(cuts)
-            rec.confidences.append(conf)
+            rec.cuts.extend(pos)
+            rec.confidences.extend(conf)
         if bidi_reordering:
             yield bidi_record(rec)
         else:
