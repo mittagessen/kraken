@@ -157,6 +157,11 @@ page segmentation:
 All commands and their parameters are documented, just add the standard
 ``--help`` flag for further information.
 
+Training Tutorial
+=================
+
+There is a training tutorial at :doc:`training`.
+
 .. _license:
 
 License
