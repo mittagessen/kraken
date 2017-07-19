@@ -42,7 +42,7 @@ standard_library.install_aliases()
 warnings.simplefilter('ignore', UserWarning)
 
 APP_NAME = 'kraken'
-DEFAULT_MODEL = 'en-default.pronn'
+DEFAULT_MODEL = ['en-default.pronn']
 LEGACY_MODEL_DIR = '/usr/local/share/ocropus'
 
 spinner = cycle([u'⣾', u'⣽', u'⣻', u'⢿', u'⡿', u'⣟', u'⣯', u'⣷'])
