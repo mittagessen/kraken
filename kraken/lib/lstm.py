@@ -306,6 +306,10 @@ class SeqRecognizer(Network):
         self.lstm = BIDILSTM(ninput,nstates,noutput)
         self.normalize = normalize
         self.codec = codec
+    def translate_back(self, output):
+        return translate_back(output)
+    def translate_back_locations(self, output):
+        return translate_back_locations(output)
     def predictSequence(self,xs):
         "Predict an integer sequence of codes."
         assert xs.shape[1]==self.Ni,"wrong image height (image: %d, expected: %d)"%(xs.shape[1],self.Ni)

@@ -37,6 +37,8 @@ from kraken import pageseg
 from kraken import transcrib
 from kraken import binarization
 from kraken.lib import models
+from kraken.lib import tlstm
+from kraken.lib.lstm import Codec
 from kraken.train import GroundTruthContainer, compute_error
 from kraken.lib.exceptions import KrakenCairoSurfaceException
 from kraken.lib.exceptions import KrakenInputException
@@ -84,9 +86,6 @@ def train(ctx, lineheight, pad, hiddensize, output, load, savefreq, report,
     Trains a model from image-text pairs.
     """
     st_time = time.time()
-    if load is None:
-        click.echo('Training from scratch not yet supported.')
-        ctx.exit(1)
     if ctx.meta['verbose'] > 0:
         click.echo(u'[{:2.4f}] Building ground truth set from {} line images'.format(time.time() - st_time, len(ground_truth)))
     else:
@@ -107,7 +106,7 @@ def train(ctx, lineheight, pad, hiddensize, output, load, savefreq, report,
         click.echo(u'[{:2.4f}] Training set {} lines, test set {} lines, alphabet {} symbols'.format(time.time() - st_time, len(gt_set.training_set), len(gt_set.test_set), len(gt_set.training_alphabet)))
     if ctx.meta['verbose'] > 1:
         click.echo(u'[{:2.4f}] grapheme\tcount'.format(time.time() - st_time))
-        for k, v in sorted(gt_set.training_alphabet.iteritems(), key=lambda(x): x[1], reverse=True):
+        for k, v in sorted(gt_set.training_alphabet.iteritems(), key=lambda x: x[1], reverse=True):
             if unicodedata.combining(k) or k.isspace():
                 k = unicodedata.name(k)
             else:
@@ -124,7 +123,7 @@ def train(ctx, lineheight, pad, hiddensize, output, load, savefreq, report,
         else:
             spin('Loading model')
 
-        rnn = models.ClstmSeqRecognizer(load)
+        rnn = tlstm.TlstmSeqRecognizer(load)
 
         if not ctx.meta['verbose'] > 0:
             click.secho(u'\b\u2713', fg='green', nl=False)
@@ -135,7 +134,15 @@ def train(ctx, lineheight, pad, hiddensize, output, load, savefreq, report,
             click.echo(u'[{:2.4f}] Creating new model with line height {}, {} hidden units, and {} outputs'.format(time.time() - st_time, lineheight, hiddensize, codec))
         else:
             spin('Initializing model')
-        rnn = models.ClstmSeqRecognizer.init_model(lineheight, hiddensize, gt_set.training_alphabet.keys())
+
+        newcodec = Codec()
+        code2char, char2code = {}, {}
+        for code, char in enumerate([126] + [ord(c) for c in sorted(list(gt_set.training_alphabet.keys()))]):
+            code2char[code] = chr(char)
+            char2code[chr(char)] = code
+        newcodec.code2char = code2char
+        newcodec.char2code = char2code
+        rnn = tlstm.TlstmSeqRecognizer.init_model(lineheight, hiddensize, len(newcodec.code2char), newcodec)
         if not ctx.meta['verbose']:
             click.secho(u'\b\u2713', fg='green', nl=False)
             click.echo('\033[?25h\n', nl=False)
@@ -144,7 +151,7 @@ def train(ctx, lineheight, pad, hiddensize, output, load, savefreq, report,
             click.echo(u'[{:2.4f}] Setting learning rate ({}) and momentum ({}) '.format(time.time() - st_time, lrate, momentum))
     rnn.setLearningRate(lrate, momentum)
 
-    for trial in xrange(ntrain):
+    for trial in range(ntrain):
         line, s = gt_set.sample()
         res = rnn.trainString(line, s)
         if ctx.meta['verbose'] > 2:

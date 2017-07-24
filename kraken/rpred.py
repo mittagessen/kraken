@@ -282,7 +282,7 @@ def rpred(network, im, bounds, pad=16, line_normalization=True, bidi_reordering=
 
         # calculate recognized LSTM locations of characters
         scale = len(raw_line.T)/(len(network.outputs)-2 * pad)
-        result = lstm.translate_back_locations(network.outputs)
+        result = network.translate_back_locations(network.outputs)
         pos = []
         conf = []
 
