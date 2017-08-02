@@ -22,18 +22,20 @@ Features
 
 kraken's main features are:
 
-  - Explicit input/output handling
+  - Script detection and multi-script recognition support
+  - `Right-to-Left <https://en.wikipedia.org/wiki/Right-to-left>`_, `BiDi
+    <https://en.wikipedia.org/wiki/Bi-directional_text>`_, and Top-to-Bottom
+    script support
+  - `ALTO <https://www.loc.gov/standards/alto/>`_ and hOCR output
   - Word bounding boxes and character cuts
-  - Removal of runtime dependency on gcc
   - `Public repository <https://github.com/mittagessen/kraken-models>`_ of model files
   - :ref:`Lightweight model files <models>`
   - Support for `clstm <https://github.com/tmbdev/clstm>`_ models
 
 Currently missing or underdocumented are:
 
-  - Clean public API 
   - Tests
-  - New training interface (certainly only for CLSTM)
+  - New training interface
 
 All functionality not pertaining to OCR and prerequisite steps has been
 removed, i.e. no more error rate measuring, etc.
@@ -145,14 +147,14 @@ To segment a binarized image into reading-order sorted lines:
 
 ::
 
-  $ kraken -i bw.tif lines.txt segment
+  $ kraken -i bw.tif lines.json segment
 
 To OCR a binarized image using the default RNN and the previously generated
 page segmentation:
 
 ::
 
-  $ kraken -i bw.tif image.txt ocr --lines lines.txt
+  $ kraken -i bw.tif image.txt ocr --lines lines.json
 
 All commands and their parameters are documented, just add the standard
 ``--help`` flag for further information.

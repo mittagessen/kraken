@@ -54,36 +54,66 @@ Page segmentation
 
 Page segmentation is mostly parameterless, although a switch to change the
 color of column separators has been retained. The segmentation is written as a
-plain text CSV file. Each record corresponds to a single line bounding box in
-the format (x0, y0, x1, y1). Lines are printed in reading order:
+`JSON <http://json.org/>`_ file containing bounding boxes in reading order and
+the general text direction (horizontal, i.e. LTR or RTL text in top-to-bottom
+reading order or vertical-ltr/rtl for vertical lines read from left-to-right or
+right-to-left).
+
+Each list in the `boxes` field corresponds to a topographical line and contains
+one or more bounding boxes of a particular script. Identifiers are `ISO 15924
+<http://www.unicode.org/iso15924/iso15924-codes.html>`_ 4 character codes.
+Script-aware page segmentation is a prerequisite for multi-script recognition.
 
 .. code-block:: console
 
         $ kraken -i 14.tif lines.txt segment
-        $ cat lines.txt
-        422,188,2158,327
-        421,328,2158,430
-        415,464,2153,599
-        412,604,2153,745
-        406,744,2152,882
-        405,877,2144,1020
-        403,1020,2139,1150
-        399,1160,2136,1297
-        394,1292,2137,1435
-        391,1431,2131,1572
-        385,1566,2128,1709
-        379,1710,2128,1830
-        383,1854,2126,1986
-        370,1985,2125,2127
-        369,2123,2118,2268
-        369,2268,2111,2407
-        366,2401,2116,2514
-        363,2541,2107,2682
-        364,2677,2109,2819
-        358,2815,2106,2956
-        354,2955,2098,3092
-        355,3092,2094,3230
-        1859,3233,2084,3354
+        $ cat lines.json
+	{
+	   "boxes" : [
+            [
+                ["Grek", [561, 216, 1626,309]]
+            ],
+            [
+                ["Latn", [2172, 197, 2424, 244]]
+            ],
+            [
+                ["Grek", [1678, 221, 2236, 320]],
+                ["Arab", [2241, 221, 2302, 320]]
+            ],
+            
+                ["Grek", [412, 318, 2215, 416]],
+                ["Latn", [2208, 318, 2424, 416]]
+            ],
+            ...
+   	   ],
+           "text_direction" : "horizontal-tb"
+	}
+
+Script detection is automatically enabled when the CLSTM bindings are
+installed. Without the bindings or by explicitly disabling script detection the
+`boxes` field will contain only a list of line bounding boxes:
+
+.. code-block:: console
+
+	      [546, 216, 1626, 309],
+	      [2169, 197, 2423, 244],
+	      [1676, 221, 2293, 320],
+              ...
+	      [503, 2641, 848, 2681]
+
+Available page segmentation parameters are:
+
+-d, --text-direction
+    Sets principal text direction. Valid values are `horizontal-tb`,
+    `vertical-lr`, and `vertical-rl`.
+-s, --script-detect / -n, --no-script-detect
+    Enables/Disables script detection on segmenter output.
+--scale FLOAT
+    TODO
+-m, --maxcolseps 
+    Maximum number of columns in the input document. Set to `0` for uni-column layouts.
+-b, --black_colseps / -w, --white_colseps
+    Switch to black column separators.
 
 Model repository
 ----------------
@@ -144,6 +174,25 @@ that image, and a pyrnn or protobuf model. In particular there is no
 requirement to use the page segmentation algorithm contained in the ``segment``
 subcommand or the binarization provided by kraken. 
 
+Multi-script recognition is possible by supplying a script-annotated
+segmentation and a mapping between scripts and models:
+
+.. code-block:: console
+
+        $ kraken -i ... ... ocr -m Grek:porson.clstm -m Latn:antiqua.clstm
+
+All polytonic Greek text portions will be recognized using the `porson.clstm`
+model while Latin text will be fed into the `antiqua.clstm` model. It is
+possible to define a fallback model that other text will be fed to:
+
+.. code-block:: console
+
+        $ kraken -i ... ... ocr -m ... -m ... -m default:porson.clstm
+
+Because script detection is not 100% reliable and sometimes single characters
+are misclassified, the main text should usually be recognized using the
+`default` model and secondary scripts explicitly assigned other models.
+
 The ``ocr`` subcommand is able to serialize the recognition results either as
 plain text (default), as `hOCR <http://hocr.info>`_, or into `ALTO
 <http://www.loc.gov/standards/alto/>`_ containing additional metadata such as
@@ -157,11 +206,11 @@ bounding boxes and confidences:
 
 hOCR output is slightly different from hOCR files produced by ocropus. Each
 ``ocr_line`` span contains not only the bounding box of the line but also
-character cuts (``cuts`` attribute) indicating the coordinates of each
-character. In each line sequences of alphanumeric (in the unicode sense)
-character are put into ``ocrx_word`` spans. Non-alphanumeric sequences are
-described by ``ocrx_word`` spans. Both have bounding boxes as attributes and
-the recognition confidence for each character in the ``x_conf`` attribute.
+character boxes (``x_bboxes`` attribute) indicating the coordinates of each
+character. In each line alternating sequences of alphanumeric and
+non-alphanumeric (in the unicode sense) characters are put into ``ocrx_word``
+spans. Both have bounding boxes as attributes and the recognition confidence
+for each character in the ``x_conf`` attribute.
 
 Paragraph detection has been removed as it was deemed to be unduly dependent on
 certain typographic features which may not be valid for your input.

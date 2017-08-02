@@ -14,15 +14,13 @@ kraken.binarization module
 
 .. automodule:: kraken.binarization
     :members:
-    :undoc-members:
     :show-inheritance:
 
-kraken.serialize module
------------------------
+kraken.serialization module
+---------------------------
 
-.. automodule:: kraken.serialize
+.. automodule:: kraken.serialization
     :members:
-    :undoc-members:
     :show-inheritance:
 
 kraken.pageseg module
@@ -30,7 +28,6 @@ kraken.pageseg module
 
 .. automodule:: kraken.pageseg
     :members:
-    :undoc-members:
     :show-inheritance:
 
 kraken.rpred module
@@ -38,7 +35,6 @@ kraken.rpred module
 
 .. automodule:: kraken.rpred
     :members:
-    :undoc-members:
     :show-inheritance:
 
 kraken.transcrib module
@@ -46,7 +42,6 @@ kraken.transcrib module
 
 .. automodule:: kraken.transcrib
     :members:
-    :undoc-members:
     :show-inheritance:
 
 kraken.train module
@@ -54,7 +49,6 @@ kraken.train module
 
 .. automodule:: kraken.train
     :members:
-    :undoc-members:
     :show-inheritance:
 
 kraken.linegen module
@@ -62,5 +56,4 @@ kraken.linegen module
 
 .. automodule:: kraken.linegen
     :members:
-    :undoc-members:
     :show-inheritance:
