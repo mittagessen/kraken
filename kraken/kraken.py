@@ -100,19 +100,25 @@ def recognizer(model, pad, bidi_reordering, base_image, input, output, lines):
 
     ctx = click.get_current_context()
 
+    scripts = None
     if not lines:
         lines = input
     with open_file(lines, 'r') as fp:
         bounds = json.load(fp)
         # script detection
-        if len(bounds['boxes'][0]) == 4:
-            if ctx.meta['verbose'] > 0:
-                click.echo(u'[{:2.4f}] Executing mono-script recognition'.format(time.time() - st_time))
-            it = rpred.rpred(model['default'], im, bounds, pad, bidi_reordering=bidi_reordering)
-        else:
+        if bounds['script_detection']:
+            scripts = set()
+            for l in bounds['boxes']:
+                for t in l:
+                    scripts.add(t[0])
             if ctx.meta['verbose'] > 0:
                 click.echo(u'[{:2.4f}] Executing multi-script recognition'.format(time.time() - st_time))
             it = rpred.mm_rpred(model, im, bounds, pad, bidi_reordering=bidi_reordering)
+        else:
+            if ctx.meta['verbose'] > 0:
+                click.echo(u'[{:2.4f}] Executing mono-script recognition'.format(time.time() - st_time))
+            it = rpred.rpred(model['default'], im, bounds, pad, bidi_reordering=bidi_reordering)
+
     preds = []
 
     st_time = time.time()
@@ -134,7 +140,7 @@ def recognizer(model, pad, bidi_reordering, base_image, input, output, lines):
         if ctx.meta['mode'] != 'text':
             fp.write(serialization.serialize(preds, base_image,
                      Image.open(base_image).size, ctx.meta['text_direction'],
-                     ctx.meta['mode']))
+                     scripts, ctx.meta['mode']))
         else:
             fp.write(u'\n'.join(s.prediction for s in preds))
         if not ctx.meta['verbose']:

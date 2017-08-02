@@ -406,7 +406,7 @@ def segment(im, text_direction='horizontal-tb', scale=None, maxcolseps=2, black_
     lsort = topsort(order)
     lines = [lines[i].bounds for i in lsort]
     lines = [(s2.start, s1.start, s2.stop, s1.stop) for s1, s2 in lines]
-    return {'text_direction': text_direction, 'boxes':  rotate_lines(lines, 360-angle, offset).tolist()}
+    return {'text_direction': text_direction, 'boxes':  rotate_lines(lines, 360-angle, offset).tolist(), 'script_detection': False}
 
 
 def detect_scripts(im, bounds, model=None):
@@ -424,11 +424,11 @@ def detect_scripts(im, bounds, model=None):
         model (str): Location of the script classification model or None for default.
 
     Returns:
-        {'text_direction': '$dir', 'boxes': [[(script, (x1, y1, x2, y2)),...]]}: A
-        dictionary containing the text direction and a list of lists of reading
-        order sorted bounding boxes under the key 'boxes' with each list
-        containing the script segmentation of a single line. Script is a
-        ISO15924 4 character identifier.
+        {'script_detection': True, 'text_direction': '$dir', 'boxes':
+        [[(script, (x1, y1, x2, y2)),...]]}: A dictionary containing the text
+        direction and a list of lists of reading order sorted bounding boxes
+        under the key 'boxes' with each list containing the script segmentation
+        of a single line. Script is a ISO15924 4 character identifier.
 
     Raises:
         KrakenInputException if the input image is not binarized or the text
@@ -465,4 +465,4 @@ def detect_scripts(im, bounds, model=None):
             t.append((n2s[str(k)], b))
         preds.append(t)
 
-    return {'boxes': preds, 'text_direction': bounds['text_direction']}
+    return {'boxes': preds, 'text_direction': bounds['text_direction'], 'script_detection': True}
