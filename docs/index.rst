@@ -56,7 +56,7 @@ installed using:
 
 .. code-block:: console
 
-        # apt-get install libpangocairo-1.0 libxml2 libblas3 liblapack3 python-dev
+        # apt install libpangocairo-1.0 libxml2 libblas3 liblapack3 python-dev python-pip
 
 If `clstm <https://github.com/tmbdev/clstm>`_ support is desired (highly
 recommended) the associated python extension has to be build and installed.
