@@ -16,7 +16,7 @@ body {
 	display: block; /* For Firefox */
 }
 
-li[contenteditable=true]:hover, li[contenteditable=true].hovered {
+li[contenteditable=true]:hover, li[contenteditable=true].hovered, span[contenteditable=true]:hover, span[contenteditable=true].hovered {
 	border: 1px solid #ff0000;
 }
 

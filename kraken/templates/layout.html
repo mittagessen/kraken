@@ -34,6 +34,7 @@
 
 				// create mouseover effect on text fields
 				$('li[contenteditable=true], span').mouseover(function(e) {
+					console.log(this.id);
 					$('a.rect[alt=' + this.id + ']').addClass("hovered");
 				}).mouseout(function(e) {
 					$('a.rect[alt=' + this.id + ']').removeClass("hovered");
@@ -90,7 +91,7 @@
 						{% endfor %}
 					{% else %}
 						{% for line in page.lines %}
-							<a class="rect" alt="line_{{ line.index }}" href="" title="" style="position: absolute; left: {{ line.left }}%; top: {{ line.top }}%; width: {{ line.width }}%; height: {{ line.height }}%; z-index: 2;"></a>
+						<a class="rect" alt="line_{{ line.index }}" href="" title="" style="position: absolute; left: {{ line.left }}%; top: {{ line.top }}%; width: {{ line.width }}%; height: {{ line.height }}%; z-index: 2;"></a>
 						{% endfor %}
 					{% endif %}
 					{% endfor %}
