@@ -247,7 +247,7 @@ def ocr(ctx, model, pad, reorder, serialization, text_direction, lines, conv):
     # first we try to find the model in the absolue path, then ~/.kraken, then
     # LEGACY_MODEL_DIR
     nm = {}
-    for k, v in model.iteritems():
+    for k, v in model.items():
         search = [v,
                   os.path.join(click.get_app_dir(APP_NAME), v),
                   os.path.join(LEGACY_MODEL_DIR, v)]
