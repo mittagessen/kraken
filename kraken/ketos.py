@@ -295,7 +295,7 @@ def transcription(ctx, text_direction, scale, maxcolseps, black_colseps, font,
             else:
                 click.secho(u'\b\u2713', fg='green', nl=False)
                 click.echo('\033[?25h\n', nl=False)
-            ti.add_page(im, records=preds)
+            ti.add_page(im, res, records=preds)
         else:
             ti.add_page(im, res)
         fp.close()

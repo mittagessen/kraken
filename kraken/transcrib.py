@@ -56,6 +56,7 @@ class TranscriptionInterface(object):
 
         Args:
             im (PIL.Image): Input image
+            segmentation (dict): Output of the segment method.
             records (list): A list of ocr_record objects.
         """
         page = {}
@@ -66,8 +67,8 @@ class TranscriptionInterface(object):
         page['img'] = 'data:image/png;base64,' + base64.b64encode(fd.getvalue()).decode('ascii')
         page['lines'] = []
         if records:
-            for record in records:
-                bbox = max_bbox(record.cuts)
+            self.text_direction = segmentation['text_direction']
+            for record, bbox in zip(records, segmentation['boxes']):
                 page['lines'].append({'index': self.line_idx, 'text': record.prediction,
                                       'left': 100*int(bbox[0]) / im.size[0],
                                       'top': 100*int(bbox[1]) / im.size[1],
