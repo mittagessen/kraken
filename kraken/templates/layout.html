@@ -85,30 +85,18 @@
 				<div class="img_container">
 					<img style="width: 100%;" src="{{ page.img }}" alt="photo"/>
 					{% for line in page.lines %}
-					{% if line.recognition %}
-						{% for segment in line.recognition %}
-						<a class="rect" alt="segment_{{ segment.index }}" href="" style="position: absolute; left: {{ segment.left }}%; top: {{ segment.top }}%; width: {{ segment.width }}%; height: {{ segment.height }}%; z-index: 2;"></a>
-						{% endfor %}
-					{% else %}
-						{% for line in page.lines %}
 						<a class="rect" alt="line_{{ line.index }}" href="" title="" style="position: absolute; left: {{ line.left }}%; top: {{ line.top }}%; width: {{ line.width }}%; height: {{ line.height }}%; z-index: 2;"></a>
-						{% endfor %}
-					{% endif %}
 					{% endfor %}
 				</div>
 			</div>
 			<div class="column">
 				<ul>
 				{% for line in page.lines %}
-					{% if line.recognition %}
-					<li data-bbox="{{ line.bbox }}">
-						{% for segment in line.recognition %}
-						<span id="segment_{{ segment.index }}" contenteditable="true" spellcheck="true" data-bbox="{{ segment.bbox }}">{{ segment.text }}</span>
-						{% endfor %}
+					<li id="line_{{ line.index }}" contenteditable="true" spellcheck="true" data-bbox="{{ line.bbox }}" data-placeholder="Enter text for line {{ line.index }}">
+						{% if line.text %}
+							{{ line.text }}
+						{% endif %}
 					</li>
-					{% else %}
-					<li id="line_{{ line.index }}" contenteditable="true" spellcheck="true" data-bbox="{{ line.bbox }}" data-placeholder="Enter text for line {{ line.index }}"></li>
-					{% endif %}
 				{% endfor %}
 				</ul>
 			</div>

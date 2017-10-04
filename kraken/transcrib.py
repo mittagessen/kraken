@@ -67,23 +67,8 @@ class TranscriptionInterface(object):
         page['lines'] = []
         if records:
             for record in records:
-                splits = regex.split(u'(\s+)', record.prediction)
                 bbox = max_bbox(record.cuts)
-                line_offset = 0
-                segments = []
-                for segment, whitespace in zip_longest(splits[0::2], splits[1::2]):
-                    if len(segment):
-                        seg_bbox = max_bbox(record.cuts[line_offset:line_offset + len(segment)])
-                        segments.append({'bbox': '{}, {}, {}, {}'.format(*seg_bbox), 'text': segment, 'index': self.seg_idx,
-                                         'left': 100*int(seg_bbox[0]) / im.size[0],
-                                         'top': 100*int(seg_bbox[1]) / im.size[1],
-                                         'width': 100*(seg_bbox[2] - seg_bbox[0])/im.size[0],
-                                         'height': 100*(int(seg_bbox[3]) - int(seg_bbox[1]))/im.size[1]})
-                        self.seg_idx += 1
-                        line_offset += len(segment)
-                    if whitespace:
-                        line_offset += len(whitespace)
-                page['lines'].append({'index': self.line_idx, 'recognition': segments,
+                page['lines'].append({'index': self.line_idx, 'text': record.prediction,
                                       'left': 100*int(bbox[0]) / im.size[0],
                                       'top': 100*int(bbox[1]) / im.size[1],
                                       'width': 100*(bbox[2] - bbox[0])/im.size[0],
