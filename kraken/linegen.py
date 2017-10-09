@@ -23,7 +23,10 @@ An advanced line generation tool using Pango for proper text shaping. The
 actual drawing code was adapted from the create_image utility from nototools
 available at [0].
 
+Line degradation uses a local model described in [1].
+
 [0] https://github.com/googlei18n/nototools
+[1] Kanungo, Tapas, et al. "A statistical, nonparametric methodology for document degradation model validation." IEEE Transactions on Pattern Analysis and Machine Intelligence 22.11 (2000): 1209-1223.
 """
 
 from __future__ import absolute_import, division, print_function
@@ -32,6 +35,8 @@ from builtins import object
 
 from scipy.ndimage.filters import gaussian_filter
 from scipy.ndimage.measurements import find_objects
+from scipy.ndimage.morphology import distance_transform_cdt, binary_closing
+
 from scipy.ndimage.interpolation import affine_transform, geometric_transform
 from PIL import Image, ImageOps
 
@@ -228,29 +233,31 @@ def ocropy_degrade(im, distort=1.0, dsigma=20.0, eps=0.03, delta=0.3, degradatio
     return im
 
 
-def degrade_line(im, mean=0.0, sigma=0.001, density=0.002):
+def degrade_line(im, eta=0, alpha=1.7, beta=1.7, alpha_0 = 1, beta_0 = 1):
     """
-    Degrades a line image by adding several kinds of noise.
+    Degrades a line image by adding noise
 
     Args:
         im (PIL.Image): Input image
-        mean (float): Mean of distribution for Gaussian noise
-        sigma (float): Standard deviation for Gaussian noise
-        density (float): Noise density for Salt and Pepper noiase
 
     Returns:
         PIL.Image in mode 'L'
     """
     im = pil2array(im)
-    m = np.amax(im)
-    im = gaussian_filter(im.astype('f')/m, 0.5)
-    im += np.random.normal(mean, sigma, im.shape)
-    flipped = np.ceil(density/2 * im.size)
-    coords = [np.random.randint(0, i - 1, int(flipped)) for i in im.shape]
-    im[coords] = 255
-    coords = [np.random.randint(0, i - 1, int(flipped)) for i in im.shape]
-    im[coords] = 0
-    return array2pil(np.clip(im * m, 0, 255).astype('uint8'))
+    # foreground distance transform and flipping to white probability
+    fg_dist = distance_transform_cdt(im, metric='taxicab')
+    fg_flip = np.random.binomial(1, alpha_0 * np.exp(-alpha * (fg_dist^2)) + eta)
+    im = np.array(im + fg_flip >= 1.0, 'f')
+
+    # background distance transform and flipping to black probability
+    bg_dist = distance_transform_cdt(1-im, metric='taxicab')
+    bg_flip = np.random.binomial(1, beta_0 * np.exp(-beta * (bg_dist^2)) + eta)
+    im = np.array(im - bg_flip > 0, 'f')
+
+    # use a circular kernel of size 3
+    sel = np.array([[0, 1, 0], [1, 1, 1], [0, 1, 0]])
+    im = binary_closing(im, sel)
+    return array2pil(im)
 
 
 def distort_line(im, distort=3.0, sigma=10, eps=0.03, delta=0.3):
