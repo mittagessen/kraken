@@ -171,7 +171,7 @@ def mm_rpred(nets, im, bounds, pad=16, line_normalization=True, bidi_reordering=
                         with a list of lists of coordinates (script, (x0, y0,
                         x1, y1)) of a text line in the image and an entry
                         'text_direction' containing
-                        'horizontal-tb/vertical-lr/rl'.
+                        'horizontal-lr/rl/vertical-lr/rl'.
         pad (int): Extra blank padding to the left and right of text line
         line_normalization (bool): Dewarp line using the line estimator
                                    contained in the network. If no normalizer
@@ -240,7 +240,7 @@ def rpred(network, im, bounds, pad=16, line_normalization=True, bidi_reordering=
         bounds (dict): A dictionary containing a 'boxes' entry with a list of
                        coordinates (x0, y0, x1, y1) of a text line in the image
                        and an entry 'text_direction' containing
-                       'horizontal-tb/vertical-lr/rl'.
+                       'horizontal-lr/rl/vertical-lr/rl'.
         pad (int): Extra blank padding to the left and right of text line
         line_normalization (bool): Dewarp line using the line estimator
                                    contained in the network. If no normalizer

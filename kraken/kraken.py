@@ -188,8 +188,9 @@ def binarize(threshold, zoom, escale, border, perc, range, low, high):
 
 
 @cli.command('segment')
-@click.option('-d', '--text-direction', default='horizontal-tb',
-              type=click.Choice(['horizontal-tb', 'vertical-lr', 'vertical-rl']),
+@click.option('-d', '--text-direction', default='horizontal-lr',
+              type=click.Choice(['horizontal-lr', 'horizontal-rl',
+                                 'vertical-lr', 'vertical-rl']),
               help='Sets principal text direction')
 @click.option('-s/-n', '--script-detect/--no-script-detect', default=have_clstm(),
               help='Enable script detection on segmenter output')
@@ -232,7 +233,7 @@ def validate_mm(ctx, param, value):
 @click.option('-t', '--text', 'serialization', flag_value='text', default=True)
 @click.option('-d', '--text-direction', default='horizontal-tb',
               type=click.Choice(['horizontal-tb', 'vertical-lr', 'vertical-rl']),
-              help='Sets principal text direction')
+              help='Sets principal text direction in serialization output')
 @click.option('-l', '--lines', type=click.Path(exists=True),
               help='JSON file containing line coordinates')
 @click.option('--enable-autoconversion/--disable-autoconversion', 'conv',

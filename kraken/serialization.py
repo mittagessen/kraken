@@ -72,7 +72,8 @@ def serialize(records, image_name=u'', image_size=(0, 0), writing_mode='horizont
         image_size (tuple): Dimensions of the source image
         writing_mode (str): Sets the principal layout of lines and the
                             direction in which blocks progress. Valid values
-                            are horizontal-tb, vertical-rl, and vertical-lr.
+                            are horizontal-tb, vertical-rl, and
+                            vertical-lr.
         scripts (list): List of scripts contained in the OCR records
         template (str): Selector for the serialization format. May be
                         'hocr' or 'alto'.

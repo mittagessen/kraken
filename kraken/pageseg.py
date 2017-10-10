@@ -103,7 +103,7 @@ def compute_lines(segmentation, scale):
     return lines
 
 
-def reading_order(lines):
+def reading_order(lines, text_direction='lr'):
     """Given the list of lines (a list of 2D slices), computes
     the partial reading order.  The output is a binary 2D array
     such that order[i,j] is true if line i comes before line j
@@ -126,6 +126,10 @@ def reading_order(lines):
             return 0
         if w[1].start < u[1].stop and w[1].stop > v[1].start:
             return 1
+    if text_direction == 'rl':
+        horizontal_order = lambda u, v: not left_of(u, v)
+    else:
+        horizontal_order = left_of
 
     for i, u in enumerate(lines):
         for j, v in enumerate(lines):
@@ -134,7 +138,7 @@ def reading_order(lines):
                     order[i, j] = 1
             else:
                 if [w for w in lines if separates(w, u, v)] == []:
-                    if left_of(u, v):
+                    if horizontal_order(u, v):
                         order[i, j] = 1
     return order
 
@@ -329,7 +333,7 @@ def rotate_lines(lines, angle, offset):
     return np.column_stack((x.flatten(), y.flatten())).reshape(-1, 4)
 
 
-def segment(im, text_direction='horizontal-tb', scale=None, maxcolseps=2, black_colseps=False):
+def segment(im, text_direction='horizontal-lr', scale=None, maxcolseps=2, black_colseps=False):
     """
     Segments a page into text lines.
 
@@ -339,7 +343,7 @@ def segment(im, text_direction='horizontal-tb', scale=None, maxcolseps=2, black_
     Args:
         im (PIL.Image): A bi-level page of mode '1' or 'L'
         text_direction (str): Principal direction of the text
-                              (horizontal-tb/vertical-lr/rl)
+                              (horizontal-lr/rl/vertical-lr/rl)
         scale (float): Scale of the image
         maxcolseps (int): Maximum number of whitespace column separators
         black_colseps (bool): Whether column separators are assumed to be
@@ -359,7 +363,7 @@ def segment(im, text_direction='horizontal-tb', scale=None, maxcolseps=2, black_
         raise KrakenInputException('Image is not bi-level')
 
     # rotate input image for vertical lines
-    if text_direction == 'horizontal-tb':
+    if text_direction.startswith('horizontal'):
         angle = 0
         offset = (0, 0)
     elif text_direction == 'vertical-lr':
@@ -402,7 +406,7 @@ def segment(im, text_direction='horizontal-tb', scale=None, maxcolseps=2, black_
     segmentation = llabels*binary
 
     lines = compute_lines(segmentation, scale)
-    order = reading_order([l.bounds for l in lines])
+    order = reading_order([l.bounds for l in lines], text_direction[-2:])
     lsort = topsort(order)
     lines = [lines[i].bounds for i in lsort]
     lines = [(s2.start, s1.start, s2.stop, s1.stop) for s1, s2 in lines]
@@ -420,7 +424,7 @@ def detect_scripts(im, bounds, model=None):
         bounds (dict): A dictionary containing a 'boxes' entry with a list of
                        coordinates (x0, y0, x1, y1) of a text line in the image
                        and an entry 'text_direction' containing
-                       'horizontal-tb/vertical-lr/rl'.
+                       'horizontal-lr/rl/vertical-lr/rl'.
         model (str): Location of the script classification model or None for default.
 
     Returns:
