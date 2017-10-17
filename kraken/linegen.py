@@ -87,17 +87,31 @@ class ensureBytes(object):
             return value.encode('utf-8')
 
 
+cairo.cairo_create.argtypes = [ctypes.c_void_p]
+cairo.cairo_create.restype = ctypes.c_void_p
+cairo.cairo_image_surface_create.restype = ctypes.c_void_p
 cairo.cairo_image_surface_get_data.restype = ctypes.c_void_p
+cairo.cairo_image_surface_get_data.argtypes = [ctypes.c_void_p]
+cairo.cairo_set_source_rgb.argtypes = [ctypes.c_void_p, ctypes.c_double, ctypes.c_double, ctypes.c_double]
+cairo.cairo_paint.argtypes = [ctypes.c_void_p]
+cairo.cairo_destroy.argtypes = [ctypes.c_void_p]
+cairo.cairo_surface_destroy.argtypes = [ctypes.c_void_p]
 
 pango.pango_language_from_string.argtypes = [ensureBytes]
 pango.pango_context_set_language.argtypes = [ctypes.POINTER(PangoContext), ensureBytes]
-pangocairo.pango_cairo_create_context.restype = ctypes.POINTER(PangoContext)
-
 pango.pango_layout_new.restype = ctypes.POINTER(PangoLayout)
 pango.pango_font_description_new.restype = ctypes.POINTER(PangoFontDescription)
 pango.pango_font_description_set_family.argtypes = [ctypes.POINTER(PangoFontDescription), ensureBytes]
 pango.pango_layout_set_markup.argtypes = [ctypes.POINTER(PangoLayout), ensureBytes, ctypes.c_int]
+pango.pango_layout_get_pixel_extents.argtypes = [ctypes.POINTER(PangoLayout),
+                                                 ctypes.POINTER(PangoRectangle),
+                                                 ctypes.POINTER(PangoRectangle)]
 
+pangocairo.pango_cairo_context_set_resolution.argtypes = [ctypes.POINTER(PangoContext), ctypes.c_int]
+pangocairo.pango_cairo_create_context.restype = ctypes.POINTER(PangoContext)
+pangocairo.pango_cairo_create_context.argtypes = [ctypes.c_void_p]
+pangocairo.pango_cairo_update_layout.argtypes = [ctypes.c_void_p, ctypes.POINTER(PangoLayout)]
+pangocairo.pango_cairo_show_layout.argtypes = [ctypes.c_void_p, ctypes.POINTER(PangoLayout)]
 
 class LineGenerator(object):
     """
@@ -148,29 +162,28 @@ def _draw_on_surface(surface, font, language, text):
 
     cr = cairo.cairo_create(surface)
     pangocairo_ctx = pangocairo.pango_cairo_create_context(cr)
+    pangocairo.pango_cairo_context_set_resolution(pangocairo_ctx, 300)
     layout = pango.pango_layout_new(pangocairo_ctx)
-
-    pango_ctx = pango.pango_layout_get_context(layout)
+    
     if language is not None:
         pango_language = pango.pango_language_from_string(language)
-        pango.pango_context_set_language(pango_ctx, pango_language)
+        pango.pango_context_set_language(pangocairo_ctx, pango_language)
 
     pango.pango_layout_set_font_description(layout, font)
 
-    cairo.cairo_set_source_rgb(cr, ctypes.c_double(1.0), ctypes.c_double(1.0), ctypes.c_double(1.0))
+    cairo.cairo_set_source_rgb(cr, 1.0, 1.0, 1.0)
     cairo.cairo_paint(cr)
 
     pango.pango_layout_set_markup(layout, text, -1)
-
-    cairo.cairo_set_source_rgb(cr, ctypes.c_double(0.0), ctypes.c_double(0.0), ctypes.c_double(0.0))
+    cairo.cairo_set_source_rgb(cr, 0.0, 0.0, 0.0)
     pangocairo.pango_cairo_update_layout(cr, layout)
     pangocairo.pango_cairo_show_layout(cr, layout)
-
     cairo.cairo_destroy(cr)
 
     ink_rect = PangoRectangle()
     logical_rect = PangoRectangle()
-    pango.pango_layout_get_pixel_extents(layout, ctypes.byref(ink_rect), ctypes.byref(logical_rect))
+
+    pango.pango_layout_get_pixel_extents(layout, ink_rect, logical_rect)
 
     return max(ink_rect.width, logical_rect.width), max(ink_rect.height, logical_rect.height)
 
@@ -244,20 +257,28 @@ def degrade_line(im, eta=0, alpha=1.7, beta=1.7, alpha_0 = 1, beta_0 = 1):
         PIL.Image in mode 'L'
     """
     im = pil2array(im)
+    im = np.amax(im)-im
+    im = im*1.0/np.amax(im)
+
     # foreground distance transform and flipping to white probability
     fg_dist = distance_transform_cdt(im, metric='taxicab')
-    fg_flip = np.random.binomial(1, alpha_0 * np.exp(-alpha * (fg_dist^2)) + eta)
-    im = np.array(im + fg_flip >= 1.0, 'f')
+    fg_prob = alpha_0 * np.exp(-alpha * (fg_dist**2)) + eta
+    fg_prob[im == 0] = 0
+    fg_flip = np.random.binomial(1, fg_prob)
 
     # background distance transform and flipping to black probability
     bg_dist = distance_transform_cdt(1-im, metric='taxicab')
-    bg_flip = np.random.binomial(1, beta_0 * np.exp(-beta * (bg_dist^2)) + eta)
-    im = np.array(im - bg_flip > 0, 'f')
+    bg_prob = beta_0 * np.exp(-beta * (bg_dist**2)) + eta
+    bg_prob[im == 1] = 0
+    bg_flip = np.random.binomial(1, bg_prob)
 
+    # flip
+    im -= fg_flip
+    im += bg_flip
     # use a circular kernel of size 3
-    sel = np.array([[0, 1, 0], [1, 1, 1], [0, 1, 0]])
+    sel = np.array([[1, 1], [1, 1]])
     im = binary_closing(im, sel)
-    return array2pil(im)
+    return array2pil(255-im.astype('B')*255)
 
 
 def distort_line(im, distort=3.0, sigma=10, eps=0.03, delta=0.3):
