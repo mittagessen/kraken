@@ -15,7 +15,7 @@ install:
 - conda create -n test-environment python=$TRAVIS_PYTHON_VERSION
 - source activate test-environment
 - conda install pbr nose pip
-- sed '/python-bidi\|regex/d' requirements.txt | xargs conda install
+- sed '/python-bidi\|regex\|clstm/d' requirements.txt | xargs conda install
 - pip install -r requirements.txt
 - conda list
 - pip freeze
