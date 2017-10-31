@@ -58,8 +58,13 @@ installed using:
 
         # apt install libpangocairo-1.0 libxml2 libblas3 liblapack3 python-dev python-pip
 
-If `clstm <https://github.com/tmbdev/clstm>`_ support is desired (highly
-recommended) the associated python extension has to be build and installed.
+.. note::
+
+  It is no longer necessary to install the clstm python bindings manually.
+  There are binary wheels (automatically installed) that should work for most
+  Linux systems on PyPi; for non-x86 systems that need to build from source the
+  dependencies listed in the clstm `documentation
+  <https://github.com/tmbdev/clstm/blob/master/README.md>`_ need to be installed.
 
 Because the build behavior of pip versions older than 6.1.0 interferes with the
 scipy build process numpy has to be installed before doing the actual install:

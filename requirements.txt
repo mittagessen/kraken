@@ -9,3 +9,4 @@ scipy
 protobuf>=3.0.0
 jinja2
 python-bidi
+clstm>=0.0.5
