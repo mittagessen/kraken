@@ -26,8 +26,12 @@ recent version of pip all dependencies will be installed from binary wheel
 packages, so installing build-essential or your distributions equivalent is
 often unnecessary.
 
-If ``clstm`` support is desired (highly recommended) the associated python
-extension has to be build and installed.
+``clstm`` is supported through automatically installed binary wheels now, that
+should work on most Linux systems except for non-x86 architectures. If the
+install process fails because the fallback source compilation does not work
+refer to the `documentation
+<https://github.com/tmbdev/clstm/blob/master/README.md>`_ to install build
+dependencies.
 
 Install kraken either from pypi:
 
