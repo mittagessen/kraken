@@ -153,8 +153,8 @@ class LineGenerator(object):
         ctypes.memmove(buffer, data, size)
         im = Image.frombuffer("RGBA", (width, height), buffer, "raw", "BGRA", 0, 1)
         cairo.cairo_surface_destroy(real_surface)
+        
         im = im.convert('L')
-        im = ImageOps.expand(im, 5, 255)
         return im
 
 
@@ -246,7 +246,7 @@ def ocropy_degrade(im, distort=1.0, dsigma=20.0, eps=0.03, delta=0.3, degradatio
     return im
 
 
-def degrade_line(im, eta=0, alpha=1.7, beta=1.7, alpha_0 = 1, beta_0 = 1):
+def degrade_line(im, eta=0, alpha=1.5, beta=1.5, alpha_0 = 1, beta_0 = 1):
     """
     Degrades a line image by adding noise
 
@@ -254,7 +254,7 @@ def degrade_line(im, eta=0, alpha=1.7, beta=1.7, alpha_0 = 1, beta_0 = 1):
         im (PIL.Image): Input image
 
     Returns:
-        PIL.Image in mode 'L'
+        PIL.Image in mode '1'
     """
     im = pil2array(im)
     im = np.amax(im)-im
@@ -275,7 +275,6 @@ def degrade_line(im, eta=0, alpha=1.7, beta=1.7, alpha_0 = 1, beta_0 = 1):
     # flip
     im -= fg_flip
     im += bg_flip
-    # use a circular kernel of size 3
     sel = np.array([[1, 1], [1, 1]])
     im = binary_closing(im, sel)
     return array2pil(255-im.astype('B')*255)
@@ -284,8 +283,6 @@ def degrade_line(im, eta=0, alpha=1.7, beta=1.7, alpha_0 = 1, beta_0 = 1):
 def distort_line(im, distort=3.0, sigma=10, eps=0.03, delta=0.3):
     """
     Distorts a line image.
-
-    Run BEFORE degrade_line as a white border of 5 pixels will be added.
 
     Args:
         im (PIL.Image): Input image
@@ -321,5 +318,4 @@ def distort_line(im, distort=3.0, sigma=10, eps=0.03, delta=0.3):
 
     im = array2pil(geometric_transform(line, f, order=1, mode='nearest'))
     im = im.crop(ImageOps.invert(im).getbbox())
-    im = ImageOps.expand(im, 5, 255)
     return im

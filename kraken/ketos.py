@@ -437,9 +437,8 @@ def line_generator(ctx, font, maxlines, encoding, normalization, renormalize,
                 click.echo('{}: {} {}'.format(e.message, e.width, e.height))
             continue
         if not disable_degradation and not legacy:
-            #im = linegen.distort_line(im, abs(np.random.normal(distort)), abs(np.random.normal(distortion_sigma)))
             im = linegen.degrade_line(im)
-            #im = linegen.degrade_line(im, abs(np.random.normal(mean)), abs(np.random.normal(sigma)), abs(np.random.normal(density)))
+            im = linegen.distort_line(im, abs(np.random.normal(distort)), abs(np.random.normal(distortion_sigma)))
         elif legacy:
             im = linegen.ocropy_degrade(im)
         if binarize:
