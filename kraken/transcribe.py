@@ -101,7 +101,7 @@ class TranscriptionInterface(object):
         Writes the HTML file to a file descriptor.
 
         Args:
-            fd (File): File descriptor to write to.
+            fd (File): File descriptor (mode='rb') to write to.
         """
         fd.write(self.tmpl.render(uuid=str(uuid.uuid4()), pages=self.pages,
                                   font=self.font,

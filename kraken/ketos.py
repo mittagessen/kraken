@@ -34,7 +34,7 @@ from bidi.algorithm import get_display
 from kraken import rpred
 from kraken import linegen
 from kraken import pageseg
-from kraken import transcrib
+from kraken import transcribe
 from kraken import binarization
 from kraken.lib import models
 from kraken.train import GroundTruthContainer, compute_error
@@ -177,11 +177,11 @@ def train(ctx, lineheight, pad, hiddensize, output, load, savefreq, report,
               help='Skip rotation of vertical lines')
 @click.option('-o', '--output', type=click.Path(), default='training',
               help='Output directory')
-@click.argument('transcribs', nargs=-1, type=click.File(lazy=True))
-def extract(ctx, normalization, reorder, rotate, output, transcribs):
+@click.argument('transcriptions', nargs=-1, type=click.File(lazy=True))
+def extract(ctx, normalization, reorder, rotate, output, transcriptions):
     """
     Extracts image-text pairs from a transcription environment created using
-    ``ketos transcrib``.
+    ``ketos transcribe``.
     """
     st_time = time.time()
     try:
@@ -190,7 +190,7 @@ def extract(ctx, normalization, reorder, rotate, output, transcribs):
         pass
     idx = 0
     manifest = []
-    for fp in transcribs:
+    for fp in transcriptions:
         if ctx.meta['verbose'] > 0:
             click.echo(u'[{:2.4f}] Reading {}'.format(time.time() - st_time, fp.name))
         else:
@@ -236,7 +236,7 @@ def extract(ctx, normalization, reorder, rotate, output, transcribs):
         click.echo('\033[?25h\n', nl=False)
 
 
-@cli.command('transcrib')
+@cli.command('transcribe')
 @click.pass_context
 @click.option('-d', '--text-direction', default='horizontal-tb',
               type=click.Choice(['horizontal-tb', 'vertical-lr', 'vertical-rl']),
@@ -250,13 +250,13 @@ def extract(ctx, normalization, reorder, rotate, output, transcribs):
               help='Font style to use')
 @click.option('-p', '--prefill', default=None,
               help='Use given model for prefill mode.')
-@click.option('-o', '--output', type=click.File(mode='wb'), default='transcrib.html',
+@click.option('-o', '--output', type=click.File(mode='wb'), default='transcription.html',
               help='Output file')
 @click.argument('images', nargs=-1, type=click.File(mode='rb', lazy=True))
 def transcription(ctx, text_direction, scale, maxcolseps, black_colseps, font,
                   font_style, prefill, output, images):
     st_time = time.time()
-    ti = transcrib.TranscriptionInterface(font, font_style)
+    ti = transcribe.TranscriptionInterface(font, font_style)
 
     if prefill:
         if ctx.meta['verbose'] > 0:
