@@ -107,7 +107,7 @@ def train(ctx, lineheight, pad, hiddensize, output, load, savefreq, report,
         click.echo(u'[{:2.4f}] Training set {} lines, test set {} lines, alphabet {} symbols'.format(time.time() - st_time, len(gt_set.training_set), len(gt_set.test_set), len(gt_set.training_alphabet)))
     if ctx.meta['verbose'] > 1:
         click.echo(u'[{:2.4f}] grapheme\tcount'.format(time.time() - st_time))
-        for k, v in sorted(gt_set.training_alphabet.items(), key=lambda(x): x[1], reverse=True):
+        for k, v in sorted(gt_set.training_alphabet.items(), key=lambda x : x[1], reverse=True):
             if unicodedata.combining(k) or k.isspace():
                 k = unicodedata.name(k)
             else:
@@ -400,8 +400,6 @@ def line_generator(ctx, font, maxlines, encoding, normalization, renormalize,
     except OSError as e:
         if e.errno != errno.EEXIST:
             raise
-
-    lines = [line.strip() for line in lines]
 
     # calculate the alphabet and print it for verification purposes
     alphabet = set()

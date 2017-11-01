@@ -30,6 +30,20 @@ class TestModels(unittest.TestCase):
         os.unlink(self.temp.name)
 
     @raises(KrakenInvalidModelException)
+    def test_load_clstm_invalid(self):
+        """
+        Tests correct handling of invalid files.
+        """
+        models.load_clstm(self.temp.name)
+
+    def test_load_clstm(self):
+        """
+        Tests loading of valid clstm files.
+        """
+        rnn = models.load_clstm(os.path.join(resources, 'toy.clstm').encode('utf-8'))
+        self.assertIsInstance(rnn, models.ClstmSeqRecognizer)
+
+    @raises(KrakenInvalidModelException)
     def test_load_pronn_invalid(self):
         """
         Test correct handling of invalid files.
@@ -37,12 +51,11 @@ class TestModels(unittest.TestCase):
         models.load_pronn(self.temp.name)
        
     @raises(KrakenInvalidModelException)
-    @unittest.skipIf(not PY2, "not supported in this version")
     def test_load_pyrnn_invalid(self):
         """
         Test correct handling of non-pickle files.
         """
-        self.temp.write('adfhewf')
+        self.temp.write(b'adfhewf')
         models.load_pyrnn(self.temp.name)
 
     @raises(KrakenInvalidModelException)
@@ -55,7 +68,6 @@ class TestModels(unittest.TestCase):
         models.load_pyrnn(self.temp.name)
 
     @raises(KrakenInvalidModelException)
-    @unittest.skipIf(not PY2, "not supported in this version")
     def test_load_any_invalid(self):
         """
         Test load_any raises the proper exception if object is neither pickle
@@ -85,6 +97,14 @@ class TestModels(unittest.TestCase):
         Test correct aliasing of pre-ocrolib classes.
         """
         pass
+
+    @raises(KrakenInvalidModelException)
+    @unittest.skipUnless(not PY2, "not supported in this version")
+    def test_load_any_pyrnn_py3(self):
+        """
+        Test load_any doesn't load pickled models on python 3
+        """
+        rnn = models.load_any(os.path.join(resources, 'model.pyrnn.gz'))
 
     @unittest.skipIf(not PY2, "not supported in this version")
     def test_load_any_pyrnn(self):

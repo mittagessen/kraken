@@ -136,7 +136,7 @@ def recognizer(model, pad, bidi_reordering, base_image, input, output, lines):
 
     ctx = click.get_current_context()
     with open_file(output, 'w', encoding='utf-8') as fp:
-        click.echo('Writing recognition results for {}\t'.format(base_image), nl=False)
+        click.echo(u'Writing recognition results for {}\t'.format(base_image), nl=False)
         if ctx.meta['mode'] != 'text':
             fp.write(serialization.serialize(preds, base_image,
                      Image.open(base_image).size, ctx.meta['text_direction'],
@@ -266,7 +266,7 @@ def ocr(ctx, model, pad, reorder, serialization, text_direction, lines, conv):
             raise click.BadParameter('No model for {} found'.format(k))
         click.echo('Loading RNN {}\t'.format(k), nl=False)
         try:
-            rnn = models.load_any(location)
+            rnn = models.load_any(location.encode('utf-8'))
             nm[k] = rnn
         except:
             click.secho(u'\u2717', fg='red')
@@ -277,7 +277,7 @@ def ocr(ctx, model, pad, reorder, serialization, text_direction, lines, conv):
         # convert input model to protobuf
         if conv and rnn.kind == 'pyrnn':
             name, _ = os.path.splitext(os.path.basename(v))
-            op = os.path.join(click.get_app_dir(APP_NAME), name + '.pronn')
+            op = os.path.join(click.get_app_dir(APP_NAME), name.encode('utf-8') + '.pronn')
             try:
                 os.makedirs(click.get_app_dir(APP_NAME))
             except OSError:

@@ -17,7 +17,6 @@
 
 
 from __future__ import absolute_import, division, print_function
-from __future__ import unicode_literals
 from builtins import range
 from builtins import object
 
@@ -25,6 +24,7 @@ import json
 import numpy as np
 import pkg_resources
 
+from future.utils import PY2
 from itertools import groupby
 from scipy.ndimage.filters import (gaussian_filter, uniform_filter,
                                    maximum_filter)
@@ -441,6 +441,10 @@ def detect_scripts(im, bounds, model=None):
     """
     if not model:
         model = pkg_resources.resource_filename(__name__, 'script.clstm')
+        # resource_filename returns byte strings on python2 and str on python3
+        if not PY2:
+            model = model.encode('utf-8')
+
     rnn = models.load_clstm(model)
     # load numerical to 4 char identifier map
     with pkg_resources.resource_stream(__name__, 'iso15924.json') as fp:

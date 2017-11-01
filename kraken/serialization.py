@@ -16,7 +16,6 @@
 
 
 from __future__ import absolute_import, division, print_function
-from __future__ import unicode_literals
 from builtins import map
 from builtins import zip
 from builtins import str
@@ -88,7 +87,7 @@ def serialize(records, image_name=u'', image_size=(0, 0), writing_mode='horizont
                 'recognition': []
                 }
 
-        splits = regex.split(u'(\s+)', record.prediction)
+        splits = regex.split(r'(\s+)', record.prediction)
         line_offset = 0
         for segment in splits:
             if len(segment) == 0:
