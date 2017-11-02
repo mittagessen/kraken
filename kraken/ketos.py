@@ -263,7 +263,7 @@ def transcription(ctx, text_direction, scale, maxcolseps, black_colseps, font,
             click.echo(u'[{:2.4f}] Loading model {}'.format(time.time() - st_time, prefill))
         else:
             spin('Loading RNN')
-        prefill = models.load_any(prefill)
+        prefill = models.load_any(prefill.encode('utf-8'))
         if not ctx.meta['verbose']:
             click.secho(u'\b\u2713', fg='green', nl=False)
             click.echo('\033[?25h\n', nl=False)
