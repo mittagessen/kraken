@@ -23,7 +23,7 @@ def log_add(x,y):
 def forward_algorithm(match,skip=-5.0):
     """Apply the forward algorithm to an array of log state
     correspondence probabilities."""
-    v = skip * arange(len(match[0]))
+    v = skip * np.arange(len(match[0]))
     result = []
     # This is a fairly straightforward dynamic programming problem and
     # implemented in close analogy to the edit distance:
@@ -31,7 +31,7 @@ def forward_algorithm(match,skip=-5.0):
     # step (transition into new state) at no extra cost; the only costs come
     # from how well the symbols match the network output.
     for i in range(0, len(match)):
-        w = roll(v, 1).copy()
+        w = np.roll(v, 1).copy()
         # extra cost for skipping initial symbols
         w[0] = skip * i
         # total cost is match cost of staying in same state
@@ -48,7 +48,7 @@ def ctc_align_targets(outputs, targets, lo=1e-5):
     represented as vectors)."""
 
     outputs = np.maximum(lo, outputs)
-    outputs = outputs * 1.0/np.sum(outputs, axis=1)[:,newaxis]
+    outputs = outputs * 1.0/np.sum(outputs, axis=1)[:,np.newaxis]
 
     # first, we compute the match between the outputs and the targets
     # and put the result in the log domain
@@ -68,9 +68,9 @@ def ctc_align_targets(outputs, targets, lo=1e-5):
     # We need posterior probabilities for the states, so we need to normalize
     # the output. Instead of keeping track of the normalization
     # factors, we just normalize the posterior distribution directly.
-    epath = exp(both - amax(both))
-    l = np.sum(epath, axis=0)[newaxis,:]
-    epath /= where(l==0.0,1e-9,l)
+    epath = np.exp(both - np.amax(both))
+    l = np.sum(epath, axis=0)[np.newaxis,:]
+    epath /= np.where(l==0.0,1e-9,l)
 
     # The previous computation gives us an alignment between input time
     # and output sequence position as posteriors over states.
@@ -78,23 +78,23 @@ def ctc_align_targets(outputs, targets, lo=1e-5):
     # output classes at each time step. This dot product gives
     # us that result. We renormalize again afterwards.
     aligned = np.maximum(lo, np.dot(epath, targets))
-    l = np.sum(aligned, axis=1)[:,newaxis]
+    l = np.sum(aligned, axis=1)[:,np.newaxis]
     aligned /= np.where(l==0.0,1e-9,l)
 
     return 1.0, aligned
 
 class _CTC(Function):
     def forward(self, inputs, targets, size_average=True, reduce=True):
-        targets = make_targets(targets, )
+        targets = make_targets(targets, inputs.size()[2])
         self.grads = torch.zeros(inputs.size()).type_as(inputs)
-        loss = Torch.FloatTensor(inputs.size()[1])
+        loss = torch.FloatTensor(inputs.size()[1])
 
-        for idx, (input, targets) in enumerate(inputs.split(1, dim=1), target.split(1, dim=1)):
+        for idx, (input, target) in enumerate(zip(inputs.split(1, dim=1), targets.split(1, dim=1))):
             loss[idx], g = ctc_align_targets(input.squeeze(1).numpy(), target.squeeze(1).numpy())
             self.grads[:,idx,:] = torch.FloatTensor(g)
 
         if reduce:
-            loss = torch.sum(loss)
+            loss = torch.FloatTensor([torch.sum(loss)])
             self.grads = torch.sum(self.grads, 1)
             if size_average:
                 loss /= inputs.size()[1]
@@ -145,8 +145,7 @@ class CTCCriterion(Module):
             raise ValueError('expected 2D targets (got {} dimensions)'.format(targets.dim()))
         if len(targets) > len(input):
             raise ValueError('target label sequence ({}) has to be shorter than input sequence ({})'.format(len(targets), len(input)))
-        return _CTC()(input, targets, size_average=self.size_average,
-                      reduce=self.reduce)
+        return _CTC()(input, targets)
 
 def make_targets(labels, l_num):
     """
