@@ -61,17 +61,12 @@ def ctc_align_targets(outputs, targets, lo=1e-5):
     # backward is just forward applied to the reversed sequence
     rl = forward_algorithm(lmatch[::-1,::-1])[::-1,::-1]
     both = lr + rl
-    
-    # calculate loss from forward alpha array
-    #loss = lr[i + (T-1)*S]
-
     # We need posterior probabilities for the states, so we need to normalize
     # the output. Instead of keeping track of the normalization
     # factors, we just normalize the posterior distribution directly.
     epath = np.exp(both - np.amax(both))
     l = np.sum(epath, axis=0)[np.newaxis,:]
     epath /= np.where(l==0.0,1e-9,l)
-
     # The previous computation gives us an alignment between input time
     # and output sequence position as posteriors over states.
     # However, we actually want the posterior probability distribution over
@@ -80,8 +75,7 @@ def ctc_align_targets(outputs, targets, lo=1e-5):
     aligned = np.maximum(lo, np.dot(epath, targets))
     l = np.sum(aligned, axis=1)[:,np.newaxis]
     aligned /= np.where(l==0.0,1e-9,l)
-
-    return 1.0, aligned
+    return -log_add(lr[-1,-1], lr[-1,-2]), outputs-aligned
 
 class _CTC(Function):
     def forward(self, inputs, targets, size_average=True, reduce=True):
@@ -90,7 +84,8 @@ class _CTC(Function):
         loss = torch.FloatTensor(inputs.size()[1])
 
         for idx, (input, target) in enumerate(zip(inputs.split(1, dim=1), targets.split(1, dim=1))):
-            loss[idx], g = ctc_align_targets(input.squeeze(1).numpy(), target.squeeze(1).numpy())
+            l, g = ctc_align_targets(input.squeeze().numpy(), target.squeeze().numpy())
+            loss[idx] = float(l)
             self.grads[:,idx,:] = torch.FloatTensor(g)
 
         if reduce:
@@ -114,6 +109,8 @@ class CTCCriterion(Module):
     computed with regard to the output gradients, so this implementation has to
     be used as the final layer in a network.
 
+    Inputs can be either from a softmax layer or direct linear projections.
+
     Args:
         size_average (bool, optional): By default, the losses are averaged over
             observations for each minibatch. However if the field size_average
@@ -125,8 +122,9 @@ class CTCCriterion(Module):
             True
 
     Shape:
-        - Input: :math:`(seq_len, batch, labels)`
-        - Target: :math:`(batch, labels)`, `batch` number of label sequences.
+        - Input: :math:`(S, N, C)` where `C` number of classes, `S` sequence
+          length, and `N` number of batches.
+        - Target: :math:`(N, l)`, `N` number of label sequences `l`.
         - Output: scalar. If reduce is False, then :math:`(N)`
     """
     def __init__(self, size_average=True, reduce=True):
