@@ -1,6 +1,5 @@
 """
 clstm in pytorch.
-needs Pytorch bindings for warp-ctc: https://github.com/SeanNaren/warp-ctc/tree/pytorch_bindings/pytorch_binding
 
 Inspiration drawn from:
 https://github.com/tmbdev/ocropy
@@ -17,11 +16,8 @@ from torch.autograd import Variable
 import numpy as np
 
 import kraken.lib.lstm
+from kraken.lib.ctc import CTCCriterion
 from kraken.lib import clstm_pb2
-
-
-from warpctc_pytorch import CTCLoss
-
 
 class TBIDILSTM(nn.Module):
     """
@@ -34,7 +30,7 @@ class TBIDILSTM(nn.Module):
         
         self.rnn = nn.LSTM(ninp+1, nhid, 1, bias=False, bidirectional=True)
         self.decoder = nn.Linear(2*nhid+1, nop, bias=False)
-        self.softmax = nn.LogSoftmax()
+        self.softmax = nn.Softmax()
         
         self.init_weights()
         
@@ -103,7 +99,7 @@ class TlstmSeqRecognizer(kraken.lib.lstm.SeqRecognizer):
         self.setLearningRate()
         self.trial = 0
         self.mode = 'clstm'
-        self.criterion = CTCLoss()
+        self.criterion = CTCCriterion()
         self.cuda_available = cuda
         if self.cuda_available:
             self.cuda()
@@ -249,7 +245,7 @@ class TlstmSeqRecognizer(kraken.lib.lstm.SeqRecognizer):
         self.setLearningRate(lrate, momentum)        
         self.rnn.zero_grad()
         
-        self.criterion = CTCLoss()
+        self.criterion = CTCCriterion()
         
         if self.cuda_available:
             self.cuda()
@@ -339,5 +335,3 @@ class TlstmSeqRecognizer(kraken.lib.lstm.SeqRecognizer):
         self.rnn.learning_rate = rate
         self.rnn.momentum = momentum
         self.optim = torch.optim.RMSprop(self.rnn.parameters(), lr=self.rnn.learning_rate, momentum=self.rnn.momentum)
-        
-
