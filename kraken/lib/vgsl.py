@@ -52,48 +52,36 @@ class TransposedSummarizingRNN(nn.Module):
 
     ### for current implementation x layer the input height is in the channels!
     def forward(self, inputs, hidden):
-        # first resize from (batch, channels, height, width) into (batch, channels * height, width)
-        # inputs = inputs.view(inputs.size(0), -1, inputs.size(3))
-        # and into (width, batch, height)
-        # inputs = inputs.permute(2, 0, 1)
-        # batches = inputs.size(1)
+        # NCHW -> HNWC
+        inputs = inputs.permute(2, 0, 3, 1)
         if self.transpose:
-            # create (height, batch * width, channels) inputs
-            
-            # (height, batch * width, output_size) outputs
-
-            # into (height, batch, width, output_size)
-
-            # summarize
-
-            # permute to (batch, output_size, height, width)
-        else:
-        # create (width, batch * height, channels) inputs
-        # (width, batch * height, output_size) outputs
-        # into (width, batch, height, output_size)
-
-
-        
-        # (width, batch, self.output_size)
-        o, hidden = self.layer(inputs, hidden)
-        if self.summarize:
-            # take final output and unsqueeze to make 3D again
+            # HNWC -> WNHC
+            inputs = inputs.transpose(0, 2)
+        # HNWC -> H(N*W)C
+        siz = inputs.size()
+        inputs = inputs.view(siz[0], -1, siz[3])
+        # H(N*W)O
+        o = self.layer(inputs, hidden)
+        # resize to HNWO
+        o = o.resize(siz[0], siz[1], siz[2], self.output_size)
+        if summarize:
+            # 1NWO
             o = o[-1].unsqueeze(0)
-        if self.transpose:
-            # switch height and width again
-            o.transpose(0, 2)
+        if transpose:
+            o = o.tranpose(0, 2)
+        # HNWO -> NOHW
+        return o.permute(1, 3, 0, 2)
 
     def get_shape(self, input):
         """
-        Calculates the output shape from input 4D tuple (batch, input_size, seq_len, channel).
+        Calculates the output shape from input 4D tuple (batch, channel, input_size, seq_len).
         """
-        if self.transpose and self.summarize:
-            return (input[0], self.hidden_size, input[2], 1)
-        elif self.summarize:
-            return (input[0], self.hidden_size, 1, 1)
-        else:
-            return (input[0], self.hidden_size, input[2], input[3])
-
+        if summarize:
+            if transpose:
+                l = (1, inputs[3])
+            else:
+                l = (inputs[2], 1)
+        return (input(0) , self.output_size) + l
 
 class LinSoftmax(nn.Module):
     """
