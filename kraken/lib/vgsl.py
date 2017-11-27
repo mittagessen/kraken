@@ -20,9 +20,6 @@ class TransposedSummarizingRNN(nn.Module):
         A wrapper around torch.nn.LSTM/GRU optionally transposing inputs and
         returning only the last column of output.
 
-        Channels in input are distributed into the height dimension, the
-        outputs are put into the same. Output is `(N, 1, hidden_size, w)` or `(N, 1, hidden_size, 1)` if summarized.
-
         Args:
             input_size:
             hidden_size:
@@ -36,7 +33,6 @@ class TransposedSummarizingRNN(nn.Module):
               height, and `W` width.
             - Outputs output :math:`(N, hidden_size * num_directions, H, S)`
               with S (or H) being 1 if summarize (and transpose) are true
-              NCHW NHWC <- tf
         """
         super(TransposedSummarizingRNN, self).__init__()
         self.transpose = transpose
@@ -83,11 +79,25 @@ class TransposedSummarizingRNN(nn.Module):
                 l = (inputs[2], 1)
         return (input(0) , self.output_size) + l
 
+
 class LinSoftmax(nn.Module):
     """
     A wrapper for linear projection + softmax dealing with dimensionality mangling.
     """
     def __init__(self, input_size, output_size):
+        """
+
+        Args:
+            input_size:
+            output_size:
+
+        Shape:
+            - Inputs: :math:`(N, C, H, W)` where `N` batches, `C` channels, `H`
+              height, and `W` width.
+            - Outputs output :math:`(N, output_size, H, S)`
+              with S (or H) being 1 if summarize (and transpose) are true
+        """
+
         self.input_size = input_size
         self.output_size = output_size
 
@@ -108,7 +118,7 @@ class LinSoftmax(nn.Module):
 
 class ActConv2D(nn.Module):
     """
-    A wrapper for convolution + activation with dimensionality mangling.
+    A wrapper for convolution + activation.
     """
     def __init__(self, in_channnels, out_channels, kernel_size, nl='l'):
         self.in_channels = in_channels
@@ -117,13 +127,13 @@ class ActConv2D(nn.Module):
 
         self.nl = None
         if nl == 's':
-            self.nl = F.sigmoid()
+            self.nl = F.sigmoid
         elif nl == 't':
-            self.nl = F.tanh()
+            self.nl = F.tanh
         elif nl == 'm':
-            self.nl = F.softmax()
+            self.nl = F.softmax
         elif nl == 'r':
-            self.nl = F.relu()
+            self.nl = F.relu
 
         self.co = torch.nn.Conv2d(in_channels, out_channels, kernel_size)
 
@@ -136,13 +146,12 @@ class ActConv2D(nn.Module):
                 np.floor((input[1]-(kernel_size[0]-1)-1)+1),
                 np.floor((input[2]-(kernel_size[1]-1)-1)+1))
 
-
 class TorchVGSLModel(object):
     """
     Class building a torch module from a VSGL spec.
     """
 
-    def __init__(self, spec):
+    def __init__(self, spec, is_training):
         """
         Constructs a torch module from a (subset of) VSGL spec.
 
@@ -182,11 +191,13 @@ class TorchVGSLModel(object):
                         [...] Execute ... networks in series (layers).
                         Mp[{name}]<y>,<x>[y_stride][x_stride] Maxpool the input, reducing the (y,x) rectangle to a
                           single vector value. 
-
+            is_training (bool): If true regularization layers are not added to the resulting network.
         Returns:
             nn.Module
         """
         self.spec = spec
+        self.ops = [self.build_rnn, self.build_dropout, self.build_conv, self.output]
+        self.is_training = is_training
 
         @classmethod
         def _parse_spec(spec):
@@ -196,7 +207,14 @@ class TorchVGSLModel(object):
             spec = spec[1:-1]
             blocks = spec.split(' ')
             batch, height, width, channels = blocks.pop(0).split(',')
-            
+
+        def parse_inputs(self, block):
+            """
+            Parses the input block and returns a tuple NCHW
+            """
+            pattern = re.compile(r'(\d+),(\d+),(\d+),(\d+)')
+            return tuple(int(x) for x in m.groups()[1:])
+
         def build_rnn(self, input, block):
             """
             Builds an LSTM/GRU layer returning number of outputs and layer.
@@ -269,7 +287,7 @@ class TorchVGSLModel(object):
                 return None, None
             if input[3] != 1:
                 raise ValueError('input depth of output layer is not 1 (got {} instead)'.format(input[3]))
-            if m.group(2) != 1:
+            if int(m.group(2)) != 1:
                 raise ValueError('non-2d output not supported, yet')
             if m.group(3) not in ['s', 'c']:
                 raise ValueError('only softmax and ctc supported in output')

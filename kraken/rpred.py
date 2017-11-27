@@ -185,7 +185,15 @@ def mm_rpred(nets, im, bounds, pad=16, line_normalization=True, bidi_reordering=
     Yields:
         An ocr_record containing the recognized text, absolute character
         positions, and confidence values for each character.
+
+    Raises:
+        KrakenInputException if the mapping between segmentation scripts and
+        networks is incomplete.
     """
+    miss = [x[0] for x in bounds['boxes'] if not nets.get(x[0])]
+    if miss:
+        raise KrakenInputException('Missing models for scripts {}'.format(miss))
+
     for line in bounds['boxes']:
         rec = ocr_record('', [], [])
         for script, (box, coords) in zip(map(lambda x: x[0], line),
@@ -204,7 +212,8 @@ def mm_rpred(nets, im, bounds, pad=16, line_normalization=True, bidi_reordering=
                 try:
                     lnorm = getattr(nets[script], 'lnorm', CenterNormalizer())
                     box = dewarp(lnorm, box)
-                except Exception as e:
+                except:
+                    yield ocr_record('', [], [])
                     continue
             line = pil2array(box)
             line = lstm.prepare_line(line, pad)
