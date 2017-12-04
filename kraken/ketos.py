@@ -204,10 +204,10 @@ def extract(ctx, normalization, reorder, rotate, output, transcribs):
             spin('Reading transcription')
         doc = html.parse(fp)
         td = doc.find(".//meta[@itemprop='text_direction']")
-        if not td:
-            td = 'horizontal-tb'
-        else:
+        if td is not None:
             td = td.attrib['content']
+        else:
+            td = 'horizontal-tb'
 
         im = None
         for section in doc.xpath('//section'):
