@@ -1,7 +1,7 @@
 Description
 ===========
 
-.. image:: https://travis-ci.org/mittagessen/kraken.svg
+.. image:: https://travis-ci.org/mittagessen/kraken.svg?branch=master
     :target: https://travis-ci.org/mittagessen/kraken
 
 kraken is a fork of ocropus intended to rectify a number of issues while
