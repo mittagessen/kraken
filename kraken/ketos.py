@@ -26,7 +26,7 @@ import unicodedata
 import numpy as np
 
 from PIL import Image
-from lxml import html
+from lxml import html, etree
 from io import BytesIO
 from itertools import cycle
 from bidi.algorithm import get_display
@@ -203,6 +203,7 @@ def extract(ctx, normalization, reorder, rotate, output, transcribs):
         else:
             spin('Reading transcription')
         doc = html.parse(fp)
+        etree.strip_tags(doc, etree.Comment)
         td = doc.find(".//meta[@itemprop='text_direction']")
         if td is not None:
             td = td.attrib['content']
