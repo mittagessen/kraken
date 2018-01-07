@@ -101,6 +101,9 @@ def recognizer(model, pad, bidi_reordering, base_image, input, output, lines):
     ctx = click.get_current_context()
 
     scripts = None
+
+    st_time = time.time()
+
     if not lines:
         lines = input
     with open_file(lines, 'r') as fp:
@@ -121,7 +124,6 @@ def recognizer(model, pad, bidi_reordering, base_image, input, output, lines):
 
     preds = []
 
-    st_time = time.time()
     for pred in it:
         if ctx.meta['verbose'] > 0:
             click.echo(u'[{:2.4f}] {}'.format(time.time() - st_time, pred.prediction))
