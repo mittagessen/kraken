@@ -13,13 +13,13 @@ Transcription
 -------------
 
 Transcription is done through local browser based HTML transcription
-environments. These are created by the ``ketos transcrib`` command line util.
+environments. These are created by the ``ketos transcribe`` command line util.
 Its basic input is just a number of image files and an output path to write the
 HTML file to:
 
 .. code-block:: console
 
-        $ ketos transcrib -o output.html image_1.png image_2.png ...
+        $ ketos transcribe -o output.html image_1.png image_2.png ...
 
 While it is possible to put multiple images into a single transcription
 environment splitting into one-image-per-HTML will ease parallel transcription

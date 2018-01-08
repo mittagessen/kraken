@@ -37,10 +37,10 @@ kraken.rpred module
     :members:
     :show-inheritance:
 
-kraken.transcrib module
+kraken.transcribe module
 -----------------------
 
-.. automodule:: kraken.transcrib
+.. automodule:: kraken.transcribe
     :members:
     :show-inheritance:
 
