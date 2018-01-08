@@ -197,7 +197,7 @@ def extract(ctx, normalization, reorder, rotate, output, transcriptions):
             spin('Reading transcription')
         doc = html.parse(fp)
         td = doc.find(".//meta[@itemprop='text_direction']")
-        if not td:
+        if td is None:
             td = 'horizontal-tb'
         else:
             td = td.attrib['content']
