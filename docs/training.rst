@@ -108,10 +108,10 @@ are systematic and relatively minor.
         sufficiently similar edition as a base.
 
 After transcribing a number of lines the results have to be saved, either using
-the ``Download`` button on the lower right or through the regular ``Save Page
-As`` function of the browser. All the work done is contained directly in the
-saved files and it is possible to save partially transcribed files and continue
-work later.
+the ``Download`` button on the lower left or through the regular ``Save Page
+As`` (CTRL+S) function of the browser. All the work done is contained directly
+in the saved files and it is possible to save partially transcribed files and
+continue work later.
 
 Next the contents of the filled transcription environments have to be
 extracted through the ``ketos extract`` command:
@@ -133,7 +133,7 @@ with
         be left-to-right and later reordered for correct display.
 --output
         The output directory where all line image-text pairs (training data)
-        are written.
+        are written, defaulting to ``training/``
 --normalization
         Unicode has code points to encode most glyphs encountered in the wild.
         A lesser known feature is that there usually are multiple ways to

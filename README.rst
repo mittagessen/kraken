@@ -29,7 +29,7 @@ often unnecessary.
 ``clstm`` is supported through automatically installed binary wheels now, that
 should work on most Linux systems except for non-x86 architectures. If the
 install process fails because the fallback source compilation does not work
-refer to the `documentation
+refer to the `readme
 <https://github.com/tmbdev/clstm/blob/master/README.md>`_ to install build
 dependencies.
 
@@ -95,4 +95,4 @@ information.
 Documentation
 =============
 
-Have a look at the `documentation <http://kraken.re>`_
+Have a look at the `docs <http://kraken.re>`_
