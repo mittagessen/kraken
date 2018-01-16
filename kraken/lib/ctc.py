@@ -16,8 +16,8 @@ def log_mul(x,y):
 
 def log_add(x,y):
     "Perform addition in the log domain."
-    return np.where(abs(x - y) > 10, 
-                    np.maximum(x, y), 
+    return np.where(abs(x - y) > 10,
+                    np.maximum(x, y),
                     np.log(np.exp(np.clip(x-y, -20, 20))+1) + y)
 
 def forward_algorithm(match,skip=-5.0):
