@@ -15,7 +15,7 @@
 
 # -*- coding: utf-8 -*-
 """
-Utility functions for training CLSTM neural networks.
+Utility functions for training VGSL networks.
 """
 
 from __future__ import absolute_import, division, print_function
@@ -33,6 +33,7 @@ import bidi.algorithm as bd
 
 from PIL import Image
 from collections import Counter
+from torchvision import transforms
 
 from kraken import rpred
 from kraken.lib import lstm
@@ -79,18 +80,20 @@ def compute_error(model, test_set):
     return total_chars, error
 
 
-class GroundTruthContainer(object):
+class GroundTruthDataset(Dataset):
     """
-    Container for ground truth used during training.
+    Dataset for ground truth used during training.
+
+    All data is cached in memory.
 
     Attributes:
         training_set (list): List of tuples (image, text) for training
         test_set (list): List of tuples (image, text) for testing
-        alphabet (str): Sorted string of all codepoint found in the ground
+        alphabet (str): Sorted string of all code points found in the ground
                         truth
     """
     def __init__(self, images=None, split=lambda x: os.path.splitext(x)[0],
-                 suffix='.gt.txt', normalization=None, reorder=True,
+                 suffix='.gt.txt', mode='1', scale=48, normalization=None, reorder=True,
                  partition=0.9, pad=16):
         """
         Reads a list of image-text pairs and creates a ground truth set.
@@ -101,6 +104,9 @@ class GroundTruthContainer(object):
                           extensions from paths
             suffix (str): Suffix to attach to image base name for text
                           retrieval
+            mode (str): Image color space (either RGB, L or 1)
+            scale (int): target height of dewarped line images. Set to 0 to
+                         disable dewarping/base line normalization.
             normalization (str): Unicode normalization for gt
             reorder (bool): Whether to rearrange code points in "display"/LTR
                             order
@@ -108,62 +114,46 @@ class GroundTruthContainer(object):
                                train/test set.
             pad (int): Padding to add to images left and right
         """
-        self.lnorm = CenterNormalizer()
         self.training_set = []
-        self.test_set = []
-        self.training_alphabet = Counter()
-        self.test_alphabet = Counter()
+        self.codec = codec
+        self.alphabet = Counter()
+        self.transforms = []
+        # first built image transforms
+        if scale:
+            lnorm = CenterNormalizer(scale)
+            self.transforms.append(transforms.Lambda(lambda x: rpred.dewarp(lnorm, x)))
+        if pad:
+            self.transforms.append(transforms.Pad(pad, 0))
+        self.transforms.append(transforms.ToTensor)
+        # invert
+        self.transforms.append(transforms.Lambda(lambda x: x.max() - x))
+        self.transforms = Compose(self.transforms)
 
         if not images:
             return
+        # first pass over images to read text/build codec
+        lines = []
         for line in images:
-            self.add(line, split, suffix, normalization, reorder, pad)
+            with click.open_file(split(image) + suffix, 'r', encoding='utf-8') as fp:
+                gt = fp.read()
+                if normalization:
+                    gt = unicodedata.normalize(normalization, gt)
+                if reorder:
+                    gt = bd.get_display(gt)
+                lines.append(gt)
+                self.alphabet.update(gt)
+        if self.codec is None:
+            self.codec = Codec().init(''.join(self.alphabet.keys()))
+        # read actual images, transform them and encode text into tensors
+        for idx, line in zip(images, lines):
+                im = Image.open(image)
+                im = self.transforms(im)
+                gt = self.codec.encode(line)
+                self.training_set.append((im, gt))
 
-        self.repartition(partition)
+    def __getitem__(self, index):
+        return self.training_set[index]
 
-    def add(self, image, split=lambda x: os.path.splitext(x)[0],
-                 suffix='.gt.txt', normalization=None, reorder=True,
-                 pad=16):
-        """
-        Adds a single image to the training set.
-        """
-        with click.open_file(split(image) + suffix, 'r', encoding='utf-8') as fp:
-            gt = fp.read()
-            if normalization:
-                gt = unicodedata.normalize(normalization, gt)
-            if reorder:
-                gt = bd.get_display(gt)
+    def __len__(self):
+        return len(self.training_set)
 
-            im = Image.open(image)
-            im = rpred.dewarp(self.lnorm, im)
-            im = pil2array(im)
-            im = lstm.prepare_line(im, pad)
-            self.training_set.append((im, gt))
-
-    def repartition(self, partition=0.9):
-        """
-        Repartitions the training/test sets.
-
-        Args:
-            partition (float): Ground truth data partition ratio between
-                               training/test sets.
-        """
-        self.training_set = self.training_set + self.test_set
-        idx = np.random.choice(len(self.training_set), int(len(self.training_set) * partition), replace=False)
-        tmp_set = [self.training_set[x] for x in idx]
-        [self.training_set.pop(x) for x in sorted(idx, reverse=True)]
-        self.test_set = self.training_set
-        self.training_set = tmp_set
-
-        self.training_alphabet = Counter(''.join(t for _, t in self.training_set))
-        self.test_alphabet = Counter(''.join(t for _, t in self.test_set))
-
-    def sample(self):
-        """
-        Samples a line image-text pair from the training set.
-
-        Returns:
-            A tuple (line, text) with line being a numpy.array run through
-            kraken.lib.lstm.prepare_line.
-        """
-        return self.training_set[np.random.choice(len(self.training_set))]
