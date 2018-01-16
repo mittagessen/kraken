@@ -2,20 +2,25 @@
 VGSL plumbing
 """
 
+import re
+import warnings
 import torch
+import numpy as np
 import torch.nn.functional as F
 
-from torch.autograd import Function
 from torch.nn import Module
+from torch.autograd import Function
+from kraken.lib.ctc import CTCCriterion
 from torch.nn.modules.loss import _assert_no_grad
 
-# all tensors are ordered NCHW
+# all tensors are ordered NCHW, the "feature" dimension is C, so the output of
+# an LSTM will be put into C same as the filters of a CNN.
 
-class TransposedSummarizingRNN(nn.Module):
+class TransposedSummarizingRNN(Module):
     """
-    An RNN wrapper allowing time axis transpositions and other 
+    An RNN wrapper allowing time axis transpositions and other
     """
-    def __init__(self, input_size, hidden_size, type='LSTM', direction='bidirectional', transpose=True, summarize=True):
+    def __init__(self, input_size, hidden_size, type='l', direction='b', transpose=True, summarize=True):
         """
         A wrapper around torch.nn.LSTM/GRU optionally transposing inputs and
         returning only the last column of output.
@@ -39,48 +44,53 @@ class TransposedSummarizingRNN(nn.Module):
         self.summarize = summarize
         self.input_size = input_size
         self.hidden_size = hidden_size
-        bidi = direction == 'bidirectional'
-        self.output_size = hidden_size if not bidi else 2*hidden_size
+        self.bidi = direction == 'b'
+        self.output_size = hidden_size if not self.bidi else 2*hidden_size
 
-        l = torch.nn.GRU if type == 'GRU' else torch.nn.LSTM
+        l = torch.nn.GRU if type == 'g' else torch.nn.LSTM
 
-        self.layer = l(input_size, hidden_size, bidirectional=bidi)
+        self.layer = l(input_size, hidden_size, bidirectional=self.bidi, batch_first=True)
 
-    ### for current implementation x layer the input height is in the channels!
-    def forward(self, inputs, hidden):
+    def forward(self, inputs):
         # NCHW -> HNWC
         inputs = inputs.permute(2, 0, 3, 1)
         if self.transpose:
             # HNWC -> WNHC
             inputs = inputs.transpose(0, 2)
-        # HNWC -> H(N*W)C
+        # HNWC -> (H*N)WC
         siz = inputs.size()
-        inputs = inputs.view(siz[0], -1, siz[3])
-        # H(N*W)O
-        o = self.layer(inputs, hidden)
+        inputs = inputs.view(-1, siz[1], siz[3])
+        # (H*N)WO
+        o = self.layer(inputs, self.init_hidden(inputs.size(0)))
         # resize to HNWO
         o = o.resize(siz[0], siz[1], siz[2], self.output_size)
         if summarize:
             # 1NWO
             o = o[-1].unsqueeze(0)
         if transpose:
-            o = o.tranpose(0, 2)
+            o = o.transpose(0, 2)
         # HNWO -> NOHW
         return o.permute(1, 3, 0, 2)
+
+    def init_hidden(self, bsz=1):
+        return (Variable(torch.zeros(2 if self.bidi else 1, bsz, self.hidden_size)),
+                Variable(torch.zeros(2 if self.bidi else 1, bsz, self.hidden_size)))
 
     def get_shape(self, input):
         """
         Calculates the output shape from input 4D tuple (batch, channel, input_size, seq_len).
         """
-        if summarize:
-            if transpose:
-                l = (1, inputs[3])
+        if self.summarize:
+            if self.transpose:
+                l = (1, input[3])
             else:
-                l = (inputs[2], 1)
-        return (input(0) , self.output_size) + l
+                l = (input[2], 1)
+        else:
+            l = (input[2], input[3])
+        return (input[0], self.output_size) + l
 
 
-class LinSoftmax(nn.Module):
+class LinSoftmax(Module):
     """
     A wrapper for linear projection + softmax dealing with dimensionality mangling.
     """
@@ -97,6 +107,7 @@ class LinSoftmax(nn.Module):
             - Outputs output :math:`(N, output_size, H, S)`
               with S (or H) being 1 if summarize (and transpose) are true
         """
+        super(LinSoftmax, self).__init__()
 
         self.input_size = input_size
         self.output_size = output_size
@@ -104,23 +115,24 @@ class LinSoftmax(nn.Module):
         self.lin = torch.nn.Linear(input_size, output_size, bias=False)
 
     def forward(self, inputs):
-        # move features (H) to last dimension for linear activation
-        o = F.softmax(self.lin(inputs.transpose(3, 2)), dim=3)
+        # move features (C) to last dimension for linear activation
+        o = F.softmax(self.lin(inputs.transpose(1, 3)), dim=3)
         # and swap again
-        return o.transpose(3,2)
+        return o.transpose(3,1)
 
     def get_shape(self, input):
         """
         Calculates the output shape from input 4D tuple NCHW.
         """
-        return (input[0], input[1], self.output_size, input[3])
+        return (input[0], self.output_size, input[2], input[3])
 
 
-class ActConv2D(nn.Module):
+class ActConv2D(Module):
     """
     A wrapper for convolution + activation.
     """
-    def __init__(self, in_channnels, out_channels, kernel_size, nl='l'):
+    def __init__(self, in_channels, out_channels, kernel_size, nl='l'):
+        super(ActConv2D, self).__init__()
         self.in_channels = in_channels
         self.kernel_size = kernel_size
         self.out_channels = out_channels
@@ -140,11 +152,12 @@ class ActConv2D(nn.Module):
     def forward(self, inputs):
         return self.nl(self.co(inputs))
 
-    def get_shape(input):
+    def get_shape(self, input):
         return (input[0],
                 self.out_channels,
-                np.floor((input[1]-(kernel_size[0]-1)-1)+1),
-                np.floor((input[2]-(kernel_size[1]-1)-1)+1))
+                int(np.floor((input[2]-(self.kernel_size[0]-1)-1)+1) if input[2] != 0 else 0),
+                int(np.floor((input[3]-(self.kernel_size[1]-1)-1)+1) if input[3] != 0 else 0))
+
 
 class TorchVGSLModel(object):
     """
@@ -190,110 +203,145 @@ class TorchVGSLModel(object):
                         ============ PLUMBING OPS ============
                         [...] Execute ... networks in series (layers).
                         Mp[{name}]<y>,<x>[y_stride][x_stride] Maxpool the input, reducing the (y,x) rectangle to a
-                          single vector value. 
+                          single vector value.
             is_training (bool): If true regularization layers are not added to the resulting network.
         Returns:
             nn.Module
         """
         self.spec = spec
-        self.ops = [self.build_rnn, self.build_dropout, self.build_conv, self.output]
+        self.ops = [self.build_rnn, self.build_dropout, self.build_maxpool, self.build_conv, self.build_output]
         self.is_training = is_training
+        self.criterion = None
 
-        @classmethod
-        def _parse_spec(spec):
-            spec = spec.strip()
-            if spec[0] != '[' or spec[-1] != ']':
-                raise ValueError('Non-sequential models not supported')
-            spec = spec[1:-1]
-            blocks = spec.split(' ')
-            batch, height, width, channels = blocks.pop(0).split(',')
-
-        def parse_inputs(self, block):
-            """
-            Parses the input block and returns a tuple NCHW
-            """
-            pattern = re.compile(r'(\d+),(\d+),(\d+),(\d+)')
-            return tuple(int(x) for x in m.groups()[1:])
-
-        def build_rnn(self, input, block):
-            """
-            Builds an LSTM/GRU layer returning number of outputs and layer.
-            """
-            pattern = re.compile(r'(?P<type>L|G)(?P<dir>f|r|b)(?P<dim>x|y)(?P<sum>s)?(?P<name>{\w+})?(?P<out>\d+)')
-            m = pattern.match(block)
-            if not m:
-                return None, None
-            direction = m.group(2)
-            dim = m.group(3)
-            summarize = m.group(4) == 's'
-            
-
-        def build_dropout(self, input, block):
-            pattern = re.compile(r'(?P<type>Do)(?P<name>{\w+})?')
-            m = pattern.match(block)
-            if not m:
-                return None, None
+        spec = spec.strip()
+        if spec[0] != '[' or spec[-1] != ']':
+            raise ValueError('Non-sequential models not supported')
+        spec = spec[1:-1]
+        blocks = spec.split(' ')
+        pattern = re.compile(r'(\d+),(\d+),(\d+),(\d+)')
+        m = pattern.match(blocks.pop(0))
+        if not m:
+            raise ValueError('Invalid input spec.')
+        batch, height, width, channels = [int(x) for x in m.groups()]
+        input = [batch, channels, height, width]
+        self.input = list(input)
+        nn = []
+        for block in blocks:
+            oshape = None
+            layer = None
+            for op in self.ops:
+                oshape, layer = op(input, block)
+                if oshape:
+                    break
+            if oshape:
+                input = oshape
+                nn.extend(layer)
             else:
-                return input, torch.nn.Dropout()
+                raise ValueError('{} invalid layer definition'.format(block))
+        self.nn = torch.nn.Sequential(*self.nn)
 
-        def build_conv(self, input, block):
-            """
-            Builds a 2D convolution layer.
-            """
-            pattern = re.compile(r'(C)(?P<nl>s|t|r|l|m)(?P<name>{\w+})?(\d+,(\d+),(?P<out>\d+)')
-            m = pattern.match(block)
-            kernel_size = (int(m.group(4)), int(m.group(5)))
-            filters = int(m.group(6))
-            nl = m.group(2)
-            fn = [torch.nn.Conv2D(input[4], filters, kernel_size)]
-            output = (input[0],
-                      np.floor((input[1]-(kernel_size[0]-1)-1)+1),
-                      np.floor((input[2]-(kernel_size[1]-1)-1)+1),
-                      filters)
-            if nl == 's':
-                fn.append(torch.nn.Sigmoid())
-            elif nl == 't':
-                fn.append(torch.nn.Tanh())
-            elif nl == 'm':
-                fn.append(torch.nn.Softmax())
-            elif nl == 'r':
-                fn.append(torch.nn.ReLu())
-            return output, fn
+    def cuda(self):
+        self.nn.cuda()
+        if self.criterion:
+            self.criterion.cuda()
 
-        def build_maxpool(self, input, block):
-            """
-            Builds a maxpool layer.
-            """
-            pattern = re.compile(r'(Mp)(?P<name>{\w+})?(\d+),(\d+)(?:,(\d+),(\d+))?')
-            m = pattern.match(block)
-            if not m:
-                return None, None
-            kernel_size = (int(m.group(3)), int(m.group(4)))
-            stride = (kernel_size[0] if not m.group(5) else int(m.group(5)),
-                      kernel_size[1] if not m.group(6) else int(m.group(6)))
-            output = (input[0],
-                      np.floor((input[1]-(kernel_size[0]-1)-1)/stride[0]+1),
-                      np.floor((input[2]-(kernel_size[1]-1)-1)/stride[1]+1),
-                      filters)
-            return output, [torch.nn.MaxPool2D(kernel_size, stride)]
+    def init_weights(self):
+        """
+        Initializes weights for all layers of the graph.
 
-        def build_output(self, input, block):
-            """
-            Builds an output layer.
-            """
-            pattern = re.compile(r'(O)(?P<dim>2|1|0)(?P<type>l|s|c)(?P<out>\d+)')
-            m = pattern.match(block)
-            if not m:
-                return None, None
-            if input[3] != 1:
-                raise ValueError('input depth of output layer is not 1 (got {} instead)'.format(input[3]))
-            if int(m.group(2)) != 1:
-                raise ValueError('non-2d output not supported, yet')
-            if m.group(3) not in ['s', 'c']:
-                raise ValueError('only softmax and ctc supported in output')
-            nl = m.group(3)
-            if nl == 'c':
-                warnings.warn('CTC is loss not layer. Just adding softmax to network.')
-            lin = LinSoftmax(input[1], int(m.group(4)))
+        LSTM/GRU layers are orthogonally initialized, convolutional layers
+        uniformly from (-0.1,0.1).
+        """
+        def _wi(m):
+            if isinstance(m, torch.nn.Linear):
+                m.weight.data.fill_(1.0)
+            elif isinstance(m, torch.nn.LSTM):
+                for p in m.parameters():
+                    # weights
+                    if p.data.dim() == 2:
+                        torch.nn.init.orthogonal(p.data)
+                    # initialize biases to 1 (jozefowicz 2015)
+                    else:
+                        p.data[len(p)//4:len(p)//2].fill_(1.0)
+            elif isinstance(m, torch.nn.GRU):
+                for p in m.parameters():
+                    torch.nn.init.orthogonal(p.data)
+            elif isinstance(m, torch.nn.Conv2d):
+                for p in m.parameters():
+                    torch.nn.init.uniform(p.data, -0.1, 0.1)
+        self.nn.apply(_wi)
 
-            return lin.get_shape(input), [lin]
+
+    def build_rnn(self, input, block):
+        """
+        Builds an LSTM/GRU layer returning number of outputs and layer.
+        """
+        pattern = re.compile(r'(?P<type>L|G)(?P<dir>f|r|b)(?P<dim>x|y)(?P<sum>s)?(?P<name>{\w+})?(?P<out>\d+)')
+        m = pattern.match(block)
+        if not m:
+            return None, None
+        type = m.group(1)
+        direction = m.group(2)
+        dim = m.group(3)  == 'y'
+        summarize = m.group(4) == 's'
+        hidden = int(m.group(6))
+        l = TransposedSummarizingRNN(input[1], hidden, type, direction, dim, summarize)
+        return l.get_shape(input), [l]
+
+    def build_dropout(self, input, block):
+        pattern = re.compile(r'(?P<type>Do)(?P<name>{\w+})?')
+        m = pattern.match(block)
+        if not m:
+            return None, None
+        else:
+            return input, [torch.nn.Dropout()]
+
+    def build_conv(self, input, block):
+        """
+        Builds a 2D convolution layer.
+        """
+        pattern = re.compile(r'(C)(?P<nl>s|t|r|l|m)(?P<name>{\w+})?(\d+),(\d+),(?P<out>\d+)')
+        m = pattern.match(block)
+        if not m:
+            return None, None
+        kernel_size = (int(m.group(4)), int(m.group(5)))
+        filters = int(m.group(6))
+        nl = m.group(2)
+        fn = ActConv2D(input[1], filters, kernel_size, nl)
+        return fn.get_shape(input), [fn]
+
+    def build_maxpool(self, input, block):
+        """
+        Builds a maxpool layer.
+        """
+        pattern = re.compile(r'(Mp)(?P<name>{\w+})?(\d+),(\d+)(?:,(\d+),(\d+))?')
+        m = pattern.match(block)
+        if not m:
+            return None, None
+        kernel_size = (int(m.group(3)), int(m.group(4)))
+        stride = (kernel_size[0] if not m.group(5) else int(m.group(5)),
+                  kernel_size[1] if not m.group(6) else int(m.group(6)))
+        output = (input[0],
+                  input[1],
+                  int(np.floor((input[2]-(kernel_size[0]-1)-1)/stride[0]+1) if input[2] != 0 else 0),
+                  int(np.floor((input[3]-(kernel_size[1]-1)-1)/stride[1]+1) if input[3] != 0 else 0))
+        return output, [torch.nn.MaxPool2d(kernel_size, stride)]
+
+    def build_output(self, input, block):
+        """
+        Builds an output layer.
+        """
+        pattern = re.compile(r'(O)(?P<dim>2|1|0)(?P<type>l|s|c)(?P<out>\d+)')
+        m = pattern.match(block)
+        if not m:
+            return None, None
+        if int(m.group(2)) != 1:
+            raise ValueError('non-2d output not supported, yet')
+        if m.group(3) not in ['s', 'c']:
+            raise ValueError('only softmax and ctc supported in output')
+        nl = m.group(3)
+        if nl == 'c':
+            self.criterion = CTCCriterion()
+        lin = LinSoftmax(input[1], int(m.group(4)))
+
+        return lin.get_shape(input), [lin]
