@@ -49,7 +49,6 @@ class PytorchCodec(object):
             self.c2l = {k: [v] for v, k in enumerate(sorted(charset))}
         # map integer labels to code points because regex only works with strings
         self.l2c = {}
-        print(self.c2l)
         for k, v in self.c2l.items():
             self.l2c[''.join(unichr(c) for c in v)] = k
 
@@ -120,7 +119,7 @@ class PytorchCodec(object):
             mo = re.match(input, idx)
             if mo is None:
                 if len(input) > idx:
-                    raise KrakenEncodeException('No prefix matches for {}'.format(input[idx:]))
+                    raise KrakenEncodeException('No prefix matches for input after {}'.format(idx))
                 return r
             r.append(mo.group())
             idx = mo.end()
