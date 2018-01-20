@@ -54,9 +54,9 @@ class PytorchCodec(object):
             self.l2c[''.join(unichr(c) for c in v)] = k
 
         # sort prefixes for c2l regex
-        self.c2l_regex = regex.compile(r'|'.join(sorted(self.c2l.keys(), key=len, reverse=True)))
+        self.c2l_regex = regex.compile(r'|'.join(regex.escape(x) for x in sorted(self.c2l.keys(), key=len, reverse=True)))
         # sort prefixes for l2c regex
-        self.l2c_regex = regex.compile(r'|'.join(sorted(self.l2c.keys(), key=len, reverse=True)))
+        self.l2c_regex = regex.compile(r'|'.join(regex.escape(x) for x in sorted(self.l2c.keys(), key=len, reverse=True)))
 
     def __len__(self):
         """
