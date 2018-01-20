@@ -20,6 +20,7 @@ graphemes.
 """
 
 import regex
+import numpy as np
 
 from torch import IntTensor
 
@@ -79,23 +80,37 @@ class PytorchCodec(object):
             l.extend(self.c2l[c])
         return IntTensor(l)
 
-    def decode(self, l):
+    def decode(self, labels):
         """
-        Decodes a labelling into a string.
+        Decodes a labelling.
+
+        Given a labelling with cuts and  confidences returns a string with the
+        cuts and confidences aggregated across label-code point
+        correspondences. When decoding multilabels to code points the resulting
+        cuts are min/max, confidences are averaged.
 
         Args:
-            l (torch.IntTensor): Input vector containing the label sequence.
+            labels (list): Input containing tuples (label, start, end,
+                           confidence).
 
         Returns:
-            (list) decoded sequence of unicode code points.
+            list: A list of tuples (code point, start, end, confidence)
         """
         # map into unicode space
-        l = ''.join(unichr(v) for v in l)
+        l = ''.join(unichr(v) for v, _, _, _ in labels)
+        start = [x for _, x, _, _ in labels]
+        end = [x for _, _, x, _ in labels]
+        con = [x for _, _, _, x in labels]
         splits = self._greedy_split(l, self.l2c_regex)
-        c = []
+        decoded = []
+        idx = 0
         for i in splits:
-            c.append(self.l2c[i])
-        return c
+            decoded.extend([(c, s, e, u) for c, s, e, u in zip(self.l2c[i],
+                                                               len(i) * [start[idx]],
+                                                               len(i) * [end[idx + len(i) - 1]],
+                                                               len(i) * [np.mean(con[idx:idx + len(i)])])])
+            idx += len(i)
+        return decoded
 
     def _greedy_split(self, input, re):
         """
