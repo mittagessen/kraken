@@ -78,22 +78,22 @@ def ctc_align_targets(outputs, targets, lo=1e-5):
     return -log_add(lr[-1,-1], lr[-1,-2]), outputs-aligned
 
 class _CTC(Function):
-    def forward(self, inputs, targets, size_average=True, reduce=True):
-        targets = make_targets(targets, inputs.size()[2])
-        self.grads = torch.zeros(inputs.size()).type_as(inputs)
-        loss = torch.FloatTensor(inputs.size()[1])
 
-        for idx, (input, target) in enumerate(zip(inputs.split(1, dim=1), targets.split(1, dim=1))):
-            l, g = ctc_align_targets(input.squeeze().numpy(), target.squeeze().numpy())
+    def forward(self, inputs, targets, size_average=True, reduce=True):
+        targets = make_targets(targets, inputs.size(1))
+        self.grads = torch.zeros(inputs.size()).type_as(inputs)
+        loss = torch.FloatTensor(inputs.size(0))
+        for idx, (input, target) in enumerate(zip(inputs.split(1, dim=0), targets.split(1, dim=1))):
+            l, g = ctc_align_targets(input.squeeze().t().numpy(), target.squeeze().numpy())
             loss[idx] = float(l)
-            self.grads[:,idx,:] = torch.FloatTensor(g)
+            self.grads[idx,:,:] = torch.FloatTensor(g)
 
         if reduce:
             loss = torch.FloatTensor([torch.sum(loss)])
-            self.grads = torch.sum(self.grads, 1)
+            self.grads = torch.sum(self.grads, 0, keepdim=True)
             if size_average:
-                loss /= inputs.size()[1]
-                self.grads /= inputs.size()[1]
+                loss /= inputs.size(0)
+                self.grads /= inputs.size(0)
         return loss
 
     def backward(self, grad_output):
@@ -122,7 +122,7 @@ class CTCCriterion(Module):
             True
 
     Shape:
-        - Input: :math:`(S, N, C)` where `C` number of classes, `S` sequence
+        - Input: :math:`(N, C, S)` where `C` number of classes, `S` sequence
           length, and `N` number of batches.
         - Target: :math:`(N, l)`, `N` number of label sequences `l`.
         - Output: scalar. If reduce is False, then :math:`(N)`
@@ -141,8 +141,8 @@ class CTCCriterion(Module):
             raise ValueError('expected 3D input (got {} dimensions)'.format(input.dim()))
         if targets.dim() != 2:
             raise ValueError('expected 2D targets (got {} dimensions)'.format(targets.dim()))
-        if len(targets) > len(input):
-            raise ValueError('target label sequence ({}) has to be shorter than input sequence ({})'.format(len(targets), len(input)))
+        if targets.size(1) > input.size(2):
+            raise ValueError('target label sequence ({}) has to be shorter than input sequence ({})'.format(target.size(1), input.size(2)))
         return _CTC()(input, targets)
 
 def make_targets(labels, l_num):
@@ -151,13 +151,18 @@ def make_targets(labels, l_num):
     output layer.
 
     Args:
-        labels (torch.LongTensor): Input label sequences (seqlen, batch)
+        labels (torch.LongTensor): Input label sequences (batch, seqlen)
         l_num (int): dimension of the output layer
+
+    Returns:
+        A tensor (2*seqlen+1, batch, l_num)
     """
+    # transposed form is easier to work with
+    labels = labels.t()
     # pad label sequence with blanks
     bl = np.zeros(labels.size())
-    l = np.hstack([bl, labels.numpy()]).reshape((labels.size()[0]*2,) + labels.size()[1:])
-    l = np.concatenate((l, np.zeros((1, labels.size()[1]))))
+    l = np.hstack([bl, labels.numpy()]).reshape((labels.size(0)*2,) + labels.size()[1:])
+    l = np.concatenate((l, np.zeros((1, labels.size(1)))))
     labels = torch.LongTensor(l.astype('int'))
 
     # one hot encode padded label sequence
