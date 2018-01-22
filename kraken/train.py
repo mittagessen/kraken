@@ -34,14 +34,16 @@ import bidi.algorithm as bd
 from PIL import Image
 from collections import Counter
 from torchvision import transforms
+from torch.utils.data import Dataset
 
 from kraken import rpred
 from kraken.lib import lstm
 from kraken.lib import models
+from kraken.lib.codec import PytorchCodec
 from kraken.lib.util import pil2array, array2pil
 from kraken.lib.lineest import CenterNormalizer
 
-__all__ = ['GroundTruthContainer']
+__all__ = ['GroundTruthDataset']
 
 def _fast_levenshtein(seq1, seq2):
 
@@ -93,8 +95,8 @@ class GroundTruthDataset(Dataset):
                         truth
     """
     def __init__(self, images=None, split=lambda x: os.path.splitext(x)[0],
-                 suffix='.gt.txt', mode='1', scale=48, normalization=None, reorder=True,
-                 partition=0.9, pad=16):
+                 suffix='.gt.txt', mode='1', scale=48, normalization=None,
+                 reorder=True, partition=0.9, pad=16, format=(0, 1, 2)):
         """
         Reads a list of image-text pairs and creates a ground truth set.
 
@@ -107,49 +109,71 @@ class GroundTruthDataset(Dataset):
             mode (str): Image color space (either RGB, L or 1)
             scale (int): target height of dewarped line images. Set to 0 to
                          disable dewarping/base line normalization.
+            codec (kraken.codec.PytorchCodec): Codec used to translate code
+                                               points. If not given one will be
+                                               constructed.
             normalization (str): Unicode normalization for gt
             reorder (bool): Whether to rearrange code points in "display"/LTR
                             order
             partition (float): Ground truth data partition ratio between
                                train/test set.
             pad (int): Padding to add to images left and right
+            format (tuple): defines the order of dimensions (0=channels, 1=height,
+                          2=width) of samples.
         """
-        self.training_set = []
-        self.codec = codec
+        self.split = lambda x: split(x) + self.suffix
+        self.suffix = suffix
+        self._images = []
+        self._gt = []
         self.alphabet = Counter()
+        self.text_transforms = []
         self.transforms = []
+        # built text transformations
+        if normalization:
+            self.text_transforms.append(lambda x: unicodedata.normalize(normalization, x))
+        if reorder:
+            self.text_transforms.append(bd.get_display)
+
         # first built image transforms
         if scale:
             lnorm = CenterNormalizer(scale)
             self.transforms.append(transforms.Lambda(lambda x: rpred.dewarp(lnorm, x)))
+            self.transforms.append(transforms.Lambda(lambda x: x.convert('L')))
         if pad:
-            self.transforms.append(transforms.Pad(pad, 0))
-        self.transforms.append(transforms.ToTensor)
+            self.transforms.append(transforms.Pad(0, pad))
+        self.transforms.append(transforms.ToTensor())
         # invert
         self.transforms.append(transforms.Lambda(lambda x: x.max() - x))
-        self.transforms = Compose(self.transforms)
+        self.transforms.append(transforms.Lambda(lambda x: x.permute(*format)))
+        self.transforms = transforms.Compose(self.transforms)
 
-        if not images:
-            return
-        # first pass over images to read text/build codec
-        lines = []
-        for line in images:
-            with click.open_file(split(image) + suffix, 'r', encoding='utf-8') as fp:
-                gt = fp.read()
-                if normalization:
-                    gt = unicodedata.normalize(normalization, gt)
-                if reorder:
-                    gt = bd.get_display(gt)
-                lines.append(gt)
-                self.alphabet.update(gt)
-        if self.codec is None:
-            self.codec = Codec().init(''.join(self.alphabet.keys()))
-        # read actual images, transform them and encode text into tensors
-        for idx, line in zip(images, lines):
-                im = Image.open(image)
-                im = self.transforms(im)
-                gt = self.codec.encode(line)
-                self.training_set.append((im, gt))
+    def add(self, image):
+        """
+        Adds a line-image-text pair to the dataset.
+        """
+        with click.open_file(self.split(image), 'r', encoding='utf-8') as fp:
+            gt = fp.read()
+            for func in self.text_transforms:
+                gt = func(gt)
+            self.alphabet.update(gt)
+        im = Image.open(image)
+        im = self.transforms(im)
+        self._images.append(im)
+        self._gt.append(gt)
+
+    def add_codec(self, codec=None):
+        """
+        Adds a codec to the dataset and encodes all text lines.
+
+        Has to be run before sampling from the dataset.
+        """
+        if codec:
+            self.codec = codec
+        else:
+            self.codec = PytorchCodec(''.join(self.alphabet.keys()))
+        self.training_set = []
+        for im, gt in zip(self._images, self._gt):
+            self.training_set.append((im, self.codec.encode(gt)))
 
     def __getitem__(self, index):
         return self.training_set[index]
