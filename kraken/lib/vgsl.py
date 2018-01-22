@@ -8,8 +8,10 @@ import torch
 import numpy as np
 import torch.nn.functional as F
 
+
 from torch.nn import Module
-from torch.autograd import Function
+
+from torch.autograd import Variable
 from kraken.lib.ctc import CTCCriterion
 from torch.nn.modules.loss import _assert_no_grad
 
@@ -59,15 +61,15 @@ class TransposedSummarizingRNN(Module):
             inputs = inputs.transpose(0, 2)
         # HNWC -> (H*N)WC
         siz = inputs.size()
-        inputs = inputs.view(-1, siz[1], siz[3])
+        inputs = inputs.contiguous().view(-1, siz[2], siz[3])
         # (H*N)WO
-        o = self.layer(inputs, self.init_hidden(inputs.size(0)))
+        o, _ = self.layer(inputs, self.init_hidden(inputs.size(0)))
         # resize to HNWO
         o = o.resize(siz[0], siz[1], siz[2], self.output_size)
-        if summarize:
+        if self.summarize:
             # 1NWO
             o = o[-1].unsqueeze(0)
-        if transpose:
+        if self.transpose:
             o = o.transpose(0, 2)
         # HNWO -> NOHW
         return o.permute(1, 3, 0, 2)
@@ -164,7 +166,7 @@ class TorchVGSLModel(object):
     Class building a torch module from a VSGL spec.
     """
 
-    def __init__(self, spec, is_training):
+    def __init__(self, spec):
         """
         Constructs a torch module from a (subset of) VSGL spec.
 
@@ -204,13 +206,11 @@ class TorchVGSLModel(object):
                         [...] Execute ... networks in series (layers).
                         Mp[{name}]<y>,<x>[y_stride][x_stride] Maxpool the input, reducing the (y,x) rectangle to a
                           single vector value.
-            is_training (bool): If true regularization layers are not added to the resulting network.
         Returns:
             nn.Module
         """
         self.spec = spec
         self.ops = [self.build_rnn, self.build_dropout, self.build_maxpool, self.build_conv, self.build_output]
-        self.is_training = is_training
         self.criterion = None
 
         spec = spec.strip()
@@ -238,12 +238,21 @@ class TorchVGSLModel(object):
                 nn.extend(layer)
             else:
                 raise ValueError('{} invalid layer definition'.format(block))
-        self.nn = torch.nn.Sequential(*self.nn)
+        self.nn = torch.nn.Sequential(*nn)
 
     def cuda(self):
         self.nn.cuda()
         if self.criterion:
             self.criterion.cuda()
+
+    def save_model(self, path):
+        """
+        Serializes the model into path.
+
+        Args:
+            path (unicode): Target destination
+        """
+        pass
 
     def init_weights(self):
         """
