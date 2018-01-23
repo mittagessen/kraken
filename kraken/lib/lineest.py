@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 from builtins import range
 from builtins import object
 
+import warnings
 import numpy as np
 
 from scipy.ndimage import interpolation, filters
@@ -12,11 +13,13 @@ def scale_to_h(img, target_height, order=1, dtype=np.dtype('f'), cval=0):
     h, w = img.shape
     scale = target_height*1.0/h
     target_width = int(scale*w)
-    output = interpolation.affine_transform(1.0*img, np.ones(2)/scale,
-                                            order=order,
-                                            output_shape=(target_height,
-                                                          target_width),
-                                            mode='constant', cval=cval)
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore', UserWarning)
+        output = interpolation.affine_transform(1.0*img, np.ones(2)/scale,
+                                                order=order,
+                                                output_shape=(target_height,
+                                                              target_width),
+                                                mode='constant', cval=cval)
     output = np.array(output, dtype=dtype)
     return output
 
@@ -31,6 +34,7 @@ class CenterNormalizer(object):
 
     def measure(self, line):
         h, w = line.shape
+        # XXX: this filter is awfully slow
         smoothed = filters.gaussian_filter(line, (h*0.5, h*self.smoothness),
                                            mode='constant')
         smoothed += 0.001*filters.uniform_filter(smoothed, (h*0.5, w),
