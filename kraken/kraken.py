@@ -100,10 +100,18 @@ def recognizer(model, pad, bidi_reordering, base_image, input, output, lines):
 
     ctx = click.get_current_context()
 
-    if not lines:
+    # input may either be output from the segmenter then it is a JSON file or
+    # be an image file when running the OCR subcommand alone. might still come
+    # from some other subcommand though.
+    if not lines and base_image != input:
         lines = input
+    if not lines:
+        raise click.UsageError('No line segmentation given. Add one with `-l` or run `segment` first.')
     with open_file(lines, 'r') as fp:
-        bounds = json.load(fp)
+        try:
+            bounds = json.load(fp)
+        except ValueError as e:
+            raise click.UsageError('{} invalid segmentation: {}'.format(lines, str(e)))
         # script detection
         if len(bounds['boxes'][0]) == 4:
             if ctx.meta['verbose'] > 0:
@@ -208,7 +216,7 @@ def validate_mm(ctx, param, value):
     except:
         raise click.BadParameter('Mappings must be in format script:model')
     return model_dict
-        
+
 
 @cli.command('ocr')
 @click.pass_context
