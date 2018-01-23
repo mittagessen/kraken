@@ -18,6 +18,8 @@ from torch.nn.modules.loss import _assert_no_grad
 # all tensors are ordered NCHW, the "feature" dimension is C, so the output of
 # an LSTM will be put into C same as the filters of a CNN.
 
+__all__ = ['TorchVGSLModel']
+
 class TransposedSummarizingRNN(Module):
     """
     An RNN wrapper allowing time axis transpositions and other
@@ -67,8 +69,8 @@ class TransposedSummarizingRNN(Module):
         # resize to HNWO
         o = o.resize(siz[0], siz[1], siz[2], self.output_size)
         if self.summarize:
-            # 1NWO
-            o = o[-1].unsqueeze(0)
+            # HN1O
+            o = o[:,:,-1,:].unsqueeze(2)
         if self.transpose:
             o = o.transpose(0, 2)
         # HNWO -> NOHW
@@ -279,7 +281,6 @@ class TorchVGSLModel(object):
                 for p in m.parameters():
                     torch.nn.init.uniform(p.data, -0.1, 0.1)
         self.nn.apply(_wi)
-
 
     def build_rnn(self, input, block):
         """
