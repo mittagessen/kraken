@@ -142,7 +142,7 @@ class CTCCriterion(Module):
         if targets.dim() != 2:
             raise ValueError('expected 2D targets (got {} dimensions)'.format(targets.dim()))
         if targets.size(1) > input.size(2):
-            raise ValueError('target label sequence ({}) has to be shorter than input sequence ({})'.format(target.size(1), input.size(2)))
+            raise ValueError('target label sequence ({}) has to be shorter than input sequence ({})'.format(targets.size(1), input.size(2)))
         return _CTC()(input, targets)
 
 def make_targets(labels, l_num):
