@@ -107,8 +107,10 @@ class GroundTruthDataset(Dataset):
             suffix (str): Suffix to attach to image base name for text
                           retrieval
             mode (str): Image color space (either RGB, L or 1)
-            scale (int): target height of dewarped line images. Set to 0 to
-                         disable dewarping/base line normalization.
+            scale (int, tuple): Target height or (width, height) of dewarped
+                                line images. Vertical-only scaling is through
+                                CenterLineNormalizer, resizing with Lanczos
+                                interpolation. Set to 0 to disable.
             codec (kraken.codec.PytorchCodec): Codec used to translate code
                                                points. If not given one will be
                                                constructed.
@@ -136,9 +138,12 @@ class GroundTruthDataset(Dataset):
 
         # first built image transforms
         if scale:
-            lnorm = CenterNormalizer(scale)
-            self.transforms.append(transforms.Lambda(lambda x: rpred.dewarp(lnorm, x)))
-            self.transforms.append(transforms.Lambda(lambda x: x.convert('L')))
+            if isinstance(scale, int):
+                lnorm = CenterNormalizer(scale)
+                self.transforms.append(transforms.Lambda(lambda x: rpred.dewarp(lnorm, x)))
+                self.transforms.append(transforms.Lambda(lambda x: x.convert('L')))
+            elif isinstance(scale, tuple):
+                self.transforms.append(transforms.Resize(scale, Image.LANCZOS))
         if pad:
             self.transforms.append(transforms.Pad(0, pad))
         self.transforms.append(transforms.ToTensor())
