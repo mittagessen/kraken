@@ -432,8 +432,6 @@ def detect_scripts(im, bounds, model=None):
         ISO15924 4 character identifier.
 
     Raises:
-        KrakenInputException if the input image is not binarized or the text
-        direction is invalid.
         KrakenInvalidModelException if no clstm module is available.
     """
     if not model:
