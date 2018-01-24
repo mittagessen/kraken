@@ -102,14 +102,13 @@ class LinSoftmax(Module):
         """
 
         Args:
-            input_size:
-            output_size:
+            input_size: Number of inputs in the feature dimension
+            output_size: Number of outputs in the feature dimension
 
         Shape:
             - Inputs: :math:`(N, C, H, W)` where `N` batches, `C` channels, `H`
               height, and `W` width.
             - Outputs output :math:`(N, output_size, H, S)`
-              with S (or H) being 1 if summarize (and transpose) are true
         """
         super(LinSoftmax, self).__init__()
 
@@ -166,6 +165,22 @@ class ActConv2D(Module):
 class TorchVGSLModel(object):
     """
     Class building a torch module from a VSGL spec.
+
+    The initialized class will contain a variable number of layers and a loss
+    function. Inputs and outputs are always 4D tensors in order (batch,
+    channels, height, width) with channels always being the feature dimension.
+
+    Importantly this means that a recurrent network will be fed the channel
+    vector at each step along its time axis, i.e. either put the non-time-axis
+    dimension into the channels dimension or use a summarizing RNN squashing
+    the time axis to 1 and putting the output into the channels dimension
+    respectively.
+
+    Attributes:
+        input (tuple): Expected input tensor as a 4-tuple.
+        nn (torch.nn.Sequential): Stack of layers parsed from the spec.
+        criterion (torch.nn.Module): Fully parametrized loss function.
+
     """
 
     def __init__(self, spec):
@@ -208,13 +223,15 @@ class TorchVGSLModel(object):
                         [...] Execute ... networks in series (layers).
                         Mp[{name}]<y>,<x>[y_stride][x_stride] Maxpool the input, reducing the (y,x) rectangle to a
                           single vector value.
-        Returns:
-            nn.Module
+
+
         """
         self.spec = spec
         self.ops = [self.build_rnn, self.build_dropout, self.build_maxpool, self.build_conv, self.build_output]
         self.criterion = None
 
+        #
+        self.idx = 0
         spec = spec.strip()
         if spec[0] != '[' or spec[-1] != ']':
             raise ValueError('Non-sequential models not supported')
@@ -226,21 +243,20 @@ class TorchVGSLModel(object):
             raise ValueError('Invalid input spec.')
         batch, height, width, channels = [int(x) for x in m.groups()]
         input = [batch, channels, height, width]
-        self.input = list(input)
-        nn = []
+        self.input = tuple(input)
+        self.nn = torch.nn.Sequential()
         for block in blocks:
             oshape = None
             layer = None
             for op in self.ops:
-                oshape, layer = op(input, block)
+                oshape, name, layer = op(input, block)
                 if oshape:
                     break
             if oshape:
                 input = oshape
-                nn.extend(layer)
+                self.nn.add_module(name, layer)
             else:
                 raise ValueError('{} invalid layer definition'.format(block))
-        self.nn = torch.nn.Sequential(*nn)
 
     def cuda(self):
         self.nn.cuda()
@@ -282,6 +298,23 @@ class TorchVGSLModel(object):
                     torch.nn.init.uniform(p.data, -0.1, 0.1)
         self.nn.apply(_wi)
 
+    def get_layer_name(self, layer, name=None):
+        """
+        Generates a unique identifier for the layer optionally using a supplied
+        name.
+
+        Args:
+            layer (str): Identifier of the layer type
+            name (str): user-supplied {name} with {} that need removing.
+
+        Returns:
+            (str) network unique layer name
+        """
+        if name:
+            return name[1:-1]
+        else:
+            return '{}_{}'.format(re.sub(r'\W+', '_', layer), self.idx)
+
     def build_rnn(self, input, block):
         """
         Builds an LSTM/GRU layer returning number of outputs and layer.
@@ -289,45 +322,46 @@ class TorchVGSLModel(object):
         pattern = re.compile(r'(?P<type>L|G)(?P<dir>f|r|b)(?P<dim>x|y)(?P<sum>s)?(?P<name>{\w+})?(?P<out>\d+)')
         m = pattern.match(block)
         if not m:
-            return None, None
+            return None, None, None
         type = m.group(1)
         direction = m.group(2)
         dim = m.group(3)  == 'y'
         summarize = m.group(4) == 's'
         hidden = int(m.group(6))
         l = TransposedSummarizingRNN(input[1], hidden, type, direction, dim, summarize)
-        return l.get_shape(input), [l]
+
+        return l.get_shape(input), self.get_layer_name(type, m.group('name')), l
 
     def build_dropout(self, input, block):
         pattern = re.compile(r'(?P<type>Do)(?P<name>{\w+})?')
         m = pattern.match(block)
         if not m:
-            return None, None
+            return None, None, None
         else:
-            return input, [torch.nn.Dropout()]
+            return input, self.get_layer_name(m.group('type'), m.group('name')), torch.nn.Dropout()
 
     def build_conv(self, input, block):
         """
         Builds a 2D convolution layer.
         """
-        pattern = re.compile(r'(C)(?P<nl>s|t|r|l|m)(?P<name>{\w+})?(\d+),(\d+),(?P<out>\d+)')
+        pattern = re.compile(r'(?P<type>C)(?P<nl>s|t|r|l|m)(?P<name>{\w+})?(\d+),(\d+),(?P<out>\d+)')
         m = pattern.match(block)
         if not m:
-            return None, None
+            return None, None, None
         kernel_size = (int(m.group(4)), int(m.group(5)))
-        filters = int(m.group(6))
-        nl = m.group(2)
+        filters = int(m.group('out'))
+        nl = m.group('nl')
         fn = ActConv2D(input[1], filters, kernel_size, nl)
-        return fn.get_shape(input), [fn]
+        return fn.get_shape(input), self.get_layer_name(m.group('type'), m.group('name')), fn
 
     def build_maxpool(self, input, block):
         """
         Builds a maxpool layer.
         """
-        pattern = re.compile(r'(Mp)(?P<name>{\w+})?(\d+),(\d+)(?:,(\d+),(\d+))?')
+        pattern = re.compile(r'(?P<type>Mp)(?P<name>{\w+})?(\d+),(\d+)(?:,(\d+),(\d+))?')
         m = pattern.match(block)
         if not m:
-            return None, None
+            return None, None, None
         kernel_size = (int(m.group(3)), int(m.group(4)))
         stride = (kernel_size[0] if not m.group(5) else int(m.group(5)),
                   kernel_size[1] if not m.group(6) else int(m.group(6)))
@@ -335,23 +369,23 @@ class TorchVGSLModel(object):
                   input[1],
                   int(np.floor((input[2]-(kernel_size[0]-1)-1)/stride[0]+1) if input[2] != 0 else 0),
                   int(np.floor((input[3]-(kernel_size[1]-1)-1)/stride[1]+1) if input[3] != 0 else 0))
-        return output, [torch.nn.MaxPool2d(kernel_size, stride)]
+        return output, self.get_layer_name(m.group('type'), m.group('name')), torch.nn.MaxPool2d(kernel_size, stride)
 
     def build_output(self, input, block):
         """
         Builds an output layer.
         """
-        pattern = re.compile(r'(O)(?P<dim>2|1|0)(?P<type>l|s|c)(?P<out>\d+)')
+        pattern = re.compile(r'(O)(?P<name>{\w+})?(?P<dim>2|1|0)(?P<type>l|s|c)(?P<out>\d+)')
         m = pattern.match(block)
         if not m:
-            return None, None
-        if int(m.group(2)) != 1:
+            return None, None, None
+        if int(m.group('dim')) != 1:
             raise ValueError('non-2d output not supported, yet')
-        if m.group(3) not in ['s', 'c']:
+        nl = m.group('type')
+        if nl not in ['s', 'c']:
             raise ValueError('only softmax and ctc supported in output')
-        nl = m.group(3)
         if nl == 'c':
             self.criterion = CTCCriterion()
-        lin = LinSoftmax(input[1], int(m.group(4)))
+        lin = LinSoftmax(input[1], int(m.group('out')))
 
-        return lin.get_shape(input), [lin]
+        return lin.get_shape(input), self.get_layer_name(m.group(0), m.group('name')), lin
