@@ -284,7 +284,7 @@ def transcription(ctx, text_direction, scale, maxcolseps, black_colseps, font,
         if prefill:
             it = rpred.rpred(prefill, im, res)
             preds = []
-            for pred in it: 
+            for pred in it:
                 if ctx.meta['verbose'] > 0:
                     click.echo(u'[{:2.4f}] {}'.format(time.time() - st_time, pred.prediction))
                 else:
@@ -339,21 +339,14 @@ def transcription(ctx, text_direction, scale, maxcolseps, black_colseps, font,
               "of lines.")
 @click.option('-d', '--disable-degradation', is_flag=True, help='Dont degrade '
               'output lines.')
-@click.option('-b/-nb', '--binarize/--no-binarize', default=True,
-              help='Binarize output using nlbin.')
-@click.option('-m', '--mean', type=click.FLOAT, default=0.0,
-              help='Mean of distribution to take means for gaussian noise '
-              'from.')
-@click.option('-s', '--sigma', type=click.FLOAT, default=0.001,
-              help='Mean of distribution to take standard deviation values for '
-              'Gaussian noise from.')
-@click.option('-r', '--density', type=click.FLOAT, default=0.002,
-              help='Mean of distribution to take density values for S&P noise '
-              'from.')
+@click.option('-a', '--alpha', type=click.FLOAT, default=1.5,
+              help="Mean of folded normal distribution for sampling foreground pixel flip probability")
+@click.option('-b', '--beta', type=click.FLOAT, default=1.5,
+              help="Mean of folded normal distribution for sampling background pixel flip probability")
 @click.option('-d', '--distort', type=click.FLOAT, default=1.0,
-              help='Mean of distribution to take distortion values from')
+              help='Mean of folded normal distribution to take distortion values from')
 @click.option('-ds', '--distortion-sigma', type=click.FLOAT, default=20.0,
-              help='Mean of distribution to take standard deviations for the '
+              help='Mean of folded normal distribution to take standard deviations for the '
               'Gaussian kernel from')
 @click.option('--legacy/--no-legacy', default=False,
               help='Use ocropy-style degradations')
@@ -362,8 +355,8 @@ def transcription(ctx, text_direction, scale, maxcolseps, black_colseps, font,
 @click.argument('text', nargs=-1, type=click.Path(exists=True))
 def line_generator(ctx, font, maxlines, encoding, normalization, renormalize,
                    reorder, font_size, font_weight, language, max_length, strip,
-                   disable_degradation, binarize, mean, sigma, density,
-                   distort, distortion_sigma, legacy, output, text):
+                   disable_degradation, alpha, beta, distort, distortion_sigma,
+                   legacy, output, text):
     """
     Generates artificial text line training data.
     """
@@ -377,7 +370,8 @@ def line_generator(ctx, font, maxlines, encoding, normalization, renormalize,
                 click.echo(u'[{:2.4f}] Reading {}'.format(time.time() - st_time, t))
             else:
                 spin('Reading texts')
-            lines.update(fp.readlines())
+            for l in fp:
+                lines.add(l.rstrip('\r\n'))
     if normalization:
         lines = set([unicodedata.normalize(normalization, line) for line in lines])
     if strip:
@@ -435,16 +429,10 @@ def line_generator(ctx, font, maxlines, encoding, normalization, renormalize,
                 click.echo('{}: {} {}'.format(e.message, e.width, e.height))
             continue
         if not disable_degradation and not legacy:
-            im = linegen.degrade_line(im)
+            im = linegen.degrade_line(im, alpha=alpha, beta=beta)
             im = linegen.distort_line(im, abs(np.random.normal(distort)), abs(np.random.normal(distortion_sigma)))
         elif legacy:
             im = linegen.ocropy_degrade(im)
-        if binarize:
-            try:
-                im = binarization.nlbin(im)
-            except KrakenInputException as e:
-                click.echo('{}'.format(e.message))
-                continue
         im.save('{}/{:06d}.png'.format(output, idx))
         with open('{}/{:06d}.gt.txt'.format(output, idx), 'wb') as fp:
             if reorder:

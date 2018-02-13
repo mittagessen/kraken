@@ -26,7 +26,9 @@ available at [0].
 Line degradation uses a local model described in [1].
 
 [0] https://github.com/googlei18n/nototools
-[1] Kanungo, Tapas, et al. "A statistical, nonparametric methodology for document degradation model validation." IEEE Transactions on Pattern Analysis and Machine Intelligence 22.11 (2000): 1209-1223.
+[1] Kanungo, Tapas, et al. "A statistical, nonparametric methodology for document degradation model validation." IEEE Transactions on Pattern Analysis and Mach
+ine Intelligence 22.11 (2000): 1209-1223.
+
 """
 
 from __future__ import absolute_import, division, print_function
@@ -55,9 +57,18 @@ cairo = ctypes.CDLL(ctypes.util.find_library('cairo'))
 
 __all__ = ['LineGenerator', 'ocropy_degrade', 'degrade_line', 'distort_line']
 
+class CairoSurface(ctypes.Structure):
+    pass
+
+class CairoContext(ctypes.Structure):
+    pass
+
+
 class PangoFontDescription(ctypes.Structure):
     pass
 
+class PangoLanguage(ctypes.Structure):
+    pass
 
 class PangoLayout(ctypes.Structure):
     pass
@@ -87,31 +98,47 @@ class ensureBytes(object):
             return value.encode('utf-8')
 
 
-cairo.cairo_create.argtypes = [ctypes.c_void_p]
-cairo.cairo_create.restype = ctypes.c_void_p
-cairo.cairo_image_surface_create.restype = ctypes.c_void_p
+cairo.cairo_create.argtypes = [ctypes.POINTER(CairoSurface)]
+cairo.cairo_create.restype = ctypes.POINTER(CairoContext)
+
+cairo.cairo_destroy.argtypes = [ctypes.POINTER(CairoContext)]
+
+cairo.cairo_image_surface_create.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_int]
+cairo.cairo_image_surface_create.restype = ctypes.POINTER(CairoSurface)
+
+cairo.cairo_surface_destroy.argtypes = [ctypes.POINTER(CairoSurface)]
+
 cairo.cairo_image_surface_get_data.restype = ctypes.c_void_p
-cairo.cairo_image_surface_get_data.argtypes = [ctypes.c_void_p]
-cairo.cairo_set_source_rgb.argtypes = [ctypes.c_void_p, ctypes.c_double, ctypes.c_double, ctypes.c_double]
-cairo.cairo_paint.argtypes = [ctypes.c_void_p]
-cairo.cairo_destroy.argtypes = [ctypes.c_void_p]
-cairo.cairo_surface_destroy.argtypes = [ctypes.c_void_p]
+
+cairo.cairo_set_source_rgb.argtypes = [ctypes.POINTER(CairoContext), ctypes.c_double, ctypes.c_double, ctypes.c_double]
+
+cairo.cairo_paint.argtypes = [ctypes.POINTER(CairoContext)]
+
+
+pangocairo.pango_cairo_create_context.argtypes = [ctypes.POINTER(CairoContext)]
+pangocairo.pango_cairo_create_context.restype = ctypes.POINTER(PangoContext)
+
+pangocairo.pango_cairo_update_layout.argtypes = [ctypes.POINTER(CairoContext), ctypes.POINTER(PangoLayout)]
+pangocairo.pango_cairo_show_layout.argtypes = [ctypes.POINTER(CairoContext), ctypes.POINTER(PangoLayout)]
 
 pango.pango_language_from_string.argtypes = [ensureBytes]
-pango.pango_context_set_language.argtypes = [ctypes.POINTER(PangoContext), ensureBytes]
-pango.pango_layout_new.restype = ctypes.POINTER(PangoLayout)
+pango.pango_language_from_string.restype = ctypes.POINTER(PangoLanguage)
+
+pango.pango_context_set_language.argtypes = [ctypes.POINTER(PangoContext), ctypes.POINTER(PangoLanguage)]
+
 pango.pango_font_description_new.restype = ctypes.POINTER(PangoFontDescription)
 pango.pango_font_description_set_family.argtypes = [ctypes.POINTER(PangoFontDescription), ensureBytes]
-pango.pango_layout_set_markup.argtypes = [ctypes.POINTER(PangoLayout), ensureBytes, ctypes.c_int]
-pango.pango_layout_get_pixel_extents.argtypes = [ctypes.POINTER(PangoLayout),
-                                                 ctypes.POINTER(PangoRectangle),
-                                                 ctypes.POINTER(PangoRectangle)]
+pango.pango_font_description_set_size.argtypes = [ctypes.POINTER(PangoFontDescription), ctypes.c_int]
+pango.pango_font_description_set_weight.argtypes = [ctypes.POINTER(PangoFontDescription), ctypes.c_uint]
 
-pangocairo.pango_cairo_context_set_resolution.argtypes = [ctypes.POINTER(PangoContext), ctypes.c_int]
-pangocairo.pango_cairo_create_context.restype = ctypes.POINTER(PangoContext)
-pangocairo.pango_cairo_create_context.argtypes = [ctypes.c_void_p]
-pangocairo.pango_cairo_update_layout.argtypes = [ctypes.c_void_p, ctypes.POINTER(PangoLayout)]
-pangocairo.pango_cairo_show_layout.argtypes = [ctypes.c_void_p, ctypes.POINTER(PangoLayout)]
+pango.pango_layout_new.restype = ctypes.POINTER(PangoLayout)
+pango.pango_layout_set_markup.argtypes = [ctypes.POINTER(PangoLayout), ensureBytes, ctypes.c_int]
+pango.pango_layout_set_font_description.argtypes = [ctypes.POINTER(PangoLayout), ctypes.POINTER(PangoFontDescription)]
+pango.pango_layout_get_context.argtypes = [ctypes.POINTER(PangoLayout)]
+pango.pango_layout_get_context.restype = ctypes.POINTER(PangoContext)
+
+pango.pango_layout_get_pixel_extents.argtypes = [ctypes.POINTER(PangoLayout), ctypes.POINTER(PangoRectangle), ctypes.POINTER(PangoRectangle)]
+
 
 class LineGenerator(object):
     """
@@ -153,8 +180,8 @@ class LineGenerator(object):
         ctypes.memmove(buffer, data, size)
         im = Image.frombuffer("RGBA", (width, height), buffer, "raw", "BGRA", 0, 1)
         cairo.cairo_surface_destroy(real_surface)
-        
         im = im.convert('L')
+        im = ImageOps.expand(im, 5, 255)
         return im
 
 
@@ -162,12 +189,12 @@ def _draw_on_surface(surface, font, language, text):
 
     cr = cairo.cairo_create(surface)
     pangocairo_ctx = pangocairo.pango_cairo_create_context(cr)
-    pangocairo.pango_cairo_context_set_resolution(pangocairo_ctx, 300)
     layout = pango.pango_layout_new(pangocairo_ctx)
-    
+
+    pango_ctx = pango.pango_layout_get_context(layout)
     if language is not None:
         pango_language = pango.pango_language_from_string(language)
-        pango.pango_context_set_language(pangocairo_ctx, pango_language)
+        pango.pango_context_set_language(pango_ctx, pango_language)
 
     pango.pango_layout_set_font_description(layout, font)
 
@@ -175,15 +202,16 @@ def _draw_on_surface(surface, font, language, text):
     cairo.cairo_paint(cr)
 
     pango.pango_layout_set_markup(layout, text, -1)
+
     cairo.cairo_set_source_rgb(cr, 0.0, 0.0, 0.0)
     pangocairo.pango_cairo_update_layout(cr, layout)
     pangocairo.pango_cairo_show_layout(cr, layout)
+
     cairo.cairo_destroy(cr)
 
     ink_rect = PangoRectangle()
     logical_rect = PangoRectangle()
-
-    pango.pango_layout_get_pixel_extents(layout, ink_rect, logical_rect)
+    pango.pango_layout_get_pixel_extents(layout, ctypes.byref(ink_rect), ctypes.byref(logical_rect))
 
     return max(ink_rect.width, logical_rect.width), max(ink_rect.height, logical_rect.height)
 
@@ -246,12 +274,19 @@ def ocropy_degrade(im, distort=1.0, dsigma=20.0, eps=0.03, delta=0.3, degradatio
     return im
 
 
-def degrade_line(im, eta=0, alpha=1.5, beta=1.5, alpha_0 = 1, beta_0 = 1):
+def degrade_line(im, eta=0.0, alpha=1.5, beta=1.5, alpha_0 = 1.0, beta_0 = 1.0):
     """
-    Degrades a line image by adding noise
+    Degrades a line image by adding noise.
+
+    For parameter meanings consult [1].
 
     Args:
         im (PIL.Image): Input image
+        eta (float):
+        alpha (float):
+        beta (float):
+        alpha_0 (float):
+        beta_0 (float):
 
     Returns:
         PIL.Image in mode '1'
@@ -283,6 +318,8 @@ def degrade_line(im, eta=0, alpha=1.5, beta=1.5, alpha_0 = 1, beta_0 = 1):
 def distort_line(im, distort=3.0, sigma=10, eps=0.03, delta=0.3):
     """
     Distorts a line image.
+
+    Run BEFORE degrade_line as a white border of 5 pixels will be added.
 
     Args:
         im (PIL.Image): Input image
