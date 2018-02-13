@@ -18,6 +18,7 @@ from __future__ import absolute_import, division, print_function
 from future import standard_library
 
 import os
+import re
 import time
 import click
 import errno
@@ -31,15 +32,17 @@ from io import BytesIO
 from itertools import cycle
 from bidi.algorithm import get_display
 
+from torch.optim import Adam
+from torch.autograd import Variable
+from torch.utils.data import DataLoader
+
 from kraken import rpred
 from kraken import linegen
 from kraken import pageseg
 from kraken import transcrib
 from kraken import binarization
-from kraken.lib import models
-from kraken.lib import tlstm
-from kraken.lib.lstm import Codec
-from kraken.train import GroundTruthContainer, compute_error
+from kraken.lib import models, vgsl
+from kraken.train import GroundTruthDataset, compute_error
 from kraken.lib.exceptions import KrakenCairoSurfaceException
 from kraken.lib.exceptions import KrakenInputException
 
@@ -64,49 +67,114 @@ def cli(verbose):
 
 @cli.command('train')
 @click.pass_context
-@click.option('-l', '--lineheight', default=48, help='Line image height after normalization')
 @click.option('-p', '--pad', type=click.INT, default=16, help='Left and right '
               'padding around lines')
-@click.option('-S', '--hiddensize', default=100, help='LSTM units in hidden layer')
-@click.option('-o', '--output', type=click.Path(), default='model.clstm', help='Output model file')
+@click.option('-o', '--output', type=click.Path(), default='model.proto', help='Output model file')
+@click.option('-s', '--spec', default='[1,1,0,48 Lbx100]', help='VGSL spec of the network to train. CTC layer will be added automatically.')
 @click.option('-i', '--load', type=click.Path(exists=True, readable=True), help='Load existing file to continue training')
-@click.option('-F', '--savefreq', default=1000, help='Model save frequency during training')
-@click.option('-R', '--report', default=1000, help='Report creation frequency')
-@click.option('-N', '--ntrain', default=1000000, help='Iterations to train.')
-@click.option('-r', '--lrate', default=1e-4, help='LSTM learning rate')
-@click.option('-m', '--momentum', default=0.9, help='LSTM momentum')
+@click.option('-F', '--savefreq', default=1, help='Model save frequency in epochs during training')
+@click.option('-R', '--report', default=1, help='Report creation frequency in epochs')
+@click.option('-N', '--epochs', default=1000, help='Number of epochs to train for')
+@click.option('-d', '--device', default='cpu', help='Select device to use (cpu, gpu:0, gpu:1, ...)')
+@click.option('--optimizer', default='SGD', type=click.Choice(['SGD', 'Adam', 'RMSprop']), help='Select optimizer')
+@click.option('-r', '--lrate', default=1e-4, help='Learning rate')
+@click.option('-w', '--wdecay', default=0.0, help='Adam weight decay')
 @click.option('-p', '--partition', default=0.9, help='Ground truth data partition ratio between train/test set')
-@click.option('-u', '--normalization', type=click.Choice(['NFD', 'NFKD', 'NFC', 'NFKC']), default=None, help='Normalize ground truth')
-@click.option('-n', '--reorder/--no-reorder', default=True, help='Reorder code points to display order')
+@click.option('-u', '--normalization', type=click.Choice(['NFD', 'NFKD', 'NFC', 'NFKC']), default=None, help='Ground truth normalization')
+@click.option('-c', '--codec', default=None, type=click.File(mode='rb', lazy=True), help='Load a codec JSON definition (invalid if loading existing model)')
+@click.option('-n', '--reorder/--no-reorder', default=True, help='Reordering of code points to display order')
 @click.argument('ground_truth', nargs=-1, type=click.Path(exists=True, dir_okay=False))
-def train(ctx, lineheight, pad, hiddensize, output, load, savefreq, report,
-          ntrain, lrate, momentum, partition, normalization, reorder,
+def train(ctx, pad, output, spec, load, savefreq, report, epochs, device,
+          optimizer, lrate, wdecay, partition, normalization, codec, reorder,
           ground_truth):
     """
     Trains a model from image-text pairs.
     """
+    if load and codec:
+        raise click.BadOptionUsage('codec', 'codec option is not supported when loading model')
+
+    # preparse input sizes from vgsl string to seed ground truth data set
+    # sizes and dimension ordering.
+    spec = spec.strip()
+    if spec[0] != '[' or spec[-1] != ']':
+        raise click.BadOptionUsage('VGSL spec {} not bracketed'.format(spec))
+    blocks = spec[1:-1].split(' ')
+    m = re.match(r'(\d+),(\d+),(\d+),(\d+)', blocks[0])
+    if not m:
+        raise click.BadOptionUsage('Invalid input spec {}'.format(blocks[0]))
+    batch, height, width, channels = [int(x) for x in m.groups()]
+    # height 1, arbitrary width, and channels > 3 indicate 8bpp fixed height
+    # (channels) strips of an arbitrary width image => swap height dimension into channels
+    if height == 1 and width == 0 and channels > 3:
+        format = (1, 0, 2)
+        scale = channels
+    # arbitrary (or fixed) height and width and channels 1 or 3 => needs a
+    # summarizing network (or a not yet implemented scale operation) to move
+    # height to the channel dimension.
+    elif height > 1 and width == 0 and channels in (1, 3):
+        format = (0, 1, 2)
+        scale = height
+    # fixed height and width image => bicubic scaling of the input image, disable padding
+    elif height > 0 and width > 0  and channels in (1, 3):
+        format = (0, 1, 2)
+        pad = 0
+        scale = (height, width)
+    elif height == 0 and width == 0  and channels in (1, 3):
+        format = (0, 1, 2)
+        pad = 0
+        scale = 0
+    else:
+        raise click.BadOptionUsage('Invalid input spec {} (variable height and fixed width not supported)'.format(blocks[0]))
+
     st_time = time.time()
     if ctx.meta['verbose'] > 0:
-        click.echo(u'[{:2.4f}] Building ground truth set from {} line images'.format(time.time() - st_time, len(ground_truth)))
+        click.echo(u'[{:2.4f}] Building training data from {} line images'.format(time.time() - st_time, len(ground_truth)))
     else:
-        spin('Building ground truth set')
+        spin('Building training set')
 
-    gt_set = GroundTruthContainer()
 
-    for line in ground_truth:
-        gt_set.add(line, normalization=normalization, reorder=reorder)
-        if ctx.meta['verbose'] > 2:
-            click.echo(u'[{:2.4f}] Adding {}'.format(time.time() - st_time, line))
+    ground_truth = list(ground_truth)
+    np.random.shuffle(ground_truth)
+    tr_im = ground_truth[:int(len(ground_truth) * partition)]
+    te_im = ground_truth[int(len(ground_truth) * partition):]
+
+    gt_set = GroundTruthDataset(tr_im, normalization=normalization, reorder=reorder, scale=scale, pad=pad, format=format)
+    for im in tr_im:
+        if ctx.meta['verbose'] > 1:
+            click.echo(u'[{:2.4f}] Adding line {} to training set'.format(time.time() - st_time, im))
         else:
-            spin('Building ground truth set')
-    gt_set.repartition(partition)
-    if ctx.meta['verbose'] < 3:
+            spin('Building training set')
+        gt_set.add(im)
+    if not ctx.meta['verbose'] > 0:
+       click.secho(u'\b\u2713', fg='green', nl=False)
+       click.echo('\033[?25h\n', nl=False)
+
+    train_loader = DataLoader(gt_set, batch_size=1, shuffle=True)
+
+    test_set = GroundTruthDataset(te_im, normalization=normalization, reorder=reorder, pad=pad, format=format)
+    for im in tr_im:
+        if ctx.meta['verbose'] > 1:
+            click.echo(u'[{:2.4f}] Adding line {} to test set'.format(time.time() - st_time, im))
+        else:
+            spin('Building test set')
+        gt_set.add(im)
+    if not ctx.meta['verbose'] > 0:
+       click.secho(u'\b\u2713', fg='green', nl=False)
+       click.echo('\033[?25h\n', nl=False)
+
+
+    test_loader = DataLoader(gt_set, batch_size=1, shuffle=True)
+
+    if ctx.meta['verbose'] == 0:
         click.echo('')
     if ctx.meta['verbose'] > 0:
-        click.echo(u'[{:2.4f}] Training set {} lines, test set {} lines, alphabet {} symbols'.format(time.time() - st_time, len(gt_set.training_set), len(gt_set.test_set), len(gt_set.training_alphabet)))
+        click.echo(u'[{:2.4f}] Training set {} lines, test set {} lines, alphabet {} symbols'.format(time.time() - st_time, len(gt_set.training_set)), len(test_set.training_set), len(gt_set.alphabet))
+    alpha_diff = set(gt_set.alphabet).symmetric_difference(set(test_set.alphabet))
+    if alpha_diff:
+        click.echo(u'[{:2.4f}] warning: alphabet mismatch {}'.format(time.time() - st_time, alpha_diff))
     if ctx.meta['verbose'] > 1:
         click.echo(u'[{:2.4f}] grapheme\tcount'.format(time.time() - st_time))
-        for k, v in sorted(gt_set.training_alphabet.iteritems(), key=lambda x: x[1], reverse=True):
+        for k, v in sorted(gt_set.alphabet.iteritems(), key=lambda x: x[1], reverse=True):
             if unicodedata.combining(k) or k.isspace():
                 k = unicodedata.name(k)
             else:
@@ -117,60 +185,66 @@ def train(ctx, lineheight, pad, hiddensize, output, load, savefreq, report,
         click.secho(u'\b\u2713', fg='green', nl=False)
         click.echo('\033[?25h\n', nl=False)
 
+    if ctx.meta['verbose'] > 1:
+        click.echo(u'[{:2.4f}] Adding codecs to sets'.format(time.time() - st_time, im))
+    gt_set.add_codec(codec)
+    test_set.add_codec(gt_set.codec)
+
     if load:
         if ctx.meta['verbose'] > 0:
             click.echo(u'[{:2.4f}] Loading existing model from {} '.format(time.time() - st_time, load))
         else:
             spin('Loading model')
 
-        rnn = tlstm.TlstmSeqRecognizer(load)
+       # rnn = tlstm.TlstmSeqRecognizer(load)
 
         if not ctx.meta['verbose'] > 0:
             click.secho(u'\b\u2713', fg='green', nl=False)
             click.echo('\033[?25h\n', nl=False)
-
     else:
         if ctx.meta['verbose'] > 0:
-            click.echo(u'[{:2.4f}] Creating new model with line height {}, {} hidden units, and {} outputs'.format(time.time() - st_time, lineheight, hiddensize, codec))
+            click.echo(u'[{:2.4f}] Creating new model {} with {} outputs'.format(time.time() - st_time, spec, len(gt_set.alphabet)))
         else:
             spin('Initializing model')
 
-        newcodec = Codec()
-        code2char, char2code = {}, {}
-        for code, char in enumerate([126] + [ord(c) for c in sorted(list(gt_set.training_alphabet.keys()))]):
-            code2char[code] = chr(char)
-            char2code[chr(char)] = code
-        newcodec.code2char = code2char
-        newcodec.char2code = char2code
-        rnn = tlstm.TlstmSeqRecognizer.init_model(lineheight, hiddensize, len(newcodec.code2char), newcodec)
+        # append output definition to spec
+        spec = '[{} O1c{}]'.format(spec[1:-1], len(gt_set.codec))
+        nn = vgsl.TorchVGSLModel(spec)
+
         if not ctx.meta['verbose']:
             click.secho(u'\b\u2713', fg='green', nl=False)
             click.echo('\033[?25h\n', nl=False)
 
-    if ctx.meta['verbose'] > 0:
-            click.echo(u'[{:2.4f}] Setting learning rate ({}) and momentum ({}) '.format(time.time() - st_time, lrate, momentum))
-    rnn.setLearningRate(lrate, momentum)
 
-    for trial in range(ntrain):
-        line, s = gt_set.sample()
-        res = rnn.trainString(line, s)
-        if ctx.meta['verbose'] > 2:
-            click.echo(u'[{0:2.4f}] TRU: {1}\n[{0:2.4f}] OUT: {2}'.format(time.time() - st_time, s, res))
-        else:
+    if ctx.meta['verbose'] > 0:
+        click.echo(u'[{:2.4f}] Constructing optimizer (lr: {}, weight decay: {})'.format(time.time() - st_time, lrate, wdecay))
+
+    optimizer = Adam(nn.nn.parameters(), lr=lrate, weight_decay=wdecay)
+
+    for epoch in range(epochs):
+        for trial, (input, target) in enumerate(train_loader):
+            input, target = Variable(input), Variable(target)
+            optimizer.zero_grad()
+            output = nn.nn(input)
+            # height should be 1 by now
+            if output.size(2) != 1:
+                raise KrakenInputException('Expected dimension 3 to be 1, actual {}'.format(output.size()))
+            loss = nn.criterion(output.squeeze(2), target)
+            loss.backward()
+            optimizer.step()
             spin('Training')
 
-        if trial and not trial % savefreq:
-            rnn.save_model('{}_{}'.format(output, trial))
-            if ctx.meta['verbose'] < 3:
-                click.echo('')
-            if ctx.meta['verbose'] > 0:
-                click.echo(u'[{:2.4f}] Saving to {}_{}'.format(time.time() - st_time, output, trial))
+            if trial and not trial % savefreq:
+                nn.save_model('{}_{}'.format(output, trial))
+                if ctx.meta['verbose'] > 0:
+                    click.echo('')
+                    click.echo(u'[{:2.4f}] Saving to {}_{}'.format(time.time() - st_time, output, trial))
 
-        if trial and not trial % report:
-            c, e = compute_error(rnn, gt_set.test_set)
-            if ctx.meta['verbose'] < 3:
-                click.echo('')
-            click.echo(u'[{:2.4f}] Accuracy report ({}) {:0.4f} {} {}'.format(time.time() - st_time, trial, (c-e)/c, c, e))
+#            if trial and not trial % report:
+#                c, e = compute_error(rnn, gt_set.test_set)
+#                if ctx.meta['verbose'] < 3:
+#                    click.echo('')
+#                click.echo(u'[{:2.4f}] Accuracy report ({}) {:0.4f} {} {}'.format(time.time() - st_time, trial, (c-e)/c, c, e))
 
 
 @cli.command('extract')
@@ -292,7 +366,7 @@ def transcription(ctx, text_direction, scale, maxcolseps, black_colseps, font,
         if prefill:
             it = rpred.rpred(prefill, im, res)
             preds = []
-            for pred in it: 
+            for pred in it:
                 if ctx.meta['verbose'] > 0:
                     click.echo(u'[{:2.4f}] {}'.format(time.time() - st_time, pred.prediction))
                 else:
