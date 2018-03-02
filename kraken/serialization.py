@@ -65,6 +65,8 @@ def serialize(records, image_name=u'', image_size=(0, 0), writing_mode='horizont
     some hOCR-specific preprocessing and then renders them through one of
     several jinja2 templates.
 
+    Note: Empty records are ignored for serialization purposes.
+
     Args:
         records (iterable): List of kraken.rpred.ocr_record
         image_name (str): Name of the source image
@@ -80,6 +82,9 @@ def serialize(records, image_name=u'', image_size=(0, 0), writing_mode='horizont
     page = {'lines': [], 'size': image_size, 'name': image_name, 'writing_mode': writing_mode, 'scripts': scripts}
     seg_idx = 0
     for idx, record in enumerate(records):
+        # skip empty records
+        if not record.prediction:
+            break
         line = {'index': idx,
                 'bbox': max_bbox(record.cuts),
                 'cuts': record.cuts,
