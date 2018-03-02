@@ -188,7 +188,7 @@ def mm_rpred(nets, im, bounds, pad=16, line_normalization=True, bidi_reordering=
     for line in bounds['boxes']:
         rec = ocr_record('', [], [])
         for script, (box, coords) in zip(map(lambda x: x[0], line),
-                                         extract_boxes(im, {'text_direction': bounds['text_direction'], 
+                                         extract_boxes(im, {'text_direction': bounds['text_direction'],
                                                             'boxes': map(lambda x: x[1], line)})):
             # check if boxes are non-zero in any dimension
             if sum(coords[::2]) == 0 or coords[3] - coords[1] == 0:
@@ -213,7 +213,7 @@ def mm_rpred(nets, im, bounds, pad=16, line_normalization=True, bidi_reordering=
             result = lstm.translate_back_locations(nets[script].outputs)
             pos = []
             conf = []
-    
+
             for _, start, end, c in result:
                 if bounds['text_direction'].startswith('horizontal'):
                     pos.append((coords[0] + int((start-pad)*scale), coords[1], coords[0] + int((end-pad/2)*scale), coords[3]))
@@ -287,9 +287,9 @@ def rpred(network, im, bounds, pad=16, line_normalization=True, bidi_reordering=
 
         for _, start, end, c in result:
             if bounds['text_direction'].startswith('horizontal'):
-                pos.append((coords[0] + int((start-pad)*scale), coords[1], coords[0] + int((end-pad/2)*scale), coords[3]))
+                pos.append((coords[0] + int((start-pad)*scale), coords[1], coords[0] + int((end-pad)*scale), coords[3]))
             else:
-                pos.append((coords[0], coords[1] + int((start-pad)*scale), coords[2], coords[1] + int((end-pad/2)*scale)))
+                pos.append((coords[0], coords[1] + int((start-pad)*scale), coords[2], coords[1] + int((end-pad)*scale)))
             conf.append(c)
         if bidi_reordering:
             yield bidi_record(ocr_record(pred, pos, conf))
