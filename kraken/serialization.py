@@ -84,7 +84,7 @@ def serialize(records, image_name=u'', image_size=(0, 0), writing_mode='horizont
     for idx, record in enumerate(records):
         # skip empty records
         if not record.prediction:
-            break
+            continue
         line = {'index': idx,
                 'bbox': max_bbox(record.cuts),
                 'cuts': record.cuts,
