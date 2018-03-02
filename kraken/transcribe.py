@@ -29,7 +29,7 @@ from kraken.lib.exceptions import KrakenInputException
 
 from jinja2 import Environment, PackageLoader
 from itertools import zip_longest
-from io import BytesIO 
+from io import BytesIO
 
 import os
 import uuid
@@ -82,7 +82,7 @@ class TranscriptionInterface(object):
         elif segmentation:
             self.text_direction = segmentation['text_direction']
             for bbox in segmentation['boxes']:
-                page['lines'].append({'index': self.line_idx, 
+                page['lines'].append({'index': self.line_idx,
                                       'left': 100*int(bbox[0]) / im.size[0],
                                       'top': 100*int(bbox[1]) / im.size[1],
                                       'width': 100*(bbox[2] - bbox[0])/im.size[0],
