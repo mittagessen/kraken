@@ -55,7 +55,7 @@ class ClstmSeqRecognizer(kraken.lib.lstm.SeqRecognizer):
         self = cls()
         self.rnn = clstm.make_net_init('bidi',
                                        'ninput={}:nhidden={}:noutput={}'.format(ninput,
-                                                                                nhidden, 
+                                                                                nhidden,
                                                                                 len(codec)))
         self.rnn.initialize()
 
