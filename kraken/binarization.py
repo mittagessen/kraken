@@ -18,12 +18,14 @@
 from __future__ import absolute_import, division, print_function
 
 import warnings
+import logging
 import numpy as np
 
 from kraken.lib.util import pil2array, array2pil
 from kraken.lib.exceptions import KrakenInputException
 from scipy.ndimage import filters, interpolation, morphology
 
+logger = logging.getLogger(__name__)
 
 def is_bitonal(im):
     """
@@ -61,19 +63,26 @@ def nlbin(im, threshold=0.5, zoom=0.5, escale=1.0, border=0.1, perc=80,
     Returns:
         PIL.Image containing the binarized image
     """
-    if im.mode == '1':
+    # PIL images may not have a file name
+    im_str = im.filename if hasattr(im, 'filename') else repr(im)
+    logger.info('Binarizing {}'.format(im_str))
+    if is_bitonal(im):
+        logger.info('Skipping binarization because {} is bitonal.'.format(im_str))
         return im
+    # convert to grayscale first
+    logger.debug('Converting {} to grayscale'.format(im_str))
+    im = im.convert('L')
     raw = pil2array(im)
+    logger.debug('Scaling and normalizing')
     # rescale image to between -1 or 0 and 1
     raw = raw/np.float(np.iinfo(raw.dtype).max)
-    if raw.ndim == 3:
-        raw = np.mean(raw, 2)
     # perform image normalization
     if np.amax(raw) == np.amin(raw):
         raise KrakenInputException('Image is empty')
     image = raw-np.amin(raw)
     image /= np.amax(image)
 
+    logger.debug('Interpolation and percentile filtering')
     with warnings.catch_warnings():
         warnings.simplefilter('ignore', UserWarning)
         m = interpolation.zoom(image, zoom)
@@ -87,9 +96,11 @@ def nlbin(im, threshold=0.5, zoom=0.5, escale=1.0, border=0.1, perc=80,
     d0, d1 = flat.shape
     o0, o1 = int(border*d0), int(border*d1)
     est = flat[o0:d0-o0, o1:d1-o1]
+    logger.debug('Threshold estimates {}'.format(est))
     # by default, we use only regions that contain
     # significant variance; this makes the percentile
     # based low and high estimates more reliable
+    logger.debug('Refine estimates')
     v = est-filters.gaussian_filter(est, escale*20.0)
     v = filters.gaussian_filter(v**2, escale*20.0)**0.5
     v = (v > 0.3*np.amax(v))
@@ -102,5 +113,6 @@ def nlbin(im, threshold=0.5, zoom=0.5, escale=1.0, border=0.1, perc=80,
     flat -= lo
     flat /= (hi-lo)
     flat = np.clip(flat, 0, 1)
+    logger.debug('Thresholding at {}'.format(threshold))
     bin = np.array(255*(flat > threshold), 'B')
     return array2pil(bin)
