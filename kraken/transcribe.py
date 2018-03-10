@@ -35,11 +35,17 @@ import os
 import uuid
 import regex
 import base64
+import logging
+
+logger = logging.getLogger()
 
 class TranscriptionInterface(object):
 
     def __init__(self, font=None, font_style=None):
+        logging.info('Initializing transcription object.')
+        logger.debug('Initializing jinja environment.')
         env = Environment(loader=PackageLoader('kraken', 'templates'))
+        logger.debug('Loading transcription template.')
         self.tmpl = env.get_template('layout.html')
         self.pages = []
         self.font = {'font': font, 'style': font_style}
@@ -58,14 +64,18 @@ class TranscriptionInterface(object):
             segmentation (dict): Output of the segment method.
             records (list): A list of ocr_record objects.
         """
+        im_str = im.filename if hasattr(im, 'filename') else repr(im)
+        logger.info('Adding page {} with {} lines'.format(im_str, len(segmentation) if segmentation else len(records)))
         page = {}
         fd = BytesIO()
         im.save(fd, format='png', optimize=True)
         page['index'] = self.page_idx
         self.page_idx += 1
+        logger.debug('Base64 encoding image')
         page['img'] = 'data:image/png;base64,' + base64.b64encode(fd.getvalue()).decode('ascii')
         page['lines'] = []
         if records:
+            logger.debug('Adding records.')
             self.text_direction = segmentation['text_direction']
             for record, bbox in zip(records, segmentation['boxes']):
                 page['lines'].append({'index': self.line_idx, 'text': record.prediction,
@@ -80,6 +90,7 @@ class TranscriptionInterface(object):
 
                 self.line_idx += 1
         elif segmentation:
+            logger.debug('Adding segmentations.')
             self.text_direction = segmentation['text_direction']
             for bbox in segmentation['boxes']:
                 page['lines'].append({'index': self.line_idx,
@@ -103,6 +114,7 @@ class TranscriptionInterface(object):
         Args:
             fd (File): File descriptor (mode='rb') to write to.
         """
+        logger.info('Rendering and writing transcription.')
         fd.write(self.tmpl.render(uuid=str(uuid.uuid4()), pages=self.pages,
                                   font=self.font,
                                   text_direction=self.text_direction).encode('utf-8'))
