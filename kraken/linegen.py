@@ -181,6 +181,7 @@ class LineGenerator(object):
         width, height = _draw_on_surface(temp_surface, self.font, self.language, text)
         cairo.cairo_surface_destroy(temp_surface)
         if width == 0 or height == 0:
+            logger.error('Surface for \'{}\' zero pixels in at least one dimension'.format(text))
             raise KrakenCairoSurfaceException('Surface zero pixels in at least one dimension', width, height)
         logger.debug('Creating sized cairo surface')
         real_surface = cairo.cairo_image_surface_create(0, width, height)

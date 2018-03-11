@@ -62,6 +62,9 @@ def nlbin(im, threshold=0.5, zoom=0.5, escale=1.0, border=0.1, perc=80,
 
     Returns:
         PIL.Image containing the binarized image
+
+    Raises:
+        KrakenInputException when trying to binarize an empty image.
     """
     # PIL images may not have a file name
     im_str = im.filename if hasattr(im, 'filename') else repr(im)
@@ -78,6 +81,7 @@ def nlbin(im, threshold=0.5, zoom=0.5, escale=1.0, border=0.1, perc=80,
     raw = raw/np.float(np.iinfo(raw.dtype).max)
     # perform image normalization
     if np.amax(raw) == np.amin(raw):
+        logger.warning('Trying to binarize empty image {}'.format(im_str))
         raise KrakenInputException('Image is empty')
     image = raw-np.amin(raw)
     image /= np.amax(image)

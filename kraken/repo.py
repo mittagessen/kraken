@@ -43,6 +43,7 @@ def get_model(model_id, path, callback):
     callback()
     resp = r.json()
     if 'object' not in resp:
+        logger.error('No \'object\' field in repo head API response.')
         raise KrakenRepoException('{}: {}'.format(r.status_code, resp['message']))
     head = resp['object']['sha']
     logger.debug('Retrieving tree of model repository')
@@ -50,6 +51,7 @@ def get_model(model_id, path, callback):
     callback()
     resp = r.json()
     if 'tree' not in resp:
+        logger.error('No \'tree\' field in repo API response.')
         raise KrakenRepoException('{}: {}'.format(r.status_code, resp['message']))
     url = None
     for el in resp['tree']:
@@ -63,10 +65,12 @@ def get_model(model_id, path, callback):
             url = el['url']
             break
     if not url:
-        raise KrakenRepoException('No such model known')
+        logger.error('Model {} not in repository.'.format(model_id))
+        raise KrakenRepoException('Modle {} not in repository'.format(model_id))
     with closing(requests.get(url, headers={'Accept': 'application/vnd.github.v3.raw'},
                  stream=True)) as r:
         with open(spath, 'wb') as f:
+            logger.debug('Downloading model')
             for chunk in r.iter_content(chunk_size=1024):
                 callback()
                 f.write(chunk)
@@ -77,12 +81,14 @@ def get_description(model_id):
     r = requests.get('{}{}'.format(MODEL_REPO, 'git/refs/heads/master'))
     resp = r.json()
     if 'object' not in resp:
+        logger.error('No \'object\' field in repo head API response.')
         raise KrakenRepoException('{}: {}'.format(r.status_code, resp['message']))
     head = resp['object']['sha']
     logger.debug('Retrieving tree of model repository')
     r = requests.get('{}{}{}'.format(MODEL_REPO, 'git/trees/', head), params={'recursive': 1})
     resp = r.json()
     if 'tree' not in resp:
+        logger.error('No \'tree\' field in repo API response.')
         raise KrakenRepoException('{}: {}'.format(r.status_code, resp['message']))
     for el in resp['tree']:
         components = el['path'].split('/')
@@ -91,13 +97,13 @@ def get_description(model_id):
             raw = base64.b64decode(requests.get(el['url']).json()['content']).decode('utf-8')
             return defaultdict(str, json.loads(raw))
 
-
 def get_listing(callback):
     logger.info('Retrieving model list')
     r = requests.get('{}{}'.format(MODEL_REPO, 'git/refs/heads/master'))
     callback()
     resp = r.json()
     if 'object' not in resp:
+        logger.error('No \'object\' field in repo head API response.')
         raise KrakenRepoException('{}: {}'.format(r.status_code, resp['message']))
     head = resp['object']['sha']
     logger.debug('Retrieving tree of model repository')
@@ -105,6 +111,7 @@ def get_listing(callback):
     callback()
     resp = r.json()
     if 'tree' not in resp:
+        logger.error('No \'tree\' field in repo API response.')
         raise KrakenRepoException('{}: {}'.format(r.status_code, resp['message']))
     models = {}
     for el in resp['tree']:
@@ -116,6 +123,7 @@ def get_listing(callback):
             logger.debug('Retrieving description for {}'.format(components[1]))
             r = requests.get(el['url'])
             if not r.ok:
+                logger.error('Requests to \'{}\' failed with status {}'.format(el['url'], r.status_code))
                 raise KrakenRepoException('{}: {}'.format(r.status_code, r.json()['message']))
             raw = base64.b64decode(requests.get(el['url']).json()['content']).decode('utf-8')
             callback()

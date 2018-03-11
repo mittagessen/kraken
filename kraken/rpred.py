@@ -131,6 +131,7 @@ def extract_boxes(im, bounds):
             box = list(box)
         if (box < [0, 0, 0, 0] or box[::2] > [im.size[0], im.size[0]] or
            box[1::2] > [im.size[1], im.size[1]]):
+            logger.error('bbox {} is outside of image bounds {}'.format(box, im.size))
             raise KrakenInputException('Line outside of image bounds')
         yield im.crop(box).rotate(angle, expand=True), box
 
@@ -195,12 +196,12 @@ def mm_rpred(nets, im, bounds, pad=16, line_normalization=True, bidi_reordering=
                                                             'boxes': map(lambda x: x[1], line)})):
             # check if boxes are non-zero in any dimension
             if sum(coords[::2]) == 0 or coords[3] - coords[1] == 0:
-                logger.debug('Run with zero dimension. Skipping.')
+                logger.warning('Run with zero dimension. Skipping.')
                 continue
             raw_line = pil2array(box)
             # check if line is non-zero
             if np.amax(raw_line) == np.amin(raw_line):
-                logger.debug('Empty run. Skipping.')
+                logger.warning('Empty run. Skipping.')
                 continue
             if line_normalization:
                 # fail gracefully and return no recognition result in case the
@@ -209,7 +210,7 @@ def mm_rpred(nets, im, bounds, pad=16, line_normalization=True, bidi_reordering=
                     lnorm = getattr(nets[script], 'lnorm', CenterNormalizer())
                     box = dewarp(lnorm, box)
                 except Exception as e:
-                    logger.debug('Dewarping failed. Skipping.')
+                    logger.warning('Dewarping for bbox {} failed. Skipping.'.format(coords))
                     continue
             line = pil2array(box)
             logger.debug('Preparing run.')
@@ -273,13 +274,13 @@ def rpred(network, im, bounds, pad=16, line_normalization=True, bidi_reordering=
     for box, coords in extract_boxes(im, bounds):
         # check if boxes are non-zero in any dimension
         if sum(coords[::2]) == 0 or coords[3] - coords[1] == 0:
-            logger.debug('Line with zero dimension. Emitting empty record.')
+            logger.warning('bbox {} with zero dimension. Emitting empty record.'.format(coords))
             yield ocr_record('', [], [])
             continue
         raw_line = pil2array(box)
         # check if line is non-zero
         if np.amax(raw_line) == np.amin(raw_line):
-            logger.debug('Empty line. Emitting empty record.')
+            logger.warning('Empty line {}. Emitting empty record.'.format(coords))
             yield ocr_record('', [], [])
             continue
         if line_normalization:
@@ -288,7 +289,7 @@ def rpred(network, im, bounds, pad=16, line_normalization=True, bidi_reordering=
             try:
                 box = dewarp(lnorm, box)
             except:
-                logger.debug('Dewarping failed. Emitting empty record.')
+                logger.warning('Dewarping for bbox {} failed. Emitting empty record.'.format(coords))
                 yield ocr_record('', [], [])
                 continue
         line = pil2array(box)

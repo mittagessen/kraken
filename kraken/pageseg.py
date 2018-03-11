@@ -378,7 +378,8 @@ def segment(im, text_direction='horizontal-lr', scale=None, maxcolseps=2, black_
     logger.info('Segmenting {}'.format(im_str))
 
     if im.mode != '1' and not is_bitonal(im):
-        raise KrakenInputException('Image {} is not bi-level'.format(im))
+        logger.error('Image {} is not bi-level'.format(im_str))
+        raise KrakenInputException('Image {} is not bi-level'.format(im_str))
 
     # rotate input image for vertical lines
     if text_direction.startswith('horizontal'):
@@ -391,7 +392,8 @@ def segment(im, text_direction='horizontal-lr', scale=None, maxcolseps=2, black_
         angle = 90
         offset = (im.size[0], 0)
     else:
-        raise KrakenInputException('Invalid text direction')
+        logger.error('Invalid text direction \'{}\''.format(text_direction))
+        raise KrakenInputException('Invalid text direction {}'.format(text_direction))
 
     logger.debug('Rotating input image by {} degrees'.format(angle))
     im = im.rotate(angle, expand=True)
@@ -415,7 +417,7 @@ def segment(im, text_direction='horizontal-lr', scale=None, maxcolseps=2, black_
         else:
             colseps = compute_white_colseps(binary, scale, maxcolseps)
     except ValueError:
-        logger.info('Exception in column finder (probably empty image) for {}.'.format(im_str))
+        logger.warning('Exception in column finder (probably empty image) for {}.'.format(im_str))
         return {'text_direction': text_direction, 'boxes':  []}
 
     bottom, top, boxmap = compute_gradmaps(binary, scale)
