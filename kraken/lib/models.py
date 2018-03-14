@@ -242,17 +242,17 @@ def load_clstm(fname):
         KrakenInvalidModelException if no clstm module is available or the
         model is broken.
     """
-    logger.info('Trying to load clstm model from {}'.format(fname))
+    logger.info(u'Trying to load clstm model from {}'.format(fname))
     try:
         import clstm
     except ImportError:
-        logger.debug('No clstm module available')
+        logger.debug(u'No clstm module available')
         raise KrakenInvalidModelException('No clstm module available')
 
     try:
         return ClstmSeqRecognizer(fname)
     except Exception as e:
-        logger.debug('Loading clstm model failed.')
+        logger.debug(u'Loading clstm model failed.')
         raise KrakenInvalidModelException(str(e))
 
 
@@ -267,30 +267,30 @@ def load_pronn(fname):
     Returns:
         A kraken.lib.lstm.SeqRecognizer object
     """
-    logger.info('Trying to load prornn model from {}'.format(fname))
+    logger.info(u'Trying to load prornn model from {}'.format(fname))
     with open(fname, 'rb') as fp:
-        logger.debug('Initializing protobuf message')
+        logger.debug(u'Initializing protobuf message')
         proto = pyrnn_pb2.pyrnn()
         try:
             proto.ParseFromString(fp.read())
         except:
-            logger.debug('File does not contain valid proto msg')
+            logger.debug(u'File does not contain valid proto msg')
             raise KrakenInvalidModelException('File does not contain valid proto msg')
         if not proto.IsInitialized():
-            logger.debug('Message in file incomplete')
+            logger.debug(u'Message in file incomplete')
             raise KrakenInvalidModelException('Model incomplete')
         # extract codec
-        logger.debug('Extracting codec')
+        logger.debug(u'Extracting codec')
         codec = kraken.lib.lstm.Codec().init(proto.codec)
         hiddensize = proto.fwdnet.wgi.dim[0]
         # next build a line estimator
-        logger.debug('Add line estimator')
+        logger.debug(u'Add line estimator')
         lnorm = kraken.lib.lineest.CenterNormalizer(proto.ninput)
         network = kraken.lib.lstm.SeqRecognizer(lnorm.target_height,
                                                 hiddensize,
                                                 codec=codec,
                                                 normalize=kraken.lib.lstm.normalize_nfkc)
-        logger.debug('Setting weights on BIDILSTM')
+        logger.debug(u'Setting weights on BIDILSTM')
         parallel, softmax = network.lstm.nets
         fwdnet, revnet = parallel.nets
         revnet = revnet.net
@@ -317,9 +317,9 @@ def load_pyrnn(fname):
         KrakenInvalidModelException on python 3, when unpickling fails, or the
         unpickled object is not a SeqRecognizer.
     """
-    logger.info('Trying to load pyrnn model from {}'.format(fname))
+    logger.info(u'Trying to load pyrnn model from {}'.format(fname))
     if not PY2:
-        logger.error('Loading pickle models is not support on python 3')
+        logger.error(u'Loading pickle models is not support on python 3')
         raise KrakenInvalidModelException('Loading pickle models is not '
                                           'supported on python 3')
     import cPickle
@@ -343,10 +343,10 @@ def load_pyrnn(fname):
         try:
             rnn = unpickler.load()
         except Exception as e:
-            logger.error('Model file is not a pickle')
+            logger.error(u'Model file is not a pickle')
             raise KrakenInvalidModelException(str(e))
         if not isinstance(rnn, kraken.lib.lstm.SeqRecognizer):
-            logger.error('Model file is {} instead of SeqRecognizer'.format(type(rnn).__name__))
+            logger.error(u'Model file is {} instead of SeqRecognizer'.format(type(rnn).__name__))
             raise KrakenInvalidModelException('Pickle is {} instead of '
                                               'SeqRecognizer'.format(type(rnn).__name__))
         return rnn
@@ -362,7 +362,7 @@ def pyrnn_to_pronn(pyrnn=None, output='en-default.pronn'):
         pyrnn (kraken.lib.lstm.SegRecognizer): pyrnn model
         output (str): path of the converted protobuf model
     """
-    logger.info('Converting pyrnn model to prornn')
+    logger.info(u'Converting pyrnn model to prornn')
     proto = pyrnn_pb2.pyrnn()
     proto.kind = 'pyrnn-bidi'
     proto.ninput = pyrnn.Ni
@@ -383,6 +383,6 @@ def pyrnn_to_pronn(pyrnn=None, output='en-default.pronn'):
             rev_ar.value.extend(rev_weights.reshape(-1).tolist())
     proto.softmax.w2.dim.extend(softmax.W2.shape)
     proto.softmax.w2.value.extend(softmax.W2.reshape(-1).tolist())
-    logger.debug('Saving converted model to {}'.format(output))
+    logger.debug(u'Saving converted model to {}'.format(output))
     with open(output, 'wb') as fp:
         fp.write(proto.SerializeToString())

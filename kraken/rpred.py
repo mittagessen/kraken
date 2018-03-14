@@ -131,7 +131,7 @@ def extract_boxes(im, bounds):
             box = list(box)
         if (box < [0, 0, 0, 0] or box[::2] > [im.size[0], im.size[0]] or
            box[1::2] > [im.size[1], im.size[1]]):
-            logger.error('bbox {} is outside of image bounds {}'.format(box, im.size))
+            logger.error(u'bbox {} is outside of image bounds {}'.format(box, im.size))
             raise KrakenInputException('Line outside of image bounds')
         yield im.crop(box).rotate(angle, expand=True), box
 
@@ -188,7 +188,7 @@ def mm_rpred(nets, im, bounds, pad=16, line_normalization=True, bidi_reordering=
         An ocr_record containing the recognized text, absolute character
         positions, and confidence values for each character.
     """
-    logger.info('Running {} multi-script recognizers on {} with {} lines'.format(len(nets), im_str, len(bounds['boxes'])))
+    logger.info(u'Running {} multi-script recognizers on {} with {} lines'.format(len(nets), im_str, len(bounds['boxes'])))
     for line in bounds['boxes']:
         rec = ocr_record('', [], [])
         for script, (box, coords) in zip(map(lambda x: x[0], line),
@@ -196,12 +196,12 @@ def mm_rpred(nets, im, bounds, pad=16, line_normalization=True, bidi_reordering=
                                                             'boxes': map(lambda x: x[1], line)})):
             # check if boxes are non-zero in any dimension
             if sum(coords[::2]) == 0 or coords[3] - coords[1] == 0:
-                logger.warning('Run with zero dimension. Skipping.')
+                logger.warning(u'Run with zero dimension. Skipping.')
                 continue
             raw_line = pil2array(box)
             # check if line is non-zero
             if np.amax(raw_line) == np.amin(raw_line):
-                logger.warning('Empty run. Skipping.')
+                logger.warning(u'Empty run. Skipping.')
                 continue
             if line_normalization:
                 # fail gracefully and return no recognition result in case the
@@ -210,17 +210,17 @@ def mm_rpred(nets, im, bounds, pad=16, line_normalization=True, bidi_reordering=
                     lnorm = getattr(nets[script], 'lnorm', CenterNormalizer())
                     box = dewarp(lnorm, box)
                 except Exception as e:
-                    logger.warning('Dewarping for bbox {} failed. Skipping.'.format(coords))
+                    logger.warning(u'Dewarping for bbox {} failed. Skipping.'.format(coords))
                     continue
             line = pil2array(box)
-            logger.debug('Preparing run.')
+            logger.debug(u'Preparing run.')
             line = lstm.prepare_line(line, pad)
-            logger.debug('Forward pass with model {}'.format(script))
+            logger.debug(u'Forward pass with model {}'.format(script))
             pred = nets[script].predictString(line)
-            logger.info('Prediction: {}'.format(pred))
+            logger.info(u'Prediction: {}'.format(pred))
             # calculate recognized LSTM locations of characters
             scale = len(raw_line.T)/(len(nets[script].outputs)-2 * pad)
-            logger.debug('Extracting labels.')
+            logger.debug(u'Extracting labels.')
             result = lstm.translate_back_locations(nets[script].outputs)
             pos = []
             conf = []
@@ -235,7 +235,7 @@ def mm_rpred(nets, im, bounds, pad=16, line_normalization=True, bidi_reordering=
             rec.cuts.extend(pos)
             rec.confidences.extend(conf)
         if bidi_reordering:
-            logger.debug('BiDi reordering record.')
+            logger.debug(u'BiDi reordering record.')
             yield bidi_record(rec)
         else:
             yield rec
@@ -267,20 +267,20 @@ def rpred(network, im, bounds, pad=16, line_normalization=True, bidi_reordering=
         positions, and confidence values for each character.
     """
     im_str = im.filename if hasattr(im, 'filename') else repr(im)
-    logger.info('Running recognizer on {} with {} lines'.format(im_str, len(bounds['boxes'])))
-    logger.debug('Loading line normalizer')
+    logger.info(u'Running recognizer on {} with {} lines'.format(im_str, len(bounds['boxes'])))
+    logger.debug(u'Loading line normalizer')
     lnorm = getattr(network, 'lnorm', CenterNormalizer())
 
     for box, coords in extract_boxes(im, bounds):
         # check if boxes are non-zero in any dimension
         if sum(coords[::2]) == 0 or coords[3] - coords[1] == 0:
-            logger.warning('bbox {} with zero dimension. Emitting empty record.'.format(coords))
+            logger.warning(u'bbox {} with zero dimension. Emitting empty record.'.format(coords))
             yield ocr_record('', [], [])
             continue
         raw_line = pil2array(box)
         # check if line is non-zero
         if np.amax(raw_line) == np.amin(raw_line):
-            logger.warning('Empty line {}. Emitting empty record.'.format(coords))
+            logger.warning(u'Empty line {}. Emitting empty record.'.format(coords))
             yield ocr_record('', [], [])
             continue
         if line_normalization:
@@ -289,19 +289,19 @@ def rpred(network, im, bounds, pad=16, line_normalization=True, bidi_reordering=
             try:
                 box = dewarp(lnorm, box)
             except:
-                logger.warning('Dewarping for bbox {} failed. Emitting empty record.'.format(coords))
+                logger.warning(u'Dewarping for bbox {} failed. Emitting empty record.'.format(coords))
                 yield ocr_record('', [], [])
                 continue
         line = pil2array(box)
-        logger.debug('Preparing line.')
+        logger.debug(u'Preparing line.')
         line = lstm.prepare_line(line, pad)
-        logger.debug('Performing forward pass.')
+        logger.debug(u'Performing forward pass.')
         pred = network.predictString(line)
-        logger.info('Prediction: {}'.format(pred))
+        logger.info(u'Prediction: {}'.format(pred))
 
         # calculate recognized LSTM locations of characters
         scale = len(raw_line.T)/(len(network.outputs)-2 * pad)
-        logger.debug('Extracting labels.')
+        logger.debug(u'Extracting labels.')
         result = lstm.translate_back_locations(network.outputs)
         pos = []
         conf = []
@@ -313,7 +313,7 @@ def rpred(network, im, bounds, pad=16, line_normalization=True, bidi_reordering=
                 pos.append((coords[0], coords[1] + int((start-pad)*scale), coords[2], coords[1] + int((end-pad)*scale)))
             conf.append(c)
         if bidi_reordering:
-            logger.debug('BiDi reordering record.')
+            logger.debug(u'BiDi reordering record.')
             yield bidi_record(ocr_record(pred, pos, conf))
         else:
             yield ocr_record(pred, pos, conf)

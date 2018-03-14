@@ -68,25 +68,25 @@ def nlbin(im, threshold=0.5, zoom=0.5, escale=1.0, border=0.1, perc=80,
     """
     # PIL images may not have a file name
     im_str = im.filename if hasattr(im, 'filename') else repr(im)
-    logger.info('Binarizing {}'.format(im_str))
+    logger.info(u'Binarizing {}'.format(im_str))
     if is_bitonal(im):
-        logger.info('Skipping binarization because {} is bitonal.'.format(im_str))
+        logger.info(u'Skipping binarization because {} is bitonal.'.format(im_str))
         return im
     # convert to grayscale first
-    logger.debug('Converting {} to grayscale'.format(im_str))
+    logger.debug(u'Converting {} to grayscale'.format(im_str))
     im = im.convert('L')
     raw = pil2array(im)
-    logger.debug('Scaling and normalizing')
+    logger.debug(u'Scaling and normalizing')
     # rescale image to between -1 or 0 and 1
     raw = raw/np.float(np.iinfo(raw.dtype).max)
     # perform image normalization
     if np.amax(raw) == np.amin(raw):
-        logger.warning('Trying to binarize empty image {}'.format(im_str))
+        logger.warning(u'Trying to binarize empty image {}'.format(im_str))
         raise KrakenInputException('Image is empty')
     image = raw-np.amin(raw)
     image /= np.amax(image)
 
-    logger.debug('Interpolation and percentile filtering')
+    logger.debug(u'Interpolation and percentile filtering')
     with warnings.catch_warnings():
         warnings.simplefilter('ignore', UserWarning)
         m = interpolation.zoom(image, zoom)
@@ -100,11 +100,11 @@ def nlbin(im, threshold=0.5, zoom=0.5, escale=1.0, border=0.1, perc=80,
     d0, d1 = flat.shape
     o0, o1 = int(border*d0), int(border*d1)
     est = flat[o0:d0-o0, o1:d1-o1]
-    logger.debug('Threshold estimates {}'.format(est))
+    logger.debug(u'Threshold estimates {}'.format(est))
     # by default, we use only regions that contain
     # significant variance; this makes the percentile
     # based low and high estimates more reliable
-    logger.debug('Refine estimates')
+    logger.debug(u'Refine estimates')
     v = est-filters.gaussian_filter(est, escale*20.0)
     v = filters.gaussian_filter(v**2, escale*20.0)**0.5
     v = (v > 0.3*np.amax(v))
@@ -117,6 +117,6 @@ def nlbin(im, threshold=0.5, zoom=0.5, escale=1.0, border=0.1, perc=80,
     flat -= lo
     flat /= (hi-lo)
     flat = np.clip(flat, 0, 1)
-    logger.debug('Thresholding at {}'.format(threshold))
+    logger.debug(u'Thresholding at {}'.format(threshold))
     bin = np.array(255*(flat > threshold), 'B')
     return array2pil(bin)

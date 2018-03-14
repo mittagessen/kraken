@@ -25,7 +25,7 @@ from jinja2 import Environment, PackageLoader
 import regex
 import logging
 
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 
 __all__ = ['serialize']
 
@@ -82,13 +82,13 @@ def serialize(records, image_name=u'', image_size=(0, 0), writing_mode='horizont
         template (str): Selector for the serialization format. May be
                         'hocr' or 'alto'.
     """
-    logger.info('Serialize {} records from {} with template {}.'.format(len(records), image_name, template))
+    logger.info(u'Serialize {} records from {} with template {}.'.format(len(records), image_name, template))
     page = {'lines': [], 'size': image_size, 'name': image_name, 'writing_mode': writing_mode, 'scripts': scripts}
     seg_idx = 0
     for idx, record in enumerate(records):
         # skip empty records
         if not record.prediction:
-            logger.debug('Empty record. Skipping')
+            logger.debug(u'Empty record. Skipping')
             continue
         line = {'index': idx,
                 'bbox': max_bbox(record.cuts),
@@ -98,7 +98,7 @@ def serialize(records, image_name=u'', image_size=(0, 0), writing_mode='horizont
                 }
         splits = regex.split(r'(\s+)', record.prediction)
         line_offset = 0
-        logger.debug('Record contains {} segments'.format(len(splits)))
+        logger.debug(u'Record contains {} segments'.format(len(splits)))
         for segment in splits:
             if len(segment) == 0:
                 continue
@@ -110,11 +110,11 @@ def serialize(records, image_name=u'', image_size=(0, 0), writing_mode='horizont
             seg_idx += 1
             line_offset += len(segment)
         page['lines'].append(line)
-    logger.debug('Initializing jinja environment.')
+    logger.debug(u'Initializing jinja environment.')
     env = Environment(loader=PackageLoader('kraken', 'templates'), trim_blocks=True, lstrip_blocks=True)
     env.tests['whitespace'] = str.isspace
     env.filters['rescale'] = _rescale
-    logger.debug('Retrieving template.')
+    logger.debug(u'Retrieving template.')
     tmpl = env.get_template(template)
-    logger.debug('Rendering data.')
+    logger.debug(u'Rendering data.')
     return tmpl.render(page=page)

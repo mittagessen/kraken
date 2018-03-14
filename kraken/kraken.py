@@ -137,7 +137,7 @@ def recognizer(model, pad, bidi_reordering, base_image, input, output, lines):
     ctx = click.get_current_context()
     with open_file(output, 'w', encoding='utf-8') as fp:
         message(u'Writing recognition results for {}\t'.format(base_image), nl=False)
-        logger.info('Serializing as {} into {}'.format(ctx.meta['mode'], fp.name))
+        logger.info(u'Serializing as {} into {}'.format(ctx.meta['mode'], fp.name))
         if ctx.meta['mode'] != 'text':
             fp.write(serialization.serialize(preds, base_image,
                      Image.open(base_image).size, ctx.meta['text_direction'],

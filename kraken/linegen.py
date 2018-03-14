@@ -155,7 +155,7 @@ class LineGenerator(object):
         self.language = language
         self.font = pango.pango_font_description_new()
         # XXX: get PANGO_SCALE programatically from somewhere
-        logger.debug('Setting font {}, size {}, weight {}'.format(family, font_size, font_weight))
+        logger.debug(u'Setting font {}, size {}, weight {}'.format(family, font_size, font_weight))
         pango.pango_font_description_set_size(self.font, font_size * 1024)
         pango.pango_font_description_set_family(self.font, family)
         pango.pango_font_description_set_weight(self.font, font_weight)
@@ -175,26 +175,26 @@ class LineGenerator(object):
             KrakenCairoSurfaceException if the Cairo surface couldn't be created
             (usually caused by invalid dimensions.
         """
-        logger.info('Rendering line \'{}\''.format(text))
-        logger.debug('Creating temporary cairo surface')
+        logger.info(u'Rendering line \'{}\''.format(text))
+        logger.debug(u'Creating temporary cairo surface')
         temp_surface = cairo.cairo_image_surface_create(0, 0, 0)
         width, height = _draw_on_surface(temp_surface, self.font, self.language, text)
         cairo.cairo_surface_destroy(temp_surface)
         if width == 0 or height == 0:
-            logger.error('Surface for \'{}\' zero pixels in at least one dimension'.format(text))
+            logger.error(u'Surface for \'{}\' zero pixels in at least one dimension'.format(text))
             raise KrakenCairoSurfaceException('Surface zero pixels in at least one dimension', width, height)
-        logger.debug('Creating sized cairo surface')
+        logger.debug(u'Creating sized cairo surface')
         real_surface = cairo.cairo_image_surface_create(0, width, height)
         _draw_on_surface(real_surface, self.font, self.language, text)
-        logger.debug('Extracing data from real surface')
+        logger.debug(u'Extracing data from real surface')
         data = cairo.cairo_image_surface_get_data(real_surface)
         size = int(4 * width * height)
         buffer = ctypes.create_string_buffer(size)
         ctypes.memmove(buffer, data, size)
-        logger.debug('Loading data into PIL image')
+        logger.debug(u'Loading data into PIL image')
         im = Image.frombuffer("RGBA", (width, height), buffer, "raw", "BGRA", 0, 1)
         cairo.cairo_surface_destroy(real_surface)
-        logger.debug('Expand and grayscale image')
+        logger.debug(u'Expand and grayscale image')
         im = im.convert('L')
         im = ImageOps.expand(im, 5, 255)
         return im
@@ -202,36 +202,36 @@ class LineGenerator(object):
 
 def _draw_on_surface(surface, font, language, text):
 
-    logger.debug('Creating cairo and pangocairo contexts')
+    logger.debug(u'Creating cairo and pangocairo contexts')
     cr = cairo.cairo_create(surface)
     pangocairo_ctx = pangocairo.pango_cairo_create_context(cr)
-    logger.debug('Creating pangocairo layout')
+    logger.debug(u'Creating pangocairo layout')
     layout = pango.pango_layout_new(pangocairo_ctx)
 
     pango_ctx = pango.pango_layout_get_context(layout)
     if language is not None:
-        logger.debug('Setting language {} on context'.format(language))
+        logger.debug(u'Setting language {} on context'.format(language))
         pango_language = pango.pango_language_from_string(language)
         pango.pango_context_set_language(pango_ctx, pango_language)
 
-    logger.debug('Setting font description on layout')
+    logger.debug(u'Setting font description on layout')
     pango.pango_layout_set_font_description(layout, font)
 
-    logger.debug('Filling background of surface')
+    logger.debug(u'Filling background of surface')
     cairo.cairo_set_source_rgb(cr, 1.0, 1.0, 1.0)
     cairo.cairo_paint(cr)
 
-    logger.debug('Typsetting text')
+    logger.debug(u'Typsetting text')
     pango.pango_layout_set_markup(layout, text, -1)
 
-    logger.debug('Drawing text')
+    logger.debug(u'Drawing text')
     cairo.cairo_set_source_rgb(cr, 0.0, 0.0, 0.0)
     pangocairo.pango_cairo_update_layout(cr, layout)
     pangocairo.pango_cairo_show_layout(cr, layout)
 
     cairo.cairo_destroy(cr)
 
-    logger.debug('Getting pixel extents')
+    logger.debug(u'Getting pixel extents')
     ink_rect = PangoRectangle()
     logical_rect = PangoRectangle()
     pango.pango_layout_get_pixel_extents(layout, ctypes.byref(ink_rect), ctypes.byref(logical_rect))
@@ -258,21 +258,21 @@ def ocropy_degrade(im, distort=1.0, dsigma=20.0, eps=0.03, delta=0.3, degradatio
     w, h = im.size
     # XXX: determine correct output shape from transformation matrices instead
     # of guesstimating.
-    logger.debug('Pasting source image into canvas')
+    logger.debug(u'Pasting source image into canvas')
     image = Image.new('L', (int(1.5*w), 4*h), 255)
     image.paste(im, (int((image.size[0] - w) / 2), int((image.size[1] - h) / 2)))
     a = pil2array(image.convert('L'))
-    logger.debug('Selecting degradations')
+    logger.debug(u'Selecting degradations')
     (sigma, ssigma, threshold, sthreshold) = degradations[np.random.choice(len(degradations))]
     sigma += (2 * np.random.rand() - 1) * ssigma
     threshold += (2 * np.random.rand() - 1) * sthreshold
     a = a * 1.0 / np.amax(a)
     if sigma > 0.0:
-        logger.debug('Apply Gaussian filter')
+        logger.debug(u'Apply Gaussian filter')
         a = gaussian_filter(a, sigma)
-    logger.debug('Adding noise')
+    logger.debug(u'Adding noise')
     a += np.clip(np.random.randn(*a.shape) * 0.2, -0.25, 0.25)
-    logger.debug('Perform affine transformation and resize')
+    logger.debug(u'Perform affine transformation and resize')
     m = np.array([[1 + eps * np.random.randn(), 0.0], [eps * np.random.randn(), 1.0 + eps * np.random.randn()]])
     w, h = a.shape
     c = np.array([w / 2.0, h / 2])
@@ -286,7 +286,7 @@ def ocropy_degrade(im, distort=1.0, dsigma=20.0, eps=0.03, delta=0.3, degradatio
     c1 = c.stop
     a = a[r0 - 5:r1 + 5, c0 - 5:c1 + 5]
     if distort > 0:
-        logger.debug('Perform geometric transformation')
+        logger.debug(u'Perform geometric transformation')
         h, w = a.shape
         hs = np.random.randn(h, w)
         ws = np.random.randn(h, w)
@@ -320,34 +320,34 @@ def degrade_line(im, eta=0.0, alpha=1.5, beta=1.5, alpha_0 = 1.0, beta_0 = 1.0):
     Returns:
         PIL.Image in mode '1'
     """
-    logger.debug('Inverting and normalizing input image')
+    logger.debug(u'Inverting and normalizing input image')
     im = pil2array(im)
     im = np.amax(im)-im
     im = im*1.0/np.amax(im)
 
-    logger.debug('Calculating foreground distance transform')
+    logger.debug(u'Calculating foreground distance transform')
     fg_dist = distance_transform_cdt(1-im, metric='taxicab')
-    logger.debug('Calculating flip to white probability')
+    logger.debug(u'Calculating flip to white probability')
     fg_prob = alpha_0 * np.exp(-alpha * (fg_dist**2)) + eta
     fg_prob[im == 1] = 0
     fg_flip = np.random.binomial(1, fg_prob)
 
-    logger.debug('Calculating background distance transform')
+    logger.debug(u'Calculating background distance transform')
     bg_dist = distance_transform_cdt(im, metric='taxicab')
-    logger.debug('Calculating flip to black probability')
+    logger.debug(u'Calculating flip to black probability')
     bg_prob = beta_0 * np.exp(-beta * (bg_dist**2)) + eta
     bg_prob[im == 0] = 0
     bg_flip = np.random.binomial(1, bg_prob)
 
     # flip
-    logger.debug('Flipping')
+    logger.debug(u'Flipping')
     im -= bg_flip
     im += fg_flip
 
-    logger.debug('Binary closing')
+    logger.debug(u'Binary closing')
     sel = np.array([[1, 1], [1, 1]])
     im = binary_closing(im, sel)
-    logger.debug('Converting to image')
+    logger.debug(u'Converting to image')
     return array2pil(255-im.astype('B')*255)
 
 
@@ -370,14 +370,14 @@ def distort_line(im, distort=3.0, sigma=10, eps=0.03, delta=0.3):
     w, h = im.size
     # XXX: determine correct output shape from transformation matrices instead
     # of guesstimating.
-    logger.debug('Pasting source image into canvas')
+    logger.debug(u'Pasting source image into canvas')
     image = Image.new('L', (int(1.5*w), 4*h), 255)
     image.paste(im, (int((image.size[0] - w) / 2), int((image.size[1] - h) / 2)))
     line = pil2array(image.convert('L'))
 
     # shear in y direction with factor eps * randn(), scaling with 1 + eps *
     # randn() in x/y axis (all offset at d)
-    logger.debug('Performing affine transformation')
+    logger.debug(u'Performing affine transformation')
     m = np.array([[1 + eps * np.random.randn(), 0.0], [eps * np.random.randn(), 1.0 + eps * np.random.randn()]])
     c = np.array([w/2.0, h/2])
     d = c - np.dot(m, c) + np.array([np.random.randn() * delta, np.random.randn() * delta])
@@ -391,8 +391,8 @@ def distort_line(im, distort=3.0, sigma=10, eps=0.03, delta=0.3):
     def f(p):
         return (p[0] + hs[p[0], p[1]], p[1] + ws[p[0], p[1]])
 
-    logger.debug('Performing geometric transformation')
+    logger.debug(u'Performing geometric transformation')
     im = array2pil(geometric_transform(line, f, order=1, mode='nearest'))
-    logger.debug('Cropping canvas to content box')
+    logger.debug(u'Cropping canvas to content box')
     im = im.crop(ImageOps.invert(im).getbbox())
     return im
