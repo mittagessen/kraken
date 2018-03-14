@@ -22,6 +22,7 @@ import time
 import click
 import errno
 import base64
+import logging
 import unicodedata
 import numpy as np
 
@@ -36,6 +37,7 @@ from kraken import linegen
 from kraken import pageseg
 from kraken import transcribe
 from kraken import binarization
+from kraken.lib import log
 from kraken.lib import models
 from kraken.train import GroundTruthContainer, compute_error
 from kraken.lib.exceptions import KrakenCairoSurfaceException
@@ -45,11 +47,17 @@ standard_library.install_aliases()
 
 APP_NAME = 'kraken'
 
+logger = logging.getLogger('kraken')
+
 spinner = cycle([u'⣾', u'⣽', u'⣻', u'⢿', u'⡿', u'⣟', u'⣯', u'⣷'])
 
-
 def spin(msg):
-    click.echo(u'\r\033[?25l{}\t{}'.format(msg, next(spinner)), nl=False)
+    if logger.getEffectiveLevel() >= 30:
+        click.echo(u'\r\033[?25l{}\t{}'.format(msg, next(spinner)), nl=False)
+
+def message(msg, **styles):
+    if logger.getEffectiveLevel() >= 30:
+        click.secho(msg, **styles)
 
 
 @click.group()
@@ -57,6 +65,7 @@ def spin(msg):
 @click.option('-v', '--verbose', default=0, count=True)
 def cli(verbose):
     ctx = click.get_current_context()
+    log.set_logger(logger, level=30-10*verbose)
     ctx.meta['verbose'] = verbose
 
 
@@ -83,87 +92,60 @@ def train(ctx, lineheight, pad, hiddensize, output, load, savefreq, report,
     """
     Trains a model from image-text pairs.
     """
-    st_time = time.time()
     if load is None:
-        click.echo('Training from scratch not yet supported.')
+        message(u'Training from scratch net yet supported.')
         ctx.exit(1)
-    if ctx.meta['verbose'] > 0:
-        click.echo(u'[{:2.4f}] Building ground truth set from {} line images'.format(time.time() - st_time, len(ground_truth)))
-    else:
-        spin('Building ground truth set')
+    logger.info(u'Building ground truth set from {} line images'.format(len(ground_truth)))
+    spin(u'Building ground truth set')
 
     gt_set = GroundTruthContainer()
 
     for line in ground_truth:
         gt_set.add(line, normalization=normalization, reorder=reorder)
-        if ctx.meta['verbose'] > 2:
-            click.echo(u'[{:2.4f}] Adding {}'.format(time.time() - st_time, line))
-        else:
-            spin('Building ground truth set')
+        logger.debug(u'Adding {}'.format(line))
+        spin(u'Building ground truth set')
     gt_set.repartition(partition)
-    if ctx.meta['verbose'] < 3:
-        click.echo('')
-    if ctx.meta['verbose'] > 0:
-        click.echo(u'[{:2.4f}] Training set {} lines, test set {} lines, alphabet {} symbols'.format(time.time() - st_time, len(gt_set.training_set), len(gt_set.test_set), len(gt_set.training_alphabet)))
-    if ctx.meta['verbose'] > 1:
-        click.echo(u'[{:2.4f}] grapheme\tcount'.format(time.time() - st_time))
-        for k, v in sorted(gt_set.training_alphabet.items(), key=lambda x : x[1], reverse=True):
-            if unicodedata.combining(k) or k.isspace():
-                k = unicodedata.name(k)
-            else:
-                k = '\t' + k
-            click.echo(u'[{:2.4f}] {}\t{}'.format(time.time() - st_time, k, v))
 
-    if not ctx.meta['verbose']:
-        click.secho(u'\b\u2713', fg='green', nl=False)
-        click.echo('\033[?25h\n', nl=False)
+    logger.info(u'Training set {} lines, test set {} lines, alphabet {} symbols'.format(len(gt_set.training_set), len(gt_set.test_set), len(gt_set.training_alphabet)))
+    logger.debug(u'grapheme\tcount')
+    for k, v in sorted(gt_set.training_alphabet.items(), key=lambda x : x[1], reverse=True):
+        if unicodedata.combining(k) or k.isspace():
+            k = unicodedata.name(k)
+        else:
+            k = '\t' + k
+        logger.debug(u'{}\t{}'.format(k, v))
+
+    message(u'\b\u2713', fg='green', nl=False)
+    message('\033[?25h\n', nl=False)
 
     if load:
-        if ctx.meta['verbose'] > 0:
-            click.echo(u'[{:2.4f}] Loading existing model from {} '.format(time.time() - st_time, load))
-        else:
-            spin('Loading model')
+        logger.info(u'Loading existing model from {} '.format(load))
+        spin('Loading model')
 
         rnn = models.ClstmSeqRecognizer(load)
 
-        if not ctx.meta['verbose'] > 0:
-            click.secho(u'\b\u2713', fg='green', nl=False)
-            click.echo('\033[?25h\n', nl=False)
+        message(u'\b\u2713', fg='green', nl=False)
+        message('\033[?25h\n', nl=False)
 
     else:
-        if ctx.meta['verbose'] > 0:
-            click.echo(u'[{:2.4f}] Creating new model with line height {}, {} hidden units, and {} outputs'.format(time.time() - st_time, lineheight, hiddensize, codec))
-        else:
-            spin('Initializing model')
-        rnn = models.ClstmSeqRecognizer.init_model(lineheight, hiddensize, gt_set.training_alphabet.keys())
-        if not ctx.meta['verbose']:
-            click.secho(u'\b\u2713', fg='green', nl=False)
-            click.echo('\033[?25h\n', nl=False)
+        ctx.exit(1)
 
-    if ctx.meta['verbose'] > 0:
-            click.echo(u'[{:2.4f}] Setting learning rate ({}) and momentum ({}) '.format(time.time() - st_time, lrate, momentum))
+    logger.info(u'Setting learning rate ({}) and momentum ({}) '.format(lrate, momentum))
     rnn.setLearningRate(lrate, momentum)
 
     for trial in xrange(ntrain):
         line, s = gt_set.sample()
         res = rnn.trainString(line, s)
-        if ctx.meta['verbose'] > 2:
-            click.echo(u'[{0:2.4f}] TRU: {1}\n[{0:2.4f}] OUT: {2}'.format(time.time() - st_time, s, res))
-        else:
-            spin('Training')
+        logger.debug(u'TRU: {1}\n[{0:2.4f}] OUT: {2}'.format(s, res))
+        spin('Training')
 
         if trial and not trial % savefreq:
             rnn.save_model('{}_{}'.format(output, trial))
-            if ctx.meta['verbose'] < 3:
-                click.echo('')
-            if ctx.meta['verbose'] > 0:
-                click.echo(u'[{:2.4f}] Saving to {}_{}'.format(time.time() - st_time, output, trial))
+            logger.info(u'Saving to {}_{}'.format(output, trial))
 
         if trial and not trial % report:
             c, e = compute_error(rnn, gt_set.test_set)
-            if ctx.meta['verbose'] < 3:
-                click.echo('')
-            click.echo(u'[{:2.4f}] Accuracy report ({}) {:0.4f} {} {}'.format(time.time() - st_time, trial, (c-e)/c, c, e))
+            logger.info(u'Accuracy report ({}) {:0.4f} {} {}'.format(trial, (c-e)/c, c, e))
 
 
 @cli.command('extract')
@@ -183,7 +165,6 @@ def extract(ctx, normalization, reorder, rotate, output, transcriptions):
     Extracts image-text pairs from a transcription environment created using
     ``ketos transcribe``.
     """
-    st_time = time.time()
     try:
         os.mkdir(output)
     except:
@@ -191,10 +172,8 @@ def extract(ctx, normalization, reorder, rotate, output, transcriptions):
     idx = 0
     manifest = []
     for fp in transcriptions:
-        if ctx.meta['verbose'] > 0:
-            click.echo(u'[{:2.4f}] Reading {}'.format(time.time() - st_time, fp.name))
-        else:
-            spin('Reading transcription')
+        logger.info(u'Reading {}'.format(fp.name))
+        spin('Reading transcription')
         doc = html.parse(fp)
         td = doc.find(".//meta[@itemprop='text_direction']")
         if td is None:
@@ -208,8 +187,7 @@ def extract(ctx, normalization, reorder, rotate, output, transcriptions):
             fd = BytesIO(base64.b64decode(img.split(',')[1]))
             im = Image.open(fd)
             if not im:
-                if ctx.meta['verbose'] > 0:
-                    click.echo(u'[{:2.4f}] Skipping {} because image not found'.format(time.time() - st_time, fp.name))
+                logger.info(u'Skipping {} because image not found'.format(fp.name))
                 break
             for line in section.iter('li'):
                 if line.get('contenteditable') and u''.join(line.itertext()):
@@ -227,13 +205,11 @@ def extract(ctx, normalization, reorder, rotate, output, transcriptions):
                         else:
                             t.write(text.encode('utf-8'))
                     idx += 1
-    if ctx.meta['verbose'] > 0:
-        click.echo(u'[{:2.4f}] Extracted {} lines'.format(time.time() - st_time, idx))
+    logger.info(u'Extracted {} lines'.format(idx))
     with open('{}/manifest.txt'.format(output), 'w') as fp:
         fp.write('\n'.join(manifest))
-    if not ctx.meta['verbose']:
-        click.secho(u'\b\u2713', fg='green', nl=False)
-        click.echo('\033[?25h\n', nl=False)
+    message(u'\b\u2713', fg='green', nl=False)
+    message('\033[?25h\n', nl=False)
 
 
 @cli.command('transcribe')
@@ -255,61 +231,44 @@ def extract(ctx, normalization, reorder, rotate, output, transcriptions):
 @click.argument('images', nargs=-1, type=click.File(mode='rb', lazy=True))
 def transcription(ctx, text_direction, scale, maxcolseps, black_colseps, font,
                   font_style, prefill, output, images):
-    st_time = time.time()
     ti = transcribe.TranscriptionInterface(font, font_style)
 
     if prefill:
-        if ctx.meta['verbose'] > 0:
-            click.echo(u'[{:2.4f}] Loading model {}'.format(time.time() - st_time, prefill))
-        else:
-            spin('Loading RNN')
+        logger.info('Loading model {}'.format(prefill))
+        spin('Loading RNN')
         prefill = models.load_any(prefill.encode('utf-8'))
-        if not ctx.meta['verbose']:
-            click.secho(u'\b\u2713', fg='green', nl=False)
-            click.echo('\033[?25h\n', nl=False)
+        message(u'\b\u2713', fg='green', nl=False)
+        message('\033[?25h\n', nl=False)
 
     for fp in images:
-        if ctx.meta['verbose'] > 0:
-            click.echo(u'[{:2.4f}] Reading {}'.format(time.time() - st_time, fp.name))
-        else:
-            spin('Reading images')
+        logger.info('Reading {}'.format(fp.name))
+        spin('Reading images')
         im = Image.open(fp)
         if not binarization.is_bitonal(im):
-            if ctx.meta['verbose'] > 0:
-                click.echo(u'[{:2.4f}] Binarizing page'.format(time.time() - st_time))
+            logger.info(u'Binarizing page')
             im = binarization.nlbin(im)
-        if ctx.meta['verbose'] > 0:
-            click.echo(u'[{:2.4f}] Segmenting page'.format(time.time() - st_time))
+        logger.info(u'Segmenting page')
         res = pageseg.segment(im, text_direction, scale, maxcolseps, black_colseps)
         if prefill:
             it = rpred.rpred(prefill, im, res)
             preds = []
             for pred in it:
-                if ctx.meta['verbose'] > 0:
-                    click.echo(u'[{:2.4f}] {}'.format(time.time() - st_time, pred.prediction))
-                else:
-                    spin('Recognizing')
+                logger.info('{}'.format(pred.prediction))
+                spin('Recognizing')
                 preds.append(pred)
-            if ctx.meta['verbose'] > 0:
-                click.echo(u'Execution time: {}s'.format(time.time() - st_time))
-            else:
-                click.secho(u'\b\u2713', fg='green', nl=False)
-                click.echo('\033[?25h\n', nl=False)
+            message(u'\b\u2713', fg='green', nl=False)
+            message('\033[?25h\n', nl=False)
             ti.add_page(im, res, records=preds)
         else:
             ti.add_page(im, res)
         fp.close()
-    if not ctx.meta['verbose']:
-        click.secho(u'\b\u2713', fg='green', nl=False)
-        click.echo('\033[?25h\n', nl=False)
-    if ctx.meta['verbose'] > 0:
-        click.echo(u'[{:2.4f}] Writing transcription to {}'.format(time.time() - st_time, output.name))
-    else:
-        spin('Writing output')
+    message(u'\b\u2713', fg='green', nl=False)
+    message('\033[?25h\n', nl=False)
+    logger.info(u'Writing transcription to {}'.format(output.name))
+    spin('Writing output')
     ti.write(output)
-    if not ctx.meta['verbose']:
-        click.secho(u'\b\u2713', fg='green', nl=False)
-        click.echo('\033[?25h\n', nl=False)
+    message(u'\b\u2713', fg='green', nl=False)
+    message('\033[?25h\n', nl=False)
 
 
 @cli.command('linegen')
@@ -366,10 +325,8 @@ def line_generator(ctx, font, maxlines, encoding, normalization, renormalize,
     st_time = time.time()
     for t in text:
         with click.open_file(t, encoding=encoding) as fp:
-            if ctx.meta['verbose'] > 0:
-                click.echo(u'[{:2.4f}] Reading {}'.format(time.time() - st_time, t))
-            else:
-                spin('Reading texts')
+            logger.info('Reading {}'.format(t))
+            spin('Reading texts')
             for l in fp:
                 lines.add(l.rstrip('\r\n'))
     if normalization:
@@ -378,17 +335,15 @@ def line_generator(ctx, font, maxlines, encoding, normalization, renormalize,
         lines = set([line.strip() for line in lines])
     if max_length:
         lines = set([line for line in lines if len(line) < max_length])
-    if ctx.meta['verbose'] > 0:
-        click.echo(u'[{:2.4f}] Read {} lines'.format(time.time() - st_time, len(lines)))
-    else:
-        click.secho(u'\b\u2713', fg='green', nl=False)
-        click.echo('\033[?25h\n', nl=False)
-        click.echo('Read {} unique lines'.format(len(lines)))
+    logger.info('Read {} lines'.format(len(lines)))
+    message(u'\b\u2713', fg='green', nl=False)
+    message('\033[?25h\n', nl=False)
+    message('Read {} unique lines'.format(len(lines)))
     if maxlines and maxlines < len(lines):
-        click.echo('Sampling {} lines\t'.format(maxlines), nl=False)
+        message('Sampling {} lines\t'.format(maxlines), nl=False)
         lines = list(lines)
         lines = [lines[idx] for idx in np.random.randint(0, len(lines), maxlines)]
-        click.secho(u'\u2713', fg='green')
+        message(u'\u2713', fg='green')
     try:
         os.makedirs(output)
     except OSError as e:
@@ -406,27 +361,22 @@ def line_generator(ctx, font, maxlines, encoding, normalization, renormalize,
             combining.append(unicodedata.name(char))
         else:
             chars.append(char)
-    click.echo(u'Σ (len: {})'.format(len(alphabet)))
-    click.echo(u'Symbols: {}'.format(''.join(chars)))
+    message(u'Σ (len: {})'.format(len(alphabet)))
+    message(u'Symbols: {}'.format(''.join(chars)))
     if combining:
-        click.echo(u'Combining Characters: {}'.format(', '.join(combining)))
+        message(u'Combining Characters: {}'.format(', '.join(combining)))
     lg = linegen.LineGenerator(font, font_size, font_weight, language)
     for idx, line in enumerate(lines):
-        if ctx.meta['verbose'] > 0:
-            click.echo(u'[{:2.4f}] {}'.format(time.time() - st_time, line))
-        else:
-            spin('Writing images')
+        logger.info(line)
+        spin('Writing images')
         try:
             if renormalize:
                 im = lg.render_line(unicodedata.normalize(renormalize, line))
             else:
                 im = lg.render_line(line)
         except KrakenCairoSurfaceException as e:
-            if ctx.meta['verbose'] > 0:
-                click.echo('[{:2.4f}] {}: {} {}'.format(time.time() - st_time, e.message, e.width, e.height))
-            else:
-                click.secho(u'\b\u2717', fg='red')
-                click.echo('{}: {} {}'.format(e.message, e.width, e.height))
+            logger.info('{}: {} {}'.format(e.message, e.width, e.height))
+            message(u'\b\u2717', fg='red')
             continue
         if not disable_degradation and not legacy:
             im = linegen.degrade_line(im, alpha=alpha, beta=beta)
@@ -439,9 +389,8 @@ def line_generator(ctx, font, maxlines, encoding, normalization, renormalize,
                 fp.write(get_display(line).encode('utf-8'))
             else:
                 fp.write(line.encode('utf-8'))
-    if ctx.meta['verbose'] == 0:
-        click.secho(u'\b\u2713', fg='green', nl=False)
-        click.echo('\033[?25h\n', nl=False)
+    message(u'\b\u2713', fg='green', nl=False)
+    message('\033[?25h\n', nl=False)
 
 
 if __name__ == '__main__':
