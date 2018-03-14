@@ -23,6 +23,7 @@ import click
 import time
 import tempfile
 import warnings
+import logging
 import unicodedata
 
 from PIL import Image
@@ -34,12 +35,15 @@ from collections import defaultdict
 from kraken import repo
 from kraken import rpred
 from kraken import pageseg
+from kraken.lib import log
 from kraken.lib import models
 from kraken import binarization
 from kraken import serialization
 
 standard_library.install_aliases()
 warnings.simplefilter('ignore', UserWarning)
+
+logger = logging.getLogger('kraken')
 
 APP_NAME = 'kraken'
 DEFAULT_MODEL = ['en-default.pronn']
@@ -55,23 +59,27 @@ def have_clstm():
     return True
 
 def spin(msg):
-    click.echo(u'\r\033[?25l{}\t{}'.format(msg, next(spinner)), nl=False)
+    if logger.getEffectiveLevel() >= 30:
+        click.echo(u'\r\033[?25l{}\t{}'.format(msg, next(spinner)), nl=False)
 
+def message(msg, **styles):
+    if logger.getEffectiveLevel() >= 30:
+        click.secho(msg, **styles)
 
 def binarizer(threshold, zoom, escale, border, perc, range, low, high, base_image, input, output):
     try:
         im = Image.open(input)
     except IOError as e:
         raise click.BadParameter(str(e))
-    click.echo('Binarizing\t', nl=False)
+    message('Binarizing\t', nl=False)
     try:
         res = binarization.nlbin(im, threshold, zoom, escale, border, perc, range,
                                  low, high)
         res.save(output, format='png')
     except:
-        click.secho(u'\u2717', fg='red')
+        message(u'\u2717', fg='red')
         raise
-    click.secho(u'\u2713', fg='green')
+    message(u'\u2713', fg='green')
 
 
 def segmenter(text_direction, script_detect, scale, maxcolseps, black_colseps, base_image, input, output):
@@ -79,17 +87,17 @@ def segmenter(text_direction, script_detect, scale, maxcolseps, black_colseps, b
         im = Image.open(input)
     except IOError as e:
         raise click.BadParameter(str(e))
-    click.echo('Segmenting\t', nl=False)
+    message('Segmenting\t', nl=False)
     try:
         res = pageseg.segment(im, text_direction, scale, maxcolseps, black_colseps)
         if script_detect:
             res = pageseg.detect_scripts(im, res)
     except:
-        click.secho(u'\u2717', fg='red')
+        message(u'\u2717', fg='red')
         raise
     with open_file(output, 'w') as fp:
         json.dump(res, fp)
-    click.secho(u'\u2713', fg='green')
+    message(u'\u2713', fg='green')
 
 
 def recognizer(model, pad, bidi_reordering, base_image, input, output, lines):
@@ -114,31 +122,22 @@ def recognizer(model, pad, bidi_reordering, base_image, input, output, lines):
             for l in bounds['boxes']:
                 for t in l:
                     scripts.add(t[0])
-            if ctx.meta['verbose'] > 0:
-                click.echo(u'[{:2.4f}] Executing multi-script recognition'.format(time.time() - st_time))
             it = rpred.mm_rpred(model, im, bounds, pad, bidi_reordering=bidi_reordering)
         else:
-            if ctx.meta['verbose'] > 0:
-                click.echo(u'[{:2.4f}] Executing mono-script recognition'.format(time.time() - st_time))
             it = rpred.rpred(model['default'], im, bounds, pad, bidi_reordering=bidi_reordering)
 
     preds = []
 
     for pred in it:
-        if ctx.meta['verbose'] > 0:
-            click.echo(u'[{:2.4f}] {}'.format(time.time() - st_time, pred.prediction))
-        else:
-            spin('Processing')
+        spin('Processing')
         preds.append(pred)
-    if ctx.meta['verbose'] > 0:
-        click.echo(u'Execution time: {}s'.format(time.time() - st_time))
-    else:
-        click.secho(u'\b\u2713', fg='green', nl=False)
-        click.echo('\033[?25h\n', nl=False)
+    message(u'\b\u2713', fg='green', nl=False)
+    message('\033[?25h\n', nl=False)
 
     ctx = click.get_current_context()
     with open_file(output, 'w', encoding='utf-8') as fp:
-        click.echo(u'Writing recognition results for {}\t'.format(base_image), nl=False)
+        message(u'Writing recognition results for {}\t'.format(base_image), nl=False)
+        logger.info('Serializing as {} into {}'.format(ctx.meta['mode'], fp.name))
         if ctx.meta['mode'] != 'text':
             fp.write(serialization.serialize(preds, base_image,
                      Image.open(base_image).size, ctx.meta['text_direction'],
@@ -146,7 +145,7 @@ def recognizer(model, pad, bidi_reordering, base_image, input, output, lines):
         else:
             fp.write(u'\n'.join(s.prediction for s in preds))
         if not ctx.meta['verbose']:
-            click.secho(u'\u2713', fg='green')
+            message(u'\u2713', fg='green')
 
 
 @click.group(chain=True)
@@ -156,6 +155,7 @@ def recognizer(model, pad, bidi_reordering, base_image, input, output, lines):
 @click.option('-v', '--verbose', default=0, count=True)
 def cli(input, verbose):
     ctx = click.get_current_context()
+    log.set_logger(logger, level=30-10*verbose)
     ctx.meta['verbose'] = verbose
 
 
@@ -217,7 +217,6 @@ def validate_mm(ctx, param, value):
     except:
         raise click.BadParameter('Mappings must be in format script:model')
     return model_dict
-        
 
 @cli.command('ocr')
 @click.pass_context
@@ -266,15 +265,15 @@ def ocr(ctx, model, pad, reorder, serialization, text_direction, lines, conv):
                 break
         if not location:
             raise click.BadParameter('No model for {} found'.format(k))
-        click.echo('Loading RNN {}\t'.format(k), nl=False)
+        message('Loading RNN {}\t'.format(k), nl=False)
         try:
             rnn = models.load_any(location.encode('utf-8'))
             nm[k] = rnn
         except:
-            click.secho(u'\u2717', fg='red')
+            message(u'\u2717', fg='red')
             raise
             ctx.exit(1)
-        click.secho(u'\u2713', fg='green')
+        message(u'\u2713', fg='green')
 
         # convert input model to protobuf
         if conv and rnn.kind == 'pyrnn':
@@ -312,7 +311,7 @@ def show(ctx, model_id):
             combining.append(unicodedata.name(char))
         else:
             chars.append(char)
-    click.echo(u'name: {}\n\n{}\n\n{}\nscripts: {}\nalphabet: {} {}\nlicense: {}\nauthor: {} ({})\n{}'.format(desc['name'],
+    message(u'name: {}\n\n{}\n\n{}\nscripts: {}\nalphabet: {} {}\nlicense: {}\nauthor: {} ({})\n{}'.format(desc['name'],
                                                                                                  desc['summary'],
                                                                                                  desc['description'],
                                                                                                  ' '.join(desc['script']),
@@ -332,10 +331,10 @@ def list(ctx):
     Lists models in the repository.
     """
     model_list = repo.get_listing(partial(spin, 'Retrieving model list'))
-    click.secho(u'\b\u2713', fg='green', nl=False)
-    click.echo('\033[?25h\n', nl=False)
+    message(u'\b\u2713', fg='green', nl=False)
+    message('\033[?25h\n', nl=False)
     for m in model_list:
-        click.echo('{} ({}) - {}'.format(m, model_list[m]['type'], model_list[m]['summary']))
+        message('{} ({}) - {}'.format(m, model_list[m]['type'], model_list[m]['summary']))
     ctx.exit(0)
 
 
@@ -353,8 +352,8 @@ def get(ctx, model_id):
 
     repo.get_model(model_id, click.get_app_dir(APP_NAME),
                    partial(spin, 'Retrieving model'))
-    click.secho(u'\b\u2713', fg='green', nl=False)
-    click.echo('\033[?25h\n', nl=False)
+    message(u'\b\u2713', fg='green', nl=False)
+    message('\033[?25h\n', nl=False)
     ctx.exit(0)
 
 
