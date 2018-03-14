@@ -2,13 +2,13 @@
 #
 # Copyright 2015 Benjamin Kiessling
 #           2014 Thomas M. Breuel
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 # http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
@@ -476,7 +476,7 @@ def detect_scripts(im, bounds, model=None):
     logger.debug(u'Loading label to identifier map')
     with pkg_resources.resource_stream(__name__, 'iso15924.json') as fp:
         n2s = json.load(fp)
-    it = rpred(rnn, im, bounds)
+    it = rpred(rnn, im, bounds, bidi_reordering=False)
     preds = []
     logger.debug(u'Running detection')
     for pred in it:
@@ -489,9 +489,9 @@ def detect_scripts(im, bounds, model=None):
                 else:
                     p += c
             return p
-        p = subs([u'\U000f03e6', u'\U000f03e6'], pred.prediction)
+        p = subs([u'\U000f03e2', u'\U000f03e6'], pred.prediction)
         # do a reverse run to fix leading inherited scripts
-        pred.prediction = ''.join(reversed(subs([u'\U000f03e6', u'\U000f03e6'], reversed(p))))
+        pred.prediction = ''.join(reversed(subs([u'\U000f03e2', u'\U000f03e6'], reversed(p))))
         # group by grapheme
         t = []
         logger.debug(u'Merging detections')
@@ -501,5 +501,4 @@ def detect_scripts(im, bounds, model=None):
             b = max_bbox(x[1] for x in g)
             t.append((n2s[str(k)], b))
         preds.append(t)
-
     return {'boxes': preds, 'text_direction': bounds['text_direction'], 'script_detection': True}
