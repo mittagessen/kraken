@@ -3,16 +3,17 @@ VGSL plumbing
 """
 
 import re
-import warnings
+import json
 import torch
+import warnings
 import numpy as np
-import coremltools
 import torch.nn.functional as F
 
 from torch.nn import Module
 
 from torch.autograd import Variable
 from kraken.lib.ctc import CTCCriterion
+from kraken.lib.codec import PytorchCodec
 from torch.nn.modules.loss import _assert_no_grad
 from coremltools.models import MLModel
 from coremltools.models import datatypes
@@ -441,9 +442,9 @@ class TorchVGSLModel(object):
         self.spec = spec
         self.named_spec = []
         self.ops = [self.build_rnn, self.build_dropout, self.build_maxpool, self.build_conv, self.build_output]
+        self.codec = None
         self.criterion = None
 
-        #
         self.idx = -1
         spec = spec.strip()
         if spec[0] != '[' or spec[-1] != ']':
@@ -494,6 +495,9 @@ class TorchVGSLModel(object):
         nn = cls(vgsl_spec)
         for name, layer in nn.nn.named_children():
             layer.deserialize(name, mlmodel.get_spec())
+
+        if 'codec' in mlmodel.user_defined_metadata:
+            nn.add_codec(PytorchCodec(json.loads(mlmodel.user_defined_metadata['codec'])))
         return nn
 
     def save_model(self, path):
@@ -512,7 +516,15 @@ class TorchVGSLModel(object):
         mlmodel = MLModel(net_builder.spec)
         mlmodel.short_description = 'kraken recognition model'
         mlmodel.user_defined_metadata['vgsl'] = '[' + ' '.join(self.named_spec) + ']'
+        if self.codec:
+            mlmodel.user_defined_metadata['codec'] = json.dumps(self.codec.c2l)
         mlmodel.save(path)
+
+    def add_codec(self, codec):
+        """
+        Adds a PytorchCodec to the model.
+        """
+        self.codec = codec
 
     def init_weights(self):
         """
