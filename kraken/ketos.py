@@ -69,10 +69,10 @@ def cli(verbose):
 @click.pass_context
 @click.option('-p', '--pad', type=click.INT, default=16, help='Left and right '
               'padding around lines')
-@click.option('-o', '--output', type=click.Path(), default='model.proto', help='Output model file')
+@click.option('-o', '--output', type=click.Path(), default='model', help='Output model file')
 @click.option('-s', '--spec', default='[1,1,0,48 Lbx100]', help='VGSL spec of the network to train. CTC layer will be added automatically.')
 @click.option('-i', '--load', type=click.Path(exists=True, readable=True), help='Load existing file to continue training')
-@click.option('-F', '--savefreq', default=1, help='Model save frequency in epochs during training')
+@click.option('-F', '--savefreq', default=1, type=click.FLOAT, help='Model save frequency in epochs during training')
 @click.option('-R', '--report', default=1, help='Report creation frequency in epochs')
 @click.option('-N', '--epochs', default=1000, help='Number of epochs to train for')
 @click.option('-d', '--device', default='cpu', help='Select device to use (cpu, gpu:0, gpu:1, ...)')
@@ -168,7 +168,7 @@ def train(ctx, pad, output, spec, load, savefreq, report, epochs, device,
     if ctx.meta['verbose'] == 0:
         click.echo('')
     if ctx.meta['verbose'] > 0:
-        click.echo(u'[{:2.4f}] Training set {} lines, test set {} lines, alphabet {} symbols'.format(time.time() - st_time, len(gt_set.training_set)), len(test_set.training_set), len(gt_set.alphabet))
+        click.echo(u'[{:2.4f}] Training set {} lines, test set {} lines, alphabet {} symbols'.format(time.time() - st_time, len(gt_set._images), len(test_set._images), len(gt_set.alphabet)))
     alpha_diff = set(gt_set.alphabet).symmetric_difference(set(test_set.alphabet))
     if alpha_diff:
         click.echo(u'[{:2.4f}] warning: alphabet mismatch {}'.format(time.time() - st_time, alpha_diff))
@@ -186,9 +186,9 @@ def train(ctx, pad, output, spec, load, savefreq, report, epochs, device,
         click.echo('\033[?25h\n', nl=False)
 
     if ctx.meta['verbose'] > 1:
-        click.echo(u'[{:2.4f}] Adding codecs to sets'.format(time.time() - st_time, im))
-    gt_set.add_codec(codec)
-    test_set.add_codec(gt_set.codec)
+        click.echo(u'[{:2.4f}] Encoding sets'.format(time.time() - st_time, im))
+    gt_set.encode(codec)
+    test_set.encode(gt_set.codec)
 
     if load:
         if ctx.meta['verbose'] > 0:
@@ -196,7 +196,7 @@ def train(ctx, pad, output, spec, load, savefreq, report, epochs, device,
         else:
             spin('Loading model')
 
-       # rnn = tlstm.TlstmSeqRecognizer(load)
+        nn = vgsl.TorchVGSLModel.load_model(load)
 
         if not ctx.meta['verbose'] > 0:
             click.secho(u'\b\u2713', fg='green', nl=False)
@@ -210,11 +210,11 @@ def train(ctx, pad, output, spec, load, savefreq, report, epochs, device,
         # append output definition to spec
         spec = '[{} O1c{}]'.format(spec[1:-1], len(gt_set.codec))
         nn = vgsl.TorchVGSLModel(spec)
+        nn.init_weights()
 
         if not ctx.meta['verbose']:
             click.secho(u'\b\u2713', fg='green', nl=False)
             click.echo('\033[?25h\n', nl=False)
-
 
     if ctx.meta['verbose'] > 0:
         click.echo(u'[{:2.4f}] Constructing optimizer (lr: {}, weight decay: {})'.format(time.time() - st_time, lrate, wdecay))
@@ -225,17 +225,20 @@ def train(ctx, pad, output, spec, load, savefreq, report, epochs, device,
         for trial, (input, target) in enumerate(train_loader):
             input, target = Variable(input), Variable(target)
             optimizer.zero_grad()
-            output = nn.nn(input)
+            o = nn.nn(input)
             # height should be 1 by now
-            if output.size(2) != 1:
+            if o.size(2) != 1:
                 raise KrakenInputException('Expected dimension 3 to be 1, actual {}'.format(output.size()))
-            loss = nn.criterion(output.squeeze(2), target)
+            loss = nn.criterion(o.squeeze(2), target)
             loss.backward()
             optimizer.step()
             spin('Training')
 
-            if trial and not trial % savefreq:
-                nn.save_model('{}_{}'.format(output, trial))
+            if trial and not trial % int(savefreq * len(gt_set.training_set)):
+                try:
+                    nn.save_model('{}_{}.mlmodel'.format(output, trial))
+                except Exception as e:
+                    click.echo('Saving model failed: {}'.format(str(e)))
                 if ctx.meta['verbose'] > 0:
                     click.echo('')
                     click.echo(u'[{:2.4f}] Saving to {}_{}'.format(time.time() - st_time, output, trial))

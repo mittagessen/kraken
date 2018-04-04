@@ -166,7 +166,7 @@ class GroundTruthDataset(Dataset):
         self._images.append(im)
         self._gt.append(gt)
 
-    def add_codec(self, codec=None):
+    def encode(self, codec=None):
         """
         Adds a codec to the dataset and encodes all text lines.
 
