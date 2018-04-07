@@ -12,6 +12,7 @@ import torch.nn.functional as F
 from torch.nn import Module
 
 from torch.autograd import Variable
+from kraken.lib import clstm_pb2
 from kraken.lib.ctc import CTCCriterion
 from kraken.lib.codec import PytorchCodec
 from torch.nn.modules.loss import _assert_no_grad
@@ -69,7 +70,7 @@ class TransposedSummarizingRNN(Module):
     """
     An RNN wrapper allowing time axis transpositions and other
     """
-    def __init__(self, input_size, hidden_size, direction='b', transpose=True, summarize=True):
+    def __init__(self, input_size, hidden_size, direction='b', transpose=True, summarize=True, clstm=False):
         """
         A wrapper around torch.nn.LSTM optionally transposing inputs and
         returning only the last column of output.
@@ -78,8 +79,9 @@ class TransposedSummarizingRNN(Module):
             input_size:
             hidden_size:
             direction (str):
-            transpose (bool):
-            summarize (bool):
+            transpose (bool): Transpose width/height dimension
+            summarize (bool): Only return the last time step.
+            clstm (bool): Legacy CLSTM mode. No biases and 1-augmented input tensors.
 
         Shape:
             - Inputs: :math:`(N, C, H, W)` where `N` batches, `C` channels, `H`
@@ -90,12 +92,19 @@ class TransposedSummarizingRNN(Module):
         super(TransposedSummarizingRNN, self).__init__()
         self.transpose = transpose
         self.summarize = summarize
+        self.clstm = clstm
         self.input_size = input_size
+        if self.clstm:
+            self.input_size += 1
         self.hidden_size = hidden_size
         self.bidi = direction == 'b'
         self.output_size = hidden_size if not self.bidi else 2*hidden_size
 
-        self.layer = torch.nn.LSTM(input_size, hidden_size, bidirectional=self.bidi, batch_first=True)
+        self.layer = torch.nn.LSTM(self.input_size,
+                                   hidden_size,
+                                   bidirectional=self.bidi,
+                                   batch_first=True,
+                                   bias=False if clstm else True)
 
     def forward(self, inputs):
         # NCHW -> HNWC
@@ -103,6 +112,9 @@ class TransposedSummarizingRNN(Module):
         if self.transpose:
             # HNWC -> WNHC
             inputs = inputs.transpose(0, 2)
+        if self.clstm:
+            Variable(torch.ones((1,) + inputs.shape[1:]))
+            inputs = torch.cat([ones, inputs])
         # HNWC -> (H*N)WC
         siz = inputs.size()
         inputs = inputs.contiguous().view(-1, siz[2], siz[3])
@@ -153,7 +165,8 @@ class TransposedSummarizingRNN(Module):
                                        fwd_params.forgetGateWeightMatrix.floatValue, # wf
                                        fwd_params.blockInputWeightMatrix.floatValue, # wz/wg
                                        fwd_params.outputGateWeightMatrix.floatValue]) # wo
-        self.layer_bias_ih_l0 = torch.nn.Parameter(weight_ih.resize_as_(self.layer.weight_ih_l0.data))
+
+        self.layer.weight_ih_l0 = torch.nn.Parameter(weight_ih.resize_as_(self.layer.weight_ih_l0.data))
 
         # hh_matrix
         weight_hh = torch.FloatTensor([fwd_params.inputGateRecursionMatrix.floatValue, # wi
@@ -162,15 +175,15 @@ class TransposedSummarizingRNN(Module):
                                        fwd_params.outputGateRecursionMatrix.floatValue]) # wo
         self.layer.weight_hh_l0 = torch.nn.Parameter(weight_hh.resize_as_(self.layer.weight_hh_l0.data))
 
-        # ih biases
-        biases = torch.FloatTensor([fwd_params.inputGateBiasVector.floatValue, #bi
-                                    fwd_params.forgetGateBiasVector.floatValue, # bf
-                                    fwd_params.blockInputBiasVector.floatValue, # bz/bg
-                                    fwd_params.outputGateBiasVector.floatValue]) #bo
-        self.layer_bias_hh_l0 = torch.nn.Parameter(biases.resize_as_(self.layer.bias_hh_l0.data))
-
-        # no hh_biases
-        self.layer.bias_ih_l0 = torch.nn.Parameter(torch.zeros(self.layer.bias_ih_l0.size()))
+        if not self.clstm:
+            # ih biases
+            biases = torch.FloatTensor([fwd_params.inputGateBiasVector.floatValue, #bi
+                                        fwd_params.forgetGateBiasVector.floatValue, # bf
+                                        fwd_params.blockInputBiasVector.floatValue, # bz/bg
+                                        fwd_params.outputGateBiasVector.floatValue]) #bo
+            self.layer.bias_hh_l0 = torch.nn.Parameter(biases.resize_as_(self.layer.bias_hh_l0.data))
+            # no hh_biases
+            self.layer.bias_ih_l0 = torch.nn.Parameter(torch.zeros(self.layer.bias_ih_l0.size()))
 
         # get backward weights
         if arch == 'biDirectionalLSTM':
@@ -187,12 +200,13 @@ class TransposedSummarizingRNN(Module):
                                                bwd_params.outputGateRecursionMatrix.floatValue]) # wo
             self.layer.weight_hh_l0_reverse = torch.nn.Parameter(weight_hh.resize_as_(self.layer.weight_hh_l0.data))
 
-            biases_rev = torch.FloatTensor([bwd_params.inputGateBiasVector.floatValue, #bi
-                                            bwd_params.forgetGateBiasVector.floatValue, # bf
-                                            bwd_params.blockInputBiasVector.floatValue, # bz/bg
-                                            bwd_params.outputGateBiasVector.floatValue]) #bo
-            self.layer.bias_hh_l0_reverse = torch.nn.Parameter(biases.resize_as_(self.layer.bias_hh_l0.data))
-            self.layer.bias_ih_l0 = torch.nn.Parameter(torch.zeros(self.layer.bias_ih_l0.size()))
+            if not self.clstm:
+                biases_rev = torch.FloatTensor([bwd_params.inputGateBiasVector.floatValue, #bi
+                                                bwd_params.forgetGateBiasVector.floatValue, # bf
+                                                bwd_params.blockInputBiasVector.floatValue, # bz/bg
+                                                bwd_params.outputGateBiasVector.floatValue]) #bo
+                self.layer.bias_hh_l0_reverse = torch.nn.Parameter(biases.resize_as_(self.layer.bias_hh_l0.data))
+                self.layer.bias_ih_l0 = torch.nn.Parameter(torch.zeros(self.layer.bias_ih_l0.size()))
 
     def serialize(self, name, input, builder):
         """
@@ -220,10 +234,10 @@ class TransposedSummarizingRNN(Module):
             builder.add_bidirlstm(name=name,
                                   W_h=_reorder_indim(self.layer.weight_hh_l0),
                                   W_x=_reorder_indim(self.layer.weight_ih_l0),
-                                  b=_reorder_indim((self.layer.bias_ih_l0 + self.layer.bias_hh_l0)),
+                                  b=_reorder_indim((self.layer.bias_ih_l0 + self.layer.bias_hh_l0)) if not self.clstm else None,
                                   W_h_back=_reorder_indim(self.layer.weight_hh_l0_reverse),
                                   W_x_back=_reorder_indim(self.layer.weight_ih_l0_reverse),
-                                  b_back=_reorder_indim((self.layer.bias_ih_l0_reverse + self.layer.bias_hh_l0_reverse)),
+                                  b_back=_reorder_indim((self.layer.bias_ih_l0_reverse + self.layer.bias_hh_l0_reverse)) if not self.clstm else None,
                                   hidden_size=self.hidden_size,
                                   input_size=self.input_size,
                                   input_names=[input],
@@ -233,7 +247,7 @@ class TransposedSummarizingRNN(Module):
             builder.add_unilstm(name=name,
                                 W_h=_reorder_indim(self.layer.weight_hh_l0),
                                 W_x=_reorder_indim(self.layer.weight_ih_l0),
-                                b=_reorder_indim((self.layer.bias_ih_l0 + self.layer.bias_hh_l0)),
+                                b=_reorder_indim((self.layer.bias_ih_l0 + self.layer.bias_hh_l0)) if not self.clstm else None,
                                 hidden_size=self.hidden_size,
                                 input_size=self.input_size,
                                 input_names=[input],
@@ -245,12 +259,13 @@ class LinSoftmax(Module):
     """
     A wrapper for linear projection + softmax dealing with dimensionality mangling.
     """
-    def __init__(self, input_size, output_size):
+    def __init__(self, input_size, output_size, augmentation=False):
         """
 
         Args:
             input_size: Number of inputs in the feature dimension
             output_size: Number of outputs in the feature dimension
+            augmentation (bool): Enables 1-augmentation of input vectors
 
         Shape:
             - Inputs: :math:`(N, C, H, W)` where `N` batches, `C` channels, `H`
@@ -261,11 +276,18 @@ class LinSoftmax(Module):
 
         self.input_size = input_size
         self.output_size = output_size
+        self.augmentation = augmentation
+        if self.augmentation:
+            self.input_size += 1
 
-        self.lin = torch.nn.Linear(input_size, output_size)
+        self.lin = torch.nn.Linear(self.input_size, output_size)
 
     def forward(self, inputs):
         # move features (C) to last dimension for linear activation
+        inputs = inputs.transpose(1, 3)
+        # augment with ones along the input (C) axis
+        if self.augmentation:
+            inputs = torch.cat([Variable(torch.ones(inputs.shape[:3] + (1,))), inputs], dim=3)
         o = F.softmax(self.lin(inputs.transpose(1, 3)), dim=3)
         # and swap again
         return o.transpose(3,1)
@@ -282,7 +304,7 @@ class LinSoftmax(Module):
         """
         # extract conv parameters
         lin = [x for x in spec.neuralNetwork.layers if x.name == '{}_lin'.format(name)][0].innerProduct
-        weights = torch.FloatTensor(lin.weights.floatValue).view(self.output_size, self.input_size)
+        weights = torch.FloatTensor(lin.weights.floatValue).resize_as_(self.lin.weight.data)
         bias = torch.FloatTensor(lin.bias.floatValue)
         self.lin.weight = torch.nn.Parameter(weights)
         self.lin.bias = torch.nn.Parameter(bias)
@@ -481,6 +503,74 @@ class TorchVGSLModel(object):
             self.criterion.cuda()
 
     @classmethod
+    def load_clstm_model(cls, path):
+        """
+        Loads an CLSTM model to VGSL.
+        """
+        net = clstm_pb2.NetworkProto()
+        with open(path, 'rb') as fp:
+            net.ParseFromString(fp.read())
+        input = net.ninput
+        output = net.noutput
+        attrib = {a.key: a.value for a in list(net.attribute)}
+        # mainline clstm model
+        if len(attrib) > 1:
+            mode = 'clstm'
+        else:
+            mode = 'clstm_compat'
+
+        # extract codec
+        codec = PytorchCodec([u''] + [unichr(x) for x in net.codec])
+
+        # separate layers
+        nets = {}
+        nets['softm'] = [n for n in list(net.sub) if n.kind == 'SoftmaxLayer'][0]
+        parallel = [n for n in list(net.sub) if n.kind == 'Parallel'][0]
+        nets['lstm1'] = [n for n in list(parallel.sub) if n.kind.startswith('NPLSTM')][0]
+        rev = [n for n in list(parallel.sub) if n.kind == 'Reversed'][0]
+        nets['lstm2'] = rev.sub[0]
+
+        hidden = int(nets['lstm1'].attribute[0].value)
+
+        weights = {}
+        for n in nets:
+            weights[n] = {}
+            for w in list(nets[n].weights):
+                weights[n][w.name] = torch.FloatTensor(w.value).view(list(w.dim))
+
+        if mode == 'clstm_compat':
+            weightnames = ('.WGI', '.WGF', '.WCI', '.WGO')
+            weightname_softm = '.W'
+
+        else:
+            weightnames = ('WGI', 'WGF', 'WCI', 'WGO')
+            weightname_softm = 'W1'
+
+        # input hidden and hidden-hidden weights are in one matrix. also
+        # CLSTM/ocropy likes 1-augmenting every other tensor so the ih weights
+        # are input+1 in one dimension.
+        t = torch.cat(w for w in [weights['lstm1'][wn] for wn in weightnames])
+        weight_ih_l0 = t[:, :input+1]
+        weight_hh_l0 = t[:, input+1:]
+
+        t = torch.cat(w for w in [weights['lstm2'][wn] for wn in weightnames])
+        weight_ih_l0_rev = t[:, :input+1]
+        weight_hh_l0_rev = t[:, input+1:]
+
+        weight_lin = weights['softm'][weightname_softm]
+        # build vgsl spec and set weights
+        nn = cls('[1,1,0,{} Lbxc{} O1ca{}]'.format(input, hidden, len(net.codec)))
+        nn.nn.L_0.layer.weight_ih_l0 = torch.nn.Parameter(weight_ih_l0)
+        nn.nn.L_0.layer.weight_hh_l0 = torch.nn.Parameter(weight_hh_l0)
+        nn.nn.L_0.layer.weight_ih_l0_reverse = torch.nn.Parameter(weight_ih_l0_rev)
+        nn.nn.L_0.layer.weight_hh_l0_reverse = torch.nn.Parameter(weight_hh_l0_rev)
+        nn.nn.O_1.lin.weight = torch.nn.Parameter(weight_lin)
+
+        nn.add_codec(codec)
+
+        return nn
+
+    @classmethod
     def load_model(cls, path):
         """
         Deserializes a VGSL model from a CoreML file.
@@ -589,16 +679,17 @@ class TorchVGSLModel(object):
         """
         Builds an LSTM/GRU layer returning number of outputs and layer.
         """
-        pattern = re.compile(r'(?P<type>L|G)(?P<dir>f|r|b)(?P<dim>x|y)(?P<sum>s)?(?P<name>{\w+})?(?P<out>\d+)')
+        pattern = re.compile(r'(?P<type>L|G)(?P<dir>f|r|b)(?P<dim>x|y)(?P<sum>s)?(?P<clstm>c)?(?P<name>{\w+})?(?P<out>\d+)')
         m = pattern.match(block)
         if not m:
             return None, None, None
-        type = m.group(1)
-        direction = m.group(2)
-        dim = m.group(3)  == 'y'
-        summarize = m.group(4) == 's'
-        hidden = int(m.group(6))
-        l = TransposedSummarizingRNN(input[1], hidden, direction, dim, summarize)
+        type = m.group('type')
+        direction = m.group('dir')
+        dim = m.group('dim')  == 'y'
+        summarize = m.group('sum') == 's'
+        clstm = m.group('clstm') == 'c'
+        hidden = int(m.group(7))
+        l = TransposedSummarizingRNN(input[1], hidden, direction, dim, summarize, clstm)
 
         return l.get_shape(input), self.get_layer_name(type, m.group('name')), l
 
@@ -642,7 +733,7 @@ class TorchVGSLModel(object):
         """
         Builds an output layer.
         """
-        pattern = re.compile(r'(O)(?P<name>{\w+})?(?P<dim>2|1|0)(?P<type>l|s|c)(?P<out>\d+)')
+        pattern = re.compile(r'(O)(?P<name>{\w+})?(?P<dim>2|1|0)(?P<type>l|s|c)(?P<aug>a)?(?P<out>\d+)')
         m = pattern.match(block)
         if not m:
             return None, None, None
@@ -653,6 +744,6 @@ class TorchVGSLModel(object):
             raise ValueError('only softmax and ctc supported in output')
         if nl == 'c':
             self.criterion = CTCCriterion()
-        lin = LinSoftmax(input[1], int(m.group('out')))
+        lin = LinSoftmax(input[1], int(m.group('out')), True if m.group('aug') else False)
 
         return lin.get_shape(input), self.get_layer_name(m.group(1), m.group('name')), lin
