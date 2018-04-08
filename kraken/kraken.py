@@ -42,7 +42,7 @@ standard_library.install_aliases()
 warnings.simplefilter('ignore', UserWarning)
 
 APP_NAME = 'kraken'
-DEFAULT_MODEL = ['en-default.pronn']
+DEFAULT_MODEL = ['en-default.mlmodel']
 LEGACY_MODEL_DIR = '/usr/local/share/ocropus'
 
 spinner = cycle([u'⣾', u'⣽', u'⣻', u'⢿', u'⡿', u'⣟', u'⣯', u'⣷'])
@@ -243,9 +243,6 @@ def ocr(ctx, model, pad, reorder, serialization, text_direction, lines, conv):
     """
     Recognizes text in line images.
     """
-    # we do the locating and loading of the model here to spare us the overhead
-    # in each worker.
-
     # first we try to find the model in the absolue path, then ~/.kraken, then
     # LEGACY_MODEL_DIR
     nm = {}
