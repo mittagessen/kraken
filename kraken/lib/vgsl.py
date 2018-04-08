@@ -87,7 +87,7 @@ class TransposedSummarizingRNN(Module):
             - Inputs: :math:`(N, C, H, W)` where `N` batches, `C` channels, `H`
               height, and `W` width.
             - Outputs output :math:`(N, hidden_size * num_directions, H, S)`
-              w + EUR 12,00 Versandith S (or H) being 1 if summarize (and transpose) are true
+              S (or H) being 1 if summarize (and transpose) are true
         """
         super(TransposedSummarizingRNN, self).__init__()
         self.transpose = transpose
@@ -113,8 +113,8 @@ class TransposedSummarizingRNN(Module):
             # HNWC -> WNHC
             inputs = inputs.transpose(0, 2)
         if self.clstm:
-            Variable(torch.ones((1,) + inputs.shape[1:]))
-            inputs = torch.cat([ones, inputs])
+            ones = Variable(torch.ones(inputs.shape[:3] + (1,)))
+            inputs = torch.cat([ones, inputs], dim=3)
         # HNWC -> (H*N)WC
         siz = inputs.size()
         inputs = inputs.contiguous().view(-1, siz[2], siz[3])
@@ -288,7 +288,7 @@ class LinSoftmax(Module):
         # augment with ones along the input (C) axis
         if self.augmentation:
             inputs = torch.cat([Variable(torch.ones(inputs.shape[:3] + (1,))), inputs], dim=3)
-        o = F.softmax(self.lin(inputs.transpose(1, 3)), dim=3)
+        o = F.softmax(self.lin(inputs), dim=3)
         # and swap again
         return o.transpose(3,1)
 
@@ -520,7 +520,7 @@ class TorchVGSLModel(object):
             mode = 'clstm_compat'
 
         # extract codec
-        codec = PytorchCodec([u''] + [unichr(x) for x in net.codec])
+        codec = PytorchCodec([u''] + [unichr(x) for x in net.codec[1:]])
 
         # separate layers
         nets = {}
@@ -541,7 +541,6 @@ class TorchVGSLModel(object):
         if mode == 'clstm_compat':
             weightnames = ('.WGI', '.WGF', '.WCI', '.WGO')
             weightname_softm = '.W'
-
         else:
             weightnames = ('WGI', 'WGF', 'WCI', 'WGO')
             weightname_softm = 'W1'
@@ -558,6 +557,9 @@ class TorchVGSLModel(object):
         weight_hh_l0_rev = t[:, input+1:]
 
         weight_lin = weights['softm'][weightname_softm]
+        if mode == 'clstm_compat':
+            weight_lin = torch.cat([torch.zeros(len(weight_lin), 1), weight_lin], 1)
+
         # build vgsl spec and set weights
         nn = cls('[1,1,0,{} Lbxc{} O1ca{}]'.format(input, hidden, len(net.codec)))
         nn.nn.L_0.layer.weight_ih_l0 = torch.nn.Parameter(weight_ih_l0)
