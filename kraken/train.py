@@ -145,7 +145,7 @@ class GroundTruthDataset(Dataset):
             elif isinstance(scale, tuple):
                 self.transforms.append(transforms.Resize(scale, Image.LANCZOS))
         if pad:
-            self.transforms.append(transforms.Pad(0, pad))
+            self.transforms.append(transforms.Pad((pad, 0)))
         self.transforms.append(transforms.ToTensor())
         # invert
         self.transforms.append(transforms.Lambda(lambda x: x.max() - x))
