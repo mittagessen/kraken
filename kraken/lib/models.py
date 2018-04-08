@@ -17,6 +17,7 @@ from os.path import expandvars, expanduser, abspath
 from builtins import next
 from builtins import chr
 
+import torch
 import numpy
 import gzip
 import bz2
@@ -27,146 +28,81 @@ import kraken.lib.lstm
 import kraken.lib.lineest
 
 from kraken.lib import pyrnn_pb2
-from kraken.lib.tlstm import TlstmSeqRecognizer
-from kraken.lib.exceptions import KrakenInvalidModelException
+from kraken.lib.vgsl import TorchVGSLModel
+from kraken.lib.exceptions import KrakenInvalidModelException, KrakenInputException
+from torch.autograd import Variable
 
-
-class ClstmSeqRecognizer(kraken.lib.lstm.SeqRecognizer):
+class TorchSeqRecognizer(object):
     """
-    A class providing the same interface to CLSTM networks as to pyrnn
-    ones.
+    A class wrapping a TorchVGSLModel with a more comfortable recognition interface.
     """
-    def __init__(self, fname, normalize=kraken.lib.lstm.normalize_nfkc):
-        self.fname = fname
-        self.rnn = None
-        self.normalize = normalize
-        global clstm
-        import clstm
-        self._load_model()
+    def __init__(self, nn, normalize=kraken.lib.lstm.normalize_nfkc):
+        self.nn = nn
+        self.codec = nn.codec
 
-    @classmethod
-    def init_model(cls, ninput, nhidden, codec):
+    def forward(self, line):
         """
-        Initialize a new neural network.
-
-        Args:
-            ninput (int): Dimension of input vector
-            nhidden (int): Number of nodes in hidden layer
-            codec (list): List mapping n-th entry in output matrix to glyph
+        Performs a forward pass on a numpy array of a line with shape (C, H, W)
+        and returns a numpy array (W, C).
         """
-        self = cls()
-        self.rnn = clstm.make_net_init('bidi',
-                                       'ninput={}:nhidden={}:noutput={}'.format(ninput,
-                                                                                nhidden, 
-                                                                                len(codec)))
-        self.rnn.initialize()
+        line = Variable(torch.FloatTensor(line))
+        # make NCHW -> 1CHW
+        line.unsqueeze_(0)
+        o = self.nn.nn(line)
+        if o.size(2) != 1:
+            raise KrakenInputException('Expected dimension 3 to be 1, actual {}'.format(output.size()))
+        self.outputs = o.data.squeeze().transpose(0, 1).numpy()
+        return self.outputs
 
-    def save_model(self, path):
+    def predict(self, line):
         """
-        Serializes a CLSTM model to protobuf.
-
-        Args:
-            path (str): Path to serialize model to.
-
-        Raises:
-            IndexError if serialization failed for any reason.
+        Performs a forward pass on a numpy array of a line with shape (C, H, W)
+        and returns the decoding as a list of tuples (string, start, end,
+        confidence).
         """
-        clstm.save_net(path, self.rnn)
-
-    def _load_model(self):
-        self.rnn = clstm.load_net(self.fname.encode('utf-8'))
+        o = self.forward(line)
+        locs = self.translate_back_locations(o)
+        return self.codec.decode(locs)
 
     def predictString(self, line):
         """
-        Predicts a string from an input image.
+        Performs a forward pass on a numpy array of a line with shape (C, H, W)
+        and returns astring of the results.
+        """
+        o = self.forward(line)
+        locs = self.translate_back_locations(o)
+        decoding = self.codec.decode(locs)
+        return ''.join(x[0] for x in decoding)
+
+    def translate_back_locations(self, output, threshold=0.5):
+        """
+        Translates an output array of shape (C, W) into a label sequence
+        with their corresponding time steps.
 
         Args:
-            line (numpy.array): Input image
+            output (numpy.array): (C, W) shaped softmax output tensor
+            threshold (float): Threshold for 0 class when determining possible
+                               label locations.
 
         Returns:
-            A unicode string containing the recognition result.
+            A list with tuples (class, start, end, max). max is the maximum value
+            of the softmax layer in the region.
         """
-        line = line.reshape(-1, self.rnn.ninput(), 1)
-        self.rnn.inputs.aset(line.astype('float32'))
-        self.rnn.forward()
-        self.outputs = self.rnn.outputs.array().reshape(line.shape[0], self.rnn.noutput())
-        codes = [x[0] for x in kraken.lib.lstm.translate_back_locations(self.outputs)]
-        cls = clstm.Classes()
-        cls.resize(len(codes))
-        for i, v in enumerate(codes):
-            cls[i] = v
-        res = self.rnn.codec.decode(cls)
-        return res
+        return kraken.lib.lstm.translate_back_locations(output, threshold)
 
-    def trainSequence(self, line, labels, update=1):
+    def translate_back(self, output):
         """
-        Trains the network using an input numpy array and a series of labels.
+        Translates an output tensor of shape (1, C, 1, W) into a label sequence.
 
         Args:
-            line (numpy.array): Input image
-            labels (clstm.Classes): Label sequence
-            update (bool): Switch to disable weight updates
+            output (torch.Tensor): (1, C, 1, W) shaped softmax output tensor
+            threshold (float): Threshold for 0 class when determining possible
+                               label locations.
 
         Returns:
-            clstm.Classes containing the recognized label sequence.
+            A list of integer labels.
         """
-        line = line.reshape(-1, self.rnn.ninput(), 1)
-        self.rnn.inputs.aset(line.astype('float32'))
-        self.rnn.forward()
-        self.outputs = self.rnn.outputs.array().reshape(line.shape[0], self.rnn.noutput())
-
-        # build CTC alignment
-        targets = clstm.Sequence()
-        aligned = clstm.Sequence()
-        clstm.mktargets(targets, labels, self.rnn.noutput())
-        clstm.seq_ctc_align(aligned, self.rnn.outputs, targets)
-
-        # calculate deltas, backpropagate and update weights
-        deltas = aligned.array() - self.rnn.outputs.array()
-        self.rnn.outputs.dset(deltas)
-        self.rnn.backward()
-        if update:
-            clstm.sgd_update(self.rnn)
-
-        codes = kraken.lib.lstm.translate_back(self.outputs)
-        cls = clstm.Classes()
-        cls.resize(len(codes))
-        for i, v in enumerate(codes):
-            cls[i] = v
-
-        return cls
-
-    def trainString(self, line, s, update=1):
-        """
-        Trains the network using an input numpy array and a unicode string.
-
-        Strings are assumed to be in ``display`` order as produced as the
-        result of the BiDi algorithm.
-
-        Args:
-            line (numpy.array): Input image
-            s (str): Expected output string
-            update (bool): Switch to disable weight updates
-
-        Returns:
-            An unicode string containing the recognized sequence.
-        """
-        labels = clstm.Classes()
-        self.rnn.codec.encode(labels, s)
-
-        cls = self.trainSequence(line, labels)
-        return self.rnn.codec.decode(cls)
-
-    def setLearningRate(self, rate=1e-4, momentum=0.9):
-        """
-        Sets learning rate and momentum on the model.
-
-        Args:
-            rate (float): Learning rate
-            momentum (float): Momentum
-        """
-        self.rnn.learning_rate = rate
-        self.rnn.momentum = momentum
+        return kraken.lib.lstm.translate_back(output, threshold)
 
 
 def load_any(fname):
@@ -184,65 +120,28 @@ def load_any(fname):
     containing a string representation of the source kind. Current known values
     are:
         * pyrnn for pickled BIDILSTMs
-        * hdf-pyrnn for protobuf models converted from pickled objects
         * clstm for protobuf models generated by clstm
 
     Args:
         fname (unicode): Path to the model
 
     Returns:
-        A kraken.lib.lstm.SeqRecognizer object.
-
-    Raises:
-        KrakenInvalidModelException if the model file could not be recognized.
+        A kraken.lib.models.TorchSeqRecognizer object.
     """
-    seq = None
-
+    nn = None
+    kind = ''
     fname = abspath(expandvars(expanduser(fname)))
     try:
-        seq = load_pronn(fname)
-        seq.kind = 'proto-pyrnn'
-        return seq
+        nn = TorchVGSLModel.load_model(fname)
+        kind = 'vgsl'
     except:
-        try:
-            seq = load_tlstm(fname)
-            return seq
-        except Exception as e:
-            if PY2:
-                try:
-                    seq = load_pyrnn(fname)
-                    seq.kind = 'pyrnn'
-                    return seq
-                except Exception as e:
-                    raise
-            else:
-                raise
-
-def load_clstm(fname):
-    """
-    Loads a CLSTM model in protobuf format and instantiates an object
-    implementing the kraken.lib.SeqRecognizer interface.
-
-    Args:
-        fname (unicode): Path to the protobuf file
-
-    Returns:
-        A SeqRecognizer object
-    """
-    try:
-        import clstm
-    except ImportError:
-        raise KrakenInvalidModelException('No clstm module available')
-
-    try:
-        clstm.load_net(fname.encode('utf-8'))
-    except Exception as e:
-        raise KrakenInvalidModelException(str(e))
-    return ClstmSeqRecognizer(fname)
-
-def load_tlstm(fname):
-    return TlstmSeqRecognizer(fname)
-
+        nn = TorchVGSLModel.load_clstm_model(fname)
+        kind = 'clstm'
+    if not nn:
+        raise KrakenInvalidModelException('File {} not loadable by any parser.'.format(fname))
+    seq = TorchSeqRecognizer(nn)
+    seq.kind = kind
+    return seq
 
 def load_pronn(fname):
     """
