@@ -22,6 +22,7 @@ from builtins import object
 
 import numpy as np
 import bidi.algorithm as bd
+from torchvision import transforms
 
 from kraken.lib import lstm
 from kraken.lib.util import pil2array, array2pil
@@ -164,7 +165,7 @@ def mm_rpred(nets, im, bounds, pad=16, line_normalization=True, bidi_reordering=
     these lines.
 
     Args:
-        nets (dict): A dict mapping ISO15924 identifiers to SegRecognizer
+        nets (dict): A dict mapping ISO15924 identifiers to TorchSegRecognizer
                      objects. Recommended to be an defaultdict.
         im (PIL.Image): Image to extract text from
                         bounds (dict): A dictionary containing a 'boxes' entry
@@ -194,41 +195,77 @@ def mm_rpred(nets, im, bounds, pad=16, line_normalization=True, bidi_reordering=
     if miss:
         raise KrakenInputException('Missing models for scripts {}'.format(miss))
 
+    # build dictionary for line preprocessing
+    ts = {}
+    for script, network in nets.iteritems():
+        ts[script] = []
+        batch, channels, height, width = network.nn.input
+        # height 1, arbitrary width, and channels > 3 indicate 8bpp fixed height
+        # (channels) strips of an arbitrary width image => swap height dimension into channels
+        if height == 1 and width == 0 and channels > 3:
+            format = (1, 0, 2)
+            scale = channels
+        # arbitrary (or fixed) height and width and channels 1 or 3 => needs a
+        # summarizing network (or a not yet implemented scale operation) to move
+        # height to the channel dimension.
+        elif height > 1 and width == 0 and channels in (1, 3):
+            format = (0, 1, 2)
+            scale = height
+        # fixed height and width image => bicubic scaling of the input image, disable padding
+        elif height > 0 and width > 0  and channels in (1, 3):
+            format = (0, 1, 2)
+            pad = 0
+            scale = (height, width)
+        elif height == 0 and width == 0  and channels in (1, 3):
+            format = (0, 1, 2)
+            pad = 0
+            scale = 0
+
+        if scale:
+            if isinstance(scale, int):
+                lnorm = CenterNormalizer(scale)
+                ts[script].append(transforms.Lambda(lambda x: dewarp(lnorm, x)))
+                ts[script].append(transforms.Lambda(lambda x: x.convert('L')))
+            elif isinstance(scale, tuple):
+                ts[script].append(transforms.Resize(scale, Image.LANCZOS))
+        if pad > 0:
+            ts[script].append(transforms.Pad((pad, 0)))
+        ts[script].append(transforms.ToTensor())
+        ts[script].append(transforms.Lambda(lambda x: x.max() - x))
+        ts[script].append(transforms.Lambda(lambda x: x.permute(*format)))
+        ts[script] = transforms.Compose(ts[script])
+
     for line in bounds['boxes']:
         rec = ocr_record('', [], [])
         for script, (box, coords) in zip(map(lambda x: x[0], line),
-                                         extract_boxes(im, {'text_direction': bounds['text_direction'], 
+                                         extract_boxes(im, {'text_direction': bounds['text_direction'],
                                                             'boxes': map(lambda x: x[1], line)})):
             # check if boxes are non-zero in any dimension
             if sum(coords[::2]) == 0 or coords[3] - coords[1] == 0:
                 continue
-            raw_line = pil2array(box)
-            # check if line is non-zero
-            if np.amax(raw_line) == np.amin(raw_line):
+            # try conversion into tensor
+            try:
+                line = ts[script](box)
+            except:
+                yield ocr_record('', [], [])
                 continue
-            if line_normalization:
-                # fail gracefully and return no recognition result in case the
-                # input line can not be normalized.
-                try:
-                    lnorm = getattr(nets[script], 'lnorm', CenterNormalizer())
-                    box = dewarp(lnorm, box)
-                except:
-                    yield ocr_record('', [], [])
-                    continue
-            line = pil2array(box)
-            line = lstm.prepare_line(line, pad)
-            pred = nets[script].predictString(line)
+            # check if line is non-zero
+            if line.max() == line.min():
+                yield ocr_record('', [], [])
+                continue
+            preds = nets[script].predict(line)
+
             # calculate recognized LSTM locations of characters
-            scale = len(raw_line.T)/(len(nets[script].outputs)-2 * pad)
-            result = lstm.translate_back_locations(nets[script].outputs)
+            scale = box.size[0]/(len(network.outputs)-2 * pad)
+            pred = ''.join(x[0] for x in preds)
             pos = []
             conf = []
-    
-            for _, start, end, c in result:
+
+            for _, start, end, c in preds:
                 if bounds['text_direction'].startswith('horizontal'):
-                    pos.append((coords[0] + int((start-pad)*scale), coords[1], coords[0] + int((end-pad/2)*scale), coords[3]))
+                    pos.append((coords[0] + int((start-pad)*scale), coords[1], coords[0] + int((end-pad)*scale), coords[3]))
                 else:
-                    pos.append((coords[0], coords[1] + int((start-pad)*scale), coords[2], coords[1] + int((end-pad/2)*scale)))
+                    pos.append((coords[0], coords[1] + int((start-pad)*scale), coords[2], coords[1] + int((end-pad)*scale)))
                 conf.append(c)
             rec.prediction += pred
             rec.cuts.extend(pos)
@@ -244,19 +281,16 @@ def rpred(network, im, bounds, pad=16, line_normalization=True, bidi_reordering=
     Uses a RNN to recognize text
 
     Args:
-        network (kraken.lib.lstm.SegRecognizer): A SegRecognizer object
+        network (kraken.lib.models.TorchSeqRecognizer): A TorchSegRecognizer
+                                                        object
         im (PIL.Image): Image to extract text from
         bounds (dict): A dictionary containing a 'boxes' entry with a list of
                        coordinates (x0, y0, x1, y1) of a text line in the image
                        and an entry 'text_direction' containing
                        'horizontal-tb/vertical-lr/rl'.
-        pad (int): Extra blank padding to the left and right of text line
-        line_normalization (bool): Dewarp line using the line estimator
-                                   contained in the network. If no normalizer
-                                   is available one using the default
-                                   parameters is created. By aware that you may
-                                   have to scale lines manually to the target
-                                   line height if disabled.
+        pad (int): Extra blank padding to the left and right of text line.
+                   Auto-disabled when expected network inputs are incompatible
+                   with padding.
         bidi_reordering (bool): Reorder classes in the ocr_record according to
                                 the Unicode bidirectional algorithm for correct
                                 display.
@@ -267,39 +301,71 @@ def rpred(network, im, bounds, pad=16, line_normalization=True, bidi_reordering=
 
     lnorm = getattr(network, 'lnorm', CenterNormalizer())
 
+    batch, channels, height, width = network.nn.input
+    # height 1, arbitrary width, and channels > 3 indicate 8bpp fixed height
+    # (channels) strips of an arbitrary width image => swap height dimension into channels
+    if height == 1 and width == 0 and channels > 3:
+        format = (1, 0, 2)
+        scale = channels
+    # arbitrary (or fixed) height and width and channels 1 or 3 => needs a
+    # summarizing network (or a not yet implemented scale operation) to move
+    # height to the channel dimension.
+    elif height > 1 and width == 0 and channels in (1, 3):
+        format = (0, 1, 2)
+        scale = height
+    # fixed height and width image => bicubic scaling of the input image, disable padding
+    elif height > 0 and width > 0  and channels in (1, 3):
+        format = (0, 1, 2)
+        pad = 0
+        scale = (height, width)
+    elif height == 0 and width == 0  and channels in (1, 3):
+        format = (0, 1, 2)
+        pad = 0
+        scale = 0
+
+    t = []
+    if scale:
+        if isinstance(scale, int):
+            lnorm = CenterNormalizer(scale)
+            t.append(transforms.Lambda(lambda x: dewarp(lnorm, x)))
+            t.append(transforms.Lambda(lambda x: x.convert('L')))
+        elif isinstance(scale, tuple):
+            t.append(transforms.Resize(scale, Image.LANCZOS))
+    if pad > 0:
+        t.append(transforms.Pad((pad, 0)))
+    t.append(transforms.ToTensor())
+    t.append(transforms.Lambda(lambda x: x.max() - x))
+    t.append(transforms.Lambda(lambda x: x.permute(*format)))
+    t = transforms.Compose(t)
+
     for box, coords in extract_boxes(im, bounds):
         # check if boxes are non-zero in any dimension
         if sum(coords[::2]) == 0 or coords[3] - coords[1] == 0:
             yield ocr_record('', [], [])
             continue
-        raw_line = pil2array(box)
-        # check if line is non-zero
-        if np.amax(raw_line) == np.amin(raw_line):
+        # try conversion into tensor
+        try:
+            line = t(box)
+        except:
             yield ocr_record('', [], [])
             continue
-        if line_normalization:
-            # fail gracefully and return no recognition result in case the
-            # input line can not be normalized.
-            try:
-                box = dewarp(lnorm, box)
-            except:
-                yield ocr_record('', [], [])
-                continue
-        line = pil2array(box)
-        line = lstm.prepare_line(line, pad)
-        pred = network.predictString(line)
-
+        # check if line is non-zero
+        if line.max() == line.min():
+            yield ocr_record('', [], [])
+            continue
+        preds = network.predict(line)
         # calculate recognized LSTM locations of characters
-        scale = len(raw_line.T)/(len(network.outputs)-2 * pad)
-        result = network.translate_back_locations(network.outputs)
+        scale = box.size[0]/(len(network.outputs)-2 * pad)
+        # XXX: fix bounding box calculation ocr_record for multi-codepoint labels.
+        pred = ''.join(x[0] for x in preds)
         pos = []
         conf = []
 
-        for _, start, end, c in result:
+        for _, start, end, c in preds:
             if bounds['text_direction'].startswith('horizontal'):
-                pos.append((coords[0] + int((start-pad)*scale), coords[1], coords[0] + int((end-pad/2)*scale), coords[3]))
+                pos.append((coords[0] + int((start-pad)*scale), coords[1], coords[0] + int((end-pad)*scale), coords[3]))
             else:
-                pos.append((coords[0], coords[1] + int((start-pad)*scale), coords[2], coords[1] + int((end-pad/2)*scale)))
+                pos.append((coords[0], coords[1] + int((start-pad)*scale), coords[2], coords[1] + int((end-pad)*scale)))
             conf.append(c)
         if bidi_reordering:
             yield bidi_record(ocr_record(pred, pos, conf))
