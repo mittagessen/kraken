@@ -15,7 +15,10 @@ from torch.autograd import Variable
 from kraken.lib import clstm_pb2
 from kraken.lib.ctc import CTCCriterion
 from kraken.lib.codec import PytorchCodec
+
+from torch.nn import functional as F
 from torch.nn.modules.loss import _assert_no_grad
+
 from coremltools.models import MLModel
 from coremltools.models import datatypes
 from coremltools.models.neural_network import NeuralNetworkBuilder
@@ -25,6 +28,117 @@ from coremltools.models.neural_network import NeuralNetworkBuilder
 # an LSTM will be put into C same as the filters of a CNN.
 
 __all__ = ['TorchVGSLModel']
+
+def PeepholeLSTMCell(input, hidden, w_ih, w_hh, w_ci, w_cf, w_co):
+    """
+    An LSTM cell with peephole connections without biases.
+
+    Mostly ripped from the pytorch autograd lstm implementation.
+    """
+    hx, cx = hidden
+    gates = F.linear(input, w_ih) + F.linear(hx, w_hh)
+
+    ingate, forgetgate, cellgate, outgate = gates.chunk(4, 1)
+    peep_i = w_ci.unsqueeze(0).expand_as(cx) * cx
+    ingate = ingate + peep_i
+    peep_f = w_cf.unsqueeze(0).expand_as(cx) * cx
+    forgetgate = forgetgate + peep_f
+
+    ingate = F.sigmoid(ingate)
+    forgetgate = F.sigmoid(forgetgate)
+    cellgate = F.tanh(cellgate)
+    cy = (forgetgate * cx) + (ingate * cellgate)
+    peep_o = w_co.unsqueeze(0).expand_as(cy) * cy
+    outgate = outgate + peep_o
+    hy = outgate * F.tanh(cy)
+
+    return hy, cy
+
+
+def StackedRNN(inners, num_layers, num_directions):
+    num_directions = len(inners)
+    total_layers = num_layers * num_directions
+
+    def forward(input, hidden, weight):
+        assert (len(weight) == total_layers)
+        next_hidden = []
+        for i in range(num_layers):
+            all_output = []
+            for j, inner in enumerate(inners):
+                l = i * num_directions + j
+                hy, output = inner(input, hidden[l], weight[l])
+                next_hidden.append(hy)
+                all_output.append(output)
+            input = torch.cat(all_output, input.dim() - 1)
+        next_h, next_c = zip(*next_hidden)
+        next_hidden = (
+            torch.cat(next_h, 0).view(total_layers, *next_h[0].size()),
+            torch.cat(next_c, 0).view(total_layers, *next_c[0].size())
+        )
+        return next_hidden, input
+
+    return forward
+
+
+def Recurrent(inner, reverse=False):
+    def forward(input, hidden, weight):
+        output = []
+        steps = range(input.size(0) - 1, -1, -1) if reverse else range(input.size(0))
+        for i in steps:
+            hidden = inner(input[i], hidden, *weight)
+            # hack to handle LSTM
+            output.append(hidden[0] if isinstance(hidden, tuple) else hidden)
+        if reverse:
+            output.reverse()
+        output = torch.cat(output, 0).view(input.size(0), *output[0].size())
+        return hidden, output
+
+    return forward
+
+
+class PeepholeBidiLSTM(Module):
+
+    def __init__(self, input_size, hidden_size):
+        super(PeepholeBidiLSTM, self).__init__()
+
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self._all_weights = []
+        gate_size = 4 * hidden_size
+        for direction in range(2):
+            w_ih = torch.nn.Parameter(torch.Tensor(gate_size, input_size))
+            w_hh = torch.nn.Parameter(torch.Tensor(gate_size, hidden_size))
+
+            w_ci = torch.nn.Parameter(torch.Tensor(hidden_size))
+            w_cf = torch.nn.Parameter(torch.Tensor(hidden_size))
+            w_co = torch.nn.Parameter(torch.Tensor(hidden_size))
+
+            layer_params = (w_ih, w_hh, w_ci, w_cf, w_co)
+
+            suffix = '_reverse' if direction == 1 else ''
+            param_names = ['weight_ih_l0{}', 'weight_hh_l0{}', 'weight_ci_l0{}', 'weight_cf_l0{}', 'weight_co_l0{}']
+            param_names = [x.format(suffix) for x in param_names]
+
+            for name, param in zip(param_names, layer_params):
+                setattr(self, name, param)
+            self._all_weights.append(param_names)
+
+    def init_hidden(self, bsz=1):
+        return (Variable(torch.zeros(2, bsz, self.hidden_size)),
+                Variable(torch.zeros(2, bsz, self.hidden_size)))
+
+    def forward(self, input, hidden):
+        layer = (Recurrent(PeepholeLSTMCell), Recurrent(PeepholeLSTMCell, reverse=True))
+        func = StackedRNN(layer, 1, 2)
+        input = input.transpose(0, 1)
+        hidden, output = func(input, hidden, self.all_weights)
+        output = output.transpose(0, 1)
+        return output, hidden
+
+    @property
+    def all_weights(self):
+        return [[getattr(self, weight) for weight in weights] for weights in self._all_weights]
+
 
 class MaxPool(Module):
     """
