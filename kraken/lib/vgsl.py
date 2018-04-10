@@ -6,6 +6,8 @@ import re
 import json
 import torch
 
+from torch.autograd import set_grad_enabled
+
 from kraken.lib import layers
 from kraken.lib import clstm_pb2
 from kraken.lib import pyrnn_pb2
@@ -43,7 +45,7 @@ class TorchVGSLModel(object):
 
     """
 
-    def __init__(self, spec):
+    def __init__(self, spec, train=True):
         """
         Constructs a torch module from a (subset of) VSGL spec.
 
@@ -92,6 +94,11 @@ class TorchVGSLModel(object):
         self.codec = None
         self.criterion = None
 
+        if train:
+            set_grad_enabled(True)
+        else:
+            set_grad_enabled(False)
+
         self.idx = -1
         spec = spec.strip()
         if spec[0] != '[' or spec[-1] != ']':
@@ -128,10 +135,15 @@ class TorchVGSLModel(object):
             self.criterion.cuda()
 
     @classmethod
-    def load_pronn_model(cls, path):
+    def load_pronn_model(cls, path, train=False):
         """
         Loads an pronn model to VGSL.
         """
+        if train:
+            set_grad_enabled(True)
+        else:
+            set_grad_enabled(False)
+
         with open(path, 'rb') as fp:
             net = pyrnn_pb2.pyrnn()
             try:
@@ -189,10 +201,15 @@ class TorchVGSLModel(object):
         return nn
 
     @classmethod
-    def load_clstm_model(cls, path):
+    def load_clstm_model(cls, path, train=False):
         """
         Loads an CLSTM model to VGSL.
         """
+        if train:
+            set_grad_enabled(True)
+        else:
+            set_grad_enabled(False)
+
         net = clstm_pb2.NetworkProto()
         with open(path, 'rb') as fp:
             try:
@@ -265,13 +282,18 @@ class TorchVGSLModel(object):
         return nn
 
     @classmethod
-    def load_model(cls, path):
+    def load_model(cls, path, train=False):
         """
         Deserializes a VGSL model from a CoreML file.
 
         Args:
             path (str): CoreML file
         """
+        if train:
+            set_grad_enabled(True)
+        else:
+            set_grad_enabled(False)
+
         mlmodel = MLModel(path)
         if 'vgsl' not in mlmodel.user_defined_metadata:
             raise ValueError('No VGSL spec in model metadata')
