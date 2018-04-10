@@ -1,18 +1,26 @@
 """
 VGSL plumbing
 """
+from __future__ import absolute_import
+from future import standard_library
+standard_library.install_aliases()
+from future.utils import PY2
 
+import io
 import re
+import sys
 import json
+import gzip
 import torch
 
-from torch.autograd import set_grad_enabled
+import kraken.lib.lstm
 
 from kraken.lib import layers
 from kraken.lib import clstm_pb2
 from kraken.lib import pyrnn_pb2
 from kraken.lib.ctc import CTCCriterion
 from kraken.lib.codec import PytorchCodec
+from kraken.lib.exceptions import KrakenInvalidModelException
 
 from coremltools.models import MLModel
 from coremltools.models import datatypes
@@ -94,10 +102,10 @@ class TorchVGSLModel(object):
         self.codec = None
         self.criterion = None
 
-        if train:
-            set_grad_enabled(True)
-        else:
-            set_grad_enabled(False)
+#        if train:
+#            set_grad_enabled(True)
+#        else:
+#            set_grad_enabled(False)
 
         self.idx = -1
         spec = spec.strip()
@@ -135,14 +143,101 @@ class TorchVGSLModel(object):
             self.criterion.cuda()
 
     @classmethod
+    def load_pyrnn_model(cls, path, train=False):
+        """
+        Loads an pyrnn model to VGSL.
+        """
+#        if train:
+#            set_grad_enabled(True)
+#        else:
+#            set_grad_enabled(False)
+#
+        if not PY2:
+            raise KrakenInvalidModelException('Loading pickle models is not supported on python 3')
+
+        import cPickle
+        def find_global(mname, cname):
+            aliases = {
+                'lstm.lstm': kraken.lib.lstm,
+                'ocrolib.lstm': kraken.lib.lstm,
+                'ocrolib.lineest': kraken.lib.lineest,
+            }
+            if mname in aliases:
+                return getattr(aliases[mname], cname)
+            return getattr(sys.modules[mname], cname)
+
+        of = io.open
+        if path.endswith(u'.gz'):
+            of = gzip.open
+        with io.BufferedReader(of(path, 'rb')) as fp:
+            unpickler = cPickle.Unpickler(fp)
+            unpickler.find_global = find_global
+            try:
+                net = unpickler.load()
+            except Exception as e:
+                raise KrakenInvalidModelException(str(e))
+            if not isinstance(net, kraken.lib.lstm.SeqRecognizer):
+                raise KrakenInvalidModelException('Pickle is %s instead of '
+                                                  'SeqRecognizer' %
+                                                  type(net).__name__)
+        # extract codec
+        codec = PytorchCodec({k: [v] for k, v in net.codec.char2code.items()})
+
+        input = net.Ni
+        parallel, softmax = net.lstm.nets
+        fwdnet, revnet = parallel.nets
+        revnet = revnet.net
+
+        hidden = fwdnet.WGI.shape[0]
+
+        # extract weights
+        weightnames = ('WGI', 'WGF', 'WCI', 'WGO', 'WIP', 'WFP', 'WOP')
+
+        fwd_w = []
+        rev_w = []
+        for w in weightnames:
+            fwd_w.append(torch.FloatTensor(getattr(fwdnet, w)))
+            rev_w.append(torch.FloatTensor(getattr(revnet, w)))
+
+        t = torch.cat(fwd_w[:4])
+        weight_ih_l0 = t[:, :input+1]
+        weight_hh_l0 = t[:, input+1:]
+
+        t = torch.cat(rev_w[:4])
+        weight_ih_l0_rev = t[:, :input+1]
+        weight_hh_l0_rev = t[:, input+1:]
+
+        weight_lin = torch.FloatTensor(softmax.W2)
+
+        # build vgsl spec and set weights
+        nn = cls('[1,1,0,{} Lbxo{} O1ca{}]'.format(input, hidden, len(net.codec.code2char)))
+
+        nn.nn.L_0.layer.weight_ih_l0 = torch.nn.Parameter(weight_ih_l0)
+        nn.nn.L_0.layer.weight_hh_l0 = torch.nn.Parameter(weight_hh_l0)
+        nn.nn.L_0.layer.weight_ih_l0_reverse = torch.nn.Parameter(weight_ih_l0_rev)
+        nn.nn.L_0.layer.weight_hh_l0_reverse = torch.nn.Parameter(weight_hh_l0_rev)
+        nn.nn.L_0.layer.weight_ip_l0 = torch.nn.Parameter(fwd_w[4])
+        nn.nn.L_0.layer.weight_fp_l0 = torch.nn.Parameter(fwd_w[5])
+        nn.nn.L_0.layer.weight_op_l0 = torch.nn.Parameter(fwd_w[6])
+        nn.nn.L_0.layer.weight_ip_l0_reverse = torch.nn.Parameter(rev_w[4])
+        nn.nn.L_0.layer.weight_fp_l0_reverse = torch.nn.Parameter(rev_w[5])
+        nn.nn.L_0.layer.weight_op_l0_reverse = torch.nn.Parameter(rev_w[6])
+
+        nn.nn.O_1.lin.weight = torch.nn.Parameter(weight_lin)
+
+        nn.add_codec(codec)
+
+        return nn
+
+    @classmethod
     def load_pronn_model(cls, path, train=False):
         """
         Loads an pronn model to VGSL.
         """
-        if train:
-            set_grad_enabled(True)
-        else:
-            set_grad_enabled(False)
+#        if train:
+#            set_grad_enabled(True)
+#        else:
+#            set_grad_enabled(False)
 
         with open(path, 'rb') as fp:
             net = pyrnn_pb2.pyrnn()
@@ -205,11 +300,11 @@ class TorchVGSLModel(object):
         """
         Loads an CLSTM model to VGSL.
         """
-        if train:
-            set_grad_enabled(True)
-        else:
-            set_grad_enabled(False)
-
+#        if train:
+#            set_grad_enabled(True)
+#        else:
+#            set_grad_enabled(False)
+#
         net = clstm_pb2.NetworkProto()
         with open(path, 'rb') as fp:
             try:
@@ -289,10 +384,10 @@ class TorchVGSLModel(object):
         Args:
             path (str): CoreML file
         """
-        if train:
-            set_grad_enabled(True)
-        else:
-            set_grad_enabled(False)
+#        if train:
+#            set_grad_enabled(True)
+#        else:
+#            set_grad_enabled(False)
 
         mlmodel = MLModel(path)
         if 'vgsl' not in mlmodel.user_defined_metadata:
