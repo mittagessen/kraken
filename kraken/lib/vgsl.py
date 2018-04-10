@@ -13,6 +13,8 @@ from torch.nn import Module
 
 from torch.autograd import Variable
 from kraken.lib import clstm_pb2
+from kraken.lib import pyrnn_pb2
+
 from kraken.lib.ctc import CTCCriterion
 from kraken.lib.codec import PytorchCodec
 
@@ -29,7 +31,7 @@ from coremltools.models.neural_network import NeuralNetworkBuilder
 
 __all__ = ['TorchVGSLModel']
 
-def PeepholeLSTMCell(input, hidden, w_ih, w_hh, w_ci, w_cf, w_co):
+def PeepholeLSTMCell(input, hidden, w_ih, w_hh, w_ip, w_fp, w_op):
     """
     An LSTM cell with peephole connections without biases.
 
@@ -39,16 +41,16 @@ def PeepholeLSTMCell(input, hidden, w_ih, w_hh, w_ci, w_cf, w_co):
     gates = F.linear(input, w_ih) + F.linear(hx, w_hh)
 
     ingate, forgetgate, cellgate, outgate = gates.chunk(4, 1)
-    peep_i = w_ci.unsqueeze(0).expand_as(cx) * cx
+    peep_i = w_ip.unsqueeze(0).expand_as(cx) * cx
     ingate = ingate + peep_i
-    peep_f = w_cf.unsqueeze(0).expand_as(cx) * cx
+    peep_f = w_fp.unsqueeze(0).expand_as(cx) * cx
     forgetgate = forgetgate + peep_f
 
     ingate = F.sigmoid(ingate)
     forgetgate = F.sigmoid(forgetgate)
     cellgate = F.tanh(cellgate)
     cy = (forgetgate * cx) + (ingate * cellgate)
-    peep_o = w_co.unsqueeze(0).expand_as(cy) * cy
+    peep_o = w_op.unsqueeze(0).expand_as(cy) * cy
     outgate = outgate + peep_o
     hy = outgate * F.tanh(cy)
 
@@ -116,7 +118,7 @@ class PeepholeBidiLSTM(Module):
             layer_params = (w_ih, w_hh, w_ci, w_cf, w_co)
 
             suffix = '_reverse' if direction == 1 else ''
-            param_names = ['weight_ih_l0{}', 'weight_hh_l0{}', 'weight_ci_l0{}', 'weight_cf_l0{}', 'weight_co_l0{}']
+            param_names = ['weight_ih_l0{}', 'weight_hh_l0{}', 'weight_ip_l0{}', 'weight_fp_l0{}', 'weight_op_l0{}']
             param_names = [x.format(suffix) for x in param_names]
 
             for name, param in zip(param_names, layer_params):
@@ -184,7 +186,7 @@ class TransposedSummarizingRNN(Module):
     """
     An RNN wrapper allowing time axis transpositions and other
     """
-    def __init__(self, input_size, hidden_size, direction='b', transpose=True, summarize=True, clstm=False):
+    def __init__(self, input_size, hidden_size, direction='b', transpose=True, summarize=True, legacy=None):
         """
         A wrapper around torch.nn.LSTM optionally transposing inputs and
         returning only the last column of output.
@@ -195,7 +197,7 @@ class TransposedSummarizingRNN(Module):
             direction (str):
             transpose (bool): Transpose width/height dimension
             summarize (bool): Only return the last time step.
-            clstm (bool): Legacy CLSTM mode. No biases and 1-augmented input tensors.
+            legacy (str): Set to `clstm` for clstm rnns and `ocropy` for ocropus models.
 
         Shape:
             - Inputs: :math:`(N, C, H, W)` where `N` batches, `C` channels, `H`
@@ -206,19 +208,22 @@ class TransposedSummarizingRNN(Module):
         super(TransposedSummarizingRNN, self).__init__()
         self.transpose = transpose
         self.summarize = summarize
-        self.clstm = clstm
+        self.legacy = legacy
         self.input_size = input_size
-        if self.clstm:
+        if self.legacy:
             self.input_size += 1
         self.hidden_size = hidden_size
         self.bidi = direction == 'b'
         self.output_size = hidden_size if not self.bidi else 2*hidden_size
 
-        self.layer = torch.nn.LSTM(self.input_size,
-                                   hidden_size,
-                                   bidirectional=self.bidi,
-                                   batch_first=True,
-                                   bias=False if clstm else True)
+        if legacy == 'ocropy':
+            self.layer = PeepholeBidiLSTM(self.input_size, hidden_size)
+        else:
+            self.layer = torch.nn.LSTM(self.input_size,
+                                       hidden_size,
+                                       bidirectional=self.bidi,
+                                       batch_first=True,
+                                       bias=False if legacy else True)
 
     def forward(self, inputs):
         # NCHW -> HNWC
@@ -226,7 +231,7 @@ class TransposedSummarizingRNN(Module):
         if self.transpose:
             # HNWC -> WNHC
             inputs = inputs.transpose(0, 2)
-        if self.clstm:
+        if self.legacy:
             ones = Variable(torch.ones(inputs.shape[:3] + (1,)))
             inputs = torch.cat([ones, inputs], dim=3)
         # HNWC -> (H*N)WC
@@ -289,7 +294,7 @@ class TransposedSummarizingRNN(Module):
                                        fwd_params.outputGateRecursionMatrix.floatValue]) # wo
         self.layer.weight_hh_l0 = torch.nn.Parameter(weight_hh.resize_as_(self.layer.weight_hh_l0.data))
 
-        if not self.clstm:
+        if not self.legacy:
             # ih biases
             biases = torch.FloatTensor([fwd_params.inputGateBiasVector.floatValue, #bi
                                         fwd_params.forgetGateBiasVector.floatValue, # bf
@@ -314,7 +319,7 @@ class TransposedSummarizingRNN(Module):
                                                bwd_params.outputGateRecursionMatrix.floatValue]) # wo
             self.layer.weight_hh_l0_reverse = torch.nn.Parameter(weight_hh.resize_as_(self.layer.weight_hh_l0.data))
 
-            if not self.clstm:
+            if not self.legacy:
                 biases_rev = torch.FloatTensor([bwd_params.inputGateBiasVector.floatValue, #bi
                                                 bwd_params.forgetGateBiasVector.floatValue, # bf
                                                 bwd_params.blockInputBiasVector.floatValue, # bz/bg
@@ -348,24 +353,33 @@ class TransposedSummarizingRNN(Module):
             builder.add_bidirlstm(name=name,
                                   W_h=_reorder_indim(self.layer.weight_hh_l0),
                                   W_x=_reorder_indim(self.layer.weight_ih_l0),
-                                  b=_reorder_indim((self.layer.bias_ih_l0 + self.layer.bias_hh_l0)) if not self.clstm else None,
+                                  b=_reorder_indim((self.layer.bias_ih_l0 + self.layer.bias_hh_l0)) if not self.legacy else None,
                                   W_h_back=_reorder_indim(self.layer.weight_hh_l0_reverse),
                                   W_x_back=_reorder_indim(self.layer.weight_ih_l0_reverse),
-                                  b_back=_reorder_indim((self.layer.bias_ih_l0_reverse + self.layer.bias_hh_l0_reverse)) if not self.clstm else None,
+                                  b_back=_reorder_indim((self.layer.bias_ih_l0_reverse + self.layer.bias_hh_l0_reverse)) if not self.legacy else None,
                                   hidden_size=self.hidden_size,
                                   input_size=self.input_size,
                                   input_names=[input],
                                   output_names=[name],
+                                  peep=[self.layer.weight_ip_l0.data.numpy(),
+                                        self.layer.weight_fp_l0.data.numpy(),
+                                        self.layer.weight_op_l0.data.numpy()] if self.legacy == 'ocropy' else None,
+                                  peep_back=[self.layer.weight_ip_l0_reverse.data.numpy(),
+                                             self.layer.weight_fp_l0_reverse.data.numpy(),
+                                             self.layer.weight_op_l0_reverse.data.numpy()] if self.legacy == 'ocropy' else None,
                                   output_all=not self.summarize)
         else:
             builder.add_unilstm(name=name,
                                 W_h=_reorder_indim(self.layer.weight_hh_l0),
                                 W_x=_reorder_indim(self.layer.weight_ih_l0),
-                                b=_reorder_indim((self.layer.bias_ih_l0 + self.layer.bias_hh_l0)) if not self.clstm else None,
+                                b=_reorder_indim((self.layer.bias_ih_l0 + self.layer.bias_hh_l0)) if not self.legacy else None,
                                 hidden_size=self.hidden_size,
                                 input_size=self.input_size,
                                 input_names=[input],
                                 output_names=[name],
+                                peep=[self.layer.weight_ip_l0.data.numpy(),
+                                      self.layer.weight_fp_l0.data.numpy(),
+                                      self.layer.weight_op_l0.data.numpy()] if self.legacy == 'ocropy' else None,
                                 output_all=not self.summarize)
         return name
 
@@ -617,13 +631,80 @@ class TorchVGSLModel(object):
             self.criterion.cuda()
 
     @classmethod
+    def load_pronn_model(cls, path):
+        """
+        Loads an pronn model to VGSL.
+        """
+        with open(path, 'rb') as fp:
+            net = pyrnn_pb2.pyrnn()
+            try:
+                net.ParseFromString(fp.read())
+            except:
+                raise KrakenInvalidModelException('File does not contain valid proto msg')
+            if not net.IsInitialized():
+                raise KrakenInvalidModelException('Model incomplete')
+
+        # extract codec
+        codec = PytorchCodec(net.codec)
+
+        input = net.ninput
+        hidden = net.fwdnet.wgi.dim[0]
+
+        # extract weights
+        weightnames = ('wgi', 'wgf', 'wci', 'wgo', 'wip', 'wfp', 'wop')
+
+        fwd_w = []
+        rev_w = []
+        for w in weightnames:
+            fwd_ar = getattr(net.fwdnet, w)
+            rev_ar = getattr(net.revnet, w)
+            fwd_w.append(torch.FloatTensor(fwd_ar.value).view(list(fwd_ar.dim)))
+            rev_w.append(torch.FloatTensor(rev_ar.value).view(list(rev_ar.dim)))
+
+        t = torch.cat(fwd_w[:4])
+        weight_ih_l0 = t[:, :input+1]
+        weight_hh_l0 = t[:, input+1:]
+
+        t = torch.cat(rev_w[:4])
+        weight_ih_l0_rev = t[:, :input+1]
+        weight_hh_l0_rev = t[:, input+1:]
+
+        weight_lin = torch.FloatTensor(net.softmax.w2.value).view(list(net.softmax.w2.dim))
+
+        # build vgsl spec and set weights
+        nn = cls('[1,1,0,{} Lbxo{} O1ca{}]'.format(input, hidden, len(net.codec)))
+
+        nn.nn.L_0.layer.weight_ih_l0 = torch.nn.Parameter(weight_ih_l0)
+        nn.nn.L_0.layer.weight_hh_l0 = torch.nn.Parameter(weight_hh_l0)
+        nn.nn.L_0.layer.weight_ih_l0_reverse = torch.nn.Parameter(weight_ih_l0_rev)
+        nn.nn.L_0.layer.weight_hh_l0_reverse = torch.nn.Parameter(weight_hh_l0_rev)
+        nn.nn.L_0.layer.weight_ip_l0 = torch.nn.Parameter(fwd_w[4])
+        nn.nn.L_0.layer.weight_fp_l0 = torch.nn.Parameter(fwd_w[5])
+        nn.nn.L_0.layer.weight_op_l0 = torch.nn.Parameter(fwd_w[6])
+        nn.nn.L_0.layer.weight_ip_l0_reverse = torch.nn.Parameter(rev_w[4])
+        nn.nn.L_0.layer.weight_fp_l0_reverse = torch.nn.Parameter(rev_w[5])
+        nn.nn.L_0.layer.weight_op_l0_reverse = torch.nn.Parameter(rev_w[6])
+
+        nn.nn.O_1.lin.weight = torch.nn.Parameter(weight_lin)
+
+        nn.add_codec(codec)
+
+        return nn
+
+    @classmethod
     def load_clstm_model(cls, path):
         """
         Loads an CLSTM model to VGSL.
         """
         net = clstm_pb2.NetworkProto()
         with open(path, 'rb') as fp:
-            net.ParseFromString(fp.read())
+            try:
+                net.ParseFromString(fp.read())
+            except:
+                raise KrakenInvalidModelException('File does not contain valid proto msg')
+            if not net.IsInitialized():
+                raise KrakenInvalidModelException('Model incomplete')
+
         input = net.ninput
         output = net.noutput
         attrib = {a.key: a.value for a in list(net.attribute)}
@@ -795,7 +876,7 @@ class TorchVGSLModel(object):
         """
         Builds an LSTM/GRU layer returning number of outputs and layer.
         """
-        pattern = re.compile(r'(?P<type>L|G)(?P<dir>f|r|b)(?P<dim>x|y)(?P<sum>s)?(?P<clstm>c)?(?P<name>{\w+})?(?P<out>\d+)')
+        pattern = re.compile(r'(?P<type>L|G)(?P<dir>f|r|b)(?P<dim>x|y)(?P<sum>s)?(?P<legacy>c|o)?(?P<name>{\w+})?(?P<out>\d+)')
         m = pattern.match(block)
         if not m:
             return None, None, None
@@ -803,9 +884,13 @@ class TorchVGSLModel(object):
         direction = m.group('dir')
         dim = m.group('dim')  == 'y'
         summarize = m.group('sum') == 's'
-        clstm = m.group('clstm') == 'c'
+        legacy = None
+        if m.group('legacy') == 'c':
+            legacy = 'clstm'
+        elif m.group('legacy') == 'o':
+            legacy = 'ocropy'
         hidden = int(m.group(7))
-        l = TransposedSummarizingRNN(input[1], hidden, direction, dim, summarize, clstm)
+        l = TransposedSummarizingRNN(input[1], hidden, direction, dim, summarize, legacy)
 
         return l.get_shape(input), self.get_layer_name(type, m.group('name')), l
 
