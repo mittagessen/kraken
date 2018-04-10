@@ -135,8 +135,12 @@ def load_any(fname):
         nn = TorchVGSLModel.load_model(fname)
         kind = 'vgsl'
     except:
-        nn = TorchVGSLModel.load_clstm_model(fname)
-        kind = 'clstm'
+        try:
+            nn = TorchVGSLModel.load_clstm_model(fname)
+            kind = 'clstm'
+        except:
+            nn = TorchVGSLModel.load_pronn_model(fname)
+            kind = 'pronn'
     if not nn:
         raise KrakenInvalidModelException('File {} not loadable by any parser.'.format(fname))
     seq = TorchSeqRecognizer(nn)
