@@ -24,7 +24,6 @@ import numpy as np
 import bidi.algorithm as bd
 from torchvision import transforms
 
-from kraken.lib import lstm
 from kraken.lib.util import pil2array, array2pil
 from kraken.lib.lineest import CenterNormalizer
 from kraken.lib.exceptions import KrakenInputException

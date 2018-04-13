@@ -47,13 +47,6 @@ LEGACY_MODEL_DIR = '/usr/local/share/ocropus'
 
 spinner = cycle([u'⣾', u'⣽', u'⣻', u'⢿', u'⡿', u'⣟', u'⣯', u'⣷'])
 
-def have_clstm():
-    try:
-        import clstm
-    except ImportError:
-        return False
-    return True
-
 def spin(msg):
     click.echo(u'\r\033[?25l{}\t{}'.format(msg, next(spinner)), nl=False)
 
@@ -193,7 +186,7 @@ def binarize(threshold, zoom, escale, border, perc, range, low, high):
 @click.option('-d', '--text-direction', default='horizontal-tb',
               type=click.Choice(['horizontal-tb', 'vertical-lr', 'vertical-rl']),
               help='Sets principal text direction')
-@click.option('-s/-n', '--script-detect/--no-script-detect', default=have_clstm(),
+@click.option('-s/-n', '--script-detect/--no-script-detect', default=True,
               help='Enable script detection on segmenter output')
 @click.option('--scale', default=None, type=click.FLOAT)
 @click.option('-m', '--maxcolseps', default=2, type=click.INT)

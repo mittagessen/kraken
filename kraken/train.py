@@ -37,7 +37,6 @@ from torchvision import transforms
 from torch.utils.data import Dataset
 
 from kraken import rpred
-from kraken.lib import lstm
 from kraken.lib import models
 from kraken.lib.codec import PytorchCodec
 from kraken.lib.util import pil2array, array2pil
