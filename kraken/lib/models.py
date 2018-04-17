@@ -123,20 +123,20 @@ def load_any(fname, train=False):
     kind = ''
     fname = abspath(expandvars(expanduser(fname)))
     try:
-        nn = TorchVGSLModel.load_model(fname, train)
+        nn = TorchVGSLModel.load_model(fname)
         kind = 'vgsl'
     except:
         try:
-            nn = TorchVGSLModel.load_clstm_model(fname, train)
+            nn = TorchVGSLModel.load_clstm_model(fname)
             kind = 'clstm'
         except:
-            nn = TorchVGSLModel.load_pronn_model(fname, train)
+            nn = TorchVGSLModel.load_pronn_model(fname)
             kind = 'pronn'
         try:
             if not PY2:
                 raise KrakenInvalidModelException('Loading pickle models is not '
                                                   'supported on python 3')
-            nn = TorchVGSLModel.load_pyrnn_model(fname, train)
+            nn = TorchVGSLModel.load_pyrnn_model(fname
             kind = 'pyrnn'
         except:
             pass
