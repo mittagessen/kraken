@@ -188,6 +188,7 @@ def mm_rpred(nets, im, bounds, pad=16, line_normalization=True, bidi_reordering=
         An ocr_record containing the recognized text, absolute character
         positions, and confidence values for each character.
     """
+    im_str = im.filename if hasattr(im, 'filename') else repr(im)
     logger.info(u'Running {} multi-script recognizers on {} with {} lines'.format(len(nets), im_str, len(bounds['boxes'])))
     for line in bounds['boxes']:
         rec = ocr_record('', [], [])
