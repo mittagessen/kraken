@@ -43,6 +43,10 @@ class TorchSeqRecognizer(object):
             train (bool): Enables or disables gradient calculation
         """
         self.nn = nn
+        if train:
+            self.nn.train()
+        else:
+            self.nn.eval()
         self.codec = nn.codec
         self.decoder = decoder
         self.train = train
