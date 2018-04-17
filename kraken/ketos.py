@@ -190,7 +190,7 @@ def extract(ctx, normalization, reorder, rotate, output, transcriptions):
                 logger.info(u'Skipping {} because image not found'.format(fp.name))
                 break
             for line in section.iter('li'):
-                if line.get('contenteditable') and not u''.join(line.itertext().isspace()):
+                if line.get('contenteditable') and not u''.join(line.itertext()).isspace():
                     l = im.crop([int(x) for x in line.get('data-bbox').split(',')])
                     if rotate and td.startswith('vertical'):
                         im.rotate(90, expand=True)
