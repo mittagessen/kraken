@@ -2,8 +2,8 @@
 kraken.lib.models
 ~~~~~~~~~~~~~~~~~
 
-Wraps around legacy pyrnn and protobuf models to provide a single interface. In
-the future it will also include support for clstm models.
+Wrapper around TorchVGSLModel including a variety of forward pass 
+Wraps around legacy pyrnn and protobuf models to provide a single interface.
 """
 
 from __future__ import absolute_import
@@ -17,14 +17,11 @@ from os.path import expandvars, expanduser, abspath
 from builtins import next
 from builtins import chr
 
-import torch
-import numpy
-import gzip
-import bz2
 import sys
-import io
+import torch
 
 import kraken.lib.lineest
+import kraken.lib.ctc_decoder
 
 from kraken.lib import pyrnn_pb2
 from kraken.lib.vgsl import TorchVGSLModel
@@ -35,16 +32,27 @@ class TorchSeqRecognizer(object):
     """
     A class wrapping a TorchVGSLModel with a more comfortable recognition interface.
     """
-    def __init__(self, nn):
+    def __init__(self, nn, decoder=kraken.lib.ctc_decoder.blank_threshold_decoder, train=False):
+        """
+        Constructs a sequence recognizer from a VGSL model and a decoder.
+
+        Args:
+            nn (kraken.lib.vgsl.TorchVGSLModel): neural network used for recognition
+            decoder (func): Decoder function used for mapping softmax
+                            activations to labels and positions
+            train (bool): Enables or disables gradient calculation
+        """
         self.nn = nn
         self.codec = nn.codec
+        self.decoder = decoder
+        self.train = train
 
     def forward(self, line):
         """
         Performs a forward pass on a numpy array of a line with shape (C, H, W)
         and returns a numpy array (W, C).
         """
-        line = Variable(torch.FloatTensor(line))
+        line = Variable(torch.FloatTensor(line), volatile=not train)
         # make NCHW -> 1CHW
         line.unsqueeze_(0)
         o = self.nn.nn(line)
@@ -60,51 +68,30 @@ class TorchSeqRecognizer(object):
         confidence).
         """
         o = self.forward(line)
-        locs = self.translate_back_locations(o)
+        locs = self.decoder(o)
         return self.codec.decode(locs)
 
-    def predictString(self, line):
+    def predict_string(self, line):
         """
         Performs a forward pass on a numpy array of a line with shape (C, H, W)
-        and returns astring of the results.
+        and returns a string of the results.
         """
         o = self.forward(line)
-        locs = self.translate_back_locations(o)
+        locs = self.decoder(o)
         decoding = self.codec.decode(locs)
         return ''.join(x[0] for x in decoding)
 
-    def translate_back_locations(self, output, threshold=0.5):
+    def predict_labels(self, line):
         """
-        Translates an output array of shape (C, W) into a label sequence
-        with their corresponding time steps.
-
-        Args:
-            output (numpy.array): (C, W) shaped softmax output tensor
-            threshold (float): Threshold for 0 class when determining possible
-                               label locations.
-
-        Returns:
-            A list with tuples (class, start, end, max). max is the maximum value
-            of the softmax layer in the region.
+        Performs a forward pass on a numpy array of a line with shape (C, H, W)
+        and returns a list of tuples (class, start, end, max). Max is the
+        maximum value of the softmax layer in the region.
         """
-        return kraken.lib.ctc_decoder.translate_back_locations(output, threshold)
-
-    def translate_back(self, output):
-        """
-        Translates an output tensor of shape (1, C, 1, W) into a label sequence.
-
-        Args:
-            output (torch.Tensor): (1, C, 1, W) shaped softmax output tensor
-            threshold (float): Threshold for 0 class when determining possible
-                               label locations.
-
-        Returns:
-            A list of integer labels.
-        """
-        return kraken.lib.ctc_decoder.translate_back(output, threshold)
+        o = self.forward(line)
+        return self.decoder(o)
 
 
-def load_any(fname):
+def load_any(fname, train=False):
     """
     Loads anything that was, is, and will be a valid ocropus model and
     instantiates a shiny new kraken.lib.lstm.SeqRecognizer from the RNN
@@ -123,6 +110,7 @@ def load_any(fname):
 
     Args:
         fname (unicode): Path to the model
+        train (bool): Enables gradient calculation and dropout layers in model.
 
     Returns:
         A kraken.lib.models.TorchSeqRecognizer object.
@@ -131,25 +119,25 @@ def load_any(fname):
     kind = ''
     fname = abspath(expandvars(expanduser(fname)))
     try:
-        nn = TorchVGSLModel.load_model(fname)
+        nn = TorchVGSLModel.load_model(fname, train)
         kind = 'vgsl'
     except:
         try:
-            nn = TorchVGSLModel.load_clstm_model(fname)
+            nn = TorchVGSLModel.load_clstm_model(fname, train)
             kind = 'clstm'
         except:
-            nn = TorchVGSLModel.load_pronn_model(fname)
+            nn = TorchVGSLModel.load_pronn_model(fname, train)
             kind = 'pronn'
         try:
             if not PY2:
                 raise KrakenInvalidModelException('Loading pickle models is not '
                                                   'supported on python 3')
-            nn = TorchVGSLModel.load_pyrnn_model(fname)
+            nn = TorchVGSLModel.load_pyrnn_model(fname, train)
             kind = 'pyrnn'
         except:
             pass
     if not nn:
         raise KrakenInvalidModelException('File {} not loadable by any parser.'.format(fname))
-    seq = TorchSeqRecognizer(nn)
+    seq = TorchSeqRecognizer(nn, train=train)
     seq.kind = kind
     return seq
