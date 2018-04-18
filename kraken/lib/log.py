@@ -46,7 +46,7 @@ class LogFormatter(logging.Formatter):
             level = record.levelname.lower()
             msg = record.msg
             if level in self.colors:
-                style = self.colors[leve]
+                style = self.colors[level]
             else:
                 style = {}
             msg = click.style(u'[{:2.4f}] {} '.format(time.time() - self.st_time, msg), **style)
