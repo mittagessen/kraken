@@ -253,7 +253,7 @@ def transcription(ctx, text_direction, scale, maxcolseps, black_colseps, font,
             it = rpred.rpred(prefill, im, res)
             preds = []
             for pred in it:
-                logger.info('{}'.format(pred.prediction))
+                logger.info(u'{}'.format(pred.prediction))
                 spin('Recognizing')
                 preds.append(pred)
             message(u'\b\u2713', fg='green', nl=False)
