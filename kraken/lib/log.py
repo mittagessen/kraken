@@ -20,9 +20,14 @@ kraken.lib.log
 Handlers and formatters for logging.
 """
 
+from future import standard_library
+standard_library.install_aliases()
+from builtins import str
+
 import time
 import click
 import logging
+
 
 class LogHandler(logging.Handler):
     def emit(self, record):
@@ -49,7 +54,7 @@ class LogFormatter(logging.Formatter):
                 style = self.colors[level]
             else:
                 style = {}
-            msg = click.style(u'[{:2.4f}] {} '.format(time.time() - self.st_time, msg), **style)
+            msg = click.style(u'[{:2.4f}] {} '.format(time.time() - self.st_time, str(msg)), **style)
             return msg
         return logging.Formatter.format(self, record)
 

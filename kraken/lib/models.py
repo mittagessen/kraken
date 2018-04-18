@@ -15,6 +15,7 @@ from os.path import expandvars, expanduser, abspath
 
 from builtins import next
 from builtins import chr
+from builtins import str
 
 import numpy
 import gzip
@@ -79,9 +80,9 @@ class ClstmSeqRecognizer(kraken.lib.lstm.SeqRecognizer):
         # py2. As filenames should always be byte strings convert it back to
         # str on py3 for swig.
         if not PY2:
-            self.rnn = clstm.load_net(self.fname.decode('utf-8'))
-        else:
             self.rnn = clstm.load_net(self.fname)
+        else:
+            self.rnn = clstm.load_net(self.fname.encode('utf-8'))
 
     def predictString(self, line):
         """
@@ -204,9 +205,8 @@ def load_any(fname):
         KrakenInvalidModelException if the model file could not be recognized.
     """
     seq = None
-
     fname = abspath(expandvars(expanduser(fname)))
-    logger.info('Loading model from {}'.format(fname))
+    logger.info(u'Loading model from {}'.format(fname))
     try:
         seq = load_pronn(fname)
         seq.kind = 'proto-pyrnn'
@@ -335,7 +335,7 @@ def load_pyrnn(fname):
         return getattr(sys.modules[mname], cname)
 
     of = io.open
-    if fname.endswith(u'.gz'):
+    if fname.endswith('.gz'):
         of = gzip.open
     with io.BufferedReader(of(fname, 'rb')) as fp:
         unpickler = cPickle.Unpickler(fp)

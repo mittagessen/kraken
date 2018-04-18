@@ -2,10 +2,12 @@
 Ocropus's magic PIL-numpy array conversion routines. They express slightly
 different behavior from PIL.Image.toarray() but the reason is rather
 mysterious.
-
 """
 
 from __future__ import absolute_import, division, print_function
+from future import standard_library
+from future.utils import PY2
+standard_library.install_aliases()
 
 import numpy as np
 
@@ -44,3 +46,26 @@ def array2pil(a):
         return Image.frombytes("F", (a.shape[1], a.shape[0]), a.tostring())
     else:
         raise Exception("unknown image type")
+
+def is_bitonal(im):
+    """
+    Tests a PIL.Image for bitonality.
+
+    Args:
+        im (PIL.Image): Image to test
+
+    Returns:
+        True if the image contains only two different color values. False
+        otherwise.
+    """
+    if im.getcolors(2):
+        return True
+    else:
+        return False
+
+def get_im_str(im):
+    if PY2:
+        return im.filename.decode('utf-8') if hasattr(im, 'filename') else str(im)
+    else:
+        return im.filename if hasattr(im, 'filename') else str(im)
+

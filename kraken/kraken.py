@@ -16,6 +16,9 @@
 
 from __future__ import absolute_import, division, print_function
 from future import standard_library
+from future.utils import PY2
+standard_library.install_aliases()
+from builtins import str
 
 import os
 import json
@@ -40,7 +43,6 @@ from kraken.lib import models
 from kraken import binarization
 from kraken import serialization
 
-standard_library.install_aliases()
 warnings.simplefilter('ignore', UserWarning)
 
 logger = logging.getLogger('kraken')
@@ -137,7 +139,9 @@ def recognizer(model, pad, bidi_reordering, base_image, input, output, lines):
     ctx = click.get_current_context()
     with open_file(output, 'w', encoding='utf-8') as fp:
         message(u'Writing recognition results for {}\t'.format(base_image), nl=False)
-        logger.info(u'Serializing as {} into {}'.format(ctx.meta['mode'], fp.name))
+        if PY2:
+            output = output.decode('utf-8')
+        logger.info(u'Serializing as {} into {}'.format(ctx.meta['mode'], output))
         if ctx.meta['mode'] != 'text':
             fp.write(serialization.serialize(preds, base_image,
                      Image.open(base_image).size, ctx.meta['text_direction'],
@@ -267,7 +271,7 @@ def ocr(ctx, model, pad, reorder, serialization, text_direction, lines, conv):
             raise click.BadParameter('No model for {} found'.format(k))
         message('Loading RNN {}\t'.format(k), nl=False)
         try:
-            rnn = models.load_any(location.encode('utf-8'))
+            rnn = models.load_any(location)
             nm[k] = rnn
         except:
             message(u'\u2717', fg='red')
@@ -278,7 +282,7 @@ def ocr(ctx, model, pad, reorder, serialization, text_direction, lines, conv):
         # convert input model to protobuf
         if conv and rnn.kind == 'pyrnn':
             name, _ = os.path.splitext(os.path.basename(v))
-            op = os.path.join(click.get_app_dir(APP_NAME), name.encode('utf-8') + '.pronn')
+            op = os.path.join(click.get_app_dir(APP_NAME), name + u'.pronn')
             try:
                 os.makedirs(click.get_app_dir(APP_NAME))
             except OSError:

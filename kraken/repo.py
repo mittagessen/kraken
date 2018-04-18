@@ -21,6 +21,8 @@ Access functions to the model repository on github.
 
 from __future__ import absolute_import, division, print_function
 
+from builtins import str
+
 from collections import defaultdict
 from contextlib import closing
 

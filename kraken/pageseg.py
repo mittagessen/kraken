@@ -17,6 +17,7 @@
 
 
 from __future__ import absolute_import, division, print_function
+from builtins import str
 from builtins import range
 from builtins import object
 
@@ -32,12 +33,11 @@ from scipy.ndimage.filters import (gaussian_filter, uniform_filter,
 
 from kraken.lib import models
 from kraken.lib import morph, sl
-from kraken.lib.util import pil2array
+from kraken.lib.util import pil2array, is_bitonal, get_im_str
 from kraken.lib.exceptions import KrakenInputException
 
 from kraken.rpred import rpred
 from kraken.serialization import max_bbox
-from kraken.binarization import is_bitonal
 
 __all__ = ['segment', 'detect_scripts']
 
@@ -374,7 +374,7 @@ def segment(im, text_direction='horizontal-lr', scale=None, maxcolseps=2, black_
         KrakenInputException if the input image is not binarized or the text
         direction is invalid.
     """
-    im_str = im.filename if hasattr(im, 'filename') else repr(im)
+    im_str = get_im_str(im)
     logger.info(u'Segmenting {}'.format(im_str))
 
     if im.mode != '1' and not is_bitonal(im):
@@ -461,15 +461,14 @@ def detect_scripts(im, bounds, model=None):
         direction is invalid.
         KrakenInvalidModelException if no clstm module is available.
     """
-    im_str = im.filename if hasattr(im, 'filename') else repr(im)
+    im_str = get_im_str(im)
     logger.info(u'Detecting scripts with {} in {} lines on {}'.format(model, len(bounds['boxes']), im_str))
     if not model:
         model = pkg_resources.resource_filename(__name__, 'script.clstm')
         logger.debug(u'No model given. Loading default {}'.format(model))
-
         # resource_filename returns byte strings on python2 and str on python3
-        if not PY2:
-            model = model.encode('utf-8')
+        if PY2:
+            model = model.decode('utf-8')
     logger.debug(u'Loading detection model')
     rnn = models.load_clstm(model)
     # load numerical to 4 char identifier map

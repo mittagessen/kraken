@@ -17,12 +17,15 @@
 from __future__ import absolute_import, division, print_function
 from future import standard_library
 
+from builtins import str
+
 import os
 import time
 import click
 import errno
 import base64
 import logging
+import warnings
 import unicodedata
 import numpy as np
 
@@ -42,8 +45,10 @@ from kraken.lib import models
 from kraken.train import GroundTruthContainer, compute_error
 from kraken.lib.exceptions import KrakenCairoSurfaceException
 from kraken.lib.exceptions import KrakenInputException
+from kraken.lib.util import is_bitonal
 
 standard_library.install_aliases()
+warnings.simplefilter('ignore', UserWarning)
 
 APP_NAME = 'kraken'
 
@@ -234,9 +239,9 @@ def transcription(ctx, text_direction, scale, maxcolseps, black_colseps, font,
     ti = transcribe.TranscriptionInterface(font, font_style)
 
     if prefill:
-        logger.info('Loading model {}'.format(prefill))
+        logger.info(u'Loading model {}'.format(prefill))
         spin('Loading RNN')
-        prefill = models.load_any(prefill.encode('utf-8'))
+        prefill = models.load_any(prefill)
         message(u'\b\u2713', fg='green', nl=False)
         message('\033[?25h\n', nl=False)
 
@@ -244,7 +249,7 @@ def transcription(ctx, text_direction, scale, maxcolseps, black_colseps, font,
         logger.info('Reading {}'.format(fp.name))
         spin('Reading images')
         im = Image.open(fp)
-        if not binarization.is_bitonal(im):
+        if not is_bitonal(im):
             logger.info(u'Binarizing page')
             im = binarization.nlbin(im)
         logger.info(u'Segmenting page')
@@ -264,7 +269,7 @@ def transcription(ctx, text_direction, scale, maxcolseps, black_colseps, font,
         fp.close()
     message(u'\b\u2713', fg='green', nl=False)
     message('\033[?25h\n', nl=False)
-    logger.info(u'Writing transcription to {}'.format(output.name))
+    logger.info('Writing transcription to {}'.format(output.name))
     spin('Writing output')
     ti.write(output)
     message(u'\b\u2713', fg='green', nl=False)

@@ -16,33 +16,21 @@
 # permissions and limitations under the License.
 
 from __future__ import absolute_import, division, print_function
+from future import standard_library
+standard_library.install_aliases()
+
+
+from builtins import str
 
 import warnings
 import logging
 import numpy as np
 
-from kraken.lib.util import pil2array, array2pil
+from kraken.lib.util import pil2array, array2pil, is_bitonal, get_im_str
 from kraken.lib.exceptions import KrakenInputException
 from scipy.ndimage import filters, interpolation, morphology
 
 logger = logging.getLogger(__name__)
-
-def is_bitonal(im):
-    """
-    Tests a PIL.Image for bitonality.
-
-    Args:
-        im (PIL.Image): Image to test
-
-    Returns:
-        True if the image contains only two different color values. False
-        otherwise.
-    """
-    if im.getcolors(2):
-        return True
-    else:
-        return False
-
 
 def nlbin(im, threshold=0.5, zoom=0.5, escale=1.0, border=0.1, perc=80,
           range=20, low=5, high=90):
@@ -66,8 +54,7 @@ def nlbin(im, threshold=0.5, zoom=0.5, escale=1.0, border=0.1, perc=80,
     Raises:
         KrakenInputException when trying to binarize an empty image.
     """
-    # PIL images may not have a file name
-    im_str = im.filename if hasattr(im, 'filename') else repr(im)
+    im_str = get_im_str(im)
     logger.info(u'Binarizing {}'.format(im_str))
     if is_bitonal(im):
         logger.info(u'Skipping binarization because {} is bitonal.'.format(im_str))

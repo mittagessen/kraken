@@ -23,9 +23,11 @@ from __future__ import absolute_import, division, print_function
 
 from future.standard_library import install_aliases
 install_aliases()
+from builtins import str
 
 from kraken.serialization import max_bbox
 from kraken.lib.exceptions import KrakenInputException
+from kraken.lib.util import get_im_str
 
 from jinja2 import Environment, PackageLoader
 from itertools import zip_longest
@@ -64,7 +66,7 @@ class TranscriptionInterface(object):
             segmentation (dict): Output of the segment method.
             records (list): A list of ocr_record objects.
         """
-        im_str = im.filename if hasattr(im, 'filename') else repr(im)
+        im_str = get_im_str(im)
         logger.info(u'Adding page {} with {} lines'.format(im_str, len(segmentation) if segmentation else len(records)))
         page = {}
         fd = BytesIO()

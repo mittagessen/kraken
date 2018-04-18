@@ -16,6 +16,7 @@
 
 from __future__ import absolute_import, division, print_function
 from future import standard_library
+from builtins import str
 from builtins import range
 from builtins import object
 
@@ -24,7 +25,7 @@ import numpy as np
 import bidi.algorithm as bd
 
 from kraken.lib import lstm
-from kraken.lib.util import pil2array, array2pil
+from kraken.lib.util import pil2array, array2pil, get_im_str
 from kraken.lib.lineest import CenterNormalizer
 from kraken.lib.exceptions import KrakenInputException
 
@@ -188,7 +189,7 @@ def mm_rpred(nets, im, bounds, pad=16, line_normalization=True, bidi_reordering=
         An ocr_record containing the recognized text, absolute character
         positions, and confidence values for each character.
     """
-    im_str = im.filename if hasattr(im, 'filename') else repr(im)
+    im_str = get_im_str(im)
     logger.info(u'Running {} multi-script recognizers on {} with {} lines'.format(len(nets), im_str, len(bounds['boxes'])))
     for line in bounds['boxes']:
         rec = ocr_record('', [], [])
@@ -267,7 +268,7 @@ def rpred(network, im, bounds, pad=16, line_normalization=True, bidi_reordering=
         An ocr_record containing the recognized text, absolute character
         positions, and confidence values for each character.
     """
-    im_str = im.filename if hasattr(im, 'filename') else repr(im)
+    im_str = get_im_str(im)
     logger.info(u'Running recognizer on {} with {} lines'.format(im_str, len(bounds['boxes'])))
     logger.debug(u'Loading line normalizer')
     lnorm = getattr(network, 'lnorm', CenterNormalizer())
