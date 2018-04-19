@@ -158,7 +158,8 @@ def dewarp(normalizer, im):
     return array2pil(line)
 
 
-def mm_rpred(nets, im, bounds, pad=16, line_normalization=True, bidi_reordering=True):
+def mm_rpred(nets, im, bounds, pad=16, line_normalization=True,
+             bidi_reordering=True, script_ignore=None):
     """
     Multi-model version of kraken.rpred.rpred.
 
@@ -185,6 +186,7 @@ def mm_rpred(nets, im, bounds, pad=16, line_normalization=True, bidi_reordering=
         bidi_reordering (bool): Reorder classes in the ocr_record according to
                                 the Unicode bidirectional algorithm for correct
                                 display.
+        script_ignore (list): List of scripts to ignore during recognition
     Yields:
         An ocr_record containing the recognized text, absolute character
         positions, and confidence values for each character.
@@ -196,6 +198,10 @@ def mm_rpred(nets, im, bounds, pad=16, line_normalization=True, bidi_reordering=
         for script, (box, coords) in zip(map(lambda x: x[0], line),
                                          extract_boxes(im, {'text_direction': bounds['text_direction'],
                                                             'boxes': map(lambda x: x[1], line)})):
+            # skip if script is set to ignore
+            if script in script_ignore:
+                logger.info(u'Ignoring {} line segment.'.format(script))
+                continue
             # check if boxes are non-zero in any dimension
             if sum(coords[::2]) == 0 or coords[3] - coords[1] == 0:
                 logger.warning(u'Run with zero dimension. Skipping.')
@@ -229,9 +235,9 @@ def mm_rpred(nets, im, bounds, pad=16, line_normalization=True, bidi_reordering=
 
             for _, start, end, c in result:
                 if bounds['text_direction'].startswith('horizontal'):
-                    pos.append((coords[0] + int((start-pad)*scale), coords[1], coords[0] + int((end-pad/2)*scale), coords[3]))
+                    pos.append((coords[0] + int(max(start-pad, 0)*scale), coords[1], coords[0] + int(min(end-pad, coords[2])*scale), coords[3]))
                 else:
-                    pos.append((coords[0], coords[1] + int((start-pad)*scale), coords[2], coords[1] + int((end-pad/2)*scale)))
+                    pos.append((coords[0], coords[1] + int(max(start-pad, 0)*scale), coords[2], coords[1] + int(min(end-pad, coords[3])*scale)))
                 conf.append(c)
             rec.prediction += pred
             rec.cuts.extend(pos)
@@ -310,9 +316,17 @@ def rpred(network, im, bounds, pad=16, line_normalization=True, bidi_reordering=
 
         for _, start, end, c in result:
             if bounds['text_direction'].startswith('horizontal'):
-                pos.append((coords[0] + int((start-pad)*scale), coords[1], coords[0] + int((end-pad)*scale), coords[3]))
+                xmin = coords[0] + int(max((start-pad)*scale, 0))
+                xmax = coords[0] + max(int(min((end-pad)*scale, coords[2]-coords[0])), 1)
+                pos.append((xmin, coords[1], xmax, coords[3]))
             else:
-                pos.append((coords[0], coords[1] + int((start-pad)*scale), coords[2], coords[1] + int((end-pad)*scale)))
+                ymin = coords[1] + int(max((start-pad)*scale, 0))
+                ymax = coords[1] + max(int(min((end-pad)*scale, coords[3]-coords[1])), 1)
+                pos.append((coords[0], ymin, coords[2], ymax))
+                if pos[-1][1] > pos[-1][3]:
+                    print(pos[-1])
+                    print(coords)
+                    print('{} {} {}'.format(start, end, pad))
             conf.append(c)
         if bidi_reordering:
             logger.debug(u'BiDi reordering record.')

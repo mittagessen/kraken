@@ -102,7 +102,7 @@ def segmenter(text_direction, script_detect, scale, maxcolseps, black_colseps, b
     message(u'\u2713', fg='green')
 
 
-def recognizer(model, pad, bidi_reordering, base_image, input, output, lines):
+def recognizer(model, pad, bidi_reordering, script_ignore, base_image, input, output, lines):
     try:
         im = Image.open(base_image)
     except IOError as e:
@@ -124,9 +124,12 @@ def recognizer(model, pad, bidi_reordering, base_image, input, output, lines):
             for l in bounds['boxes']:
                 for t in l:
                     scripts.add(t[0])
-            it = rpred.mm_rpred(model, im, bounds, pad, bidi_reordering=bidi_reordering)
+            it = rpred.mm_rpred(model, im, bounds, pad,
+                                bidi_reordering=bidi_reordering,
+                                script_ignore=script_ignore)
         else:
-            it = rpred.rpred(model['default'], im, bounds, pad, bidi_reordering=bidi_reordering)
+            it = rpred.rpred(model['default'], im, bounds, pad,
+                             bidi_reordering=bidi_reordering)
 
     preds = []
 
@@ -214,10 +217,14 @@ def validate_mm(ctx, param, value):
     model_dict = {}
     if len(value) == 1 and len(value[0].split(':')) == 1:
         return {'default': value[0]}
+    model_dict['ignore'] = []
     try:
         for m in value:
             k, v =  m.split(':')
-            model_dict[k] = os.path.expanduser(v)
+            if v == 'ignore':
+                model_dict['ignore'].append(k)
+            else:
+                model_dict[k] = os.path.expanduser(v)
     except:
         raise click.BadParameter('Mappings must be in format script:model')
     return model_dict
@@ -227,7 +234,9 @@ def validate_mm(ctx, param, value):
 @click.option('-m', '--model', default=DEFAULT_MODEL, multiple=True, callback=validate_mm,
               help='Path to an recognition model or mapping of the form '
               '$script1:$model1. Add multiple mappings to run multi-model '
-              'recognition based on detected scripts.')
+              'recognition based on detected scripts. Use the default keyword '
+              'for adding a catch-all model. Recognition on scripts can be '
+              'ignored with the model value ignore.')
 @click.option('-p', '--pad', type=click.INT, default=16, help='Left and right '
               'padding around lines')
 @click.option('-n', '--reorder/--no-reorder', default=True,
@@ -253,6 +262,7 @@ def ocr(ctx, model, pad, reorder, serialization, text_direction, lines, conv):
     # first we try to find the model in the absolue path, then ~/.kraken, then
     # LEGACY_MODEL_DIR
     nm = {}
+    ign_scripts = model.pop('ignore')
     for k, v in model.items():
         search = [v,
                   os.path.join(click.get_app_dir(APP_NAME), v),
@@ -296,7 +306,7 @@ def ocr(ctx, model, pad, reorder, serialization, text_direction, lines, conv):
     # set output mode
     ctx.meta['mode'] = serialization
     ctx.meta['text_direction'] = text_direction
-    return partial(recognizer, model=nm, pad=pad, bidi_reordering=reorder, lines=lines)
+    return partial(recognizer, model=nm, pad=pad, bidi_reordering=reorder, script_ignore=ign_scripts, lines=lines)
 
 
 @cli.command('show')
