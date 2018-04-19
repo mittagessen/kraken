@@ -155,6 +155,8 @@ def train(ctx, lineheight, pad, hiddensize, output, load, savefreq, report,
 
 @cli.command('extract')
 @click.pass_context
+@click.option('-b', '--binarize/--no-binarize', default=True,
+              help='Binarize color/grayscale images')
 @click.option('-u', '--normalization',
               type=click.Choice(['NFD', 'NFKD', 'NFC', 'NFKC']), default=None,
               help='Normalize ground truth')
@@ -165,7 +167,8 @@ def train(ctx, lineheight, pad, hiddensize, output, load, savefreq, report,
 @click.option('-o', '--output', type=click.Path(), default='training',
               help='Output directory')
 @click.argument('transcriptions', nargs=-1, type=click.File(lazy=True))
-def extract(ctx, normalization, reorder, rotate, output, transcriptions):
+def extract(ctx, binarize, normalization, reorder, rotate, output,
+            transcriptions):
     """
     Extracts image-text pairs from a transcription environment created using
     ``ketos transcribe``.
@@ -194,6 +197,8 @@ def extract(ctx, normalization, reorder, rotate, output, transcriptions):
             if not im:
                 logger.info(u'Skipping {} because image not found'.format(fp.name))
                 break
+            if binarize:
+                im = binarization.nlbin(im)
             for line in section.iter('li'):
                 if line.get('contenteditable') and not u''.join(line.itertext()).isspace():
                     l = im.crop([int(x) for x in line.get('data-bbox').split(',')])
@@ -201,7 +206,7 @@ def extract(ctx, normalization, reorder, rotate, output, transcriptions):
                         im.rotate(90, expand=True)
                     l.save('{}/{:06d}.png'.format(output, idx))
                     manifest.append('{:06d}.png'.format(idx))
-                    text = u''.join(line.itertext())
+                    text = u''.join(line.itertext()).strip()
                     if normalization:
                         text = unicodedata.normalize(normalization, text)
                     with open('{}/{:06d}.gt.txt'.format(output, idx), 'wb') as t:
@@ -223,6 +228,8 @@ def extract(ctx, normalization, reorder, rotate, output, transcriptions):
               type=click.Choice(['horizontal-tb', 'vertical-lr', 'vertical-rl']),
               help='Sets principal text direction')
 @click.option('--scale', default=None, type=click.FLOAT)
+@click.option('--bw/--orig', default=True,
+              help="Put nonbinarized images in output")
 @click.option('-m', '--maxcolseps', default=2, type=click.INT)
 @click.option('-b/-w', '--black_colseps/--white_colseps', default=False)
 @click.option('-f', '--font', default='',
@@ -234,8 +241,8 @@ def extract(ctx, normalization, reorder, rotate, output, transcriptions):
 @click.option('-o', '--output', type=click.File(mode='wb'), default='transcription.html',
               help='Output file')
 @click.argument('images', nargs=-1, type=click.File(mode='rb', lazy=True))
-def transcription(ctx, text_direction, scale, maxcolseps, black_colseps, font,
-                  font_style, prefill, output, images):
+def transcription(ctx, text_direction, scale, bw, maxcolseps,
+                  black_colseps, font, font_style, prefill, output, images):
     ti = transcribe.TranscriptionInterface(font, font_style)
 
     if prefill:
@@ -251,11 +258,13 @@ def transcription(ctx, text_direction, scale, maxcolseps, black_colseps, font,
         im = Image.open(fp)
         if not is_bitonal(im):
             logger.info(u'Binarizing page')
-            im = binarization.nlbin(im)
+            im_bin = binarization.nlbin(im)
         logger.info(u'Segmenting page')
-        res = pageseg.segment(im, text_direction, scale, maxcolseps, black_colseps)
+        if bw:
+            im = im_bin
+        res = pageseg.segment(im_bin, text_direction, scale, maxcolseps, black_colseps)
         if prefill:
-            it = rpred.rpred(prefill, im, res)
+            it = rpred.rpred(prefill, im_bin, res)
             preds = []
             for pred in it:
                 logger.info(u'{}'.format(pred.prediction))
