@@ -103,10 +103,16 @@ def serialize(records, image_name=u'', image_size=(0, 0), writing_mode='horizont
             if len(segment) == 0:
                 continue
             seg_bbox = max_bbox(record.cuts[line_offset:line_offset + len(segment)])
-            line['recognition'].append({'bbox': seg_bbox,
+            line['recognition'].extend([{'bbox': seg_bbox,
                                         'confidences': record.confidences[line_offset:line_offset + len(segment)],
+                                        'cuts': record.cuts[line_offset:line_offset + len(segment)],
                                         'text': segment,
-                                        'index': seg_idx})
+                                        'recognition': [{'bbox': cut, 'confidence': conf, 'text': char}
+                                            for conf, cut , char in
+                                            zip(record.confidences[line_offset:line_offset + len(segment)],
+                                                record.cuts[line_offset:line_offset + len(segment)],
+                                                segment)],
+                                        'index': seg_idx}])
             seg_idx += 1
             line_offset += len(segment)
         page['lines'].append(line)
