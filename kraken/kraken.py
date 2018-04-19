@@ -214,10 +214,10 @@ def segment(text_direction, script_detect, scale, maxcolseps, black_colseps):
 
 
 def validate_mm(ctx, param, value):
-    model_dict = {}
+    model_dict = {'ignore': []}
     if len(value) == 1 and len(value[0].split(':')) == 1:
-        return {'default': value[0]}
-    model_dict['ignore'] = []
+        model_dict['default'] = value[0]
+        return model_dict
     try:
         for m in value:
             k, v =  m.split(':')
@@ -244,6 +244,7 @@ def validate_mm(ctx, param, value):
 @click.option('-h', '--hocr', 'serialization', help='Switch between hOCR, '
               'ALTO, and plain text output', flag_value='hocr')
 @click.option('-a', '--alto', 'serialization', flag_value='alto')
+@click.option('-y', '--abbyy', 'serialization', flag_value='abbyyxml')
 @click.option('-t', '--text', 'serialization', flag_value='text', default=True)
 @click.option('-d', '--text-direction', default='horizontal-tb',
               type=click.Choice(['horizontal-tb', 'vertical-lr', 'vertical-rl']),
