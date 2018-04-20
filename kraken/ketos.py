@@ -256,6 +256,7 @@ def transcription(ctx, text_direction, scale, bw, maxcolseps,
         logger.info('Reading {}'.format(fp.name))
         spin('Reading images')
         im = Image.open(fp)
+        im_bin = im
         if not is_bitonal(im):
             logger.info(u'Binarizing page')
             im_bin = binarization.nlbin(im)
