@@ -216,6 +216,9 @@ def mm_rpred(nets, im, bounds, pad=16, line_normalization=True,
                 # input line can not be normalized.
                 try:
                     lnorm = getattr(nets[script], 'lnorm', CenterNormalizer())
+                    if im.mode == 'L':
+                        logger.info(u'Image is grayscale. Adjusting normalizer parameters')
+                        lnorm.range = 2
                     box = dewarp(lnorm, box)
                 except Exception as e:
                     logger.warning(u'Dewarping for bbox {} failed. Skipping.'.format(coords))
@@ -278,6 +281,9 @@ def rpred(network, im, bounds, pad=16, line_normalization=True, bidi_reordering=
     logger.info(u'Running recognizer on {} with {} lines'.format(im_str, len(bounds['boxes'])))
     logger.debug(u'Loading line normalizer')
     lnorm = getattr(network, 'lnorm', CenterNormalizer())
+    if im.mode == 'L':
+        logger.info(u'Image is grayscale. Adjusting normalizer parameters')
+        lnorm.range = 2
 
     for box, coords in extract_boxes(im, bounds):
         # check if boxes are non-zero in any dimension
@@ -323,10 +329,6 @@ def rpred(network, im, bounds, pad=16, line_normalization=True, bidi_reordering=
                 ymin = coords[1] + int(max((start-pad)*scale, 0))
                 ymax = coords[1] + max(int(min((end-pad)*scale, coords[3]-coords[1])), 1)
                 pos.append((coords[0], ymin, coords[2], ymax))
-                if pos[-1][1] > pos[-1][3]:
-                    print(pos[-1])
-                    print(coords)
-                    print('{} {} {}'.format(start, end, pad))
             conf.append(c)
         if bidi_reordering:
             logger.debug(u'BiDi reordering record.')
