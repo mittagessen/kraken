@@ -84,7 +84,7 @@ def binarizer(threshold, zoom, escale, border, perc, range, low, high, base_imag
     message(u'\u2713', fg='green')
 
 
-def segmenter(text_direction, script_detect, scale, maxcolseps, black_colseps, base_image, input, output):
+def segmenter(text_direction, script_detect, allowed_scripts, scale, maxcolseps, black_colseps, base_image, input, output):
     try:
         im = Image.open(input)
     except IOError as e:
@@ -93,7 +93,7 @@ def segmenter(text_direction, script_detect, scale, maxcolseps, black_colseps, b
     try:
         res = pageseg.segment(im, text_direction, scale, maxcolseps, black_colseps)
         if script_detect:
-            res = pageseg.detect_scripts(im, res)
+            res = pageseg.detect_scripts(im, res, valid_scripts=allowed_scripts)
     except:
         message(u'\u2717', fg='red')
         raise
@@ -203,14 +203,16 @@ def binarize(threshold, zoom, escale, border, perc, range, low, high):
               help='Sets principal text direction')
 @click.option('-s/-n', '--script-detect/--no-script-detect', default=have_clstm(),
               help='Enable script detection on segmenter output')
+@click.option('-a', '--allowed-scripts', default=None, multiple=True,
+              help='List of allowed scripts in script detection output. Ignored if disabled.')
 @click.option('--scale', default=None, type=click.FLOAT)
 @click.option('-m', '--maxcolseps', default=2, type=click.INT)
 @click.option('-b/-w', '--black_colseps/--white_colseps', default=False)
-def segment(text_direction, script_detect, scale, maxcolseps, black_colseps):
+def segment(text_direction, script_detect, allowed_scripts, scale, maxcolseps, black_colseps):
     """
     Segments page images into text lines.
     """
-    return partial(segmenter, text_direction, script_detect, scale, maxcolseps, black_colseps)
+    return partial(segmenter, text_direction, script_detect, allowed_scripts, scale, maxcolseps, black_colseps)
 
 
 def validate_mm(ctx, param, value):

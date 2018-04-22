@@ -435,7 +435,7 @@ def segment(im, text_direction='horizontal-lr', scale=None, maxcolseps=2, black_
     return {'text_direction': text_direction, 'boxes':  rotate_lines(lines, 360-angle, offset).tolist(), 'script_detection': False}
 
 
-def detect_scripts(im, bounds, model=None):
+def detect_scripts(im, bounds, model=None, valid_scripts=None):
     """
     Detects scripts in a segmented page.
 
@@ -448,6 +448,7 @@ def detect_scripts(im, bounds, model=None):
                        and an entry 'text_direction' containing
                        'horizontal-lr/rl/vertical-lr/rl'.
         model (str): Location of the script classification model or None for default.
+        valid_scripts (list): List of valid scripts.
 
     Returns:
         {'script_detection': True, 'text_direction': '$dir', 'boxes':
@@ -475,29 +476,57 @@ def detect_scripts(im, bounds, model=None):
     logger.debug(u'Loading label to identifier map')
     with pkg_resources.resource_stream(__name__, 'iso15924.json') as fp:
         n2s = json.load(fp)
+    # convert allowed scripts to labels
+    val_scripts = []
+    if valid_scripts:
+        logger.debug(u'Converting allowed scripts list {}'.format(valid_scripts))
+        for k, v in n2s.items():
+            if v in valid_scripts:
+                val_scripts.append(unichr(int(k) + 0xF0000))
+    else:
+        valid_scripts = []
     it = rpred(rnn, im, bounds, bidi_reordering=False)
     preds = []
     logger.debug(u'Running detection')
-    for pred in it:
+    for pred, bbox in zip(it, bounds['boxes']):
         # substitute inherited scripts with neighboring runs
-        def subs(m, s):
+        def subs(m, s, r=False):
             p = u''
             for c in s:
-                if c in m and p:
+                if c in m and p and not r:
+                    p += p[-1]
+                elif c not in m and p and r:
                     p += p[-1]
                 else:
                     p += c
             return p
+
+        logger.debug(u'Substituting scripts')
         p = subs([u'\U000f03e2', u'\U000f03e6'], pred.prediction)
         # do a reverse run to fix leading inherited scripts
         pred.prediction = ''.join(reversed(subs([u'\U000f03e2', u'\U000f03e6'], reversed(p))))
+        # group by valid scripts. two steps: 1. substitute common confusions
+        # (Latin->Fraktur and Syriac->Arabic) if given in script list.
+        if 'Arab' in valid_scripts and 'Syrc' not in valid_scripts:
+            pred.prediction = pred.prediction.replace(u'\U000f0087', u'\U000f00a0')
+        if 'Latn' in valid_scripts and 'Latf' not in valid_scripts:
+            pred.prediction = pred.prediction.replace(u'\U000f00d9', u'\U000f00d7')
+        # next merge adjacent scripts
+        if val_scripts:
+            pred.prediction = subs(val_scripts, pred.prediction, r=True)
         # group by grapheme
         t = []
         logger.debug(u'Merging detections')
-        for k, g in groupby(pred, key=lambda x: x[0]):
-            # convert to ISO15924 numerical identifier
-            k = ord(k) - 0xF0000
-            b = max_bbox(x[1] for x in g)
-            t.append((n2s[str(k)], b))
+        # if line contains only a single script return whole line bounding box
+        if len(set(pred.prediction)) == 1:
+            logger.debug('Only one script on line. Emitting whole line bbox')
+            k = ord(pred.prediction[0]) - 0xF0000
+            t.append((n2s[str(k)], bbox))
+        else:
+            for k, g in groupby(pred, key=lambda x: x[0]):
+                # convert to ISO15924 numerical identifier
+                k = ord(k) - 0xF0000
+                b = max_bbox(x[1] for x in g)
+                t.append((n2s[str(k)], b))
         preds.append(t)
     return {'boxes': preds, 'text_direction': bounds['text_direction'], 'script_detection': True}
