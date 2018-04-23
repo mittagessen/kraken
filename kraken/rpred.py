@@ -25,7 +25,7 @@ import numpy as np
 import bidi.algorithm as bd
 
 from kraken.lib import lstm
-from kraken.lib.util import pil2array, array2pil, get_im_str
+from kraken.lib.util import pil2array, array2pil, get_im_str, is_bitonal
 from kraken.lib.lineest import CenterNormalizer
 from kraken.lib.exceptions import KrakenInputException
 
@@ -216,7 +216,7 @@ def mm_rpred(nets, im, bounds, pad=16, line_normalization=True,
                 # input line can not be normalized.
                 try:
                     lnorm = getattr(nets[script], 'lnorm', CenterNormalizer())
-                    if im.mode == 'L':
+                    if not is_bitonal(im):
                         logger.info(u'Image is grayscale. Adjusting normalizer parameters')
                         lnorm.range = 2
                     box = dewarp(lnorm, box)
@@ -281,7 +281,7 @@ def rpred(network, im, bounds, pad=16, line_normalization=True, bidi_reordering=
     logger.info(u'Running recognizer on {} with {} lines'.format(im_str, len(bounds['boxes'])))
     logger.debug(u'Loading line normalizer')
     lnorm = getattr(network, 'lnorm', CenterNormalizer())
-    if im.mode == 'L':
+    if not is_bitonal(im):
         logger.info(u'Image is grayscale. Adjusting normalizer parameters')
         lnorm.range = 2
 
