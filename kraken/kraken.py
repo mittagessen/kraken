@@ -84,14 +84,16 @@ def binarizer(threshold, zoom, escale, border, perc, range, low, high, base_imag
     message(u'\u2713', fg='green')
 
 
-def segmenter(text_direction, script_detect, allowed_scripts, scale, maxcolseps, black_colseps, base_image, input, output):
+def segmenter(text_direction, script_detect, allowed_scripts, scale,
+              maxcolseps, black_colseps, remove_hlines, base_image, input,
+              output):
     try:
         im = Image.open(input)
     except IOError as e:
         raise click.BadParameter(str(e))
     message('Segmenting\t', nl=False)
     try:
-        res = pageseg.segment(im, text_direction, scale, maxcolseps, black_colseps)
+        res = pageseg.segment(im, text_direction, scale, maxcolseps, black_colseps, remove_hlines)
         if script_detect:
             res = pageseg.detect_scripts(im, res, valid_scripts=allowed_scripts)
     except:
@@ -208,11 +210,13 @@ def binarize(threshold, zoom, escale, border, perc, range, low, high):
 @click.option('--scale', default=None, type=click.FLOAT)
 @click.option('-m', '--maxcolseps', default=2, type=click.INT)
 @click.option('-b/-w', '--black_colseps/--white_colseps', default=False)
-def segment(text_direction, script_detect, allowed_scripts, scale, maxcolseps, black_colseps):
+@click.option('-r/-l', '--remove_hlines/--hlines', default=True)
+def segment(text_direction, script_detect, allowed_scripts, scale, maxcolseps, black_colseps, remove_hlines):
     """
     Segments page images into text lines.
     """
-    return partial(segmenter, text_direction, script_detect, allowed_scripts, scale, maxcolseps, black_colseps)
+    return partial(segmenter, text_direction, script_detect, allowed_scripts,
+                   scale, maxcolseps, black_colseps, remove_hlines)
 
 
 def validate_mm(ctx, param, value):
