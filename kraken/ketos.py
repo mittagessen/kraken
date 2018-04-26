@@ -200,7 +200,7 @@ def extract(ctx, binarize, normalization, reorder, rotate, output,
             if binarize:
                 im = binarization.nlbin(im)
             for line in section.iter('li'):
-                if line.get('contenteditable') and not u''.join(line.itertext()).isspace():
+                if line.get('contenteditable') and (not u''.join(line.itertext()).isspace() or not u''.join(line.itertext())):
                     l = im.crop([int(x) for x in line.get('data-bbox').split(',')])
                     if rotate and td.startswith('vertical'):
                         im.rotate(90, expand=True)
