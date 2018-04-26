@@ -350,7 +350,7 @@ def rotate_lines(lines, angle, offset):
 
 
 def segment(im, text_direction='horizontal-lr', scale=None, maxcolseps=2,
-            black_colseps=False, remove_hlines=True):
+            black_colseps=False, no_hlines=True):
     """
     Segments a page into text lines.
 
@@ -365,7 +365,7 @@ def segment(im, text_direction='horizontal-lr', scale=None, maxcolseps=2,
         maxcolseps (int): Maximum number of whitespace column separators
         black_colseps (bool): Whether column separators are assumed to be
                               vertical black lines or not
-        remove_hlines (bool): Switch for horizontal line removal
+        no_hlines (bool): Switch for horizontal line removal
 
     Returns:
         {'text_direction': '$dir', 'boxes': [(x1, y1, x2, y2),...]}: A
@@ -411,7 +411,7 @@ def segment(im, text_direction='horizontal-lr', scale=None, maxcolseps=2,
     if not scale:
         scale = estimate_scale(binary)
 
-    if remove_hlines:
+    if no_hlines:
         binary = remove_hlines(binary, scale)
     # emptyish images wll cause exceptions here.
     try:

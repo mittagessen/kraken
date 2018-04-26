@@ -93,7 +93,7 @@ def segmenter(text_direction, script_detect, allowed_scripts, scale,
         raise click.BadParameter(str(e))
     message('Segmenting\t', nl=False)
     try:
-        res = pageseg.segment(im, text_direction, scale, maxcolseps, black_colseps, remove_hlines)
+        res = pageseg.segment(im, text_direction, scale, maxcolseps, black_colseps, no_hlines=remove_hlines)
         if script_detect:
             res = pageseg.detect_scripts(im, res, valid_scripts=allowed_scripts)
     except:
