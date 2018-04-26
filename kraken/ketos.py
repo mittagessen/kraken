@@ -185,7 +185,7 @@ def extract(ctx, binarize, normalization, reorder, rotate, output,
         doc = html.parse(fp)
         td = doc.find(".//meta[@itemprop='text_direction']")
         if td is None:
-            td = 'horizontal-tb'
+            td = 'horizontal-lr'
         else:
             td = td.attrib['content']
 
@@ -224,8 +224,8 @@ def extract(ctx, binarize, normalization, reorder, rotate, output,
 
 @cli.command('transcribe')
 @click.pass_context
-@click.option('-d', '--text-direction', default='horizontal-tb',
-              type=click.Choice(['horizontal-tb', 'vertical-lr', 'vertical-rl']),
+@click.option('-d', '--text-direction', default='horizontal-lr',
+              type=click.Choice(['horizontal-lr', 'horizontal-rl', 'vertical-lr', 'vertical-rl']),
               help='Sets principal text direction')
 @click.option('--scale', default=None, type=click.FLOAT)
 @click.option('--bw/--orig', default=True,
