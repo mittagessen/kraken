@@ -197,8 +197,8 @@ class TorchVGSLModel(object):
         fwd_w = []
         rev_w = []
         for w in weightnames:
-            fwd_w.append(torch.FloatTensor(getattr(fwdnet, w)))
-            rev_w.append(torch.FloatTensor(getattr(revnet, w)))
+            fwd_w.append(torch.Tensor(getattr(fwdnet, w)))
+            rev_w.append(torch.Tensor(getattr(revnet, w)))
 
         t = torch.cat(fwd_w[:4])
         weight_ih_l0 = t[:, :input+1]
@@ -208,7 +208,7 @@ class TorchVGSLModel(object):
         weight_ih_l0_rev = t[:, :input+1]
         weight_hh_l0_rev = t[:, input+1:]
 
-        weight_lin = torch.FloatTensor(softmax.W2)
+        weight_lin = torch.Tensor(softmax.W2)
 
         # build vgsl spec and set weights
         nn = cls('[1,1,0,{} Lbxo{} O1ca{}]'.format(input, hidden, len(net.codec.code2char)))
@@ -258,8 +258,8 @@ class TorchVGSLModel(object):
         for w in weightnames:
             fwd_ar = getattr(net.fwdnet, w)
             rev_ar = getattr(net.revnet, w)
-            fwd_w.append(torch.FloatTensor(fwd_ar.value).view(list(fwd_ar.dim)))
-            rev_w.append(torch.FloatTensor(rev_ar.value).view(list(rev_ar.dim)))
+            fwd_w.append(torch.Tensor(fwd_ar.value).view(list(fwd_ar.dim)))
+            rev_w.append(torch.Tensor(rev_ar.value).view(list(rev_ar.dim)))
 
         t = torch.cat(fwd_w[:4])
         weight_ih_l0 = t[:, :input+1]
@@ -269,7 +269,7 @@ class TorchVGSLModel(object):
         weight_ih_l0_rev = t[:, :input+1]
         weight_hh_l0_rev = t[:, input+1:]
 
-        weight_lin = torch.FloatTensor(net.softmax.w2.value).view(list(net.softmax.w2.dim))
+        weight_lin = torch.Tensor(net.softmax.w2.value).view(list(net.softmax.w2.dim))
 
         # build vgsl spec and set weights
         nn = cls('[1,1,0,{} Lbxo{} O1ca{}]'.format(input, hidden, len(net.codec)))
@@ -331,7 +331,7 @@ class TorchVGSLModel(object):
         for n in nets:
             weights[n] = {}
             for w in list(nets[n].weights):
-                weights[n][w.name] = torch.FloatTensor(w.value).view(list(w.dim))
+                weights[n][w.name] = torch.Tensor(w.value).view(list(w.dim))
 
         if mode == 'clstm_compat':
             weightnames = ('.WGI', '.WGF', '.WCI', '.WGO')
