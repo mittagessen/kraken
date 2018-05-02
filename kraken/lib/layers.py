@@ -261,7 +261,7 @@ class TransposedSummarizingRNN(Module):
 
         fwd_params = l.weightParams if arch == 'uniDirectionalLSTM' else l.weightParams[0]
         # ih_matrix
-        weight_ih = torch.FloatTensor([fwd_params.inputGateWeightMatrix.floatValue, # wi
+        weight_ih = torch.Tensor([fwd_params.inputGateWeightMatrix.floatValue, # wi
                                        fwd_params.forgetGateWeightMatrix.floatValue, # wf
                                        fwd_params.blockInputWeightMatrix.floatValue, # wz/wg
                                        fwd_params.outputGateWeightMatrix.floatValue]) # wo
@@ -269,7 +269,7 @@ class TransposedSummarizingRNN(Module):
         self.layer.weight_ih_l0 = torch.nn.Parameter(weight_ih.resize_as_(self.layer.weight_ih_l0.data))
 
         # hh_matrix
-        weight_hh = torch.FloatTensor([fwd_params.inputGateRecursionMatrix.floatValue, # wi
+        weight_hh = torch.Tensor([fwd_params.inputGateRecursionMatrix.floatValue, # wi
                                        fwd_params.forgetGateRecursionMatrix.floatValue, # wf
                                        fwd_params.blockInputRecursionMatrix.floatValue, #wz/wg
                                        fwd_params.outputGateRecursionMatrix.floatValue]) # wo
@@ -277,7 +277,7 @@ class TransposedSummarizingRNN(Module):
 
         if not self.legacy:
             # ih biases
-            biases = torch.FloatTensor([fwd_params.inputGateBiasVector.floatValue, #bi
+            biases = torch.Tensor([fwd_params.inputGateBiasVector.floatValue, #bi
                                         fwd_params.forgetGateBiasVector.floatValue, # bf
                                         fwd_params.blockInputBiasVector.floatValue, # bz/bg
                                         fwd_params.outputGateBiasVector.floatValue]) #bo
@@ -288,20 +288,20 @@ class TransposedSummarizingRNN(Module):
         # get backward weights
         if arch == 'biDirectionalLSTM':
             bwd_params = l.weightParams[1]
-            weight_ih_rev = torch.FloatTensor([bwd_params.inputGateWeightMatrix.floatValue, # wi
+            weight_ih_rev = torch.Tensor([bwd_params.inputGateWeightMatrix.floatValue, # wi
                                                bwd_params.forgetGateWeightMatrix.floatValue, # wf
                                                bwd_params.blockInputWeightMatrix.floatValue, # wz/wg
                                                bwd_params.outputGateWeightMatrix.floatValue]) # wo
             self.layer.weight_ih_l0_reverse = torch.nn.Parameter(weight_ih.resize_as_(self.layer.weight_ih_l0.data))
 
-            weight_hh_rev = torch.FloatTensor([bwd_params.inputGateRecursionMatrix.floatValue, # wi
+            weight_hh_rev = torch.Tensor([bwd_params.inputGateRecursionMatrix.floatValue, # wi
                                                bwd_params.forgetGateRecursionMatrix.floatValue, # wf
                                                bwd_params.blockInputRecursionMatrix.floatValue, #wz/wg
                                                bwd_params.outputGateRecursionMatrix.floatValue]) # wo
             self.layer.weight_hh_l0_reverse = torch.nn.Parameter(weight_hh.resize_as_(self.layer.weight_hh_l0.data))
 
             if not self.legacy:
-                biases_rev = torch.FloatTensor([bwd_params.inputGateBiasVector.floatValue, #bi
+                biases_rev = torch.Tensor([bwd_params.inputGateBiasVector.floatValue, #bi
                                                 bwd_params.forgetGateBiasVector.floatValue, # bf
                                                 bwd_params.blockInputBiasVector.floatValue, # bz/bg
                                                 bwd_params.outputGateBiasVector.floatValue]) #bo
@@ -413,8 +413,8 @@ class LinSoftmax(Module):
         """
         # extract conv parameters
         lin = [x for x in spec.neuralNetwork.layers if x.name == '{}_lin'.format(name)][0].innerProduct
-        weights = torch.FloatTensor(lin.weights.floatValue).resize_as_(self.lin.weight.data)
-        bias = torch.FloatTensor(lin.bias.floatValue)
+        weights = torch.Tensor(lin.weights.floatValue).resize_as_(self.lin.weight.data)
+        bias = torch.Tensor(lin.bias.floatValue)
         self.lin.weight = torch.nn.Parameter(weights)
         self.lin.bias = torch.nn.Parameter(bias)
 
@@ -475,10 +475,10 @@ class ActConv2D(Module):
         Sets the weight of an initialized model from a CoreML protobuf spec.
         """
         conv = [x for x in spec.neuralNetwork.layers if x.name == '{}_conv'.format(name)][0].convolution
-        self.co.weight = torch.nn.Parameter(torch.FloatTensor(conv.weights.floatValue).view(self.out_channels,
+        self.co.weight = torch.nn.Parameter(torch.Tensor(conv.weights.floatValue).view(self.out_channels,
                                                                                             self.in_channels,
                                                                                             *self.kernel_size))
-        self.co.bias = torch.nn.Parameter(torch.FloatTensor(conv.bias.floatValue))
+        self.co.bias = torch.nn.Parameter(torch.Tensor(conv.bias.floatValue))
 
     def serialize(self, name, input, builder):
         """
