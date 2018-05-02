@@ -435,8 +435,8 @@ def detect_scripts(im, bounds, model=None):
         KrakenInvalidModelException if no clstm module is available.
     """
     if not model:
-        model = pkg_resources.resource_filename(__name__, 'script.clstm')
-    rnn = models.load_clstm(model)
+        model = pkg_resources.resource_filename(__name__, 'script.mlmodel')
+    rnn = models.load_any(model)
     # load numerical to 4 char identifier map
     with pkg_resources.resource_stream(__name__, 'iso15924.json') as fp:
         n2s = json.load(fp)
