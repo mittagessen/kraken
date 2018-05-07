@@ -52,7 +52,7 @@ class LSTM(Network):
     and backward propagation formulas, mainly for speed. (There is another, more
     abstract implementation as well, but that's significantly slower in Python
     due to function call overhead.)"""
-    def __init__(self,ni,ns,initial=initial_range,maxlen=5000):
+    def __init__(self,ni,ns,initial=0.1,maxlen=5000):
         pass
 
     def init_weights(self,initial):

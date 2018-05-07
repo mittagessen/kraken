@@ -147,9 +147,10 @@ class TorchVGSLModel(object):
         """
         Sets the model to training mode (enables dropout layers).
         """
+        self.nn.train()
 
     @classmethod
-    def load_pyrnn_model(cls, path, train=False):
+    def load_pyrnn_model(cls, path):
         """
         Loads an pyrnn model to VGSL.
         """
@@ -495,12 +496,13 @@ class TorchVGSLModel(object):
         return l.get_shape(input), self.get_layer_name(type, m.group('name')), l
 
     def build_dropout(self, input, block):
-        pattern = re.compile(r'(?P<type>Do)(?P<name>{\w+})?')
+        pattern = re.compile(r'(?P<type>Do)(?P<name>{\w+})(?P<p>[-+]?(\d+(\.\d*)?|\.\d+)([eE][-+]?\d+)?),(?P<dim>\d+)')
         m = pattern.match(block)
         if not m:
             return None, None, None
         else:
-            return input, self.get_layer_name(m.group('type'), m.group('name')), torch.nn.Dropout()
+            l = layers.Dropout(float(m.group('p')), m.group('dim'))
+            return l.get_shape(input), self.get_layer_name(type, m.group('name')), l
 
     def build_conv(self, input, block):
         """
