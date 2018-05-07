@@ -163,6 +163,46 @@ class MaxPool(Module):
                             output_name=name)
         return name
 
+class Dropout(Module):
+    """
+    A simple wrapper for dropout layers
+    """
+    def __init__(self, p, dim):
+        """
+        A wrapper around dropout layers with serialization and layer arithmetic.
+        """
+        super(Dropout, self).__init__()
+        self.p = p
+        sef.dim = dim
+        if dim == 1:
+            self.layer = torch.nn.Dropout(p)
+        elif dim == 2:
+            self.layer = torch.nn.Dropout2D(p)
+
+    def forward(self, inputs):
+        return self.layer(inputs)
+
+    def get_shape(self, input):
+        return input
+
+    def deserialize(self, name, spec):
+        """
+        Noop for deserialization
+        """
+        pass
+
+    def serialize(self, name, input, builder):
+        params = NeuralNetwork_pb2.CustomLayerParams()
+        params.className = 'dropout'
+        params.description = 'An n-dimensional dropout layer'
+        params.parameters['dim'].intValue = self.dim
+        params.parameters['p'].doubleValue = self.p
+        builder.add_custom(name,
+                           input_names=[input],
+                           output_names=[name],
+                           custom_proto_spec=params)
+        return name
+
 class TransposedSummarizingRNN(Module):
     """
     An RNN wrapper allowing time axis transpositions and other
