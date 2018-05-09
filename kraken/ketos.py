@@ -16,6 +16,7 @@
 
 from __future__ import absolute_import, division, print_function
 from future import standard_library
+import torch
 
 import os
 import re
@@ -32,7 +33,7 @@ from io import BytesIO
 from itertools import cycle
 from bidi.algorithm import get_display
 
-from torch.optim import Adam
+from torch.optim import Adam, SGD, RMSprop
 from torch.autograd import Variable
 from torch.utils.data import DataLoader
 
@@ -77,7 +78,7 @@ def cli(verbose):
 @click.option('-N', '--epochs', default=1000, help='Number of epochs to train for')
 @click.option('-d', '--device', default='cpu', help='Select device to use (cpu, gpu:0, gpu:1, ...)')
 @click.option('--optimizer', default='SGD', type=click.Choice(['SGD', 'Adam', 'RMSprop']), help='Select optimizer')
-@click.option('-r', '--lrate', default=1e-4, help='Learning rate')
+@click.option('-r', '--lrate', default=1e-3, help='Learning rate')
 @click.option('-w', '--wdecay', default=0.0, help='Adam weight decay')
 @click.option('-p', '--partition', default=0.9, help='Ground truth data partition ratio between train/test set')
 @click.option('-u', '--normalization', type=click.Choice(['NFD', 'NFKD', 'NFC', 'NFKC']), default=None, help='Ground truth normalization')
@@ -132,7 +133,6 @@ def train(ctx, pad, output, spec, load, savefreq, report, epochs, device,
     else:
         spin('Building training set')
 
-
     ground_truth = list(ground_truth)
     np.random.shuffle(ground_truth)
     tr_im = ground_truth[:int(len(ground_truth) * partition)]
@@ -152,18 +152,15 @@ def train(ctx, pad, output, spec, load, savefreq, report, epochs, device,
     train_loader = DataLoader(gt_set, batch_size=1, shuffle=True)
 
     test_set = GroundTruthDataset(te_im, normalization=normalization, reorder=reorder, pad=pad, format=format)
-    for im in tr_im:
+    for im in te_im:
         if ctx.meta['verbose'] > 1:
             click.echo(u'[{:2.4f}] Adding line {} to test set'.format(time.time() - st_time, im))
         else:
             spin('Building test set')
-        gt_set.add(im)
+        test_set.add(im)
     if not ctx.meta['verbose'] > 0:
        click.secho(u'\b\u2713', fg='green', nl=False)
        click.echo('\033[?25h\n', nl=False)
-
-
-    test_loader = DataLoader(gt_set, batch_size=1, shuffle=True)
 
     if ctx.meta['verbose'] == 0:
         click.echo('')
@@ -186,9 +183,11 @@ def train(ctx, pad, output, spec, load, savefreq, report, epochs, device,
         click.echo('\033[?25h\n', nl=False)
 
     if ctx.meta['verbose'] > 1:
-        click.echo(u'[{:2.4f}] Encoding sets'.format(time.time() - st_time, im))
+        click.echo(u'[{:2.4f}] Encoding training set'.format(time.time() - st_time, im))
+    # don't encode test set as the alphabets may not match causing encoding failures
     gt_set.encode(codec)
-    test_set.encode(gt_set.codec)
+    # encode without codec
+    test_set.training_set = zip(test_set._images, test_set._gt)
 
     if load:
         if ctx.meta['verbose'] > 0:
@@ -210,7 +209,12 @@ def train(ctx, pad, output, spec, load, savefreq, report, epochs, device,
         # append output definition to spec
         spec = '[{} O1c{}]'.format(spec[1:-1], len(gt_set.codec))
         nn = vgsl.TorchVGSLModel(spec)
+        # initialize weights
         nn.init_weights()
+        # initialize codec
+        nn.add_codec(gt_set.codec)
+        # set mode to trainindg
+        nn.train()
 
         if not ctx.meta['verbose']:
             click.secho(u'\b\u2713', fg='green', nl=False)
@@ -219,35 +223,36 @@ def train(ctx, pad, output, spec, load, savefreq, report, epochs, device,
     if ctx.meta['verbose'] > 0:
         click.echo(u'[{:2.4f}] Constructing optimizer (lr: {}, weight decay: {})'.format(time.time() - st_time, lrate, wdecay))
 
+    rec = models.TorchSeqRecognizer(nn, train=True)
     optimizer = Adam(nn.nn.parameters(), lr=lrate, weight_decay=wdecay)
+    #optimizer = SGD(nn.nn.parameters(), lr=lrate, momentum=0.9)
 
     for epoch in range(epochs):
         for trial, (input, target) in enumerate(train_loader):
             input, target = Variable(input), Variable(target)
-            optimizer.zero_grad()
             o = nn.nn(input)
             # height should be 1 by now
             if o.size(2) != 1:
                 raise KrakenInputException('Expected dimension 3 to be 1, actual {}'.format(output.size()))
-            loss = nn.criterion(o.squeeze(2), target)
+            o = o.squeeze(2)
+            optimizer.zero_grad()
+            loss = nn.criterion(o, target)
             loss.backward()
             optimizer.step()
             spin('Training')
-
-            if trial and not trial % int(savefreq * len(gt_set.training_set)):
-                try:
-                    nn.save_model('{}_{}.mlmodel'.format(output, trial))
-                except Exception as e:
-                    click.echo('Saving model failed: {}'.format(str(e)))
-                if ctx.meta['verbose'] > 0:
-                    click.echo('')
-                    click.echo(u'[{:2.4f}] Saving to {}_{}'.format(time.time() - st_time, output, trial))
-
-#            if trial and not trial % report:
-#                c, e = compute_error(rnn, gt_set.test_set)
-#                if ctx.meta['verbose'] < 3:
-#                    click.echo('')
-#                click.echo(u'[{:2.4f}] Accuracy report ({}) {:0.4f} {} {}'.format(time.time() - st_time, trial, (c-e)/c, c, e))
+        if epoch and not epoch % savefreq:
+            try:
+                nn.save_model('{}_{}.mlmodel'.format(output, epoch))
+            except Exception as e:
+                click.echo('Saving model failed: {}'.format(str(e)))
+            if ctx.meta['verbose'] > 0:
+                click.echo('')
+                click.echo(u'[{:2.4f}] Saving to {}_{}'.format(time.time() - st_time, output, epoch))
+        if epoch and not epoch % report:
+            c, e = compute_error(rec, test_set.training_set)
+            if ctx.meta['verbose'] < 3:
+                click.echo('')
+            click.echo(u'[{:2.4f}] Accuracy report ({}) {:0.4f} {} {}'.format(time.time() - st_time, epoch, (c-e)/c, c, e))
 
 
 @cli.command('extract')
