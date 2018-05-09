@@ -261,7 +261,7 @@ class TransposedSummarizingRNN(Module):
         # (H*N)WO
         o, _ = self.layer(inputs, self.init_hidden(inputs.size(0)))
         # resize to HNWO
-        o = o.resize(siz[0], siz[1], siz[2], self.output_size)
+        o = o.view(siz[0], siz[1], siz[2], self.output_size)
         if self.summarize:
             # HN1O
             o = o[:,:,-1,:].unsqueeze(2)
@@ -332,20 +332,20 @@ class TransposedSummarizingRNN(Module):
                                                bwd_params.forgetGateWeightMatrix.floatValue, # wf
                                                bwd_params.blockInputWeightMatrix.floatValue, # wz/wg
                                                bwd_params.outputGateWeightMatrix.floatValue]) # wo
-            self.layer.weight_ih_l0_reverse = torch.nn.Parameter(weight_ih.resize_as_(self.layer.weight_ih_l0.data))
+            self.layer.weight_ih_l0_reverse = torch.nn.Parameter(weight_ih_rev.resize_as_(self.layer.weight_ih_l0.data))
 
             weight_hh_rev = torch.Tensor([bwd_params.inputGateRecursionMatrix.floatValue, # wi
                                                bwd_params.forgetGateRecursionMatrix.floatValue, # wf
                                                bwd_params.blockInputRecursionMatrix.floatValue, #wz/wg
                                                bwd_params.outputGateRecursionMatrix.floatValue]) # wo
-            self.layer.weight_hh_l0_reverse = torch.nn.Parameter(weight_hh.resize_as_(self.layer.weight_hh_l0.data))
+            self.layer.weight_hh_l0_reverse = torch.nn.Parameter(weight_hh_rev.resize_as_(self.layer.weight_hh_l0.data))
 
             if not self.legacy:
                 biases_rev = torch.Tensor([bwd_params.inputGateBiasVector.floatValue, #bi
                                                 bwd_params.forgetGateBiasVector.floatValue, # bf
                                                 bwd_params.blockInputBiasVector.floatValue, # bz/bg
                                                 bwd_params.outputGateBiasVector.floatValue]) #bo
-                self.layer.bias_hh_l0_reverse = torch.nn.Parameter(biases.resize_as_(self.layer.bias_hh_l0.data))
+                self.layer.bias_hh_l0_reverse = torch.nn.Parameter(biases_rev.resize_as_(self.layer.bias_hh_l0.data))
                 self.layer.bias_ih_l0 = torch.nn.Parameter(torch.zeros(self.layer.bias_ih_l0.size()))
 
     def serialize(self, name, input, builder):
