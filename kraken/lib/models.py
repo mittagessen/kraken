@@ -56,13 +56,13 @@ class TorchSeqRecognizer(object):
         Performs a forward pass on a numpy array of a line with shape (C, H, W)
         and returns a numpy array (W, C).
         """
-        line = Variable(torch.FloatTensor(line), volatile=not train)
+        line = Variable(torch.FloatTensor(line), volatile=not self.train)
         # make NCHW -> 1CHW
         line.unsqueeze_(0)
         o = self.nn.nn(line)
         if o.size(2) != 1:
             raise KrakenInputException('Expected dimension 3 to be 1, actual {}'.format(output.size()))
-        self.outputs = o.data.squeeze().transpose(0, 1).numpy()
+        self.outputs = o.data.squeeze().numpy()
         return self.outputs
 
     def predict(self, line):
@@ -123,7 +123,7 @@ def load_any(fname, train=False):
     kind = ''
     fname = abspath(expandvars(expanduser(fname)))
     try:
-        nn = TorchVGSLModel.load_model(fname)
+        nn = TorchVGSLModel.load_model(str(fname))
         kind = 'vgsl'
     except:
         try:
@@ -136,7 +136,7 @@ def load_any(fname, train=False):
             if not PY2:
                 raise KrakenInvalidModelException('Loading pickle models is not '
                                                   'supported on python 3')
-            nn = TorchVGSLModel.load_pyrnn_model(fname
+            nn = TorchVGSLModel.load_pyrnn_model(fname)
             kind = 'pyrnn'
         except:
             pass
