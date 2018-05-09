@@ -66,7 +66,7 @@ def compute_error(model, test_set):
     Args:
         model (kraken.lib.models.ClstmSeqRecognizer): Model used for
                                                       recognition
-        test_set (list): List of tuples (imae, text) for testing
+        test_set (list): List of tuples (image, text) for testing
 
     Returns:
         A tuple with total number of characters and edit distance across the
@@ -75,7 +75,7 @@ def compute_error(model, test_set):
     total_chars = 0
     error = 0
     for im, text in test_set:
-        pred = model.predictString(im)
+        pred = model.predict_string(im)
         total_chars += len(text)
         error += _fast_levenshtein(pred, text)
     return total_chars, error
