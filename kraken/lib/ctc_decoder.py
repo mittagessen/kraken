@@ -20,6 +20,8 @@ Decoders for softmax outputs of CTC trained networks.
 
 import numpy as np
 
+from scipy.ndimage import measurements
+
 def beam_decoder(outputs):
     """
     Translates back the network output to a label sequence using beam search
@@ -89,6 +91,7 @@ def blank_threshold_decoder(outputs, threshold=0.5):
         A list with tuples (class, start, end, max). max is the maximum value
         of the softmax layer in the region.
     """
+    outputs = outputs.T
     labels, n = measurements.label(outputs[:,0] < threshold)
     mask = np.tile(labels.reshape(-1,1), (1,outputs.shape[1]))
     maxima = measurements.maximum_position(outputs, mask, np.arange(1, np.amax(mask)+1))
