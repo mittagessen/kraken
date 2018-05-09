@@ -344,11 +344,11 @@ class TorchVGSLModel(object):
         # input hidden and hidden-hidden weights are in one matrix. also
         # CLSTM/ocropy likes 1-augmenting every other tensor so the ih weights
         # are input+1 in one dimension.
-        t = torch.cat(w for w in [weights['lstm1'][wn] for wn in weightnames])
+        t = torch.cat(list(w for w in [weights['lstm1'][wn] for wn in weightnames]))
         weight_ih_l0 = t[:, :input+1]
         weight_hh_l0 = t[:, input+1:]
 
-        t = torch.cat(w for w in [weights['lstm2'][wn] for wn in weightnames])
+        t = torch.cat(list(w for w in [weights['lstm2'][wn] for wn in weightnames]))
         weight_ih_l0_rev = t[:, :input+1]
         weight_hh_l0_rev = t[:, input+1:]
 
@@ -450,7 +450,7 @@ class TorchVGSLModel(object):
             name (str): Layer name
         """
         if '{' in layer and '}' in layer:
-            return
+            return layer
         l = re.split(r'(^[^\d]+)', layer)
         l.insert(-1, '{{{}}}'.format(name))
         return ''.join(l)
