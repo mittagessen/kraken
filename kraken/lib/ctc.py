@@ -45,8 +45,16 @@ def ctc_align_targets(outputs, targets, lo=1e-5):
     classifier and some targets. The targets themselves are a time sequence
     of vectors, usually a unary representation of each target class (but
     possibly sequences of arbitrary posterior probability distributions
-    represented as vectors)."""
+    represented as vectors).
 
+    Args:
+        outputs (numpy.array): (W, C) shaped softmax output
+        targets (numpy.array: (L, C) shaped one-hot encoded label sequence of
+                              length L
+
+    Returns:
+        Negative log loss and a (W, C) shaped gradients
+    """
     outputs = np.maximum(lo, outputs)
     outputs = outputs * 1.0/np.sum(outputs, axis=1)[:,np.newaxis]
 
@@ -75,7 +83,7 @@ def ctc_align_targets(outputs, targets, lo=1e-5):
     aligned = np.maximum(lo, np.dot(epath, targets))
     l = np.sum(aligned, axis=1)[:,np.newaxis]
     aligned /= np.where(l==0.0,1e-9,l)
-    return -log_add(lr[-1,-1], lr[-1,-2]), outputs-aligned
+    return -np.log(lr[-1,-1] + lr[-1,-2]), aligned - outputs
 
 class _CTC(Function):
 
@@ -86,8 +94,7 @@ class _CTC(Function):
         for idx, (input, target) in enumerate(zip(inputs.split(1, dim=0), targets.split(1, dim=1))):
             l, g = ctc_align_targets(input.squeeze().t().numpy(), target.squeeze().numpy())
             loss[idx] = float(l)
-            self.grads[idx,:,:] = torch.FloatTensor(g)
-
+            self.grads[idx,:,:] = torch.FloatTensor(g.T)
         if reduce:
             loss = torch.FloatTensor([torch.sum(loss)])
             self.grads = torch.sum(self.grads, 0, keepdim=True)
