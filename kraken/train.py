@@ -93,14 +93,13 @@ class GroundTruthDataset(Dataset):
         alphabet (str): Sorted string of all code points found in the ground
                         truth
     """
-    def __init__(self, images=None, split=lambda x: os.path.splitext(x)[0],
+    def __init__(self, split=lambda x: os.path.splitext(x)[0],
                  suffix='.gt.txt', mode='1', scale=48, normalization=None,
-                 reorder=True, partition=0.9, pad=16, format=(0, 1, 2)):
+                 reorder=True, pad=16, format=(0, 1, 2)):
         """
         Reads a list of image-text pairs and creates a ground truth set.
 
         Args:
-            images (list): List of file paths of line images
             split (func): Function for generating the base name without
                           extensions from paths
             suffix (str): Suffix to attach to image base name for text
@@ -116,8 +115,6 @@ class GroundTruthDataset(Dataset):
             normalization (str): Unicode normalization for gt
             reorder (bool): Whether to rearrange code points in "display"/LTR
                             order
-            partition (float): Ground truth data partition ratio between
-                               train/test set.
             pad (int): Padding to add to images left and right
             format (tuple): defines the order of dimensions (0=channels, 1=height,
                           2=width) of samples.
@@ -139,12 +136,13 @@ class GroundTruthDataset(Dataset):
         if scale:
             if isinstance(scale, int):
                 lnorm = CenterNormalizer(scale)
+                self.transforms.append(transforms.Lambda(lambda x: x.convert('L')))
                 self.transforms.append(transforms.Lambda(lambda x: rpred.dewarp(lnorm, x)))
                 self.transforms.append(transforms.Lambda(lambda x: x.convert('L')))
             elif isinstance(scale, tuple):
                 self.transforms.append(transforms.Resize(scale, Image.LANCZOS))
         if pad:
-            self.transforms.append(transforms.Pad((pad, 0)))
+            self.transforms.append(transforms.Pad((pad, 0), fill=255))
         self.transforms.append(transforms.ToTensor())
         # invert
         self.transforms.append(transforms.Lambda(lambda x: x.max() - x))
@@ -156,7 +154,7 @@ class GroundTruthDataset(Dataset):
         Adds a line-image-text pair to the dataset.
         """
         with click.open_file(self.split(image), 'r', encoding='utf-8') as fp:
-            gt = fp.read()
+            gt = fp.read().strip('\n\r')
             for func in self.text_transforms:
                 gt = func(gt)
             self.alphabet.update(gt)
