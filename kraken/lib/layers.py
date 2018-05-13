@@ -433,13 +433,16 @@ class LinSoftmax(Module):
 
     def forward(self, inputs):
         # move features (C) to last dimension for linear activation
+        # NCHW -> NWHC
         inputs = inputs.transpose(1, 3)
         # augment with ones along the input (C) axis
         if self.augmentation:
             inputs = torch.cat([Variable(torch.ones(inputs.shape[:3] + (1,))), inputs], dim=3)
-        o = F.softmax(self.lin(inputs), dim=3)
+        # only enable softmax during inference (CTC loss calculates softmax internally)
+        if not self.training:
+            o = F.softmax(self.lin(inputs), dim=3)
         # and swap again
-        return o.transpose(3,1)
+        return o.transpose(1, 3)
 
     def get_shape(self, input):
         """

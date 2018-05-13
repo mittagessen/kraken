@@ -145,9 +145,13 @@ class TorchVGSLModel(object):
 
     def train(self):
         """
-        Sets the model to training mode (enables dropout layers).
+        Sets the model to training mode (enables dropout layers and disables
+        softmax on CTC layers).
         """
         self.nn.train()
+        # set last layer back to eval mode if not CTC output layer
+        if not self.criterion:
+            self.nn[-1].eval()
 
     @classmethod
     def load_pyrnn_model(cls, path):
@@ -316,7 +320,7 @@ class TorchVGSLModel(object):
             mode = 'clstm_compat'
 
         # extract codec
-        codec = PytorchCodec([u''] + [unichr(x) for x in net.codec[1:]])
+        codec = PytorchCodec([u''] + [chr(x) for x in net.codec[1:]])
 
         # separate layers
         nets = {}
@@ -428,16 +432,16 @@ class TorchVGSLModel(object):
                 for p in m.parameters():
                     # weights
                     if p.data.dim() == 2:
-                        torch.nn.init.orthogonal(p.data)
+                        torch.nn.init.orthogonal_(p.data)
                     # initialize biases to 1 (jozefowicz 2015)
                     else:
                         p.data[len(p)//4:len(p)//2].fill_(1.0)
             elif isinstance(m, torch.nn.GRU):
                 for p in m.parameters():
-                    torch.nn.init.orthogonal(p.data)
+                    torch.nn.init.orthogonal_(p.data)
             elif isinstance(m, torch.nn.Conv2d):
                 for p in m.parameters():
-                    torch.nn.init.uniform(p.data, -0.1, 0.1)
+                    torch.nn.init.uniform_(p.data, -0.1, 0.1)
         self.nn.apply(_wi)
 
     @staticmethod
