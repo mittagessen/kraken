@@ -51,7 +51,7 @@ class PytorchCodec(object):
         # map integer labels to code points because regex only works with strings
         self.l2c = {}
         for k, v in self.c2l.items():
-            self.l2c[''.join(unichr(c) for c in v)] = k
+            self.l2c[''.join(chr(c) for c in v)] = k
 
         # sort prefixes for c2l regex
         self.c2l_regex = regex.compile(r'|'.join(regex.escape(x) for x in sorted(self.c2l.keys(), key=len, reverse=True)))
@@ -97,7 +97,7 @@ class PytorchCodec(object):
             list: A list of tuples (code point, start, end, confidence)
         """
         # map into unicode space
-        l = ''.join(unichr(v) for v, _, _, _ in labels)
+        l = ''.join(chr(v) for v, _, _, _ in labels)
         start = [x for _, x, _, _ in labels]
         end = [x for _, _, x, _ in labels]
         con = [x for _, _, _, x in labels]
@@ -132,7 +132,7 @@ class PytorchCodec(object):
         idx = 0
         while True:
             mo = re.match(input, idx)
-            if mo is None:
+            if mo is None or idx == len(input):
                 if len(input) > idx:
                     raise KrakenEncodeException('No prefix matches for input after {}'.format(idx))
                 return r
