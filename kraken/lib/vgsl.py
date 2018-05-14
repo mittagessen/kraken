@@ -427,21 +427,21 @@ class TorchVGSLModel(object):
         """
         def _wi(m):
             if isinstance(m, torch.nn.Linear):
-                m.weight.data.fill_(1.0)
+                torch.nn.init.uniform_(p.weight, -0.1, 0.1)
             elif isinstance(m, torch.nn.LSTM):
                 for p in m.parameters():
                     # weights
                     if p.data.dim() == 2:
-                        torch.nn.init.orthogonal_(p.data)
+                        torch.nn.init.orthogonal_(p)
                     # initialize biases to 1 (jozefowicz 2015)
                     else:
-                        p.data[len(p)//4:len(p)//2].fill_(1.0)
+                        p[len(p)//4:len(p)//2].fill_(1.0)
             elif isinstance(m, torch.nn.GRU):
                 for p in m.parameters():
-                    torch.nn.init.orthogonal_(p.data)
+                    torch.nn.init.orthogonal_(p)
             elif isinstance(m, torch.nn.Conv2d):
                 for p in m.parameters():
-                    torch.nn.init.uniform_(p.data, -0.1, 0.1)
+                    torch.nn.init.uniform_(p, -0.1, 0.1)
         self.nn.apply(_wi)
 
     @staticmethod
