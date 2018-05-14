@@ -439,8 +439,9 @@ class LinSoftmax(Module):
         if self.augmentation:
             inputs = torch.cat([Variable(torch.ones(inputs.shape[:3] + (1,))), inputs], dim=3)
         # only enable softmax during inference (CTC loss calculates softmax internally)
+        o = self.lin(inputs)
         if not self.training:
-            o = F.softmax(self.lin(inputs), dim=3)
+            o = F.softmax(o, dim=3)
         # and swap again
         return o.transpose(1, 3)
 
