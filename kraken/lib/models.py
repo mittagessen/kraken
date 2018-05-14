@@ -32,7 +32,7 @@ class TorchSeqRecognizer(object):
     """
     A class wrapping a TorchVGSLModel with a more comfortable recognition interface.
     """
-    def __init__(self, nn, decoder=kraken.lib.ctc_decoder.blank_threshold_decoder, train=False):
+    def __init__(self, nn, decoder=kraken.lib.ctc_decoder.blank_threshold_decoder, train=False, codec=None):
         """
         Constructs a sequence recognizer from a VGSL model and a decoder.
 
@@ -47,7 +47,7 @@ class TorchSeqRecognizer(object):
             self.nn.train()
         else:
             self.nn.eval()
-        self.codec = nn.codec
+        self.codec = codec
         self.decoder = decoder
         self.train = train
 
@@ -56,10 +56,9 @@ class TorchSeqRecognizer(object):
         Performs a forward pass on a numpy array of a line with shape (C, H, W)
         and returns a numpy array (W, C).
         """
-        line = Variable(torch.FloatTensor(line), volatile=not self.train)
         # make NCHW -> 1CHW
         line.unsqueeze_(0)
-        o = self.nn.nn(line)
+        o = self.nn(line.permute(2, 1, 0))
         if o.size(2) != 1:
             raise KrakenInputException('Expected dimension 3 to be 1, actual {}'.format(output.size()))
         self.outputs = o.data.squeeze().numpy()
