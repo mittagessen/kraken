@@ -1,132 +1,230 @@
-"""
-CTC for pytorch. Adapted from ocropy/clstm
-"""
+# -*- coding: utf-8 -*-
+#
+# Copyright 2018 Benjamin Kiessling
+# Copyright 2015 Preferred Infrastructure, Inc.
+# Copyright 2015 Preferred Networks, Inc.
+# 
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+# 
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
 
 import torch
-from torch.autograd import Function
-from torch.nn import Module
-from torch.nn.modules.loss import _assert_no_grad
-
-
 import numpy as np
+import torch.nn.functional as F
 
-def log_mul(x,y):
-    "Perform multiplication in the log domain (i.e., addition)."
-    return x+y
+from torch.nn import Module
+from torch.autograd import Function
 
-def log_add(x,y):
-    "Perform addition in the log domain."
-    return np.where(abs(x - y) > 10,
-                    np.maximum(x, y),
-                    np.log(np.exp(np.clip(x-y, -20, 20))+1) + y)
 
-def forward_algorithm(match,skip=-5.0):
-    """Apply the forward algorithm to an array of log state
-    correspondence probabilities."""
-    v = skip * np.arange(len(match[0]))
-    result = []
-    # This is a fairly straightforward dynamic programming problem and
-    # implemented in close analogy to the edit distance:
-    # we either stay in the same state at no extra cost or make a diagonal
-    # step (transition into new state) at no extra cost; the only costs come
-    # from how well the symbols match the network output.
-    for i in range(0, len(match)):
-        w = np.roll(v, 1).copy()
-        # extra cost for skipping initial symbols
-        w[0] = skip * i
-        # total cost is match cost of staying in same state
-        # plus match cost of making a transition into the next state
-        v = log_add(log_mul(v, match[i]), log_mul(w, match[i]))
-        result.append(v)
-    return np.array(result, 'f')
+# ~33% faster than scipy implementation with checks
+def logsumexp(a, axis=None):
+    vmax = np.amax(a, axis=axis, keepdims=True)
+    vmax += np.log(np.sum(np.exp(a - vmax),
+                   axis=axis, keepdims=True, dtype=a.dtype))
+    return np.squeeze(vmax, axis=axis)
 
-def ctc_align_targets(outputs, targets, lo=1e-5):
-    """Perform alignment between the `outputs` of a neural network
-    classifier and some targets. The targets themselves are a time sequence
-    of vectors, usually a unary representation of each target class (but
-    possibly sequences of arbitrary posterior probability distributions
-    represented as vectors).
+def _label_to_path(labels, blank_symbol):
+    path = np.full((len(labels), labels.shape[1]*2+1),
+                   blank_symbol, dtype=np.int32)
+    path[:,1::2] = labels
+    return path
 
-    Args:
-        outputs (numpy.array): (W, C) shaped softmax output
-        targets (numpy.array: (L, C) shaped one-hot encoded label sequence of
-                              length L
 
-    Returns:
-        Negative log loss and a (W, C) shaped gradients
+def _flip_path(path, path_length):
+    """Flips label sequence.
+
+    This function rotates a label sequence and flips it.
+    ``path[b, t]`` stores a label at time ``t`` in ``b``-th batch.
+    The rotated matrix ``r`` is defined as
+    ``r[b, t] = path[b, t + path_length[b]]``
+
+    .. ::
+
+       a b c d .     . a b c d    d c b a .
+       e f . . .  -> . . . e f -> f e . . .
+       g h i j k     g h i j k    k j i h g
+
     """
-    outputs = np.maximum(lo, outputs)
-    outputs = outputs * 1.0/np.sum(outputs, axis=1)[:,np.newaxis]
+    n_batch, n_label = path.shape
+    rotate = (np.arange(n_label) + path_length[:, None]) % n_label
+    return path[np.arange(n_batch, dtype='i')[:, None],
+                rotate][:, ::-1]
 
-    # first, we compute the match between the outputs and the targets
-    # and put the result in the log domain
-    match = np.dot(outputs, targets.T)
-    lmatch = np.log(match)
 
-    # Now, we compute a forward-backward algorithm over the matches between
-    # the input and the output states.
-    lr = forward_algorithm(lmatch)
-    # backward is just forward applied to the reversed sequence
-    rl = forward_algorithm(lmatch[::-1,::-1])[::-1,::-1]
-    both = lr + rl
-    # We need posterior probabilities for the states, so we need to normalize
-    # the output. Instead of keeping track of the normalization
-    # factors, we just normalize the posterior distribution directly.
-    epath = np.exp(both - np.amax(both))
-    l = np.sum(epath, axis=0)[np.newaxis,:]
-    epath /= np.where(l==0.0,1e-9,l)
-    # The previous computation gives us an alignment between input time
-    # and output sequence position as posteriors over states.
-    # However, we actually want the posterior probability distribution over
-    # output classes at each time step. This dot product gives
-    # us that result. We renormalize again afterwards.
-    aligned = np.maximum(lo, np.dot(epath, targets))
-    l = np.sum(aligned, axis=1)[:,np.newaxis]
-    aligned /= np.where(l==0.0,1e-9,l)
-    return -np.log(lr[-1,-1] + lr[-1,-2]), aligned - outputs
+def _flip_label_probability(y, input_length):
+    """Flips a label probability matrix.
+
+    This function rotates a label probability matrix and flips it.
+    ``y[i, b, l]`` stores log probability of label ``l`` at ``i``-th
+    input in ``b``-th batch.
+    The rotated matrix ``r`` is defined as
+    ``r[i, b, l] = y[i + input_length[b], b, l]``
+
+    """
+    seq, n_batch, n_vocab = y.shape
+    rotate = (np.arange(seq, dtype='i')[:, None] + input_length) % seq
+    return y[
+        rotate[:, :, None],
+        np.arange(n_batch, dtype='i')[None, :, None],
+        np.arange(n_vocab, dtype='i')[None, None, :]][::-1]
+
+
+def _flip_path_probability(prob, input_length, path_length):
+    """Flips a path probability matrix.
+
+    This function returns a path probability matrix and flips it.
+    ``prob[i, b, t]`` stores log probability at ``i``-th input and
+    at time ``t`` in a output sequence in ``b``-th batch.
+    The rotated matrix ``r`` is defined as
+    ``r[i, j, k] = prob[i + input_length[j], j, k + path_length[j]]``
+
+    """
+    seq, n_batch, n_label = prob.shape
+    rotate_input = (np.arange(seq, dtype='i')[:, None] + input_length) % seq
+    rotate_label = (
+        np.arange(n_label, dtype='i') + path_length[:, None]) % n_label
+    return prob[
+        rotate_input[:, :, None],
+        np.arange(n_batch, dtype='i')[None, :, None],
+        rotate_label][::-1, :, ::-1]
+
 
 class _CTC(Function):
+    """
+    Implementation of Connectionist Temporal Classification loss.
+    """
 
-    def forward(self, inputs, targets, size_average=True, reduce=True):
-        targets = make_targets(targets, inputs.size(1))
-        self.grads = torch.zeros(inputs.size()).type_as(inputs)
-        loss = torch.FloatTensor(inputs.size(0))
-        for idx, (input, target) in enumerate(zip(inputs.split(1, dim=0), targets.split(1, dim=1))):
-            l, g = ctc_align_targets(input.squeeze().t().numpy(), target.squeeze().numpy())
-            loss[idx] = float(l)
-            self.grads[idx,:,:] = torch.FloatTensor(g.T)
-        if reduce:
-            loss = torch.FloatTensor([torch.sum(loss)])
-            self.grads = torch.sum(self.grads, 0, keepdim=True)
-            if size_average:
-                loss /= inputs.size(0)
-                self.grads /= inputs.size(0)
-        return loss
+    def __init__(self, size_average=True, reduce=True):
+        self.blank_symbol = 0
+        self.zero_padding = -10000000000.0
+
+        self.size_average = size_average
+        self.reduce = reduce
+
+    def log_matrix(self, x):
+        res = np.ma.log(x).filled(fill_value=self.zero_padding)
+        return res.astype(np.float32)
+
+    # path probablity to label probability
+    def label_probability(self, label_size, path, path_length,
+                          multiply_seq):
+        seq_length = len(multiply_seq)
+        n_batch = len(path)
+        dtype = multiply_seq.dtype
+
+        ret = np.zeros((seq_length, n_batch, label_size), dtype)
+        for b in range(len(path)):
+            target_path = path[b, :path_length[b]]
+            chars = {c for c in target_path}
+            for c in chars:
+                ret[:, b, c] = np.sum(
+                    multiply_seq[:, b, 0:path_length[b]]
+                    [:, target_path == c], axis=1)
+        return ret
+
+    def _computes_transition(self, prev_prob, path, path_length, cum_prob, y):
+        n_batch, max_path_length = path.shape
+        mat = np.full(
+            (3, n_batch, max_path_length), self.zero_padding, 'f')
+        mat[0, :, :] = prev_prob
+        mat[1, :, 1:] = prev_prob[:, :-1]
+        mat[2, :, 2:] = prev_prob[:, :-2]
+        # disable transition between the same symbols
+        # (including blank-to-blank)
+        same_transition = (path[:, :-2] == path[:, 2:])
+        mat[2, :, 2:][same_transition] = self.zero_padding
+        prob = logsumexp(mat, axis=0)
+        outside = np.arange(max_path_length) >= path_length[:, None]
+        prob[outside] = self.zero_padding
+        cum_prob += prob
+        batch_index = np.arange(n_batch, dtype='i')
+        prob += y[batch_index[:, None], path]
+        return prob
+
+    def calc_trans(self, yseq, input_length,
+                   label, label_length, path, path_length):
+        max_input_length, n_batch, n_unit = yseq.shape
+        max_label_length = label.shape[1]
+        max_path_length = path.shape[1]
+        assert label.shape == (n_batch, max_label_length), (label.shape, n_batch)
+        assert path.shape == (n_batch, max_label_length * 2 + 1)
+
+        forward_prob = np.full(
+            (n_batch, max_path_length), self.zero_padding, dtype='f')
+        forward_prob[:, 0] = 0
+        backward_prob = forward_prob
+
+        batch_index = np.arange(n_batch, dtype='i')
+        seq_index = np.arange(len(yseq), dtype='i')
+        prob = yseq[seq_index[:, None, None], batch_index[:, None], path]
+        # forward computation.
+        for i, y in enumerate(yseq):
+            forward_prob = self._computes_transition(
+                forward_prob, path, path_length, prob[i], y)
+
+        r_path = _flip_path(path, path_length)
+
+        yseq_inv = _flip_label_probability(yseq, input_length)
+        prob = _flip_path_probability(prob, input_length, path_length)
+
+        for i, y_inv in enumerate(yseq_inv):
+            backward_prob = self._computes_transition(
+                backward_prob, r_path, path_length, prob[i], y_inv)
+
+        return _flip_path_probability(prob, input_length, path_length)
+
+    def forward(self, xs, t):
+        t = t.numpy()
+        xs = xs.permute(2, 0, 1).detach()
+        self.yseq = F.softmax(xs, dim=2).numpy()
+        xs = xs.numpy()
+        self.input_length = np.full(len(xs[0]), len(xs), dtype=np.int32)
+        self.batch_size = len(xs[0])
+        label_length = np.full(len(t), t.shape[1], dtype=np.int32)
+        self.path_length = 2 * label_length + 1
+
+        log_yseq = self.log_matrix(self.yseq)
+        self.path = _label_to_path(t, self.blank_symbol)
+        self.prob_trans = self.calc_trans(log_yseq, self.input_length, t,
+                                          label_length, self.path,
+                                          self.path_length)
+        loss = -logsumexp(self.prob_trans[0], axis=1)
+        return torch.tensor(loss)
 
     def backward(self, grad_output):
-        return self.grads, None, None, None
+        total_probability = logsumexp(self.prob_trans[0], axis=1)
+        label_prob = self.label_probability(self.yseq.shape[2],
+                                            self.path,
+                                            self.path_length,
+                                            np.exp(self.prob_trans - total_probability[:, None]))
+        self.yseq -= label_prob
+        # mask
+        self.yseq *= (np.arange(len(self.yseq))[:, None] < self.input_length)[..., None]
+        return torch.tensor(self.yseq).permute(1, 2, 0), None
 
 
 class CTCCriterion(Module):
     r"""
-    Python CTC loss pulled from ocropy.
+    Connectionist Temporal Classification loss function.
 
-    The targets are label sequences. The implementation will convert them to
-    one-hot representation and pad them with blank labels.  Gradients are NOT
-    computed with regard to the output gradients, so this implementation has to
-    be used as the final layer in a network.
-
-    Inputs can be either from a softmax layer or direct linear projections.
-
-    Args:
-        size_average (bool, optional): By default, the losses are averaged over
-            observations for each minibatch. However if the field size_average
-            is set to False, the losses are instead summed for each minibatch.
-            Ignored when reduce is False. Default:True
-        reduce (bool, optional): By default, the losses are averaged or summed
-            for each minibatch. When reduce is False, the loss function returns
-            a loss per batch element instead and ignores size_average. Default:
-            True
+    This class performs the softmax operation (increases numerical stability)
+    for you, so inputs should be unnormalized linear projections from an RNN.
+    For the same reason, forward-backward computations are performed in log
+    domain.
 
     Shape:
         - Input: :math:`(N, C, S)` where `C` number of classes, `S` sequence
@@ -134,47 +232,8 @@ class CTCCriterion(Module):
         - Target: :math:`(N, l)`, `N` number of label sequences `l`.
         - Output: scalar. If reduce is False, then :math:`(N)`
     """
-    def __init__(self, size_average=True, reduce=True):
+    def __init__(self):
         super(CTCCriterion, self).__init__()
-        self.size_average = size_average
-        self.reduce = reduce
 
     def forward(self, input, targets):
-        """
-        CTC
-        """
-        _assert_no_grad(targets)
-        if input.dim() != 3:
-            raise ValueError('expected 3D input (got {} dimensions)'.format(input.dim()))
-        if targets.dim() != 2:
-            raise ValueError('expected 2D targets (got {} dimensions)'.format(targets.dim()))
-        if targets.size(1) > input.size(2):
-            raise ValueError('target label sequence ({}) has to be shorter than input sequence ({})'.format(targets.size(1), input.size(2)))
         return _CTC()(input, targets)
-
-def make_targets(labels, l_num):
-    """
-    Produces a CTC target tensor from a list of labels and the dimension of an
-    output layer.
-
-    Args:
-        labels (torch.LongTensor): Input label sequences (batch, seqlen)
-        l_num (int): dimension of the output layer
-
-    Returns:
-        A tensor (2*seqlen+1, batch, l_num)
-    """
-    # transposed form is easier to work with
-    labels = labels.t()
-    # pad label sequence with blanks
-    bl = np.zeros(labels.size())
-    l = np.hstack([bl, labels.numpy()]).reshape((labels.size(0)*2,) + labels.size()[1:])
-    l = np.concatenate((l, np.zeros((1, labels.size(1)))))
-    labels = torch.LongTensor(l.astype('int'))
-
-    # one hot encode padded label sequence
-    onehot = torch.FloatTensor(labels.size() + (l_num,))
-    labels.unsqueeze_(2)
-    onehot.zero_()
-    onehot.scatter_(2, labels, 1)
-    return onehot
