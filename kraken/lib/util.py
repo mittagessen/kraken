@@ -12,6 +12,7 @@ import numpy as np
 
 from PIL import Image
 
+__all__ = ['pil2array', 'array2pil']
 
 def pil2array(im, alpha=0):
     if im.mode == "L":

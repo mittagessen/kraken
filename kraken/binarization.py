@@ -25,6 +25,7 @@ from kraken.lib.util import pil2array, array2pil
 from kraken.lib.exceptions import KrakenInputException
 from scipy.ndimage import filters, interpolation, morphology
 
+__all__ = ['is_bitonal', 'nlbin']
 
 def is_bitonal(im):
     """

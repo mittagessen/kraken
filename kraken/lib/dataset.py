@@ -42,7 +42,7 @@ from kraken.lib.codec import PytorchCodec
 from kraken.lib.util import pil2array, array2pil
 from kraken.lib.lineest import CenterNormalizer
 
-__all__ = ['GroundTruthDataset']
+__all__ = ['GroundTruthDataset', 'compute_error']
 
 def _fast_levenshtein(seq1, seq2):
 

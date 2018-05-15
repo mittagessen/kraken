@@ -33,6 +33,8 @@ import json
 import os
 import logging
 
+__all__ = ['get_model', 'get_description', 'get_listing']
+
 logger = logging.getLogger(__name__)
 
 MODEL_REPO = 'https://api.github.com/repos/mittagessen/kraken-models/'

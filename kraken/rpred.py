@@ -30,6 +30,7 @@ from kraken.lib.exceptions import KrakenInputException
 
 standard_library.install_aliases()
 
+__all__ = ['ocr_record', 'bidi_record', 'mm_rpred', 'rpred']
 
 class ocr_record(object):
     """

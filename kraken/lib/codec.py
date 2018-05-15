@@ -26,6 +26,8 @@ from torch import IntTensor
 
 from kraken.lib.exceptions import KrakenEncodeException
 
+__all__ = ['PytorchCodec']
+
 class PytorchCodec(object):
     """
     Translates between labels and graphemes.

@@ -8,6 +8,7 @@ import numpy as np
 
 from scipy.ndimage import interpolation, filters
 
+__all__ = ['CenterNormalizer']
 
 def scale_to_h(img, target_height, order=1, dtype=np.dtype('f'), cval=0):
     h, w = img.shape

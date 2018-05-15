@@ -29,6 +29,7 @@ import torch.nn.functional as F
 from torch.nn import Module
 from torch.autograd import Function
 
+__all__ = ['CTCCriterion']
 
 # ~33% faster than scipy implementation with checks
 def logsumexp(a, axis=None):

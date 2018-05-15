@@ -12,6 +12,8 @@ from torch.nn import functional as F
 # all tensors are ordered NCHW, the "feature" dimension is C, so the output of
 # an LSTM will be put into C same as the filters of a CNN.
 
+__all__ = ['MaxPool', 'Dropout', 'TransposedSummarizingRNN', 'LinSoftmax', 'ActConv2D']
+
 def PeepholeLSTMCell(input, hidden, w_ih, w_hh, w_ip, w_fp, w_op):
     """
     An LSTM cell with peephole connections without biases.

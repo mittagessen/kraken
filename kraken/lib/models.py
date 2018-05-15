@@ -28,6 +28,8 @@ from kraken.lib.vgsl import TorchVGSLModel
 from kraken.lib.exceptions import KrakenInvalidModelException, KrakenInputException
 from torch.autograd import Variable
 
+__all__ = ['TorchSeqRecognizer', 'load_any']
+
 class TorchSeqRecognizer(object):
     """
     A class wrapping a TorchVGSLModel with a more comfortable recognition interface.
