@@ -50,7 +50,7 @@ class PytorchCodec(object):
         if isinstance(charset, dict):
             self.c2l = charset
         else:
-            self.c2l = {k: [v] for v, k in enumerate(sorted(charset))}
+            self.c2l = {k: [v] for v, k in enumerate(sorted(charset), start=1)}
         # map integer labels to code points because regex only works with strings
         self.l2c = {}
         for k, v in self.c2l.items():
@@ -66,6 +66,12 @@ class PytorchCodec(object):
         Total number of input labels the codec can decode.
         """
         return len(self.l2c.keys())
+
+    def max_label(self):
+        """
+        Returns the maximum label value.
+        """
+        return max(l for labels in self.c2l.values() for l in labels)
 
     def encode(self, s):
         """
