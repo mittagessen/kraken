@@ -248,14 +248,14 @@ def _validate_mm(ctx, param, value):
               help='Sets principal text direction')
 @click.option('-l', '--lines', type=click.Path(exists=True),
               help='JSON file containing line coordinates')
-def ocr(ctx, model, pad, reorder, serializer, text_direction, lines, conv):
+def ocr(ctx, model, pad, reorder, serializer, text_direction, lines):
     """
     Recognizes text in line images.
     """
     # first we try to find the model in the absolue path, then ~/.kraken, then
     # LEGACY_MODEL_DIR
     nm = {}
-    for k, v in model.iteritems():
+    for k, v in model.items():
         search = [v,
                   os.path.join(click.get_app_dir(APP_NAME), v),
                   os.path.join(LEGACY_MODEL_DIR, v)]

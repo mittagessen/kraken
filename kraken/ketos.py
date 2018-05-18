@@ -225,7 +225,7 @@ def train(ctx, pad, output, spec, load, savefreq, report, epochs, device,
     # set mode to trainindg
     nn.train()
 
-    rec = models.TorchSeqRecognizer(nn, train=True, codec=gt_set.codec)
+    rec = models.TorchSeqRecognizer(nn, train=True)
     if optimizer == 'SGD':
         optimizer = SGD(nn.nn.parameters(), lr=lrate, momentum=momentum)
     elif optimizer = 'RMSprop':
