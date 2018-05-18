@@ -500,13 +500,13 @@ class TorchVGSLModel(object):
         return l.get_shape(input), self.get_layer_name(type, m.group('name')), l
 
     def build_dropout(self, input, block):
-        pattern = re.compile(r'(?P<type>Do)(?P<name>{\w+})(?P<p>[-+]?(\d+(\.\d*)?|\.\d+)([eE][-+]?\d+)?),(?P<dim>\d+)')
+        pattern = re.compile(r'(?P<type>Do)(?P<name>{\w+})?(?P<p>(\d+(\.\d*)?|\.\d+)),(?P<dim>\d+)')
         m = pattern.match(block)
         if not m:
             return None, None, None
         else:
-            l = layers.Dropout(float(m.group('p')), m.group('dim'))
-            return l.get_shape(input), self.get_layer_name(type, m.group('name')), l
+            l = layers.Dropout(float(m.group('p')), int(m.group('dim')))
+            return l.get_shape(input), self.get_layer_name(m.group('type'), m.group('name')), l
 
     def build_conv(self, input, block):
         """
