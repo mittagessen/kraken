@@ -15,8 +15,9 @@
 # permissions and limitations under the License.
 
 from __future__ import absolute_import, division, print_function
-from future import standard_library
 import torch
+
+from kraken.lib.ctc import CTCCriterion
 
 import os
 import re
@@ -33,7 +34,7 @@ from io import BytesIO
 from itertools import cycle
 from bidi.algorithm import get_display
 
-from torch.optim import Adam, SGD, RMSprop
+from torch.optim import SGD, RMSprop
 from torch.autograd import Variable
 from torch.utils.data import DataLoader
 
@@ -43,11 +44,9 @@ from kraken import pageseg
 from kraken import transcrib
 from kraken import binarization
 from kraken.lib import models, vgsl
-from kraken.train import GroundTruthDataset, compute_error
+from kraken.lib.dataset import GroundTruthDataset, compute_error
 from kraken.lib.exceptions import KrakenCairoSurfaceException
 from kraken.lib.exceptions import KrakenInputException
-
-standard_library.install_aliases()
 
 APP_NAME = 'kraken'
 
@@ -77,16 +76,16 @@ def cli(verbose):
 @click.option('-R', '--report', default=1, help='Report creation frequency in epochs')
 @click.option('-N', '--epochs', default=1000, help='Number of epochs to train for')
 @click.option('-d', '--device', default='cpu', help='Select device to use (cpu, gpu:0, gpu:1, ...)')
-@click.option('--optimizer', default='SGD', type=click.Choice(['SGD', 'Adam', 'RMSprop']), help='Select optimizer')
+@click.option('--optimizer', default='SGD', type=click.Choice(['SGD', 'RMSprop']), help='Select optimizer')
 @click.option('-r', '--lrate', default=1e-3, help='Learning rate')
-@click.option('-w', '--wdecay', default=0.0, help='Adam weight decay')
+@click.option('-m', '--momentum', default=0.9, help='Momentum')
 @click.option('-p', '--partition', default=0.9, help='Ground truth data partition ratio between train/test set')
 @click.option('-u', '--normalization', type=click.Choice(['NFD', 'NFKD', 'NFC', 'NFKC']), default=None, help='Ground truth normalization')
 @click.option('-c', '--codec', default=None, type=click.File(mode='rb', lazy=True), help='Load a codec JSON definition (invalid if loading existing model)')
 @click.option('-n', '--reorder/--no-reorder', default=True, help='Reordering of code points to display order')
 @click.argument('ground_truth', nargs=-1, type=click.Path(exists=True, dir_okay=False))
 def train(ctx, pad, output, spec, load, savefreq, report, epochs, device,
-          optimizer, lrate, wdecay, partition, normalization, codec, reorder,
+          optimizer, lrate, momentum, partition, normalization, codec, reorder,
           ground_truth):
     """
     Trains a model from image-text pairs.
@@ -138,7 +137,7 @@ def train(ctx, pad, output, spec, load, savefreq, report, epochs, device,
     tr_im = ground_truth[:int(len(ground_truth) * partition)]
     te_im = ground_truth[int(len(ground_truth) * partition):]
 
-    gt_set = GroundTruthDataset(tr_im, normalization=normalization, reorder=reorder, scale=scale, pad=pad, format=format)
+    gt_set = GroundTruthDataset(normalization=normalization, reorder=reorder, scale=scale, pad=pad, format=format)
     for im in tr_im:
         if ctx.meta['verbose'] > 1:
             click.echo(u'[{:2.4f}] Adding line {} to training set'.format(time.time() - st_time, im))
@@ -151,7 +150,7 @@ def train(ctx, pad, output, spec, load, savefreq, report, epochs, device,
 
     train_loader = DataLoader(gt_set, batch_size=1, shuffle=True)
 
-    test_set = GroundTruthDataset(te_im, normalization=normalization, reorder=reorder, pad=pad, format=format)
+    test_set = GroundTruthDataset(normalization=normalization, reorder=reorder, pad=pad, format=format)
     for im in te_im:
         if ctx.meta['verbose'] > 1:
             click.echo(u'[{:2.4f}] Adding line {} to test set'.format(time.time() - st_time, im))
@@ -171,7 +170,7 @@ def train(ctx, pad, output, spec, load, savefreq, report, epochs, device,
         click.echo(u'[{:2.4f}] warning: alphabet mismatch {}'.format(time.time() - st_time, alpha_diff))
     if ctx.meta['verbose'] > 1:
         click.echo(u'[{:2.4f}] grapheme\tcount'.format(time.time() - st_time))
-        for k, v in sorted(gt_set.alphabet.iteritems(), key=lambda x: x[1], reverse=True):
+        for k, v in sorted(gt_set.alphabet.items(), key=lambda x: x[1], reverse=True):
             if unicodedata.combining(k) or k.isspace():
                 k = unicodedata.name(k)
             else:
@@ -184,10 +183,12 @@ def train(ctx, pad, output, spec, load, savefreq, report, epochs, device,
 
     if ctx.meta['verbose'] > 1:
         click.echo(u'[{:2.4f}] Encoding training set'.format(time.time() - st_time, im))
+
+    # use codec in model if loading existing one
+    if not load:
+        gt_set.encode(codec)
     # don't encode test set as the alphabets may not match causing encoding failures
-    gt_set.encode(codec)
-    # encode without codec
-    test_set.training_set = zip(test_set._images, test_set._gt)
+    test_set.training_set = list(zip(test_set._images, test_set._gt))
 
     if load:
         if ctx.meta['verbose'] > 0:
@@ -196,40 +197,58 @@ def train(ctx, pad, output, spec, load, savefreq, report, epochs, device,
             spin('Loading model')
 
         nn = vgsl.TorchVGSLModel.load_model(load)
-
+        gt_set.encode(nn.codec)
         if not ctx.meta['verbose'] > 0:
             click.secho(u'\b\u2713', fg='green', nl=False)
             click.echo('\033[?25h\n', nl=False)
     else:
         if ctx.meta['verbose'] > 0:
-            click.echo(u'[{:2.4f}] Creating new model {} with {} outputs'.format(time.time() - st_time, spec, len(gt_set.alphabet)))
+            click.echo(u'[{:2.4f}] Creating new model {} with {} outputs'.format(time.time() - st_time, spec, gt_set.codec.max_label()+1))
         else:
             spin('Initializing model')
 
         # append output definition to spec
-        spec = '[{} O1c{}]'.format(spec[1:-1], len(gt_set.codec))
+        spec = '[{} O1c{}]'.format(spec[1:-1], gt_set.codec.max_label()+1)
         nn = vgsl.TorchVGSLModel(spec)
         # initialize weights
         nn.init_weights()
         # initialize codec
         nn.add_codec(gt_set.codec)
-        # set mode to trainindg
-        nn.train()
 
         if not ctx.meta['verbose']:
             click.secho(u'\b\u2713', fg='green', nl=False)
             click.echo('\033[?25h\n', nl=False)
 
     if ctx.meta['verbose'] > 0:
-        click.echo(u'[{:2.4f}] Constructing optimizer (lr: {}, weight decay: {})'.format(time.time() - st_time, lrate, wdecay))
+        click.echo(u'[{:2.4f}] Constructing optimizer (lr: {}, momentum: {})'.format(time.time() - st_time, lrate, momentum))
 
-    rec = models.TorchSeqRecognizer(nn, train=True)
-    optimizer = Adam(nn.nn.parameters(), lr=lrate, weight_decay=wdecay)
-    #optimizer = SGD(nn.nn.parameters(), lr=lrate, momentum=0.9)
+    # set mode to trainindg
+    nn.train()
+
+    rec = models.TorchSeqRecognizer(nn, train=True, codec=gt_set.codec)
+    if optimizer == 'SGD':
+        optimizer = SGD(nn.nn.parameters(), lr=lrate, momentum=momentum)
+    elif optimizer = 'RMSprop':
+        optim = RMSprop(nn.nn.parameters(), lr=lrate, momentum=momentum)
 
     for epoch in range(epochs):
+        if epoch and not epoch % savefreq:
+            try:
+                nn.save_model('{}_{}.mlmodel'.format(output, epoch))
+            except Exception as e:
+                click.echo('Saving model failed: {}'.format(str(e)))
+            if ctx.meta['verbose'] > 0:
+                click.echo('')
+                click.echo(u'[{:2.4f}] Saving to {}_{}'.format(time.time() - st_time, output, epoch))
+        if not epoch % report:
+            nn.eval()
+            c, e = compute_error(rec, test_set.training_set)
+            nn.train()
+            if ctx.meta['verbose'] < 3:
+                click.echo('')
+            click.echo(u'[{:2.4f}] Accuracy report ({}) {:0.4f} {} {}'.format(time.time() - st_time, epoch, (c-e)/c, c, e))
         for trial, (input, target) in enumerate(train_loader):
-            input, target = Variable(input), Variable(target)
+            input = input.requires_grad_()
             o = nn.nn(input)
             # height should be 1 by now
             if o.size(2) != 1:
@@ -240,19 +259,6 @@ def train(ctx, pad, output, spec, load, savefreq, report, epochs, device,
             loss.backward()
             optimizer.step()
             spin('Training')
-        if epoch and not epoch % savefreq:
-            try:
-                nn.save_model('{}_{}.mlmodel'.format(output, epoch))
-            except Exception as e:
-                click.echo('Saving model failed: {}'.format(str(e)))
-            if ctx.meta['verbose'] > 0:
-                click.echo('')
-                click.echo(u'[{:2.4f}] Saving to {}_{}'.format(time.time() - st_time, output, epoch))
-        if epoch and not epoch % report:
-            c, e = compute_error(rec, test_set.training_set)
-            if ctx.meta['verbose'] < 3:
-                click.echo('')
-            click.echo(u'[{:2.4f}] Accuracy report ({}) {:0.4f} {} {}'.format(time.time() - st_time, epoch, (c-e)/c, c, e))
 
 
 @cli.command('extract')
@@ -275,7 +281,7 @@ def extract(ctx, normalization, reorder, rotate, output, transcribs):
     st_time = time.time()
     try:
         os.mkdir(output)
-    except:
+    except Exception:
         pass
     idx = 0
     manifest = []
