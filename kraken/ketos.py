@@ -227,8 +227,8 @@ def train(ctx, pad, output, spec, load, savefreq, report, epochs, device,
 
     rec = models.TorchSeqRecognizer(nn, train=True)
     if optimizer == 'SGD':
-        optimizer = SGD(nn.nn.parameters(), lr=lrate, momentum=momentum)
-    elif optimizer = 'RMSprop':
+        optim = SGD(nn.nn.parameters(), lr=lrate, momentum=momentum)
+    elif optimizer == 'RMSprop':
         optim = RMSprop(nn.nn.parameters(), lr=lrate, momentum=momentum)
 
     for epoch in range(epochs):
@@ -254,10 +254,10 @@ def train(ctx, pad, output, spec, load, savefreq, report, epochs, device,
             if o.size(2) != 1:
                 raise KrakenInputException('Expected dimension 3 to be 1, actual {}'.format(output.size()))
             o = o.squeeze(2)
-            optimizer.zero_grad()
+            optim.zero_grad()
             loss = nn.criterion(o, target)
             loss.backward()
-            optimizer.step()
+            optim.step()
             spin('Training')
 
 
