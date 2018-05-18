@@ -1,19 +1,19 @@
+# -*- coding: utf-8 -*-
 #
 # Copyright 2017 Benjamin Kiessling
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 # http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
 # or implied. See the License for the specific language governing
 # permissions and limitations under the License.
 
-# -*- coding: utf-8 -*-
 """
 pytorch compatible codec with many-to-many mapping between labels and
 graphemes.
@@ -27,6 +27,7 @@ from torch import IntTensor
 from kraken.lib.exceptions import KrakenEncodeException
 
 __all__ = ['PytorchCodec']
+
 
 class PytorchCodec(object):
     """
@@ -77,10 +78,10 @@ class PytorchCodec(object):
             (torch.IntTensor) encoded label sequence
         """
         splits = self._greedy_split(s, self.c2l_regex)
-        l = []
+        labels = []
         for c in splits:
-            l.extend(self.c2l[c])
-        return IntTensor(l)
+            labels.extend(self.c2l[c])
+        return IntTensor(labels)
 
     def decode(self, labels):
         """
@@ -99,11 +100,11 @@ class PytorchCodec(object):
             list: A list of tuples (code point, start, end, confidence)
         """
         # map into unicode space
-        l = ''.join(chr(v) for v, _, _, _ in labels)
+        uni_labels = ''.join(chr(v) for v, _, _, _ in labels)
         start = [x for _, x, _, _ in labels]
         end = [x for _, _, x, _ in labels]
         con = [x for _, _, _, x in labels]
-        splits = self._greedy_split(l, self.l2c_regex)
+        splits = self._greedy_split(uni_labels, self.l2c_regex)
         decoded = []
         idx = 0
         for i in splits:

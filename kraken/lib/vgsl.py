@@ -1,9 +1,6 @@
 """
 VGSL plumbing
 """
-from __future__ import absolute_import
-from future import standard_library
-standard_library.install_aliases()
 from future.utils import PY2
 
 import io
@@ -32,6 +29,7 @@ from coremltools.models.neural_network import NeuralNetworkBuilder
 
 __all__ = ['TorchVGSLModel']
 
+
 class TorchVGSLModel(object):
     """
     Class building a torch module from a VSGL spec.
@@ -52,7 +50,6 @@ class TorchVGSLModel(object):
         criterion (torch.nn.Module): Fully parametrized loss function.
 
     """
-
     def __init__(self, spec):
         """
         Constructs a torch module from a (subset of) VSGL spec.
@@ -139,9 +136,11 @@ class TorchVGSLModel(object):
 
     def eval(self):
         """
-        Sets the model to evaluation/inference mode.
+        Sets the model to evaluation/inference mode, disabling dropout and
+        gradient calculation.
         """
         self.nn.eval()
+        torch.set_grad_enabled(False)
 
     def train(self):
         """
@@ -152,6 +151,7 @@ class TorchVGSLModel(object):
         # set last layer back to eval mode if not CTC output layer
         if not self.criterion:
             self.nn[-1].eval()
+        torch.set_grad_enabled(True)
 
     @classmethod
     def load_pyrnn_model(cls, path):
@@ -162,6 +162,7 @@ class TorchVGSLModel(object):
             raise KrakenInvalidModelException('Loading pickle models is not supported on python 3')
 
         import cPickle
+
         def find_global(mname, cname):
             aliases = {
                 'lstm.lstm': kraken.lib.lstm,
@@ -244,7 +245,7 @@ class TorchVGSLModel(object):
             net = pyrnn_pb2.pyrnn()
             try:
                 net.ParseFromString(fp.read())
-            except:
+            except Exception:
                 raise KrakenInvalidModelException('File does not contain valid proto msg')
             if not net.IsInitialized():
                 raise KrakenInvalidModelException('Model incomplete')
@@ -305,13 +306,12 @@ class TorchVGSLModel(object):
         with open(path, 'rb') as fp:
             try:
                 net.ParseFromString(fp.read())
-            except:
+            except Exception:
                 raise KrakenInvalidModelException('File does not contain valid proto msg')
             if not net.IsInitialized():
                 raise KrakenInvalidModelException('Model incomplete')
 
         input = net.ninput
-        output = net.noutput
         attrib = {a.key: a.value for a in list(net.attribute)}
         # mainline clstm model
         if len(attrib) > 1:
@@ -427,21 +427,22 @@ class TorchVGSLModel(object):
         """
         def _wi(m):
             if isinstance(m, torch.nn.Linear):
-                torch.nn.init.uniform_(p.weight, -0.1, 0.1)
+                torch.nn.init.xavier_uniform_(m.weight.data)
+                torch.nn.init.constant_(m.bias.data, 0)
             elif isinstance(m, torch.nn.LSTM):
                 for p in m.parameters():
                     # weights
                     if p.data.dim() == 2:
-                        torch.nn.init.orthogonal_(p)
+                        torch.nn.init.orthogonal_(p.data)
                     # initialize biases to 1 (jozefowicz 2015)
                     else:
-                        p[len(p)//4:len(p)//2].fill_(1.0)
+                        torch.nn.init.constant_(p.data[len(p)//4:len(p)//2], 1.0)
             elif isinstance(m, torch.nn.GRU):
                 for p in m.parameters():
-                    torch.nn.init.orthogonal_(p)
+                    torch.nn.init.orthogonal_(p.data)
             elif isinstance(m, torch.nn.Conv2d):
                 for p in m.parameters():
-                    torch.nn.init.uniform_(p, -0.1, 0.1)
+                    torch.nn.init.uniform_(p.data, -0.1, 0.1)
         self.nn.apply(_wi)
 
     @staticmethod
@@ -455,9 +456,9 @@ class TorchVGSLModel(object):
         """
         if '{' in layer and '}' in layer:
             return layer
-        l = re.split(r'(^[^\d]+)', layer)
-        l.insert(-1, '{{{}}}'.format(name))
-        return ''.join(l)
+        lsplits = re.split(r'(^[^\d]+)', layer)
+        lsplits.insert(-1, '{{{}}}'.format(name))
+        return ''.join(lsplits)
 
     def get_layer_name(self, layer, name=None):
         """
@@ -487,7 +488,7 @@ class TorchVGSLModel(object):
             return None, None, None
         type = m.group('type')
         direction = m.group('dir')
-        dim = m.group('dim')  == 'y'
+        dim = m.group('dim') == 'y'
         summarize = m.group('sum') == 's'
         legacy = None
         if m.group('legacy') == 'c':
@@ -496,7 +497,6 @@ class TorchVGSLModel(object):
             legacy = 'ocropy'
         hidden = int(m.group(7))
         l = layers.TransposedSummarizingRNN(input[1], hidden, direction, dim, summarize, legacy)
-
         return l.get_shape(input), self.get_layer_name(type, m.group('name')), l
 
     def build_dropout(self, input, block):

@@ -13,24 +13,27 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
 # or implied. See the License for the specific language governing
 # permissions and limitations under the License.
+"""
+kraken.rpred
+~~~~~~~~~~~~
 
+Generators for recognition on lines images.
+"""
 from __future__ import absolute_import, division, print_function
-from __future__ import unicode_literals
-from future import standard_library
-from builtins import range
-from builtins import object
 
 import numpy as np
 import bidi.algorithm as bd
+
+from PIL import Image
 from torchvision import transforms
 
 from kraken.lib.util import pil2array, array2pil
 from kraken.lib.lineest import CenterNormalizer
 from kraken.lib.exceptions import KrakenInputException
 
-standard_library.install_aliases()
 
 __all__ = ['ocr_record', 'bidi_record', 'mm_rpred', 'rpred']
+
 
 class ocr_record(object):
     """
@@ -130,7 +133,7 @@ def extract_boxes(im, bounds):
         if isinstance(box, tuple):
             box = list(box)
         if (box < [0, 0, 0, 0] or box[::2] > [im.size[0], im.size[0]] or
-           box[1::2] > [im.size[1], im.size[1]]):
+                box[1::2] > [im.size[1], im.size[1]]):
             raise KrakenInputException('Line outside of image bounds')
         yield im.crop(box).rotate(angle, expand=True), box
 
@@ -156,7 +159,7 @@ def dewarp(normalizer, im):
     return array2pil(line)
 
 
-def mm_rpred(nets, im, bounds, pad=16, line_normalization=True, bidi_reordering=True):
+def mm_rpred(nets, im, bounds, pad=16, bidi_reordering=True):
     """
     Multi-model version of kraken.rpred.rpred.
 
@@ -174,12 +177,6 @@ def mm_rpred(nets, im, bounds, pad=16, line_normalization=True, bidi_reordering=
                         'text_direction' containing
                         'horizontal-tb/vertical-lr/rl'.
         pad (int): Extra blank padding to the left and right of text line
-        line_normalization (bool): Dewarp line using the line estimator
-                                   contained in the network. If no normalizer
-                                   is available one using the default
-                                   parameters is created. By aware that you may
-                                   have to scale lines manually to the target
-                                   line height if disabled.
         bidi_reordering (bool): Reorder classes in the ocr_record according to
                                 the Unicode bidirectional algorithm for correct
                                 display.
@@ -203,28 +200,27 @@ def mm_rpred(nets, im, bounds, pad=16, line_normalization=True, bidi_reordering=
         # height 1, arbitrary width, and channels > 3 indicate 8bpp fixed height
         # (channels) strips of an arbitrary width image => swap height dimension into channels
         if height == 1 and width == 0 and channels > 3:
-            format = (1, 0, 2)
+            perm = (1, 0, 2)
             scale = channels
         # arbitrary (or fixed) height and width and channels 1 or 3 => needs a
         # summarizing network (or a not yet implemented scale operation) to move
         # height to the channel dimension.
         elif height > 1 and width == 0 and channels in (1, 3):
-            format = (0, 1, 2)
+            perm = (0, 1, 2)
             scale = height
         # fixed height and width image => bicubic scaling of the input image, disable padding
-        elif height > 0 and width > 0  and channels in (1, 3):
-            format = (0, 1, 2)
+        elif height > 0 and width > 0 and channels in (1, 3):
+            perm = (0, 1, 2)
             pad = 0
             scale = (height, width)
-        elif height == 0 and width == 0  and channels in (1, 3):
-            format = (0, 1, 2)
+        elif height == 0 and width == 0 and channels in (1, 3):
+            perm = (0, 1, 2)
             pad = 0
             scale = 0
 
         if scale:
             if isinstance(scale, int):
-                lnorm = CenterNormalizer(scale)
-                ts[script].append(transforms.Lambda(lambda x: dewarp(lnorm, x)))
+                ts[script].append(transforms.Lambda(lambda x: dewarp(CenterNormalizer(scale), x)))
                 ts[script].append(transforms.Lambda(lambda x: x.convert('L')))
             elif isinstance(scale, tuple):
                 ts[script].append(transforms.Resize(scale, Image.LANCZOS))
@@ -232,7 +228,7 @@ def mm_rpred(nets, im, bounds, pad=16, line_normalization=True, bidi_reordering=
             ts[script].append(transforms.Pad((pad, 0)))
         ts[script].append(transforms.ToTensor())
         ts[script].append(transforms.Lambda(lambda x: x.max() - x))
-        ts[script].append(transforms.Lambda(lambda x: x.permute(*format)))
+        ts[script].append(transforms.Lambda(lambda x: x.permute(*perm)))
         ts[script] = transforms.Compose(ts[script])
 
     for line in bounds['boxes']:
@@ -246,7 +242,7 @@ def mm_rpred(nets, im, bounds, pad=16, line_normalization=True, bidi_reordering=
             # try conversion into tensor
             try:
                 line = ts[script](box)
-            except:
+            except Exception:
                 yield ocr_record('', [], [])
                 continue
             # check if line is non-zero
@@ -256,7 +252,7 @@ def mm_rpred(nets, im, bounds, pad=16, line_normalization=True, bidi_reordering=
             preds = nets[script].predict(line)
 
             # calculate recognized LSTM locations of characters
-            scale = box.size[0]/(len(network.outputs)-2 * pad)
+            scale = box.size[0]/(len(nets[script].outputs)-2 * pad)
             pred = ''.join(x[0] for x in preds)
             pos = []
             conf = []
@@ -276,7 +272,7 @@ def mm_rpred(nets, im, bounds, pad=16, line_normalization=True, bidi_reordering=
             yield rec
 
 
-def rpred(network, im, bounds, pad=16, line_normalization=True, bidi_reordering=True):
+def rpred(network, im, bounds, pad=16, bidi_reordering=True):
     """
     Uses a RNN to recognize text
 
@@ -305,21 +301,21 @@ def rpred(network, im, bounds, pad=16, line_normalization=True, bidi_reordering=
     # height 1, arbitrary width, and channels > 3 indicate 8bpp fixed height
     # (channels) strips of an arbitrary width image => swap height dimension into channels
     if height == 1 and width == 0 and channels > 3:
-        format = (1, 0, 2)
+        perm = (1, 0, 2)
         scale = channels
     # arbitrary (or fixed) height and width and channels 1 or 3 => needs a
     # summarizing network (or a not yet implemented scale operation) to move
     # height to the channel dimension.
     elif height > 1 and width == 0 and channels in (1, 3):
-        format = (0, 1, 2)
+        perm = (0, 1, 2)
         scale = height
     # fixed height and width image => bicubic scaling of the input image, disable padding
-    elif height > 0 and width > 0  and channels in (1, 3):
-        format = (0, 1, 2)
+    elif height > 0 and width > 0 and channels in (1, 3):
+        perm = (0, 1, 2)
         pad = 0
         scale = (height, width)
-    elif height == 0 and width == 0  and channels in (1, 3):
-        format = (0, 1, 2)
+    elif height == 0 and width == 0 and channels in (1, 3):
+        perm = (0, 1, 2)
         pad = 0
         scale = 0
 
@@ -335,7 +331,7 @@ def rpred(network, im, bounds, pad=16, line_normalization=True, bidi_reordering=
         t.append(transforms.Pad((pad, 0)))
     t.append(transforms.ToTensor())
     t.append(transforms.Lambda(lambda x: x.max() - x))
-    t.append(transforms.Lambda(lambda x: x.permute(*format)))
+    t.append(transforms.Lambda(lambda x: x.permute(*perm)))
     t = transforms.Compose(t)
 
     for box, coords in extract_boxes(im, bounds):
@@ -346,7 +342,7 @@ def rpred(network, im, bounds, pad=16, line_normalization=True, bidi_reordering=
         # try conversion into tensor
         try:
             line = t(box)
-        except:
+        except Exception:
             yield ocr_record('', [], [])
             continue
         # check if line is non-zero

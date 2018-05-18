@@ -13,23 +13,28 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
 # or implied. See the License for the specific language governing
 # permissions and limitations under the License.
+"""
+kraken.kraken
+~~~~~~~~~~~~~
 
+Command line drivers for recognition functionality.
+"""
 from __future__ import absolute_import, division, print_function
-from future import standard_library
 
 import os
 import json
-import click
 import time
 import tempfile
 import warnings
 import unicodedata
 
-from PIL import Image
-from click import open_file
-from itertools import cycle
-from functools import partial
 from collections import defaultdict
+from functools import partial
+from itertools import cycle
+from PIL import Image
+
+import click
+from click import open_file
 
 from kraken import repo
 from kraken import rpred
@@ -38,7 +43,6 @@ from kraken.lib import models
 from kraken import binarization
 from kraken import serialization
 
-standard_library.install_aliases()
 warnings.simplefilter('ignore', UserWarning)
 
 APP_NAME = 'kraken'
@@ -46,6 +50,7 @@ DEFAULT_MODEL = ['en-default.mlmodel']
 LEGACY_MODEL_DIR = '/usr/local/share/ocropus'
 
 spinner = cycle([u'⣾', u'⣽', u'⣻', u'⢿', u'⡿', u'⣟', u'⣯', u'⣷'])
+
 
 def spin(msg):
     click.echo(u'\r\033[?25l{}\t{}'.format(msg, next(spinner)), nl=False)
@@ -61,7 +66,7 @@ def binarizer(threshold, zoom, escale, border, perc, range, low, high, base_imag
         res = binarization.nlbin(im, threshold, zoom, escale, border, perc, range,
                                  low, high)
         res.save(output, format='png')
-    except:
+    except Exception:
         click.secho(u'\u2717', fg='red')
         raise
     click.secho(u'\u2713', fg='green')
@@ -77,7 +82,7 @@ def segmenter(text_direction, script_detect, scale, maxcolseps, black_colseps, b
         res = pageseg.segment(im, text_direction, scale, maxcolseps, black_colseps)
         if script_detect:
             res = pageseg.detect_scripts(im, res)
-    except:
+    except Exception:
         click.secho(u'\u2717', fg='red')
         raise
     with open_file(output, 'w') as fp:
@@ -92,6 +97,8 @@ def recognizer(model, pad, bidi_reordering, base_image, input, output, lines):
         raise click.BadParameter(str(e))
 
     ctx = click.get_current_context()
+
+    st_time = time.time()
 
     # input may either be output from the segmenter then it is a JSON file or
     # be an image file when running the OCR subcommand alone. might still come
@@ -116,7 +123,6 @@ def recognizer(model, pad, bidi_reordering, base_image, input, output, lines):
             it = rpred.mm_rpred(model, im, bounds, pad, bidi_reordering=bidi_reordering)
     preds = []
 
-    st_time = time.time()
     for pred in it:
         if ctx.meta['verbose'] > 0:
             click.echo(u'[{:2.4f}] {}'.format(time.time() - st_time, pred.prediction))
@@ -134,8 +140,9 @@ def recognizer(model, pad, bidi_reordering, base_image, input, output, lines):
         click.echo('Writing recognition results for {}\t'.format(base_image), nl=False)
         if ctx.meta['mode'] != 'text':
             fp.write(serialization.serialize(preds, base_image,
-                     Image.open(base_image).size, ctx.meta['text_direction'],
-                     ctx.meta['mode']))
+                                             Image.open(base_image).size,
+                                             ctx.meta['text_direction'],
+                                             ctx.meta['mode']))
         else:
             fp.write(u'\n'.join(s.prediction for s in preds))
         if not ctx.meta['verbose']:
@@ -148,12 +155,23 @@ def recognizer(model, pad, bidi_reordering, base_image, input, output, lines):
                                      click.Path(writable=True)), multiple=True)
 @click.option('-v', '--verbose', default=0, count=True)
 def cli(input, verbose):
+    """
+    Base command for recognition functionality.
+
+    Inputs are defined as one or more pairs `-i input_file output_file`
+    followed by one or more chainable processing commands. Likewise, verbosity
+    is set on all subcommands with the `-v` switch.
+    """
     ctx = click.get_current_context()
     ctx.meta['verbose'] = verbose
 
 
 @cli.resultcallback()
 def process_pipeline(subcommands, input, verbose):
+    """
+    Helper function calling the partials returned by each subcommand and
+    placing their respective outputs in temporary files.
+    """
     for io_pair in input:
         try:
             base_image = io_pair[0]
@@ -198,22 +216,22 @@ def segment(text_direction, script_detect, scale, maxcolseps, black_colseps):
     return partial(segmenter, text_direction, script_detect, scale, maxcolseps, black_colseps)
 
 
-def validate_mm(ctx, param, value):
+def _validate_mm(ctx, param, value):
     model_dict = {}
     if len(value) == 1 and len(value[0].split(':')) == 1:
         return {'default': value[0]}
     try:
         for m in value:
-            k, v =  m.split(':')
+            k, v = m.split(':')
             model_dict[k] = os.path.expanduser(v)
-    except:
+    except Exception:
         raise click.BadParameter('Mappings must be in format script:model')
     return model_dict
 
 
 @cli.command('ocr')
 @click.pass_context
-@click.option('-m', '--model', default=DEFAULT_MODEL, multiple=True, callback=validate_mm,
+@click.option('-m', '--model', default=DEFAULT_MODEL, multiple=True, callback=_validate_mm,
               help='Path to an recognition model or mapping of the form '
               '$script1:$model1. Add multiple mappings to run multi-model '
               'recognition based on detected scripts.')
@@ -221,18 +239,16 @@ def validate_mm(ctx, param, value):
               'padding around lines')
 @click.option('-n', '--reorder/--no-reorder', default=True,
               help='Reorder code points to logical order')
-@click.option('-h', '--hocr', 'serialization', help='Switch between hOCR, '
+@click.option('-h', '--hocr', 'serializer', help='Switch between hOCR, '
               'ALTO, and plain text output', flag_value='hocr')
-@click.option('-a', '--alto', 'serialization', flag_value='alto')
-@click.option('-t', '--text', 'serialization', flag_value='text', default=True)
+@click.option('-a', '--alto', 'serializer', flag_value='alto')
+@click.option('-t', '--text', 'serializer', flag_value='text', default=True)
 @click.option('-d', '--text-direction', default='horizontal-tb',
               type=click.Choice(['horizontal-tb', 'vertical-lr', 'vertical-rl']),
               help='Sets principal text direction')
 @click.option('-l', '--lines', type=click.Path(exists=True),
               help='JSON file containing line coordinates')
-@click.option('--enable-autoconversion/--disable-autoconversion', 'conv',
-              default=True, help='Automatically convert pyrnn models to protobuf')
-def ocr(ctx, model, pad, reorder, serialization, text_direction, lines, conv):
+def ocr(ctx, model, pad, reorder, serializer, text_direction, lines, conv):
     """
     Recognizes text in line images.
     """
@@ -243,11 +259,6 @@ def ocr(ctx, model, pad, reorder, serialization, text_direction, lines, conv):
         search = [v,
                   os.path.join(click.get_app_dir(APP_NAME), v),
                   os.path.join(LEGACY_MODEL_DIR, v)]
-        # if automatic conversion is enabled we look for an converted model in
-        # ~/.kraken
-        if conv is True:
-            search.insert(0, os.path.join(click.get_app_dir(APP_NAME),
-                          os.path.basename(os.path.splitext(v)[0]) + '.pronn'))
         location = None
         for loc in search:
             if os.path.isfile(loc):
@@ -259,28 +270,18 @@ def ocr(ctx, model, pad, reorder, serialization, text_direction, lines, conv):
         try:
             rnn = models.load_any(location)
             nm[k] = rnn
-        except:
+        except Exception:
             click.secho(u'\u2717', fg='red')
             raise
             ctx.exit(1)
         click.secho(u'\u2713', fg='green')
-
-        # convert input model to protobuf
-        if conv and rnn.kind == 'pyrnn':
-            name, _ = os.path.splitext(os.path.basename(v))
-            op = os.path.join(click.get_app_dir(APP_NAME), name + '.pronn')
-            try:
-                os.makedirs(click.get_app_dir(APP_NAME))
-            except OSError:
-                pass
-            models.pyrnn_to_pronn(rnn, op)
 
     if 'default' in nm:
         nn = defaultdict(lambda: nm['default'])
         nn.update(nm)
         nm = nn
     # set output mode
-    ctx.meta['mode'] = serialization
+    ctx.meta['mode'] = serializer
     ctx.meta['text_direction'] = text_direction
     return partial(recognizer, model=nm, pad=pad, bidi_reordering=reorder, lines=lines)
 
@@ -302,21 +303,21 @@ def show(ctx, model_id):
         else:
             chars.append(char)
     click.echo(u'name: {}\n\n{}\n\n{}\nscripts: {}\nalphabet: {} {}\nlicense: {}\nauthor: {} ({})\n{}'.format(desc['name'],
-                                                                                                 desc['summary'],
-                                                                                                 desc['description'],
-                                                                                                 ' '.join(desc['script']),
-                                                                                                 ''.join(chars),
-                                                                                                 ', '.join(combining),
-                                                                                                 desc['license'],
-                                                                                                 desc['author'],
-                                                                                                 desc['author-email'],
-                                                                                                 desc['url']))
+                                                                                                              desc['summary'],
+                                                                                                              desc['description'],
+                                                                                                              ' '.join(desc['script']),
+                                                                                                              ''.join(chars),
+                                                                                                              ', '.join(combining),
+                                                                                                              desc['license'],
+                                                                                                              desc['author'],
+                                                                                                              desc['author-email'],
+                                                                                                              desc['url']))
     ctx.exit(0)
 
 
 @cli.command('list')
 @click.pass_context
-def list(ctx):
+def list_models(ctx):
     """
     Lists models in the repository.
     """

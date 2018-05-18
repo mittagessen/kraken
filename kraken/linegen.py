@@ -27,8 +27,9 @@ available at [0].
 """
 
 from __future__ import absolute_import, division, print_function
-from future import standard_library
-from builtins import object
+
+import ctypes.util
+import ctypes
 
 from scipy.ndimage.filters import gaussian_filter
 from scipy.ndimage.measurements import find_objects
@@ -36,19 +37,16 @@ from scipy.ndimage.interpolation import affine_transform, geometric_transform
 from PIL import Image, ImageOps
 
 import numpy as np
-import ctypes.util
-import ctypes
 
 from kraken.lib.exceptions import KrakenCairoSurfaceException
 from kraken.lib.util import pil2array, array2pil
-
-standard_library.install_aliases()
 
 pangocairo = ctypes.CDLL(ctypes.util.find_library('pangocairo-1.0'))
 pango = ctypes.CDLL(ctypes.util.find_library('pango-1.0'))
 cairo = ctypes.CDLL(ctypes.util.find_library('cairo'))
 
 __all__ = ['LineGenerator', 'ocropy_degrade', 'degrade_line', 'distort_line']
+
 
 class PangoFontDescription(ctypes.Structure):
     pass
@@ -170,7 +168,7 @@ def _draw_on_surface(surface, font, language, text):
     return max(ink_rect.width, logical_rect.width), max(ink_rect.height, logical_rect.height)
 
 
-def ocropy_degrade(im, distort=1.0, dsigma=20.0, eps=0.03, delta=0.3, degradations=[(0.5, 0.0, 0.5, 0.0)]):
+def ocropy_degrade(im, distort=1.0, dsigma=20.0, eps=0.03, delta=0.3, degradations=((0.5, 0.0, 0.5, 0.0))):
     """
     Degrades and distorts a line using the same noise model used by ocropus.
 
@@ -220,10 +218,10 @@ def ocropy_degrade(im, distort=1.0, dsigma=20.0, eps=0.03, delta=0.3, degradatio
         hs *= distort / np.amax(hs)
         ws *= distort / np.amax(ws)
 
-        def f(p):
+        def _f(p):
             return (p[0] + hs[p[0], p[1]], p[1] + ws[p[0], p[1]])
 
-        a = geometric_transform(a, f, output_shape=(h, w), order=1, mode='constant', cval=np.amax(a))
+        a = geometric_transform(a, _f, output_shape=(h, w), order=1, mode='constant', cval=np.amax(a))
     im = array2pil(a).convert('L')
     return im
 
@@ -288,10 +286,10 @@ def distort_line(im, distort=3.0, sigma=10, eps=0.03, delta=0.3):
     hs *= distort/np.amax(hs)
     ws *= distort/np.amax(ws)
 
-    def f(p):
+    def _f(p):
         return (p[0] + hs[p[0], p[1]], p[1] + ws[p[0], p[1]])
 
-    im = array2pil(geometric_transform(line, f, order=1, mode='nearest'))
+    im = array2pil(geometric_transform(line, _f, order=1, mode='nearest'))
     im = im.crop(ImageOps.invert(im).getbbox())
     im = ImageOps.expand(im, 5, 255)
     return im

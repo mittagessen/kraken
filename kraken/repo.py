@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 #
 # Copyright 2015 Benjamin Kiessling
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 # http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
@@ -39,7 +39,16 @@ logger = logging.getLogger(__name__)
 
 MODEL_REPO = 'https://api.github.com/repos/mittagessen/kraken-models/'
 
+
 def get_model(model_id, path, callback):
+    """
+    Retrieves a model and saves it to a path.
+
+    Args:
+        model_id (str): Identifier of the model
+        path (str): Destination to write model to.
+        callback (func): Function called for every 1024 octet chunk received.
+    """
     logger.info('Retrieving head of model repository')
     r = requests.get('{}{}'.format(MODEL_REPO, 'git/refs/heads/master'))
     callback()
@@ -66,12 +75,13 @@ def get_model(model_id, path, callback):
             break
     if not url:
         raise KrakenRepoException('No such model known')
-    with closing(requests.get(url, headers={'Accept': 'application/vnd.github.v3.raw'}, 
-                 stream=True)) as r:
+    with closing(requests.get(url, headers={'Accept': 'application/vnd.github.v3.raw'},
+                              stream=True)) as r:
         with open(spath, 'wb') as f:
             for chunk in r.iter_content(chunk_size=1024):
                 callback()
                 f.write(chunk)
+
 
 def get_description(model_id):
     logger.info('Retrieving head of model repository')
@@ -119,7 +129,7 @@ def get_listing(callback):
             callback()
             try:
                 models[components[1]].update(json.loads(raw))
-            except:
+            except Exception:
                 del models[components[1]]
         elif len(components) > 2 and components[1] in models:
             models[components[1]]['model'] = el['url']

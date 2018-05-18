@@ -3,17 +3,17 @@
 # Copyright 2018 Benjamin Kiessling
 # Copyright 2015 Preferred Infrastructure, Inc.
 # Copyright 2015 Preferred Networks, Inc.
-# 
+#
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
 # in the Software without restriction, including without limitation the rights
 # to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 # copies of the Software, and to permit persons to whom the Software is
 # furnished to do so, subject to the following conditions:
-# 
+#
 # The above copyright notice and this permission notice shall be included in
 # all copies or substantial portions of the Software.
-# 
+#
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 # IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 # FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -21,9 +21,17 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
+"""
+kraken.lib.layers
+~~~~~~~~~~~~~~~~~
+
+Various pytorch layers compatible with the dimension ordering and
+inputs/outputs of VGSL-defined networks.
+"""
+
+import numpy as np
 
 import torch
-import numpy as np
 import torch.nn.functional as F
 
 from torch.nn import Module
@@ -31,17 +39,19 @@ from torch.autograd import Function
 
 __all__ = ['CTCCriterion']
 
+
 # ~33% faster than scipy implementation with checks
-def logsumexp(a, axis=None):
+def _logsumexp(a, axis=None):
     vmax = np.amax(a, axis=axis, keepdims=True)
-    vmax += np.log(np.sum(np.exp(a - vmax),
-                   axis=axis, keepdims=True, dtype=a.dtype))
+    vmax += np.log(np.sum(np.exp(a - vmax), axis=axis,
+                          keepdims=True, dtype=a.dtype))
     return np.squeeze(vmax, axis=axis)
+
 
 def _label_to_path(labels, blank_symbol):
     path = np.full((len(labels), labels.shape[1]*2+1),
                    blank_symbol, dtype=np.int32)
-    path[:,1::2] = labels
+    path[:, 1::2] = labels
     return path
 
 
@@ -120,9 +130,11 @@ class _CTC(Function):
         res = np.ma.log(x).filled(fill_value=self.zero_padding)
         return res.astype(np.float32)
 
-    # path probablity to label probability
     def label_probability(self, label_size, path, path_length,
                           multiply_seq):
+        """
+        Converts path probability to label probability.
+        """
         seq_length = len(multiply_seq)
         n_batch = len(path)
         dtype = multiply_seq.dtype
@@ -148,7 +160,7 @@ class _CTC(Function):
         # (including blank-to-blank)
         same_transition = (path[:, :-2] == path[:, 2:])
         mat[2, :, 2:][same_transition] = self.zero_padding
-        prob = logsumexp(mat, axis=0)
+        prob = _logsumexp(mat, axis=0)
         outside = np.arange(max_path_length) >= path_length[:, None]
         prob[outside] = self.zero_padding
         cum_prob += prob
@@ -157,7 +169,7 @@ class _CTC(Function):
         return prob
 
     def calc_trans(self, yseq, input_length,
-                   label, label_length, path, path_length):
+                   label, path, path_length):
         max_input_length, n_batch, n_unit = yseq.shape
         max_label_length = label.shape[1]
         max_path_length = path.shape[1]
@@ -190,6 +202,7 @@ class _CTC(Function):
 
     def forward(self, xs, t):
         t = t.numpy()
+        # permute to (seq, batch, feat)
         xs = xs.permute(2, 0, 1).detach()
         self.yseq = F.softmax(xs, dim=2).numpy()
         xs = xs.numpy()
@@ -201,13 +214,12 @@ class _CTC(Function):
         log_yseq = self.log_matrix(self.yseq)
         self.path = _label_to_path(t, self.blank_symbol)
         self.prob_trans = self.calc_trans(log_yseq, self.input_length, t,
-                                          label_length, self.path,
-                                          self.path_length)
-        loss = -logsumexp(self.prob_trans[0], axis=1)
+                                          self.path, self.path_length)
+        loss = -_logsumexp(self.prob_trans[0], axis=1)
         return torch.tensor(loss)
 
     def backward(self, grad_output):
-        total_probability = logsumexp(self.prob_trans[0], axis=1)
+        total_probability = _logsumexp(self.prob_trans[0], axis=1)
         label_prob = self.label_probability(self.yseq.shape[2],
                                             self.path,
                                             self.path_length,

@@ -2,33 +2,23 @@
 kraken.lib.models
 ~~~~~~~~~~~~~~~~~
 
-Wrapper around TorchVGSLModel including a variety of forward pass 
-Wraps around legacy pyrnn and protobuf models to provide a single interface.
+Wrapper around TorchVGSLModel including a variety of forward pass helpers for
+sequence classification.
 """
 
 from __future__ import absolute_import
 from __future__ import unicode_literals
-from future import standard_library
-standard_library.install_aliases()
-from future.utils import PY2
 
 from os.path import expandvars, expanduser, abspath
-
-from builtins import next
-from builtins import chr
-
-import sys
-import torch
 
 import kraken.lib.lineest
 import kraken.lib.ctc_decoder
 
-from kraken.lib import pyrnn_pb2
 from kraken.lib.vgsl import TorchVGSLModel
 from kraken.lib.exceptions import KrakenInvalidModelException, KrakenInputException
-from torch.autograd import Variable
 
 __all__ = ['TorchSeqRecognizer', 'load_any']
+
 
 class TorchSeqRecognizer(object):
     """
@@ -58,11 +48,11 @@ class TorchSeqRecognizer(object):
         Performs a forward pass on a numpy array of a line with shape (C, H, W)
         and returns a numpy array (W, C).
         """
-        # make NCHW -> 1CHW
-        line.unsqueeze_(0)
-        o = self.nn(line.permute(2, 1, 0))
+        # make CHW -> 1CHW
+        line = line.unsqueeze(0)
+        o = self.nn.nn(line)
         if o.size(2) != 1:
-            raise KrakenInputException('Expected dimension 3 to be 1, actual {}'.format(output.size()))
+            raise KrakenInputException('Expected dimension 3 to be 1, actual {}'.format(o.size()))
         self.outputs = o.data.squeeze().numpy()
         return self.outputs
 
@@ -74,6 +64,7 @@ class TorchSeqRecognizer(object):
         """
         o = self.forward(line)
         locs = self.decoder(o)
+        print(locs)
         return self.codec.decode(locs)
 
     def predict_string(self, line):
@@ -126,20 +117,17 @@ def load_any(fname, train=False):
     try:
         nn = TorchVGSLModel.load_model(str(fname))
         kind = 'vgsl'
-    except:
+    except Exception:
         try:
             nn = TorchVGSLModel.load_clstm_model(fname)
             kind = 'clstm'
-        except:
+        except Exception:
             nn = TorchVGSLModel.load_pronn_model(fname)
             kind = 'pronn'
         try:
-            if not PY2:
-                raise KrakenInvalidModelException('Loading pickle models is not '
-                                                  'supported on python 3')
             nn = TorchVGSLModel.load_pyrnn_model(fname)
             kind = 'pyrnn'
-        except:
+        except Exception:
             pass
     if not nn:
         raise KrakenInvalidModelException('File {} not loadable by any parser.'.format(fname))

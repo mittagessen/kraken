@@ -27,6 +27,7 @@ import regex
 
 __all__ = ['serialize']
 
+
 def _rescale(val, low, high):
     """
     Rescales a list of confidence value between 0 and 1 to an interval [low,
@@ -56,6 +57,7 @@ def max_bbox(boxes):
     """
     sbox = list(map(sorted, list(zip(*boxes))))
     return (sbox[0][0], sbox[1][0], sbox[2][-1], sbox[3][-1])
+
 
 def serialize(records, image_name=u'', image_size=(0, 0), writing_mode='horizontal-tb', template='hocr'):
     """

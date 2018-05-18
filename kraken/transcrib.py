@@ -1,41 +1,35 @@
 # -*- coding: utf-8 -*-
 #
 # Copyright 2015 Benjamin Kiessling
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 # http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
 # or implied. See the License for the specific language governing
 # permissions and limitations under the License.
-
-# -*- coding: utf-8 -*-
 """
 Utility functions for ground truth transcription.
 """
 
 from __future__ import absolute_import, division, print_function
-from __future__ import unicode_literals
-
-from future.standard_library import install_aliases
-install_aliases()
 
 from kraken.serialization import max_bbox
 from kraken.lib.exceptions import KrakenInputException
 
 from jinja2 import Environment, PackageLoader
 from itertools import zip_longest
-from io import BytesIO 
+from io import BytesIO
 
-import os
 import uuid
 import regex
 import base64
+
 
 class TranscriptionInterface(object):
 
@@ -93,7 +87,7 @@ class TranscriptionInterface(object):
         elif segmentation:
             self.text_direction = segmentation['text_direction']
             for bbox in segmentation['boxes']:
-                page['lines'].append({'index': self.line_idx, 
+                page['lines'].append({'index': self.line_idx,
                                       'left': 100*int(bbox[0]) / im.size[0],
                                       'top': 100*int(bbox[1]) / im.size[1],
                                       'width': 100*(bbox[2] - bbox[0])/im.size[0],
