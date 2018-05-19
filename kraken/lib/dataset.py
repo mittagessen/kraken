@@ -14,7 +14,7 @@
 # or implied. See the License for the specific language governing
 # permissions and limitations under the License.
 """
-Utility functions for training VGSL networks.
+Utility functions for data loading and training of VGSL networks.
 """
 
 from __future__ import absolute_import, division, print_function
@@ -30,11 +30,72 @@ from collections import Counter
 from torchvision import transforms
 from torch.utils.data import Dataset
 
-from kraken import rpred
 from kraken.lib.codec import PytorchCodec
-from kraken.lib.lineest import CenterNormalizer
+from kraken.lib.exceptions import KrakenInputException
+from kraken.lib.lineest import CenterNormalizer, dewarp
 
-__all__ = ['GroundTruthDataset', 'compute_error']
+__all__ = ['GroundTruthDataset', 'compute_error', 'generate_input_transforms']
+
+
+def generate_input_transforms(batch, height, width, channels, pad):
+    """
+    Generates a torchvision transformation converting a PIL.Image into a
+    tensor usable in a network forward pass.
+
+    Args:
+        batch (int): mini-batch size
+        height (int): height of input image in pixels
+        width (int): width of input image in pixels
+        channels (int): color channels of input
+        pad (int): Amount of padding on horizontal ends of image
+
+    Returns:
+        A torchvision transformation composition converting the input image to
+        the appropriate tensor.
+    """
+    if height == 1 and width == 0 and channels > 3:
+        perm = (1, 0, 2)
+        scale = channels
+        mode = 'L'
+    # arbitrary (or fixed) height and width and channels 1 or 3 => needs a
+    # summarizing network (or a not yet implemented scale operation) to move
+    # height to the channel dimension.
+    elif height > 1 and width == 0 and channels in (1, 3):
+        perm  = (0, 1, 2)
+        scale = height
+        mode = 'RGB' if channels == 3 else 'L'
+    # fixed height and width image => bicubic scaling of the input image, disable padding
+    elif height > 0 and width > 0 and channels in (1, 3):
+        perm = (0, 1, 2)
+        pad = 0
+        scale = (height, width)
+        mode = 'RGB' if channels == 3 else 'L'
+    elif height == 0 and width == 0 and channels in (1, 3):
+        perm = (0, 1, 2)
+        pad = 0
+        scale = 0
+        mode = 'RGB' if channels == 3 else 'L'
+    else:
+        raise KrakenInputException('Invalid input spec (variable height and fixed width not supported)')
+
+    out_transforms = []
+    out_transforms.append(transforms.Lambda(lambda x: x.convert(mode)))
+    if scale:
+        if isinstance(scale, int):
+            if mode not in ['1', 'L']:
+                raise KrakenInputException('Invalid mode {} for line dewarping'.format(mode))
+            lnorm = CenterNormalizer(scale)
+            out_transforms.append(transforms.Lambda(lambda x: dewarp(lnorm, x)))
+            out_transforms.append(transforms.Lambda(lambda x: x.convert(mode)))
+        elif isinstance(scale, tuple):
+            out_transforms.append(transforms.Resize(scale, Image.LANCZOS))
+    if pad:
+        out_transforms.append(transforms.Pad((pad, 0), fill=255))
+    out_transforms.append(transforms.ToTensor())
+    # invert
+    out_transforms.append(transforms.Lambda(lambda x: x.max() - x))
+    out_transforms.append(transforms.Lambda(lambda x: x.permute(*perm)))
+    return transforms.Compose(out_transforms)
 
 
 def _fast_levenshtein(seq1, seq2):
@@ -89,8 +150,8 @@ class GroundTruthDataset(Dataset):
                         truth
     """
     def __init__(self, split=lambda x: os.path.splitext(x)[0],
-                 suffix='.gt.txt', mode='1', scale=48, normalization=None,
-                 reorder=True, pad=16, format=(0, 1, 2)):
+                 suffix='.gt.txt', normalization=None, reorder=True,
+                 im_transforms=None):
         """
         Reads a list of image-text pairs and creates a ground truth set.
 
@@ -106,15 +167,11 @@ class GroundTruthDataset(Dataset):
                                 line images. Vertical-only scaling is through
                                 CenterLineNormalizer, resizing with Lanczos
                                 interpolation. Set to 0 to disable.
-            codec (kraken.codec.PytorchCodec): Codec used to translate code
-                                               points. If not given one will be
-                                               constructed.
             normalization (str): Unicode normalization for gt
             reorder (bool): Whether to rearrange code points in "display"/LTR
                             order
-            pad (int): Padding to add to images left and right
-            format (tuple): defines the order of dimensions (0=channels, 1=height,
-                          2=width) of samples.
+            im_transforms (func): Function taking an PIL.Image and returning a
+                                  tensor suitable for forward passes.
         """
         self.split = lambda x: split(x) + self.suffix
         self.suffix = suffix
@@ -122,31 +179,12 @@ class GroundTruthDataset(Dataset):
         self._gt = []
         self.alphabet = Counter()
         self.text_transforms = []
-        self.transforms = []
+        self.transforms = im_transforms
         # built text transformations
         if normalization:
             self.text_transforms.append(lambda x: unicodedata.normalize(normalization, x))
         if reorder:
             self.text_transforms.append(bd.get_display)
-        if mode:
-            self.transforms.append(transforms.Lambda(lambda x: x.convert(mode)))
-        # first built image transforms
-        if scale:
-            if isinstance(scale, int):
-                if mode not in ['1', 'L']:
-                    raise KrakenInputException('Invalid mode {} for line dewarping'.format(mode))
-                lnorm = CenterNormalizer(scale)
-                self.transforms.append(transforms.Lambda(lambda x: rpred.dewarp(lnorm, x)))
-                self.transforms.append(transforms.Lambda(lambda x: x.convert(mode)))
-            elif isinstance(scale, tuple):
-                self.transforms.append(transforms.Resize(scale, Image.LANCZOS))
-        if pad:
-            self.transforms.append(transforms.Pad((pad, 0), fill=255))
-        self.transforms.append(transforms.ToTensor())
-        # invert
-        self.transforms.append(transforms.Lambda(lambda x: x.max() - x))
-        self.transforms.append(transforms.Lambda(lambda x: x.permute(*format)))
-        self.transforms = transforms.Compose(self.transforms)
 
     def add(self, image):
         """
