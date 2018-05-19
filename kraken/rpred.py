@@ -25,11 +25,10 @@ import numpy as np
 import bidi.algorithm as bd
 
 from PIL import Image
-from torchvision import transforms
 
 from kraken.lib.util import pil2array, array2pil
-from kraken.lib.lineest import CenterNormalizer
 from kraken.lib.exceptions import KrakenInputException
+from kraken.lib.dataset import generate_input_transforms
 
 
 __all__ = ['ocr_record', 'bidi_record', 'mm_rpred', 'rpred']
@@ -138,27 +137,6 @@ def extract_boxes(im, bounds):
         yield im.crop(box).rotate(angle, expand=True), box
 
 
-def dewarp(normalizer, im):
-    """
-    Dewarps an image of a line using a kraken.lib.lineest.CenterNormalizer
-    instance.
-
-    Args:
-        normalizer (kraken.lib.lineest.CenterNormalizer): A line normalizer
-                                                          instance
-        im (PIL.Image): Image to dewarp
-
-    Returns:
-        PIL.Image containing the dewarped image.
-    """
-    line = pil2array(im)
-    temp = np.amax(line)-line
-    temp = temp*1.0/np.amax(temp)
-    normalizer.measure(temp)
-    line = normalizer.normalize(line, cval=np.amax(line))
-    return array2pil(line)
-
-
 def mm_rpred(nets, im, bounds, pad=16, bidi_reordering=True):
     """
     Multi-model version of kraken.rpred.rpred.
@@ -195,41 +173,8 @@ def mm_rpred(nets, im, bounds, pad=16, bidi_reordering=True):
     # build dictionary for line preprocessing
     ts = {}
     for script, network in nets.iteritems():
-        ts[script] = []
         batch, channels, height, width = network.nn.input
-        # height 1, arbitrary width, and channels > 3 indicate 8bpp fixed height
-        # (channels) strips of an arbitrary width image => swap height dimension into channels
-        if height == 1 and width == 0 and channels > 3:
-            perm = (1, 0, 2)
-            scale = channels
-        # arbitrary (or fixed) height and width and channels 1 or 3 => needs a
-        # summarizing network (or a not yet implemented scale operation) to move
-        # height to the channel dimension.
-        elif height > 1 and width == 0 and channels in (1, 3):
-            perm = (0, 1, 2)
-            scale = height
-        # fixed height and width image => bicubic scaling of the input image, disable padding
-        elif height > 0 and width > 0 and channels in (1, 3):
-            perm = (0, 1, 2)
-            pad = 0
-            scale = (height, width)
-        elif height == 0 and width == 0 and channels in (1, 3):
-            perm = (0, 1, 2)
-            pad = 0
-            scale = 0
-
-        if scale:
-            if isinstance(scale, int):
-                ts[script].append(transforms.Lambda(lambda x: dewarp(CenterNormalizer(scale), x)))
-                ts[script].append(transforms.Lambda(lambda x: x.convert('L')))
-            elif isinstance(scale, tuple):
-                ts[script].append(transforms.Resize(scale, Image.LANCZOS))
-        if pad > 0:
-            ts[script].append(transforms.Pad((pad, 0)))
-        ts[script].append(transforms.ToTensor())
-        ts[script].append(transforms.Lambda(lambda x: x.max() - x))
-        ts[script].append(transforms.Lambda(lambda x: x.permute(*perm)))
-        ts[script] = transforms.Compose(ts[script])
+        ts[script] = generate_input_transforms(batch, height, width, channels, pad)
 
     for line in bounds['boxes']:
         rec = ocr_record('', [], [])
@@ -294,45 +239,8 @@ def rpred(network, im, bounds, pad=16, bidi_reordering=True):
         An ocr_record containing the recognized text, absolute character
         positions, and confidence values for each character.
     """
-
-    lnorm = getattr(network, 'lnorm', CenterNormalizer())
-
     batch, channels, height, width = network.nn.input
-    # height 1, arbitrary width, and channels > 3 indicate 8bpp fixed height
-    # (channels) strips of an arbitrary width image => swap height dimension into channels
-    if height == 1 and width == 0 and channels > 3:
-        perm = (1, 0, 2)
-        scale = channels
-    # arbitrary (or fixed) height and width and channels 1 or 3 => needs a
-    # summarizing network (or a not yet implemented scale operation) to move
-    # height to the channel dimension.
-    elif height > 1 and width == 0 and channels in (1, 3):
-        perm = (0, 1, 2)
-        scale = height
-    # fixed height and width image => bicubic scaling of the input image, disable padding
-    elif height > 0 and width > 0 and channels in (1, 3):
-        perm = (0, 1, 2)
-        pad = 0
-        scale = (height, width)
-    elif height == 0 and width == 0 and channels in (1, 3):
-        perm = (0, 1, 2)
-        pad = 0
-        scale = 0
-
-    t = []
-    if scale:
-        if isinstance(scale, int):
-            lnorm = CenterNormalizer(scale)
-            t.append(transforms.Lambda(lambda x: dewarp(lnorm, x)))
-            t.append(transforms.Lambda(lambda x: x.convert('L')))
-        elif isinstance(scale, tuple):
-            t.append(transforms.Resize(scale, Image.LANCZOS))
-    if pad > 0:
-        t.append(transforms.Pad((pad, 0)))
-    t.append(transforms.ToTensor())
-    t.append(transforms.Lambda(lambda x: x.max() - x))
-    t.append(transforms.Lambda(lambda x: x.permute(*perm)))
-    t = transforms.Compose(t)
+    ts = generate_input_transforms(batch, height, width, channels, pad)
 
     for box, coords in extract_boxes(im, bounds):
         # check if boxes are non-zero in any dimension
@@ -341,7 +249,7 @@ def rpred(network, im, bounds, pad=16, bidi_reordering=True):
             continue
         # try conversion into tensor
         try:
-            line = t(box)
+            line = ts(box)
         except Exception:
             yield ocr_record('', [], [])
             continue

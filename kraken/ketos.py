@@ -15,9 +15,6 @@
 # permissions and limitations under the License.
 
 from __future__ import absolute_import, division, print_function
-import torch
-
-from kraken.lib.ctc import CTCCriterion
 
 import os
 import re
@@ -44,7 +41,7 @@ from kraken import pageseg
 from kraken import transcrib
 from kraken import binarization
 from kraken.lib import models, vgsl
-from kraken.lib.dataset import GroundTruthDataset, compute_error
+from kraken.lib.dataset import GroundTruthDataset, compute_error, generate_input_transforms
 from kraken.lib.exceptions import KrakenCairoSurfaceException
 from kraken.lib.exceptions import KrakenInputException
 
@@ -103,32 +100,10 @@ def train(ctx, pad, output, spec, load, savefreq, report, epochs, device,
     if not m:
         raise click.BadOptionUsage('Invalid input spec {}'.format(blocks[0]))
     batch, height, width, channels = [int(x) for x in m.groups()]
-    # height 1, arbitrary width, and channels > 3 indicate 8bpp fixed height
-    # (channels) strips of an arbitrary width image => swap height dimension into channels
-    if height == 1 and width == 0 and channels > 3:
-        format = (1, 0, 2)
-        scale = channels
-        mode = 'L'
-    # arbitrary (or fixed) height and width and channels 1 or 3 => needs a
-    # summarizing network (or a not yet implemented scale operation) to move
-    # height to the channel dimension.
-    elif height > 1 and width == 0 and channels in (1, 3):
-        format = (0, 1, 2)
-        scale = height
-        mode = 'RGB' if channels == 3 else 'L'
-    # fixed height and width image => bicubic scaling of the input image, disable padding
-    elif height > 0 and width > 0 and channels in (1, 3):
-        format = (0, 1, 2)
-        pad = 0
-        scale = (height, width)
-        mode = 'RGB' if channels == 3 else 'L'
-    elif height == 0 and width == 0 and channels in (1, 3):
-        format = (0, 1, 2)
-        pad = 0
-        scale = 0
-        mode = 'RGB' if channels == 3 else 'L'
-    else:
-        raise click.BadOptionUsage('Invalid input spec {} (variable height and fixed width not supported)'.format(blocks[0]))
+    try:
+        transforms = generate_input_transforms(batch, height, width, channels, pad)
+    except KrakenInputException as e:
+        raise click.BadOptionUsage(str(e))
 
     st_time = time.time()
     if ctx.meta['verbose'] > 0:
@@ -141,7 +116,7 @@ def train(ctx, pad, output, spec, load, savefreq, report, epochs, device,
     tr_im = ground_truth[:int(len(ground_truth) * partition)]
     te_im = ground_truth[int(len(ground_truth) * partition):]
 
-    gt_set = GroundTruthDataset(normalization=normalization, reorder=reorder, mode = mode, scale=scale, pad=pad, format=format)
+    gt_set = GroundTruthDataset(normalization=normalization, reorder=reorder, im_transforms=transforms)
     for im in tr_im:
         if ctx.meta['verbose'] > 1:
             click.echo(u'[{:2.4f}] Adding line {} to training set'.format(time.time() - st_time, im))
@@ -154,7 +129,7 @@ def train(ctx, pad, output, spec, load, savefreq, report, epochs, device,
 
     train_loader = DataLoader(gt_set, batch_size=1, shuffle=True)
 
-    test_set = GroundTruthDataset(normalization=normalization, reorder=reorder, mode=mode, scale=scale, pad=pad, format=format)
+    test_set = GroundTruthDataset(normalization=normalization, reorder=reorder, im_transforms=transforms)
     for im in te_im:
         if ctx.meta['verbose'] > 1:
             click.echo(u'[{:2.4f}] Adding line {} to test set'.format(time.time() - st_time, im))
