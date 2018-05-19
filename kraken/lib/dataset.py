@@ -99,7 +99,9 @@ class GroundTruthDataset(Dataset):
                           extensions from paths
             suffix (str): Suffix to attach to image base name for text
                           retrieval
-            mode (str): Image color space (either RGB, L or 1)
+            mode (str): Image color space. Either RGB (color) or L
+                        (grayscale/bw). Only L is compatible with vertical
+                        scaling/dewarping.
             scale (int, tuple): Target height or (width, height) of dewarped
                                 line images. Vertical-only scaling is through
                                 CenterLineNormalizer, resizing with Lanczos
@@ -126,14 +128,16 @@ class GroundTruthDataset(Dataset):
             self.text_transforms.append(lambda x: unicodedata.normalize(normalization, x))
         if reorder:
             self.text_transforms.append(bd.get_display)
-
+        if mode:
+            self.transforms.append(transforms.Lambda(lambda x: x.convert(mode)))
         # first built image transforms
         if scale:
             if isinstance(scale, int):
+                if mode not in ['1', 'L']:
+                    raise KrakenInputException('Invalid mode {} for line dewarping'.format(mode))
                 lnorm = CenterNormalizer(scale)
-                self.transforms.append(transforms.Lambda(lambda x: x.convert('L')))
                 self.transforms.append(transforms.Lambda(lambda x: rpred.dewarp(lnorm, x)))
-                self.transforms.append(transforms.Lambda(lambda x: x.convert('L')))
+                self.transforms.append(transforms.Lambda(lambda x: x.convert(mode)))
             elif isinstance(scale, tuple):
                 self.transforms.append(transforms.Resize(scale, Image.LANCZOS))
         if pad:
