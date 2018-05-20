@@ -22,6 +22,8 @@ import numpy as np
 
 from scipy.ndimage import measurements
 
+from itertools import groupby
+
 __all__ = ['beam_decoder', 'greedy_decoder', 'blank_threshold_decoder']
 
 def beam_decoder(outputs):
@@ -64,17 +66,15 @@ def greedy_decoder(outputs):
         A list with tuples (class, start, end, max). max is the maximum value
         of the softmax layer in the region.
     """
-    m = np.argmax(outputs, 0)
-    start = None
-    x = []
-    for i in range(len(m)):
-        if start is None and dec[i] != 0 and (not (i > 0 and dec[i-1] == dec[i])):
-            start = i
-            code = dec[i]
-        if start is not None and (dec[i-1] != dec[i]):
-            x.append((code, start, i , val[start:i+1].max().data[-1]))
-            start = None
-    return x
+    labels = np.argmax(outputs, 0)
+    seq_len = outputs.shape[1]
+    mask = np.eye(outputs.shape[0], dtype='bool')[labels].T
+    classes = []
+    for label, group in groupby(zip(np.arange(seq_len), labels, outputs[mask]), key=lambda x: x[1]):
+        group = list(group)
+        if label != 0:
+            classes.append((label, group[0][0], group[-1][0], max(x[2] for x in group)))
+    return classes
 
 def blank_threshold_decoder(outputs, threshold=0.5):
     """
@@ -113,5 +113,5 @@ def blank_threshold_decoder(outputs, threshold=0.5):
     # append last non-zero region to list of no zero region occurs after it
     if start:
         x.append((maxima[p-1][1], start, len(outputs), outputs[maxima[p-1]]))
-    return x
+    return [y for y in x if x[0] != 0]
 
