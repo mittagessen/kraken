@@ -73,7 +73,7 @@ def cli(verbose):
 @click.option('-R', '--report', default=1, help='Report creation frequency in epochs')
 @click.option('-N', '--epochs', default=1000, help='Number of epochs to train for')
 @click.option('-d', '--device', default='cpu', help='Select device to use (cpu, gpu:0, gpu:1, ...)')
-@click.option('--optimizer', default='SGD', type=click.Choice(['SGD', 'RMSprop']), help='Select optimizer')
+@click.option('--optimizer', default='RMSprop', type=click.Choice(['SGD', 'RMSprop']), help='Select optimizer')
 @click.option('-r', '--lrate', default=1e-3, help='Learning rate')
 @click.option('-m', '--momentum', default=0.9, help='Momentum')
 @click.option('-p', '--partition', default=0.9, help='Ground truth data partition ratio between train/test set')
