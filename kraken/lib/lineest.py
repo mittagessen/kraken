@@ -1,21 +1,46 @@
 from __future__ import absolute_import, division, print_function
-from builtins import range
-from builtins import object
 
+import warnings
 import numpy as np
 
+from kraken.lib.util import pil2array, array2pil
 from scipy.ndimage import interpolation, filters
+
+__all__ = ['CenterNormalizer', 'dewarp']
+
+
+def dewarp(normalizer, im):
+    """
+    Dewarps an image of a line using a kraken.lib.lineest.CenterNormalizer
+    instance.
+
+    Args:
+        normalizer (kraken.lib.lineest.CenterNormalizer): A line normalizer
+                                                          instance
+        im (PIL.Image): Image to dewarp
+
+    Returns:
+        PIL.Image containing the dewarped image.
+    """
+    line = pil2array(im)
+    temp = np.amax(line)-line
+    temp = temp*1.0/np.amax(temp)
+    normalizer.measure(temp)
+    line = normalizer.normalize(line, cval=np.amax(line))
+    return array2pil(line)
 
 
 def scale_to_h(img, target_height, order=1, dtype=np.dtype('f'), cval=0):
     h, w = img.shape
     scale = target_height*1.0/h
     target_width = int(scale*w)
-    output = interpolation.affine_transform(1.0*img, np.ones(2)/scale,
-                                            order=order,
-                                            output_shape=(target_height,
-                                                          target_width),
-                                            mode='constant', cval=cval)
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore', UserWarning)
+        output = interpolation.affine_transform(1.0*img, np.ones(2)/scale,
+                                                order=order,
+                                                output_shape=(target_height,
+                                                              target_width),
+                                                mode='constant', cval=cval)
     output = np.array(output, dtype=dtype)
     return output
 
@@ -30,6 +55,7 @@ class CenterNormalizer(object):
 
     def measure(self, line):
         h, w = line.shape
+        # XXX: this filter is awfully slow
         smoothed = filters.gaussian_filter(line, (h*0.5, h*self.smoothness),
                                            mode='constant')
         smoothed += 0.001*filters.uniform_filter(smoothed, (h*0.5, w),

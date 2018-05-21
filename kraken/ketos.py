@@ -15,11 +15,11 @@
 # permissions and limitations under the License.
 
 from __future__ import absolute_import, division, print_function
-from future import standard_library
 
 from builtins import str
 
 import os
+import re
 import time
 import click
 import errno
@@ -30,35 +30,39 @@ import unicodedata
 import numpy as np
 
 from PIL import Image
-from lxml import html
+from lxml import html, etree
 from io import BytesIO
 from itertools import cycle
 from bidi.algorithm import get_display
 
+from torch.optim import SGD, RMSprop
+from torch.autograd import Variable
+from torch.utils.data import DataLoader
+
+from kraken.lib import log
 from kraken import rpred
 from kraken import linegen
 from kraken import pageseg
 from kraken import transcribe
 from kraken import binarization
-from kraken.lib import log
-from kraken.lib import models
+from kraken.lib import models, vgsl
 from kraken.train import GroundTruthContainer, compute_error
+from kraken.lib.dataset import GroundTruthDataset, compute_error, generate_input_transforms
 from kraken.lib.exceptions import KrakenCairoSurfaceException
 from kraken.lib.exceptions import KrakenInputException
 from kraken.lib.util import is_bitonal
-
-standard_library.install_aliases()
-warnings.simplefilter('ignore', UserWarning)
 
 APP_NAME = 'kraken'
 
 logger = logging.getLogger('kraken')
 
-spinner = cycle([u'⣾', u'⣽', u'⣻', u'⢿', u'⡿', u'⣟', u'⣯', u'⣷'])
+spinner = cycle(['⣾', '⣽', '⣻', '⢿', '⡿', '⣟', '⣯', '⣷'])
+
 
 def spin(msg):
     if logger.getEffectiveLevel() >= 30:
-        click.echo(u'\r\033[?25l{}\t{}'.format(msg, next(spinner)), nl=False)
+        click.echo('\r\033[?25l{}\t{}'.format(msg, next(spinner)), nl=False)
+
 
 def message(msg, **styles):
     if logger.getEffectiveLevel() >= 30:
@@ -76,81 +80,153 @@ def cli(verbose):
 
 @cli.command('train')
 @click.pass_context
-@click.option('-l', '--lineheight', default=48, help='Line image height after normalization')
 @click.option('-p', '--pad', type=click.INT, default=16, help='Left and right '
               'padding around lines')
-@click.option('-S', '--hiddensize', default=100, help='LSTM units in hidden layer')
-@click.option('-o', '--output', type=click.Path(), default='model.clstm', help='Output model file')
+@click.option('-o', '--output', type=click.Path(), default='model', help='Output model file')
+@click.option('-s', '--spec', default='[1,1,0,48 Lbx100]', help='VGSL spec of the network to train. CTC layer will be added automatically.')
 @click.option('-i', '--load', type=click.Path(exists=True, readable=True), help='Load existing file to continue training')
-@click.option('-F', '--savefreq', default=1000, help='Model save frequency during training')
-@click.option('-R', '--report', default=1000, help='Report creation frequency')
-@click.option('-N', '--ntrain', default=1000000, help='Iterations to train.')
-@click.option('-r', '--lrate', default=1e-4, help='LSTM learning rate')
-@click.option('-m', '--momentum', default=0.9, help='LSTM momentum')
+@click.option('-F', '--savefreq', default=1, type=click.FLOAT, help='Model save frequency in epochs during training')
+@click.option('-R', '--report', default=1, help='Report creation frequency in epochs')
+@click.option('-N', '--epochs', default=1000, help='Number of epochs to train for')
+@click.option('-d', '--device', default='cpu', help='Select device to use (cpu, gpu:0, gpu:1, ...)')
+@click.option('--optimizer', default='RMSprop', type=click.Choice(['SGD', 'RMSprop']), help='Select optimizer')
+@click.option('-r', '--lrate', default=1e-3, help='Learning rate')
+@click.option('-m', '--momentum', default=0.9, help='Momentum')
 @click.option('-p', '--partition', default=0.9, help='Ground truth data partition ratio between train/test set')
-@click.option('-u', '--normalization', type=click.Choice(['NFD', 'NFKD', 'NFC', 'NFKC']), default=None, help='Normalize ground truth')
-@click.option('-n', '--reorder/--no-reorder', default=True, help='Reorder code points to display order')
+@click.option('-u', '--normalization', type=click.Choice(['NFD', 'NFKD', 'NFC', 'NFKC']), default=None, help='Ground truth normalization')
+@click.option('-c', '--codec', default=None, type=click.File(mode='rb', lazy=True), help='Load a codec JSON definition (invalid if loading existing model)')
+@click.option('-n', '--reorder/--no-reorder', default=True, help='Reordering of code points to display order')
 @click.argument('ground_truth', nargs=-1, type=click.Path(exists=True, dir_okay=False))
-def train(ctx, lineheight, pad, hiddensize, output, load, savefreq, report,
-          ntrain, lrate, momentum, partition, normalization, reorder,
+def train(ctx, pad, output, spec, load, savefreq, report, epochs, device,
+          optimizer, lrate, momentum, partition, normalization, codec, reorder,
           ground_truth):
     """
     Trains a model from image-text pairs.
     """
-    if load is None:
-        message(u'Training from scratch net yet supported.')
-        ctx.exit(1)
     logger.info(u'Building ground truth set from {} line images'.format(len(ground_truth)))
-    spin(u'Building ground truth set')
 
-    gt_set = GroundTruthContainer()
+    if load and codec:
+        raise click.BadOptionUsage('codec', 'codec option is not supported when loading model')
 
-    for line in ground_truth:
-        gt_set.add(line, normalization=normalization, reorder=reorder)
-        logger.debug(u'Adding {}'.format(line))
-        spin(u'Building ground truth set')
-    gt_set.repartition(partition)
+    # preparse input sizes from vgsl string to seed ground truth data set
+    # sizes and dimension ordering.
+    spec = spec.strip()
+    if spec[0] != '[' or spec[-1] != ']':
+        raise click.BadOptionUsage('VGSL spec {} not bracketed'.format(spec))
+    blocks = spec[1:-1].split(' ')
+    m = re.match(r'(\d+),(\d+),(\d+),(\d+)', blocks[0])
+    if not m:
+        raise click.BadOptionUsage('Invalid input spec {}'.format(blocks[0]))
+    batch, height, width, channels = [int(x) for x in m.groups()]
+    try:
+        transforms = generate_input_transforms(batch, height, width, channels, pad)
+    except KrakenInputException as e:
+        raise click.BadOptionUsage(str(e))
 
-    logger.info(u'Training set {} lines, test set {} lines, alphabet {} symbols'.format(len(gt_set.training_set), len(gt_set.test_set), len(gt_set.training_alphabet)))
-    logger.debug(u'grapheme\tcount')
-    for k, v in sorted(gt_set.training_alphabet.items(), key=lambda x : x[1], reverse=True):
+    ground_truth = list(ground_truth)
+    np.random.shuffle(ground_truth)
+    tr_im = ground_truth[:int(len(ground_truth) * partition)]
+    te_im = ground_truth[int(len(ground_truth) * partition):]
+
+    gt_set = GroundTruthDataset(normalization=normalization, reorder=reorder, im_transforms=transforms)
+    for im in tr_im:
+        logger.debug('Adding line {} to training set'.format(im))
+        spin('Building training set')
+        gt_set.add(im)
+    message('\b\u2713', fg='green', nl=False)
+    message('\033[?25h\n', nl=False)
+
+    train_loader = DataLoader(gt_set, batch_size=1, shuffle=True)
+
+    test_set = GroundTruthDataset(normalization=normalization, reorder=reorder, im_transforms=transforms)
+    for im in te_im:
+        logger.debug('Adding line {} to test set'.format(im))
+        spin('Building test set')
+        test_set.add(im)
+    message('\b\u2713', fg='green', nl=False)
+    message('\033[?25h\n', nl=False)
+
+    logger.info('Training set {} lines, test set {} lines, alphabet {} symbols'.format(len(gt_set._images), len(test_set._images), len(gt_set.alphabet)))
+    alpha_diff = set(gt_set.alphabet).symmetric_difference(set(test_set.alphabet))
+    if alpha_diff:
+        logger.warn('alphabet mismatch {}'.format(alpha_diff))
+    logger.info('grapheme\tcount')
+    for k, v in sorted(gt_set.alphabet.items(), key=lambda x: x[1], reverse=True):
         if unicodedata.combining(k) or k.isspace():
             k = unicodedata.name(k)
         else:
             k = '\t' + k
-        logger.debug(u'{}\t{}'.format(k, v))
+        logger.info(u'{}\t{}'.format(time.time() - st_time, k, v))
 
-    message(u'\b\u2713', fg='green', nl=False)
+    message('\b\u2713', fg='green', nl=False)
     message('\033[?25h\n', nl=False)
 
+    if ctx.meta['verbose'] > 1:
+        click.echo(u'[{:2.4f}] Encoding training set'.format(time.time() - st_time, im))
+
+    # use codec in model if loading existing one
+    if not load:
+        gt_set.encode(codec)
+    # don't encode test set as the alphabets may not match causing encoding failures
+    test_set.training_set = list(zip(test_set._images, test_set._gt))
+
     if load:
-        logger.info(u'Loading existing model from {} '.format(load))
+        logger.info('Loading existing model from {} '.format(load))
         spin('Loading model')
 
-        rnn = models.ClstmSeqRecognizer(load)
-
-        message(u'\b\u2713', fg='green', nl=False)
-        message('\033[?25h\n', nl=False)
-
+        nn = vgsl.TorchVGSLModel.load_model(load)
+        gt_set.encode(nn.codec)
     else:
-        ctx.exit(1)
+        logger.info('Creating new model {} with {} outputs'.format(spec, gt_set.codec.max_label()+1))
+        spin('Initializing model')
 
-    logger.info(u'Setting learning rate ({}) and momentum ({}) '.format(lrate, momentum))
-    rnn.setLearningRate(lrate, momentum)
+        # append output definition to spec
+        spec = '[{} O1c{}]'.format(spec[1:-1], gt_set.codec.max_label()+1)
+        nn = vgsl.TorchVGSLModel(spec)
+        # initialize weights
+        nn.init_weights()
+        # initialize codec
+        nn.add_codec(gt_set.codec)
 
-    for trial in xrange(ntrain):
-        line, s = gt_set.sample()
-        res = rnn.trainString(line, s)
-        logger.debug(u'TRU: {1}\n[{0:2.4f}] OUT: {2}'.format(s, res))
-        spin('Training')
+    message('\b\u2713', fg='green', nl=False)
+    message('\033[?25h\n', nl=False)
 
-        if trial and not trial % savefreq:
-            rnn.save_model('{}_{}'.format(output, trial))
-            logger.info(u'Saving to {}_{}'.format(output, trial))
+    logger.debug('Constructing {} optimizer (lr: {}, momentum: {})'.format(optimizer, lrate, momentum))
 
-        if trial and not trial % report:
-            c, e = compute_error(rnn, gt_set.test_set)
-            logger.info(u'Accuracy report ({}) {:0.4f} {} {}'.format(trial, (c-e)/c, c, e))
+    # set mode to trainindg
+    nn.train()
+
+    rec = models.TorchSeqRecognizer(nn, train=True)
+    if optimizer == 'SGD':
+        optim = SGD(nn.nn.parameters(), lr=lrate, momentum=momentum)
+    elif optimizer == 'RMSprop':
+        optim = RMSprop(nn.nn.parameters(), lr=lrate, momentum=momentum)
+
+    for epoch in range(epochs):
+        if epoch and not epoch % savefreq:
+            try:
+                nn.save_model('{}_{}.mlmodel'.format(output, epoch))
+            except Exception as e:
+                logger.error('Saving model failed: {}'.format(str(e)))
+            logger.info('Saving to {}_{}'.format(output, epoch))
+        if not epoch % report:
+            nn.eval()
+            c, e = compute_error(rec, test_set.training_set)
+            nn.train()
+            message('Accuracy report ({}) {:0.4f} {} {}'.format(epoch, (c-e)/c, c, e))
+        with click.progressbar(label='epoch {}/{}'.format(epoch, epochs) , length=len(train_loader), show_pos=True) as bar:
+            for trial, (input, target) in enumerate(train_loader):
+                input = input.requires_grad_()
+                o = nn.nn(input)
+                # height should be 1 by now
+                if o.size(2) != 1:
+                    raise KrakenInputException('Expected dimension 3 to be 1, actual {}'.format(output.size()))
+                o = o.squeeze(2)
+                optim.zero_grad()
+                loss = nn.criterion(o, target)
+                loss.backward()
+                optim.step()
+                bar.update(1)
 
 
 @cli.command('extract')
@@ -175,19 +251,22 @@ def extract(ctx, binarize, normalization, reorder, rotate, output,
     """
     try:
         os.mkdir(output)
-    except:
+    except Exception:
         pass
     idx = 0
     manifest = []
     for fp in transcriptions:
-        logger.info(u'Reading {}'.format(fp.name))
+        logger.info('Reading {}'.format(fp.name))
         spin('Reading transcription')
         doc = html.parse(fp)
+        etree.strip_tags(doc, etree.Comment)
         td = doc.find(".//meta[@itemprop='text_direction']")
         if td is None:
             td = 'horizontal-lr'
         else:
             td = td.attrib['content']
+        else:
+            td = 'horizontal-tb'
 
         im = None
         for section in doc.xpath('//section'):
@@ -195,7 +274,7 @@ def extract(ctx, binarize, normalization, reorder, rotate, output,
             fd = BytesIO(base64.b64decode(img.split(',')[1]))
             im = Image.open(fd)
             if not im:
-                logger.info(u'Skipping {} because image not found'.format(fp.name))
+                logger.info('Skipping {} because image not found'.format(fp.name))
                 break
             if binarize:
                 im = binarization.nlbin(im)
@@ -215,10 +294,10 @@ def extract(ctx, binarize, normalization, reorder, rotate, output,
                         else:
                             t.write(text.encode('utf-8'))
                     idx += 1
-    logger.info(u'Extracted {} lines'.format(idx))
+    logger.info('Extracted {} lines'.format(idx))
     with open('{}/manifest.txt'.format(output), 'w') as fp:
         fp.write('\n'.join(manifest))
-    message(u'\b\u2713', fg='green', nl=False)
+    message('\b\u2713', fg='green', nl=False)
     message('\033[?25h\n', nl=False)
 
 
@@ -246,10 +325,10 @@ def transcription(ctx, text_direction, scale, bw, maxcolseps,
     ti = transcribe.TranscriptionInterface(font, font_style)
 
     if prefill:
-        logger.info(u'Loading model {}'.format(prefill))
+        logger.info('Loading model {}'.format(prefill))
         spin('Loading RNN')
         prefill = models.load_any(prefill)
-        message(u'\b\u2713', fg='green', nl=False)
+        message('\b\u2713', fg='green', nl=False)
         message('\033[?25h\n', nl=False)
 
     for fp in images:
@@ -258,9 +337,9 @@ def transcription(ctx, text_direction, scale, bw, maxcolseps,
         im = Image.open(fp)
         im_bin = im
         if not is_bitonal(im):
-            logger.info(u'Binarizing page')
+            logger.info('Binarizing page')
             im_bin = binarization.nlbin(im)
-        logger.info(u'Segmenting page')
+        logger.info('Segmenting page')
         if bw:
             im = im_bin
         res = pageseg.segment(im_bin, text_direction, scale, maxcolseps, black_colseps)
@@ -268,21 +347,21 @@ def transcription(ctx, text_direction, scale, bw, maxcolseps,
             it = rpred.rpred(prefill, im_bin, res)
             preds = []
             for pred in it:
-                logger.info(u'{}'.format(pred.prediction))
+                logger.info('{}'.format(pred.prediction))
                 spin('Recognizing')
                 preds.append(pred)
-            message(u'\b\u2713', fg='green', nl=False)
+            message('\b\u2713', fg='green', nl=False)
             message('\033[?25h\n', nl=False)
             ti.add_page(im, res, records=preds)
         else:
             ti.add_page(im, res)
         fp.close()
-    message(u'\b\u2713', fg='green', nl=False)
+    message('\b\u2713', fg='green', nl=False)
     message('\033[?25h\n', nl=False)
     logger.info('Writing transcription to {}'.format(output.name))
     spin('Writing output')
     ti.write(output)
-    message(u'\b\u2713', fg='green', nl=False)
+    message('\b\u2713', fg='green', nl=False)
     message('\033[?25h\n', nl=False)
 
 
@@ -351,14 +430,14 @@ def line_generator(ctx, font, maxlines, encoding, normalization, renormalize,
     if max_length:
         lines = set([line for line in lines if len(line) < max_length])
     logger.info('Read {} lines'.format(len(lines)))
-    message(u'\b\u2713', fg='green', nl=False)
+    message('\b\u2713', fg='green', nl=False)
     message('\033[?25h\n', nl=False)
     message('Read {} unique lines'.format(len(lines)))
     if maxlines and maxlines < len(lines):
         message('Sampling {} lines\t'.format(maxlines), nl=False)
         lines = list(lines)
         lines = [lines[idx] for idx in np.random.randint(0, len(lines), maxlines)]
-        message(u'\u2713', fg='green')
+        message('\u2713', fg='green')
     try:
         os.makedirs(output)
     except OSError as e:
@@ -376,10 +455,10 @@ def line_generator(ctx, font, maxlines, encoding, normalization, renormalize,
             combining.append(unicodedata.name(char))
         else:
             chars.append(char)
-    message(u'Σ (len: {})'.format(len(alphabet)))
-    message(u'Symbols: {}'.format(''.join(chars)))
+    message('Σ (len: {})'.format(len(alphabet)))
+    message('Symbols: {}'.format(''.join(chars)))
     if combining:
-        message(u'Combining Characters: {}'.format(', '.join(combining)))
+        message('Combining Characters: {}'.format(', '.join(combining)))
     lg = linegen.LineGenerator(font, font_size, font_weight, language)
     for idx, line in enumerate(lines):
         logger.info(line)
@@ -391,7 +470,7 @@ def line_generator(ctx, font, maxlines, encoding, normalization, renormalize,
                 im = lg.render_line(line)
         except KrakenCairoSurfaceException as e:
             logger.info('{}: {} {}'.format(e.message, e.width, e.height))
-            message(u'\b\u2717', fg='red')
+            message('\b\u2717', fg='red')
             continue
         if not disable_degradation and not legacy:
             im = linegen.degrade_line(im, alpha=alpha, beta=beta)
@@ -404,7 +483,7 @@ def line_generator(ctx, font, maxlines, encoding, normalization, renormalize,
                 fp.write(get_display(line).encode('utf-8'))
             else:
                 fp.write(line.encode('utf-8'))
-    message(u'\b\u2713', fg='green', nl=False)
+    message('\b\u2713', fg='green', nl=False)
     message('\033[?25h\n', nl=False)
 
 

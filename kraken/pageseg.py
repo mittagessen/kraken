@@ -14,20 +14,22 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
 # or implied. See the License for the specific language governing
 # permissions and limitations under the License.
+"""
+kraken.pageseg
+~~~~~~~~~~~~~~
 
+Layout analysis and script detection methods.
+"""
 
 from __future__ import absolute_import, division, print_function
-from builtins import str
-from builtins import range
-from builtins import object
+
+from itertools import groupby
 
 import json
 import logging
 import numpy as np
 import pkg_resources
 
-from future.utils import PY2
-from itertools import groupby
 from scipy.ndimage.filters import (gaussian_filter, uniform_filter,
                                    maximum_filter)
 
@@ -44,6 +46,9 @@ __all__ = ['segment', 'detect_scripts']
 logger = logging.getLogger(__name__)
 
 class record(object):
+    """
+    Simple dict-like object.
+    """
     def __init__(self, **kw):
         self.__dict__.update(kw)
 
@@ -55,12 +60,18 @@ def find(condition):
 
 
 def binary_objects(binary):
-    labels, n = morph.label(binary)
+    """
+    Labels features in an array and segments them into objects.
+    """
+    labels, _ = morph.label(binary)
     objects = morph.find_objects(labels)
     return objects
 
 
 def estimate_scale(binary):
+    """
+    Estimates image scale based on number of connected components.
+    """
     objects = binary_objects(binary)
     bysize = sorted(objects, key=sl.area)
     scalemap = np.zeros(binary.shape)
@@ -73,6 +84,9 @@ def estimate_scale(binary):
 
 
 def compute_boxmap(binary, scale, threshold=(.5, 4), dtype='i'):
+    """
+    Returns grapheme cluster-like boxes based on connected components.
+    """
     objects = binary_objects(binary)
     bysize = sorted(objects, key=sl.area)
     boxmap = np.zeros(binary.shape, dtype)
@@ -117,22 +131,23 @@ def reading_order(lines, text_direction='lr'):
 
     order = np.zeros((len(lines), len(lines)), 'B')
 
-    def x_overlaps(u, v):
+    def _x_overlaps(u, v):
         return u[1].start < v[1].stop and u[1].stop > v[1].start
 
-    def above(u, v):
+    def _above(u, v):
         return u[0].start < v[0].start
 
-    def left_of(u, v):
+    def _left_of(u, v):
         return u[1].stop < v[1].start
 
-    def separates(w, u, v):
+    def _separates(w, u, v):
         if w[0].stop < min(u[0].start, v[0].start):
             return 0
         if w[0].start > max(u[0].stop, v[0].stop):
             return 0
         if w[1].start < u[1].stop and w[1].stop > v[1].start:
             return 1
+        return 0
 
     if text_direction == 'rl':
         horizontal_order = lambda u, v: not left_of(u, v)
@@ -141,8 +156,8 @@ def reading_order(lines, text_direction='lr'):
 
     for i, u in enumerate(lines):
         for j, v in enumerate(lines):
-            if x_overlaps(u, v):
-                if above(u, v):
+            if _x_overlaps(u, v):
+                if _above(u, v):
                     order[i, j] = 1
             else:
                 if [w for w in lines if separates(w, u, v)] == []:
@@ -160,18 +175,18 @@ def topsort(order):
     visited = np.zeros(n)
     L = []
 
-    def visit(k):
+    def _visit(k):
         if visited[k]:
             return
         visited[k] = 1
         a, = np.nonzero(np.ravel(order[:, k]))
         for l in a:
-            visit(l)
+            _visit(l)
         L.append(k)
 
     for k in range(n):
-        visit(k)
-    return L    # [::-1]
+        _visit(k)
+    return L
 
 
 def compute_separators_morph(binary, scale, sepwiden=10, maxcolseps=2):
@@ -200,8 +215,6 @@ def compute_colseps_conv(binary, scale=1.0, minheight=10, maxcolseps=2):
         Separators
     """
     logger.debug(u'Finding column separators')
-
-    h, w = binary.shape
     # find vertical whitespace by thresholding
     smoothed = gaussian_filter(1.0*binary, (scale, scale*0.5))
     smoothed = uniform_filter(smoothed, (5.0*scale, 1))
@@ -252,6 +265,9 @@ def compute_white_colseps(binary, scale, maxcolseps):
 
 
 def norm_max(v):
+    """
+    Normalizes the input array by maximum value.
+    """
     return v/np.amax(v)
 
 
@@ -338,14 +354,17 @@ def remove_hlines(binary, scale, maxsize=10):
 
 
 def rotate_lines(lines, angle, offset):
+    """
+    Rotates line bounding boxes around the origin and adding and offset.
+    """
     logger.debug(u'Rotate line coordinates by {} with offset {}'.format(angle, offset))
     angle = np.radians(angle)
     r = np.array([[np.cos(angle), -np.sin(angle)], [np.sin(angle), np.cos(angle)]])
     p = np.array(lines).reshape((-1, 2))
     offset = np.array([2*offset])
     p = p.dot(r).reshape((-1, 4)).astype(int) + offset
-    x = np.sort(p[:,[0,2]])
-    y = np.sort(p[:,[1,3]])
+    x = np.sort(p[:, [0, 2]])
+    y = np.sort(p[:, [1, 3]])
     return np.column_stack((x.flatten(), y.flatten())).reshape(-1, 4)
 
 
@@ -414,6 +433,7 @@ def segment(im, text_direction='horizontal-lr', scale=None, maxcolseps=2,
     if no_hlines:
         binary = remove_hlines(binary, scale)
     # emptyish images wll cause exceptions here.
+
     try:
         if black_colseps:
             colseps, binary = compute_black_colseps(binary, scale, maxcolseps)
@@ -461,20 +481,15 @@ def detect_scripts(im, bounds, model=None, valid_scripts=None):
         of a single line. Script is a ISO15924 4 character identifier.
 
     Raises:
-        KrakenInputException if the input image is not binarized or the text
-        direction is invalid.
         KrakenInvalidModelException if no clstm module is available.
     """
     im_str = get_im_str(im)
     logger.info(u'Detecting scripts with {} in {} lines on {}'.format(model, len(bounds['boxes']), im_str))
     if not model:
-        model = pkg_resources.resource_filename(__name__, 'script.clstm')
+        model = pkg_resources.resource_filename(__name__, 'script.mlmodel')
         logger.debug(u'No model given. Loading default {}'.format(model))
-        # resource_filename returns byte strings on python2 and str on python3
-        if PY2:
-            model = model.decode('utf-8')
     logger.debug(u'Loading detection model')
-    rnn = models.load_clstm(model)
+    rnn = models.load_any(model)
     # load numerical to 4 char identifier map
     logger.debug(u'Loading label to identifier map')
     with pkg_resources.resource_stream(__name__, 'iso15924.json') as fp:
@@ -493,7 +508,7 @@ def detect_scripts(im, bounds, model=None, valid_scripts=None):
     logger.debug(u'Running detection')
     for pred, bbox in zip(it, bounds['boxes']):
         # substitute inherited scripts with neighboring runs
-        def subs(m, s, r=False):
+        def _subs(m, s):
             p = u''
             for c in s:
                 if c in m and p and not r:
@@ -517,6 +532,7 @@ def detect_scripts(im, bounds, model=None, valid_scripts=None):
         # next merge adjacent scripts
         if val_scripts:
             pred.prediction = subs(val_scripts, pred.prediction, r=True)
+
         # group by grapheme
         t = []
         logger.debug(u'Merging detections')

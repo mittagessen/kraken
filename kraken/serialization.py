@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 
 __all__ = ['serialize']
 
+
 def _rescale(val, low, high):
     """
     Rescales a list of confidence value between 0 and 1 to an interval [low,

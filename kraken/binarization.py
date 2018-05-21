@@ -14,6 +14,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
 # or implied. See the License for the specific language governing
 # permissions and limitations under the License.
+"""
+kraken.binarization
+~~~~~~~~~~~~~~~~~~~
+
+An adaptive binarization algorithm.
+"""
 
 from __future__ import absolute_import, division, print_function
 from future import standard_library
@@ -27,10 +33,14 @@ import logging
 import numpy as np
 
 from kraken.lib.util import pil2array, array2pil, is_bitonal, get_im_str
-from kraken.lib.exceptions import KrakenInputException
 from scipy.ndimage import filters, interpolation, morphology
 
+from kraken.lib.exceptions import KrakenInputException
+
+__all__ = ['is_bitonal', 'nlbin']
+
 logger = logging.getLogger(__name__)
+
 
 def nlbin(im, threshold=0.5, zoom=0.5, escale=1.0, border=0.1, perc=80,
           range=20, low=5, high=90):
