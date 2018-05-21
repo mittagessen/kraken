@@ -130,8 +130,6 @@ def compute_error(model, test_set):
     error = 0
     for im, text in test_set:
         pred = model.predict_string(im)
-        print('line {}'.format(pred))
-        print('text: {}'.format(text))
         total_chars += len(text)
         error += _fast_levenshtein(pred, text)
     return total_chars, error

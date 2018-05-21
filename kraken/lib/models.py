@@ -64,7 +64,6 @@ class TorchSeqRecognizer(object):
         """
         o = self.forward(line)
         locs = self.decoder(o)
-        print(locs)
         return self.codec.decode(locs)
 
     def predict_string(self, line):
