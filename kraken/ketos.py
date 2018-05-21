@@ -161,8 +161,7 @@ def train(ctx, pad, output, spec, load, savefreq, report, epochs, device,
     message('\b\u2713', fg='green', nl=False)
     message('\033[?25h\n', nl=False)
 
-    if ctx.meta['verbose'] > 1:
-        click.echo(u'[{:2.4f}] Encoding training set'.format(time.time() - st_time, im))
+    logger.debug('Encoding training set')
 
     # use codec in model if loading existing one
     if not load:

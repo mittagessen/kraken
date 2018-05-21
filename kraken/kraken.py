@@ -75,7 +75,7 @@ def binarizer(threshold, zoom, escale, border, perc, range, low, high, base_imag
                                  low, high)
         res.save(output, format='png')
     except Exception:
-        click.secho('\u2717', fg='red')
+        message('\u2717', fg='red')
         raise
     message('\u2713', fg='green')
 
@@ -93,7 +93,7 @@ def segmenter(text_direction, script_detect, allowed_scripts, scale,
         if script_detect:
             res = pageseg.detect_scripts(im, res, valid_scripts=allowed_scripts)
     except Exception:
-        click.secho('\u2717', fg='red')
+        message('\u2717', fg='red')
         raise
     with open_file(output, 'w') as fp:
         json.dump(res, fp)
