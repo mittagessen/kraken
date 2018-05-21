@@ -226,18 +226,19 @@ def train(ctx, pad, output, spec, load, savefreq, report, epochs, device,
             if ctx.meta['verbose'] < 3:
                 click.echo('')
             click.echo(u'[{:2.4f}] Accuracy report ({}) {:0.4f} {} {}'.format(time.time() - st_time, epoch, (c-e)/c, c, e))
-        for trial, (input, target) in enumerate(train_loader):
-            input = input.requires_grad_()
-            o = nn.nn(input)
-            # height should be 1 by now
-            if o.size(2) != 1:
-                raise KrakenInputException('Expected dimension 3 to be 1, actual {}'.format(output.size()))
-            o = o.squeeze(2)
-            optim.zero_grad()
-            loss = nn.criterion(o, target)
-            loss.backward()
-            optim.step()
-            spin('Training')
+        with click.progressbar(label='epoch {}/{}'.format(epoch, epochs) , length=len(train_loader), show_pos=True) as bar:
+            for trial, (input, target) in enumerate(train_loader):
+                input = input.requires_grad_()
+                o = nn.nn(input)
+                # height should be 1 by now
+                if o.size(2) != 1:
+                    raise KrakenInputException('Expected dimension 3 to be 1, actual {}'.format(output.size()))
+                o = o.squeeze(2)
+                optim.zero_grad()
+                loss = nn.criterion(o, target)
+                loss.backward()
+                optim.step()
+                bar.update(1)
 
 
 @cli.command('extract')
