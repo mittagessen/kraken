@@ -46,7 +46,6 @@ from kraken import pageseg
 from kraken import transcribe
 from kraken import binarization
 from kraken.lib import models, vgsl
-from kraken.train import GroundTruthContainer, compute_error
 from kraken.lib.dataset import GroundTruthDataset, compute_error, generate_input_transforms
 from kraken.lib.exceptions import KrakenCairoSurfaceException
 from kraken.lib.exceptions import KrakenInputException
@@ -75,7 +74,6 @@ def message(msg, **styles):
 def cli(verbose):
     ctx = click.get_current_context()
     log.set_logger(logger, level=30-10*verbose)
-    ctx.meta['verbose'] = verbose
 
 
 @cli.command('train')
@@ -156,7 +154,7 @@ def train(ctx, pad, output, spec, load, savefreq, report, epochs, device,
             k = unicodedata.name(k)
         else:
             k = '\t' + k
-        logger.info(u'{}\t{}'.format(time.time() - st_time, k, v))
+        logger.info(u'{}\t{}'.format(k, v))
 
     message('\b\u2713', fg='green', nl=False)
     message('\033[?25h\n', nl=False)
@@ -264,8 +262,6 @@ def extract(ctx, binarize, normalization, reorder, rotate, output,
             td = 'horizontal-lr'
         else:
             td = td.attrib['content']
-        else:
-            td = 'horizontal-tb'
 
         im = None
         for section in doc.xpath('//section'):
@@ -415,7 +411,6 @@ def line_generator(ctx, font, maxlines, encoding, normalization, renormalize,
     lines = set()
     if not text:
         return
-    st_time = time.time()
     for t in text:
         with click.open_file(t, encoding=encoding) as fp:
             logger.info('Reading {}'.format(t))

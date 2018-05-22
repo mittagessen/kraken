@@ -153,8 +153,7 @@ def recognizer(model, pad, bidi_reordering, script_ignore, base_image, input, ou
                                              ctx.meta['mode']))
         else:
             fp.write('\n'.join(s.prediction for s in preds))
-        if not ctx.meta['verbose']:
-            message('\u2713', fg='green')
+        message('\u2713', fg='green')
 
 
 @click.group(chain=True)
@@ -172,7 +171,6 @@ def cli(input, verbose):
     """
     ctx = click.get_current_context()
     log.set_logger(logger, level=30-10*verbose)
-    ctx.meta['verbose'] = verbose
 
 
 @cli.resultcallback()
