@@ -44,6 +44,9 @@ class PytorchCodec(object):
         key string will be mapped to the value sequence of integers. In the
         first two cases labels will be assigned automatically.
 
+        As 0 is the blank label in a CTC output layer, output labels and input
+        dictionaries are/should be 1-indexed.
+
         Args:
             charset (unicode, list, dict): Input character set.
         """
@@ -115,9 +118,9 @@ class PytorchCodec(object):
         idx = 0
         for i in splits:
             decoded.extend([(c, s, e, u) for c, s, e, u in zip(self.l2c[i],
-                                                               len(i) * [start[idx]],
-                                                               len(i) * [end[idx + len(i) - 1]],
-                                                               len(i) * [np.mean(con[idx:idx + len(i)])])])
+                                                               len(self.l2c[i]) * [start[idx]],
+                                                               len(self.l2c[i]) * [end[idx + len(i) - 1]],
+                                                               len(self.l2c[i]) * [np.mean(con[idx:idx + len(i)])])])
             idx += len(i)
         return decoded
 
