@@ -20,9 +20,6 @@ kraken.pageseg
 
 Layout analysis and script detection methods.
 """
-
-from __future__ import absolute_import, division, print_function
-
 from itertools import groupby
 
 import json

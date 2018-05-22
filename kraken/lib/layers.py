@@ -1,7 +1,6 @@
 """
 Layers for VGSL models
 """
-
 import torch
 import numpy as np
 

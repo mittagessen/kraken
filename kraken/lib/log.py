@@ -19,11 +19,6 @@ kraken.lib.log
 
 Handlers and formatters for logging.
 """
-
-from future import standard_library
-standard_library.install_aliases()
-from builtins import str
-
 import time
 import click
 import logging

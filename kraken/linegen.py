@@ -30,9 +30,6 @@ Line degradation uses a local model described in [1].
 ine Intelligence 22.11 (2000): 1209-1223.
 
 """
-
-from __future__ import absolute_import, division, print_function
-
 import ctypes.util
 import ctypes
 

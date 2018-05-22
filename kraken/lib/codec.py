@@ -18,7 +18,6 @@
 pytorch compatible codec with many-to-many mapping between labels and
 graphemes.
 """
-
 import regex
 import numpy as np
 

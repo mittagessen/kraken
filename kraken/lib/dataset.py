@@ -16,10 +16,6 @@
 """
 Utility functions for data loading and training of VGSL networks.
 """
-
-from __future__ import absolute_import, division, print_function
-from __future__ import unicode_literals
-
 import os
 import click
 import unicodedata

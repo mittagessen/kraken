@@ -5,9 +5,6 @@ kraken.lib.models
 Wrapper around TorchVGSLModel including a variety of forward pass helpers for
 sequence classification.
 """
-
-from __future__ import absolute_import
-
 from os.path import expandvars, expanduser, abspath
 
 import kraken.lib.lineest

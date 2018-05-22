@@ -19,8 +19,6 @@ kraken.rpred
 
 Generators for recognition on lines images.
 """
-from __future__ import absolute_import, division, print_function
-
 import logging
 import numpy as np
 import bidi.algorithm as bd

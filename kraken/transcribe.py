@@ -16,9 +16,6 @@
 """
 Utility functions for ground truth transcription.
 """
-
-from __future__ import absolute_import, division, print_function
-
 from kraken.serialization import max_bbox
 from kraken.lib.exceptions import KrakenInputException
 from kraken.lib.util import get_im_str

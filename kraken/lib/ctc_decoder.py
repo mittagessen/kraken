@@ -17,7 +17,6 @@
 """
 Decoders for softmax outputs of CTC trained networks.
 """
-
 import numpy as np
 
 from scipy.ndimage import measurements
