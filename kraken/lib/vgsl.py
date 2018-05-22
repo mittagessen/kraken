@@ -9,6 +9,7 @@ import sys
 import json
 import gzip
 import torch
+import logging
 
 import kraken.lib.lstm
 
@@ -28,6 +29,8 @@ from coremltools.models.neural_network import NeuralNetworkBuilder
 # an LSTM will be put into C same as the filters of a CNN.
 
 __all__ = ['TorchVGSLModel']
+
+logger = logging.getLogger(__name__)
 
 
 class TorchVGSLModel(object):
@@ -114,6 +117,7 @@ class TorchVGSLModel(object):
         input = [batch, channels, height, width]
         self.input = tuple(input)
         self.nn = torch.nn.Sequential()
+        logger.debug('layer\t\ttype')
         for block in blocks:
             oshape = None
             layer = None
@@ -497,6 +501,7 @@ class TorchVGSLModel(object):
             legacy = 'ocropy'
         hidden = int(m.group(7))
         l = layers.TransposedSummarizingRNN(input[1], hidden, direction, dim, summarize, legacy)
+        logger.debug('{}\t\tRNN direction {} transposed {} summarize {} out {} legacy {}'.format(self.idx+1, direction, dim, summarize, hidden, legacy))
         return l.get_shape(input), self.get_layer_name(type, m.group('name')), l
 
     def build_dropout(self, input, block):
@@ -506,6 +511,7 @@ class TorchVGSLModel(object):
             return None, None, None
         else:
             l = layers.Dropout(float(m.group('p')), int(m.group('dim')))
+            logger.debug('{}\t\tdropout probability {} dims {}'.format(self.idx+1, m.group('p'), m.group('dim')))
             return l.get_shape(input), self.get_layer_name(m.group('type'), m.group('name')), l
 
     def build_conv(self, input, block):
@@ -520,6 +526,7 @@ class TorchVGSLModel(object):
         filters = int(m.group('out'))
         nl = m.group('nl')
         fn = layers.ActConv2D(input[1], filters, kernel_size, nl)
+        logger.debug('{}\t\tconv kernel {} filters {} activation {}'.format(self.idx+1, 'x'.join(kernel_size), filters, nl))
         return fn.get_shape(input), self.get_layer_name(m.group('type'), m.group('name')), fn
 
     def build_maxpool(self, input, block):
@@ -534,6 +541,7 @@ class TorchVGSLModel(object):
         stride = (kernel_size[0] if not m.group(5) else int(m.group(5)),
                   kernel_size[1] if not m.group(6) else int(m.group(6)))
         fn = layers.MaxPool(kernel_size, stride)
+        logger.debug('{}\t\tMaxpool'.format(self.idx+1))
         return fn.get_shape(input), self.get_layer_name(m.group('type'), m.group('name')), fn
 
     def build_output(self, input, block):
@@ -551,6 +559,7 @@ class TorchVGSLModel(object):
             raise ValueError('only softmax and ctc supported in output')
         if nl == 'c':
             self.criterion = CTCCriterion()
-        lin = layers.LinSoftmax(input[1], int(m.group('out')), True if m.group('aug') else False)
-
+        aug = True if m.group('aug') else False
+        lin = layers.LinSoftmax(input[1], int(m.group('out')), aug)
+        logger.debug('{}\t\tlinear augmented {} out {}'.format(self.idx+1, aug, m.group('out')))
         return lin.get_shape(input), self.get_layer_name(m.group(1), m.group('name')), lin
