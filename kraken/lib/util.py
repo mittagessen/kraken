@@ -1,13 +1,9 @@
 """
 Ocropus's magic PIL-numpy array conversion routines. They express slightly
-different behavior from PIL.Image.toarray() but the reason is rather
-mysterious.
+different behavior from PIL.Image.toarray().
 """
 
 from __future__ import absolute_import, division, print_function
-from future import standard_library
-from future.utils import PY2
-standard_library.install_aliases()
 
 import numpy as np
 
@@ -17,21 +13,9 @@ __all__ = ['pil2array', 'array2pil']
 
 
 def pil2array(im, alpha=0):
-    if im.mode == "L":
-        a = np.fromstring(im.tobytes(), 'B')
-        a.shape = im.size[1], im.size[0]
-        return a
-    if im.mode == "RGB":
-        a = np.fromstring(im.tobytes(), 'B')
-        a.shape = im.size[1], im.size[0], 3
-        return a
-    if im.mode == "RGBA":
-        a = np.fromstring(im.tobytes(), 'B')
-        a.shape = im.size[1], im.size[0], 4
-        if not alpha:
-            a = a[:, :, :3]
-        return a
-    return pil2array(im.convert("L"))
+    if im.mode == '1':
+        return np.array(im.convert('L'))
+    return np.array(im)
 
 
 def array2pil(a):
@@ -49,6 +33,7 @@ def array2pil(a):
     else:
         raise Exception("unknown image type")
 
+
 def is_bitonal(im):
     """
     Tests a PIL.Image for bitonality.
@@ -60,14 +45,8 @@ def is_bitonal(im):
         True if the image contains only two different color values. False
         otherwise.
     """
-    if im.getcolors(2):
-        return True
-    else:
-        return False
+    return im.getcolors(2) is not None
+
 
 def get_im_str(im):
-    if PY2:
-        return im.filename.decode('utf-8') if hasattr(im, 'filename') else str(im)
-    else:
-        return im.filename if hasattr(im, 'filename') else str(im)
-
+    return im.filename if hasattr(im, 'filename') else str(im)
