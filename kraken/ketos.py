@@ -16,8 +16,6 @@
 
 from __future__ import absolute_import, division, print_function
 
-from builtins import str
-
 import os
 import re
 import time
@@ -36,7 +34,6 @@ from itertools import cycle
 from bidi.algorithm import get_display
 
 from torch.optim import SGD, RMSprop
-from torch.autograd import Variable
 from torch.utils.data import DataLoader
 
 from kraken.lib import log
@@ -73,7 +70,7 @@ def message(msg, **styles):
 @click.option('-v', '--verbose', default=0, count=True)
 def cli(verbose):
     ctx = click.get_current_context()
-    log.set_logger(logger, level=30-10*verbose)
+    log.set_logger(logger, level=30-min(10*verbose, 20))
 
 
 @cli.command('train')
@@ -86,7 +83,7 @@ def cli(verbose):
 @click.option('-F', '--savefreq', default=1, type=click.FLOAT, help='Model save frequency in epochs during training')
 @click.option('-R', '--report', default=1, help='Report creation frequency in epochs')
 @click.option('-N', '--epochs', default=1000, help='Number of epochs to train for')
-@click.option('-d', '--device', default='cpu', help='Select device to use (cpu, gpu:0, gpu:1, ...)')
+@click.option('-d', '--device', default='cpu', help='Select device to use (cpu, cuda:0, cuda:1, ...)')
 @click.option('--optimizer', default='RMSprop', type=click.Choice(['SGD', 'RMSprop']), help='Select optimizer')
 @click.option('-r', '--lrate', default=1e-3, help='Learning rate')
 @click.option('-m', '--momentum', default=0.9, help='Momentum')
@@ -185,6 +182,9 @@ def train(ctx, pad, output, spec, load, savefreq, report, epochs, device,
         # initialize codec
         nn.add_codec(gt_set.codec)
 
+    logger.debug('Moving model to device {}'.format(device))
+    nn.to(device)
+
     message('\b\u2713', fg='green', nl=False)
     message('\033[?25h\n', nl=False)
 
@@ -210,9 +210,12 @@ def train(ctx, pad, output, spec, load, savefreq, report, epochs, device,
             nn.eval()
             c, e = compute_error(rec, test_set.training_set)
             nn.train()
+            logger.info('Accuracy report ({}) {:0.4f} {} {}'.format(epoch, (c-e)/c, c, e))
             message('Accuracy report ({}) {:0.4f} {} {}'.format(epoch, (c-e)/c, c, e))
         with click.progressbar(label='epoch {}/{}'.format(epoch, epochs) , length=len(train_loader), show_pos=True) as bar:
             for trial, (input, target) in enumerate(train_loader):
+                input = input.to(device)
+                target = target.to(device)
                 input = input.requires_grad_()
                 o = nn.nn(input)
                 # height should be 1 by now

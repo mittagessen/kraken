@@ -172,7 +172,7 @@ def cli(input, verbose):
     is set on all subcommands with the `-v` switch.
     """
     ctx = click.get_current_context()
-    log.set_logger(logger, level=30-10*verbose)
+    log.set_logger(logger, level=30-min(10*verbose, 20))
 
 
 @cli.resultcallback()
@@ -230,7 +230,7 @@ def segment(text_direction, script_detect, allowed_scripts, scale, maxcolseps, b
                    scale, maxcolseps, black_colseps, remove_hlines)
 
 
-def validate_mm(ctx, param, value):
+def _validate_mm(ctx, param, value):
     model_dict = {'ignore': []}
     if len(value) == 1 and len(value[0].split(':')) == 1:
         model_dict['default'] = value[0]
@@ -261,9 +261,9 @@ def validate_mm(ctx, param, value):
               help='Reorder code points to logical order')
 @click.option('-h', '--hocr', 'serializer', help='Switch between hOCR, '
               'ALTO, and plain text output', flag_value='hocr')
-@click.option('-a', '--alto', 'serialization', flag_value='alto')
-@click.option('-y', '--abbyy', 'serialization', flag_value='abbyyxml')
-@click.option('-t', '--text', 'serialization', flag_value='text', default=True)
+@click.option('-a', '--alto', 'serializer', flag_value='alto')
+@click.option('-y', '--abbyy', 'serializer', flag_value='abbyyxml')
+@click.option('-t', '--text', 'serializer', flag_value='text', default=True)
 @click.option('-d', '--text-direction', default='horizontal-tb',
               type=click.Choice(['horizontal-tb', 'vertical-lr', 'vertical-rl']),
               help='Sets principal text direction in serialization output')
