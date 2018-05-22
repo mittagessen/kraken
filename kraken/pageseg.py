@@ -150,9 +150,9 @@ def reading_order(lines, text_direction='lr'):
         return 0
 
     if text_direction == 'rl':
-        horizontal_order = lambda u, v: not left_of(u, v)
+        horizontal_order = lambda u, v: not _left_of(u, v)
     else:
-        horizontal_order = left_of
+        horizontal_order = _left_of
 
     for i, u in enumerate(lines):
         for j, v in enumerate(lines):
@@ -160,7 +160,7 @@ def reading_order(lines, text_direction='lr'):
                 if _above(u, v):
                     order[i, j] = 1
             else:
-                if [w for w in lines if separates(w, u, v)] == []:
+                if [w for w in lines if _separates(w, u, v)] == []:
                     if horizontal_order(u, v):
                         order[i, j] = 1
     return order

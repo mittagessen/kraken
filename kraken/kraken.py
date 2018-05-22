@@ -60,9 +60,11 @@ def spin(msg):
     if logger.getEffectiveLevel() >= 30:
         click.echo('\r\033[?25l{}\t{}'.format(msg, next(spinner)), nl=False)
 
+
 def message(msg, **styles):
     if logger.getEffectiveLevel() >= 30:
         click.secho(msg, **styles)
+
 
 def binarizer(threshold, zoom, escale, border, perc, range, low, high, base_image, input, output):
     try:

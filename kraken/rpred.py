@@ -27,7 +27,7 @@ import bidi.algorithm as bd
 
 from PIL import Image
 
-from kraken.lib.util import pil2array, array2pil
+from kraken.lib.util import pil2array, array2pil, get_im_str
 from kraken.lib.exceptions import KrakenInputException
 from kraken.lib.dataset import generate_input_transforms
 
