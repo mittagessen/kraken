@@ -133,10 +133,10 @@ class TorchVGSLModel(object):
                 raise ValueError('{} invalid layer definition'.format(block))
         self.output = oshape
 
-    def cuda(self):
-        self.nn.cuda()
+    def to(self, device):
+        self.nn.to(device)
         if self.criterion:
-            self.criterion.cuda()
+            self.criterion.to(device)
 
     def eval(self):
         """

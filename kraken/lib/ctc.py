@@ -201,11 +201,11 @@ class _CTC(Function):
         return _flip_path_probability(prob, input_length, path_length)
 
     def forward(self, xs, t):
-        t = t.numpy()
+        t = t.cpu().numpy()
         # permute to (seq, batch, feat)
         xs = xs.permute(2, 0, 1).detach()
         self.yseq = F.softmax(xs, dim=2).numpy()
-        xs = xs.numpy()
+        xs = xs.cpu().numpy()
         self.input_length = np.full(len(xs[0]), len(xs), dtype=np.int32)
         self.batch_size = len(xs[0])
         label_length = np.full(len(t), t.shape[1], dtype=np.int32)
