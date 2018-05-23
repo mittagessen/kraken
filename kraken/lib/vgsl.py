@@ -505,13 +505,15 @@ class TorchVGSLModel(object):
         return l.get_shape(input), self.get_layer_name(type, m.group('name')), l
 
     def build_dropout(self, input, block):
-        pattern = re.compile(r'(?P<type>Do)(?P<name>{\w+})?(?P<p>(\d+(\.\d*)?|\.\d+)),(?P<dim>\d+)')
+        pattern = re.compile(r'(?P<type>Do)(?P<name>{\w+})?(?P<p>(\d+(\.\d*)?|\.\d+))?(,(?P<dim>\d+))?')
         m = pattern.match(block)
         if not m:
             return None, None, None
         else:
-            l = layers.Dropout(float(m.group('p')), int(m.group('dim')))
-            logger.debug('{}\t\tdropout probability {} dims {}'.format(self.idx+1, m.group('p'), m.group('dim')))
+            prob = float(m.group('p')) if m.group('p') else 0.5
+            dim = int(m.group('dim')) if m.group('dim') else 1
+            l = layers.Dropout(prob, dim)
+            logger.debug('{}\t\tdropout probability {} dims {}'.format(self.idx+1, prob, dim))
             return l.get_shape(input), self.get_layer_name(m.group('type'), m.group('name')), l
 
     def build_conv(self, input, block):
@@ -526,7 +528,7 @@ class TorchVGSLModel(object):
         filters = int(m.group('out'))
         nl = m.group('nl')
         fn = layers.ActConv2D(input[1], filters, kernel_size, nl)
-        logger.debug('{}\t\tconv kernel {} filters {} activation {}'.format(self.idx+1, 'x'.join(kernel_size), filters, nl))
+        logger.debug('{}\t\tconv kernel {} x {} filters {} activation {}'.format(self.idx+1, kernel_size[0], kernel_size[1], filters, nl))
         return fn.get_shape(input), self.get_layer_name(m.group('type'), m.group('name')), fn
 
     def build_maxpool(self, input, block):

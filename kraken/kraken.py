@@ -135,11 +135,9 @@ def recognizer(model, pad, bidi_reordering, script_ignore, base_image, input, ou
 
     preds = []
 
-    for pred in it:
-        spin('Processing')
-        preds.append(pred)
-    message('\b\u2713', fg='green', nl=False)
-    message('\033[?25h\n', nl=False)
+    with log.progressbar(it, label='Processing') as bar:
+        for pred in bar:
+            preds.append(pred)
 
     ctx = click.get_current_context()
     with open_file(output, 'w', encoding='utf-8') as fp:

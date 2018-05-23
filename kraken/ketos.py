@@ -49,13 +49,6 @@ APP_NAME = 'kraken'
 
 logger = logging.getLogger('kraken')
 
-spinner = cycle(['⣾', '⣽', '⣻', '⢿', '⡿', '⣟', '⣯', '⣷'])
-
-
-def spin(msg):
-    if logger.getEffectiveLevel() >= 30:
-        click.echo('\r\033[?25l{}\t{}'.format(msg, next(spinner)), nl=False)
-
 
 def message(msg, **styles):
     if logger.getEffectiveLevel() >= 30:
@@ -121,22 +114,18 @@ def train(ctx, pad, output, spec, load, savefreq, report, epochs, device,
     te_im = ground_truth[int(len(ground_truth) * partition):]
 
     gt_set = GroundTruthDataset(normalization=normalization, reorder=reorder, im_transforms=transforms)
-    for im in tr_im:
-        logger.debug('Adding line {} to training set'.format(im))
-        spin('Building training set')
-        gt_set.add(im)
-    message('\b\u2713', fg='green', nl=False)
-    message('\033[?25h\n', nl=False)
+    with log.progressbar(tr_im, label='Building training set') as bar:
+        for im in bar:
+            logger.debug('Adding line {} to training set'.format(im))
+            gt_set.add(im)
 
     train_loader = DataLoader(gt_set, batch_size=1, shuffle=True)
 
     test_set = GroundTruthDataset(normalization=normalization, reorder=reorder, im_transforms=transforms)
-    for im in te_im:
-        logger.debug('Adding line {} to test set'.format(im))
-        spin('Building test set')
-        test_set.add(im)
-    message('\b\u2713', fg='green', nl=False)
-    message('\033[?25h\n', nl=False)
+    with log.progressbar(te_im, label='Building test set') as bar:
+        for im in bar:
+            logger.debug('Adding line {} to test set'.format(im))
+            test_set.add(im)
 
     logger.info('Training set {} lines, test set {} lines, alphabet {} symbols'.format(len(gt_set._images), len(test_set._images), len(gt_set.alphabet)))
     alpha_diff = set(gt_set.alphabet).symmetric_difference(set(test_set.alphabet))
@@ -150,9 +139,6 @@ def train(ctx, pad, output, spec, load, savefreq, report, epochs, device,
             k = '\t' + k
         logger.info(u'{}\t{}'.format(k, v))
 
-    message('\b\u2713', fg='green', nl=False)
-    message('\033[?25h\n', nl=False)
-
     logger.debug('Encoding training set')
 
     # use codec in model if loading existing one
@@ -163,13 +149,15 @@ def train(ctx, pad, output, spec, load, savefreq, report, epochs, device,
 
     if load:
         logger.info('Loading existing model from {} '.format(load))
-        spin('Loading model')
+        message('Loading model {}'.format(load), nl=False)
 
         nn = vgsl.TorchVGSLModel.load_model(load)
         gt_set.encode(nn.codec)
+        message('\u2713', fg='green', nl=False)
+
     else:
         logger.info('Creating new model {} with {} outputs'.format(spec, gt_set.codec.max_label()+1))
-        spin('Initializing model')
+        message('Initializing model ', nl=False)
 
         # append output definition to spec
         spec = '[{} O1c{}]'.format(spec[1:-1], gt_set.codec.max_label()+1)
@@ -178,12 +166,10 @@ def train(ctx, pad, output, spec, load, savefreq, report, epochs, device,
         nn.init_weights()
         # initialize codec
         nn.add_codec(gt_set.codec)
+        message('\u2713', fg='green')
 
     logger.debug('Moving model to device {}'.format(device))
     nn.to(device)
-
-    message('\b\u2713', fg='green', nl=False)
-    message('\033[?25h\n', nl=False)
 
     logger.debug('Constructing {} optimizer (lr: {}, momentum: {})'.format(optimizer, lrate, momentum))
 
@@ -209,7 +195,7 @@ def train(ctx, pad, output, spec, load, savefreq, report, epochs, device,
             nn.train()
             logger.info('Accuracy report ({}) {:0.4f} {} {}'.format(epoch, (c-e)/c, c, e))
             message('Accuracy report ({}) {:0.4f} {} {}'.format(epoch, (c-e)/c, c, e))
-        with click.progressbar(label='epoch {}/{}'.format(epoch, epochs) , length=len(train_loader), show_pos=True) as bar:
+        with log.progressbar(label='epoch {}/{}'.format(epoch, epochs) , length=len(train_loader), show_pos=True) as bar:
             for trial, (input, target) in enumerate(train_loader):
                 input = input.to(device)
                 target = target.to(device)
@@ -252,48 +238,46 @@ def extract(ctx, binarize, normalization, reorder, rotate, output,
         pass
     idx = 0
     manifest = []
-    for fp in transcriptions:
-        logger.info('Reading {}'.format(fp.name))
-        spin('Reading transcription')
-        doc = html.parse(fp)
-        etree.strip_tags(doc, etree.Comment)
-        td = doc.find(".//meta[@itemprop='text_direction']")
-        if td is None:
-            td = 'horizontal-lr'
-        else:
-            td = td.attrib['content']
+    with log.progressbar(transcriptions, label='Reading transcriptions') as bar:
+        for fp in bar:
+            logger.info('Reading {}'.format(fp.name))
+            doc = html.parse(fp)
+            etree.strip_tags(doc, etree.Comment)
+            td = doc.find(".//meta[@itemprop='text_direction']")
+            if td is None:
+                td = 'horizontal-lr'
+            else:
+                td = td.attrib['content']
 
-        im = None
-        for section in doc.xpath('//section'):
-            img = section.xpath('.//img')[0].get('src')
-            fd = BytesIO(base64.b64decode(img.split(',')[1]))
-            im = Image.open(fd)
-            if not im:
-                logger.info('Skipping {} because image not found'.format(fp.name))
-                break
-            if binarize:
-                im = binarization.nlbin(im)
-            for line in section.iter('li'):
-                if line.get('contenteditable') and (not u''.join(line.itertext()).isspace() or not u''.join(line.itertext())):
-                    l = im.crop([int(x) for x in line.get('data-bbox').split(',')])
-                    if rotate and td.startswith('vertical'):
-                        im.rotate(90, expand=True)
-                    l.save('{}/{:06d}.png'.format(output, idx))
-                    manifest.append('{:06d}.png'.format(idx))
-                    text = u''.join(line.itertext()).strip()
-                    if normalization:
-                        text = unicodedata.normalize(normalization, text)
-                    with open('{}/{:06d}.gt.txt'.format(output, idx), 'wb') as t:
-                        if reorder:
-                            t.write(get_display(text).encode('utf-8'))
-                        else:
-                            t.write(text.encode('utf-8'))
-                    idx += 1
+            im = None
+            for section in doc.xpath('//section'):
+                img = section.xpath('.//img')[0].get('src')
+                fd = BytesIO(base64.b64decode(img.split(',')[1]))
+                im = Image.open(fd)
+                if not im:
+                    logger.info('Skipping {} because image not found'.format(fp.name))
+                    break
+                if binarize:
+                    im = binarization.nlbin(im)
+                for line in section.iter('li'):
+                    if line.get('contenteditable') and (not u''.join(line.itertext()).isspace() or not u''.join(line.itertext())):
+                        l = im.crop([int(x) for x in line.get('data-bbox').split(',')])
+                        if rotate and td.startswith('vertical'):
+                            im.rotate(90, expand=True)
+                        l.save('{}/{:06d}.png'.format(output, idx))
+                        manifest.append('{:06d}.png'.format(idx))
+                        text = u''.join(line.itertext()).strip()
+                        if normalization:
+                            text = unicodedata.normalize(normalization, text)
+                        with open('{}/{:06d}.gt.txt'.format(output, idx), 'wb') as t:
+                            if reorder:
+                                t.write(get_display(text).encode('utf-8'))
+                            else:
+                                t.write(text.encode('utf-8'))
+                        idx += 1
     logger.info('Extracted {} lines'.format(idx))
     with open('{}/manifest.txt'.format(output), 'w') as fp:
         fp.write('\n'.join(manifest))
-    message('\b\u2713', fg='green', nl=False)
-    message('\033[?25h\n', nl=False)
 
 
 @cli.command('transcribe')
@@ -321,43 +305,37 @@ def transcription(ctx, text_direction, scale, bw, maxcolseps,
 
     if prefill:
         logger.info('Loading model {}'.format(prefill))
-        spin('Loading RNN')
+        message('Loading RNN', nl=False)
         prefill = models.load_any(prefill)
-        message('\b\u2713', fg='green', nl=False)
-        message('\033[?25h\n', nl=False)
+        message('\u2713', fg='green')
 
-    for fp in images:
-        logger.info('Reading {}'.format(fp.name))
-        spin('Reading images')
-        im = Image.open(fp)
-        im_bin = im
-        if not is_bitonal(im):
-            logger.info('Binarizing page')
-            im_bin = binarization.nlbin(im)
-        logger.info('Segmenting page')
-        if bw:
-            im = im_bin
-        res = pageseg.segment(im_bin, text_direction, scale, maxcolseps, black_colseps)
-        if prefill:
-            it = rpred.rpred(prefill, im_bin, res)
-            preds = []
-            for pred in it:
-                logger.info('{}'.format(pred.prediction))
-                spin('Recognizing')
-                preds.append(pred)
-            message('\b\u2713', fg='green', nl=False)
-            message('\033[?25h\n', nl=False)
-            ti.add_page(im, res, records=preds)
-        else:
-            ti.add_page(im, res)
-        fp.close()
-    message('\b\u2713', fg='green', nl=False)
-    message('\033[?25h\n', nl=False)
+    with log.progressbar(images, label='Reading images') as bar:
+        for fp in bar:
+            logger.info('Reading {}'.format(fp.name))
+            im = Image.open(fp)
+            im_bin = im
+            if not is_bitonal(im):
+                logger.info('Binarizing page')
+                im_bin = binarization.nlbin(im)
+            logger.info('Segmenting page')
+            if bw:
+                im = im_bin
+            res = pageseg.segment(im_bin, text_direction, scale, maxcolseps, black_colseps)
+            if prefill:
+                it = rpred.rpred(prefill, im_bin, res)
+                preds = []
+                logger.info('Recognizing')
+                for pred in it:
+                    logger.debug('{}'.format(pred.prediction))
+                    preds.append(pred)
+                ti.add_page(im, res, records=preds)
+            else:
+                ti.add_page(im, res)
+            fp.close()
     logger.info('Writing transcription to {}'.format(output.name))
-    spin('Writing output')
+    message('Writing output', nl=False)
     ti.write(output)
-    message('\b\u2713', fg='green', nl=False)
-    message('\033[?25h\n', nl=False)
+    message('\u2713', fg='green')
 
 
 @cli.command('linegen')
@@ -411,12 +389,12 @@ def line_generator(ctx, font, maxlines, encoding, normalization, renormalize,
     lines = set()
     if not text:
         return
-    for t in text:
-        with click.open_file(t, encoding=encoding) as fp:
-            logger.info('Reading {}'.format(t))
-            spin('Reading texts')
-            for l in fp:
-                lines.add(l.rstrip('\r\n'))
+    with log.progressbar(text, label='Reading texts') as bar:
+        for t in text:
+            with click.open_file(t, encoding=encoding) as fp:
+                logger.info('Reading {}'.format(t))
+                for l in fp:
+                    lines.add(l.rstrip('\r\n'))
     if normalization:
         lines = set([unicodedata.normalize(normalization, line) for line in lines])
     if strip:
@@ -424,8 +402,6 @@ def line_generator(ctx, font, maxlines, encoding, normalization, renormalize,
     if max_length:
         lines = set([line for line in lines if len(line) < max_length])
     logger.info('Read {} lines'.format(len(lines)))
-    message('\b\u2713', fg='green', nl=False)
-    message('\033[?25h\n', nl=False)
     message('Read {} unique lines'.format(len(lines)))
     if maxlines and maxlines < len(lines):
         message('Sampling {} lines\t'.format(maxlines), nl=False)
@@ -454,31 +430,28 @@ def line_generator(ctx, font, maxlines, encoding, normalization, renormalize,
     if combining:
         message('Combining Characters: {}'.format(', '.join(combining)))
     lg = linegen.LineGenerator(font, font_size, font_weight, language)
-    for idx, line in enumerate(lines):
-        logger.info(line)
-        spin('Writing images')
-        try:
-            if renormalize:
-                im = lg.render_line(unicodedata.normalize(renormalize, line))
-            else:
-                im = lg.render_line(line)
-        except KrakenCairoSurfaceException as e:
-            logger.info('{}: {} {}'.format(e.message, e.width, e.height))
-            message('\b\u2717', fg='red')
-            continue
-        if not disable_degradation and not legacy:
-            im = linegen.degrade_line(im, alpha=alpha, beta=beta)
-            im = linegen.distort_line(im, abs(np.random.normal(distort)), abs(np.random.normal(distortion_sigma)))
-        elif legacy:
-            im = linegen.ocropy_degrade(im)
-        im.save('{}/{:06d}.png'.format(output, idx))
-        with open('{}/{:06d}.gt.txt'.format(output, idx), 'wb') as fp:
-            if reorder:
-                fp.write(get_display(line).encode('utf-8'))
-            else:
-                fp.write(line.encode('utf-8'))
-    message('\b\u2713', fg='green', nl=False)
-    message('\033[?25h\n', nl=False)
+    with log.progressbar(lines, label='Writing images') as bar:
+        for idx, line in enumerate(bar):
+            logger.info(line)
+            try:
+                if renormalize:
+                    im = lg.render_line(unicodedata.normalize(renormalize, line))
+                else:
+                    im = lg.render_line(line)
+            except KrakenCairoSurfaceException as e:
+                logger.info('{}: {} {}'.format(e.message, e.width, e.height))
+                continue
+            if not disable_degradation and not legacy:
+                im = linegen.degrade_line(im, alpha=alpha, beta=beta)
+                im = linegen.distort_line(im, abs(np.random.normal(distort)), abs(np.random.normal(distortion_sigma)))
+            elif legacy:
+                im = linegen.ocropy_degrade(im)
+            im.save('{}/{:06d}.png'.format(output, idx))
+            with open('{}/{:06d}.gt.txt'.format(output, idx), 'wb') as fp:
+                if reorder:
+                    fp.write(get_display(line).encode('utf-8'))
+                else:
+                    fp.write(line.encode('utf-8'))
 
 
 if __name__ == '__main__':
