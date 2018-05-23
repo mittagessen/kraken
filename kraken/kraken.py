@@ -135,7 +135,7 @@ def recognizer(model, pad, bidi_reordering, script_ignore, base_image, input, ou
 
     preds = []
 
-    with log.progressbar(it, label='Processing') as bar:
+    with log.progressbar(it, label='Processing', length=len(bounds['boxes'])) as bar:
         for pred in bar:
             preds.append(pred)
 
