@@ -68,7 +68,7 @@ def cli(verbose):
 @click.option('-p', '--pad', type=click.INT, default=16, help='Left and right '
               'padding around lines')
 @click.option('-o', '--output', type=click.Path(), default='model', help='Output model file')
-@click.option('-s', '--spec', default='[1,1,0,48 Lbx100]', help='VGSL spec of the network to train. CTC layer will be added automatically.')
+@click.option('-s', '--spec', default='[1,1,0,48 Lbx100 Do]', help='VGSL spec of the network to train. CTC layer will be added automatically.')
 @click.option('-i', '--load', type=click.Path(exists=True, readable=True), help='Load existing file to continue training')
 @click.option('-F', '--savefreq', default=1, type=click.FLOAT, help='Model save frequency in epochs during training')
 @click.option('-R', '--report', default=1, help='Report creation frequency in epochs')
@@ -197,6 +197,7 @@ def train(ctx, pad, output, spec, load, savefreq, report, epochs, device,
             message('Accuracy report ({}) {:0.4f} {} {}'.format(epoch, (c-e)/c, c, e))
         with log.progressbar(label='epoch {}/{}'.format(epoch, epochs) , length=len(train_loader), show_pos=True) as bar:
             for trial, (input, target) in enumerate(train_loader):
+                logger.debug('batch {}'.format(trial))
                 input = input.to(device)
                 target = target.to(device)
                 input = input.requires_grad_()
