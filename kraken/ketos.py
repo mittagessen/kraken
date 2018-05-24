@@ -90,10 +90,11 @@ def _validate_manifests(ctx, param, value):
 @click.option('-n', '--reorder/--no-reorder', default=True, help='Reordering of code points to display order')
 @click.option('-t', '--training-files', default=None, multiple=True, callback=_validate_manifests, type=click.File(mode='r', lazy=True), help='File(s) with additional paths to training data')
 @click.option('-e', '--evaluation-files', default=None, multiple=True, callback=_validate_manifests, type=click.File(mode='r', lazy=True), help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
+@click.option('--preload/--disable-preload', default=None, help='Hard enable/disable for training data preloading')
 @click.argument('ground_truth', nargs=-1, type=click.Path(exists=True, dir_okay=False))
 def train(ctx, pad, output, spec, load, savefreq, report, epochs, device,
           optimizer, lrate, momentum, partition, normalization, codec, reorder,
-          training_files, evaluation_files, ground_truth):
+          training_files, evaluation_files, preload, ground_truth):
     """
     Trains a model from image-text pairs.
     """
@@ -102,16 +103,28 @@ def train(ctx, pad, output, spec, load, savefreq, report, epochs, device,
     if load and codec:
         raise click.BadOptionUsage('codec', 'codec option is not supported when loading model')
 
+    # load model if given. if a new model has to be created we need to do that
+    # after data set initialization, otherwise to output size is still unknown.
+    nn = None
+    if load:
+        logger.info('Loading existing model from {} '.format(load))
+        message('Loading model {}'.format(load), nl=False)
+        nn = vgsl.TorchVGSLModel.load_model(load)
+        message('\u2713', fg='green', nl=False)
+
     # preparse input sizes from vgsl string to seed ground truth data set
     # sizes and dimension ordering.
-    spec = spec.strip()
-    if spec[0] != '[' or spec[-1] != ']':
-        raise click.BadOptionUsage('VGSL spec {} not bracketed'.format(spec))
-    blocks = spec[1:-1].split(' ')
-    m = re.match(r'(\d+),(\d+),(\d+),(\d+)', blocks[0])
-    if not m:
-        raise click.BadOptionUsage('Invalid input spec {}'.format(blocks[0]))
-    batch, height, width, channels = [int(x) for x in m.groups()]
+    if not nn:
+        spec = spec.strip()
+        if spec[0] != '[' or spec[-1] != ']':
+            raise click.BadOptionUsage('VGSL spec {} not bracketed'.format(spec))
+        blocks = spec[1:-1].split(' ')
+        m = re.match(r'(\d+),(\d+),(\d+),(\d+)', blocks[0])
+        if not m:
+            raise click.BadOptionUsage('Invalid input spec {}'.format(blocks[0]))
+        batch, height, width, channels = [int(x) for x in m.groups()]
+    else:
+        batch, channels, height, width = nn.input
     try:
         transforms = generate_input_transforms(batch, height, width, channels, pad)
     except KrakenInputException as e:
@@ -127,6 +140,14 @@ def train(ctx, pad, output, spec, load, savefreq, report, epochs, device,
         ground_truth.extend(training_files)
 
     np.random.shuffle(ground_truth)
+
+    if len(ground_truth) > 2500 and not preload:
+        logger.info('Disabling preloading for large (>2500) training data set. Enable by setting --preload parameter')
+        preload = False
+    # implicit preloading enabled for small data sets
+    if preload is None:
+        preload = True
+
     tr_im = ground_truth[:int(len(ground_truth) * partition)]
     if evaluation_files:
         logger.debug('Using {} lines from explicit eval set'.format(len(evaluation_files)))
@@ -135,15 +156,20 @@ def train(ctx, pad, output, spec, load, savefreq, report, epochs, device,
         te_im = ground_truth[int(len(ground_truth) * partition):]
         logger.debug('Taking {} lines from training for evaluation'.format(len(te_im)))
 
-    gt_set = GroundTruthDataset(normalization=normalization, reorder=reorder, im_transforms=transforms)
+    gt_set = GroundTruthDataset(normalization=normalization, reorder=reorder, im_transforms=transforms, preload=preload)
     with log.progressbar(tr_im, label='Building training set') as bar:
         for im in bar:
             logger.debug('Adding line {} to training set'.format(im))
-            gt_set.add(im)
+            try:
+                gt_set.add(im)
+            except FileNotFoundError as e:
+                logger.warning('{}: {}. Skipping.'.format(e.strerror, e.filename))
+            except KrakenInputException as e:
+                logger.warning(str(e))
 
     train_loader = DataLoader(gt_set, batch_size=1, shuffle=True)
 
-    test_set = GroundTruthDataset(normalization=normalization, reorder=reorder, im_transforms=transforms)
+    test_set = GroundTruthDataset(normalization=normalization, reorder=reorder, im_transforms=transforms, preload=preload)
     with log.progressbar(te_im, label='Building test set') as bar:
         for im in bar:
             logger.debug('Adding line {} to test set'.format(im))
@@ -163,32 +189,26 @@ def train(ctx, pad, output, spec, load, savefreq, report, epochs, device,
 
     logger.debug('Encoding training set')
 
-    # use codec in model if loading existing one
-    if not load:
-        gt_set.encode(codec)
-    # don't encode test set as the alphabets may not match causing encoding failures
-    test_set.training_set = list(zip(test_set._images, test_set._gt))
-
+    # use model codec when given
     if load:
-        logger.info('Loading existing model from {} '.format(load))
-        message('Loading model {}'.format(load), nl=False)
-
-        nn = vgsl.TorchVGSLModel.load_model(load)
         gt_set.encode(nn.codec)
-        message('\u2713', fg='green', nl=False)
-
     else:
+        gt_set.encode(codec)
+        # now we can create a new model
         logger.info('Creating new model {} with {} outputs'.format(spec, gt_set.codec.max_label()+1))
-        message('Initializing model ', nl=False)
-
-        # append output definition to spec
         spec = '[{} O1c{}]'.format(spec[1:-1], gt_set.codec.max_label()+1)
         nn = vgsl.TorchVGSLModel(spec)
         # initialize weights
+        message('Initializing model ', nl=False)
         nn.init_weights()
-        # initialize codec
         nn.add_codec(gt_set.codec)
+        # initialize codec
         message('\u2713', fg='green')
+
+
+    # don't encode test set as the alphabets may not match causing encoding failures
+    test_set.training_set = list(zip(test_set._images, test_set._gt))
+
 
     logger.debug('Moving model to device {}'.format(device))
     nn.to(device)
@@ -213,7 +233,7 @@ def train(ctx, pad, output, spec, load, savefreq, report, epochs, device,
             logger.info('Saving to {}_{}'.format(output, epoch))
         if not epoch % report:
             nn.eval()
-            c, e = compute_error(rec, test_set.training_set)
+            c, e = compute_error(rec, list(test_set))
             nn.train()
             logger.info('Accuracy report ({}) {:0.4f} {} {}'.format(epoch, (c-e)/c, c, e))
             message('Accuracy report ({}) {:0.4f} {} {}'.format(epoch, (c-e)/c, c, e))
