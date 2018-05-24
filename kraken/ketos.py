@@ -76,6 +76,7 @@ def _validate_manifests(ctx, param, value):
               'padding around lines')
 @click.option('-o', '--output', type=click.Path(), default='model', help='Output model file')
 @click.option('-s', '--spec', default='[1,1,0,48 Lbx100 Do]', help='VGSL spec of the network to train. CTC layer will be added automatically.')
+@click.option('-a', '--append', default=None, type=click.INT, help='Removes layers before argument and then appends spec. Only works when loading an existing model')
 @click.option('-i', '--load', type=click.Path(exists=True, readable=True), help='Load existing file to continue training')
 @click.option('-F', '--savefreq', default=1, type=click.FLOAT, help='Model save frequency in epochs during training')
 @click.option('-R', '--report', default=1, help='Report creation frequency in epochs')
@@ -92,9 +93,9 @@ def _validate_manifests(ctx, param, value):
 @click.option('-e', '--evaluation-files', default=None, multiple=True, callback=_validate_manifests, type=click.File(mode='r', lazy=True), help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
 @click.option('--preload/--disable-preload', default=None, help='Hard enable/disable for training data preloading')
 @click.argument('ground_truth', nargs=-1, type=click.Path(exists=True, dir_okay=False))
-def train(ctx, pad, output, spec, load, savefreq, report, epochs, device,
-          optimizer, lrate, momentum, partition, normalization, codec, reorder,
-          training_files, evaluation_files, preload, ground_truth):
+def train(ctx, pad, output, spec, append, load, savefreq, report, epochs,
+          device, optimizer, lrate, momentum, partition, normalization, codec,
+          reorder, training_files, evaluation_files, preload, ground_truth):
     """
     Trains a model from image-text pairs.
     """
@@ -102,6 +103,9 @@ def train(ctx, pad, output, spec, load, savefreq, report, epochs, device,
 
     if load and codec:
         raise click.BadOptionUsage('codec', 'codec option is not supported when loading model')
+
+    if not load and append:
+        raise click.BadOptionUsage('append', 'append option requires loading an existing model')
 
     # load model if given. if a new model has to be created we need to do that
     # after data set initialization, otherwise to output size is still unknown.
@@ -190,7 +194,17 @@ def train(ctx, pad, output, spec, load, savefreq, report, epochs, device,
     logger.debug('Encoding training set')
 
     # use model codec when given
-    if load:
+    if append:
+        gt_set.encode(codec)
+        message('Slicing and dicing model ', nl=False)
+        # now we can create a new model
+        spec = '[{} O1c{}]'.format(spec[1:-1], gt_set.codec.max_label()+1)
+        logger.info('Appending {} to existing model {} after {}'.format(spec, nn.spec, append))
+        nn.append(append, spec)
+        nn.add_codec(gt_set.codec)
+        message('\u2713', fg='green')
+        logger.info('Assembled model spec: {}'.format(nn.spec))
+    elif load:
         gt_set.encode(nn.codec)
     else:
         gt_set.encode(codec)

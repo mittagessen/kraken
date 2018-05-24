@@ -117,6 +117,12 @@ class TorchVGSLModel(object):
         input = [batch, channels, height, width]
         self.input = tuple(input)
         self.nn = torch.nn.Sequential()
+        self._parse(input, blocks)
+
+    def _parse(self, input, blocks):
+        """
+        Parses VGSL spec and appends layers to self.nn
+        """
         logger.debug('layer\t\ttype')
         for block in blocks:
             oshape = None
@@ -132,6 +138,24 @@ class TorchVGSLModel(object):
             else:
                 raise ValueError('{} invalid layer definition'.format(block))
         self.output = oshape
+
+    def append(self, idx, spec):
+        """
+        Splits a model at layer `idx` and append layers `spec`.
+
+        Args:
+            idx (int): Index of layer to append spec to starting with 1.  To
+                       select the whole layer stack set idx to None.
+            spec (str): VGSL spec without input block to append to model.
+        """
+        self.nn = self.nn[:idx]
+        self.idx = idx-1
+        spec = spec[1:-1]
+        blocks = spec.split(' ')
+        self.named_spec = self.named_spec[:idx+1]
+        self._parse(self.nn[-1].output_shape, blocks)
+        self.spec = '[' + ' '.join(self.named_spec) + ']'
+        self.init_weights(slice(idx, -1))
 
     def to(self, device):
         self.nn.to(device)
@@ -422,12 +446,16 @@ class TorchVGSLModel(object):
         """
         self.codec = codec
 
-    def init_weights(self):
+    def init_weights(self, idx=slice(0, None)):
         """
-        Initializes weights for all layers of the graph.
+        Initializes weights for all or a subset of layers in the graph.
 
         LSTM/GRU layers are orthogonally initialized, convolutional layers
         uniformly from (-0.1,0.1).
+
+        Args:
+            idx (slice): A slice object representing the indices of layers to
+                         initialize.
         """
         def _wi(m):
             if isinstance(m, torch.nn.Linear):
@@ -447,7 +475,7 @@ class TorchVGSLModel(object):
             elif isinstance(m, torch.nn.Conv2d):
                 for p in m.parameters():
                     torch.nn.init.uniform_(p.data, -0.1, 0.1)
-        self.nn.apply(_wi)
+        self.nn[idx].apply(_wi)
 
     @staticmethod
     def set_layer_name(layer, name):
@@ -476,10 +504,10 @@ class TorchVGSLModel(object):
         Returns:
             (str) network unique layer name
         """
+        self.idx += 1
         if name:
             return name[1:-1]
         else:
-            self.idx += 1
             return '{}_{}'.format(re.sub(r'\W+', '_', layer), self.idx)
 
     def build_rnn(self, input, block):

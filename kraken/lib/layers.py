@@ -143,10 +143,11 @@ class MaxPool(Module):
         return self.layer(inputs)
 
     def get_shape(self, input):
-        return (input[0],
-                input[1],
-                int(np.floor((input[2]-(self.kernel_size[0]-1)-1)/self.stride[0]+1) if input[2] != 0 else 0),
-                int(np.floor((input[3]-(self.kernel_size[1]-1)-1)/self.stride[1]+1) if input[3] != 0 else 0))
+        self.output_shape = (input[0],
+                             input[1],
+                             int(np.floor((input[2]-(self.kernel_size[0]-1)-1)/self.stride[0]+1) if input[2] != 0 else 0),
+                             int(np.floor((input[3]-(self.kernel_size[1]-1)-1)/self.stride[1]+1) if input[3] != 0 else 0))
+        return self.output_shape
 
     def deserialize(self, name, spec):
         """
@@ -187,6 +188,7 @@ class Dropout(Module):
         return self.layer(inputs)
 
     def get_shape(self, input):
+        self.output_shape = input
         return input
 
     def deserialize(self, name, spec):
@@ -290,7 +292,8 @@ class TransposedSummarizingRNN(Module):
                 layer = (input[2], 1)
         else:
             layer = (input[2], input[3])
-        return (input[0], self.output_size) + layer
+        self.output_shape = (input[0], self.output_size) + layer
+        return self.output_shape
 
     def deserialize(self, name, spec):
         """
@@ -455,7 +458,8 @@ class LinSoftmax(Module):
         """
         Calculates the output shape from input 4D tuple NCHW.
         """
-        return (input[0], self.output_size, input[2], input[3])
+        self.output_shape = (input[0], self.output_size, input[2], input[3])
+        return self.output_shape
 
     def deserialize(self, name, spec):
         """
@@ -515,10 +519,11 @@ class ActConv2D(Module):
         return self.nl(self.co(inputs))
 
     def get_shape(self, input):
-        return (input[0],
-                self.out_channels,
-                int(min(np.floor((input[2]+2*self.padding[0]-(self.kernel_size[0]-1)-1)+1), 1) if input[2] != 0 else 0),
-                int(min(np.floor((input[3]+2*self.padding[1]-(self.kernel_size[1]-1)-1)+1), 1) if input[3] != 0 else 0))
+        self.output_shape = (input[0],
+                             self.out_channels,
+                             int(min(np.floor((input[2]+2*self.padding[0]-(self.kernel_size[0]-1)-1)+1), 1) if input[2] != 0 else 0),
+                             int(min(np.floor((input[3]+2*self.padding[1]-(self.kernel_size[1]-1)-1)+1), 1) if input[3] != 0 else 0))
+        return self.output_shape
 
     def deserialize(self, name, spec):
         """
