@@ -19,6 +19,7 @@ Utility functions for data loading and training of VGSL networks.
 import os
 import click
 import unicodedata
+import numpy as np
 import bidi.algorithm as bd
 
 from PIL import Image
@@ -145,7 +146,7 @@ class GroundTruthDataset(Dataset):
     """
     def __init__(self, split=lambda x: os.path.splitext(x)[0],
                  suffix='.gt.txt', normalization=None, reorder=True,
-                 im_transforms=None):
+                 im_transforms=None, preload=True):
         """
         Reads a list of image-text pairs and creates a ground truth set.
 
@@ -166,6 +167,7 @@ class GroundTruthDataset(Dataset):
                             order
             im_transforms (func): Function taking an PIL.Image and returning a
                                   tensor suitable for forward passes.
+            preload (bool): Enables preloading and preprocessing of image files.
         """
         self.split = lambda x: split(x) + self.suffix
         self.suffix = suffix
@@ -174,6 +176,7 @@ class GroundTruthDataset(Dataset):
         self.alphabet = Counter()
         self.text_transforms = []
         self.transforms = im_transforms
+        self.preload = preload
         # built text transformations
         if normalization:
             self.text_transforms.append(lambda x: unicodedata.normalize(normalization, x))
@@ -183,16 +186,25 @@ class GroundTruthDataset(Dataset):
     def add(self, image):
         """
         Adds a line-image-text pair to the dataset.
+
+        Args:
+            image (str): Input image path
         """
         with click.open_file(self.split(image), 'r', encoding='utf-8') as fp:
             gt = fp.read().strip('\n\r')
             for func in self.text_transforms:
                 gt = func(gt)
-            self.alphabet.update(gt)
-        im = Image.open(image)
-        im = self.transforms(im)
-        self._images.append(im)
+        if self.preload:
+            im = Image.open(image)
+            try:
+                im = self.transforms(im)
+            except ValueError as e:
+                raise KrakenInputException('Image transforms failed on {}'.format(image))
+            self._images.append(im)
+        else:
+            self._images.append(image)
         self._gt.append(gt)
+        self.alphabet.update(gt)
 
     def encode(self, codec=None):
         """
@@ -209,7 +221,14 @@ class GroundTruthDataset(Dataset):
             self.training_set.append((im, self.codec.encode(gt)))
 
     def __getitem__(self, index):
-        return self.training_set[index]
+        if self.preload:
+            return self.training_set[index]
+        else:
+            item = self.training_set[index]
+            try:
+                return (self.transforms(Image.open(item[0])), item[1])
+            except Exception:
+                return self[np.random.randint(0, len(self.training_set))]
 
     def __len__(self):
         return len(self.training_set)
