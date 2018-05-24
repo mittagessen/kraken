@@ -63,6 +63,13 @@ def cli(verbose):
     log.set_logger(logger, level=30-min(10*verbose, 20))
 
 
+def _validate_manifests(ctx, param, value):
+    images = []
+    for manifest in value:
+        images.extend([x.rstrip('\r\n') for x in manifest.readlines() if os.path.isfile(x.rstrip('\r\n'))])
+    return images
+
+
 @cli.command('train')
 @click.pass_context
 @click.option('-p', '--pad', type=click.INT, default=16, help='Left and right '
@@ -79,16 +86,18 @@ def cli(verbose):
 @click.option('-m', '--momentum', default=0.9, help='Momentum')
 @click.option('-p', '--partition', default=0.9, help='Ground truth data partition ratio between train/test set')
 @click.option('-u', '--normalization', type=click.Choice(['NFD', 'NFKD', 'NFC', 'NFKC']), default=None, help='Ground truth normalization')
-@click.option('-c', '--codec', default=None, type=click.File(mode='rb', lazy=True), help='Load a codec JSON definition (invalid if loading existing model)')
+@click.option('-c', '--codec', default=None, type=click.File(mode='r', lazy=True), help='Load a codec JSON definition (invalid if loading existing model)')
 @click.option('-n', '--reorder/--no-reorder', default=True, help='Reordering of code points to display order')
+@click.option('-t', '--training-files', default=None, multiple=True, callback=_validate_manifests, type=click.File(mode='r', lazy=True), help='File(s) with additional paths to training data')
+@click.option('-e', '--evaluation-files', default=None, multiple=True, callback=_validate_manifests, type=click.File(mode='r', lazy=True), help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
 @click.argument('ground_truth', nargs=-1, type=click.Path(exists=True, dir_okay=False))
 def train(ctx, pad, output, spec, load, savefreq, report, epochs, device,
           optimizer, lrate, momentum, partition, normalization, codec, reorder,
-          ground_truth):
+          training_files, evaluation_files, ground_truth):
     """
     Trains a model from image-text pairs.
     """
-    logger.info(u'Building ground truth set from {} line images'.format(len(ground_truth)))
+    logger.info('Building ground truth set from {} line images'.format(len(ground_truth) + len(training_files)))
 
     if load and codec:
         raise click.BadOptionUsage('codec', 'codec option is not supported when loading model')
@@ -108,10 +117,23 @@ def train(ctx, pad, output, spec, load, savefreq, report, epochs, device,
     except KrakenInputException as e:
         raise click.BadOptionUsage(str(e))
 
+    # disable automatic partition when given evaluation set explicitly
+    if evaluation_files:
+        partition = 1
     ground_truth = list(ground_truth)
+
+    # merge training_files into ground_truth list
+    if training_files:
+        ground_truth.extend(training_files)
+
     np.random.shuffle(ground_truth)
     tr_im = ground_truth[:int(len(ground_truth) * partition)]
-    te_im = ground_truth[int(len(ground_truth) * partition):]
+    if evaluation_files:
+        logger.debug('Using {} lines from explicit eval set'.format(len(evaluation_files)))
+        te_im = evaluation_files
+    else:
+        te_im = ground_truth[int(len(ground_truth) * partition):]
+        logger.debug('Taking {} lines from training for evaluation'.format(len(te_im)))
 
     gt_set = GroundTruthDataset(normalization=normalization, reorder=reorder, im_transforms=transforms)
     with log.progressbar(tr_im, label='Building training set') as bar:
