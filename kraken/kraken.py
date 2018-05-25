@@ -20,28 +20,16 @@ kraken.kraken
 Command line drivers for recognition functionality.
 """
 import os
-import json
-import time
-import tempfile
 import warnings
 import logging
-import unicodedata
 
-from collections import defaultdict
 from functools import partial
-from itertools import cycle
 from PIL import Image
 
 import click
 from click import open_file
 
-from kraken import repo
-from kraken import rpred
-from kraken import pageseg
 from kraken.lib import log
-from kraken.lib import models
-from kraken import binarization
-from kraken import serialization
 
 warnings.simplefilter('ignore', UserWarning)
 
@@ -51,13 +39,6 @@ APP_NAME = 'kraken'
 DEFAULT_MODEL = ['en-default.mlmodel']
 LEGACY_MODEL_DIR = '/usr/local/share/ocropus'
 
-spinner = cycle(['⣾', '⣽', '⣻', '⢿', '⡿', '⣟', '⣯', '⣷'])
-
-
-def spin(msg):
-    if logger.getEffectiveLevel() >= 30:
-        click.echo('\r\033[?25l{}\t{}'.format(msg, next(spinner)), nl=False)
-
 
 def message(msg, **styles):
     if logger.getEffectiveLevel() >= 30:
@@ -65,6 +46,8 @@ def message(msg, **styles):
 
 
 def binarizer(threshold, zoom, escale, border, perc, range, low, high, base_image, input, output):
+    from kraken import binarization
+
     try:
         im = Image.open(input)
     except IOError as e:
@@ -83,6 +66,10 @@ def binarizer(threshold, zoom, escale, border, perc, range, low, high, base_imag
 def segmenter(text_direction, script_detect, allowed_scripts, scale,
               maxcolseps, black_colseps, remove_hlines, base_image, input,
               output):
+    import json
+
+    from kraken import pageseg
+
     try:
         im = Image.open(input)
     except IOError as e:
@@ -101,6 +88,10 @@ def segmenter(text_direction, script_detect, allowed_scripts, scale,
 
 
 def recognizer(model, pad, bidi_reordering, script_ignore, base_image, input, output, lines):
+    import json
+
+    from kraken import rpred
+
     try:
         im = Image.open(base_image)
     except IOError as e:
@@ -144,6 +135,7 @@ def recognizer(model, pad, bidi_reordering, script_ignore, base_image, input, ou
         message('Writing recognition results for {}\t'.format(base_image), nl=False)
         logger.info('Serializing as {} into {}'.format(ctx.meta['mode'], output))
         if ctx.meta['mode'] != 'text':
+            from kraken import serialization
             fp.write(serialization.serialize(preds, base_image,
                                              Image.open(base_image).size,
                                              ctx.meta['text_direction'],
@@ -177,6 +169,8 @@ def process_pipeline(subcommands, input, verbose):
     Helper function calling the partials returned by each subcommand and
     placing their respective outputs in temporary files.
     """
+    import tempfile
+
     for io_pair in input:
         try:
             base_image = io_pair[0]
@@ -269,6 +263,8 @@ def ocr(ctx, model, pad, reorder, serializer, text_direction, lines):
     """
     Recognizes text in line images.
     """
+    from kraken.lib import models
+
     # first we try to find the model in the absolue path, then ~/.kraken, then
     # LEGACY_MODEL_DIR
     nm = {}
@@ -295,6 +291,8 @@ def ocr(ctx, model, pad, reorder, serializer, text_direction, lines):
         message('\u2713', fg='green')
 
     if 'default' in nm:
+        from collections import defaultdict
+
         nn = defaultdict(lambda: nm['default'])
         nn.update(nm)
         nm = nn
@@ -311,6 +309,10 @@ def show(ctx, model_id):
     """
     Retrieves model metadata from the repository.
     """
+    import unicodedata
+
+    from kraken import repo
+
     desc = repo.get_description(model_id)
 
     chars = []
@@ -339,6 +341,8 @@ def list_models(ctx):
     """
     Lists models in the repository.
     """
+    from kraken import repo
+
     model_list = repo.get_listing(partial(spin, 'Retrieving model list'))
     message('\b\u2713', fg='green', nl=False)
     message('\033[?25h\n', nl=False)
@@ -354,6 +358,8 @@ def get(ctx, model_id):
     """
     Retrieves a model from the repository.
     """
+    from kraken import repo
+
     try:
         os.makedirs(click.get_app_dir(APP_NAME))
     except OSError:
