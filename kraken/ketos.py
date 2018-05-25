@@ -14,38 +14,16 @@
 # or implied. See the License for the specific language governing
 # permissions and limitations under the License.
 import os
-import re
-import time
 import click
-import errno
-import base64
 import logging
-import warnings
 import unicodedata
-import numpy as np
 
-from PIL import Image
-from lxml import html, etree
-from io import BytesIO
-from itertools import cycle
 from bidi.algorithm import get_display
 
-from torch.optim import SGD, RMSprop
-from torch.utils.data import DataLoader
-
 from kraken.lib import log
-from kraken import rpred
-from kraken import linegen
-from kraken import pageseg
-from kraken import transcribe
-from kraken import binarization
-from kraken.lib import models, vgsl
-from kraken.lib.codec import PytorchCodec
-from kraken.lib.dataset import GroundTruthDataset, compute_error, generate_input_transforms
 from kraken.lib.exceptions import KrakenCairoSurfaceException
 from kraken.lib.exceptions import KrakenEncodeException
 from kraken.lib.exceptions import KrakenInputException
-from kraken.lib.util import is_bitonal
 
 APP_NAME = 'kraken'
 
@@ -74,27 +52,27 @@ def _validate_manifests(ctx, param, value):
 
 @cli.command('train')
 @click.pass_context
-@click.option('-p', '--pad', type=click.INT, default=16, help='Left and right '
+@click.option('-p', '--pad', show_default=True, type=click.INT, default=16, help='Left and right '
               'padding around lines')
-@click.option('-o', '--output', type=click.Path(), default='model', help='Output model file')
-@click.option('-s', '--spec', default='[1,1,0,48 Lbx100 Do]', help='VGSL spec of the network to train. CTC layer will be added automatically.')
-@click.option('-a', '--append', default=None, type=click.INT, help='Removes layers before argument and then appends spec. Only works when loading an existing model')
-@click.option('-i', '--load', type=click.Path(exists=True, readable=True), help='Load existing file to continue training')
-@click.option('-F', '--savefreq', default=1, type=click.FLOAT, help='Model save frequency in epochs during training')
-@click.option('-R', '--report', default=1, help='Report creation frequency in epochs')
-@click.option('-N', '--epochs', default=1000, help='Number of epochs to train for')
-@click.option('-d', '--device', default='cpu', help='Select device to use (cpu, cuda:0, cuda:1, ...)')
-@click.option('--optimizer', default='RMSprop', type=click.Choice(['SGD', 'RMSprop']), help='Select optimizer')
-@click.option('-r', '--lrate', default=1e-3, help='Learning rate')
-@click.option('-m', '--momentum', default=0.9, help='Momentum')
-@click.option('-p', '--partition', default=0.9, help='Ground truth data partition ratio between train/test set')
-@click.option('-u', '--normalization', type=click.Choice(['NFD', 'NFKD', 'NFC', 'NFKC']), default=None, help='Ground truth normalization')
-@click.option('-c', '--codec', default=None, type=click.File(mode='r', lazy=True), help='Load a codec JSON definition (invalid if loading existing model)')
-@click.option('--resize', default='fail', type=click.Choice(['add', 'both', 'fail']), help='Codec/output layer resizing option. If set to `add` code points will be added, `both` will set the layer to match exactly the training data, `fail` will abort if training data and model codec do not match.')
-@click.option('-n', '--reorder/--no-reorder', default=True, help='Reordering of code points to display order')
-@click.option('-t', '--training-files', default=None, multiple=True, callback=_validate_manifests, type=click.File(mode='r', lazy=True), help='File(s) with additional paths to training data')
-@click.option('-e', '--evaluation-files', default=None, multiple=True, callback=_validate_manifests, type=click.File(mode='r', lazy=True), help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
-@click.option('--preload/--disable-preload', default=None, help='Hard enable/disable for training data preloading')
+@click.option('-o', '--output', show_default=True, type=click.Path(), default='model', help='Output model file')
+@click.option('-s', '--spec', show_default=True, default='[1,1,0,48 Lbx100 Do]', help='VGSL spec of the network to train. CTC layer will be added automatically.')
+@click.option('-a', '--append', show_default=True, default=None, type=click.INT, help='Removes layers before argument and then appends spec. Only works when loading an existing model')
+@click.option('-i', '--load', show_default=True, type=click.Path(exists=True, readable=True), help='Load existing file to continue training')
+@click.option('-F', '--savefreq', show_default=True, default=1, type=click.FLOAT, help='Model save frequency in epochs during training')
+@click.option('-R', '--report', show_default=True, default=1, help='Report creation frequency in epochs')
+@click.option('-N', '--epochs', show_default=True, default=1000, help='Number of epochs to train for')
+@click.option('-d', '--device', show_default=True, default='cpu', help='Select device to use (cpu, cuda:0, cuda:1, ...)')
+@click.option('--optimizer', show_default=True, default='RMSprop', type=click.Choice(['SGD', 'RMSprop']), help='Select optimizer')
+@click.option('-r', '--lrate', show_default=True, default=1e-3, help='Learning rate')
+@click.option('-m', '--momentum', show_default=True, default=0.9, help='Momentum')
+@click.option('-p', '--partition', show_default=True, default=0.9, help='Ground truth data partition ratio between train/test set')
+@click.option('-u', '--normalization', show_default=True, type=click.Choice(['NFD', 'NFKD', 'NFC', 'NFKC']), default=None, help='Ground truth normalization')
+@click.option('-c', '--codec', show_default=True, default=None, type=click.File(mode='r', lazy=True), help='Load a codec JSON definition (invalid if loading existing model)')
+@click.option('--resize', show_default=True, default='fail', type=click.Choice(['add', 'both', 'fail']), help='Codec/output layer resizing option. If set to `add` code points will be added, `both` will set the layer to match exactly the training data, `fail` will abort if training data and model codec do not match.')
+@click.option('-n', '--reorder/--no-reorder', show_default=True, default=True, help='Reordering of code points to display order')
+@click.option('-t', '--training-files', show_default=True, default=None, multiple=True, callback=_validate_manifests, type=click.File(mode='r', lazy=True), help='File(s) with additional paths to training data')
+@click.option('-e', '--evaluation-files', show_default=True, default=None, multiple=True, callback=_validate_manifests, type=click.File(mode='r', lazy=True), help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
+@click.option('--preload/--disable-preload', show_default=True, default=None, help='Hard enable/disable for training data preloading')
 @click.argument('ground_truth', nargs=-1, type=click.Path(exists=True, dir_okay=False))
 def train(ctx, pad, output, spec, append, load, savefreq, report, epochs,
           device, optimizer, lrate, momentum, partition, normalization, codec,
@@ -103,6 +81,16 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, epochs,
     """
     Trains a model from image-text pairs.
     """
+    import re
+    import numpy as np
+
+    from torch.optim import SGD, RMSprop
+    from torch.utils.data import DataLoader
+
+    from kraken.lib import models, vgsl
+    from kraken.lib.codec import PytorchCodec
+    from kraken.lib.dataset import GroundTruthDataset, compute_error, generate_input_transforms
+
     logger.info('Building ground truth set from {} line images'.format(len(ground_truth) + len(training_files)))
 
     if load and codec:
@@ -312,10 +300,18 @@ def extract(ctx, binarize, normalization, reorder, rotate, output,
     Extracts image-text pairs from a transcription environment created using
     ``ketos transcribe``.
     """
+    import base64
+
+    from io import BytesIO
+    from PIL import Image
+    from lxml import html, etree
+
     try:
         os.mkdir(output)
     except Exception:
         pass
+
+
     idx = 0
     manifest = []
     with log.progressbar(transcriptions, label='Reading transcriptions') as bar:
@@ -381,6 +377,16 @@ def extract(ctx, binarize, normalization, reorder, rotate, output,
 @click.argument('images', nargs=-1, type=click.File(mode='rb', lazy=True))
 def transcription(ctx, text_direction, scale, bw, maxcolseps,
                   black_colseps, font, font_style, prefill, output, images):
+    from PIL import Image
+
+    from kraken import rpred
+    from kraken import pageseg
+    from kraken import transcribe
+    from kraken import binarization
+
+    from kraken.lib import models
+    from kraken.lib.util import is_bitonal
+
     ti = transcribe.TranscriptionInterface(font, font_style)
 
     if prefill:
@@ -466,6 +472,12 @@ def line_generator(ctx, font, maxlines, encoding, normalization, renormalize,
     """
     Generates artificial text line training data.
     """
+    import errno
+    import numpy as np
+
+    from kraken import linegen
+    from kraken import binarization
+
     lines = set()
     if not text:
         return
