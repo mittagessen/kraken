@@ -485,6 +485,33 @@ class LinSoftmax(Module):
         builder.add_softmax(softmax_name, lin_name, name)
         return name
 
+    def resize(self, output_size, del_indices=None):
+        """
+        Resizes the linear layer with minimal disturbance to the existing
+        weights.
+
+        First removes the weight and bias  at the output positions in
+        del_indices, then resizes both tensors to a new output size.
+
+        Args:
+            output_size (int): Desired output size after resizing
+            del_indices (list): List of connection to outputs to remove.
+        """
+        if not del_indices:
+            del_indices = []
+        old_shape = self.lin.weight.size(0)
+        self.output_size = output_size
+        idx = torch.tensor([x for x in range(old_shape) if x not in del_indices])
+        weight = self.lin.weight.index_select(0, idx)
+        rweight = torch.zeros((output_size - weight.size(0), weight.size(1)))
+        torch.nn.init.xavier_uniform_(rweight)
+        weight = torch.cat([weight, rweight])
+        bias = self.lin.bias.index_select(0, idx)
+        bias = torch.cat([bias, torch.zeros(output_size - bias.size(0))])
+        self.lin = torch.nn.Linear(self.input_size, output_size)
+        self.lin.weight = torch.nn.Parameter(weight)
+        self.lin.bias = torch.nn.Parameter(bias)
+
 
 class ActConv2D(Module):
     """
