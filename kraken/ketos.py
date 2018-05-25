@@ -40,8 +40,10 @@ from kraken import pageseg
 from kraken import transcribe
 from kraken import binarization
 from kraken.lib import models, vgsl
+from kraken.lib.codec import PytorchCodec
 from kraken.lib.dataset import GroundTruthDataset, compute_error, generate_input_transforms
 from kraken.lib.exceptions import KrakenCairoSurfaceException
+from kraken.lib.exceptions import KrakenEncodeException
 from kraken.lib.exceptions import KrakenInputException
 from kraken.lib.util import is_bitonal
 
@@ -88,6 +90,7 @@ def _validate_manifests(ctx, param, value):
 @click.option('-p', '--partition', default=0.9, help='Ground truth data partition ratio between train/test set')
 @click.option('-u', '--normalization', type=click.Choice(['NFD', 'NFKD', 'NFC', 'NFKC']), default=None, help='Ground truth normalization')
 @click.option('-c', '--codec', default=None, type=click.File(mode='r', lazy=True), help='Load a codec JSON definition (invalid if loading existing model)')
+@click.option('--resize', default='fail', type=click.Choice(['add', 'both', 'fail']), help='Codec/output layer resizing option. If set to `add` code points will be added, `both` will set the layer to match exactly the training data, `fail` will abort if training data and model codec do not match.')
 @click.option('-n', '--reorder/--no-reorder', default=True, help='Reordering of code points to display order')
 @click.option('-t', '--training-files', default=None, multiple=True, callback=_validate_manifests, type=click.File(mode='r', lazy=True), help='File(s) with additional paths to training data')
 @click.option('-e', '--evaluation-files', default=None, multiple=True, callback=_validate_manifests, type=click.File(mode='r', lazy=True), help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
@@ -95,7 +98,8 @@ def _validate_manifests(ctx, param, value):
 @click.argument('ground_truth', nargs=-1, type=click.Path(exists=True, dir_okay=False))
 def train(ctx, pad, output, spec, append, load, savefreq, report, epochs,
           device, optimizer, lrate, momentum, partition, normalization, codec,
-          reorder, training_files, evaluation_files, preload, ground_truth):
+          resize, reorder, training_files, evaluation_files, preload,
+          ground_truth):
     """
     Trains a model from image-text pairs.
     """
@@ -106,6 +110,9 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, epochs,
 
     if not load and append:
         raise click.BadOptionUsage('append', 'append option requires loading an existing model')
+
+    if resize != 'fail' and not load:
+        raise click.BadOptionUsage('resize', 'resize option requires loading an existing model')
 
     # load model if given. if a new model has to be created we need to do that
     # after data set initialization, otherwise to output size is still unknown.
@@ -205,7 +212,23 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, epochs,
         message('\u2713', fg='green')
         logger.info('Assembled model spec: {}'.format(nn.spec))
     elif load:
-        gt_set.encode(nn.codec)
+        try:
+            gt_set.encode(nn.codec)
+        except KrakenEncodeException as e:
+            alpha_diff = set(gt_set.alphabet).difference(set(nn.codec.c2l.keys()))
+            if resize == 'fail':
+                logger.error('Training data and model codec alphabets mismatch: {}'.format(alpha_diff))
+                ctx.exit(code=1)
+            elif resize == 'add':
+                logger.info('Resizing codec to include {} new code points'.format(len(alpha_diff)))
+                nn.codec.c2l.update({k: [v] for v, k in enumerate(alpha_diff, start=nn.codec.max_label()+1)})
+                nn.add_codec(PytorchCodec(nn.codec.c2l))
+                logger.info('Resizing last layer in network to {} outputs'.format(nn.codec.max_label()+1))
+                nn.nn[-1].resize(nn.codec.max_label()+1)
+            elif resize == 'both':
+                logger.info('Resizing codec to {} code points'.format(len(gt_set.alphabet)))
+            else:
+                raise click.BadOptionUsage('Invalid resize value {}'.format(resize))
     else:
         gt_set.encode(codec)
         # now we can create a new model
