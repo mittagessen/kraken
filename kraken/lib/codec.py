@@ -80,10 +80,13 @@ class PytorchCodec(object):
         Encodes a string into a sequence of labels.
 
         Args:
-            s (unicode): Input unicode string
+            s (str): Input unicode string
 
         Returns:
             (torch.IntTensor) encoded label sequence
+
+        Raises:
+            KrakenEncodeException is encoding fails and errors is set to raise.
         """
         splits = self._greedy_split(s, self.c2l_regex)
         labels = []
@@ -129,7 +132,7 @@ class PytorchCodec(object):
         more matches are found.
 
         Args:
-            input (unicode): input string
+            input (str): input string
             re (regex.Regex): Prefix match object
 
         Returns:
@@ -149,3 +152,48 @@ class PytorchCodec(object):
                 return r
             r.append(mo.group())
             idx = mo.end()
+
+    def merge(self, codec):
+        """
+        Transforms this codec (c1) into another (c2) reusing as many labels as
+        possible.
+
+        The resulting codec is able to encode the same code point sequences
+        while not necessarily having the same labels for them as c2.
+        Retains matching character -> label mappings from both codecs, removes
+        mappings not c2, and adds mappings not in c1. Compound labels in c2 for
+        code point sequences not in c1 containing labels also in use in c1 are
+        added as separate labels.
+
+        Args:
+            codec (kraken.lib.codec.PytorchCodec):
+
+        Returns:
+            A merged codec and a list of labels that were removed from the
+            original codec.
+        """
+        # find character sequences not encodable (exact match) by new codec.
+        # get labels for these sequences as deletion candidates
+        rm_candidates = {cseq: enc for cseq, enc in self.c2l.items() if cseq not in codec.c2l}
+        c2l_cand = self.c2l.copy()
+        for x in rm_candidates.keys():
+            c2l_cand.pop(x)
+        # remove labels from candidate list that are in use for other decodings
+        rm_labels = [label for v in rm_candidates.values() for label in v]
+        for v in c2l_cand.values():
+            for l in rm_labels:
+                if l in v:
+                    rm_labels.remove(l)
+        # iteratively remove labels, decrementing subsequent labels to close
+        # (new) holes in the codec.
+        offset_rm_labels = [v-idx for idx, v in enumerate(sorted(set(rm_labels)))]
+        for rlabel in offset_rm_labels:
+            c2l_cand = {k: [l-1 if l > rlabel else l for l in v] for k, v in c2l_cand.items()}
+        # add mappings not in original codec
+        add_list = {cseq: enc for cseq, enc in codec.c2l.items() if cseq not in self.c2l}
+        # renumber
+        start_idx = max(label for v in c2l_cand.values() for label in v) + 1
+        add_labels = {k: v for v, k in enumerate(sorted(set(label for v in add_list.values() for label in v)), start_idx)}
+        for k, v in add_list.items():
+            c2l_cand[k] = [add_labels[label] for label in v]
+        return PytorchCodec(c2l_cand), set(rm_labels)

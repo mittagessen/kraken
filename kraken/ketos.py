@@ -72,7 +72,7 @@ def _validate_manifests(ctx, param, value):
 @click.option('-n', '--reorder/--no-reorder', show_default=True, default=True, help='Reordering of code points to display order')
 @click.option('-t', '--training-files', show_default=True, default=None, multiple=True, callback=_validate_manifests, type=click.File(mode='r', lazy=True), help='File(s) with additional paths to training data')
 @click.option('-e', '--evaluation-files', show_default=True, default=None, multiple=True, callback=_validate_manifests, type=click.File(mode='r', lazy=True), help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
-@click.option('--preload/--disable-preload', show_default=True, default=None, help='Hard enable/disable for training data preloading')
+@click.option('--preload/--no-preload', show_default=True, default=None, help='Hard enable/disable for training data preloading')
 @click.argument('ground_truth', nargs=-1, type=click.Path(exists=True, dir_okay=False))
 def train(ctx, pad, output, spec, append, load, savefreq, report, epochs,
           device, optimizer, lrate, momentum, partition, normalization, codec,
@@ -92,9 +92,6 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, epochs,
     from kraken.lib.dataset import GroundTruthDataset, compute_error, generate_input_transforms
 
     logger.info('Building ground truth set from {} line images'.format(len(ground_truth) + len(training_files)))
-
-    if load and codec:
-        raise click.BadOptionUsage('codec', 'codec option is not supported when loading model')
 
     if not load and append:
         raise click.BadOptionUsage('append', 'append option requires loading an existing model')
@@ -200,26 +197,38 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, epochs,
         message('\u2713', fg='green')
         logger.info('Assembled model spec: {}'.format(nn.spec))
     elif load:
+        # prefer explicitly given codec over network codec if mode is 'both'
+        codec = codec if (codec and mode == 'both') else nn.codec
+
         try:
-            gt_set.encode(nn.codec)
+            gt_set.encode(codec)
         except KrakenEncodeException as e:
-            alpha_diff = set(gt_set.alphabet).difference(set(nn.codec.c2l.keys()))
+            message('Network codec not compatible with training set')
+            alpha_diff = set(gt_set.alphabet).difference(set(codec.c2l.keys()))
             if resize == 'fail':
                 logger.error('Training data and model codec alphabets mismatch: {}'.format(alpha_diff))
                 ctx.exit(code=1)
             elif resize == 'add':
+                message('Adding missing labels to network ', nl=False)
                 logger.info('Resizing codec to include {} new code points'.format(len(alpha_diff)))
-                nn.codec.c2l.update({k: [v] for v, k in enumerate(alpha_diff, start=nn.codec.max_label()+1)})
-                nn.add_codec(PytorchCodec(nn.codec.c2l))
-                logger.info('Resizing last layer in network to {} outputs'.format(nn.codec.max_label()+1))
-                nn.nn[-1].resize(nn.codec.max_label()+1)
+                codec.c2l.update({k: [v] for v, k in enumerate(alpha_diff, start=codec.max_label()+1)})
+                nn.add_codec(PytorchCodec(codec.c2l))
+                logger.info('Resizing last layer in network to {} outputs'.format(codec.max_label()+1))
+                nn.nn[-1].resize(codec.max_label()+1)
+                message('\u2713', fg='green')
             elif resize == 'both':
-                logger.info('Resizing codec to {} code points'.format(len(gt_set.alphabet)))
+                message('Fitting network exactly to training set ', nl=False)
+                logger.info('Resizing network or given codec to {} code sequences'.format(len(gt_set.alphabet)))
+                gt_set.encode(None)
+                ncodec, del_labels = codec.merge(gt_set.codec)
+                logger.info('Deleting {} output classes from network ({} retained)'.format(len(del_labels), len(codec)-len(del_labels)))
+                gt_set.encode(ncodec)
+                nn.nn[-1].resize(ncodec.max_label()+1, del_labels)
+                message('\u2713', fg='green')
             else:
                 raise click.BadOptionUsage('Invalid resize value {}'.format(resize))
     else:
         gt_set.encode(codec)
-        # now we can create a new model
         logger.info('Creating new model {} with {} outputs'.format(spec, gt_set.codec.max_label()+1))
         spec = '[{} O1c{}]'.format(spec[1:-1], gt_set.codec.max_label()+1)
         nn = vgsl.TorchVGSLModel(spec)
@@ -251,12 +260,13 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, epochs,
 
     for epoch in range(epochs):
         if epoch and not epoch % savefreq:
+            logger.info('Saving to {}_{}'.format(output, epoch))
             try:
                 nn.save_model('{}_{}.mlmodel'.format(output, epoch))
             except Exception as e:
                 logger.error('Saving model failed: {}'.format(str(e)))
-            logger.info('Saving to {}_{}'.format(output, epoch))
         if not epoch % report:
+            logger.debug('Starting evaluation run')
             nn.eval()
             c, e = compute_error(rec, list(test_set))
             nn.train()
@@ -264,7 +274,6 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, epochs,
             message('Accuracy report ({}) {:0.4f} {} {}'.format(epoch, (c-e)/c, c, e))
         with log.progressbar(label='epoch {}/{}'.format(epoch, epochs) , length=len(train_loader), show_pos=True) as bar:
             for trial, (input, target) in enumerate(train_loader):
-                logger.debug('batch {}'.format(trial))
                 input = input.to(device)
                 target = target.to(device)
                 input = input.requires_grad_()
@@ -275,6 +284,7 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, epochs,
                 o = o.squeeze(2)
                 optim.zero_grad()
                 loss = nn.criterion(o, target)
+                logger.debug('batch {} - loss {}'.format(trial, float(loss)))
                 loss.backward()
                 optim.step()
                 bar.update(1)

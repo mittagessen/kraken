@@ -490,7 +490,7 @@ class LinSoftmax(Module):
         Resizes the linear layer with minimal disturbance to the existing
         weights.
 
-        First removes the weight and bias  at the output positions in
+        First removes the weight and bias at the output positions in
         del_indices, then resizes both tensors to a new output size.
 
         Args:
