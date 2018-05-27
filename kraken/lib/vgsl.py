@@ -511,6 +511,24 @@ class TorchVGSLModel(object):
         else:
             return '{}_{}'.format(re.sub(r'\W+', '_', layer), self.idx)
 
+    def resize_output(self, output_size, del_indices=None):
+        """
+        Resizes an output linear projection layer.
+
+        Args:
+            output_size (int): New size of the linear layer
+            del_indices (list): list of outputs to delete from layer
+        """
+        if not isinstance(self.nn[-1], layers.LinSoftmax):
+            raise ValueError('last layer is not linear projection')
+        logger.debug('Resizing output LinSoftmax layer to {}'.format(output_size))
+        self.nn[-1].resize(output_size, del_indices)
+        pattern = re.compile(r'(O)(?P<name>{\w+})?(?P<dim>2|1|0)(?P<type>l|s|c)(?P<aug>a)?(?P<out>\d+)')
+        m = pattern.match(self.named_spec[-1])
+        aug = m.group('aug') if m.group('aug') else ''
+        self.named_spec[-1] = 'O{}{}{}{}{}'.format(m.group('name'), m.group('dim'), m.group('type'), aug, output_size)
+        self.spec = '[' + ' '.join(self.named_spec) + ']'
+
     def build_rnn(self, input, block):
         """
         Builds an LSTM/GRU layer returning number of outputs and layer.

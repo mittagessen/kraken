@@ -214,7 +214,7 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, epochs,
                 codec.c2l.update({k: [v] for v, k in enumerate(alpha_diff, start=codec.max_label()+1)})
                 nn.add_codec(PytorchCodec(codec.c2l))
                 logger.info('Resizing last layer in network to {} outputs'.format(codec.max_label()+1))
-                nn.nn[-1].resize(codec.max_label()+1)
+                nn.resize_output(codec.max_label()+1)
                 message('\u2713', fg='green')
             elif resize == 'both':
                 message('Fitting network exactly to training set ', nl=False)
@@ -223,7 +223,7 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, epochs,
                 ncodec, del_labels = codec.merge(gt_set.codec)
                 logger.info('Deleting {} output classes from network ({} retained)'.format(len(del_labels), len(codec)-len(del_labels)))
                 gt_set.encode(ncodec)
-                nn.nn[-1].resize(ncodec.max_label()+1, del_labels)
+                nn.resize_output(ncodec.max_label()+1, del_labels)
                 message('\u2713', fg='green')
             else:
                 raise click.BadOptionUsage('Invalid resize value {}'.format(resize))
