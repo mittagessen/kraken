@@ -184,14 +184,14 @@ def process_pipeline(subcommands, input, verbose):
 
 
 @cli.command('binarize')
-@click.option('--threshold', default=0.5, type=click.FLOAT)
-@click.option('--zoom', default=0.5, type=click.FLOAT)
-@click.option('--escale', default=1.0, type=click.FLOAT)
-@click.option('--border', default=0.1, type=click.FLOAT)
-@click.option('--perc', default=80, type=click.IntRange(1, 100))
-@click.option('--range', default=20, type=click.INT)
-@click.option('--low', default=5, type=click.IntRange(1, 100))
-@click.option('--high', default=90, type=click.IntRange(1, 100))
+@click.option('--threshold', show_default=True, default=0.5, type=click.FLOAT)
+@click.option('--zoom', show_default=True, default=0.5, type=click.FLOAT)
+@click.option('--escale', show_default=True, default=1.0, type=click.FLOAT)
+@click.option('--border', show_default=True, default=0.1, type=click.FLOAT)
+@click.option('--perc', show_default=True, default=80, type=click.IntRange(1, 100))
+@click.option('--range', show_default=True, default=20, type=click.INT)
+@click.option('--low', show_default=True, default=5, type=click.IntRange(1, 100))
+@click.option('--high', show_default=True, default=90, type=click.IntRange(1, 100))
 def binarize(threshold, zoom, escale, border, perc, range, low, high):
     """
     Binarizes page images.
@@ -201,17 +201,20 @@ def binarize(threshold, zoom, escale, border, perc, range, low, high):
 
 @cli.command('segment')
 @click.option('-d', '--text-direction', default='horizontal-lr',
+              show_default=True,
               type=click.Choice(['horizontal-lr', 'horizontal-rl',
                                  'vertical-lr', 'vertical-rl']),
               help='Sets principal text direction')
 @click.option('-s/-n', '--script-detect/--no-script-detect', default=True,
+              show_default=True,
               help='Enable script detection on segmenter output')
 @click.option('-a', '--allowed-scripts', default=None, multiple=True,
+              show_default=True,
               help='List of allowed scripts in script detection output. Ignored if disabled.')
-@click.option('--scale', default=None, type=click.FLOAT)
-@click.option('-m', '--maxcolseps', default=2, type=click.INT)
-@click.option('-b/-w', '--black_colseps/--white_colseps', default=False)
-@click.option('-r/-l', '--remove_hlines/--hlines', default=True)
+@click.option('--scale', show_default=True, default=None, type=click.FLOAT)
+@click.option('-m', '--maxcolseps', show_default=True, default=2, type=click.INT)
+@click.option('-b/-w', '--black_colseps/--white_colseps', show_default=True, default=False)
+@click.option('-r/-l', '--remove_hlines/--hlines', show_default=True, default=True)
 def segment(text_direction, script_detect, allowed_scripts, scale, maxcolseps, black_colseps, remove_hlines):
     """
     Segments page images into text lines.
@@ -239,25 +242,28 @@ def _validate_mm(ctx, param, value):
 
 @cli.command('ocr')
 @click.pass_context
-@click.option('-m', '--model', default=DEFAULT_MODEL, multiple=True, callback=_validate_mm,
+@click.option('-m', '--model', default=DEFAULT_MODEL, multiple=True,
+              show_default=True, callback=_validate_mm,
               help='Path to an recognition model or mapping of the form '
               '$script1:$model1. Add multiple mappings to run multi-model '
               'recognition based on detected scripts. Use the default keyword '
               'for adding a catch-all model. Recognition on scripts can be '
               'ignored with the model value ignore.')
-@click.option('-p', '--pad', type=click.INT, default=16, help='Left and right '
+@click.option('-p', '--pad', show_default=True, type=click.INT, default=16, help='Left and right '
               'padding around lines')
-@click.option('-n', '--reorder/--no-reorder', default=True,
+@click.option('-n', '--reorder/--no-reorder', show_default=True, default=True,
               help='Reorder code points to logical order')
 @click.option('-h', '--hocr', 'serializer', help='Switch between hOCR, '
               'ALTO, and plain text output', flag_value='hocr')
 @click.option('-a', '--alto', 'serializer', flag_value='alto')
 @click.option('-y', '--abbyy', 'serializer', flag_value='abbyyxml')
-@click.option('-t', '--text', 'serializer', flag_value='text', default=True)
+@click.option('-t', '--text', 'serializer', flag_value='text', default=True,
+              show_default=True)
 @click.option('-d', '--text-direction', default='horizontal-tb',
+              show_default=True,
               type=click.Choice(['horizontal-tb', 'vertical-lr', 'vertical-rl']),
               help='Sets principal text direction in serialization output')
-@click.option('-l', '--lines', type=click.Path(exists=True),
+@click.option('-l', '--lines', type=click.Path(exists=True), show_default=True,
               help='JSON file containing line coordinates')
 def ocr(ctx, model, pad, reorder, serializer, text_direction, lines):
     """
