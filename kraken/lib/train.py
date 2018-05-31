@@ -37,7 +37,7 @@ class EarlyStopping(object):
         self.best_loss = 0
         self.wait = 0
 
-    def __iter(self):
+    def __iter__(self):
         return self
 
     def __next__(self):

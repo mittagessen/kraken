@@ -59,10 +59,13 @@ def _validate_manifests(ctx, param, value):
 @click.option('-a', '--append', show_default=True, default=None, type=click.INT, help='Removes layers before argument and then appends spec. Only works when loading an existing model')
 @click.option('-i', '--load', show_default=True, type=click.Path(exists=True, readable=True), help='Load existing file to continue training')
 @click.option('-F', '--savefreq', show_default=True, default=1, type=click.FLOAT, help='Model save frequency in epochs during training')
-@click.option('-R', '--report', show_default=True, default=1, help='Report creation frequency in epochs')
-@click.option('-N', '--epochs', show_default=True, default=1000, help='Number of epochs to train for')
+@click.option('-R', '--report', show_default=True, default=1, type=click.FLOAT, help='Report creation frequency in epochs')
+@click.option('-q', '--quit', show_default=True, default='early', type=click.Choice(['early', 'dumb']), help='Stop condition for training. Set to `early` for early stooping or `dumb` for fixed number of epochs')
+@click.option('-N', '--epochs', show_default=True, default=-1, help='Number of epochs to train for')
+@click.option('--lag', show_default=True, default=5, help='Number of epochs to wait before stopping training without improvement')
+@click.option('--min-delta', show_default=True, default=0.005, help='Minimum improvement between epochs to reset early stopping')
 @click.option('-d', '--device', show_default=True, default='cpu', help='Select device to use (cpu, cuda:0, cuda:1, ...)')
-@click.option('--optimizer', show_default=True, default='RMSprop', type=click.Choice(['SGD', 'RMSprop']), help='Select optimizer')
+@click.option('--optimizer', show_default=True, default='RMSprop', type=click.Choice(['Adagrad', 'SGD', 'RMSprop']), help='Select optimizer')
 @click.option('-r', '--lrate', show_default=True, default=1e-3, help='Learning rate')
 @click.option('-m', '--momentum', show_default=True, default=0.9, help='Momentum')
 @click.option('-p', '--partition', show_default=True, default=0.9, help='Ground truth data partition ratio between train/test set')
@@ -74,10 +77,10 @@ def _validate_manifests(ctx, param, value):
 @click.option('-e', '--evaluation-files', show_default=True, default=None, multiple=True, callback=_validate_manifests, type=click.File(mode='r', lazy=True), help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
 @click.option('--preload/--no-preload', show_default=True, default=None, help='Hard enable/disable for training data preloading')
 @click.argument('ground_truth', nargs=-1, type=click.Path(exists=True, dir_okay=False))
-def train(ctx, pad, output, spec, append, load, savefreq, report, epochs,
-          device, optimizer, lrate, momentum, partition, normalization, codec,
-          resize, reorder, training_files, evaluation_files, preload,
-          ground_truth):
+def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
+          lag, min_delta, device, optimizer, lrate, momentum, partition,
+          normalization, codec, resize, reorder, training_files,
+          evaluation_files, preload, ground_truth):
     """
     Trains a model from image-text pairs.
     """
@@ -88,6 +91,7 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, epochs,
     from torch.utils.data import DataLoader
 
     from kraken.lib import models, vgsl
+    from kraken.lib.train import EarlyStopping, EpochStopping
     from kraken.lib.codec import PytorchCodec
     from kraken.lib.dataset import GroundTruthDataset, compute_error, generate_input_transforms
 
@@ -257,8 +261,15 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, epochs,
         optim = SGD(nn.nn.parameters(), lr=lrate, momentum=momentum)
     elif optimizer == 'RMSprop':
         optim = RMSprop(nn.nn.parameters(), lr=lrate, momentum=momentum)
+    elif optimizer == 'Adagrad':
+        optim = Adagrad(nn.nn.parameters(), lr=lrate)
 
-    for epoch in range(epochs):
+    if quit == 'early':
+        st_it = EarlyStopping(train_loader, min_delta, lag)
+    elif quit == 'dumb':
+        st_it = EpochStopping(train_loader, epochs)
+
+    for epoch, loader in enumerate(st_it):
         if epoch and not epoch % savefreq:
             logger.info('Saving to {}_{}'.format(output, epoch))
             try:
@@ -270,10 +281,12 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, epochs,
             nn.eval()
             c, e = compute_error(rec, list(test_set))
             nn.train()
-            logger.info('Accuracy report ({}) {:0.4f} {} {}'.format(epoch, (c-e)/c, c, e))
-            message('Accuracy report ({}) {:0.4f} {} {}'.format(epoch, (c-e)/c, c, e))
-        with log.progressbar(label='epoch {}/{}'.format(epoch, epochs) , length=len(train_loader), show_pos=True) as bar:
-            for trial, (input, target) in enumerate(train_loader):
+            accuracy = (c-e)/c
+            logger.info('Accuracy report ({}) {:0.4f} {} {}'.format(epoch, accuracy, c, e))
+            message('Accuracy report ({}) {:0.4f} {} {}'.format(epoch, accuracy, c, e))
+            st_it.update(accuracy)
+        with log.progressbar(label='epoch {}/{}'.format(epoch, epochs) , length=len(loader), show_pos=True) as bar:
+            for trial, (input, target) in enumerate(loader):
                 input = input.to(device)
                 target = target.to(device)
                 input = input.requires_grad_()
