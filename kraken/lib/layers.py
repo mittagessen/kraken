@@ -307,54 +307,52 @@ class TransposedSummarizingRNN(Module):
             arch = nn.WhichOneof('layer')
             layer = getattr(nn, arch)
 
-        fwd_params = layer.weightParams if arch == 'uniDirectionalLSTM' else layer.weightParams[0]
-        # ih_matrix
-        weight_ih = torch.Tensor([fwd_params.inputGateWeightMatrix.floatValue,  # wi
-                                  fwd_params.forgetGateWeightMatrix.floatValue,  # wf
-                                  fwd_params.blockInputWeightMatrix.floatValue,  # wz/wg
-                                  fwd_params.outputGateWeightMatrix.floatValue])  # wo
 
-        self.layer.weight_ih_l0 = torch.nn.Parameter(weight_ih.resize_as_(self.layer.weight_ih_l0.data))
+        def _deserialize_weights(params, layer, direction):
+            # ih_matrix
+            weight_ih = torch.Tensor([params.inputGateWeightMatrix.floatValue,  # wi
+                                      params.forgetGateWeightMatrix.floatValue,  # wf
+                                      params.blockInputWeightMatrix.floatValue,  # wz/wg
+                                      params.outputGateWeightMatrix.floatValue])  # wo
+            # hh_matrix
+            weight_hh = torch.Tensor([params.inputGateRecursionMatrix.floatValue,  # wi
+                                      params.forgetGateRecursionMatrix.floatValue,  # wf
+                                      params.blockInputRecursionMatrix.floatValue,  # wz/wg
+                                      params.outputGateRecursionMatrix.floatValue])  # wo
 
-        # hh_matrix
-        weight_hh = torch.Tensor([fwd_params.inputGateRecursionMatrix.floatValue,  # wi
-                                  fwd_params.forgetGateRecursionMatrix.floatValue,  # wf
-                                  fwd_params.blockInputRecursionMatrix.floatValue,  # wz/wg
-                                  fwd_params.outputGateRecursionMatrix.floatValue])  # wo
-        self.layer.weight_hh_l0 = torch.nn.Parameter(weight_hh.resize_as_(self.layer.weight_hh_l0.data))
+            if direction == 'fwd':
+                layer.weight_ih_l0 = torch.nn.Parameter(weight_ih.resize_as_(layer.weight_ih_l0.data))
+                layer.weight_hh_l0 = torch.nn.Parameter(weight_hh.resize_as_(layer.weight_hh_l0.data))
+            elif direction == 'bwd':
+                layer.weight_ih_l0_reverse = torch.nn.Parameter(weight_ih.resize_as_(layer.weight_ih_l0.data))
+                layer.weight_hh_l0_reverse = torch.nn.Parameter(weight_hh.resize_as_(layer.weight_hh_l0.data))
 
-        if not self.legacy:
+        def _deserialize_biases(params, layer, direction):
             # ih biases
-            biases = torch.Tensor([fwd_params.inputGateBiasVector.floatValue,  # bi
-                                   fwd_params.forgetGateBiasVector.floatValue,  # bf
-                                   fwd_params.blockInputBiasVector.floatValue,  # bz/bg
-                                   fwd_params.outputGateBiasVector.floatValue])  # bo
-            self.layer.bias_hh_l0 = torch.nn.Parameter(biases.resize_as_(self.layer.bias_hh_l0.data))
-            # no hh_biases
-            self.layer.bias_ih_l0 = torch.nn.Parameter(torch.zeros(self.layer.bias_ih_l0.size()))
+            biases = torch.Tensor([params.inputGateBiasVector.floatValue,  # bi
+                                   params.forgetGateBiasVector.floatValue,  # bf
+                                   params.blockInputBiasVector.floatValue,  # bz/bg
+                                   params.outputGateBiasVector.floatValue])  # bo
+            if direction == 'fwd':
+                layer.bias_hh_l0 = torch.nn.Parameter(biases.resize_as_(layer.bias_hh_l0.data))
+                # no ih_biases
+                layer.bias_ih_l0 = torch.nn.Parameter(torch.zeros(layer.bias_ih_l0.size()))
+            elif direction == 'bwd':
+                layer.bias_hh_l0_reverse = torch.nn.Parameter(biases.resize_as_(layer.bias_hh_l0.data))
+                # no ih_biases
+                layer.bias_ih_l0_reverse = torch.nn.Parameter(torch.zeros(layer.bias_ih_l0.size()))
+
+        fwd_params = layer.weightParams if arch == 'uniDirectionalLSTM' else layer.weightParams[0]
+        _deserialize_weights(fwd_params, self.layer, 'fwd')
+        if not self.legacy:
+            _deserialize_biases(fwd_params, self.layer, 'fwd')
 
         # get backward weights
         if arch == 'biDirectionalLSTM':
             bwd_params = layer.weightParams[1]
-            weight_ih_rev = torch.Tensor([bwd_params.inputGateWeightMatrix.floatValue,  # wi
-                                          bwd_params.forgetGateWeightMatrix.floatValue,  # wf
-                                          bwd_params.blockInputWeightMatrix.floatValue,  # wz/wg
-                                          bwd_params.outputGateWeightMatrix.floatValue])  # wo
-            self.layer.weight_ih_l0_reverse = torch.nn.Parameter(weight_ih_rev.resize_as_(self.layer.weight_ih_l0.data))
-
-            weight_hh_rev = torch.Tensor([bwd_params.inputGateRecursionMatrix.floatValue,  # wi
-                                          bwd_params.forgetGateRecursionMatrix.floatValue,  # wf
-                                          bwd_params.blockInputRecursionMatrix.floatValue,  # wz/wg
-                                          bwd_params.outputGateRecursionMatrix.floatValue])  # wo
-            self.layer.weight_hh_l0_reverse = torch.nn.Parameter(weight_hh_rev.resize_as_(self.layer.weight_hh_l0.data))
-
+            _deserialize_weights(bwd_params, self.layer, 'bwd')
             if not self.legacy:
-                biases_rev = torch.Tensor([bwd_params.inputGateBiasVector.floatValue,  # bi
-                                           bwd_params.forgetGateBiasVector.floatValue,  # bf
-                                           bwd_params.blockInputBiasVector.floatValue,  # bz/bg
-                                           bwd_params.outputGateBiasVector.floatValue])  # bo
-                self.layer.bias_hh_l0_reverse = torch.nn.Parameter(biases_rev.resize_as_(self.layer.bias_hh_l0.data))
-                self.layer.bias_ih_l0 = torch.nn.Parameter(torch.zeros(self.layer.bias_ih_l0.size()))
+                _deserialize_biases(bwd_params, self.layer, 'bwd')
 
     def serialize(self, name, input, builder):
         """
