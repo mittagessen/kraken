@@ -182,6 +182,12 @@ class TorchVGSLModel(object):
             self.nn[-1].eval()
         torch.set_grad_enabled(True)
 
+    def set_num_threads(self, num):
+        """
+        Sets number of OpenMP threads to use.
+        """
+        torch.set_num_threads(num)
+
     @classmethod
     def load_pyrnn_model(cls, path):
         """

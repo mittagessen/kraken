@@ -265,7 +265,10 @@ def _validate_mm(ctx, param, value):
               help='Sets principal text direction in serialization output')
 @click.option('-l', '--lines', type=click.Path(exists=True), show_default=True,
               help='JSON file containing line coordinates')
-def ocr(ctx, model, pad, reorder, serializer, text_direction, lines):
+@click.option('--threads', default=min(len(os.sched_getaffinity()), 4),
+              show_default=True, help='Number of threads to use for OpenMP '
+              'parallelization. Defaults to min(4, #cores)')
+def ocr(ctx, model, pad, reorder, serializer, text_direction, lines, threads):
     """
     Recognizes text in line images.
     """
@@ -302,6 +305,9 @@ def ocr(ctx, model, pad, reorder, serializer, text_direction, lines):
         nn = defaultdict(lambda: nm['default'])
         nn.update(nm)
         nm = nn
+    # thread count is global so setting it once is sufficient
+    nn.values()[0].set_num_threads(threads)
+
     # set output mode
     ctx.meta['mode'] = serializer
     ctx.meta['text_direction'] = text_direction

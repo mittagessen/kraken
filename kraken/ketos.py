@@ -76,15 +76,17 @@ def _validate_manifests(ctx, param, value):
 @click.option('-t', '--training-files', show_default=True, default=None, multiple=True, callback=_validate_manifests, type=click.File(mode='r', lazy=True), help='File(s) with additional paths to training data')
 @click.option('-e', '--evaluation-files', show_default=True, default=None, multiple=True, callback=_validate_manifests, type=click.File(mode='r', lazy=True), help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
 @click.option('--preload/--no-preload', show_default=True, default=None, help='Hard enable/disable for training data preloading')
+@click.option('--threads', show_default=True, default=min(4, len(os.sched_getaffinity(0))), help='Number of OpenMP threads when running on CPU. Defaults to min(4, #cores).')
 @click.argument('ground_truth', nargs=-1, type=click.Path(exists=True, dir_okay=False))
 def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
           lag, min_delta, device, optimizer, lrate, momentum, partition,
           normalization, codec, resize, reorder, training_files,
-          evaluation_files, preload, ground_truth):
+          evaluation_files, preload, threads, ground_truth):
     """
     Trains a model from image-text pairs.
     """
     import re
+    import torch
     import numpy as np
 
     from torch.optim import SGD, RMSprop
@@ -247,7 +249,6 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
     # don't encode test set as the alphabets may not match causing encoding failures
     test_set.training_set = list(zip(test_set._images, test_set._gt))
 
-
     logger.debug('Moving model to device {}'.format(device))
     nn.to(device)
 
@@ -255,6 +256,10 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
 
     # set mode to trainindg
     nn.train()
+
+    # set number of OpenMP threads
+    logger.debug('Set OpenMP threads to {}'.format(threads))
+    nn.set_num_threads(threads)
 
     rec = models.TorchSeqRecognizer(nn, train=True)
     if optimizer == 'SGD':
