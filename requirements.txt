@@ -11,3 +11,4 @@ jinja2
 python-bidi
 torchvision
 torch>=0.4.0
+coremltools
