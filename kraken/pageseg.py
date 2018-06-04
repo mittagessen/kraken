@@ -455,7 +455,7 @@ def segment(im, text_direction='horizontal-lr', scale=None, maxcolseps=2,
     return {'text_direction': text_direction, 'boxes':  rotate_lines(lines, 360-angle, offset).tolist(), 'script_detection': False}
 
 
-def detect_scripts(im, bounds, model=None, valid_scripts=None):
+def detect_scripts(im, bounds, model=pkg_resources.resource_filename(__name__, 'script.mlmodel'), valid_scripts=None):
     """
     Detects scripts in a segmented page.
 
@@ -482,10 +482,7 @@ def detect_scripts(im, bounds, model=None, valid_scripts=None):
     """
     im_str = get_im_str(im)
     logger.info(u'Detecting scripts with {} in {} lines on {}'.format(model, len(bounds['boxes']), im_str))
-    if not model:
-        model = pkg_resources.resource_filename(__name__, 'script.mlmodel')
-        logger.debug(u'No model given. Loading default {}'.format(model))
-    logger.debug(u'Loading detection model')
+    logger.debug(u'Loading detection model {}'.format(model))
     rnn = models.load_any(model)
     # load numerical to 4 char identifier map
     logger.debug(u'Loading label to identifier map')
