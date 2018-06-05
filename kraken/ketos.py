@@ -310,16 +310,16 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
 
 @cli.command('extract')
 @click.pass_context
-@click.option('-b', '--binarize/--no-binarize', default=True,
+@click.option('-b', '--binarize/--no-binarize', show_default=True, default=True,
               help='Binarize color/grayscale images')
-@click.option('-u', '--normalization',
+@click.option('-u', '--normalization', show_default=True,
               type=click.Choice(['NFD', 'NFKD', 'NFC', 'NFKC']), default=None,
               help='Normalize ground truth')
-@click.option('-n', '--reorder/--no-reorder', default=True,
+@click.option('-n', '--reorder/--no-reorder', default=True, show_default=True,
               help='Reorder transcribed lines to display order')
-@click.option('-r', '--rotate/--no-rotate', default=True,
+@click.option('-r', '--rotate/--no-rotate', default=True, show_default=True,
               help='Skip rotation of vertical lines')
-@click.option('-o', '--output', type=click.Path(), default='training',
+@click.option('-o', '--output', type=click.Path(), default='training', show_default=True,
               help='Output directory')
 @click.argument('transcriptions', nargs=-1, type=click.File(lazy=True))
 def extract(ctx, binarize, normalization, reorder, rotate, output,
@@ -333,6 +333,8 @@ def extract(ctx, binarize, normalization, reorder, rotate, output,
     from io import BytesIO
     from PIL import Image
     from lxml import html, etree
+
+    from kraken import binarization
 
     try:
         os.mkdir(output)
