@@ -33,6 +33,10 @@ from kraken.lib.lineest import CenterNormalizer, dewarp
 
 __all__ = ['GroundTruthDataset', 'compute_error', 'generate_input_transforms']
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 def generate_input_transforms(batch, height, width, channels, pad):
     """
@@ -226,8 +230,11 @@ class GroundTruthDataset(Dataset):
         else:
             item = self.training_set[index]
             try:
+                logger.debug('Attempting to load {}'.format(item[0]))
                 return (self.transforms(Image.open(item[0])), item[1])
             except Exception:
+                idx = np.random.randint(0, len(self.training_set))
+                logger.debug('Failed. Replacing with sample {}'.format(idx))
                 return self[np.random.randint(0, len(self.training_set))]
 
     def __len__(self):
