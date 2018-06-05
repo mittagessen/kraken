@@ -198,6 +198,8 @@ class GroundTruthDataset(Dataset):
             gt = fp.read().strip('\n\r')
             for func in self.text_transforms:
                 gt = func(gt)
+                if not gt:
+                    raise KrakenInputException('Text line is empty ({})'.format(fp.name))
         if self.preload:
             im = Image.open(image)
             try:
