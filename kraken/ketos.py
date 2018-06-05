@@ -302,7 +302,7 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
                 o = o.squeeze(2)
                 optim.zero_grad()
                 loss = nn.criterion(o, target)
-                logger.debug('batch {} - loss {}'.format(trial, float(loss)))
+                logger.info('trial {} - loss {}'.format(trial, float(loss)))
                 loss.backward()
                 optim.step()
                 bar.update(1)
