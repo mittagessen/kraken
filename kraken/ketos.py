@@ -175,7 +175,12 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
     with log.progressbar(te_im, label='Building test set') as bar:
         for im in bar:
             logger.debug('Adding line {} to test set'.format(im))
-            test_set.add(im)
+            try:
+                test_set.add(im)
+            except FileNotFoundError as e:
+                logger.warning('{}: {}. Skipping.'.format(e.strerror, e.filename))
+            except KrakenInputException as e:
+                logger.warning(str(e))
 
     logger.info('Training set {} lines, test set {} lines, alphabet {} symbols'.format(len(gt_set._images), len(test_set._images), len(gt_set.alphabet)))
     alpha_diff = set(gt_set.alphabet).symmetric_difference(set(test_set.alphabet))
