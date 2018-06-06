@@ -320,6 +320,8 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
 @click.option('-u', '--normalization', show_default=True,
               type=click.Choice(['NFD', 'NFKD', 'NFC', 'NFKC']), default=None,
               help='Normalize ground truth')
+@click.option('-s', '--normalize-whitespace/--no-normalize-whitespace',
+              show_default=True, default=True, help='Normalizes unicode whitespace')
 @click.option('-n', '--reorder/--no-reorder', default=True, show_default=True,
               help='Reorder transcribed lines to display order')
 @click.option('-r', '--rotate/--no-rotate', default=True, show_default=True,
@@ -327,12 +329,13 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
 @click.option('-o', '--output', type=click.Path(), default='training', show_default=True,
               help='Output directory')
 @click.argument('transcriptions', nargs=-1, type=click.File(lazy=True))
-def extract(ctx, binarize, normalization, reorder, rotate, output,
-            transcriptions):
+def extract(ctx, binarize, normalization, normalize_whitespace, reorder,
+            rotate, output, transcriptions):
     """
     Extracts image-text pairs from a transcription environment created using
     ``ketos transcribe``.
     """
+    import regex
     import base64
 
     from io import BytesIO
@@ -346,6 +349,13 @@ def extract(ctx, binarize, normalization, reorder, rotate, output,
     except Exception:
         pass
 
+    text_transforms = []
+    if normalization:
+        text_transforms.append(lambda x: unicodedata.normalize(normalization, x))
+    if normalize_whitespace:
+        text_transforms.append(lambda x: regex.sub('\s', ' ', x))
+    if reorder:
+        text_transforms.append(get_display)
 
     idx = 0
     manifest = []
@@ -378,13 +388,10 @@ def extract(ctx, binarize, normalization, reorder, rotate, output,
                         l.save('{}/{:06d}.png'.format(output, idx))
                         manifest.append('{:06d}.png'.format(idx))
                         text = u''.join(line.itertext()).strip()
-                        if normalization:
-                            text = unicodedata.normalize(normalization, text)
+                        for func in text_transforms:
+                            text = func(text)
                         with open('{}/{:06d}.gt.txt'.format(output, idx), 'wb') as t:
-                            if reorder:
-                                t.write(get_display(text).encode('utf-8'))
-                            else:
-                                t.write(text.encode('utf-8'))
+                            t.write(text.encode('utf-8'))
                         idx += 1
     logger.info('Extracted {} lines'.format(idx))
     with open('{}/manifest.txt'.format(output), 'w') as fp:
