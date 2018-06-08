@@ -189,7 +189,10 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
     logger.info('grapheme\tcount')
     for k, v in sorted(gt_set.alphabet.items(), key=lambda x: x[1], reverse=True):
         if unicodedata.combining(k) or k.isspace():
-            k = unicodedata.name(k)
+            try:
+                k = unicodedata.name(k)
+            except ValueError as e:
+                k = '0x{:x}'.format(ord(k))
         else:
             k = '\t' + k
         logger.info(u'{}\t{}'.format(k, v))
