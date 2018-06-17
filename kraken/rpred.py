@@ -106,7 +106,8 @@ def bidi_record(record):
     cuts = []
     confidences = []
     for ch in storage['chars']:
-        prediction = prediction + ch['record'][0]
+        # code point may have been mirrored
+        prediction = prediction + ch['ch']
         cuts.append(ch['record'][1])
         confidences.append(ch['record'][2])
     return ocr_record(prediction, cuts, confidences)
