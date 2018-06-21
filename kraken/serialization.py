@@ -79,6 +79,7 @@ def serialize(records, image_name=u'', image_size=(0, 0), writing_mode='horizont
     logger.info(u'Serialize {} records from {} with template {}.'.format(len(records), image_name, template))
     page = {'lines': [], 'size': image_size, 'name': image_name, 'writing_mode': writing_mode, 'scripts': scripts}
     seg_idx = 0
+    char_idx = 0
     for idx, record in enumerate(records):
         # skip empty records
         if not record.prediction:
@@ -97,16 +98,19 @@ def serialize(records, image_name=u'', image_size=(0, 0), writing_mode='horizont
             if len(segment) == 0:
                 continue
             seg_bbox = max_bbox(record.cuts[line_offset:line_offset + len(segment)])
+
             line['recognition'].extend([{'bbox': seg_bbox,
                                         'confidences': record.confidences[line_offset:line_offset + len(segment)],
                                         'cuts': record.cuts[line_offset:line_offset + len(segment)],
                                         'text': segment,
-                                        'recognition': [{'bbox': cut, 'confidence': conf, 'text': char}
-                                            for conf, cut , char in
+                                        'recognition': [{'bbox': cut, 'confidence': conf, 'text': char, 'index': cid}
+                                            for conf, cut, char, cid in
                                             zip(record.confidences[line_offset:line_offset + len(segment)],
                                                 record.cuts[line_offset:line_offset + len(segment)],
-                                                segment)],
+                                                segment,
+                                                range(char_idx, char_idx + len(segment)))],
                                         'index': seg_idx}])
+            char_idx += len(segment)
             seg_idx += 1
             line_offset += len(segment)
         page['lines'].append(line)

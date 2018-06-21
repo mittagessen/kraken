@@ -1,9 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
+
 <!-- ALTO: Analyzed Layout and Text Object  -->
+<!-- This document is available under the Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0 - https://creativecommons.org/licenses/by-sa/4.0/ ). 
+The ALTO Editorial Board has waived all rights to it worldwide under copyright law with confirmation of the original creating authors, including all related and neighboring rights, to the extent allowed by law.
+For the full text see https://creativecommons.org/licenses/by-sa/4.0/legalcode. -->
+
 <!-- Originally created during the EU-funded Project METAe, the Metadata Engine Project (2001 - 2003), by Alexander Egger (1), Birgit Stehno (2) and Gregor Retti (2), (1) University of Graz and (2) University of Innsbruck, Austria with contributions of Ralph Tiede, CCS GmbH, Germany -->
 <!-- Prepared for the Library of Congress by Ralph Tiede, CCS GmbH, with the assistance of Justin Littman (Library of Congress). -->
 
-<!-- Version 3.1 -->
+<!-- Version 4.0 DRAFT -->
 
 <!-- Change History -->
 <!-- June 22, 2004: Version finalized for docWORKS/METAe -->
@@ -23,31 +28,31 @@
 	2. add measurement enumeration 'inch1200'
 -->
 <!-- Modifications of December 14, 2004:
-      1. "FILEID" (attribute of "ComposedBlock"): change type from xsd:IDREF to xsd:string
-      2. include minor changes requested by JDL
-      3. change "ZORDER" to "IDNEXT" (attribute of "BlockType")
+	1. "FILEID" (attribute of "ComposedBlock"): change type from xsd:IDREF to xsd:string
+	2. include minor changes requested by JDL
+	3. change "ZORDER" to "IDNEXT" (attribute of "BlockType")
 -->
 <!-- Modifications of February 24, 2006:
-      1. ACCURACY attribute added to PAGE element to store information on OCR accuracy
-      2. CS attribute added to TEXTLINE element to indicate manual correction status
+	1. ACCURACY attribute added to PAGE element to store information on OCR accuracy
+	2. CS attribute added to TEXTLINE element to indicate manual correction status
 -->
 <!-- Modifications of June 20, 2007 (version 1.3):
-      1. Adaption of xlink namespace and schema location to prevent conflicts on XSL transformations in combination with used namespace in original METS file
+	1. Adaption of xlink namespace and schema location to prevent conflicts on XSL transformations in combination with used namespace in original METS file
 -->
 <!-- Modifications of August 27, 2007 (version 1.4):
-      1. add "QUALITY_DETAIL" attribute to "PAGE" element (gives more details about the page quality, is a free string comparing with QUALITY attribute which is a restrictive one)
-      2. add "Cover" to "POSITION" attribute of "PAGE" element
-      3. specification of interpretation of confidence values (CC, WC, PC and ACCURACY)
+	1. add "QUALITY_DETAIL" attribute to "PAGE" element (gives more details about the page quality, is a free string comparing with QUALITY attribute which is a restrictive one)
+	2. add "Cover" to "POSITION" attribute of "PAGE" element
+	3. specification of interpretation of confidence values (CC, WC, PC and ACCURACY)
 -->
 <!-- Modifications of August 7, 2009:
-	1.  Change namespace from old CCS URI to LC-based URI.
-	2.  Use standard LC XLink Schema.
-	3.  Push version to 2.0 to reflect change in maintenance agency.
-	4.  Remove CCS copyright statement.
-	5.  Rollback to model used in 1.4 schema except with the changes itemized in 1-4 of this change note.  An incorrect version of the 2.0 alpha schema was public until 2010-01-11.  The incorrect version was a derivative of the Library of Congress's custom ALTO XML Schema that introduced new elements and attributes. 
+	1. Change namespace from old CCS URI to LC-based URI.
+	2. Use standard LC XLink Schema.
+	3. Push version to 2.0 to reflect change in maintenance agency.
+	4. Remove CCS copyright statement.
+	5. Rollback to model used in 1.4 schema except with the changes itemized in 1-4 of this change note.  An incorrect version of the 2.0 alpha schema was public until 2010-01-11.  The incorrect version was a derivative of the Library of Congress's custom ALTO XML Schema that introduced new elements and attributes. 
 -->
 <!-- Modifications of January 11, 2010:
-	1.  Rollback to model used in 1.4 schema except with the changes itemized in 1-4 of the previous change note of August 7, 2009.  An incorrect version of the 2.0 alpha schema was public until 2010-01-11.  The incorrect version was a derivative of the Library of Congress's custom ALTO XML Schema that introduced new elements and attributes that extended the 1.4 model prior to editorial board approval. 
+	1. Rollback to model used in 1.4 schema except with the changes itemized in 1-4 of the previous change note of August 7, 2009.  An incorrect version of the 2.0 alpha schema was public until 2010-01-11.  The incorrect version was a derivative of the Library of Congress's custom ALTO XML Schema that introduced new elements and attributes that extended the 1.4 model prior to editorial board approval. 
 -->
 <!-- February 20, 2014, version 2.1:
 	1. Page and BlockType element HEIGHT, WIDTH, HPOS, VPOS attribute types changed to xsd:float from xsd:int.
@@ -61,17 +66,13 @@
 	9. HEIGHT attribute added to HYP and SP elements.
 -->
 <!-- April, 2014, version 2.2 DRAFT:
-	1. Anonymous types changed to named types (to allow use of xsd:redefine mechanism)
-		
+	1. Anonymous types changed to named types (to allow use of xsd:redefine mechanism)	
 -->
-
 <!-- July 2014, version 2.2 DRAFT
 	1. Version added to xsd:schema.
 	2. SCHEMAVERSION attribute added to <alto> element.
 	3. documentIdentifier element added to <sourceImageInformationType> element (+ documentIdentifierLocation attribute)
-
 -->
-
 <!-- August 2014, version 3.0
 	1. Changed namespace and targetNamespace to http://www.loc.gov/standards/alto/ns-v3#
 	2. Changed schema version to 3.0 
@@ -79,14 +80,24 @@
 	ALTO schemas will be updated by whole numbers upon making changes that break backward compatibility (version 1 to version 2), 
 	and decimals for changes that will not (2.0 to 2.1). The namespace itself will also only change on major versions (ns-v2 to ns-v3). 
 -->
-
 <!-- January 2016, version 3.1
 	1. Changed schema version to 3.1
-    2. Added support for using different shapes for the elements String, TextLine, all PageSpaceType elements and on all BlockType elements.
-    3. The description of the attribute ROTATION is changed to the rotation of the contents of a block and not the block itself. The attribute is inherited by all sub elements.
+	2. Added support for using different shapes for the elements String, TextLine, all PageSpaceType elements and on all BlockType elements.
+	3. The description of the attribute ROTATION is changed to the rotation of the contents of a block and not the block itself. The attribute is inherited by all sub elements.
+-->
+<!-- January 2018, version 4.0 (draft)
+	1. Changed schema version to 4.0
+	2. Changed namespace and targetNamespace to http://www.loc.gov/standards/alto/ns-v4#
+	3. Clarification and definition of the licensing to common standard "CC BY-SA 4.0" for this ALTO standard (with agreement of the authors)
+	4. Added character based text description with new Glyph element and its subelement Variant (GlyphType, VariantType)
+	5. Extended annotation for clarification of the difference of existing element ALTERNATIVE and Glyph/Variant
+	6. Introduce generic "Processing" and deprecate "OcrProcessing"
+	7. Introduce generic "processingStep" with "ProcessingStepType" and required attribute "ID" and deprecate "preProcessingStep", "ocrProcessingStep", "postProcessingStep"
+	8. Add common vocabulary for "processingStep" comprising the "ContentGeneration", "ContentModification", "PreOperation", "PostOperation", "Other"
+	9. Fix for the element Shape. The Shape element can now only be used once within a PageSpace or a TextLine as it was intended.
 -->
 
-<xsd:schema xmlns="http://www.loc.gov/standards/alto/ns-v3#" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xlink="http://www.w3.org/1999/xlink" targetNamespace="http://www.loc.gov/standards/alto/ns-v3#" elementFormDefault="qualified" attributeFormDefault="unqualified" version="3.1">
+<xsd:schema xmlns="http://www.loc.gov/standards/alto/ns-v4#" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xlink="http://www.w3.org/1999/xlink" targetNamespace="http://www.loc.gov/standards/alto/ns-v4#" elementFormDefault="qualified" attributeFormDefault="unqualified" version="4.0">
 	<xsd:import namespace="http://www.w3.org/1999/xlink" schemaLocation="http://www.loc.gov/standards/xlink/xlink.xsd"/>
 	<xsd:element name="alto" type="altoType">
 		<xsd:annotation>
@@ -113,9 +124,9 @@
 			<xsd:element name="Tags" type="TagsType" minOccurs="0">
 				<xsd:annotation>
 					<xsd:documentation>
-							Tag define properties of additional characteristic. The tags are referenced from related content element on Block or String element by attribute TAGREF via the tag ID.
-							This container element contains the individual elements for LayoutTags, StructureTags, RoleTags, NamedEntityTags and OtherTags
-						</xsd:documentation>
+						Tag define properties of additional characteristic. The tags are referenced from related content element on Block or String element by attribute TAGREF via the tag ID.
+						This container element contains the individual elements for LayoutTags, StructureTags, RoleTags, NamedEntityTags and OtherTags
+					</xsd:documentation>
 				</xsd:annotation>
 			</xsd:element>
 			<xsd:element name="Layout" type="LayoutType">
@@ -135,9 +146,21 @@
 			<xsd:element name="MeasurementUnit" type="MeasurementUnitType" minOccurs="1"/>
 			<xsd:element name="sourceImageInformation" type="sourceImageInformationType" minOccurs="0"/>
 			<xsd:element name="OCRProcessing" minOccurs="0" maxOccurs="unbounded">
+				<xsd:annotation>
+					<xsd:documentation>Element deprecated. 'Processing' should be used instead.</xsd:documentation>
+				</xsd:annotation>
 				<xsd:complexType>
 					<xsd:complexContent>
 						<xsd:extension base="ocrProcessingType">
+							<xsd:attribute name="ID" type="xsd:ID" use="required"/>
+						</xsd:extension>
+					</xsd:complexContent>
+				</xsd:complexType>
+			</xsd:element>
+			<xsd:element name="Processing" minOccurs="0" maxOccurs="unbounded">
+				<xsd:complexType>
+					<xsd:complexContent>
+						<xsd:extension base="processingStepType">
 							<xsd:attribute name="ID" type="xsd:ID" use="required"/>
 						</xsd:extension>
 					</xsd:complexContent>
@@ -445,7 +468,13 @@
 	</xsd:simpleType>
 	<xsd:complexType name="ALTERNATIVEType">
 		<xsd:annotation>
-			<xsd:documentation>Any alternative for the word.</xsd:documentation>
+			<xsd:documentation>
+				Any alternative for the word.
+				Alternative can outline a variant of writing by new typing / spelling rules, typically manually done or by dictionary replacements.
+				The above sample is an old composed character "Æ" of ancient time, which is replaced now by "Ä".
+				As variant are meant alternatives of the real printed content which are options outlined by the text recognition process. 
+				Similar sample: "Straße" vs. "Strasse". Such alternatives are not coming from text recognition.
+			</xsd:documentation>
 		</xsd:annotation>
 		<xsd:simpleContent>
 			<xsd:extension base="xsd:string">
@@ -464,6 +493,7 @@
 		<xsd:sequence minOccurs="0">
 			<xsd:element name="Shape" type="ShapeType" minOccurs="0" maxOccurs="1"/>
 			<xsd:element name="ALTERNATIVE" type="ALTERNATIVEType" minOccurs="0" maxOccurs="unbounded"/>
+			<xsd:element name="Glyph" type="GlyphType" minOccurs="0" maxOccurs="unbounded"/>
 		</xsd:sequence>
 		<xsd:attribute name="ID" type="StringTypeID" use="optional"/>
 		<xsd:attribute name="STYLEREFS" type="xsd:IDREFS" use="optional"/>
@@ -501,9 +531,11 @@
 		<xsd:annotation>
 			<xsd:documentation>A region on a page</xsd:documentation>
 		</xsd:annotation>
-		<xsd:sequence minOccurs="0" maxOccurs="unbounded">
+		<xsd:sequence>
 			<xsd:element name="Shape" type="ShapeType" minOccurs="0"  maxOccurs="1"/>
-			<xsd:group ref="BlockGroup"/>
+			<xsd:sequence minOccurs="0" maxOccurs="unbounded">
+				<xsd:group ref="BlockGroup"/>
+			</xsd:sequence>
 		</xsd:sequence>
 		<xsd:attribute name="ID" type="PageSpaceTypeID" use="optional"/>
 		<xsd:attribute name="STYLEREFS" type="xsd:IDREFS" use="optional"/>
@@ -539,7 +571,7 @@
 			<xsd:documentation>An ellipse shape. HPOS and VPOS describe the center of the ellipse.
                                 HLENGTH and VLENGTH are the width and height of the described ellipse.</xsd:documentation>
 			<xsd:documentation>The attribute ROTATION tells the rotation of the e.g. text or 
-				               illustration within the block. The value is in degrees counterclockwise. </xsd:documentation>
+				           illustration within the block. The value is in degrees counterclockwise. </xsd:documentation>
 		</xsd:annotation>
 		<xsd:attribute name="HPOS" type="xsd:float" use="required"/>
 		<xsd:attribute name="VPOS" type="xsd:float" use="required"/>
@@ -600,21 +632,21 @@
 	<xsd:simpleType name="MeasurementUnitType">
 		<xsd:annotation>
 			<xsd:documentation>
-										All measurement values inside the alto file are related to 
-										this unit, except the font size.
-										Coordinates as being used in HPOS and VPOS are absolute coordinates referring to the upper-left corner of a page.
-										The upper left corner of the page is defined as coordinate (0/0). 
+				All measurement values inside the alto file are related to 
+				this unit, except the font size.
+				Coordinates as being used in HPOS and VPOS are absolute coordinates referring to the upper-left corner of a page.
+				The upper left corner of the page is defined as coordinate (0/0). 
 
-										values meaning:
-										  mm10: 1/10th of millimeter
-										  inch1200: 1/1200th of inch 
-										  pixel: 1 pixel
+				values meaning:
+				mm10: 1/10th of millimeter
+				inch1200: 1/1200th of inch 
+				pixel: 1 pixel
 										
-										The values for pixel will be related to the resolution of the image based 
-										on which the layout is described. Incase the original image is not known
-										the scaling factor can be calculated based on total width and height of 
-										the image and the according information of the PAGE element.
-										</xsd:documentation>
+				The values for pixel will be related to the resolution of the image based 
+				on which the layout is described. Incase the original image is not known
+				the scaling factor can be calculated based on total width and height of 
+				the image and the according information of the PAGE element.
+		</xsd:documentation>
 		</xsd:annotation>
 		<xsd:restriction base="xsd:string">
 			<xsd:enumeration value="pixel"/>
@@ -681,13 +713,25 @@
 	</xsd:complexType>
 	<xsd:complexType name="ocrProcessingType">
 		<xsd:annotation>
-			<xsd:documentation>Information on how the text was created, including preprocessing, OCR processing, and postprocessing steps.</xsd:documentation>
-			<xsd:documentation>Where possible, this draws from MIX's change history.</xsd:documentation>
+			<xsd:documentation>Deprecated. processingType should be used instead.</xsd:documentation>
+			<xsd:documentation>Information on how the text was created, including preprocessing, OCR processing, and postprocessing steps. Where possible, this draws from MIX's change history.</xsd:documentation>
 		</xsd:annotation>
 		<xsd:sequence>
 			<xsd:element name="preProcessingStep" type="processingStepType" minOccurs="0" maxOccurs="unbounded"/>
 			<xsd:element name="ocrProcessingStep" type="processingStepType"/>
 			<xsd:element name="postProcessingStep" type="processingStepType" minOccurs="0" maxOccurs="unbounded"/>
+		</xsd:sequence>
+	</xsd:complexType>
+	<xsd:complexType name="processingType">
+		<xsd:annotation>
+			<xsd:documentation>Information on how the text was created, including generation, modification, preprocessing, postprocessing or any other steps. May include references to a list of space-separated IDs of elements processed.</xsd:documentation>
+		</xsd:annotation>
+		<xsd:sequence>
+			<xsd:element name="contentGeneration" type="processingType" minOccurs="0" maxOccurs="unbounded"/>
+			<xsd:element name="contentModification" type="processingType" minOccurs="0" maxOccurs="unbounded"/>
+			<xsd:element name="preOperation" type="processingType" minOccurs="0" maxOccurs="unbounded"/>
+			<xsd:element name="postOperation" type="processingType" minOccurs="0" maxOccurs="unbounded"/>
+			<xsd:element name="other" type="processingType" minOccurs="0" maxOccurs="unbounded"/>
 		</xsd:sequence>
 	</xsd:complexType>
 	<xsd:complexType name="processingStepType">
@@ -720,7 +764,7 @@
 	</xsd:complexType>
 	<xsd:complexType name="processingSoftwareType">
 		<xsd:annotation>
-			<xsd:documentation>Information about a software application. Where applicable, the preferred method for determining this information is by selecting Help --> About.</xsd:documentation>
+			<xsd:documentation>Information about a software application. Where applicable, the preferred method for determining this information is by selecting Help -- About.</xsd:documentation>
 		</xsd:annotation>
 		<xsd:sequence>
 			<xsd:element name="softwareCreator" type="xsd:string" minOccurs="0">
@@ -832,8 +876,10 @@
 						</xsd:annotation>
 						<xsd:complexType>
 							<xsd:sequence>
-								<xsd:sequence maxOccurs="unbounded">
+								<xsd:sequence>
 									<xsd:element name="Shape" type="ShapeType" minOccurs="0" maxOccurs="1"/>
+								</xsd:sequence>
+								<xsd:sequence maxOccurs="unbounded">
 									<xsd:element name="String" type="StringType"/>
 									<xsd:element name="SP" type="SPType" minOccurs="0"/>
 								</xsd:sequence>
@@ -889,15 +935,15 @@
 			<xsd:element name="XmlData" minOccurs="0">
 				<xsd:annotation>
 					<xsd:documentation xml:lang="en">
-	          The xml data wrapper element XmlData is used to contain XML encoded metadata.
-	          The content of an XmlData element can be in any namespace or in no namespace.
-	          As permitted by the XML Schema Standard, the processContents attribute value for the
-	          metadata in an XmlData is set to “lax”. Therefore, if the source schema and its location are
-	          identified by means of an XML schemaLocation attribute, then an XML processor will validate
-	          the elements for which it can find declarations. If a source schema is not identified, or cannot be
-	          found at the specified schemaLocation, then an XML validator will check for well-formedness,
-	          but otherwise skip over the elements appearing in the XmlData element.
-	        </xsd:documentation>
+						The xml data wrapper element XmlData is used to contain XML encoded metadata.
+						The content of an XmlData element can be in any namespace or in no namespace.
+						As permitted by the XML Schema Standard, the processContents attribute value for the
+						metadata in an XmlData is set to “lax”. Therefore, if the source schema and its location are
+						identified by means of an XML schemaLocation attribute, then an XML processor will validate
+						the elements for which it can find declarations. If a source schema is not identified, or cannot be
+						found at the specified schemaLocation, then an XML validator will check for well-formedness,
+						but otherwise skip over the elements appearing in the XmlData element.
+					</xsd:documentation>
 				</xsd:annotation>
 				<xsd:complexType>
 					<xsd:sequence>
@@ -909,9 +955,7 @@
 		<xsd:attribute name="ID" type="xsd:ID" use="required"/>
 		<xsd:attribute name="TYPE" type="xsd:string" use="optional">
 			<xsd:annotation>
-				<xsd:documentation>Type can be used to classify and group the information within each tag
-	        element type.
-	      </xsd:documentation>
+				<xsd:documentation>Type can be used to classify and group the information within each tag element type.</xsd:documentation>
 			</xsd:annotation>
 		</xsd:attribute>
 		<xsd:attribute name="LABEL" type="xsd:string" use="required">
@@ -926,9 +970,112 @@
 		</xsd:attribute>
 		<xsd:attribute name="URI" type="xsd:anyURI" use="optional">
 			<xsd:annotation>
-				<xsd:documentation>Any URI for authority or description relevant information.
-	      </xsd:documentation>
+				<xsd:documentation>Any URI for authority or description relevant information.</xsd:documentation>
 			</xsd:annotation>
+		</xsd:attribute>
+	</xsd:complexType>
+	<xsd:complexType name="GlyphType" mixed="false">
+		<xsd:annotation> 
+			<xsd:documentation>
+				Modern OCR software stores information on glyph level. A glyph is essentially a character or ligature.
+				Accordingly the value for the glyph element will be defined as follows:
+				Pre-composed representation = base + combining character(s) (decomposed representation)
+				See http://www.fileformat.info/info/unicode/char/0101/index.htm
+				"U+0101" = (U+0061) + (U+0304)
+				"combining characters" ("base characters" in combination with non-spacing marks or characters which are combined to one) are represented as one "glyph", e.g. áàâ.
+				
+				Each glyph has its own coordinate information and must be separately addressable as a distinct object.
+				Correction and verification processes can be carried out for individual characters.
+				
+				Post-OCR analysis of the text as well as adaptive OCR algorithm must be able to record information on glyph level.
+				In order to reproduce the decision of the OCR software, optional characters must be recorded. These are called variants.
+				The OCR software evaluates each variant and picks the one with the highest confidence score as the glyph.
+				The confidence score expresses how confident the OCR software is that a single glyph had been recognized correctly.
+				
+				The glyph elements are in order of the word. Each glyph need to be recorded to built up the whole word sequence.
+				
+				The glyph’s CONTENT attribute is no replacement for the string’s CONTENT attribute.
+				Due to post-processing steps such as correction the values of both attributes may be inconsistent. 
+			</xsd:documentation>
+		</xsd:annotation>
+		<xsd:sequence minOccurs="0">
+			<xsd:element name="Shape" type="ShapeType" minOccurs="0"/>
+			<xsd:element name="Variant" type="VariantType" minOccurs="0" maxOccurs="unbounded" />
+		</xsd:sequence>
+		<xsd:attribute name="ID" type="xsd:ID" use="optional"/>
+		<xsd:attribute name="CONTENT" use="required">
+			<xsd:annotation>
+				<xsd:documentation>
+					CONTENT contains the precomposed representation (combining character) of the character from the parent String element.
+					The sequence position of the Gylph element matches the position of the character in the String.
+				</xsd:documentation>
+			</xsd:annotation>
+			<xsd:simpleType>
+				<xsd:restriction base="xsd:string">
+					<xsd:length fixed="true" value="1"/>
+					<xsd:whiteSpace value="preserve"/>
+				</xsd:restriction>
+			</xsd:simpleType>
+		</xsd:attribute>
+		<xsd:attribute name="GC" use="optional">
+			<xsd:annotation>
+				<xsd:documentation>
+					This GC attribute records a float value between 0.0 and 1.0 that expresses the level of confidence for the variant where is 1 is certain.
+					This attribute is optional. If it is not available, the default value for the variant is “0”.
+					The GC attribute semantic is the same as the WC attribute on the String element and VC on Variant element.
+				</xsd:documentation>
+			</xsd:annotation>
+			<xsd:simpleType>
+				<xsd:restriction base="xsd:float">
+					<xsd:minInclusive value="0"/>
+					<xsd:maxInclusive value="1"/>
+				</xsd:restriction>
+			</xsd:simpleType>
+		</xsd:attribute>
+		<xsd:attribute name="HEIGHT" type="xsd:float" use="optional"/>
+		<xsd:attribute name="WIDTH" type="xsd:float" use="optional"/>
+		<xsd:attribute name="HPOS" type="xsd:float" use="optional"/>
+		<xsd:attribute name="VPOS" type="xsd:float" use="optional"/>
+	</xsd:complexType>
+	<xsd:complexType name="VariantType" mixed="false">
+		<xsd:annotation>
+			<xsd:documentation>
+				Alternative (combined) character for the glyph, outlined by OCR engine or similar recognition processes.
+				In case the variant are two (combining) characters, two characters are outlined in one Variant element.
+				E.g. a Glyph element with CONTENT="m" can have a Variant element with the content "rn".
+				Details for different use-cases see on the samples on GitHub.
+			</xsd:documentation>
+		</xsd:annotation>
+		<xsd:attribute name="CONTENT" use="optional">
+			<xsd:annotation>
+				<xsd:documentation>
+					Each Variant represents an option for the glyph that the OCR software detected as possible alternatives.
+					In case the variant are two (combining) characters, two characters are outlined in one Variant element.
+					E.g. a Glyph element with CONTENT="m" can have a Variant element with the content "rn".
+					Details for different use-cases see on the samples on GitHub.
+				</xsd:documentation>
+			</xsd:annotation>
+			<xsd:simpleType>
+				<xsd:restriction base="xsd:string">
+					<xsd:maxLength value="3"/>
+					<xsd:whiteSpace value="preserve"/>
+				</xsd:restriction>
+			</xsd:simpleType>
+		</xsd:attribute>
+		<xsd:attribute name="VC" use="optional">
+			<xsd:annotation>
+				<xsd:documentation>
+					This VC attribute records a float value between 0.0 and 1.0 that expresses the level of confidence for the variant where is 1 is certain.
+					This attribute is optional. If it is not available, the default value for the variant is “0”.
+					The VC attribute semantic is the same as the GC attribute on the Glyph element.
+				</xsd:documentation>
+			</xsd:annotation>
+			<xsd:simpleType>
+				<xsd:restriction base="xsd:float">
+					<xsd:minInclusive value="0"/>
+					<xsd:maxInclusive value="1"/>
+				</xsd:restriction>
+			</xsd:simpleType>
 		</xsd:attribute>
 	</xsd:complexType>
 </xsd:schema>

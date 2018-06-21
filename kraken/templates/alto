@@ -1,4 +1,7 @@
-<alto xmlns="http://www.loc.gov/standards/alto/ns-v3#">
+<?xml version="1.0" encoding="UTF-8"?>
+<alto xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns="http://www.loc.gov/standards/alto/ns-v4#"
+	xsi:schemaLocation="http://www.loc.gov/standards/alto/ns-v4# http://www.loc.gov/standards/alto/v4/alto-4-0.xsd">
 	<Description>
 		<MeasurementUnit>pixel</MeasurementUnit>
 		<sourceImageInformation>
@@ -34,12 +37,21 @@
 							{% else %}
 							<String ID="segment_{{ segment.index }}"
 								CONTENT="{{ segment.text|e }}" 
-								HPOS="{{ segment.bbox[0]}}" 
+								HPOS="{{ segment.bbox[0] }}" 
 								VPOS="{{ segment.bbox[1] }}"
 								WIDTH="{{ segment.bbox[2] - segment.bbox[0] }}" 
 								HEIGHT="{{ segment.bbox[3] - segment.bbox[1] }}" 
 								WC="{{ (segment.confidences|sum / segment.confidences|length)|round(4) }}"
-								CC="{{ segment.confidences|rescale(9, 0)|map('round')|map('int')|join(' ') }}"/>
+								{% for char in segment.recognition %}
+								<Glyph ID="char_{{ char.index }}" 
+								       CONTENT="{{ char.text|e }}
+								       HPOS="{{ char.bbox[0] }}"
+								       VPOS="{{ char.bbox[1] }}"
+								       WIDTH="{{ char.bbox[2] - char.bbox[0] }}"
+								       HEIGHT="{{ char.bbox[3] - char.bbox[1] }}"
+								       GC="{{ char.conf|round(4) }}">
+								</Glyph>>
+								{% endfor %}
 							{% endif %}
 						{% endfor %}
 					</TextLine>
