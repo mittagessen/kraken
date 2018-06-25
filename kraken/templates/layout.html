@@ -85,7 +85,7 @@
 				        <div class="img_container">
 					          <img style="width: 100%;" src="{{ page.img }}" alt="photo"/>
 					          {% for line in page.lines %}
-					          <a class="rect" alt="line_{{ line.index }}" href="" title="" style="position: absolute; left: {{ line.left }}%; top: {{ line.top }}%; width: {{ line.width }}%; height: {{ line.height }}%; z-index: 2;" id="image-line-{{ line.index }}"></a>
+					          <a class="rect" alt="line_{{ line.index }}" href="" title="" style="position: absolute; left: {{ line.left }}%; top: {{ line.top }}%; width: {{ line.width }}%; height: {{ line.height }}%; z-index: 2;" id="{{ line.index }}"></a>
                     <!-- This is the bounding boxes overlayed on the image -->
 					          {% endfor %}
 				        </div>
@@ -95,26 +95,29 @@
                     <button onclick="deleteBoxes()" id="deleteButton">
                         Delete Marked Lines
                     </button>
+                    <button onclick="undoDeletion()" id="undodeleteButton">
+                        Undo Deletion
+                    </button>
                 </fieldset>
 				        <ol id="text-line-list">
                     <!-- Contains the lines -->
 				            {% for line in page.lines %}
-                    <li class="item-group" id="item-group-{{ line.index }}">
-                        <ul class="item-list" id="item-list-{{ line.index }}">
-					                  <li id="line_{{ line.index }}" contenteditable="true" spellcheck="true" data-bbox="{{ line.bbox }}" data-placeholder="Enter text for line {{ line.index }}" class="editable-line">
+                    <li class="item-group" id="{{ line.index }}">
+                        <ul class="item-list" id="{{ line.index }}">
+					                  <li id="{{ line.index }}" contenteditable="true" spellcheck="true" data-bbox="{{ line.bbox }}" data-placeholder="Enter text for line {{ line.index }}" class="editable-line">
                                 <!-- This is the texts of the line on the image -->
 						                    {% if line.text %}
 							                  {{ line.text }}
 						                    {% endif %}
                             </li>
-                            <li class="line-widget" id="line-widget-{{ line.index }}">
+                            <li class="line-widget" id="{{ line.index }}">
                                 <label class="lbl-container">
                                     Mark as deleted
-                                    <input type="checkbox" id="deleted-line-{{ line.index }}" class="delete-checkbox">
+                                    <input type="checkbox" id="{{ line.index }}" class="delete-checkbox">
                                     <span class="checkmark"></span>
                                 </label>
-                                <button onclick="" id="add-below-b-{{ line.index }}" class="add-below-button">Add Below</button>
-                                <button onclick="" id="add-above-b-{{ line.index }}" class="add-above-button">Add Above</button>
+                                <button onclick="" id="{{ line.index }}" class="add-below-button">Add Below</button>
+                                <button onclick="" id="{{ line.index }}" class="add-above-button">Add Above</button>
 					                  </li>
                         </ul>
                     </li>
@@ -124,25 +127,49 @@
 		    </section>
 		    {% endfor %}
         <script>
-         // get line deletion
-         var deleteList = $( "input:checked#deleted_line" );
-         // delete line list
-         $( "#deleteButton" ).click(function() {
-             var editableLines = $( ".editableLine" )
-             var linesLenght = editableLines.length
-             // iterate over lines and the ones that are deleted
-             for(i=0;i===linesLenght;i++){
-                 var line = editableLines[i];
-                 var lineDeleteCheckBox = $( line . "> label.container > input:checked#deleted_line" );
-                 var deleted_number = lineDeleteCheckBox.length
-                 if (deleted_number === 0){
-                     console.log("no marked");
-                     alert("No line is marked for deletion");
-                 }else{
-                     $( "" . line ).remove();
+         var deletedNodes = [];
+         function deleteBoxes(){
+             /*
+                Simple function for deleting lines whose checkboxes are selected
+                Description:
+                We query the input elements whose class is delete-checkbox.
+                Then we check whether they are checked or not.
+                If they are checked we delete the item group containing them
+              */
+             var deleteCheckBoxList = document.querySelectorAll("input.delete-checkbox");
+             var dellength = deleteCheckBoxList.length;
+             var deletedboxlength = 0;
+             var i = 0;
+             while(i!==dellength){
+                 var cbox = deleteCheckBoxList[i];
+                 var checkval = cbox.checked;
+                 if(checkval===true){
+                     // removing the element if checkbox is checked
+                     var labelnode = cbox.parentNode;
+                     var linewidgetNode = labelnode.parentNode;
+                     var itemlistNode = linewidgetNode.parentNode;
+                     var itemgroupNode = itemlistNode.parentNode;
+                     var lineId = itemgroupNode.id;
+                     // get the image line from the other column
+                     var imageLineSelector = "a.rect[id='".concat(lineId,
+                                                                  "']");
+                     var imageLine = document.querySelector(imageLineSelector);
+                     //
+                     // remove both from the page
+                     itemgroupNode.parentNode.removeChild(itemgroupNode);
+                     imageLine.parentNode.removeChild(imageLine);
+                     var deleted = {"imageline" : imageLine,
+                                    "itemgroup" : itemgroupNode};
+                     deletedNodes.push(deleted);
+                     deletedboxlength +=1;
                  }
+                 i+=1;
+             }
+             if(deletedboxlength === 0){
+                 alert("Please select lines for deletion");
              }
          }
+         //
         </script>
 
 	  </body>
