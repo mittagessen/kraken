@@ -1,139 +1,149 @@
 <!DOCTYPE html>
 <html>
-	<head>
-		<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
-		<meta name="uuid" content="{{ uuid }}"/>
-		<meta itemprop="text_direction" content="{{ text_direction }}"/>
-		<style>
-			{% include 'style.css' %}
-		</style>
-	</head>
-	<body>
-		<script language="javascript" type="text/javascript">
-			{% include 'jquery-1.11.3.min.js' %}
-		</script>
-		<script>
-			$(document).ready(function() {
-				var uuid = $('meta[name=uuid]').attr('content');
-				if (localStorage) {
-					$('li[contenteditable=true], span').each(function(index) {
-						if(localStorage[uuid + this.id]) {
-							$(this).text(localStorage[uuid + this.id]);
-						}
-					});
-				}
-				// focus text fields when lines/words are clicked + mouseover
-				$('a.rect').click(function(e) {
-					e.preventDefault();
-					$('#' + $(this).attr('alt')).focus();
-				}).mouseover(function(e) {
-					$('#' + $(this).attr('alt')).addClass("hovered");
-				}).mouseout(function(e) {
-					$('#' + $(this).attr('alt')).removeClass("hovered");
-				});
+	  <head>
+		    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+		    <meta name="uuid" content="{{ uuid }}"/>
+		    <meta itemprop="text_direction" content="{{ text_direction }}"/>
+		    <style>
+			   {% include 'style.css' %}
+		    </style>
+	  </head>
+	  <body>
+		    <script language="javascript" type="text/javascript">
+			   {% include 'jquery-1.11.3.min.js' %}
+		    </script>
+		    <script>
+			   $(document).ready(function() {
+				     var uuid = $('meta[name=uuid]').attr('content');
+				     if (localStorage) {
+					       $('li[contenteditable=true], span').each(function(index) {
+						         if(localStorage[uuid + this.id]) {
+							           $(this).text(localStorage[uuid + this.id]);
+						         }
+					       });
+				     }
+				     // focus text fields when lines/words are clicked + mouseover
+				     $('a.rect').click(function(e) {
+					       e.preventDefault();
+					       $('#' + $(this).attr('alt')).focus();
+				     }).mouseover(function(e) {
+					       $('#' + $(this).attr('alt')).addClass("hovered");
+				     }).mouseout(function(e) {
+					       $('#' + $(this).attr('alt')).removeClass("hovered");
+				     });
 
-				// create mouseover effect on text fields
-				$('li[contenteditable=true], span').mouseover(function(e) {
-					console.log(this.id);
-					$('a.rect[alt=' + this.id + ']').addClass("hovered");
-				}).mouseout(function(e) {
-					$('a.rect[alt=' + this.id + ']').removeClass("hovered");
-				}).focusin(function(e) {
-					$('a.rect[alt=' + this.id + ']').addClass("hovered");
-				}).focusout(function(e) {
-					$('a.rect[alt=' + this.id + ']').removeClass("hovered");
-				}).keydown(function(e) {
-					if(e.which == 13) {
-						e.preventDefault();
-						$(this).addClass('corrected');
-						var $els = $('[contenteditable=true]');
-						$els.eq($els.index(this) + 1).focus();
-					}
-				// save to local storage 
-				}).keyup(function () {
-					localStorage[uuid + this.id] = $(this).text();
-				});
-				
-				// smooth scrolling
-				$('.page_anchor').click(function(e) {
-					e.preventDefault();
-					var target = $(this).attr("href");
-					var top = $(target).offset().top;
-					$('html, body').stop().animate({scrollTop: top }, 500);
-				});
+				     // create mouseover effect on text fields
+				     $('li[contenteditable=true], span').mouseover(function(e) {
+					       console.log(this.id);
+					       $('a.rect[alt=' + this.id + ']').addClass("hovered");
+				     }).mouseout(function(e) {
+					       $('a.rect[alt=' + this.id + ']').removeClass("hovered");
+				     }).focusin(function(e) {
+					       $('a.rect[alt=' + this.id + ']').addClass("hovered");
+				     }).focusout(function(e) {
+					       $('a.rect[alt=' + this.id + ']').removeClass("hovered");
+				     }).keydown(function(e) {
+					       if(e.which == 13) {
+						         e.preventDefault();
+						         $(this).addClass('corrected');
+						         var $els = $('[contenteditable=true]');
+						         $els.eq($els.index(this) + 1).focus();
+					       }
+				         // save to local storage 
+				     }).keyup(function () {
+					       localStorage[uuid + this.id] = $(this).text();
+				     });
+				     
+				     // smooth scrolling
+				     $('.page_anchor').click(function(e) {
+					       e.preventDefault();
+					       var target = $(this).attr("href");
+					       var top = $(target).offset().top;
+					       $('html, body').stop().animate({scrollTop: top }, 500);
+				     });
 
-				// serializing the DOM to a file
-				$('#download_button').click(function(e) {
-					path = window.location.pathname;
-					$(this).attr('href', 'data:text/html,' + encodeURIComponent($('html')[0].outerHTML));
-					$(this).attr('download', path.substr(path.lastIndexOf('/') + 1));
-				});
-			});
-		</script>
-		<nav>
-			<ul>
-			{% for page in pages %}
-				<li><a class="page_anchor" href='#page_{{ page.index }}'>{{ page.index }}</a></li>
-			{% endfor %}
-			</ul>
-			<a id="download_button" href="#">Download</a>
-		</nav>
+				     // serializing the DOM to a file
+				     $('#download_button').click(function(e) {
+					       path = window.location.pathname;
+					       $(this).attr('href', 'data:text/html,' + encodeURIComponent($('html')[0].outerHTML));
+					       $(this).attr('download', path.substr(path.lastIndexOf('/') + 1));
+				     });
+			   });
+		    </script>
+		    <nav>
+			      <ul>
+			          {% for page in pages %}
+				        <li><a class="page_anchor" href='#page_{{ page.index }}'>{{ page.index }}</a></li>
+			          {% endfor %}
+			      </ul>
+			      <a id="download_button" href="#">Download</a>
+		    </nav>
 
-		{% for page in pages %}
-		<section class="page container" id="page_{{ page.index }}">
-			<div class="column">
-				<div class="img_container">
-					<img style="width: 100%;" src="{{ page.img }}" alt="photo"/>
-					{% for line in page.lines %}
-					<a class="rect" alt="line_{{ line.index }}" href="" title="" style="position: absolute; left: {{ line.left }}%; top: {{ line.top }}%; width: {{ line.width }}%; height: {{ line.height }}%; z-index: 2;"></a>
-          <!-- This is the bounding boxes overlayed on the image -->
-					{% endfor %}
-				</div>
-			</div>
-			<div class="column">
-          <fieldset>
-              <input type="button" value="Delete Marked Lines" id="deleteButton">
-          </fieldset>
-				  <ul id="textLineList">
-              <!-- Contains the lines -->
-				      {% for line in page.lines %}
-					    <li id="line_{{ line.index }}" contenteditable="true" spellcheck="true" data-bbox="{{ line.bbox }}" data-placeholder="Enter text for line {{ line.index }}" class="editableLine">
-                  <!-- This is the texts of the line on the image -->
-						      {% if line.text %}
-							    {{ line.text }}
-						      {% endif %}
-                  <label class="container">
-                      Mark as deleted
-                      <input type="checkbox" id="deleted_line">
-                      <span class="checkmark"></span>
-                  </label>
-					    </li>
-				      {% endfor %}
-          </ul>
-			</div>
-		</section>
-		{% endfor %}
-    <script>
-     // get line deletion
-     var deleteList = $( "input:checked#deleted_line" );
-     // delete line list
-     $( "#deleteButton" ).click(function() {
-         var editableLines = $( ".editableLine" )
-         var linesLenght = editableLines.length
-         // iterate over lines and the ones that are deleted
-         for(i=0;i===linesLenght;i++){
-             var line = editableLines[i];
-             var lineDeleteCheckBox = $( line . "> label.container > input:checked#deleted_line" );
-             var deleted_number = lineDeleteCheckBox.length
-             if (deleted_number === 0){
-                 console.log("no marked");
-                 alert("No line is marked for deletion");
-             }else{
-                 $( "" . line ).remove();
+		    {% for page in pages %}
+		    <section class="page container" id="page_{{ page.index }}">
+			      <div class="column">
+				        <div class="img_container">
+					          <img style="width: 100%;" src="{{ page.img }}" alt="photo"/>
+					          {% for line in page.lines %}
+					          <a class="rect" alt="line_{{ line.index }}" href="" title="" style="position: absolute; left: {{ line.left }}%; top: {{ line.top }}%; width: {{ line.width }}%; height: {{ line.height }}%; z-index: 2;" id="image-line-{{ line.index }}"></a>
+                    <!-- This is the bounding boxes overlayed on the image -->
+					          {% endfor %}
+				        </div>
+			      </div>
+			      <div class="column">
+                <fieldset>
+                    <button onclick="deleteBoxes()" id="deleteButton">
+                        Delete Marked Lines
+                    </button>
+                </fieldset>
+				        <ol id="text-line-list">
+                    <!-- Contains the lines -->
+				            {% for line in page.lines %}
+                    <li class="item-group" id="item-group-{{ line.index }}">
+                        <ul class="item-list" id="item-list-{{ line.index }}">
+					                  <li id="line_{{ line.index }}" contenteditable="true" spellcheck="true" data-bbox="{{ line.bbox }}" data-placeholder="Enter text for line {{ line.index }}" class="editable-line">
+                                <!-- This is the texts of the line on the image -->
+						                    {% if line.text %}
+							                  {{ line.text }}
+						                    {% endif %}
+                            </li>
+                            <li class="line-widget" id="line-widget-{{ line.index }}">
+                                <label class="lbl-container">
+                                    Mark as deleted
+                                    <input type="checkbox" id="deleted-line-{{ line.index }}" class="delete-checkbox">
+                                    <span class="checkmark"></span>
+                                </label>
+                                <button onclick="" id="add-below-b-{{ line.index }}" class="add-below-button">Add Below</button>
+                                <button onclick="" id="add-above-b-{{ line.index }}" class="add-above-button">Add Above</button>
+					                  </li>
+                        </ul>
+                    </li>
+				            {% endfor %}
+                </ol>
+			      </div>
+		    </section>
+		    {% endfor %}
+        <script>
+         // get line deletion
+         var deleteList = $( "input:checked#deleted_line" );
+         // delete line list
+         $( "#deleteButton" ).click(function() {
+             var editableLines = $( ".editableLine" )
+             var linesLenght = editableLines.length
+             // iterate over lines and the ones that are deleted
+             for(i=0;i===linesLenght;i++){
+                 var line = editableLines[i];
+                 var lineDeleteCheckBox = $( line . "> label.container > input:checked#deleted_line" );
+                 var deleted_number = lineDeleteCheckBox.length
+                 if (deleted_number === 0){
+                     console.log("no marked");
+                     alert("No line is marked for deletion");
+                 }else{
+                     $( "" . line ).remove();
+                 }
              }
          }
-     }
-    </script>
+        </script>
 
-	</body>
+	  </body>
 </html>

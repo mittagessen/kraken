@@ -95,3 +95,23 @@ nav a:hover {
 	background-color: #73AD21;
 }
 
+li.line-widget label.lbl-container {
+    position: relative;
+    text-align: center;
+    width: 30%;
+}
+
+
+li.line-widget button.add-below-button {
+    position: relative;
+    text-align: center;
+    width: 35%;
+}
+
+
+li.line-widget button.add-above-button {
+    position: relative;
+    text-align: center;
+    width: 35%;
+}
+
