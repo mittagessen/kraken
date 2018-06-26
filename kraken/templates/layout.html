@@ -98,6 +98,9 @@
                     <button onclick="undoDeletion()" id="undodeleteButton">
                         Undo Deletion
                     </button>
+                    <button onclick="sortLines()" id="sortButton">
+                        Sort Lines
+                    </button>
                 </fieldset>
 				        <ol id="text-line-list">
                     <!-- Contains the lines -->
@@ -170,6 +173,29 @@
              }
          }
          //
+         function undoDeletion(){
+             if (deletedNodes.length === 0){
+                 alert("Deleted line information is not found");
+             }
+             var lastObject = deletedNodes.pop();
+             //
+             var imageLine = lastObject["imageline"];
+             var itemgroup = lastObject["itemgroup"];
+             var imageparent = lastObject["imageparent"];
+             var itemparent = lastObject["itemparent"];
+             //
+             imageparent.appendChild(imageLine);
+             itemparent.appendChild(itemgroup);
+             //
+         }
+         //
+         function sortLines() {
+             var lineList = document.querySelectorAll(".item-group");
+             var itemparent = document.querySelector("#text-line-list");
+             var linearr = Array.from(lineList).sort((a,b) => a.id - b.id);
+             linearr.forEach(el => itemparent.appendChild(el) );
+         }
+
         </script>
 
 	  </body>
