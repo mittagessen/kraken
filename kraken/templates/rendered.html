@@ -230,6 +230,9 @@
 					          
 				        </div>
 			      </div>
+            <script>
+             
+            </script>
 			      <div class="column">
                 <fieldset>
                     <button onclick="deleteBoxes()" value="" id="deleteButton">
@@ -241,6 +244,10 @@
                     <button onclick="sortLines()" id="sortButton">
                         Sort Lines
                     </button>
+                    <button onclick="addLines()" id="addLineButton">
+                        Add Lines
+                    </button>
+
                 </fieldset>
 				        <ol id="text-line-list">
 				            <li class="item-group" id="1">
@@ -260,13 +267,18 @@
                                            class="delete-checkbox">
                                     <span class="checkmark"></span>
                                 </label>
-                                <button onclick=""
-                                        id="1"
-                                        class="add-below-button">Add Below</button>
-                                <button onclick=""
-                                        id="1"
-                                        class="add-above-button">Add Above</button>
+                                <label class="lbl-container">
+                                    Add Line Below
+                                    <input type="checkbox" id="1"
+                                           class="below-checkbox">
+                                    <span class="checkmark"></span>
+                                </label>
+                                <label class="lbl-container">
 
+                                    Add Line Above
+                                    <input type="checkbox" id="1" class="above-checkbox">
+                                    <span class="checkmark"></span>
+                                </label>
                             </li>
                         </ul>
 				            </li>
@@ -287,73 +299,462 @@
                                            class="delete-checkbox">
                                     <span class="checkmark"></span>
                                 </label>
-                                <button onclick=""
-                                        id="2"
-                                        class="add-below-button">Add Below</button>
-                                <button onclick=""
-                                        id="2"
-                                        class="add-above-button">Add Above</button>
-
+                                <label class="lbl-container">
+                                    Add Line Below
+                                    <input type="checkbox" id="2"
+                                           class="below-checkbox">
+                                    <span class="checkmark"></span>
+                                </label>
+                                <label class="lbl-container">
+                                    Add Line Above
+                                    <input type="checkbox" id="2" class="above-checkbox">
+                                    <span class="checkmark"></span>
+                                </label>
                             </li>
                         </ul>
                     </li>
-				            
-					          <li id="3" contenteditable="true" spellcheck="true" data-bbox="2, 120, 1080, 207" data-placeholder="Enter text for line 3" class="editable-line">
-						            
+                    <li class="item-group" id="3">
+                        <ul class="item-list" id="3">
+					                  <li id="3" contenteditable="true"
+                                spellcheck="true"
+                                data-bbox="2, 120, 1080, 207"
+                                data-placeholder="Enter text for line 3"
+                                class="editable-line">
+						                </li>
+                            <li class="line-widget" id="3">
+                                <label class="container">
+                                    Mark as deleted
+                                    <input type="checkbox"
+                                           id="3"
+                                           class="delete-checkbox">
+                                    <span class="checkmark"></span>
+                                </label>
+                                <label class="lbl-container">
+                                    Add Line Below
+                                    <input type="checkbox" id="3"
+                                           class="below-checkbox">
+                                    <span class="checkmark"></span>
+                                </label>
+                                <label class="lbl-container">
+                                    Add Line Above
+                                    <input type="checkbox" id="3" class="above-checkbox">
+                                    <span class="checkmark"></span>
+                                </label>
+                            </li>
+                        </ul>
 					          </li>
-				            
-					          <li id="4" contenteditable="true" spellcheck="true" data-bbox="2, 180, 1080, 266" data-placeholder="Enter text for line 4" class="editable-line">
-						            
+				            <li class="item-group" id="4">
+                        <ul class="item-list" id="4">
+					                  <li id="4" contenteditable="true"
+                                spellcheck="true"
+                                data-bbox="2, 180, 1080, 266"
+                                data-placeholder="Enter text for line 4"
+                                class="editable-line">
+						                </li>
+
+                            <li class="line-widget" id="4">
+
+                                <label class="container">
+                                    Mark as deleted
+                                    <input type="checkbox"
+                                           id="4"
+                                           class="delete-checkbox">
+
+                                    <span class="checkmark"></span>
+                                </label>
+                                <label class="lbl-container">
+                                    Add Line Below
+                                    <input type="checkbox" id="4"
+                                           class="below-checkbox">
+                                    <span class="checkmark"></span>
+                                </label>
+                                <label class="lbl-container">
+                                    Add Line Above
+                                    <input type="checkbox" id="4" class="above-checkbox">
+                                    <span class="checkmark"></span>
+                                </label>
+                            </li>
+                        </ul>
 					          </li>
-				            
-					          <li id="5" contenteditable="true" spellcheck="true" data-bbox="3, 248, 1075, 329" data-placeholder="Enter text for line 5" class="editable-line">
-						            
+
+	                  <li class="item-group" id="5">
+                        <ul class="item-list" id="5">
+					                  <li id="5"
+                                contenteditable="true"
+                                spellcheck="true"
+                                data-bbox="3, 248, 1075, 329"
+                                data-placeholder="Enter text for line 5"
+                                class="editable-line">
+							              </li>
+                            <li class="line-widget" id="5">
+                                <label class="container">
+                                    Mark as deleted
+                                    <input type="checkbox"
+                                           id="5"
+                                           class="delete-checkbox">
+                                    <span class="checkmark"></span>
+                                </label>
+                                <label class="lbl-container">
+                                    Add Line Below
+                                    <input type="checkbox" id="5"
+                                           class="below-checkbox">
+                                    <span class="checkmark"></span>
+                                </label>
+                                <label class="lbl-container">
+                                    Add Line Above
+                                    <input type="checkbox" id="5" class="above-checkbox">
+                                    <span class="checkmark"></span>
+                                </label>
+                            </li>
+                        </ul>
 					          </li>
-				            
-					          <li id="6" contenteditable="true" spellcheck="true" data-bbox="2, 312, 1080, 405" data-placeholder="Enter text for line 6" class="editable-line">
-						            
+	                  <li class="item-group" id="6">
+                        <ul class="item-list" id="6">
+					                  <li id="6"
+                                contenteditable="true"
+                                spellcheck="true"
+                                data-bbox="2, 312, 1080, 405"
+                                data-placeholder="Enter text for line 6"
+                                class="editable-line">
+							              </li>
+                            <li class="line-widget" id="6">
+                                <label class="container">
+                                    Mark as deleted
+                                    <input type="checkbox"
+                                           id="6"
+                                           class="delete-checkbox">
+                                    <span class="checkmark"></span>
+                                </label>
+                                <label class="lbl-container">
+                                    Add Line Below
+                                    <input type="checkbox" id="6"
+                                           class="below-checkbox">
+                                    <span class="checkmark"></span>
+                                </label>
+                                <label class="lbl-container">
+                                    Add Line Above
+                                    <input type="checkbox" id="6" class="above-checkbox">
+                                    <span class="checkmark"></span>
+                                </label>
+                            </li>
+                        </ul>
 					          </li>
-				            
-					          <li id="7" contenteditable="true" spellcheck="true" data-bbox="26, 379, 1076, 467" data-placeholder="Enter text for line 7" class="editable-line">
-						            
+	                  <li class="item-group" id="7">
+                        <ul class="item-list" id="7">
+					                  <li id="7"
+                                contenteditable="true"
+                                spellcheck="true"
+                                data-bbox="26, 379, 1076, 467"
+                                data-placeholder="Enter text for line 7"
+                                class="editable-line">
+							              </li>
+                            <li class="line-widget" id="7">
+                                <label class="container">
+                                    Mark as deleted
+                                    <input type="checkbox"
+                                           id="7"
+                                           class="delete-checkbox">
+                                    <span class="checkmark"></span>
+                                </label>
+                                <label class="lbl-container">
+                                    Add Line Below
+                                    <input type="checkbox" id="7"
+                                           class="below-checkbox">
+                                    <span class="checkmark"></span>
+                                </label>
+                                <label class="lbl-container">
+                                    Add Line Above
+                                    <input type="checkbox" id="7" class="above-checkbox">
+                                    <span class="checkmark"></span>
+                                </label>
+                            </li>
+                        </ul>
 					          </li>
-				            
-					          <li id="8" contenteditable="true" spellcheck="true" data-bbox="0, 445, 1071, 532" data-placeholder="Enter text for line 8" class="editable-line">
-						            
+	                  <li class="item-group" id="8">
+                        <ul class="item-list" id="8">
+					                  <li id="8"
+                                contenteditable="true"
+                                spellcheck="true"
+                                data-bbox="0, 445, 1071, 532"
+                                data-placeholder="Enter text for line 8"
+                                class="editable-line">
+							              </li>
+                            <li class="line-widget" id="8">
+                                <label class="container">
+                                    Mark as deleted
+                                    <input type="checkbox"
+                                           id="8"
+                                           class="delete-checkbox">
+                                    <span class="checkmark"></span>
+                                </label>
+                                <label class="lbl-container">
+                                    Add Line Below
+                                    <input type="checkbox" id="8"
+                                           class="below-checkbox">
+                                    <span class="checkmark"></span>
+                                </label>
+                                <label class="lbl-container">
+                                    Add Line Above
+                                    <input type="checkbox"
+                                           id="8"
+                                           class="above-checkbox">
+                                    <span class="checkmark"></span>
+                                </label>
+                            </li>
+                        </ul>
 					          </li>
-				            
-					          <li id="9" contenteditable="true" spellcheck="true" data-bbox="0, 513, 1070, 602" data-placeholder="Enter text for line 9" class="editable-line">
-						            
+					          
+	                  <li class="item-group" id="9">
+                        <ul class="item-list" id="9">
+			                      
+					                  <li id="9"
+                                contenteditable="true"
+                                spellcheck="true"
+                                data-bbox="0, 513, 1070, 602"
+                                data-placeholder="Enter text for line 9"
+                                class="editable-line">
+							              </li>
+                            <li class="line-widget" id="9">
+                                <label class="container">
+                                    Mark as deleted
+                                    <input type="checkbox"
+                                           id="9"
+                                           class="delete-checkbox">
+                                    <span class="checkmark"></span>
+                                </label>
+                                <label class="lbl-container">
+                                    Add Line Below
+                                    <input type="checkbox" id="9"
+                                           class="below-checkbox">
+                                    <span class="checkmark"></span>
+                                </label>
+                                <label class="lbl-container">
+                                    Add Line Above
+                                    <input type="checkbox" id="9" class="above-checkbox">
+                                    <span class="checkmark"></span>
+                                </label>
+                            </li>
+                        </ul>
 					          </li>
-				            
-					          <li id="10" contenteditable="true" spellcheck="true" data-bbox="0, 583, 1061, 659" data-placeholder="Enter text for line 10" class="editable-line">
-						            
+	                  <li class="item-group" id="10">
+                        <ul class="item-list" id="10">
+					                  <li id="10"
+                                contenteditable="true"
+                                spellcheck="true"
+                                data-bbox="0, 583, 1061, 659"
+                                data-placeholder="Enter text for line 10"
+                                class="editable-line">
+							              </li>
+                            <li class="line-widget" id="10">
+                                <label class="container">
+                                    Mark as deleted
+                                    <input type="checkbox"
+                                           id=10"
+                                           class="delete-checkbox">
+                                    <span class="checkmark"></span>
+                                </label>
+                                <label class="lbl-container">
+                                    Add Line Below
+                                    <input type="checkbox" id="10"
+                                           class="below-checkbox">
+                                    <span class="checkmark"></span>
+                                </label>
+                                <label class="lbl-container">
+                                    Add Line Above
+                                    <input type="checkbox" id="10" class="above-checkbox">
+                                    <span class="checkmark"></span>
+                                </label>
+                            </li>
+                        </ul>
 					          </li>
-				            
-					          <li id="11" contenteditable="true" spellcheck="true" data-bbox="0, 640, 1079, 720" data-placeholder="Enter text for line 11" class="editable-line">
-						            
+	                  <li class="item-group" id="11">
+                        <ul class="item-list" id="11">
+					                  <li id="11"
+                                contenteditable="true"
+                                spellcheck="true"
+                                data-bbox="0, 640, 1079, 720"
+                                data-placeholder="Enter text for line 11"
+                                class="editable-line">
+							              </li>
+                            <li class="line-widget" id="11">
+                                <label class="container">
+                                    Mark as deleted
+                                    <input type="checkbox"
+                                           id="11"
+                                           class="delete-checkbox">
+                                    <span class="checkmark"></span>
+                                </label>
+                                <label class="lbl-container">
+                                    Add Line Below
+                                    <input type="checkbox" id="11"
+                                           class="below-checkbox">
+                                    <span class="checkmark"></span>
+                                </label>
+                                <label class="lbl-container">
+                                    Add Line Above
+                                    <input type="checkbox" id="11" class="above-checkbox">
+                                    <span class="checkmark"></span>
+                                </label>
+                            </li>
+                        </ul>
 					          </li>
-				            
-					          <li id="12" contenteditable="true" spellcheck="true" data-bbox="0, 699, 1069, 788" data-placeholder="Enter text for line 12" class="editable-line">
-						            
+	                  <li class="item-group" id="12">
+                        <ul class="item-list" id="12">
+					                  <li id="12"
+                                contenteditable="true"
+                                spellcheck="true"
+                                data-bbox="0, 699, 1069, 788"
+                                data-placeholder="Enter text for line 12"
+                                class="editable-line">
+							              </li>
+                            <li class="line-widget" id="12">
+                                <label class="container">
+                                    Mark as deleted
+                                    <input type="checkbox"
+                                           id="12"
+                                           class="delete-checkbox">
+                                    <span class="checkmark"></span>
+                                </label>
+                                <label class="lbl-container">
+                                    Add Line Below
+                                    <input type="checkbox" id="12"
+                                           class="below-checkbox">
+                                    <span class="checkmark"></span>
+                                </label>
+                                <label class="lbl-container">
+                                    Add Line Above
+                                    <input type="checkbox" id="12" class="above-checkbox">
+                                    <span class="checkmark"></span>
+                                </label>
+                            </li>
+                        </ul>
 					          </li>
-				            
-					          <li id="13" contenteditable="true" spellcheck="true" data-bbox="0, 768, 1079, 853" data-placeholder="Enter text for line 13" class="editable-line">
-						            
+	                  <li class="item-group" id="13">
+                        <ul class="item-list" id="13">
+					                  <li id="13"
+                                contenteditable="true"
+                                spellcheck="true"
+                                data-bbox="0, 768, 1079, 853"
+                                data-placeholder="Enter text for line 13"
+                                class="editable-line">
+							              </li>
+                            <li class="line-widget" id="13">
+                                <label class="container">
+                                    Mark as deleted
+                                    <input type="checkbox"
+                                           id="13"
+                                           class="delete-checkbox">
+                                    <span class="checkmark"></span>
+                                </label>
+                                <label class="lbl-container">
+                                    Add Line Below
+                                    <input type="checkbox" id="13"
+                                           class="below-checkbox">
+                                    <span class="checkmark"></span>
+                                </label>
+                                <label class="lbl-container">
+                                    Add Line Above
+                                    <input type="checkbox" id="13" class="above-checkbox">
+                                    <span class="checkmark"></span>
+                                </label>
+                            </li>
+                        </ul>
 					          </li>
-				            
-					          <li id="14" contenteditable="true" spellcheck="true" data-bbox="2, 833, 1074, 924" data-placeholder="Enter text for line 14" class="editable-line">
-						            
+	                  <li class="item-group" id="14">
+                        <ul class="item-list" id="14">
+					                  <li id="14"
+                                contenteditable="true"
+                                spellcheck="true"
+                                data-bbox="2, 833, 1074, 924"
+                                data-placeholder="Enter text for line 14"
+                                class="editable-line">
+							              </li>
+                            <li class="line-widget" id="14">
+                                <label class="container">
+                                    Mark as deleted
+                                    <input type="checkbox"
+                                           id="14"
+                                           class="delete-checkbox">
+                                    <span class="checkmark"></span>
+                                </label>
+                                <label class="lbl-container">
+                                    Add Line Below
+                                    <input type="checkbox" id="14"
+                                           class="below-checkbox">
+                                    <span class="checkmark"></span>
+                                </label>
+                                <label class="lbl-container">
+                                    Add Line Above
+                                    <input type="checkbox" id="14" class="above-checkbox">
+                                    <span class="checkmark"></span>
+                                </label>
+                            </li>
+                        </ul>
 					          </li>
-				            
-					          <li id="15" contenteditable="true" spellcheck="true" data-bbox="2, 910, 1074, 1005" data-placeholder="Enter text for line 15" class="editable-line">
-						            
+	                  <li class="item-group" id="15">
+                        <ul class="item-list" id="15">
+					                  <li id="15"
+                                contenteditable="true"
+                                spellcheck="true"
+                                data-bbox="2, 910, 1074, 1005"
+                                data-placeholder="Enter text for line 15"
+                                class="editable-line">
+							              </li>
+                            <li class="line-widget" id="15">
+                                <label class="container">
+                                    Mark as deleted
+                                    <input type="checkbox"
+                                           id="15"
+                                           class="delete-checkbox">
+                                    <span class="checkmark"></span>
+                                </label>
+                                <label class="lbl-container">
+                                    Add Line Below
+                                    <input type="checkbox" id="15"
+                                           class="below-checkbox">
+                                    <span class="checkmark"></span>
+                                </label>
+                                <label class="lbl-container">
+                                    Add Line Above
+                                    <input type="checkbox" id="15" class="above-checkbox">
+                                    <span class="checkmark"></span>
+                                </label>
+                            </li>
+                        </ul>
 					          </li>
-				            
-					          <li id="16" contenteditable="true" spellcheck="true" data-bbox="0, 967, 1078, 1066" data-placeholder="Enter text for line 16" class="editable-line">
-						            
+	                  <li class="item-group" id="16">
+                        <ul class="item-list" id="16">
+					                  <li id="16"
+                                contenteditable="true"
+                                spellcheck="true"
+                                data-bbox="0, 967, 1078, 1066"
+                                data-placeholder="Enter text for line 16"
+                                class="editable-line">
+                            </li>
+                            <li class="line-widget" id="16">
+                                <label class="container">
+                                    Mark as deleted
+                                    <input type="checkbox"
+                                           id="16"
+                                           class="delete-checkbox">
+                                    <span class="checkmark"></span>
+                                </label>
+                                <label class="lbl-container">
+                                    Add Line Below
+                                    <input type="checkbox" id="16"
+                                           class="below-checkbox">
+                                    <span class="checkmark"></span>
+                                </label>
+                                <label class="lbl-container">
+                                    Add Line Above
+                                    <input type="checkbox"
+                                           id="16"
+                                           class="above-checkbox">
+                                    <span class="checkmark"></span>
+                                </label>
+                            </li>
+                        </ul>
 					          </li>
-				            
 				        </ol>
 			      </div>
 		    </section>
@@ -373,7 +774,7 @@
              var dellength = deleteCheckBoxList.length;
              var deletedboxlength = 0;
              var i = 0;
-             while(i!==dellength){
+             while(i < dellength){
                  var cbox = deleteCheckBoxList[i];
                  var checkval = cbox.checked;
                  if(checkval===true){
@@ -385,7 +786,7 @@
                      var lineId = itemgroupNode.id;
                      // get the image line from the other column
                      var imageLineSelector = "a.rect[id='".concat(lineId,
-                                                             "']");
+                                                                  "']");
                      var imageLine = document.querySelector(imageLineSelector);
                      //
                      var imageparent = imageLine.parentNode;
@@ -425,10 +826,11 @@
          function sortLines() {
              var lineList = document.querySelectorAll(".item-group");
              var itemparent = document.querySelector("#text-line-list");
-             var linearr = Array.from(lineList).sort((a,b) => a.id - b.id);
+             var linearr = Array.from(lineList).sort(
+                 (a,b) => parseInt(a.id, 10) - parseInt(b.id, 10)
+             );
              linearr.forEach(el => itemparent.appendChild(el) );
          }
-         //
         </script>
 	  </body>
 </html>

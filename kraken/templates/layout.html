@@ -101,6 +101,9 @@
                     <button onclick="sortLines()" id="sortButton">
                         Sort Lines
                     </button>
+                    <button onclick="addLines()" id="addLineButton">
+                        Add Lines
+                    </button>
                 </fieldset>
 				        <ol id="text-line-list">
                     <!-- Contains the lines -->
@@ -119,8 +122,18 @@
                                     <input type="checkbox" id="{{ line.index }}" class="delete-checkbox">
                                     <span class="checkmark"></span>
                                 </label>
-                                <button onclick="" id="{{ line.index }}" class="add-below-button">Add Below</button>
-                                <button onclick="" id="{{ line.index }}" class="add-above-button">Add Above</button>
+                                <label class="lbl-container">
+                                    Add Line Below
+                                    <input type="checkbox" id="{{ line.index }}" class="below-checkbox">
+                                    <span class="checkmark"></span>
+                                    </label>
+                                    <label class="lbl-container">
+
+                                        Add Line Above
+                                        <input type="checkbox" id="{{ line.index }}" class="above-checkbox">
+                                        <span class="checkmark"></span>
+                                    </label>
+
 					                  </li>
                         </ul>
                     </li>
@@ -192,7 +205,9 @@
          function sortLines() {
              var lineList = document.querySelectorAll(".item-group");
              var itemparent = document.querySelector("#text-line-list");
-             var linearr = Array.from(lineList).sort((a,b) => a.id - b.id);
+             var linearr = Array.from(lineList).sort(
+                 (a,b) => parseInt(a.id, 10) - parseInt(b.id, 10)
+             );
              linearr.forEach(el => itemparent.appendChild(el) );
          }
 
