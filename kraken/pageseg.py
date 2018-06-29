@@ -42,6 +42,7 @@ __all__ = ['segment', 'detect_scripts']
 
 logger = logging.getLogger(__name__)
 
+
 class record(object):
     """
     Simple dict-like object.
@@ -494,7 +495,7 @@ def detect_scripts(im, bounds, model=pkg_resources.resource_filename(__name__, '
         logger.debug(u'Converting allowed scripts list {}'.format(valid_scripts))
         for k, v in n2s.items():
             if v in valid_scripts:
-                val_scripts.append(unichr(int(k) + 0xF0000))
+                val_scripts.append(chr(int(k) + 0xF0000))
     else:
         valid_scripts = []
     it = rpred(rnn, im, bounds, bidi_reordering=False)
@@ -502,7 +503,7 @@ def detect_scripts(im, bounds, model=pkg_resources.resource_filename(__name__, '
     logger.debug(u'Running detection')
     for pred, bbox in zip(it, bounds['boxes']):
         # substitute inherited scripts with neighboring runs
-        def _subs(m, s):
+        def _subs(m, s, r=False):
             p = u''
             for c in s:
                 if c in m and p and not r:
@@ -514,9 +515,9 @@ def detect_scripts(im, bounds, model=pkg_resources.resource_filename(__name__, '
             return p
 
         logger.debug(u'Substituting scripts')
-        p = subs([u'\U000f03e2', u'\U000f03e6'], pred.prediction)
+        p = _subs([u'\U000f03e2', u'\U000f03e6'], pred.prediction)
         # do a reverse run to fix leading inherited scripts
-        pred.prediction = ''.join(reversed(subs([u'\U000f03e2', u'\U000f03e6'], reversed(p))))
+        pred.prediction = ''.join(reversed(_subs([u'\U000f03e2', u'\U000f03e6'], reversed(p))))
         # group by valid scripts. two steps: 1. substitute common confusions
         # (Latin->Fraktur and Syriac->Arabic) if given in script list.
         if 'Arab' in valid_scripts and 'Syrc' not in valid_scripts:
@@ -525,7 +526,7 @@ def detect_scripts(im, bounds, model=pkg_resources.resource_filename(__name__, '
             pred.prediction = pred.prediction.replace(u'\U000f00d9', u'\U000f00d7')
         # next merge adjacent scripts
         if val_scripts:
-            pred.prediction = subs(val_scripts, pred.prediction, r=True)
+            pred.prediction = _subs(val_scripts, pred.prediction, r=True)
 
         # group by grapheme
         t = []
