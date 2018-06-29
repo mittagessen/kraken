@@ -88,10 +88,9 @@ def _flip_label_probability(y, input_length):
     """
     seq, n_batch, n_vocab = y.shape
     rotate = (np.arange(seq, dtype='i')[:, None] + input_length) % seq
-    return y[
-        rotate[:, :, None],
-        np.arange(n_batch, dtype='i')[None, :, None],
-        np.arange(n_vocab, dtype='i')[None, None, :]][::-1]
+    return y[rotate[:, :, None],
+             np.arange(n_batch, dtype='i')[None, :, None],
+             np.arange(n_vocab, dtype='i')[None, None, :]][::-1]
 
 
 def _flip_path_probability(prob, input_length, path_length):
@@ -106,12 +105,10 @@ def _flip_path_probability(prob, input_length, path_length):
     """
     seq, n_batch, n_label = prob.shape
     rotate_input = (np.arange(seq, dtype='i')[:, None] + input_length) % seq
-    rotate_label = (
-        np.arange(n_label, dtype='i') + path_length[:, None]) % n_label
-    return prob[
-        rotate_input[:, :, None],
-        np.arange(n_batch, dtype='i')[None, :, None],
-        rotate_label][::-1, :, ::-1]
+    rotate_label = (np.arange(n_label, dtype='i') + path_length[:, None]) % n_label
+    return prob[rotate_input[:, :, None],
+                np.arange(n_batch, dtype='i')[None, :, None],
+                rotate_label][::-1, :, ::-1]
 
 
 class _CTC(Function):
@@ -151,8 +148,7 @@ class _CTC(Function):
 
     def _computes_transition(self, prev_prob, path, path_length, cum_prob, y):
         n_batch, max_path_length = path.shape
-        mat = np.full(
-            (3, n_batch, max_path_length), self.zero_padding, 'f')
+        mat = np.full((3, n_batch, max_path_length), self.zero_padding, 'f')
         mat[0, :, :] = prev_prob
         mat[1, :, 1:] = prev_prob[:, :-1]
         mat[2, :, 2:] = prev_prob[:, :-2]
@@ -176,8 +172,7 @@ class _CTC(Function):
         assert label.shape == (n_batch, max_label_length), (label.shape, n_batch)
         assert path.shape == (n_batch, max_label_length * 2 + 1)
 
-        forward_prob = np.full(
-            (n_batch, max_path_length), self.zero_padding, dtype='f')
+        forward_prob = np.full((n_batch, max_path_length), self.zero_padding, dtype='f')
         forward_prob[:, 0] = 0
         backward_prob = forward_prob
 
@@ -186,8 +181,8 @@ class _CTC(Function):
         prob = yseq[seq_index[:, None, None], batch_index[:, None], path]
         # forward computation.
         for i, y in enumerate(yseq):
-            forward_prob = self._computes_transition(
-                forward_prob, path, path_length, prob[i], y)
+            forward_prob = self._computes_transition(forward_prob, path,
+                                                     path_length, prob[i], y)
 
         r_path = _flip_path(path, path_length)
 
@@ -195,8 +190,8 @@ class _CTC(Function):
         prob = _flip_path_probability(prob, input_length, path_length)
 
         for i, y_inv in enumerate(yseq_inv):
-            backward_prob = self._computes_transition(
-                backward_prob, r_path, path_length, prob[i], y_inv)
+            backward_prob = self._computes_transition(backward_prob, r_path,
+                                                      path_length, prob[i], y_inv)
 
         return _flip_path_probability(prob, input_length, path_length)
 
