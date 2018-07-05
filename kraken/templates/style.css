@@ -115,3 +115,7 @@ li.line-widget button.add-above-button {
     width: 35%;
 }
 
+i.fa-map-marker {
+    position: absolute;
+}
+

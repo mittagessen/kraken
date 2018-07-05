@@ -80,13 +80,27 @@
 		    </nav>
 
 		    {% for page in pages %}
-		    <section class="page container" id="page_{{ page.index }}">
+		    <section class="page container" id="page-{{ page.index }}">
 			      <div class="column">
-				        <div class="img_container">
-					          <img style="width: 100%;" src="{{ page.img }}" alt="photo"/>
+				        <div class="img-container" id="page-image-div">
+					          <img style="width: 100%;" src="images/{{ page.index }}"
+                         alt="photo"
+                         id="page-image"/>
+                    <canvas style="width: 100%" id="image-canvas"></canvas>
+                    <script>var lines = [];</script>
 					          {% for line in page.lines %}
 					          <a class="rect" alt="line_{{ line.index }}" href="" title="" style="position: absolute; left: {{ line.left }}%; top: {{ line.top }}%; width: {{ line.width }}%; height: {{ line.height }}%; z-index: 2;" id="{{ line.index }}"></a>
                     <!-- This is the bounding boxes overlayed on the image -->
+                    <script>
+                     var line = {
+                         "left" : "{{ line.left }}",
+                         "width" : "{{ line.width }}",
+                         "top" : "{{ line.top }}",
+                         "height" : "{{ line.height }}",
+                         "index" : "{{ line.index }}"
+                     };
+                     lines.push(line);
+                    </script>
 					          {% endfor %}
 				        </div>
 			      </div>
