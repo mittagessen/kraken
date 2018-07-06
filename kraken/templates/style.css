@@ -118,4 +118,12 @@ li.line-widget button.add-above-button {
 i.fa-map-marker {
     position: absolute;
 }
-
+canvas#image-canvas {
+    position: relative;
+    width: 100%;
+    height: 100;
+}
+div#page-image {
+    position: absolute;
+    width: 100%;
+}
