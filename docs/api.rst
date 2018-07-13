@@ -57,3 +57,31 @@ kraken.linegen module
 .. automodule:: kraken.linegen
     :members:
     :show-inheritance:
+
+kraken.lib.models module
+------------------------
+
+.. automodule:: kraken.lib.models
+    :members:
+    :show-inheritance:
+
+kraken.lib.vgsl module
+----------------------
+
+.. automodule:: kraken.lib.vgsl
+    :members:
+    :show-inheritance:
+
+kraken.lib.codec
+----------------
+
+.. automodule:: kraken.lib.codec
+    :members:
+    :show-inheritance:
+
+kraken.lib.ctc
+----------------
+
+.. automodule:: kraken.lib.ctc
+    :members:
+    :show-inheritance:

@@ -14,9 +14,6 @@ kraken is a turn-key OCR system forked from `ocropus
 <https://github.com/tmbdev/ocropy>`_. It is intended to rectify a number of
 issues while preserving (mostly) functional equivalence. 
 
-If you already got a model trained for ocropus you can always expect it to work
-with kraken without all the fuss of the original ocropus tools.
-
 Features
 ========
 
@@ -30,12 +27,7 @@ kraken's main features are:
   - Word bounding boxes and character cuts
   - `Public repository <https://github.com/mittagessen/kraken-models>`_ of model files
   - :ref:`Lightweight model files <models>`
-  - Support for `clstm <https://github.com/tmbdev/clstm>`_ models
-
-Currently missing or underdocumented are:
-
-  - Tests
-  - New training interface
+  - :ref:`Variable recognition network architectures <vgsl>`
 
 All functionality not pertaining to OCR and prerequisite steps has been
 removed, i.e. no more error rate measuring, etc.
@@ -45,54 +37,45 @@ Pull requests and code contributions are always welcome.
 Installation
 ============
 
-.. note::
-
-  A vagrant virtual machine is also available on the hashicorp atlas. Run
-  ``vagrant init openphilology/kraken && vagrant up`` to install without doing
-  any compiling yourself.
-
 kraken requires some external libraries to run. On Debian/Ubuntu they may be
 installed using:
 
 .. code-block:: console
 
-        # apt install libpangocairo-1.0 libxml2 libblas3 liblapack3 python-dev python-pip
+        # apt install libpangocairo-1.0 libxml2 libblas3 liblapack3 python3-dev python3-pip
 
-.. note::
-
-  It is no longer necessary to install the clstm python bindings manually.
-  There are binary wheels (automatically installed) that should work for most
-  Linux systems on PyPi; for non-x86 systems that need to build from source the
-  dependencies listed in the clstm `documentation
-  <https://github.com/tmbdev/clstm/blob/master/README.md>`_ need to be installed.
+pip
+---
 
 Because the build behavior of pip versions older than 6.1.0 interferes with the
 scipy build process numpy has to be installed before doing the actual install:
 
 .. code-block:: console
 
-  $ pip install numpy
+  $ pip3 install numpy
 
 Install kraken either from pypi:
 
 .. code-block:: console
 
-  $ pip install kraken
+  $ pip3 install kraken
 
 or by running pip in the git repository:
 
 .. code-block:: console
 
-  $ pip install .
+  $ pip3 install .
 
-.. note::
+conda
+-----
 
-  While kraken is Python 2/3 compliant, there are limits to its compatibility.
-  For various reasons it is not possible to use :ref:`pickled models
-  <pyrnn>` under Python 3. As the vast majority of models are still in
-  the legacy format it is recommended to use Python 2.7. On the other hand all
-  models in the central repository are converted to the fully upward compatible
-  pronn format.
+If you are running `Anaconda <https://www.anaconda.com/download/>`_/miniconda, use:
+
+.. code-block::
+  $ conda install -c mittagessen kraken
+
+Models
+------
 
 Finally you'll have to scrounge up an RNN to do the actual recognition of
 characters. To download ocropus' default RNN converted to the new format and

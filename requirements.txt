@@ -9,4 +9,6 @@ scipy
 protobuf>=3.0.0
 jinja2
 python-bidi
-clstm>=0.0.5
+torchvision
+torch>=0.4.0
+coremltools

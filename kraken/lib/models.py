@@ -2,178 +2,91 @@
 kraken.lib.models
 ~~~~~~~~~~~~~~~~~
 
-Wraps around legacy pyrnn and protobuf models to provide a single interface. In
-the future it will also include support for clstm models.
+Wrapper around TorchVGSLModel including a variety of forward pass helpers for
+sequence classification.
 """
-
-from __future__ import absolute_import
-from future import standard_library
-standard_library.install_aliases()
-from future.utils import PY2
-
 from os.path import expandvars, expanduser, abspath
 
-from builtins import next
-from builtins import chr
-
-import numpy
-import gzip
-import bz2
-import sys
-import io
-
-import kraken.lib.lstm
 import kraken.lib.lineest
+import kraken.lib.ctc_decoder
 
-from kraken.lib import pyrnn_pb2
-from kraken.lib.exceptions import KrakenInvalidModelException
+from kraken.lib.vgsl import TorchVGSLModel
+from kraken.lib.exceptions import KrakenInvalidModelException, KrakenInputException
+
+__all__ = ['TorchSeqRecognizer', 'load_any']
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 
-class ClstmSeqRecognizer(kraken.lib.lstm.SeqRecognizer):
+class TorchSeqRecognizer(object):
     """
-    A class providing the same interface to CLSTM networks as to pyrnn
-    ones.
+    A class wrapping a TorchVGSLModel with a more comfortable recognition interface.
     """
-    def __init__(self, fname, normalize=kraken.lib.lstm.normalize_nfkc):
-        self.fname = fname
-        self.rnn = None
-        self.normalize = normalize
-        global clstm
-        import clstm
-        self._load_model()
-
-    @classmethod
-    def init_model(cls, ninput, nhidden, codec):
+    def __init__(self, nn, decoder=kraken.lib.ctc_decoder.greedy_decoder, train=False, device='cpu'):
         """
-        Initialize a new neural network.
+        Constructs a sequence recognizer from a VGSL model and a decoder.
 
         Args:
-            ninput (int): Dimension of input vector
-            nhidden (int): Number of nodes in hidden layer
-            codec (list): List mapping n-th entry in output matrix to glyph
+            nn (kraken.lib.vgsl.TorchVGSLModel): neural network used for recognition
+            decoder (func): Decoder function used for mapping softmax
+                            activations to labels and positions
+            train (bool): Enables or disables gradient calculation
         """
-        self = cls()
-        self.rnn = clstm.make_net_init('bidi',
-                                       'ninput={}:nhidden={}:noutput={}'.format(ninput,
-                                                                                nhidden, 
-                                                                                len(codec)))
-        self.rnn.initialize()
-
-    def save_model(self, path):
-        """
-        Serializes a CLSTM model to protobuf.
-
-        Args:
-            path (str): Path to serialize model to.
-
-        Raises:
-            IndexError if serialization failed for any reason.
-        """
-        clstm.save_net(path, self.rnn)
-
-    def _load_model(self):
-        # swig autoconverts py3 str to C++ string but expect byte strings on
-        # py2. As filenames should always be byte strings convert it back to
-        # str on py3 for swig.
-        if not PY2:
-            self.rnn = clstm.load_net(self.fname.decode('utf-8'))
+        self.nn = nn
+        if train:
+            self.nn.train()
         else:
-            self.rnn = clstm.load_net(self.fname)
+            self.nn.eval()
+        self.codec = self.nn.codec
+        self.decoder = decoder
+        self.train = train
 
-    def predictString(self, line):
+    def forward(self, line):
         """
-        Predicts a string from an input image.
-
-        Args:
-            line (numpy.array): Input image
-
-        Returns:
-            A unicode string containing the recognition result.
+        Performs a forward pass on a numpy array of a line with shape (C, H, W)
+        and returns a numpy array (W, C).
         """
-        line = line.reshape(-1, self.rnn.ninput(), 1)
-        self.rnn.inputs.aset(line.astype('float32'))
-        self.rnn.forward()
-        self.outputs = self.rnn.outputs.array().reshape(line.shape[0], self.rnn.noutput())
-        codes = [x[0] for x in kraken.lib.lstm.translate_back_locations(self.outputs)]
-        cls = clstm.Classes()
-        cls.resize(len(codes))
-        for i, v in enumerate(codes):
-            cls[i] = int(v)
-        res = self.rnn.decode(cls)
-        return res
+        # make CHW -> 1CHW
+        line = line.unsqueeze(0)
+        o = self.nn.nn(line)
+        if o.size(2) != 1:
+            raise KrakenInputException('Expected dimension 3 to be 1, actual {}'.format(o.size()))
+        self.outputs = o.data.squeeze().numpy()
+        return self.outputs
 
-    def trainSequence(self, line, labels, update=1):
+    def predict(self, line):
         """
-        Trains the network using an input numpy array and a series of labels.
-
-        Args:
-            line (numpy.array): Input image
-            labels (clstm.Classes): Label sequence
-            update (bool): Switch to disable weight updates
-
-        Returns:
-            clstm.Classes containing the recognized label sequence.
+        Performs a forward pass on a numpy array of a line with shape (C, H, W)
+        and returns the decoding as a list of tuples (string, start, end,
+        confidence).
         """
-        line = line.reshape(-1, self.rnn.ninput(), 1)
-        self.rnn.inputs.aset(line.astype('float32'))
-        self.rnn.forward()
-        self.outputs = self.rnn.outputs.array().reshape(line.shape[0], self.rnn.noutput())
+        o = self.forward(line)
+        locs = self.decoder(o)
+        return self.codec.decode(locs)
 
-        # build CTC alignment
-        targets = clstm.Sequence()
-        aligned = clstm.Sequence()
-        clstm.mktargets(targets, labels, self.rnn.noutput())
-        clstm.seq_ctc_align(aligned, self.rnn.outputs, targets)
-
-        # calculate deltas, backpropagate and update weights
-        deltas = aligned.array() - self.rnn.outputs.array()
-        self.rnn.d_outputs.aset(deltas)
-        self.rnn.backward()
-        if update:
-            self.rnn.update()
-
-        codes = kraken.lib.lstm.translate_back(self.outputs)
-        cls = clstm.Classes()
-        cls.resize(len(codes))
-        for i, v in enumerate(codes):
-            cls[i] = v
-
-        return cls
-
-    def trainString(self, line, s, update=1):
+    def predict_string(self, line):
         """
-        Trains the network using an input numpy array and a unicode string.
-
-        Strings are assumed to be in ``display`` order as produced as the
-        result of the BiDi algorithm.
-
-        Args:
-            line (numpy.array): Input image
-            s (str): Expected output string
-            update (bool): Switch to disable weight updates
-
-        Returns:
-            An unicode string containing the recognized sequence.
+        Performs a forward pass on a numpy array of a line with shape (C, H, W)
+        and returns a string of the results.
         """
-        labels = clstm.Classes()
-        self.rnn.encode(labels, s)
+        o = self.forward(line)
+        locs = self.decoder(o)
+        decoding = self.codec.decode(locs)
+        return ''.join(x[0] for x in decoding)
 
-        cls = self.trainSequence(line, labels)
-        return self.rnn.decode(cls)
-
-    def setLearningRate(self, rate=1e-4, momentum=0.9):
+    def predict_labels(self, line):
         """
-        Sets learning rate and momentum on the model.
-
-        Args:
-            rate (float): Learning rate
-            momentum (float): Momentum
+        Performs a forward pass on a numpy array of a line with shape (C, H, W)
+        and returns a list of tuples (class, start, end, max). Max is the
+        maximum value of the softmax layer in the region.
         """
-        self.rnn.learning_rate = rate
-        self.rnn.momentum = momentum
+        o = self.forward(line)
+        return self.decoder(o)
 
 
-def load_any(fname):
+def load_any(fname, train=False):
     """
     Loads anything that was, is, and will be a valid ocropus model and
     instantiates a shiny new kraken.lib.lstm.SeqRecognizer from the RNN
@@ -188,176 +101,36 @@ def load_any(fname):
     containing a string representation of the source kind. Current known values
     are:
         * pyrnn for pickled BIDILSTMs
-        * proto-pyrnn for protobuf models converted from pickled objects
         * clstm for protobuf models generated by clstm
 
     Args:
-        fname (str): Path to the model
+        fname (unicode): Path to the model
+        train (bool): Enables gradient calculation and dropout layers in model.
 
     Returns:
-        A kraken.lib.lstm.SeqRecognizer object.
-
-    Raises:
-        KrakenInvalidModelException if the model file could not be recognized.
+        A kraken.lib.models.TorchSeqRecognizer object.
     """
-    seq = None
-
+    nn = None
+    kind = ''
     fname = abspath(expandvars(expanduser(fname)))
+    logger.info(u'Loading model from {}'.format(fname))
     try:
-        seq = load_pronn(fname)
-        seq.kind = 'proto-pyrnn'
-        return seq
-    except:
+        nn = TorchVGSLModel.load_model(str(fname))
+        kind = 'vgsl'
+    except Exception:
         try:
-            seq = load_clstm(fname)
-            seq.kind = 'clstm'
-            return seq
-        except Exception as e:
-            if PY2:
-                try:
-                    seq = load_pyrnn(fname)
-                    seq.kind = 'pyrnn'
-                    return seq
-                except Exception as e:
-                    raise
-            else:
-                raise
-
-def load_clstm(fname):
-    """
-    Loads a CLSTM model in protobuf format and instantiates an object
-    implementing the kraken.lib.SeqRecognizer interface.
-
-    Args:
-        fname (str): Path to the protobuf file
-
-    Returns:
-        A SeqRecognizer object
-    """
-    try:
-        import clstm
-    except ImportError:
-        raise KrakenInvalidModelException('No clstm module available')
-
-    try:
-        return ClstmSeqRecognizer(fname)
-    except Exception as e:
-        raise KrakenInvalidModelException(str(e))
-
-
-def load_pronn(fname):
-    """
-    Loads a legacy pyrnn model in protobuf format and instantiates a
-    kraken.lib.lstm.SeqRecognizer object.
-
-    Args:
-        fname (str): Path to the protobuf file
-
-    Returns:
-        A kraken.lib.lstm.SeqRecognizer object
-    """
-    with open(fname, 'rb') as fp:
-        proto = pyrnn_pb2.pyrnn()
+            nn = TorchVGSLModel.load_clstm_model(fname)
+            kind = 'clstm'
+        except Exception:
+            nn = TorchVGSLModel.load_pronn_model(fname)
+            kind = 'pronn'
         try:
-            proto.ParseFromString(fp.read())
-        except:
-            raise KrakenInvalidModelException('File does not contain valid proto msg')
-        if not proto.IsInitialized():
-            raise KrakenInvalidModelException('Model incomplete')
-        # extract codec
-        codec = kraken.lib.lstm.Codec().init(proto.codec)
-        hiddensize = proto.fwdnet.wgi.dim[0]
-        # next build a line estimator
-        lnorm = kraken.lib.lineest.CenterNormalizer(proto.ninput)
-        network = kraken.lib.lstm.SeqRecognizer(lnorm.target_height,
-                                                hiddensize,
-                                                codec=codec,
-                                                normalize=kraken.lib.lstm.normalize_nfkc)
-        parallel, softmax = network.lstm.nets
-        fwdnet, revnet = parallel.nets
-        revnet = revnet.net
-        for w in ('WGI', 'WGF', 'WGO', 'WCI', 'WIP', 'WFP', 'WOP'):
-            fwd_ar = getattr(proto.fwdnet, w.lower())
-            rev_ar = getattr(proto.revnet, w.lower())
-            setattr(fwdnet, w, numpy.array(fwd_ar.value).reshape(fwd_ar.dim))
-            setattr(revnet, w, numpy.array(rev_ar.value).reshape(rev_ar.dim))
-        softmax.W2 = numpy.array(proto.softmax.w2.value).reshape(proto.softmax.w2.dim)
-        return network
-
-
-def load_pyrnn(fname):
-    """
-    Loads a legacy RNN from a pickle file.
-
-    Args:
-        fname (str): Path to the pickle object
-
-    Returns:
-        Unpickled object
-
-    """
-
-    if not PY2:
-        raise KrakenInvalidModelException('Loading pickle models is not '
-                                          'supported on python 3')
-    import cPickle
-
-    def find_global(mname, cname):
-        aliases = {
-            'lstm.lstm': kraken.lib.lstm,
-            'ocrolib.lstm': kraken.lib.lstm,
-            'ocrolib.lineest': kraken.lib.lineest,
-        }
-        if mname in aliases:
-            return getattr(aliases[mname], cname)
-        return getattr(sys.modules[mname], cname)
-
-    of = io.open
-    if fname.endswith(u'.gz'):
-        of = gzip.open
-    with io.BufferedReader(of(fname, 'rb')) as fp:
-        unpickler = cPickle.Unpickler(fp)
-        unpickler.find_global = find_global
-        try:
-            rnn = unpickler.load()
-        except Exception as e:
-            raise KrakenInvalidModelException(str(e))
-        if not isinstance(rnn, kraken.lib.lstm.SeqRecognizer):
-            raise KrakenInvalidModelException('Pickle is %s instead of '
-                                              'SeqRecognizer' %
-                                              type(rnn).__name__)
-        return rnn
-
-
-def pyrnn_to_pronn(pyrnn=None, output='en-default.pronn'):
-    """
-    Converts a legacy python RNN to the new protobuf format. Benefits of the
-    new format include independence from particular python versions and no
-    arbitrary code execution issues inherent in pickle.
-
-    Args:
-        pyrnn (kraken.lib.lstm.SegRecognizer): pyrnn model
-        output (str): path of the converted protobuf model
-    """
-    proto = pyrnn_pb2.pyrnn()
-    proto.kind = 'pyrnn-bidi'
-    proto.ninput = pyrnn.Ni
-    proto.noutput = pyrnn.No
-    proto.codec.extend(pyrnn.codec.code2char.values())
-
-    parallel, softmax = pyrnn.lstm.nets
-    fwdnet, revnet = parallel.nets
-    revnet = revnet.net
-    for w in ('WGI', 'WGF', 'WGO', 'WCI', 'WIP', 'WFP', 'WOP'):
-            fwd_weights = getattr(fwdnet, w)
-            rev_weights = getattr(revnet, w)
-            fwd_ar = getattr(proto.fwdnet, w.lower())
-            rev_ar = getattr(proto.revnet, w.lower())
-            fwd_ar.dim.extend(fwd_weights.shape)
-            fwd_ar.value.extend(fwd_weights.reshape(-1).tolist())
-            rev_ar.dim.extend(rev_weights.shape)
-            rev_ar.value.extend(rev_weights.reshape(-1).tolist())
-    proto.softmax.w2.dim.extend(softmax.W2.shape)
-    proto.softmax.w2.value.extend(softmax.W2.reshape(-1).tolist())
-    with open(output, 'wb') as fp:
-        fp.write(proto.SerializeToString())
+            nn = TorchVGSLModel.load_pyrnn_model(fname)
+            kind = 'pyrnn'
+        except Exception:
+            pass
+    if not nn:
+        raise KrakenInvalidModelException('File {} not loadable by any parser.'.format(fname))
+    seq = TorchSeqRecognizer(nn, train=train)
+    seq.kind = kind
+    return seq

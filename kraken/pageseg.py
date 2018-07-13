@@ -2,45 +2,51 @@
 #
 # Copyright 2015 Benjamin Kiessling
 #           2014 Thomas M. Breuel
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 # http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
 # or implied. See the License for the specific language governing
 # permissions and limitations under the License.
+"""
+kraken.pageseg
+~~~~~~~~~~~~~~
 
-
-from __future__ import absolute_import, division, print_function
-from builtins import range
-from builtins import object
+Layout analysis and script detection methods.
+"""
+from itertools import groupby
 
 import json
+import logging
 import numpy as np
 import pkg_resources
 
-from future.utils import PY2
-from itertools import groupby
 from scipy.ndimage.filters import (gaussian_filter, uniform_filter,
                                    maximum_filter)
 
 from kraken.lib import models
 from kraken.lib import morph, sl
-from kraken.lib.util import pil2array
+from kraken.lib.util import pil2array, is_bitonal, get_im_str
 from kraken.lib.exceptions import KrakenInputException
 
 from kraken.rpred import rpred
 from kraken.serialization import max_bbox
-from kraken.binarization import is_bitonal
 
 __all__ = ['segment', 'detect_scripts']
 
+logger = logging.getLogger(__name__)
+
+
 class record(object):
+    """
+    Simple dict-like object.
+    """
     def __init__(self, **kw):
         self.__dict__.update(kw)
 
@@ -52,12 +58,18 @@ def find(condition):
 
 
 def binary_objects(binary):
-    labels, n = morph.label(binary)
+    """
+    Labels features in an array and segments them into objects.
+    """
+    labels, _ = morph.label(binary)
     objects = morph.find_objects(labels)
     return objects
 
 
 def estimate_scale(binary):
+    """
+    Estimates image scale based on number of connected components.
+    """
     objects = binary_objects(binary)
     bysize = sorted(objects, key=sl.area)
     scalemap = np.zeros(binary.shape)
@@ -70,6 +82,9 @@ def estimate_scale(binary):
 
 
 def compute_boxmap(binary, scale, threshold=(.5, 4), dtype='i'):
+    """
+    Returns grapheme cluster-like boxes based on connected components.
+    """
     objects = binary_objects(binary)
     bysize = sorted(objects, key=sl.area)
     boxmap = np.zeros(binary.shape, dtype)
@@ -85,6 +100,7 @@ def compute_boxmap(binary, scale, threshold=(.5, 4), dtype='i'):
 def compute_lines(segmentation, scale):
     """Given a line segmentation map, computes a list
     of tuples consisting of 2D slices and masked images."""
+    logger.debug(u'Convert segmentation to lines')
     lobjects = morph.find_objects(segmentation)
     lines = []
     for i, o in enumerate(lobjects):
@@ -108,36 +124,41 @@ def reading_order(lines, text_direction='lr'):
     the partial reading order.  The output is a binary 2D array
     such that order[i,j] is true if line i comes before line j
     in reading order."""
+
+    logger.info(u'Compute reading order on {} lines in {} direction'.format(len(lines), text_direction))
+
     order = np.zeros((len(lines), len(lines)), 'B')
 
-    def x_overlaps(u, v):
+    def _x_overlaps(u, v):
         return u[1].start < v[1].stop and u[1].stop > v[1].start
 
-    def above(u, v):
+    def _above(u, v):
         return u[0].start < v[0].start
 
-    def left_of(u, v):
+    def _left_of(u, v):
         return u[1].stop < v[1].start
 
-    def separates(w, u, v):
+    def _separates(w, u, v):
         if w[0].stop < min(u[0].start, v[0].start):
             return 0
         if w[0].start > max(u[0].stop, v[0].stop):
             return 0
         if w[1].start < u[1].stop and w[1].stop > v[1].start:
             return 1
+        return 0
+
     if text_direction == 'rl':
-        horizontal_order = lambda u, v: not left_of(u, v)
+        horizontal_order = lambda u, v: not _left_of(u, v)
     else:
-        horizontal_order = left_of
+        horizontal_order = _left_of
 
     for i, u in enumerate(lines):
         for j, v in enumerate(lines):
-            if x_overlaps(u, v):
-                if above(u, v):
+            if _x_overlaps(u, v):
+                if _above(u, v):
                     order[i, j] = 1
             else:
-                if [w for w in lines if separates(w, u, v)] == []:
+                if [w for w in lines if _separates(w, u, v)] == []:
                     if horizontal_order(u, v):
                         order[i, j] = 1
     return order
@@ -147,26 +168,28 @@ def topsort(order):
     """Given a binary array defining a partial order (o[i,j]==True means i<j),
     compute a topological sort.  This is a quick and dirty implementation
     that works for up to a few thousand elements."""
+    logger.info(u'Perform topological sort on partially ordered lines')
     n = len(order)
     visited = np.zeros(n)
     L = []
 
-    def visit(k):
+    def _visit(k):
         if visited[k]:
             return
         visited[k] = 1
         a, = np.nonzero(np.ravel(order[:, k]))
         for l in a:
-            visit(l)
+            _visit(l)
         L.append(k)
 
     for k in range(n):
-        visit(k)
-    return L    # [::-1]
+        _visit(k)
+    return L
 
 
 def compute_separators_morph(binary, scale, sepwiden=10, maxcolseps=2):
     """Finds vertical black lines corresponding to column separators."""
+    logger.debug(u'Finding vertical black column lines')
     d0 = int(max(5, scale/4))
     d1 = int(max(5, scale)) + sepwiden
     thick = morph.r_dilation(binary, (d0, d1))
@@ -189,8 +212,7 @@ def compute_colseps_conv(binary, scale=1.0, minheight=10, maxcolseps=2):
     Returns:
         Separators
     """
-
-    h, w = binary.shape
+    logger.debug(u'Finding column separators')
     # find vertical whitespace by thresholding
     smoothed = gaussian_filter(1.0*binary, (scale, scale*0.5))
     smoothed = uniform_filter(smoothed, (5.0*scale, 1))
@@ -219,6 +241,7 @@ def compute_black_colseps(binary, scale, maxcolseps):
     Returns:
         (colseps, binary):
     """
+    logger.debug(u'Extract vertical black column separators from lines')
     seps = compute_separators_morph(binary, scale, maxcolseps)
     colseps = np.maximum(compute_colseps_conv(binary, scale, maxcolseps), seps)
     binary = np.minimum(binary, 1-seps)
@@ -240,6 +263,9 @@ def compute_white_colseps(binary, scale, maxcolseps):
 
 
 def norm_max(v):
+    """
+    Normalizes the input array by maximum value.
+    """
     return v/np.amax(v)
 
 
@@ -256,6 +282,7 @@ def compute_gradmaps(binary, scale, gauss=False):
         (bottom, top, boxmap)
     """
     # use gradient filtering to find baselines
+    logger.debug(u'Computing gradient maps')
     boxmap = compute_boxmap(binary, scale)
     cleaned = boxmap*binary
     if gauss:
@@ -274,6 +301,7 @@ def compute_line_seeds(binary, bottom, top, colseps, scale, threshold=0.2):
     Base on gradient maps, computes candidates for baselines and xheights.
     Then, it marks the regions between the two as a line seed.
     """
+    logger.debug(u'Finding line seeds')
     vrange = int(scale)
     bmarked = maximum_filter(bottom == maximum_filter(bottom, (vrange, 0)),
                              (2, 2))
@@ -314,6 +342,7 @@ def remove_hlines(binary, scale, maxsize=10):
             numpy.array containing the filtered image.
 
     """
+    logger.debug(u'Filtering horizontal lines')
     labels, _ = morph.label(binary)
     objects = morph.find_objects(labels)
     for i, b in enumerate(objects):
@@ -323,17 +352,22 @@ def remove_hlines(binary, scale, maxsize=10):
 
 
 def rotate_lines(lines, angle, offset):
+    """
+    Rotates line bounding boxes around the origin and adding and offset.
+    """
+    logger.debug(u'Rotate line coordinates by {} with offset {}'.format(angle, offset))
     angle = np.radians(angle)
     r = np.array([[np.cos(angle), -np.sin(angle)], [np.sin(angle), np.cos(angle)]])
     p = np.array(lines).reshape((-1, 2))
     offset = np.array([2*offset])
     p = p.dot(r).reshape((-1, 4)).astype(int) + offset
-    x = np.sort(p[:,[0,2]])
-    y = np.sort(p[:,[1,3]])
+    x = np.sort(p[:, [0, 2]])
+    y = np.sort(p[:, [1, 3]])
     return np.column_stack((x.flatten(), y.flatten())).reshape(-1, 4)
 
 
-def segment(im, text_direction='horizontal-lr', scale=None, maxcolseps=2, black_colseps=False):
+def segment(im, text_direction='horizontal-lr', scale=None, maxcolseps=2,
+            black_colseps=False, no_hlines=True):
     """
     Segments a page into text lines.
 
@@ -348,6 +382,7 @@ def segment(im, text_direction='horizontal-lr', scale=None, maxcolseps=2, black_
         maxcolseps (int): Maximum number of whitespace column separators
         black_colseps (bool): Whether column separators are assumed to be
                               vertical black lines or not
+        no_hlines (bool): Switch for horizontal line removal
 
     Returns:
         {'text_direction': '$dir', 'boxes': [(x1, y1, x2, y2),...]}: A
@@ -358,9 +393,12 @@ def segment(im, text_direction='horizontal-lr', scale=None, maxcolseps=2, black_
         KrakenInputException if the input image is not binarized or the text
         direction is invalid.
     """
+    im_str = get_im_str(im)
+    logger.info(u'Segmenting {}'.format(im_str))
 
     if im.mode != '1' and not is_bitonal(im):
-        raise KrakenInputException('Image is not bi-level')
+        logger.error(u'Image {} is not bi-level'.format(im_str))
+        raise KrakenInputException('Image {} is not bi-level'.format(im_str))
 
     # rotate input image for vertical lines
     if text_direction.startswith('horizontal'):
@@ -373,8 +411,10 @@ def segment(im, text_direction='horizontal-lr', scale=None, maxcolseps=2, black_
         angle = 90
         offset = (im.size[0], 0)
     else:
-        raise KrakenInputException('Invalid text direction')
+        logger.error(u'Invalid text direction \'{}\''.format(text_direction))
+        raise KrakenInputException('Invalid text direction {}'.format(text_direction))
 
+    logger.debug(u'Rotating input image by {} degrees'.format(angle))
     im = im.rotate(angle, expand=True)
 
     # honestly I've got no idea what's going on here. In theory a simple
@@ -388,14 +428,17 @@ def segment(im, text_direction='horizontal-lr', scale=None, maxcolseps=2, black_
     if not scale:
         scale = estimate_scale(binary)
 
-    binary = remove_hlines(binary, scale)
+    if no_hlines:
+        binary = remove_hlines(binary, scale)
     # emptyish images wll cause exceptions here.
+
     try:
         if black_colseps:
             colseps, binary = compute_black_colseps(binary, scale, maxcolseps)
         else:
             colseps = compute_white_colseps(binary, scale, maxcolseps)
     except ValueError:
+        logger.warning(u'Exception in column finder (probably empty image) for {}.'.format(im_str))
         return {'text_direction': text_direction, 'boxes':  []}
 
     bottom, top, boxmap = compute_gradmaps(binary, scale)
@@ -413,7 +456,7 @@ def segment(im, text_direction='horizontal-lr', scale=None, maxcolseps=2, black_
     return {'text_direction': text_direction, 'boxes':  rotate_lines(lines, 360-angle, offset).tolist(), 'script_detection': False}
 
 
-def detect_scripts(im, bounds, model=None):
+def detect_scripts(im, bounds, model=pkg_resources.resource_filename(__name__, 'script.mlmodel'), valid_scripts=None):
     """
     Detects scripts in a segmented page.
 
@@ -426,6 +469,7 @@ def detect_scripts(im, bounds, model=None):
                        and an entry 'text_direction' containing
                        'horizontal-lr/rl/vertical-lr/rl'.
         model (str): Location of the script classification model or None for default.
+        valid_scripts (list): List of valid scripts.
 
     Returns:
         {'script_detection': True, 'text_direction': '$dir', 'boxes':
@@ -435,42 +479,68 @@ def detect_scripts(im, bounds, model=None):
         of a single line. Script is a ISO15924 4 character identifier.
 
     Raises:
-        KrakenInputException if the input image is not binarized or the text
-        direction is invalid.
         KrakenInvalidModelException if no clstm module is available.
     """
-    if not model:
-        model = pkg_resources.resource_filename(__name__, 'script.clstm')
-        # resource_filename returns byte strings on python2 and str on python3
-        if not PY2:
-            model = model.encode('utf-8')
-
-    rnn = models.load_clstm(model)
+    im_str = get_im_str(im)
+    logger.info(u'Detecting scripts with {} in {} lines on {}'.format(model, len(bounds['boxes']), im_str))
+    logger.debug(u'Loading detection model {}'.format(model))
+    rnn = models.load_any(model)
     # load numerical to 4 char identifier map
+    logger.debug(u'Loading label to identifier map')
     with pkg_resources.resource_stream(__name__, 'iso15924.json') as fp:
         n2s = json.load(fp)
-    it = rpred(rnn, im, bounds)
+    # convert allowed scripts to labels
+    val_scripts = []
+    if valid_scripts:
+        logger.debug(u'Converting allowed scripts list {}'.format(valid_scripts))
+        for k, v in n2s.items():
+            if v in valid_scripts:
+                val_scripts.append(chr(int(k) + 0xF0000))
+    else:
+        valid_scripts = []
+    it = rpred(rnn, im, bounds, bidi_reordering=False)
     preds = []
-    for pred in it:
+    logger.debug(u'Running detection')
+    for pred, bbox in zip(it, bounds['boxes']):
         # substitute inherited scripts with neighboring runs
-        def subs(m, s):
+        def _subs(m, s, r=False):
             p = u''
             for c in s:
-                if c in m and p:
+                if c in m and p and not r:
+                    p += p[-1]
+                elif c not in m and p and r:
                     p += p[-1]
                 else:
                     p += c
             return p
-        p = subs([u'\U000f03e6', u'\U000f03e6'], pred.prediction)
+
+        logger.debug(u'Substituting scripts')
+        p = _subs([u'\U000f03e2', u'\U000f03e6'], pred.prediction)
         # do a reverse run to fix leading inherited scripts
-        pred.prediction = ''.join(reversed(subs([u'\U000f03e6', u'\U000f03e6'], reversed(p))))
+        pred.prediction = ''.join(reversed(_subs([u'\U000f03e2', u'\U000f03e6'], reversed(p))))
+        # group by valid scripts. two steps: 1. substitute common confusions
+        # (Latin->Fraktur and Syriac->Arabic) if given in script list.
+        if 'Arab' in valid_scripts and 'Syrc' not in valid_scripts:
+            pred.prediction = pred.prediction.replace(u'\U000f0087', u'\U000f00a0')
+        if 'Latn' in valid_scripts and 'Latf' not in valid_scripts:
+            pred.prediction = pred.prediction.replace(u'\U000f00d9', u'\U000f00d7')
+        # next merge adjacent scripts
+        if val_scripts:
+            pred.prediction = _subs(val_scripts, pred.prediction, r=True)
+
         # group by grapheme
         t = []
-        for k, g in groupby(pred, key=lambda x: x[0]):
-            # convert to ISO15924 numerical identifier
-            k = ord(k) - 0xF0000
-            b = max_bbox(x[1] for x in g)
-            t.append((n2s[str(k)], b))
+        logger.debug(u'Merging detections')
+        # if line contains only a single script return whole line bounding box
+        if len(set(pred.prediction)) == 1:
+            logger.debug('Only one script on line. Emitting whole line bbox')
+            k = ord(pred.prediction[0]) - 0xF0000
+            t.append((n2s[str(k)], bbox))
+        else:
+            for k, g in groupby(pred, key=lambda x: x[0]):
+                # convert to ISO15924 numerical identifier
+                k = ord(k) - 0xF0000
+                b = max_bbox(x[1] for x in g)
+                t.append((n2s[str(k)], b))
         preds.append(t)
-
     return {'boxes': preds, 'text_direction': bounds['text_direction'], 'script_detection': True}

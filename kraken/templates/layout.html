@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html {% if text_direction == "horizontal-rl" %}dir="rtl"{% endif %}>
 	  <head>
 		    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
 		    <meta name="uuid" content="{{ uuid }}"/>
@@ -141,13 +141,13 @@
                                     Add Line Below
                                     <input type="checkbox" id="{{ line.index }}" class="below-checkbox">
                                     <span class="checkmark"></span>
-                                    </label>
-                                    <label class="lbl-container">
+                                </label>
+                                <label class="lbl-container">
 
-                                        Add Line Above
-                                        <input type="checkbox" id="{{ line.index }}" class="above-checkbox">
-                                        <span class="checkmark"></span>
-                                    </label>
+                                    Add Line Above
+                                    <input type="checkbox" id="{{ line.index }}" class="above-checkbox">
+                                    <span class="checkmark"></span>
+                                </label>
 
 					                  </li>
                         </ul>

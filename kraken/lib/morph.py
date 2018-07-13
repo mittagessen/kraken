@@ -1,9 +1,6 @@
 """
 Various add-ons to the SciPy morphology package
 """
-
-from __future__ import absolute_import, division, print_function
-
 import numpy as np
 from scipy.ndimage import morphology, measurements, filters
 
@@ -16,13 +13,13 @@ def label(image, **kw):
     """
     try:
         return measurements.label(image, **kw)
-    except:
+    except Exception:
         pass
     types = ["int32", "uint32", "int64", "uint64", "int16", "uint16"]
     for t in types:
         try:
             return measurements.label(np.array(image, dtype=t), **kw)
-        except:
+        except Exception:
             pass
     # let it raise the same exception as before
     return measurements.label(image, **kw)
@@ -36,24 +33,16 @@ def find_objects(image, **kw):
     """
     try:
         return measurements.find_objects(image, **kw)
-    except:
+    except Exception:
         pass
     types = ["int32", "uint32", "int64", "uint64", "int16", "uint16"]
     for t in types:
         try:
             return measurements.find_objects(np.array(image, dtype=t), **kw)
-        except:
+        except Exception:
             pass
     # let it raise the same exception as before
     return measurements.find_objects(image, **kw)
-
-
-def check_binary(image):
-    assert image.dtype == 'B' or image.dtype == 'i' or image.dtype == np.dtype('bool'),\
-        "array should be binary, is %s %s" % (image.dtype, image.shape)
-    assert np.amin(image) >= 0 and np.amax(image) <= 1,\
-        "array should be binary, has values %g to %g" % (np.amin(image),
-                                                         np.amax(image))
 
 
 def r_dilation(image, size, origin=0):
@@ -64,22 +53,6 @@ def r_dilation(image, size, origin=0):
 def r_erosion(image, size, origin=0):
     """Erosion with rectangular structuring element using maximum_filter"""
     return filters.minimum_filter(image, size, origin=origin)
-
-
-def r_opening(image, size, origin=0):
-    """Opening with rectangular structuring element using maximum/minimum
-    filter"""
-    check_binary(image)
-    image = r_erosion(image, size, origin=origin)
-    return r_dilation(image, size, origin=origin)
-
-
-def r_closing(image, size, origin=0):
-    """Closing with rectangular structuring element using maximum/minimum
-    filter"""
-    check_binary(image)
-    image = r_dilation(image, size, origin=0)
-    return r_erosion(image, size, origin=0)
 
 
 def rb_dilation(image, size, origin=0):
@@ -102,34 +75,6 @@ def rb_opening(image, size, origin=0):
     """Binary opening using linear filters."""
     image = rb_erosion(image, size, origin=origin)
     return rb_dilation(image, size, origin=origin)
-
-
-def rb_closing(image, size, origin=0):
-    """Binary closing using linear filters."""
-    image = rb_dilation(image, size, origin=origin)
-    return rb_erosion(image, size, origin=origin)
-
-
-def rg_dilation(image, size, origin=0):
-    """Grayscale dilation with maximum/minimum filters."""
-    return filters.maximum_filter(image, size, origin=origin)
-
-
-def rg_erosion(image, size, origin=0):
-    """Grayscale erosion with maximum/minimum filters."""
-    return filters.minimum_filter(image, size, origin=origin)
-
-
-def rg_opening(image, size, origin=0):
-    """Grayscale opening with maximum/minimum filters."""
-    image = r_erosion(image, size, origin=origin)
-    return r_dilation(image, size, origin=origin)
-
-
-def rg_closing(image, size, origin=0):
-    """Grayscale closing with maximum/minimum filters."""
-    image = r_dilation(image, size, origin=0)
-    return r_erosion(image, size, origin=0)
 
 
 def spread_labels(labels, maxdist=9999999):

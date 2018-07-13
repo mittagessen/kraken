@@ -6,9 +6,6 @@ kraken.lib.exceptions
 All custom exceptions raised by kraken's modules and packages. Packages should
 always define their exceptions here.
 """
-
-from __future__ import absolute_import, division, print_function
-
 class KrakenDecodeException(Exception):
 
     def __init__(self, message=None):
