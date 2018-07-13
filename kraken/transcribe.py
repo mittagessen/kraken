@@ -100,7 +100,13 @@ class TranscriptionInterface(object):
                                       'bbox': '{}, {}, {}, {}'.format(int(bbox[0]),
                                                                       int(bbox[1]),
                                                                       int(bbox[2]),
-                                                                      int(bbox[3]))})
+                                                                      int(bbox[3])),
+                                      'left_real': int(bbox[0]),
+                                      'top_real': int(bbox[1]),
+                                      'width_real': int(bbox[2] - bbox[0]),
+                                      'height_real': int(bbox[3] - bbox[1])
+
+                })
                 self.line_idx += 1
         else:
             raise KrakenInputException('Neither segmentations nor records given')
