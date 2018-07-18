@@ -196,6 +196,7 @@ class _CTC(Function):
         return _flip_path_probability(prob, input_length, path_length)
 
     def forward(self, xs, t):
+        self.device = t.device
         t = t.cpu().numpy()
         xs = xs.cpu()
         # permute to (seq, batch, feat)
@@ -223,7 +224,7 @@ class _CTC(Function):
         self.yseq -= label_prob
         # mask
         self.yseq *= (np.arange(len(self.yseq))[:, None] < self.input_length)[..., None]
-        return torch.tensor(self.yseq).permute(1, 2, 0), None
+        return torch.tensor(self.yseq).to(self.device).permute(1, 2, 0), None
 
 
 class CTCCriterion(Module):
