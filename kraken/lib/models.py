@@ -46,7 +46,7 @@ class TorchSeqRecognizer(object):
         self.device = device
         self.nn.to(device)
 
-    def to(self, device)
+    def to(self, device):
         """
         Moves model to device and automatically loads input tensors onto it.
         """
