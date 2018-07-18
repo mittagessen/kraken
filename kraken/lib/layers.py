@@ -5,7 +5,6 @@ import torch
 import numpy as np
 
 from torch.nn import Module
-from torch.autograd import Variable
 from torch.nn import functional as F
 from coremltools.proto import NeuralNetwork_pb2
 
@@ -108,10 +107,6 @@ class PeepholeBidiLSTM(Module):
             for name, param in zip(param_names, layer_params):
                 setattr(self, name, param)
             self._all_weights.append(param_names)
-
-    def init_hidden(self, bsz=1):
-        return (Variable(torch.zeros(2, bsz, self.hidden_size)),
-                Variable(torch.zeros(2, bsz, self.hidden_size)))
 
     def forward(self, input, hidden):
         layer = (Recurrent(PeepholeLSTMCell), Recurrent(PeepholeLSTMCell, reverse=True))
@@ -260,13 +255,13 @@ class TransposedSummarizingRNN(Module):
             # HNWC -> WNHC
             inputs = inputs.transpose(0, 2)
         if self.legacy:
-            ones = Variable(torch.ones(inputs.shape[:3] + (1,)))
+            ones = torch.ones(inputs.shape[:3] + (1,))
             inputs = torch.cat([ones, inputs], dim=3)
         # HNWC -> (H*N)WC
         siz = inputs.size()
         inputs = inputs.contiguous().view(-1, siz[2], siz[3])
         # (H*N)WO
-        o, _ = self.layer(inputs, self.init_hidden(inputs.size(0)))
+        o, _ = self.layer(inputs)
         # resize to HNWO
         o = o.view(siz[0], siz[1], siz[2], self.output_size)
         if self.summarize:
@@ -277,9 +272,6 @@ class TransposedSummarizingRNN(Module):
         # HNWO -> NOHW
         return o.permute(1, 3, 0, 2)
 
-    def init_hidden(self, bsz=1):
-        return (Variable(torch.zeros(2 if self.bidi else 1, bsz, self.hidden_size)),
-                Variable(torch.zeros(2 if self.bidi else 1, bsz, self.hidden_size)))
 
     def get_shape(self, input):
         """
@@ -444,7 +436,7 @@ class LinSoftmax(Module):
         inputs = inputs.transpose(1, 3)
         # augment with ones along the input (C) axis
         if self.augmentation:
-            inputs = torch.cat([Variable(torch.ones(inputs.shape[:3] + (1,))), inputs], dim=3)
+            inputs = torch.cat([torch.ones(inputs.shape[:3] + (1,)), inputs], dim=3)
         # only enable softmax during inference (CTC loss calculates softmax internally)
         o = self.lin(inputs)
         if not self.training:

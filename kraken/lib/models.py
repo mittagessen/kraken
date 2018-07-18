@@ -46,9 +46,16 @@ class TorchSeqRecognizer(object):
         self.device = device
         self.nn.to(device)
 
+    def to(self, device)
+        """
+        Moves model to device and automatically loads input tensors onto it.
+        """
+        self.device = device
+        self.nn.to(device)
+
     def forward(self, line):
         """
-        Performs a forward pass on a numpy array of a line with shape (C, H, W)
+        Performs a forward pass on a torch tensor of a line with shape (C, H, W)
         and returns a numpy array (W, C).
         """
         # make CHW -> 1CHW
@@ -62,7 +69,7 @@ class TorchSeqRecognizer(object):
 
     def predict(self, line):
         """
-        Performs a forward pass on a numpy array of a line with shape (C, H, W)
+        Performs a forward pass on a torch tensor of a line with shape (C, H, W)
         and returns the decoding as a list of tuples (string, start, end,
         confidence).
         """
@@ -72,7 +79,7 @@ class TorchSeqRecognizer(object):
 
     def predict_string(self, line):
         """
-        Performs a forward pass on a numpy array of a line with shape (C, H, W)
+        Performs a forward pass on a torch tensor of a line with shape (C, H, W)
         and returns a string of the results.
         """
         o = self.forward(line)
@@ -82,7 +89,7 @@ class TorchSeqRecognizer(object):
 
     def predict_labels(self, line):
         """
-        Performs a forward pass on a numpy array of a line with shape (C, H, W)
+        Performs a forward pass on a torch tensor of a line with shape (C, H, W)
         and returns a list of tuples (class, start, end, max). Max is the
         maximum value of the softmax layer in the region.
         """
