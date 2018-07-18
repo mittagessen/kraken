@@ -197,10 +197,11 @@ class _CTC(Function):
 
     def forward(self, xs, t):
         t = t.cpu().numpy()
+        xs = xs.cpu()
         # permute to (seq, batch, feat)
         xs = xs.permute(2, 0, 1).detach()
         self.yseq = F.softmax(xs, dim=2).numpy()
-        xs = xs.cpu().numpy()
+        xs = xs.numpy()
         self.input_length = np.full(len(xs[0]), len(xs), dtype=np.int32)
         self.batch_size = len(xs[0])
         label_length = np.full(len(t), t.shape[1], dtype=np.int32)
