@@ -64,7 +64,7 @@ class TorchSeqRecognizer(object):
         o = self.nn.nn(line)
         if o.size(2) != 1:
             raise KrakenInputException('Expected dimension 3 to be 1, actual {}'.format(o.size()))
-        self.outputs = o.data.squeeze().numpy()
+        self.outputs = o.data.squeeze().cpu().numpy()
         return self.outputs
 
     def predict(self, line):
