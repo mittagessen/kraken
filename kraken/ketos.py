@@ -290,7 +290,7 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
         if not epoch % report:
             logger.debug('Starting evaluation run')
             nn.eval()
-            c, e = compute_error(rec, device, list(test_set))
+            c, e = compute_error(rec, list(test_set))
             nn.train()
             accuracy = (c-e)/c
             logger.info('Accuracy report ({}) {:0.4f} {} {}'.format(epoch, accuracy, c, e))
