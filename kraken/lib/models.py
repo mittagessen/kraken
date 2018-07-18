@@ -33,6 +33,7 @@ class TorchSeqRecognizer(object):
             decoder (func): Decoder function used for mapping softmax
                             activations to labels and positions
             train (bool): Enables or disables gradient calculation
+            device (torch.Device): Device to run model on
         """
         self.nn = nn
         if train:
@@ -42,6 +43,8 @@ class TorchSeqRecognizer(object):
         self.codec = self.nn.codec
         self.decoder = decoder
         self.train = train
+        self.device = device
+        self.nn.to(device)
 
     def forward(self, line):
         """
@@ -49,6 +52,7 @@ class TorchSeqRecognizer(object):
         and returns a numpy array (W, C).
         """
         # make CHW -> 1CHW
+        line = line.to(self.device)
         line = line.unsqueeze(0)
         o = self.nn.nn(line)
         if o.size(2) != 1:

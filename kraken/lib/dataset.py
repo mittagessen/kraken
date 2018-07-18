@@ -119,8 +119,7 @@ def compute_error(model, test_set):
     pairs.
 
     Args:
-        model (kraken.lib.models.ClstmSeqRecognizer): Model used for
-                                                      recognition
+        model (kraken.lib.models.TorchSeqRecognizer): Model used for recognition
         test_set (list): List of tuples (image, text) for testing
 
     Returns:

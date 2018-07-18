@@ -257,9 +257,6 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
     # don't encode test set as the alphabets may not match causing encoding failures
     test_set.training_set = list(zip(test_set._images, test_set._gt))
 
-    logger.debug('Moving model to device {}'.format(device))
-    nn.to(device)
-
     logger.debug('Constructing {} optimizer (lr: {}, momentum: {})'.format(optimizer, lrate, momentum))
 
     # set mode to trainindg
@@ -269,7 +266,8 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
     logger.debug('Set OpenMP threads to {}'.format(threads))
     nn.set_num_threads(threads)
 
-    rec = models.TorchSeqRecognizer(nn, train=True)
+    logger.debug('Moving model to device {}'.format(device))
+    rec = models.TorchSeqRecognizer(nn, train=True, device=device)
     if optimizer == 'SGD':
         optim = SGD(nn.nn.parameters(), lr=lrate, momentum=momentum)
     elif optimizer == 'RMSprop':
@@ -292,7 +290,7 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
         if not epoch % report:
             logger.debug('Starting evaluation run')
             nn.eval()
-            c, e = compute_error(rec, list(test_set))
+            c, e = compute_error(rec, device, list(test_set))
             nn.train()
             accuracy = (c-e)/c
             logger.info('Accuracy report ({}) {:0.4f} {} {}'.format(epoch, accuracy, c, e))
