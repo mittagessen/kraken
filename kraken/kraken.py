@@ -150,8 +150,9 @@ def recognizer(model, pad, bidi_reordering, script_ignore, base_image, input, ou
 @click.version_option()
 @click.option('-i', '--input', type=(click.Path(exists=True),
                                      click.Path(writable=True)), multiple=True)
-@click.option('-v', '--verbose', default=0, count=True)
-def cli(input, verbose):
+@click.option('-v', '--verbose', default=0, count=True, show_default=True)
+@click.option('-d', '--device', default='cpu', show_default=True, help='Select device to use (cpu, cuda:0, cuda:1, ...)')
+def cli(input, verbose, device):
     """
     Base command for recognition functionality.
 
@@ -160,6 +161,7 @@ def cli(input, verbose):
     is set on all subcommands with the `-v` switch.
     """
     ctx = click.get_current_context()
+    ctx.meta['device'] = device
     log.set_logger(logger, level=30-min(10*verbose, 20))
 
 
@@ -291,7 +293,7 @@ def ocr(ctx, model, pad, reorder, serializer, text_direction, lines, threads):
             raise click.BadParameter('No model for {} found'.format(k))
         message('Loading RNN {}\t'.format(k), nl=False)
         try:
-            rnn = models.load_any(location)
+            rnn = models.load_any(location, device=ctx.meta['device'])
             nm[k] = rnn
         except Exception:
             message('\u2717', fg='red')
