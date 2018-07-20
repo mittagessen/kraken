@@ -93,8 +93,8 @@ class TorchVGSLModel(object):
                         [...] Execute ... networks in series (layers).
                         Mp[{name}]<y>,<x>[y_stride][x_stride] Maxpool the input, reducing the (y,x) rectangle to a
                           single vector value.
-
-
+                        S[{name}]<d>(<a>x<b>)<e>,<f> Splits one dimension, moves one part to another
+                          dimension.
         """
         self.spec = spec
         self.named_spec = []
