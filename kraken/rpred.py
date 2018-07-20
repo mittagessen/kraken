@@ -20,12 +20,9 @@ kraken.rpred
 Generators for recognition on lines images.
 """
 import logging
-import numpy as np
 import bidi.algorithm as bd
 
-from PIL import Image
-
-from kraken.lib.util import pil2array, array2pil, get_im_str
+from kraken.lib.util import get_im_str
 from kraken.lib.exceptions import KrakenInputException
 from kraken.lib.dataset import generate_input_transforms
 
@@ -33,6 +30,7 @@ from kraken.lib.dataset import generate_input_transforms
 __all__ = ['ocr_record', 'bidi_record', 'mm_rpred', 'rpred']
 
 logger = logging.getLogger(__name__)
+
 
 class ocr_record(object):
     """
@@ -222,7 +220,7 @@ def mm_rpred(nets, im, bounds, pad=16, bidi_reordering=True,
             pos = []
             conf = []
 
-            for _, start, end, c in result:
+            for _, start, end, c in preds:
                 if bounds['text_direction'].startswith('horizontal'):
                     xmin = coords[0] + int(max((start-pad)*scale, 0))
                     xmax = coords[0] + max(int(min((end-pad)*scale, coords[2]-coords[0])), 1)

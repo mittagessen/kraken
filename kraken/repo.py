@@ -106,6 +106,7 @@ def get_description(model_id):
             raw = base64.b64decode(requests.get(el['url']).json()['content']).decode('utf-8')
             return defaultdict(str, json.loads(raw))
 
+
 def get_listing(callback):
     logger.info(u'Retrieving model list')
     r = requests.get('{}{}'.format(MODEL_REPO, 'git/refs/heads/master'))

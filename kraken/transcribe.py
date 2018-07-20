@@ -16,16 +16,13 @@
 """
 Utility functions for ground truth transcription.
 """
-from kraken.serialization import max_bbox
 from kraken.lib.exceptions import KrakenInputException
 from kraken.lib.util import get_im_str
 
 from jinja2 import Environment, PackageLoader
-from itertools import zip_longest
 from io import BytesIO
 
 import uuid
-import regex
 import base64
 import logging
 

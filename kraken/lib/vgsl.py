@@ -553,21 +553,20 @@ class TorchVGSLModel(object):
         elif m.group('legacy') == 'o':
             legacy = 'ocropy'
         hidden = int(m.group(7))
-        l = layers.TransposedSummarizingRNN(input[1], hidden, direction, dim, summarize, legacy)
+        fn = layers.TransposedSummarizingRNN(input[1], hidden, direction, dim, summarize, legacy)
         logger.debug('{}\t\tRNN\tdirection {} transposed {} summarize {} out {} legacy {}'.format(self.idx+1, direction, dim, summarize, hidden, legacy))
-        return l.get_shape(input), self.get_layer_name(type, m.group('name')), l
+        return fn.get_shape(input), self.get_layer_name(type, m.group('name')), fn
 
     def build_dropout(self, input, block):
         pattern = re.compile(r'(?P<type>Do)(?P<name>{\w+})?(?P<p>(\d+(\.\d*)?|\.\d+))?(,(?P<dim>\d+))?')
         m = pattern.match(block)
         if not m:
             return None, None, None
-        else:
-            prob = float(m.group('p')) if m.group('p') else 0.5
-            dim = int(m.group('dim')) if m.group('dim') else 1
-            l = layers.Dropout(prob, dim)
-            logger.debug('{}\t\tdropout\tprobability {} dims {}'.format(self.idx+1, prob, dim))
-            return l.get_shape(input), self.get_layer_name(m.group('type'), m.group('name')), l
+        prob = float(m.group('p')) if m.group('p') else 0.5
+        dim = int(m.group('dim')) if m.group('dim') else 1
+        fn = layers.Dropout(prob, dim)
+        logger.debug('{}\t\tdropout\tprobability {} dims {}'.format(self.idx+1, prob, dim))
+        return fn.get_shape(input), self.get_layer_name(m.group('type'), m.group('name')), fn
 
     def build_conv(self, input, block):
         """

@@ -120,6 +120,7 @@ class PeepholeBidiLSTM(Module):
     def all_weights(self):
         return [[getattr(self, weight) for weight in weights] for weights in self._all_weights]
 
+
 class Reshape(Module):
     """
     Reshapes input and moves it into other dimensions.
@@ -189,6 +190,7 @@ class Reshape(Module):
                            output_names=[name],
                            custom_proto_spec=params)
         return name
+
 
 class MaxPool(Module):
     """
@@ -341,7 +343,6 @@ class TransposedSummarizingRNN(Module):
         # HNWO -> NOHW
         return o.permute(1, 3, 0, 2)
 
-
     def get_shape(self, input):
         """
         Calculates the output shape from input 4D tuple (batch, channel, input_size, seq_len).
@@ -367,7 +368,6 @@ class TransposedSummarizingRNN(Module):
             nn = [x for x in spec.neuralNetwork.layers if x.input == nn.output][0]
             arch = nn.WhichOneof('layer')
             layer = getattr(nn, arch)
-
 
         def _deserialize_weights(params, layer, direction):
             # ih_matrix

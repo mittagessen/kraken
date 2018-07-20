@@ -16,7 +16,7 @@
 """
 Training loop interception helpers
 """
-import numpy as np
+
 
 class EarlyStopping(object):
     """
@@ -42,7 +42,7 @@ class EarlyStopping(object):
 
     def __next__(self):
         if self.wait >= self.lag:
-             raise StopIteration
+            raise StopIteration
         return self.it
 
     def update(self, val_loss):

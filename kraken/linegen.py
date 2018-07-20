@@ -30,8 +30,6 @@ Line degradation uses a local model described in [1].
 ine Intelligence 22.11 (2000): 1209-1223.
 
 """
-import ctypes.util
-import ctypes
 
 from scipy.ndimage.filters import gaussian_filter
 from scipy.ndimage.measurements import find_objects
@@ -300,7 +298,7 @@ def ocropy_degrade(im, distort=1.0, dsigma=20.0, eps=0.03, delta=0.3, degradatio
     return im
 
 
-def degrade_line(im, eta=0.0, alpha=1.5, beta=1.5, alpha_0 = 1.0, beta_0 = 1.0):
+def degrade_line(im, eta=0.0, alpha=1.5, beta=1.5, alpha_0=1.0, beta_0=1.0):
     """
     Degrades a line image by adding noise.
 
@@ -389,7 +387,7 @@ def distort_line(im, distort=3.0, sigma=10, eps=0.03, delta=0.3):
         return (p[0] + hs[p[0], p[1]], p[1] + ws[p[0], p[1]])
 
     logger.debug(u'Performing geometric transformation')
-    im = array2pil(geometric_transform(line, f, order=1, mode='nearest'))
+    im = array2pil(geometric_transform(line, _f, order=1, mode='nearest'))
     logger.debug(u'Cropping canvas to content box')
     im = im.crop(ImageOps.invert(im).getbbox())
     return im

@@ -232,12 +232,12 @@ def _validate_mm(ctx, param, value):
         return model_dict
     try:
         for m in value:
-            k, v =  m.split(':')
+            k, v = m.split(':')
             if v == 'ignore':
                 model_dict['ignore'].append(k)
             else:
                 model_dict[k] = os.path.expanduser(v)
-    except:
+    except Exception as e:
         raise click.BadParameter('Mappings must be in format script:model')
     return model_dict
 
@@ -357,7 +357,8 @@ def list_models(ctx):
     """
     from kraken import repo
 
-    model_list = repo.get_listing(partial(spin, 'Retrieving model list'))
+    message('Retrieving model list ', nl=False)
+    model_list = repo.get_listing(partial(message, '.', nl=False))
     message('\b\u2713', fg='green', nl=False)
     message('\033[?25h\n', nl=False)
     for m in model_list:
@@ -379,8 +380,9 @@ def get(ctx, model_id):
     except OSError:
         pass
 
+    message('Retrieving model ', nl=False)
     repo.get_model(model_id, click.get_app_dir(APP_NAME),
-                   partial(spin, 'Retrieving model'))
+                   partial(message, '.', nl=False))
     message('\b\u2713', fg='green', nl=False)
     message('\033[?25h\n', nl=False)
     ctx.exit(0)

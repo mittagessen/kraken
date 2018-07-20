@@ -86,7 +86,7 @@ class PytorchCodec(object):
             (torch.IntTensor) encoded label sequence
 
         Raises:
-            KrakenEncodeException is encoding fails and errors is set to raise.
+            KrakenEncodeException if encoding fails.
         """
         splits = self._greedy_split(s, self.c2l_regex)
         labels = []

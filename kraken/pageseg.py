@@ -148,7 +148,8 @@ def reading_order(lines, text_direction='lr'):
         return 0
 
     if text_direction == 'rl':
-        horizontal_order = lambda u, v: not _left_of(u, v)
+        def horizontal_order(u, v):
+            return not _left_of(u, v)
     else:
         horizontal_order = _left_of
 

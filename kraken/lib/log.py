@@ -23,12 +23,14 @@ import time
 import click
 import logging
 
+
 class LogHandler(logging.Handler):
     def emit(self, record):
         msg = self.format(record)
         level = record.levelname.lower()
         err = level in ('warning', 'error', 'exception', 'critical')
         click.echo(msg, err=err)
+
 
 class LogFormatter(logging.Formatter):
     colors = {

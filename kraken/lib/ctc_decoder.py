@@ -28,6 +28,7 @@ from itertools import groupby
 
 __all__ = ['beam_decoder', 'greedy_decoder', 'blank_threshold_decoder']
 
+
 def beam_decoder(outputs, beam_size=3):
     """
     Translates back the network output to a label sequence using
@@ -50,7 +51,7 @@ def beam_decoder(outputs, beam_size=3):
 
     # loop over each time step
     for t in range(w):
-        next_beam = collections.defaultdict(lambda : 2*(float('-inf'),))
+        next_beam = collections.defaultdict(lambda: 2*(float('-inf'),))
         # p_b -> prob for prefix ending in blank
         # p_nb -> prob for prefix not ending in blank
         for prefix, (p_b, p_nb) in beam:
@@ -88,7 +89,7 @@ def beam_decoder(outputs, beam_size=3):
                       key=lambda x: logsumexp(x[1]),
                       reverse=True)
         beam = beam[:beam_size]
-    return [(c, start, end, max(outputs[c,start:end+1])) for (c, start, end) in beam[0][0]]
+    return [(c, start, end, max(outputs[c, start:end+1])) for (c, start, end) in beam[0][0]]
 
 
 def greedy_decoder(outputs):
@@ -120,6 +121,7 @@ def greedy_decoder(outputs):
             classes.append((label, group[0][0], group[-1][0], max(x[2] for x in group)))
     return classes
 
+
 def blank_threshold_decoder(outputs, threshold=0.5):
     """
     Translates back the network output to a label sequence as the original
@@ -138,8 +140,8 @@ def blank_threshold_decoder(outputs, threshold=0.5):
         of the softmax layer in the region.
     """
     outputs = outputs.T
-    labels, n = measurements.label(outputs[:,0] < threshold)
-    mask = np.tile(labels.reshape(-1,1), (1,outputs.shape[1]))
+    labels, n = measurements.label(outputs[:, 0] < threshold)
+    mask = np.tile(labels.reshape(-1, 1), (1, outputs.shape[1]))
     maxima = measurements.maximum_position(outputs, mask, np.arange(1, np.amax(mask)+1))
     p = 0
     start = None
@@ -158,4 +160,3 @@ def blank_threshold_decoder(outputs, threshold=0.5):
     if start:
         x.append((maxima[p-1][1], start, len(outputs), outputs[maxima[p-1]]))
     return [y for y in x if x[0] != 0]
-

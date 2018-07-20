@@ -39,7 +39,6 @@ def message(msg, **styles):
 @click.version_option()
 @click.option('-v', '--verbose', default=0, count=True)
 def cli(verbose):
-    ctx = click.get_current_context()
     log.set_logger(logger, level=30-min(10*verbose, 20))
 
 
@@ -55,28 +54,43 @@ def _validate_manifests(ctx, param, value):
 @click.option('-p', '--pad', show_default=True, type=click.INT, default=16, help='Left and right '
               'padding around lines')
 @click.option('-o', '--output', show_default=True, type=click.Path(), default='model', help='Output model file')
-@click.option('-s', '--spec', show_default=True, default='[1,48,0,1 Cr3,3,32 Mp2,2 Cr3,3,64 Mp2,2 S1(1x12)1,3 Lbx100 Do]', help='VGSL spec of the network to train. CTC layer will be added automatically.')
-@click.option('-a', '--append', show_default=True, default=None, type=click.INT, help='Removes layers before argument and then appends spec. Only works when loading an existing model')
+@click.option('-s', '--spec', show_default=True,
+              default='[1,48,0,1 Cr3,3,32 Mp2,2 Cr3,3,64 Mp2,2 S1(1x12)1,3 Lbx100 Do]',
+              help='VGSL spec of the network to train. CTC layer will be added automatically.')
+@click.option('-a', '--append', show_default=True, default=None, type=click.INT,
+              help='Removes layers before argument and then appends spec. Only works when loading an existing model')
 @click.option('-i', '--load', show_default=True, type=click.Path(exists=True, readable=True), help='Load existing file to continue training')
 @click.option('-F', '--savefreq', show_default=True, default=1, type=click.FLOAT, help='Model save frequency in epochs during training')
 @click.option('-R', '--report', show_default=True, default=1, type=click.FLOAT, help='Report creation frequency in epochs')
-@click.option('-q', '--quit', show_default=True, default='early', type=click.Choice(['early', 'dumb']), help='Stop condition for training. Set to `early` for early stooping or `dumb` for fixed number of epochs')
+@click.option('-q', '--quit', show_default=True, default='early', type=click.Choice(['early', 'dumb']),
+              help='Stop condition for training. Set to `early` for early stooping or `dumb` for fixed number of epochs')
 @click.option('-N', '--epochs', show_default=True, default=-1, help='Number of epochs to train for')
 @click.option('--lag', show_default=True, default=5, help='Number of epochs to wait before stopping training without improvement')
 @click.option('--min-delta', show_default=True, default=0.005, help='Minimum improvement between epochs to reset early stopping')
 @click.option('-d', '--device', show_default=True, default='cpu', help='Select device to use (cpu, cuda:0, cuda:1, ...)')
-@click.option('--optimizer', show_default=True, default='RMSprop', type=click.Choice(['Adagrad', 'SGD', 'RMSprop']), help='Select optimizer')
+@click.option('--optimizer', show_default=True, default='RMSprop', type=click.Choice(['Adam', 'SGD', 'RMSprop']), help='Select optimizer')
 @click.option('-r', '--lrate', show_default=True, default=1e-3, help='Learning rate')
 @click.option('-m', '--momentum', show_default=True, default=0.9, help='Momentum')
 @click.option('-p', '--partition', show_default=True, default=0.9, help='Ground truth data partition ratio between train/test set')
-@click.option('-u', '--normalization', show_default=True, type=click.Choice(['NFD', 'NFKD', 'NFC', 'NFKC']), default=None, help='Ground truth normalization')
-@click.option('-c', '--codec', show_default=True, default=None, type=click.File(mode='r', lazy=True), help='Load a codec JSON definition (invalid if loading existing model)')
-@click.option('--resize', show_default=True, default='fail', type=click.Choice(['add', 'both', 'fail']), help='Codec/output layer resizing option. If set to `add` code points will be added, `both` will set the layer to match exactly the training data, `fail` will abort if training data and model codec do not match.')
+@click.option('-u', '--normalization', show_default=True, type=click.Choice(['NFD', 'NFKD', 'NFC', 'NFKC']),
+              default=None, help='Ground truth normalization')
+@click.option('-c', '--codec', show_default=True, default=None, type=click.File(mode='r', lazy=True),
+              help='Load a codec JSON definition (invalid if loading existing model)')
+@click.option('--resize', show_default=True, default='fail', type=click.Choice(['add', 'both', 'fail']),
+              help='Codec/output layer resizing option. If set to `add` code '
+                   'points will be added, `both` will set the layer to match exactly '
+                   'the training data, `fail` will abort if training data and model '
+                   'codec do not match.')
 @click.option('-n', '--reorder/--no-reorder', show_default=True, default=True, help='Reordering of code points to display order')
-@click.option('-t', '--training-files', show_default=True, default=None, multiple=True, callback=_validate_manifests, type=click.File(mode='r', lazy=True), help='File(s) with additional paths to training data')
-@click.option('-e', '--evaluation-files', show_default=True, default=None, multiple=True, callback=_validate_manifests, type=click.File(mode='r', lazy=True), help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
+@click.option('-t', '--training-files', show_default=True, default=None, multiple=True,
+              callback=_validate_manifests, type=click.File(mode='r', lazy=True),
+              help='File(s) with additional paths to training data')
+@click.option('-e', '--evaluation-files', show_default=True, default=None, multiple=True,
+              callback=_validate_manifests, type=click.File(mode='r', lazy=True),
+              help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
 @click.option('--preload/--no-preload', show_default=True, default=None, help='Hard enable/disable for training data preloading')
-@click.option('--threads', show_default=True, default=min(4, len(os.sched_getaffinity(0))), help='Number of OpenMP threads when running on CPU. Defaults to min(4, #cores).')
+@click.option('--threads', show_default=True, default=min(4, len(os.sched_getaffinity(0))),
+              help='Number of OpenMP threads when running on CPU. Defaults to min(4, #cores).')
 @click.argument('ground_truth', nargs=-1, type=click.Path(exists=True, dir_okay=False))
 def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
           lag, min_delta, device, optimizer, lrate, momentum, partition,
@@ -86,10 +100,9 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
     Trains a model from image-text pairs.
     """
     import re
-    import torch
     import numpy as np
 
-    from torch.optim import SGD, RMSprop
+    from torch.optim import SGD, RMSprop, Adam
     from torch.utils.data import DataLoader
 
     from kraken.lib import models, vgsl
@@ -212,7 +225,7 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
         logger.info('Assembled model spec: {}'.format(nn.spec))
     elif load:
         # prefer explicitly given codec over network codec if mode is 'both'
-        codec = codec if (codec and mode == 'both') else nn.codec
+        codec = codec if (codec and resize == 'both') else nn.codec
 
         try:
             gt_set.encode(codec)
@@ -253,7 +266,6 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
         # initialize codec
         message('\u2713', fg='green')
 
-
     # don't encode test set as the alphabets may not match causing encoding failures
     test_set.training_set = list(zip(test_set._images, test_set._gt))
 
@@ -272,8 +284,8 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
         optim = SGD(nn.nn.parameters(), lr=lrate, momentum=momentum)
     elif optimizer == 'RMSprop':
         optim = RMSprop(nn.nn.parameters(), lr=lrate, momentum=momentum)
-    elif optimizer == 'Adagrad':
-        optim = Adagrad(nn.nn.parameters(), lr=lrate)
+    elif optimizer == 'Adam':
+        optim = Adam(nn.nn.parameters(), lr=lrate)
 
     if quit == 'early':
         st_it = EarlyStopping(train_loader, min_delta, lag)
@@ -296,7 +308,7 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
             logger.info('Accuracy report ({}) {:0.4f} {} {}'.format(epoch, accuracy, c, e))
             message('Accuracy report ({}) {:0.4f} {} {}'.format(epoch, accuracy, c, e))
             st_it.update(accuracy)
-        with log.progressbar(label='epoch {}/{}'.format(epoch, epochs) , length=len(loader), show_pos=True) as bar:
+        with log.progressbar(label='epoch {}/{}'.format(epoch, epochs), length=len(loader), show_pos=True) as bar:
             for trial, (input, target) in enumerate(loader):
                 input = input.to(device)
                 target = target.to(device)
@@ -384,10 +396,10 @@ def extract(ctx, binarize, normalization, normalize_whitespace, reorder,
                 for line in section.iter('li'):
                     if line.get('contenteditable') and (not u''.join(line.itertext()).isspace() and u''.join(line.itertext())):
                         logger.debug('Writing line {:06d}'.format(idx))
-                        l = im.crop([int(x) for x in line.get('data-bbox').split(',')])
+                        l_img = im.crop([int(x) for x in line.get('data-bbox').split(',')])
                         if rotate and td.startswith('vertical'):
                             im.rotate(90, expand=True)
-                        l.save('{}/{:06d}.png'.format(output, idx))
+                        l_img.save('{}/{:06d}.png'.format(output, idx))
                         manifest.append('{:06d}.png'.format(idx))
                         text = u''.join(line.itertext()).strip()
                         for func in text_transforms:
@@ -520,7 +532,6 @@ def line_generator(ctx, font, maxlines, encoding, normalization, renormalize,
     import numpy as np
 
     from kraken import linegen
-    from kraken import binarization
 
     lines = set()
     if not text:

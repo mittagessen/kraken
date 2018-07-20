@@ -100,16 +100,16 @@ def serialize(records, image_name=u'', image_size=(0, 0), writing_mode='horizont
             seg_bbox = max_bbox(record.cuts[line_offset:line_offset + len(segment)])
 
             line['recognition'].extend([{'bbox': seg_bbox,
-                                        'confidences': record.confidences[line_offset:line_offset + len(segment)],
-                                        'cuts': record.cuts[line_offset:line_offset + len(segment)],
-                                        'text': segment,
-                                        'recognition': [{'bbox': cut, 'confidence': conf, 'text': char, 'index': cid}
-                                            for conf, cut, char, cid in
-                                            zip(record.confidences[line_offset:line_offset + len(segment)],
-                                                record.cuts[line_offset:line_offset + len(segment)],
-                                                segment,
-                                                range(char_idx, char_idx + len(segment)))],
-                                        'index': seg_idx}])
+                                         'confidences': record.confidences[line_offset:line_offset + len(segment)],
+                                         'cuts': record.cuts[line_offset:line_offset + len(segment)],
+                                         'text': segment,
+                                         'recognition': [{'bbox': cut, 'confidence': conf, 'text': char, 'index': cid}
+                                                         for conf, cut, char, cid in
+                                                         zip(record.confidences[line_offset:line_offset + len(segment)],
+                                                             record.cuts[line_offset:line_offset + len(segment)],
+                                                             segment,
+                                                             range(char_idx, char_idx + len(segment)))],
+                                         'index': seg_idx}])
             char_idx += len(segment)
             seg_idx += 1
             line_offset += len(segment)

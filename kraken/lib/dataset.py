@@ -62,7 +62,7 @@ def generate_input_transforms(batch, height, width, channels, pad):
     # summarizing network (or a not yet implemented scale operation) to move
     # height to the channel dimension.
     elif height > 1 and width == 0 and channels in (1, 3):
-        perm  = (0, 1, 2)
+        perm = (0, 1, 2)
         scale = height
         mode = 'RGB' if channels == 3 else 'L'
     # fixed height and width image => bicubic scaling of the input image, disable padding
