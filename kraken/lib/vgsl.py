@@ -98,7 +98,7 @@ class TorchVGSLModel(object):
         """
         self.spec = spec
         self.named_spec = []
-        self.ops = [self.build_rnn, self.build_dropout, self.build_maxpool, self.build_conv, self.build_output]
+        self.ops = [self.build_rnn, self.build_dropout, self.build_maxpool, self.build_conv, self.build_output, self.build_reshape]
         self.codec = None
         self.criterion = None
 
@@ -123,7 +123,7 @@ class TorchVGSLModel(object):
         """
         Parses VGSL spec and appends layers to self.nn
         """
-        logger.debug('layer\t\ttype')
+        logger.debug('layer\t\ttype\tparams')
         for block in blocks:
             oshape = None
             layer = None
@@ -554,7 +554,7 @@ class TorchVGSLModel(object):
             legacy = 'ocropy'
         hidden = int(m.group(7))
         l = layers.TransposedSummarizingRNN(input[1], hidden, direction, dim, summarize, legacy)
-        logger.debug('{}\t\tRNN direction {} transposed {} summarize {} out {} legacy {}'.format(self.idx+1, direction, dim, summarize, hidden, legacy))
+        logger.debug('{}\t\tRNN\tdirection {} transposed {} summarize {} out {} legacy {}'.format(self.idx+1, direction, dim, summarize, hidden, legacy))
         return l.get_shape(input), self.get_layer_name(type, m.group('name')), l
 
     def build_dropout(self, input, block):
@@ -566,7 +566,7 @@ class TorchVGSLModel(object):
             prob = float(m.group('p')) if m.group('p') else 0.5
             dim = int(m.group('dim')) if m.group('dim') else 1
             l = layers.Dropout(prob, dim)
-            logger.debug('{}\t\tdropout probability {} dims {}'.format(self.idx+1, prob, dim))
+            logger.debug('{}\t\tdropout\tprobability {} dims {}'.format(self.idx+1, prob, dim))
             return l.get_shape(input), self.get_layer_name(m.group('type'), m.group('name')), l
 
     def build_conv(self, input, block):
@@ -581,7 +581,7 @@ class TorchVGSLModel(object):
         filters = int(m.group('out'))
         nl = m.group('nl')
         fn = layers.ActConv2D(input[1], filters, kernel_size, nl)
-        logger.debug('{}\t\tconv kernel {} x {} filters {} activation {}'.format(self.idx+1, kernel_size[0], kernel_size[1], filters, nl))
+        logger.debug('{}\t\tconv\tkernel {} x {} filters {} activation {}'.format(self.idx+1, kernel_size[0], kernel_size[1], filters, nl))
         return fn.get_shape(input), self.get_layer_name(m.group('type'), m.group('name')), fn
 
     def build_maxpool(self, input, block):
@@ -596,7 +596,34 @@ class TorchVGSLModel(object):
         stride = (kernel_size[0] if not m.group(5) else int(m.group(5)),
                   kernel_size[1] if not m.group(6) else int(m.group(6)))
         fn = layers.MaxPool(kernel_size, stride)
-        logger.debug('{}\t\tMaxpool'.format(self.idx+1))
+        logger.debug('{}\t\tmaxpool\tkernel {} x {} stride {} x {}'.format(self.idx+1, kernel_size[0], kernel_size[1], stride[0], stride[1]))
+        return fn.get_shape(input), self.get_layer_name(m.group('type'), m.group('name')), fn
+
+    def build_reshape(self, input, block):
+        """
+        Builds a reshape layer
+        """
+        pattern = re.compile(r'(?P<type>S)(?P<name>{\w+})?(?P<dim>\d+)\((?P<part_a>\d+)x(?P<part_b>\d+)\)(?P<high>\d+),(?P<low>\d+)')
+        m = pattern.match(block)
+        if not m:
+            return None, None, None
+        src_dim = int(m.group('dim'))
+        part_a = int(m.group('part_a'))
+        part_b = int(m.group('part_b'))
+        high = int(m.group('high'))
+        low = int(m.group('low'))
+        dim_map = {0: 0, 1: 2, 2: 3, 3: 1}
+        if src_dim != high and src_dim != low:
+            raise ValueError('Either high ({}) or low ({}) must be source dimension ({})'.format(high, low, src_dim))
+        if part_a == 0 or part_b == 0:
+            raise ValueError('Expected non-zero size for part_a ({}) or part_b ({})'.format(part_a, part_b))
+        if (part_a == -1 and part_b < 0) or (part_b == -1 and part_b < 0):
+            raise ValueError('Only one size may be -1')
+        logger.debug('{}\t\treshape from {} {} x {} to {}/{}'.format(self.idx+1, src_dim, part_a, part_b, high, low))
+        src_dim = dim_map[src_dim]
+        high = dim_map[high]
+        low = dim_map[low]
+        fn = layers.Reshape(src_dim, part_a, part_b, high, low)
         return fn.get_shape(input), self.get_layer_name(m.group('type'), m.group('name')), fn
 
     def build_output(self, input, block):
@@ -616,5 +643,5 @@ class TorchVGSLModel(object):
             self.criterion = CTCCriterion()
         aug = True if m.group('aug') else False
         lin = layers.LinSoftmax(input[1], int(m.group('out')), aug)
-        logger.debug('{}\t\tlinear augmented {} out {}'.format(self.idx+1, aug, m.group('out')))
+        logger.debug('{}\t\tlinear\taugmented {} out {}'.format(self.idx+1, aug, m.group('out')))
         return lin.get_shape(input), self.get_layer_name(m.group(1), m.group('name')), lin

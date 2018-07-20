@@ -11,7 +11,7 @@ from coremltools.proto import NeuralNetwork_pb2
 # all tensors are ordered NCHW, the "feature" dimension is C, so the output of
 # an LSTM will be put into C same as the filters of a CNN.
 
-__all__ = ['MaxPool', 'Dropout', 'TransposedSummarizingRNN', 'LinSoftmax', 'ActConv2D']
+__all__ = ['MaxPool', 'Reshape', 'Dropout', 'TransposedSummarizingRNN', 'LinSoftmax', 'ActConv2D']
 
 
 def PeepholeLSTMCell(input, hidden, w_ih, w_hh, w_ip, w_fp, w_op):
@@ -120,6 +120,75 @@ class PeepholeBidiLSTM(Module):
     def all_weights(self):
         return [[getattr(self, weight) for weight in weights] for weights in self._all_weights]
 
+class Reshape(Module):
+    """
+    Reshapes input and moves it into other dimensions.
+    """
+    def __init__(self, src_dim, part_a, part_b, high, low):
+        """
+        A wrapper around reshape with serialization and layer arithmetic.
+
+        Args:
+            src_dim (int): Source dimension
+            part_a (int): Size of split dim to move to `high`
+            part_b (int): Size of split dim to move to `low`
+            high (int): Target dimension 1
+            low (int): Target dimension 2
+
+        Shape:
+            - Inputs: :math:`(N, C, H, W)` where `N` batches, `C` channels, `H`
+              height, and `W` width.
+            - Outputs output :math:`(N, C, H, W)`
+        """
+        super(Reshape, self).__init__()
+        self.src_dim = src_dim
+        self.part_a = part_a
+        self.part_b = part_b
+        self.high = high
+        self.low = low
+
+    def forward(self, input):
+        # split dimension src_dim into part_a x part_b
+        input = input.reshape(input.shape[:self.src_dim] + (self.part_a, self.part_b) + input.shape[self.src_dim + 1:])
+        dest = self.low
+        src_dim = self.src_dim
+        if self.high != src_dim:
+            dest = self.high
+        else:
+            src_dim += 1
+        # rotate dimension permutation list
+        perm = list(range(len(input.shape)))
+        step = 1 if dest > src_dim else -1
+        for x in range(src_dim, dest, step):
+            perm[x], perm[x + step] = perm[x + step], perm[x]
+        input = input.permute(perm)
+        o = input.reshape(input.shape[:dest] + (input.shape[dest] * input.shape[dest + 1],) + input.shape[dest + 2:])
+        return o
+
+    def get_shape(self, input):
+        return tuple(self.forward(torch.zeros([x if x else 1 for x in input])).shape)
+
+    def deserialize(self, name, spec):
+        """
+        Noop for deserialization
+        """
+        pass
+
+    def serialize(self, name, input, builder):
+        params = NeuralNetwork_pb2.CustomLayerParams()
+        params.className = 'reshape'
+        params.description = 'A generalized reshape layer'
+        params.parameters['src_dim'].intValue = self.src_dim
+        params.parameters['part_a'].intValue = self.part_a
+        params.parameters['part_b'].intValue = self.part_b
+        params.parameters['high'].intValue = self.high
+        params.parameters['low'].intValue = self.low
+
+        builder.add_custom(name,
+                           input_names=[input],
+                           output_names=[name],
+                           custom_proto_spec=params)
+        return name
 
 class MaxPool(Module):
     """
@@ -528,18 +597,22 @@ class ActConv2D(Module):
         elif nl == 'r':
             self.nl = F.relu
             self.nl_name = 'RELU'
-
+        else:
+            self.nl_name = 'LINEAR'
         self.co = torch.nn.Conv2d(in_channels, out_channels, kernel_size,
                                   padding=self.padding)
 
     def forward(self, inputs):
-        return self.nl(self.co(inputs))
+        o = self.co(inputs)
+        if self.nl:
+            o = self.nl(o)
+        return o
 
     def get_shape(self, input):
         self.output_shape = (input[0],
                              self.out_channels,
-                             int(min(np.floor((input[2]+2*self.padding[0]-(self.kernel_size[0]-1)-1)+1), 1) if input[2] != 0 else 0),
-                             int(min(np.floor((input[3]+2*self.padding[1]-(self.kernel_size[1]-1)-1)+1), 1) if input[3] != 0 else 0))
+                             int(max(np.floor((input[2]+2*self.padding[0]-(self.kernel_size[0]-1)-1)+1), 1) if input[2] != 0 else 0),
+                             int(max(np.floor((input[3]+2*self.padding[1]-(self.kernel_size[1]-1)-1)+1), 1) if input[3] != 0 else 0))
         return self.output_shape
 
     def deserialize(self, name, spec):
