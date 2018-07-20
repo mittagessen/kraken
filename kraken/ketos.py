@@ -55,7 +55,7 @@ def _validate_manifests(ctx, param, value):
 @click.option('-p', '--pad', show_default=True, type=click.INT, default=16, help='Left and right '
               'padding around lines')
 @click.option('-o', '--output', show_default=True, type=click.Path(), default='model', help='Output model file')
-@click.option('-s', '--spec', show_default=True, default='[1,1,0,48 Lbx100 Do]', help='VGSL spec of the network to train. CTC layer will be added automatically.')
+@click.option('-s', '--spec', show_default=True, default='[1,48,0,1 Cr3,3,32 Mp2,2 Cr3,3,64 Mp2,2 S1(1x12)1,3 Lbx100 Do]', help='VGSL spec of the network to train. CTC layer will be added automatically.')
 @click.option('-a', '--append', show_default=True, default=None, type=click.INT, help='Removes layers before argument and then appends spec. Only works when loading an existing model')
 @click.option('-i', '--load', show_default=True, type=click.Path(exists=True, readable=True), help='Load existing file to continue training')
 @click.option('-F', '--savefreq', show_default=True, default=1, type=click.FLOAT, help='Model save frequency in epochs during training')
