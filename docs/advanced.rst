@@ -1,4 +1,4 @@
-Advanced usage
+Advanced Usage
 ==============
 
 Optical character recognition is the serial execution of multiple steps, in the
@@ -8,7 +8,7 @@ from an image), recognition (feeding text lines images into an classifiers),
 and finally serialization of results into an appropriate format such as hOCR or
 ALTO.
 
-Input specification
+Input Specification
 -------------------
 
 All kraken subcommands operating on input-output pairs, i.e. producing one
@@ -31,9 +31,9 @@ binarize any image that is thrown at it.
 
 Available parameters are:
 
-======          ====
+===========     ====
 option          type
-======          ==== 
+===========     ==== 
 --threshold     FLOAT
 --zoom          FLOAT
 --escale        FLOAT
@@ -42,10 +42,10 @@ option          type
 --range         INTEGER
 --low           INTEGER RANGE
 --high          INTEGER RANGE
-======          ====
+===========     ====
 
-Page segmentation
------------------
+Page Segmentation and Script Detection
+--------------------------------------
 
 Page segmentation is mostly parameterless, although a switch to change the
 color of column separators has been retained. The segmentation is written as a
@@ -98,17 +98,17 @@ installed. Without the bindings or by explicitly disabling script detection the
 
 Available page segmentation parameters are:
 
-======                                          ======
+=============================================== ======
 option                                          action
-======                                          ======
+=============================================== ======
 -d, --text-direction                            Sets principal text direction. Valid values are `horizontal-tb`, `vertical-lr`, and `vertical-rl`.
 -s, --script-detect / -n, --no-script-detect    Enables/Disables script detection on segmenter output.
 --scale FLOAT                                   Estimate of the average line height on the page
 -m, --maxcolseps                                Maximum number of columns in the input document. Set to `0` for uni-column layouts.
 -b, --black_colseps / -w, --white_colseps       Switch to black column separators.
-======                                          ======
+=============================================== ======
 
-Model repository
+Model Repository
 ----------------
 
 There is a semi-curated `repository
