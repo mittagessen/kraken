@@ -68,9 +68,6 @@ class TorchVGSLModel(object):
                           r = relu
                           l = linear (i.e., None)
                           m = softmax
-                        F(s|t|r|l|m)[{name}]<d> Fully-connected with s|t|r|l|m non-linearity and
-                          d outputs. Reduces height, width to 1. Input height and width must be
-                          constant.
                         L(f|r|b)(x|y)[s][{name}]<n> LSTM cell with n outputs.
                           f runs the LSTM forward only.
                           r runs the LSTM reversed only.
@@ -91,7 +88,7 @@ class TorchVGSLModel(object):
                         Do[{name}] Insert a 1D dropout layer with 0.5 drop probability.
                         ============ PLUMBING OPS ============
                         [...] Execute ... networks in series (layers).
-                        Mp[{name}]<y>,<x>[y_stride][x_stride] Maxpool the input, reducing the (y,x) rectangle to a
+                        Mp[{name}]<y>,<x>[<y_stride>,<x_stride>] Maxpool the input, reducing the (y,x) rectangle to a
                           single vector value.
                         S[{name}]<d>(<a>x<b>)<e>,<f> Splits one dimension, moves one part to another
                           dimension.
