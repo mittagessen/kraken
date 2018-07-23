@@ -71,7 +71,8 @@ conda
 
 If you are running `Anaconda <https://www.anaconda.com/download/>`_/miniconda, use:
 
-.. code-block::
+.. code-block:: console
+
   $ conda install -c mittagessen kraken
 
 Models

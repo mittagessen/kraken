@@ -295,3 +295,12 @@ texinfo_documents = [
 
 # If true, do not generate a @detailmenu in the "Top" node's menu.
 #texinfo_no_detailmenu = False
+
+scv_whitelist_branches = ('master',)
+import re
+scv_whitelist_tags = (re.compile(r'^\d+\.\d+\.0$'),)
+
+scv_greatest_tag = True
+
+scv_show_banner = True
+scv_banner_greatest_tag = True

@@ -31,23 +31,18 @@ binarize any image that is thrown at it.
 
 Available parameters are:
 
---threshold FLOAT
-        TODO
---zoom FLOAT
-        TODO
---escale FLOAT
-        TODO
---border FLOAT
-        TODO
---perc INTEGER RANGE
-        TODO
---range INTEGER
-        TODO
---low INTEGER RANGE
-        TODO
---high INTEGER RANGE
-        TODO
-
+======          ====
+option          type
+======          ==== 
+--threshold     FLOAT
+--zoom          FLOAT
+--escale        FLOAT
+--border        FLOAT
+--perc          INTEGER RANGE
+--range         INTEGER
+--low           INTEGER RANGE
+--high          INTEGER RANGE
+======          ====
 
 Page segmentation
 -----------------
@@ -103,17 +98,15 @@ installed. Without the bindings or by explicitly disabling script detection the
 
 Available page segmentation parameters are:
 
--d, --text-direction
-    Sets principal text direction. Valid values are `horizontal-tb`,
-    `vertical-lr`, and `vertical-rl`.
--s, --script-detect / -n, --no-script-detect
-    Enables/Disables script detection on segmenter output.
---scale FLOAT
-    TODO
--m, --maxcolseps 
-    Maximum number of columns in the input document. Set to `0` for uni-column layouts.
--b, --black_colseps / -w, --white_colseps
-    Switch to black column separators.
+======                                          ======
+option                                          action
+======                                          ======
+-d, --text-direction                            Sets principal text direction. Valid values are `horizontal-tb`, `vertical-lr`, and `vertical-rl`.
+-s, --script-detect / -n, --no-script-detect    Enables/Disables script detection on segmenter output.
+--scale FLOAT                                   Estimate of the average line height on the page
+-m, --maxcolseps                                Maximum number of columns in the input document. Set to `0` for uni-column layouts.
+-b, --black_colseps / -w, --white_colseps       Switch to black column separators.
+======                                          ======
 
 Model repository
 ----------------
@@ -134,7 +127,6 @@ description):
         Retrieving model list   ✓
         default (pyrnn) - A converted version of en-default.pyrnn.gz
         toy (clstm) - A toy model trained on 400 lines of the UW3 data set.
-
 
 To access more detailed information the ``show`` subcommand may be used:
 

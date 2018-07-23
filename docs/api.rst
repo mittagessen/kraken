@@ -38,16 +38,9 @@ kraken.rpred module
     :show-inheritance:
 
 kraken.transcribe module
------------------------
+------------------------
 
 .. automodule:: kraken.transcribe
-    :members:
-    :show-inheritance:
-
-kraken.train module
------------------------
-
-.. automodule:: kraken.train
     :members:
     :show-inheritance:
 
@@ -79,9 +72,30 @@ kraken.lib.codec
     :members:
     :show-inheritance:
 
+kraken.lib.train module
+-----------------------
+
+.. automodule:: kraken.lib.train
+    :members:
+    :show-inheritance:
+
+kraken.lib.dataset module
+-------------------------
+
+.. automodule:: kraken.lib.dataset
+    :members:
+    :show-inheritance:
+
 kraken.lib.ctc
-----------------
+--------------
 
 .. automodule:: kraken.lib.ctc
+    :members:
+    :show-inheritance:
+
+kraken.lib.ctc_decoder
+----------------------
+
+.. automodule:: kraken.lib.ctc_decoder
     :members:
     :show-inheritance:

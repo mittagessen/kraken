@@ -12,6 +12,7 @@ A VGSL specification consists of an input spec, one or more layers, and an
 output spec. For example:
 
 .. code-block:: console
+
         [1,48,0,1 Cr3,3,32 Mp2,2 Cr3,3,64 Mp2,2 S1(1x12)1,3 Lbx100 Do O1c103]
 
 The first block defines the input in order of [batch, heigh, width, channels]
@@ -31,11 +32,13 @@ height requires the height dimension to be moved to the channel dimension,
 e.g.:
 
 .. code-block:: console
+
         [1,48,0,1 S1(1x48)1,3 Lbx100 O1c103]
 
 or using the alternative slightly faster  formulation:
 
 .. code-block:: console
+
         [1,1,0,48 Lbx100 Oc1c103]
 
 Finally an output definition is appended. When training sequence classification
@@ -62,6 +65,7 @@ Recurrent Layers
 ----------------
 
 .. code-block:: console
+
         L(f|r|b)(x|y)[s][{name}]<n> LSTM cell with n outputs.
         G(f|r|b)(x|y)[s][{name}]<n> GRU cell with n outputs.
           The RNN must have one of:
@@ -85,6 +89,7 @@ Helper and Plumbing Layers
 --------------------------
 
 .. code-block:: console
+
         Mp[{name}]<y>,<x>[,<y_stride>,<x_stride>] maxpool the input, reducing the (y,x) rectangle to a
                 single vector value
         S[{name}]<d>(<a>x<b>)<e>,<f> Splits one dimension, moves one part to another
@@ -102,6 +107,7 @@ Regularization Layers
 ---------------------
 
 .. code-block:: console
+
         Do[{name}][<prob>],[<dim>] Insert a 1D or 2D dropout layer
 
 Adds an 1D or 2D dropout layer with a given probability. Defaults to `0.5` drop

@@ -141,6 +141,7 @@ class TorchVGSLModel(object):
         Splits a model at layer `idx` and append layers `spec`.
 
         New layers are initialized using the init_weights method.
+
         Args:
             idx (int): Index of layer to append spec to starting with 1.  To
                        select the whole layer stack set idx to None.
