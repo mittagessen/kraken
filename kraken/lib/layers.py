@@ -248,7 +248,7 @@ class Dropout(Module):
         if dim == 1:
             self.layer = torch.nn.Dropout(p)
         elif dim == 2:
-            self.layer = torch.nn.Dropout2D(p)
+            self.layer = torch.nn.Dropout2d(p)
 
     def forward(self, inputs):
         return self.layer(inputs)
