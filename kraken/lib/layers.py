@@ -63,10 +63,10 @@ def StackedRNN(inners, num_layers: int, num_directions: int):
                 all_output.append(output)
             input = torch.cat(all_output, input.dim() - 1)
         next_h, next_c = zip(*next_hidden)
-        next_hidden = (
+        next_hidden = [
             torch.cat(next_h, 0).view(total_layers, *next_h[0].size()),
             torch.cat(next_c, 0).view(total_layers, *next_c[0].size())
-        )
+        ]
         return next_hidden, input
 
     return forward
@@ -95,7 +95,7 @@ class PeepholeBidiLSTM(Module):
 
         self.input_size = input_size
         self.hidden_size = hidden_size
-        self._all_weights = []
+        self._all_weights: List[torch.Tensor] = []
         gate_size = 4 * hidden_size
         for direction in range(2):
             w_ih = torch.nn.Parameter(torch.Tensor(gate_size, input_size))
@@ -638,7 +638,7 @@ class ActConv2D(Module):
                                                                                        *self.kernel_size))
         self.co.bias = torch.nn.Parameter(torch.Tensor(conv.bias.floatValue))
 
-    def serialize(self, name: str, input: str, builder) -> None:
+    def serialize(self, name: str, input: str, builder) -> str:
         """
         Serializes the module using a NeuralNetworkBuilder.
         """

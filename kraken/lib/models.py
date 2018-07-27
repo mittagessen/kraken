@@ -28,7 +28,7 @@ class TorchSeqRecognizer(object):
     """
     A class wrapping a TorchVGSLModel with a more comfortable recognition interface.
     """
-    def __init__(self, nn, decoder=kraken.lib.ctc_decoder.greedy_decoder, train: bool = False, device: str = 'cpu'):
+    def __init__(self, nn, decoder=kraken.lib.ctc_decoder.greedy_decoder, train: bool = False, device: str = 'cpu') -> None:
         """
         Constructs a sequence recognizer from a VGSL model and a decoder.
 
@@ -40,6 +40,7 @@ class TorchSeqRecognizer(object):
             device (torch.Device): Device to run model on
         """
         self.nn = nn
+        self.kind = ''
         if train:
             self.nn.train()
         else:

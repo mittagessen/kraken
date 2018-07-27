@@ -48,11 +48,11 @@ def beam_decoder(outputs: np.ndarray, beam_size: int = 3) -> List[Tuple[int, int
     """
     c, w = outputs.shape
     probs = np.log(outputs)
-    beam = [(tuple(), (0.0, float('-inf')))]
+    beam: List[Tuple[Tuple, Tuple[float, float]]] = [(tuple(), (0.0, float('-inf')))]
 
     # loop over each time step
     for t in range(w):
-        next_beam = collections.defaultdict(lambda: 2*(float('-inf'),))
+        next_beam: dict  = collections.defaultdict(lambda: 2*(float('-inf'),))
         # p_b -> prob for prefix ending in blank
         # p_nb -> prob for prefix not ending in blank
         for prefix, (p_b, p_nb) in beam:
@@ -117,9 +117,9 @@ def greedy_decoder(outputs: np.ndarray) -> List[Tuple[int, int, int, float]]:
     mask = np.eye(outputs.shape[0], dtype='bool')[labels].T
     classes = []
     for label, group in groupby(zip(np.arange(seq_len), labels, outputs[mask]), key=lambda x: x[1]):
-        group = list(group)
+        lgroup = list(group)
         if label != 0:
-            classes.append((label, group[0][0], group[-1][0], max(x[2] for x in group)))
+            classes.append((label, lgroup[0][0], lgroup[-1][0], max(x[2] for x in lgroup)))
     return classes
 
 

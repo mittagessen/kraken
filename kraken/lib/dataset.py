@@ -18,13 +18,12 @@ Utility functions for data loading and training of VGSL networks.
 """
 import os
 import torch
-import click
 import unicodedata
 import numpy as np
 import bidi.algorithm as bd
 
 from PIL import Image
-from typing import List, Tuple, Sequence, TypeVar, Callable, Optional, Any
+from typing import List, Tuple, Sequence, TypeVar, Callable, Optional, Any, Union, cast
 from collections import Counter
 from torchvision import transforms
 from torch.utils.data import Dataset
@@ -57,6 +56,7 @@ def generate_input_transforms(batch: int, height: int, width: int, channels: int
         A torchvision transformation composition converting the input image to
         the appropriate tensor.
     """
+    scale: Union[Tuple[int, int], int]
     if height == 1 and width == 0 and channels > 3:
         perm = (1, 0, 2)
         scale = channels
@@ -156,7 +156,7 @@ class GroundTruthDataset(Dataset):
                  suffix: str = '.gt.txt',
                  normalization: Optional[str] = None,
                  reorder: bool = True,
-                 im_transforms: Callable[[Any], torch.Tensor] = None,
+                 im_transforms: Callable[[Any], torch.Tensor] = transforms.Compose([]),
                  preload: bool = True) -> None:
         """
         Reads a list of image-text pairs and creates a ground truth set.
@@ -180,17 +180,17 @@ class GroundTruthDataset(Dataset):
                                   tensor suitable for forward passes.
             preload (bool): Enables preloading and preprocessing of image files.
         """
-        self.split = lambda x: split(x) + self.suffix
         self.suffix = suffix
-        self._images = []
-        self._gt = []
+        self.split = lambda x: split(x) + self.suffix
+        self._images: Union[List[Image], List[torch.Tensor]] = []
+        self._gt: List[str] = []
         self.alphabet: Counter = Counter()
-        self.text_transforms = []
+        self.text_transforms: List[Callable[[str], str]] = []
         self.transforms = im_transforms
         self.preload = preload
         # built text transformations
         if normalization:
-            self.text_transforms.append(lambda x: unicodedata.normalize(normalization, x))
+            self.text_transforms.append(lambda x: unicodedata.normalize(cast(str, normalization), x))
         if reorder:
             self.text_transforms.append(bd.get_display)
 
@@ -201,7 +201,7 @@ class GroundTruthDataset(Dataset):
         Args:
             image (str): Input image path
         """
-        with click.open_file(self.split(image), 'r', encoding='utf-8') as fp:
+        with open(self.split(image), 'r', encoding='utf-8') as fp:
             gt = fp.read().strip('\n\r')
             for func in self.text_transforms:
                 gt = func(gt)

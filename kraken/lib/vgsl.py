@@ -11,7 +11,7 @@ import gzip
 import torch
 import logging
 
-from typing import List, Tuple, Union, Optional, Iterable, Callable
+from typing import List, Tuple, Union, Optional, Iterable, Callable, Dict
 
 import kraken.lib.lstm
 
@@ -55,7 +55,7 @@ class TorchVGSLModel(object):
         criterion (torch.nn.Module): Fully parametrized loss function.
 
     """
-    def __init__(self, spec: str):
+    def __init__(self, spec: str) -> None:
         """
         Constructs a torch module from a (subset of) VSGL spec.
 
@@ -98,7 +98,7 @@ class TorchVGSLModel(object):
         self.spec = spec
         self.named_spec: List[str] = []
         self.ops = [self.build_rnn, self.build_dropout, self.build_maxpool, self.build_conv, self.build_output, self.build_reshape]
-        self.codec = None
+        self.codec: Optional[PytorchCodec] = None
         self.criterion = None
 
         self.idx = -1
@@ -118,7 +118,7 @@ class TorchVGSLModel(object):
         self.nn = torch.nn.Sequential()
         self._parse(input, blocks)
 
-    def _parse(self, input: str, blocks: List[str]) -> None:
+    def _parse(self, input: Tuple[int, int, int, int], blocks: List[str]) -> None:
         """
         Parses VGSL spec and appends layers to self.nn
         """
@@ -132,7 +132,7 @@ class TorchVGSLModel(object):
                     break
             if oshape:
                 input = oshape
-                self.named_spec.append(self.set_layer_name(block, name))
+                self.named_spec.append(self.set_layer_name(block, name)) # type: ignore
                 self.nn.add_module(name, layer)
             else:
                 raise ValueError('{} invalid layer definition'.format(block))
@@ -531,11 +531,13 @@ class TorchVGSLModel(object):
         self.nn[-1].resize(output_size, del_indices)
         pattern = re.compile(r'(O)(?P<name>{\w+})?(?P<dim>2|1|0)(?P<type>l|s|c)(?P<aug>a)?(?P<out>\d+)')
         m = pattern.match(self.named_spec[-1])
+        if not m:
+            raise ValueError('Output specification is not parsable')
         aug = m.group('aug') if m.group('aug') else ''
         self.named_spec[-1] = 'O{}{}{}{}{}'.format(m.group('name'), m.group('dim'), m.group('type'), aug, output_size)
         self.spec = '[' + ' '.join(self.named_spec) + ']'
 
-    def build_rnn(self, input: Tuple[int, int, int, int], block: str) -> Tuple[Tuple[int, int, int, int], str, Callable]:
+    def build_rnn(self, input: Tuple[int, int, int, int], block: str) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
         """
         Builds an LSTM/GRU layer returning number of outputs and layer.
         """
@@ -557,7 +559,7 @@ class TorchVGSLModel(object):
         logger.debug('{}\t\tRNN\tdirection {} transposed {} summarize {} out {} legacy {}'.format(self.idx+1, direction, dim, summarize, hidden, legacy))
         return fn.get_shape(input), self.get_layer_name(type, m.group('name')), fn
 
-    def build_dropout(self, input: Tuple[int, int, int, int], block: str) -> Tuple[Tuple[int, int, int, int], str, Callable]:
+    def build_dropout(self, input: Tuple[int, int, int, int], block: str) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
         pattern = re.compile(r'(?P<type>Do)(?P<name>{\w+})?(?P<p>(\d+(\.\d*)?|\.\d+))?(,(?P<dim>\d+))?')
         m = pattern.match(block)
         if not m:
@@ -568,7 +570,7 @@ class TorchVGSLModel(object):
         logger.debug('{}\t\tdropout\tprobability {} dims {}'.format(self.idx+1, prob, dim))
         return fn.get_shape(input), self.get_layer_name(m.group('type'), m.group('name')), fn
 
-    def build_conv(self, input: Tuple[int, int, int, int], block: str) -> Tuple[Tuple[int, int, int, int], str, Callable]:
+    def build_conv(self, input: Tuple[int, int, int, int], block: str) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
         """
         Builds a 2D convolution layer.
         """
@@ -583,7 +585,7 @@ class TorchVGSLModel(object):
         logger.debug('{}\t\tconv\tkernel {} x {} filters {} activation {}'.format(self.idx+1, kernel_size[0], kernel_size[1], filters, nl))
         return fn.get_shape(input), self.get_layer_name(m.group('type'), m.group('name')), fn
 
-    def build_maxpool(self, input: Tuple[int, int, int, int], block: str) -> Tuple[Tuple[int, int, int, int], str, Callable]:
+    def build_maxpool(self, input: Tuple[int, int, int, int], block: str) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
         """
         Builds a maxpool layer.
         """
@@ -598,7 +600,7 @@ class TorchVGSLModel(object):
         logger.debug('{}\t\tmaxpool\tkernel {} x {} stride {} x {}'.format(self.idx+1, kernel_size[0], kernel_size[1], stride[0], stride[1]))
         return fn.get_shape(input), self.get_layer_name(m.group('type'), m.group('name')), fn
 
-    def build_reshape(self, input: Tuple[int, int, int, int], block: str) -> Tuple[Tuple[int, int, int, int], str, Callable]:
+    def build_reshape(self, input: Tuple[int, int, int, int], block: str) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
         """
         Builds a reshape layer
         """
@@ -625,7 +627,7 @@ class TorchVGSLModel(object):
         fn = layers.Reshape(src_dim, part_a, part_b, high, low)
         return fn.get_shape(input), self.get_layer_name(m.group('type'), m.group('name')), fn
 
-    def build_output(self, input: Tuple[int, int, int, int], block: str) -> Tuple[Tuple[int, int, int, int], str, Callable]:
+    def build_output(self, input: Tuple[int, int, int, int], block: str) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
         """
         Builds an output layer.
         """

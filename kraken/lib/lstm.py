@@ -1,6 +1,7 @@
 # flake8: noqa
 import numpy as np
 
+from typing import Dict
 from scipy.ndimage import measurements
 from scipy.special import expit
 
@@ -11,8 +12,8 @@ class Codec(object):
     """Translate between integer codes and characters."""
     def init(self, charset):
         charset = sorted(list(set(charset)))
-        self.code2char = {}
-        self.char2code = {}
+        self.code2char: Dict[int, str] = {}
+        self.char2code: Dict[str, int] = {}
         for code,char in enumerate(charset):
             self.code2char[code] = char
             self.char2code[char] = code

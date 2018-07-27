@@ -54,7 +54,7 @@ class PytorchCodec(object):
         else:
             self.c2l = {k: [v] for v, k in enumerate(sorted(charset), start=1)}
         # map integer labels to code points because regex only works with strings
-        self.l2c = {}
+        self.l2c: Dict[str, str] = {}
         for k, v in self.c2l.items():
             self.l2c[''.join(chr(c) for c in v)] = k
 
@@ -89,7 +89,7 @@ class PytorchCodec(object):
             KrakenEncodeException if encoding fails.
         """
         splits = self._greedy_split(s, self.c2l_regex)
-        labels = []
+        labels: List[int] = []
         for c in splits:
             labels.extend(self.c2l[c])
         return IntTensor(labels)
@@ -126,7 +126,7 @@ class PytorchCodec(object):
             idx += len(i)
         return decoded
 
-    def _greedy_split(self, input, re):
+    def _greedy_split(self, input: str, re: regex.Regex) -> List[str]:
         """
         Splits an input string greedily from a list of prefixes. Stops when no
         more matches are found.
@@ -142,7 +142,7 @@ class PytorchCodec(object):
             (KrakenEncodeException) if no prefix match is found for some part
             of the string.
         """
-        r = []
+        r: List[str] = []
         idx = 0
         while True:
             mo = re.match(input, idx)

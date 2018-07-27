@@ -35,7 +35,7 @@ class EarlyStopping(object):
         self.min_delta = min_delta
         self.lag = lag
         self.it = it
-        self.best_loss = 0
+        self.best_loss = 0.0
         self.wait = 0
 
     def __iter__(self):
