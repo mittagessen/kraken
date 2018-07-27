@@ -4,6 +4,7 @@ Layers for VGSL models
 import torch
 import numpy as np
 
+from typing import List, Tuple, Optional, Iterable
 from torch.nn import Module
 from torch.nn import functional as F
 from coremltools.proto import NeuralNetwork_pb2
@@ -14,7 +15,13 @@ from coremltools.proto import NeuralNetwork_pb2
 __all__ = ['MaxPool', 'Reshape', 'Dropout', 'TransposedSummarizingRNN', 'LinSoftmax', 'ActConv2D']
 
 
-def PeepholeLSTMCell(input, hidden, w_ih, w_hh, w_ip, w_fp, w_op):
+def PeepholeLSTMCell(input: torch.Tensor,
+                     hidden: Tuple[torch.Tensor, torch.Tensor],
+                     w_ih: torch.Tensor,
+                     w_hh: torch.Tensor,
+                     w_ip: torch.Tensor,
+                     w_fp: torch.Tensor,
+                     w_op: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
     """
     An LSTM cell with peephole connections without biases.
 
@@ -40,7 +47,7 @@ def PeepholeLSTMCell(input, hidden, w_ih, w_hh, w_ip, w_fp, w_op):
     return hy, cy
 
 
-def StackedRNN(inners, num_layers, num_directions):
+def StackedRNN(inners, num_layers: int, num_directions: int):
     num_directions = len(inners)
     total_layers = num_layers * num_directions
 
@@ -65,7 +72,7 @@ def StackedRNN(inners, num_layers, num_directions):
     return forward
 
 
-def Recurrent(inner, reverse=False):
+def Recurrent(inner, reverse: bool = False):
     def forward(input, hidden, weight):
         output = []
         steps = range(input.size(0) - 1, -1, -1) if reverse else range(input.size(0))
@@ -83,7 +90,7 @@ def Recurrent(inner, reverse=False):
 
 class PeepholeBidiLSTM(Module):
 
-    def __init__(self, input_size, hidden_size):
+    def __init__(self, input_size: int, hidden_size: int) -> None:
         super(PeepholeBidiLSTM, self).__init__()
 
         self.input_size = input_size
@@ -108,7 +115,7 @@ class PeepholeBidiLSTM(Module):
                 setattr(self, name, param)
             self._all_weights.append(param_names)
 
-    def forward(self, input, hidden):
+    def forward(self, input: torch.Tensor, hidden: Tuple[torch.Tensor, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
         layer = (Recurrent(PeepholeLSTMCell), Recurrent(PeepholeLSTMCell, reverse=True))
         func = StackedRNN(layer, 1, 2)
         input = input.transpose(0, 1)
@@ -125,7 +132,7 @@ class Reshape(Module):
     """
     Reshapes input and moves it into other dimensions.
     """
-    def __init__(self, src_dim, part_a, part_b, high, low):
+    def __init__(self, src_dim: int, part_a: int, part_b: int, high: int, low: int) -> None:
         """
         A wrapper around reshape with serialization and layer arithmetic.
 
@@ -148,7 +155,7 @@ class Reshape(Module):
         self.high = high
         self.low = low
 
-    def forward(self, input):
+    def forward(self, input: torch.Tensor) -> torch.Tensor:
         # split dimension src_dim into part_a x part_b
         input = input.reshape(input.shape[:self.src_dim] + (self.part_a, self.part_b) + input.shape[self.src_dim + 1:])
         dest = self.low
@@ -166,7 +173,7 @@ class Reshape(Module):
         o = input.reshape(input.shape[:dest] + (input.shape[dest] * input.shape[dest + 1],) + input.shape[dest + 2:])
         return o
 
-    def get_shape(self, input):
+    def get_shape(self, input: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
         return tuple(self.forward(torch.zeros([x if x else 1 for x in input])).shape)
 
     def deserialize(self, name, spec):
@@ -175,7 +182,7 @@ class Reshape(Module):
         """
         pass
 
-    def serialize(self, name, input, builder):
+    def serialize(self, name: str, input: str, builder) -> str:
         params = NeuralNetwork_pb2.CustomLayerParams()
         params.className = 'reshape'
         params.description = 'A generalized reshape layer'
@@ -196,7 +203,7 @@ class MaxPool(Module):
     """
     A simple wrapper for MaxPool layers
     """
-    def __init__(self, kernel_size, stride):
+    def __init__(self, kernel_size: Tuple[int, int], stride: Tuple[int, int]) -> None:
         """
         A wrapper around MaxPool layers with serialization and layer arithmetic.
         """
@@ -205,23 +212,23 @@ class MaxPool(Module):
         self.stride = stride
         self.layer = torch.nn.MaxPool2d(kernel_size, stride)
 
-    def forward(self, inputs):
+    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
         return self.layer(inputs)
 
-    def get_shape(self, input):
+    def get_shape(self, input: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
         self.output_shape = (input[0],
                              input[1],
                              int(np.floor((input[2]-(self.kernel_size[0]-1)-1)/self.stride[0]+1) if input[2] != 0 else 0),
                              int(np.floor((input[3]-(self.kernel_size[1]-1)-1)/self.stride[1]+1) if input[3] != 0 else 0))
         return self.output_shape
 
-    def deserialize(self, name, spec):
+    def deserialize(self, name, spec) -> None:
         """
         Noop for MaxPool deserialization
         """
         pass
 
-    def serialize(self, name, input, builder):
+    def serialize(self, name: str, input: str, builder) -> str:
         builder.add_pooling(name,
                             self.kernel_size[0],
                             self.kernel_size[1],
@@ -238,7 +245,7 @@ class Dropout(Module):
     """
     A simple wrapper for dropout layers
     """
-    def __init__(self, p, dim):
+    def __init__(self, p: float, dim: int) -> None:
         """
         A wrapper around dropout layers with serialization and layer arithmetic.
         """
@@ -250,10 +257,10 @@ class Dropout(Module):
         elif dim == 2:
             self.layer = torch.nn.Dropout2d(p)
 
-    def forward(self, inputs):
+    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
         return self.layer(inputs)
 
-    def get_shape(self, input):
+    def get_shape(self, input: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
         self.output_shape = input
         return input
 
@@ -280,7 +287,13 @@ class TransposedSummarizingRNN(Module):
     """
     An RNN wrapper allowing time axis transpositions and other
     """
-    def __init__(self, input_size, hidden_size, direction='b', transpose=True, summarize=True, legacy=None):
+    def __init__(self,
+                 input_size: int,
+                 hidden_size: int,
+                 direction: str = 'b',
+                 transpose: bool = True,
+                 summarize: bool = True,
+                 legacy: Optional[str] = None) -> None:
         """
         A wrapper around torch.nn.LSTM optionally transposing inputs and
         returning only the last column of output.
@@ -319,7 +332,7 @@ class TransposedSummarizingRNN(Module):
                                        batch_first=True,
                                        bias=False if legacy else True)
 
-    def forward(self, inputs):
+    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
         # NCHW -> HNWC
         inputs = inputs.permute(2, 0, 3, 1)
         if self.transpose:
@@ -343,7 +356,7 @@ class TransposedSummarizingRNN(Module):
         # HNWO -> NOHW
         return o.permute(1, 3, 0, 2)
 
-    def get_shape(self, input):
+    def get_shape(self, input: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
         """
         Calculates the output shape from input 4D tuple (batch, channel, input_size, seq_len).
         """
@@ -357,7 +370,7 @@ class TransposedSummarizingRNN(Module):
         self.output_shape = (input[0], self.output_size) + layer
         return self.output_shape
 
-    def deserialize(self, name, spec):
+    def deserialize(self, name: str, spec) -> None:
         """
         Sets the weights of an initialized layer from a coreml spec.
         """
@@ -415,7 +428,7 @@ class TransposedSummarizingRNN(Module):
             if not self.legacy:
                 _deserialize_biases(bwd_params, self.layer, 'bwd')
 
-    def serialize(self, name, input, builder):
+    def serialize(self, name: str, input: str, builder) -> str:
         """
         Serializes the module using a NeuralNetworkBuilder.
         """
@@ -476,7 +489,7 @@ class LinSoftmax(Module):
     """
     A wrapper for linear projection + softmax dealing with dimensionality mangling.
     """
-    def __init__(self, input_size, output_size, augmentation=False):
+    def __init__(self, input_size: int, output_size: int, augmentation: bool = False) -> None:
         """
 
         Args:
@@ -499,7 +512,7 @@ class LinSoftmax(Module):
 
         self.lin = torch.nn.Linear(self.input_size, output_size)
 
-    def forward(self, inputs):
+    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
         # move features (C) to last dimension for linear activation
         # NCHW -> NWHC
         inputs = inputs.transpose(1, 3)
@@ -513,14 +526,14 @@ class LinSoftmax(Module):
         # and swap again
         return o.transpose(1, 3)
 
-    def get_shape(self, input):
+    def get_shape(self, input: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
         """
         Calculates the output shape from input 4D tuple NCHW.
         """
         self.output_shape = (input[0], self.output_size, input[2], input[3])
         return self.output_shape
 
-    def deserialize(self, name, spec):
+    def deserialize(self, name: str, spec) -> None:
         """
         Sets the weights of an initialized module from a CoreML protobuf spec.
         """
@@ -531,7 +544,7 @@ class LinSoftmax(Module):
         self.lin.weight = torch.nn.Parameter(weights)
         self.lin.bias = torch.nn.Parameter(bias)
 
-    def serialize(self, name, input, builder):
+    def serialize(self, name: str, input: str, builder):
         """
         Serializes the module using a NeuralNetworkBuilder.
         """
@@ -544,7 +557,7 @@ class LinSoftmax(Module):
         builder.add_softmax(softmax_name, lin_name, name)
         return name
 
-    def resize(self, output_size, del_indices=None):
+    def resize(self, output_size: int, del_indices: Optional[Iterable[int]] = None) -> None:
         """
         Resizes the linear layer with minimal disturbance to the existing
         weights.
@@ -577,7 +590,7 @@ class ActConv2D(Module):
     A wrapper for convolution + activation with automatic padding ensuring no
     dropped columns.
     """
-    def __init__(self, in_channels, out_channels, kernel_size, nl='l'):
+    def __init__(self, in_channels: int, out_channels: int, kernel_size: Tuple[int, int], nl: str = 'l') -> None:
         super(ActConv2D, self).__init__()
         self.in_channels = in_channels
         self.kernel_size = kernel_size
@@ -602,20 +615,20 @@ class ActConv2D(Module):
         self.co = torch.nn.Conv2d(in_channels, out_channels, kernel_size,
                                   padding=self.padding)
 
-    def forward(self, inputs):
+    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
         o = self.co(inputs)
         if self.nl:
             o = self.nl(o)
         return o
 
-    def get_shape(self, input):
+    def get_shape(self, input: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
         self.output_shape = (input[0],
                              self.out_channels,
                              int(max(np.floor((input[2]+2*self.padding[0]-(self.kernel_size[0]-1)-1)+1), 1) if input[2] != 0 else 0),
                              int(max(np.floor((input[3]+2*self.padding[1]-(self.kernel_size[1]-1)-1)+1), 1) if input[3] != 0 else 0))
         return self.output_shape
 
-    def deserialize(self, name, spec):
+    def deserialize(self, name: str, spec) -> None:
         """
         Sets the weight of an initialized model from a CoreML protobuf spec.
         """
@@ -625,7 +638,7 @@ class ActConv2D(Module):
                                                                                        *self.kernel_size))
         self.co.bias = torch.nn.Parameter(torch.Tensor(conv.bias.floatValue))
 
-    def serialize(self, name, input, builder):
+    def serialize(self, name: str, input: str, builder) -> None:
         """
         Serializes the module using a NeuralNetworkBuilder.
         """

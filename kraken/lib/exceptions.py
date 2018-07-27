@@ -47,10 +47,10 @@ class KrakenCairoSurfaceException(Exception):
         width (int): Width of the surface
         height (int): Height of the surface
     """
-    def __init__(self, message, width, height):
+    def __init__(self, message: str, width: int, height: int) -> None:
         self.message = message
         self.width = width
         self.height = height
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return repr(self.message)

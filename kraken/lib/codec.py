@@ -21,8 +21,8 @@ graphemes.
 import regex
 import numpy as np
 
+from typing import List, Tuple, Set, Union, Dict, Sequence
 from torch import IntTensor
-
 from kraken.lib.exceptions import KrakenEncodeException
 
 __all__ = ['PytorchCodec']
@@ -32,7 +32,7 @@ class PytorchCodec(object):
     """
     Translates between labels and graphemes.
     """
-    def __init__(self, charset):
+    def __init__(self, charset: Union[Dict[str, Sequence[int]], List[str], str]) -> None:
         """
         Builds a codec converting between graphemes/code points and integer
         label sequences.
@@ -63,19 +63,19 @@ class PytorchCodec(object):
         # sort prefixes for l2c regex
         self.l2c_regex = regex.compile(r'|'.join(regex.escape(x) for x in sorted(self.l2c.keys(), key=len, reverse=True)))
 
-    def __len__(self):
+    def __len__(self) -> int:
         """
         Total number of input labels the codec can decode.
         """
         return len(self.l2c.keys())
 
-    def max_label(self):
+    def max_label(self) -> int:
         """
         Returns the maximum label value.
         """
         return max(l for labels in self.c2l.values() for l in labels)
 
-    def encode(self, s):
+    def encode(self, s: str) -> IntTensor:
         """
         Encodes a string into a sequence of labels.
 
@@ -94,7 +94,7 @@ class PytorchCodec(object):
             labels.extend(self.c2l[c])
         return IntTensor(labels)
 
-    def decode(self, labels):
+    def decode(self, labels: List[Tuple[int, int, int, float]]) -> List[Tuple[str, int, int, float]]:
         """
         Decodes a labelling.
 
@@ -153,7 +153,7 @@ class PytorchCodec(object):
             r.append(mo.group())
             idx = mo.end()
 
-    def merge(self, codec):
+    def merge(self, codec: 'PytorchCodec') -> Tuple['PytorchCodec', Set]:
         """
         Transforms this codec (c1) into another (c2) reusing as many labels as
         possible.

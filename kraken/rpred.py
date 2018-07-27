@@ -22,6 +22,9 @@ Generators for recognition on lines images.
 import logging
 import bidi.algorithm as bd
 
+from PIL import Image
+from typing import List, Tuple, Optional, Generator, Union
+
 from kraken.lib.util import get_im_str
 from kraken.lib.exceptions import KrakenInputException
 from kraken.lib.dataset import generate_input_transforms
@@ -36,22 +39,22 @@ class ocr_record(object):
     """
     A record object containing the recognition result of a single line
     """
-    def __init__(self, prediction, cuts, confidences):
+    def __init__(self, prediction: str, cuts, confidences):
         self.prediction = prediction
         self.cuts = cuts
         self.confidences = confidences
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.prediction)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.prediction
 
     def __iter__(self):
         self.idx = -1
         return self
 
-    def __next__(self):
+    def __next__(self) -> Tuple[str, int, float]:
         if self.idx + 1 < len(self):
             self.idx += 1
             return (self.prediction[self.idx], self.cuts[self.idx],
@@ -59,7 +62,7 @@ class ocr_record(object):
         else:
             raise StopIteration
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: Union[int, slice]):
         if isinstance(key, slice):
             return [self[i] for i in range(*key.indices(len(self)))]
         elif isinstance(key, int):
@@ -73,7 +76,7 @@ class ocr_record(object):
             raise TypeError('Invalid argument type')
 
 
-def bidi_record(record):
+def bidi_record(record: ocr_record) -> ocr_record:
     """
     Reorders a record using the Unicode BiDi algorithm.
 
@@ -111,7 +114,7 @@ def bidi_record(record):
     return ocr_record(prediction, cuts, confidences)
 
 
-def extract_boxes(im, bounds):
+def extract_boxes(im: Image, bounds: Dict[str, Any]) -> Image:
     """
     Yields the subimages of image im defined in the list of bounding boxes in
     bounds preserving order.
@@ -137,8 +140,12 @@ def extract_boxes(im, bounds):
         yield im.crop(box).rotate(angle, expand=True), box
 
 
-def mm_rpred(nets, im, bounds, pad=16, bidi_reordering=True,
-             script_ignore=None):
+def mm_rpred(nets: Dict[str, TorchSeqRecognizer],
+             im: Image,
+             bounds: dict,
+             pad: int = 16,
+             bidi_reordering: bool = True,
+             script_ignore: Optional[List[str]] = None) -> Generator[ocr_record, None, None]:
     """
     Multi-model version of kraken.rpred.rpred.
 
@@ -150,7 +157,7 @@ def mm_rpred(nets, im, bounds, pad=16, bidi_reordering=True,
         nets (dict): A dict mapping ISO15924 identifiers to TorchSegRecognizer
                      objects. Recommended to be an defaultdict.
         im (PIL.Image): Image to extract text from
-                        bounds (dict): A dictionary containing a 'boxes' entry
+        bounds (dict): A dictionary containing a 'boxes' entry
                         with a list of lists of coordinates (script, (x0, y0,
                         x1, y1)) of a text line in the image and an entry
                         'text_direction' containing
@@ -241,7 +248,11 @@ def mm_rpred(nets, im, bounds, pad=16, bidi_reordering=True,
             yield rec
 
 
-def rpred(network, im, bounds, pad=16, bidi_reordering=True):
+def rpred(network: TorchSeqRecognizer,
+          im: Image,
+          bounds: dict,
+          pad: int = 16,
+          bidi_reordering: bool = True) -> Generator[ocr_record, None, None]:
     """
     Uses a RNN to recognize text
 

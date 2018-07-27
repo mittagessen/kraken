@@ -11,6 +11,8 @@ import gzip
 import torch
 import logging
 
+from typing import List, Tuple, Union, Optional, Iterable, Callable
+
 import kraken.lib.lstm
 
 from kraken.lib import layers
@@ -53,7 +55,7 @@ class TorchVGSLModel(object):
         criterion (torch.nn.Module): Fully parametrized loss function.
 
     """
-    def __init__(self, spec):
+    def __init__(self, spec: str):
         """
         Constructs a torch module from a (subset of) VSGL spec.
 
@@ -94,7 +96,7 @@ class TorchVGSLModel(object):
                           dimension.
         """
         self.spec = spec
-        self.named_spec = []
+        self.named_spec: List[str] = []
         self.ops = [self.build_rnn, self.build_dropout, self.build_maxpool, self.build_conv, self.build_output, self.build_reshape]
         self.codec = None
         self.criterion = None
@@ -116,7 +118,7 @@ class TorchVGSLModel(object):
         self.nn = torch.nn.Sequential()
         self._parse(input, blocks)
 
-    def _parse(self, input, blocks):
+    def _parse(self, input: str, blocks: List[str]) -> None:
         """
         Parses VGSL spec and appends layers to self.nn
         """
@@ -136,7 +138,7 @@ class TorchVGSLModel(object):
                 raise ValueError('{} invalid layer definition'.format(block))
         self.output = oshape
 
-    def append(self, idx, spec):
+    def append(self, idx: int, spec: str) -> None:
         """
         Splits a model at layer `idx` and append layers `spec`.
 
@@ -156,12 +158,12 @@ class TorchVGSLModel(object):
         self.spec = '[' + ' '.join(self.named_spec) + ']'
         self.init_weights(slice(idx, -1))
 
-    def to(self, device):
+    def to(self, device: Union[str, torch.device]) -> None:
         self.nn.to(device)
         if self.criterion:
             self.criterion.to(device)
 
-    def eval(self):
+    def eval(self) -> None:
         """
         Sets the model to evaluation/inference mode, disabling dropout and
         gradient calculation.
@@ -169,7 +171,7 @@ class TorchVGSLModel(object):
         self.nn.eval()
         torch.set_grad_enabled(False)
 
-    def train(self):
+    def train(self) -> None:
         """
         Sets the model to training mode (enables dropout layers and disables
         softmax on CTC layers).
@@ -180,14 +182,14 @@ class TorchVGSLModel(object):
             self.nn[-1].eval()
         torch.set_grad_enabled(True)
 
-    def set_num_threads(self, num):
+    def set_num_threads(self, num: int) -> None:
         """
         Sets number of OpenMP threads to use.
         """
         torch.set_num_threads(num)
 
     @classmethod
-    def load_pyrnn_model(cls, path):
+    def load_pyrnn_model(cls, path: str):
         """
         Loads an pyrnn model to VGSL.
         """
@@ -270,7 +272,7 @@ class TorchVGSLModel(object):
         return nn
 
     @classmethod
-    def load_pronn_model(cls, path):
+    def load_pronn_model(cls, path: str):
         """
         Loads an pronn model to VGSL.
         """
@@ -331,7 +333,7 @@ class TorchVGSLModel(object):
         return nn
 
     @classmethod
-    def load_clstm_model(cls, path):
+    def load_clstm_model(cls, path: str):
         """
         Loads an CLSTM model to VGSL.
         """
@@ -365,7 +367,7 @@ class TorchVGSLModel(object):
 
         hidden = int(nets['lstm1'].attribute[0].value)
 
-        weights = {}
+        weights: Dict[str, torch.Tensor] = {}
         for n in nets:
             weights[n] = {}
             for w in list(nets[n].weights):
@@ -406,7 +408,7 @@ class TorchVGSLModel(object):
         return nn
 
     @classmethod
-    def load_model(cls, path):
+    def load_model(cls, path: str):
         """
         Deserializes a VGSL model from a CoreML file.
 
@@ -425,7 +427,7 @@ class TorchVGSLModel(object):
             nn.add_codec(PytorchCodec(json.loads(mlmodel.user_defined_metadata['codec'])))
         return nn
 
-    def save_model(self, path):
+    def save_model(self, path: str):
         """
         Serializes the model into path.
 
@@ -445,13 +447,13 @@ class TorchVGSLModel(object):
             mlmodel.user_defined_metadata['codec'] = json.dumps(self.codec.c2l)
         mlmodel.save(path)
 
-    def add_codec(self, codec):
+    def add_codec(self, codec: PytorchCodec) -> None:
         """
         Adds a PytorchCodec to the model.
         """
         self.codec = codec
 
-    def init_weights(self, idx=slice(0, None)):
+    def init_weights(self, idx: slice = slice(0, None)) -> None:
         """
         Initializes weights for all or a subset of layers in the graph.
 
@@ -483,7 +485,7 @@ class TorchVGSLModel(object):
         self.nn[idx].apply(_wi)
 
     @staticmethod
-    def set_layer_name(layer, name):
+    def set_layer_name(layer: str, name: str) -> str:
         """
         Sets the name field of an VGSL layer definition.
 
@@ -497,7 +499,7 @@ class TorchVGSLModel(object):
         lsplits.insert(-1, '{{{}}}'.format(name))
         return ''.join(lsplits)
 
-    def get_layer_name(self, layer, name=None):
+    def get_layer_name(self, layer: str, name: Optional[str] = None) -> str:
         """
         Generates a unique identifier for the layer optionally using a supplied
         name.
@@ -515,7 +517,7 @@ class TorchVGSLModel(object):
         else:
             return '{}_{}'.format(re.sub(r'\W+', '_', layer), self.idx)
 
-    def resize_output(self, output_size, del_indices=None):
+    def resize_output(self, output_size: int, del_indices: Optional[Iterable] = None) -> None:
         """
         Resizes an output linear projection layer.
 
@@ -533,7 +535,7 @@ class TorchVGSLModel(object):
         self.named_spec[-1] = 'O{}{}{}{}{}'.format(m.group('name'), m.group('dim'), m.group('type'), aug, output_size)
         self.spec = '[' + ' '.join(self.named_spec) + ']'
 
-    def build_rnn(self, input, block):
+    def build_rnn(self, input: Tuple[int, int, int, int], block: str) -> Tuple[Tuple[int, int, int, int], str, Callable]:
         """
         Builds an LSTM/GRU layer returning number of outputs and layer.
         """
@@ -555,7 +557,7 @@ class TorchVGSLModel(object):
         logger.debug('{}\t\tRNN\tdirection {} transposed {} summarize {} out {} legacy {}'.format(self.idx+1, direction, dim, summarize, hidden, legacy))
         return fn.get_shape(input), self.get_layer_name(type, m.group('name')), fn
 
-    def build_dropout(self, input, block):
+    def build_dropout(self, input: Tuple[int, int, int, int], block: str) -> Tuple[Tuple[int, int, int, int], str, Callable]:
         pattern = re.compile(r'(?P<type>Do)(?P<name>{\w+})?(?P<p>(\d+(\.\d*)?|\.\d+))?(,(?P<dim>\d+))?')
         m = pattern.match(block)
         if not m:
@@ -566,7 +568,7 @@ class TorchVGSLModel(object):
         logger.debug('{}\t\tdropout\tprobability {} dims {}'.format(self.idx+1, prob, dim))
         return fn.get_shape(input), self.get_layer_name(m.group('type'), m.group('name')), fn
 
-    def build_conv(self, input, block):
+    def build_conv(self, input: Tuple[int, int, int, int], block: str) -> Tuple[Tuple[int, int, int, int], str, Callable]:
         """
         Builds a 2D convolution layer.
         """
@@ -581,7 +583,7 @@ class TorchVGSLModel(object):
         logger.debug('{}\t\tconv\tkernel {} x {} filters {} activation {}'.format(self.idx+1, kernel_size[0], kernel_size[1], filters, nl))
         return fn.get_shape(input), self.get_layer_name(m.group('type'), m.group('name')), fn
 
-    def build_maxpool(self, input, block):
+    def build_maxpool(self, input: Tuple[int, int, int, int], block: str) -> Tuple[Tuple[int, int, int, int], str, Callable]:
         """
         Builds a maxpool layer.
         """
@@ -596,7 +598,7 @@ class TorchVGSLModel(object):
         logger.debug('{}\t\tmaxpool\tkernel {} x {} stride {} x {}'.format(self.idx+1, kernel_size[0], kernel_size[1], stride[0], stride[1]))
         return fn.get_shape(input), self.get_layer_name(m.group('type'), m.group('name')), fn
 
-    def build_reshape(self, input, block):
+    def build_reshape(self, input: Tuple[int, int, int, int], block: str) -> Tuple[Tuple[int, int, int, int], str, Callable]:
         """
         Builds a reshape layer
         """
@@ -623,7 +625,7 @@ class TorchVGSLModel(object):
         fn = layers.Reshape(src_dim, part_a, part_b, high, low)
         return fn.get_shape(input), self.get_layer_name(m.group('type'), m.group('name')), fn
 
-    def build_output(self, input, block):
+    def build_output(self, input: Tuple[int, int, int, int], block: str) -> Tuple[Tuple[int, int, int, int], str, Callable]:
         """
         Builds an output layer.
         """

@@ -55,7 +55,7 @@ def _validate_manifests(ctx, param, value):
               'padding around lines')
 @click.option('-o', '--output', show_default=True, type=click.Path(), default='model', help='Output model file')
 @click.option('-s', '--spec', show_default=True,
-              default='[1,48,0,1 Cr3,3,32 Mp2,2 Cr3,3,64 Mp2,2 S1(1x12)1,3 Lbx100 Do]',
+              default='[1,48,0,1 Cr3,3,32 Do0.1,2 Mp2,2 Cr3,3,64 Do0.1,2 Mp2,2 S1(1x12)1,3 Lbx100 Do]',
               help='VGSL spec of the network to train. CTC layer will be added automatically.')
 @click.option('-a', '--append', show_default=True, default=None, type=click.INT,
               help='Removes layers before argument and then appends spec. Only works when loading an existing model')
@@ -302,11 +302,11 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
         if not epoch % report:
             logger.debug('Starting evaluation run')
             nn.eval()
-            c, e = compute_error(rec, list(test_set))
+            chars, error = compute_error(rec, list(test_set))
             nn.train()
-            accuracy = (c-e)/c
-            logger.info('Accuracy report ({}) {:0.4f} {} {}'.format(epoch, accuracy, c, e))
-            message('Accuracy report ({}) {:0.4f} {} {}'.format(epoch, accuracy, c, e))
+            accuracy = (chars-error)/chars
+            logger.info('Accuracy report ({}) {:0.4f} {} {}'.format(epoch, accuracy, chars, error))
+            message('Accuracy report ({}) {:0.4f} {} {}'.format(epoch, accuracy, chars, error))
             st_it.update(accuracy)
         with log.progressbar(label='epoch {}/{}'.format(epoch, epochs), length=len(loader), show_pos=True) as bar:
             for trial, (input, target) in enumerate(loader):

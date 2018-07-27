@@ -18,12 +18,14 @@ from jinja2 import Environment, PackageLoader
 import regex
 import logging
 
+from typing import List, Tuple, Iterable, Optional
+
 logger = logging.getLogger(__name__)
 
 __all__ = ['serialize']
 
 
-def _rescale(val, low, high):
+def _rescale(val: List[float], low: float, high: float) -> List[float]:
     """
     Rescales a list of confidence value between 0 and 1 to an interval [low,
     high].
@@ -39,7 +41,7 @@ def _rescale(val, low, high):
     return [(high - low) * x + low for x in val]
 
 
-def max_bbox(boxes):
+def max_bbox(boxes: Iterable[Tuple[int, int, int, int]]) -> Tuple[int, int, int, int]:
     """
     Calculates the minimal bounding box containing all boxes contained in an
     iterator.
@@ -54,7 +56,12 @@ def max_bbox(boxes):
     return (sbox[0][0], sbox[1][0], sbox[2][-1], sbox[3][-1])
 
 
-def serialize(records, image_name=u'', image_size=(0, 0), writing_mode='horizontal-tb', scripts=None, template='hocr'):
+def serialize(records: Iterable,
+              image_name: str = None,
+              image_size: Tuple[int, int] = (0, 0),
+              writing_mode: str = 'horizontal-tb',
+              scripts: Optional[List] = None,
+              template: str = 'hocr') -> None:
     """
     Serializes a list of ocr_records into an output document.
 

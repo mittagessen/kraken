@@ -7,8 +7,12 @@ sequence classification.
 """
 from os.path import expandvars, expanduser, abspath
 
+import torch
+import numpy as np
 import kraken.lib.lineest
 import kraken.lib.ctc_decoder
+
+from typing import List, Tuple
 
 from kraken.lib.vgsl import TorchVGSLModel
 from kraken.lib.exceptions import KrakenInvalidModelException, KrakenInputException
@@ -24,7 +28,7 @@ class TorchSeqRecognizer(object):
     """
     A class wrapping a TorchVGSLModel with a more comfortable recognition interface.
     """
-    def __init__(self, nn, decoder=kraken.lib.ctc_decoder.greedy_decoder, train=False, device='cpu'):
+    def __init__(self, nn, decoder=kraken.lib.ctc_decoder.greedy_decoder, train: bool = False, device: str = 'cpu'):
         """
         Constructs a sequence recognizer from a VGSL model and a decoder.
 
@@ -53,7 +57,7 @@ class TorchSeqRecognizer(object):
         self.device = device
         self.nn.to(device)
 
-    def forward(self, line):
+    def forward(self, line: torch.Tensor) -> np.array:
         """
         Performs a forward pass on a torch tensor of a line with shape (C, H, W)
         and returns a numpy array (W, C).
@@ -67,7 +71,7 @@ class TorchSeqRecognizer(object):
         self.outputs = o.data.squeeze().cpu().numpy()
         return self.outputs
 
-    def predict(self, line):
+    def predict(self, line: torch.Tensor) -> List[Tuple[str, int, int, float]]:
         """
         Performs a forward pass on a torch tensor of a line with shape (C, H, W)
         and returns the decoding as a list of tuples (string, start, end,
@@ -77,7 +81,7 @@ class TorchSeqRecognizer(object):
         locs = self.decoder(o)
         return self.codec.decode(locs)
 
-    def predict_string(self, line):
+    def predict_string(self, line: torch.Tensor) -> str:
         """
         Performs a forward pass on a torch tensor of a line with shape (C, H, W)
         and returns a string of the results.
@@ -87,7 +91,7 @@ class TorchSeqRecognizer(object):
         decoding = self.codec.decode(locs)
         return ''.join(x[0] for x in decoding)
 
-    def predict_labels(self, line):
+    def predict_labels(self, line: torch.tensor) -> List[Tuple[int, int, int, float]]:
         """
         Performs a forward pass on a torch tensor of a line with shape (C, H, W)
         and returns a list of tuples (class, start, end, max). Max is the
@@ -97,7 +101,7 @@ class TorchSeqRecognizer(object):
         return self.decoder(o)
 
 
-def load_any(fname, train=False, device='cpu'):
+def load_any(fname: str, train: bool = False, device: str = 'cpu') -> TorchSeqRecognizer:
     """
     Loads anything that was, is, and will be a valid ocropus model and
     instantiates a shiny new kraken.lib.lstm.SeqRecognizer from the RNN

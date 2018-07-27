@@ -5,7 +5,7 @@ import numpy as np
 from scipy.ndimage import morphology, measurements, filters
 
 
-def label(image, **kw):
+def label(image: np.array, **kw) -> np.array:
     """
     Redefine the scipy.ndimage.measurements.label function to work with a wider
     range of data types.  The default function is inconsistent about the data
@@ -25,7 +25,7 @@ def label(image, **kw):
     return measurements.label(image, **kw)
 
 
-def find_objects(image, **kw):
+def find_objects(image: np.array, **kw) -> np.array:
     """
     Redefine the scipy.ndimage.measurements.find_objects function to work with
     a wider range of data types.  The default function is inconsistent about

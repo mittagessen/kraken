@@ -19,6 +19,7 @@
 Access functions to the model repository on github.
 """
 from collections import defaultdict
+from typing import Callable, Any
 from contextlib import closing
 
 from kraken.lib.exceptions import KrakenRepoException
@@ -36,7 +37,7 @@ logger = logging.getLogger(__name__)
 MODEL_REPO = 'https://api.github.com/repos/mittagessen/kraken-models/'
 
 
-def get_model(model_id, path, callback):
+def get_model(model_id: str, path: str, callback: Callable[..., Any]) -> None:
     """
     Retrieves a model and saves it to a path.
 
@@ -82,9 +83,10 @@ def get_model(model_id, path, callback):
             for chunk in r.iter_content(chunk_size=1024):
                 callback()
                 f.write(chunk)
+    return
 
 
-def get_description(model_id):
+def get_description(model_id: str) -> dict:
     logger.info(u'Retrieving metadata for {}'.format(model_id))
     logger.debug(u'Retrieving head of model repository')
     r = requests.get('{}{}'.format(MODEL_REPO, 'git/refs/heads/master'))
@@ -107,7 +109,7 @@ def get_description(model_id):
             return defaultdict(str, json.loads(raw))
 
 
-def get_listing(callback):
+def get_listing(callback: Callable[..., Any]) -> dict:
     logger.info(u'Retrieving model list')
     r = requests.get('{}{}'.format(MODEL_REPO, 'git/refs/heads/master'))
     callback()

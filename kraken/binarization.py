@@ -24,18 +24,19 @@ import warnings
 import logging
 import numpy as np
 
+from PIL import Image
 from kraken.lib.util import pil2array, array2pil, is_bitonal, get_im_str
 from scipy.ndimage import filters, interpolation, morphology
 
 from kraken.lib.exceptions import KrakenInputException
 
-__all__ = ['is_bitonal', 'nlbin']
+__all__ = ['nlbin']
 
 logger = logging.getLogger(__name__)
 
 
-def nlbin(im, threshold=0.5, zoom=0.5, escale=1.0, border=0.1, perc=80,
-          range=20, low=5, high=90):
+def nlbin(im: Image, threshold: float = 0.5, zoom: float = 0.5, escale: float = 1.0, border: float = 0.1, perc: int = 80,
+        range: int = 20, low: int = 5, high: int = 90) -> Image:
     """
     Performs binarization using non-linear processing.
 

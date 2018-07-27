@@ -17,13 +17,14 @@
 Training loop interception helpers
 """
 
+from torch.utils import data
 
 class EarlyStopping(object):
     """
     Early stopping to terminate training when validation loss doesn't improve
     over a certain time.
     """
-    def __init__(self, it=None, min_delta=0.002, lag=5):
+    def __init__(self, it: data.DataLoader = None, min_delta: float = 0.002, lag: int = 5) -> None:
         """
         Args:
             it (torch.utils.data.DataLoader): training data loader
@@ -45,7 +46,7 @@ class EarlyStopping(object):
             raise StopIteration
         return self.it
 
-    def update(self, val_loss):
+    def update(self, val_loss: float) -> None:
         """
         Updates the internal validation loss state
         """
@@ -60,7 +61,7 @@ class EpochStopping(object):
     """
     Dumb stopping after a fixed number of epochs.
     """
-    def __init__(self, it=None, epochs=100):
+    def __init__(self, it: data.DataLoader = None, epochs: int = 100) -> None:
         """
         Args:
             it (torch.utils.data.DataLoader): training data loader
@@ -80,7 +81,7 @@ class EpochStopping(object):
         else:
             raise StopIteration
 
-    def update(self, val_loss):
+    def update(self, val_loss: int) -> None:
         """
         No-Op for this stopper
         """

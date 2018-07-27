@@ -210,12 +210,12 @@ def binarize(threshold, zoom, escale, border, perc, range, low, high):
 @click.option('-s/-n', '--script-detect/--no-script-detect', default=True,
               show_default=True,
               help='Enable script detection on segmenter output')
-@click.option('-a', '--allowed-scripts', default=None, multiple=True,
+@click.option('-a', '--allowed-script', default=None, multiple=True,
               show_default=True,
               help='List of allowed scripts in script detection output. Ignored if disabled.')
 @click.option('--scale', show_default=True, default=None, type=click.FLOAT)
 @click.option('-m', '--maxcolseps', show_default=True, default=2, type=click.INT)
-@click.option('-b/-w', '--black_colseps/--white_colseps', show_default=True, default=False)
+@click.option('-b/-w', '--black-colseps/--white_colseps', show_default=True, default=False)
 @click.option('-r/-l', '--remove_hlines/--hlines', show_default=True, default=True)
 def segment(text_direction, script_detect, allowed_scripts, scale, maxcolseps, black_colseps, remove_hlines):
     """

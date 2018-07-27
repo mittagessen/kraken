@@ -9,13 +9,13 @@ from PIL import Image
 __all__ = ['pil2array', 'array2pil']
 
 
-def pil2array(im, alpha=0):
+def pil2array(im: Image, alpha: int = 0) -> np.array:
     if im.mode == '1':
         return np.array(im.convert('L'))
     return np.array(im)
 
 
-def array2pil(a):
+def array2pil(a: np.array) -> Image:
     if a.dtype == np.dtype("B"):
         if a.ndim == 2:
             return Image.frombytes("L", (a.shape[1], a.shape[0]),
@@ -31,7 +31,7 @@ def array2pil(a):
         raise Exception("unknown image type")
 
 
-def is_bitonal(im):
+def is_bitonal(im: Image) -> bool:
     """
     Tests a PIL.Image for bitonality.
 
@@ -45,5 +45,5 @@ def is_bitonal(im):
     return im.getcolors(2) is not None
 
 
-def get_im_str(im):
+def get_im_str(im: Image) -> str:
     return im.filename if hasattr(im, 'filename') else str(im)

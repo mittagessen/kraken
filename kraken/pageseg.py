@@ -27,6 +27,7 @@ import logging
 import numpy as np
 import pkg_resources
 
+from typing import Tuple, Iterable
 from scipy.ndimage.filters import (gaussian_filter, uniform_filter,
                                    maximum_filter)
 
@@ -57,7 +58,7 @@ def find(condition):
     return res
 
 
-def binary_objects(binary):
+def binary_objects(binary: np.array) -> np.array:
     """
     Labels features in an array and segments them into objects.
     """
@@ -66,7 +67,7 @@ def binary_objects(binary):
     return objects
 
 
-def estimate_scale(binary):
+def estimate_scale(binary: np.array) -> float:
     """
     Estimates image scale based on number of connected components.
     """
@@ -81,7 +82,7 @@ def estimate_scale(binary):
     return scale
 
 
-def compute_boxmap(binary, scale, threshold=(.5, 4), dtype='i'):
+def compute_boxmap(binary: np.array, scale: float, threshold: Tuple[float, int] = (.5, 4), dtype: str = 'i') -> np.array:
     """
     Returns grapheme cluster-like boxes based on connected components.
     """
@@ -119,7 +120,7 @@ def compute_lines(segmentation, scale):
     return lines
 
 
-def reading_order(lines, text_direction='lr'):
+def reading_order(lines: Iterable, text_direction: str = 'lr') -> Iterable:
     """Given the list of lines (a list of 2D slices), computes
     the partial reading order.  The output is a binary 2D array
     such that order[i,j] is true if line i comes before line j
@@ -165,7 +166,7 @@ def reading_order(lines, text_direction='lr'):
     return order
 
 
-def topsort(order):
+def topsort(order: np.array) -> np.array:
     """Given a binary array defining a partial order (o[i,j]==True means i<j),
     compute a topological sort.  This is a quick and dirty implementation
     that works for up to a few thousand elements."""
@@ -188,7 +189,7 @@ def topsort(order):
     return L
 
 
-def compute_separators_morph(binary, scale, sepwiden=10, maxcolseps=2):
+def compute_separators_morph(binary: np.array, scale: float, sepwiden: int = 10, maxcolseps: int = 2) -> np.array:
     """Finds vertical black lines corresponding to column separators."""
     logger.debug(u'Finding vertical black column lines')
     d0 = int(max(5, scale/4))
@@ -201,7 +202,7 @@ def compute_separators_morph(binary, scale, sepwiden=10, maxcolseps=2):
     return vert
 
 
-def compute_colseps_conv(binary, scale=1.0, minheight=10, maxcolseps=2):
+def compute_colseps_conv(binary: np.array, scale: float = 1.0, minheight: int = 10, maxcolseps: int = 2) -> np.array:
     """Find column separators by convolution and thresholding.
 
     Args:
@@ -231,7 +232,7 @@ def compute_colseps_conv(binary, scale=1.0, minheight=10, maxcolseps=2):
     return seps
 
 
-def compute_black_colseps(binary, scale, maxcolseps):
+def compute_black_colseps(binary: np.array, scale: float, maxcolseps: int) -> Tuple[np.array, np.array]:
     """
     Computes column separators from vertical black lines.
 

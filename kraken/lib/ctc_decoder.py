@@ -21,6 +21,7 @@ Decoders for softmax outputs of CTC trained networks.
 import collections
 import numpy as np
 
+from typing import List, Tuple
 from scipy.special import logsumexp
 from scipy.ndimage import measurements
 
@@ -29,7 +30,7 @@ from itertools import groupby
 __all__ = ['beam_decoder', 'greedy_decoder', 'blank_threshold_decoder']
 
 
-def beam_decoder(outputs, beam_size=3):
+def beam_decoder(outputs: np.ndarray, beam_size: int = 3) -> List[Tuple[int, int, int, float]]:
     """
     Translates back the network output to a label sequence using
     same-prefix-merge beam search decoding as described in [0].
@@ -92,7 +93,7 @@ def beam_decoder(outputs, beam_size=3):
     return [(c, start, end, max(outputs[c, start:end+1])) for (c, start, end) in beam[0][0]]
 
 
-def greedy_decoder(outputs):
+def greedy_decoder(outputs: np.ndarray) -> List[Tuple[int, int, int, float]]:
     """
     Translates back the network output to a label sequence using greedy/best
     path decoding as described in [0].
@@ -122,7 +123,7 @@ def greedy_decoder(outputs):
     return classes
 
 
-def blank_threshold_decoder(outputs, threshold=0.5):
+def blank_threshold_decoder(outputs: np.ndarray, threshold: float = 0.5) -> List[Tuple[int, int, int, float]]:
     """
     Translates back the network output to a label sequence as the original
     ocropy/clstm.

@@ -1,31 +1,11 @@
 import warnings
+import PIL
 import numpy as np
 
 from kraken.lib.util import pil2array, array2pil
 from scipy.ndimage import interpolation, filters
 
 __all__ = ['CenterNormalizer', 'dewarp']
-
-
-def dewarp(normalizer, im):
-    """
-    Dewarps an image of a line using a kraken.lib.lineest.CenterNormalizer
-    instance.
-
-    Args:
-        normalizer (kraken.lib.lineest.CenterNormalizer): A line normalizer
-                                                          instance
-        im (PIL.Image): Image to dewarp
-
-    Returns:
-        PIL.Image containing the dewarped image.
-    """
-    line = pil2array(im)
-    temp = np.amax(line)-line
-    temp = temp*1.0/np.amax(temp)
-    normalizer.measure(temp)
-    line = normalizer.normalize(line, cval=np.amax(line))
-    return array2pil(line)
 
 
 def scale_to_h(img, target_height, order=1, dtype=np.dtype('f'), cval=0):
@@ -82,3 +62,25 @@ class CenterNormalizer(object):
         scaled = scale_to_h(dewarped, self.target_height, order=order,
                             dtype=dtype, cval=cval)
         return scaled
+
+
+def dewarp(normalizer: CenterNormalizer, im: PIL.Image) -> PIL.Image:
+    """
+    Dewarps an image of a line using a kraken.lib.lineest.CenterNormalizer
+    instance.
+
+    Args:
+        normalizer (kraken.lib.lineest.CenterNormalizer): A line normalizer
+                                                          instance
+        im (PIL.Image): Image to dewarp
+
+    Returns:
+        PIL.Image containing the dewarped image.
+    """
+    line = pil2array(im)
+    temp = np.amax(line)-line
+    temp = temp*1.0/np.amax(temp)
+    normalizer.measure(temp)
+    line = normalizer.normalize(line, cval=np.amax(line))
+    return array2pil(line)
+

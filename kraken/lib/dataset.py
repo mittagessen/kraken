@@ -17,17 +17,20 @@
 Utility functions for data loading and training of VGSL networks.
 """
 import os
+import torch
 import click
 import unicodedata
 import numpy as np
 import bidi.algorithm as bd
 
 from PIL import Image
+from typing import List, Tuple, Sequence, TypeVar, Callable, Optional, Any
 from collections import Counter
 from torchvision import transforms
 from torch.utils.data import Dataset
 
 from kraken.lib.codec import PytorchCodec
+from kraken.lib.models import TorchSeqRecognizer
 from kraken.lib.exceptions import KrakenInputException
 from kraken.lib.lineest import CenterNormalizer, dewarp
 
@@ -38,7 +41,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def generate_input_transforms(batch, height, width, channels, pad):
+def generate_input_transforms(batch: int, height: int, width: int, channels: int, pad: int) -> transforms.Compose:
     """
     Generates a torchvision transformation converting a PIL.Image into a
     tensor usable in a network forward pass.
@@ -99,7 +102,9 @@ def generate_input_transforms(batch, height, width, channels, pad):
     return transforms.Compose(out_transforms)
 
 
-def _fast_levenshtein(seq1, seq2):
+T = TypeVar('T')
+
+def _fast_levenshtein(seq1: Sequence[T], seq2: Sequence[T]) -> int:
 
     oneago = None
     thisrow = list(range(1, len(seq2) + 1)) + [0]
@@ -113,7 +118,7 @@ def _fast_levenshtein(seq1, seq2):
     return thisrow[len(seq2) - 1]
 
 
-def compute_error(model, test_set):
+def compute_error(model: TorchSeqRecognizer, test_set: List[Tuple[str, str]]) -> Tuple[int, int]:
     """
     Computes detailed error report from a model and a list of line image-text
     pairs.
@@ -147,9 +152,12 @@ class GroundTruthDataset(Dataset):
         alphabet (str): Sorted string of all code points found in the ground
                         truth
     """
-    def __init__(self, split=lambda x: os.path.splitext(x)[0],
-                 suffix='.gt.txt', normalization=None, reorder=True,
-                 im_transforms=None, preload=True):
+    def __init__(self, split: Callable[[str], str] = lambda x: os.path.splitext(x)[0],
+                 suffix: str = '.gt.txt',
+                 normalization: Optional[str] = None,
+                 reorder: bool = True,
+                 im_transforms: Callable[[Any], torch.Tensor] = None,
+                 preload: bool = True) -> None:
         """
         Reads a list of image-text pairs and creates a ground truth set.
 
@@ -176,7 +184,7 @@ class GroundTruthDataset(Dataset):
         self.suffix = suffix
         self._images = []
         self._gt = []
-        self.alphabet = Counter()
+        self.alphabet: Counter = Counter()
         self.text_transforms = []
         self.transforms = im_transforms
         self.preload = preload
@@ -186,7 +194,7 @@ class GroundTruthDataset(Dataset):
         if reorder:
             self.text_transforms.append(bd.get_display)
 
-    def add(self, image):
+    def add(self, image: str) -> None:
         """
         Adds a line-image-text pair to the dataset.
 
@@ -211,7 +219,7 @@ class GroundTruthDataset(Dataset):
         self._gt.append(gt)
         self.alphabet.update(gt)
 
-    def encode(self, codec=None):
+    def encode(self, codec: Optional[PytorchCodec] = None) -> None:
         """
         Adds a codec to the dataset and encodes all text lines.
 
@@ -221,11 +229,11 @@ class GroundTruthDataset(Dataset):
             self.codec = codec
         else:
             self.codec = PytorchCodec(''.join(self.alphabet.keys()))
-        self.training_set = []
+        self.training_set: List[Tuple[Union[Image, torch.Tensor], torch.Tensor]] = []
         for im, gt in zip(self._images, self._gt):
             self.training_set.append((im, self.codec.encode(gt)))
 
-    def __getitem__(self, index):
+    def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor]:
         if self.preload:
             return self.training_set[index]
         else:
@@ -238,5 +246,5 @@ class GroundTruthDataset(Dataset):
                 logger.debug('Failed. Replacing with sample {}'.format(idx))
                 return self[np.random.randint(0, len(self.training_set))]
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.training_set)
