@@ -319,7 +319,8 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
                     raise KrakenInputException('Expected dimension 3 to be 1, actual {}'.format(output.size()))
                 o = o.squeeze(2)
                 optim.zero_grad()
-                loss = nn.criterion(o, target)
+                # NCW -> WNC
+                loss = nn.criterion(o.permute(2, 0, 1), target.permute(2, 0, 1), torch.tensor((o.size(2),)), torch.tensor((target.size(2),)))
                 logger.info('trial {} - loss {}'.format(trial, float(loss)))
                 loss.backward()
                 optim.step()

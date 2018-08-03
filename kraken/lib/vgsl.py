@@ -11,6 +11,7 @@ import gzip
 import torch
 import logging
 
+from torch import nn
 from typing import List, Tuple, Union, Optional, Iterable, Callable, Dict
 
 import kraken.lib.lstm
@@ -18,7 +19,6 @@ import kraken.lib.lstm
 from kraken.lib import layers
 from kraken.lib import clstm_pb2
 from kraken.lib import pyrnn_pb2
-from kraken.lib.ctc import CTCCriterion
 from kraken.lib.codec import PytorchCodec
 from kraken.lib.exceptions import KrakenInvalidModelException
 
@@ -641,7 +641,7 @@ class TorchVGSLModel(object):
         if nl not in ['s', 'c']:
             raise ValueError('only softmax and ctc supported in output')
         if nl == 'c':
-            self.criterion = CTCCriterion()
+            self.criterion = nn.CTCLoss()
         aug = True if m.group('aug') else False
         lin = layers.LinSoftmax(input[1], int(m.group('out')), aug)
         logger.debug('{}\t\tlinear\taugmented {} out {}'.format(self.idx+1, aug, m.group('out')))
