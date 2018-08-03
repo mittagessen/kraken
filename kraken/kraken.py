@@ -23,6 +23,7 @@ import os
 import warnings
 import logging
 
+from typing import Dict, Union, List
 from functools import partial
 from PIL import Image
 
@@ -40,12 +41,12 @@ DEFAULT_MODEL = ['en-default.mlmodel']
 LEGACY_MODEL_DIR = '/usr/local/share/ocropus'
 
 
-def message(msg, **styles):
+def message(msg: str, **styles) -> None:
     if logger.getEffectiveLevel() >= 30:
         click.secho(msg, **styles)
 
 
-def binarizer(threshold, zoom, escale, border, perc, range, low, high, base_image, input, output):
+def binarizer(threshold, zoom, escale, border, perc, range, low, high, base_image, input, output) -> None:
     from kraken import binarization
 
     try:
@@ -65,7 +66,7 @@ def binarizer(threshold, zoom, escale, border, perc, range, low, high, base_imag
 
 def segmenter(text_direction, script_detect, allowed_scripts, scale,
               maxcolseps, black_colseps, remove_hlines, base_image, input,
-              output):
+              output) -> None:
     import json
 
     from kraken import pageseg
@@ -87,7 +88,7 @@ def segmenter(text_direction, script_detect, allowed_scripts, scale,
     message('\u2713', fg='green')
 
 
-def recognizer(model, pad, bidi_reordering, script_ignore, base_image, input, output, lines):
+def recognizer(model, pad, bidi_reordering, script_ignore, base_image, input, output, lines) -> None:
     import json
 
     from kraken import rpred
@@ -226,7 +227,7 @@ def segment(text_direction, script_detect, allowed_scripts, scale, maxcolseps, b
 
 
 def _validate_mm(ctx, param, value):
-    model_dict = {'ignore': []}
+    model_dict: Dict[str, Union[str, List[str]]] = {'ignore': []}
     if len(value) == 1 and len(value[0].split(':')) == 1:
         model_dict['default'] = value[0]
         return model_dict
@@ -234,7 +235,7 @@ def _validate_mm(ctx, param, value):
         for m in value:
             k, v = m.split(':')
             if v == 'ignore':
-                model_dict['ignore'].append(k)
+                model_dict['ignore'].append(k) # type: ignore
             else:
                 model_dict[k] = os.path.expanduser(v)
     except Exception as e:
@@ -278,7 +279,7 @@ def ocr(ctx, model, pad, reorder, serializer, text_direction, lines, threads):
 
     # first we try to find the model in the absolue path, then ~/.kraken, then
     # LEGACY_MODEL_DIR
-    nm = {}
+    nm: Dict[str, models.TorchSeqRecognizer] = {}
     ign_scripts = model.pop('ignore')
     for k, v in model.items():
         search = [v,
@@ -304,11 +305,11 @@ def ocr(ctx, model, pad, reorder, serializer, text_direction, lines, threads):
     if 'default' in nm:
         from collections import defaultdict
 
-        nn = defaultdict(lambda: nm['default'])
+        nn: Dict[str, models.TorchSeqRecognizer] = defaultdict(lambda: nm['default'])
         nn.update(nm)
         nm = nn
     # thread count is global so setting it once is sufficient
-    nn.values()[0].set_num_threads(threads)
+    nn[k].nn.set_num_threads(threads)
 
     # set output mode
     ctx.meta['mode'] = serializer

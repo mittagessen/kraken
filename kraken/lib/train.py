@@ -16,10 +16,25 @@
 """
 Training loop interception helpers
 """
+import abc
+
+from collections.abc import Iterable
 
 from torch.utils import data
+from collections.abc import Iterable
 
-class EarlyStopping(object):
+
+class TrainStopper(Iterable):
+
+    @abc.abstractmethod
+    def update(self, val_loss: float) -> None:
+        """
+        Updates the internal state of the train stopper.
+        """
+        pass
+
+
+class EarlyStopping(TrainStopper):
     """
     Early stopping to terminate training when validation loss doesn't improve
     over a certain time.
@@ -57,7 +72,7 @@ class EarlyStopping(object):
             self.best_loss = val_loss
 
 
-class EpochStopping(object):
+class EpochStopping(TrainStopper):
     """
     Dumb stopping after a fixed number of epochs.
     """
@@ -81,7 +96,7 @@ class EpochStopping(object):
         else:
             raise StopIteration
 
-    def update(self, val_loss: int) -> None:
+    def update(self, val_loss: float) -> None:
         """
         No-Op for this stopper
         """

@@ -87,26 +87,27 @@ def get_model(model_id: str, path: str, callback: Callable[..., Any]) -> None:
 
 
 def get_description(model_id: str) -> dict:
-    logger.info(u'Retrieving metadata for {}'.format(model_id))
-    logger.debug(u'Retrieving head of model repository')
+    logger.info('Retrieving metadata for {}'.format(model_id))
+    logger.debug('Retrieving head of model repository')
     r = requests.get('{}{}'.format(MODEL_REPO, 'git/refs/heads/master'))
     resp = r.json()
     if 'object' not in resp:
-        logger.error(u'No \'object\' field in repo head API response.')
+        logger.error('No \'object\' field in repo head API response.')
         raise KrakenRepoException('{}: {}'.format(r.status_code, resp['message']))
     head = resp['object']['sha']
-    logger.debug(u'Retrieving tree of model repository')
+    logger.debug('Retrieving tree of model repository')
     r = requests.get('{}{}{}'.format(MODEL_REPO, 'git/trees/', head), params={'recursive': 1})
     resp = r.json()
     if 'tree' not in resp:
-        logger.error(u'No \'tree\' field in repo API response.')
+        logger.error('No \'tree\' field in repo API response.')
         raise KrakenRepoException('{}: {}'.format(r.status_code, resp['message']))
     for el in resp['tree']:
         components = el['path'].split('/')
         if len(components) > 2 and components[1] == model_id and components[2] == 'DESCRIPTION':
-            logger.debug(u'Retrieving description for {}'.format(components[1]))
+            logger.debug('Retrieving description for {}'.format(components[1]))
             raw = base64.b64decode(requests.get(el['url']).json()['content']).decode('utf-8')
             return defaultdict(str, json.loads(raw))
+    raise KrakenRepoException('No description for {} found'.format(model_id))
 
 
 def get_listing(callback: Callable[..., Any]) -> dict:

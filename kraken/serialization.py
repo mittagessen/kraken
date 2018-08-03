@@ -18,14 +18,14 @@ from jinja2 import Environment, PackageLoader
 import regex
 import logging
 
-from typing import List, Tuple, Iterable, Optional
+from typing import List, Tuple, Iterable, Optional, Sequence
 
 logger = logging.getLogger(__name__)
 
 __all__ = ['serialize']
 
 
-def _rescale(val: List[float], low: float, high: float) -> List[float]:
+def _rescale(val: Sequence[float], low: float, high: float) -> List[float]:
     """
     Rescales a list of confidence value between 0 and 1 to an interval [low,
     high].
@@ -52,16 +52,17 @@ def max_bbox(boxes: Iterable[Tuple[int, int, int, int]]) -> Tuple[int, int, int,
     Returns:
         A box covering all bounding boxes in the input argument
     """
+    # XXX: fix type hinting
     sbox = list(map(sorted, list(zip(*boxes))))
-    return (sbox[0][0], sbox[1][0], sbox[2][-1], sbox[3][-1])
+    return (sbox[0][0], sbox[1][0], sbox[2][-1], sbox[3][-1]) # type: ignore
 
 
-def serialize(records: Iterable,
+def serialize(records: Sequence,
               image_name: str = None,
               image_size: Tuple[int, int] = (0, 0),
               writing_mode: str = 'horizontal-tb',
               scripts: Optional[List] = None,
-              template: str = 'hocr') -> None:
+              template: str = 'hocr') -> str:
     """
     Serializes a list of ocr_records into an output document.
 
@@ -82,9 +83,12 @@ def serialize(records: Iterable,
         scripts (list): List of scripts contained in the OCR records
         template (str): Selector for the serialization format. May be
                         'hocr' or 'alto'.
+
+    Returns:
+            (str) rendered template.
     """
     logger.info(u'Serialize {} records from {} with template {}.'.format(len(records), image_name, template))
-    page = {'lines': [], 'size': image_size, 'name': image_name, 'writing_mode': writing_mode, 'scripts': scripts}
+    page: dict = {'lines': [], 'size': image_size, 'name': image_name, 'writing_mode': writing_mode, 'scripts': scripts}
     seg_idx = 0
     char_idx = 0
     for idx, record in enumerate(records):

@@ -38,6 +38,8 @@ from scipy.ndimage.morphology import distance_transform_cdt, binary_closing
 from scipy.ndimage.interpolation import affine_transform, geometric_transform
 from PIL import Image, ImageOps
 
+from typing import AnyStr
+
 import logging
 import ctypes
 import ctypes.util
@@ -48,9 +50,18 @@ from kraken.lib.util import pil2array, array2pil
 
 logger = logging.getLogger(__name__)
 
-pangocairo = ctypes.CDLL(ctypes.util.find_library('pangocairo-1.0'))
-pango = ctypes.CDLL(ctypes.util.find_library('pango-1.0'))
-cairo = ctypes.CDLL(ctypes.util.find_library('cairo'))
+pc_lib = ctypes.util.find_library('pangocairo-1.0')
+p_lib = ctypes.util.find_library('pango-1.0')
+c_lib = ctypes.util.find_library('cairo')
+if pc_lib is None:
+    raise ImportError('Couldnt load pangocairo line generator dependency. Please install pangocairo, pango, and cairo.')
+if p_lib is None:
+    raise ImportError('Couldnt load pango line generator dependency. Please install pangocairo, pango, and cairo.')
+if c_lib is None:
+    raise ImportError('Couldnt load cairo line generator dependency. Please install pangocairo, pango, and cairo.')
+pangocairo = ctypes.CDLL(pc_lib)
+pango = ctypes.CDLL(p_lib)
+cairo = ctypes.CDLL(c_lib)
 
 
 __all__ = ['LineGenerator', 'ocropy_degrade', 'degrade_line', 'distort_line']
@@ -93,7 +104,7 @@ class ensureBytes(object):
     bytes.
     """
     @classmethod
-    def from_param(cls, value):
+    def from_param(cls, value: AnyStr) -> bytes:
         if isinstance(value, bytes):
             return value
         else:
@@ -123,18 +134,18 @@ pangocairo.pango_cairo_create_context.restype = ctypes.POINTER(PangoContext)
 pangocairo.pango_cairo_update_layout.argtypes = [ctypes.POINTER(CairoContext), ctypes.POINTER(PangoLayout)]
 pangocairo.pango_cairo_show_layout.argtypes = [ctypes.POINTER(CairoContext), ctypes.POINTER(PangoLayout)]
 
-pango.pango_language_from_string.argtypes = [ensureBytes]
+pango.pango_language_from_string.argtypes = [ensureBytes] # type: ignore
 pango.pango_language_from_string.restype = ctypes.POINTER(PangoLanguage)
 
 pango.pango_context_set_language.argtypes = [ctypes.POINTER(PangoContext), ctypes.POINTER(PangoLanguage)]
 
 pango.pango_font_description_new.restype = ctypes.POINTER(PangoFontDescription)
-pango.pango_font_description_set_family.argtypes = [ctypes.POINTER(PangoFontDescription), ensureBytes]
+pango.pango_font_description_set_family.argtypes = [ctypes.POINTER(PangoFontDescription), ensureBytes] # type: ignore
 pango.pango_font_description_set_size.argtypes = [ctypes.POINTER(PangoFontDescription), ctypes.c_int]
 pango.pango_font_description_set_weight.argtypes = [ctypes.POINTER(PangoFontDescription), ctypes.c_uint]
 
 pango.pango_layout_new.restype = ctypes.POINTER(PangoLayout)
-pango.pango_layout_set_markup.argtypes = [ctypes.POINTER(PangoLayout), ensureBytes, ctypes.c_int]
+pango.pango_layout_set_markup.argtypes = [ctypes.POINTER(PangoLayout), ensureBytes, ctypes.c_int] # type: ignore
 pango.pango_layout_set_font_description.argtypes = [ctypes.POINTER(PangoLayout), ctypes.POINTER(PangoFontDescription)]
 pango.pango_layout_get_context.argtypes = [ctypes.POINTER(PangoLayout)]
 pango.pango_layout_get_context.restype = ctypes.POINTER(PangoContext)

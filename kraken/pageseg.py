@@ -27,7 +27,7 @@ import logging
 import numpy as np
 import pkg_resources
 
-from typing import Tuple, Iterable
+from typing import Tuple, Sequence, List
 from scipy.ndimage.filters import (gaussian_filter, uniform_filter,
                                    maximum_filter)
 
@@ -50,7 +50,9 @@ class record(object):
     """
     def __init__(self, **kw):
         self.__dict__.update(kw)
-
+        self.label: int
+        self.bounds: List
+        self.mask: np.array
 
 def find(condition):
     "Return the indices where ravel(condition) is true"
@@ -101,7 +103,7 @@ def compute_boxmap(binary: np.array, scale: float, threshold: Tuple[float, int] 
 def compute_lines(segmentation, scale):
     """Given a line segmentation map, computes a list
     of tuples consisting of 2D slices and masked images."""
-    logger.debug(u'Convert segmentation to lines')
+    logger.debug('Convert segmentation to lines')
     lobjects = morph.find_objects(segmentation)
     lines = []
     for i, o in enumerate(lobjects):
@@ -120,13 +122,13 @@ def compute_lines(segmentation, scale):
     return lines
 
 
-def reading_order(lines: Iterable, text_direction: str = 'lr') -> Iterable:
+def reading_order(lines: Sequence, text_direction: str = 'lr') -> List:
     """Given the list of lines (a list of 2D slices), computes
     the partial reading order.  The output is a binary 2D array
     such that order[i,j] is true if line i comes before line j
     in reading order."""
 
-    logger.info(u'Compute reading order on {} lines in {} direction'.format(len(lines), text_direction))
+    logger.info('Compute reading order on {} lines in {} direction'.format(len(lines), text_direction))
 
     order = np.zeros((len(lines), len(lines)), 'B')
 

@@ -23,7 +23,7 @@ import numpy as np
 import bidi.algorithm as bd
 
 from PIL import Image
-from typing import List, Tuple, Sequence, TypeVar, Callable, Optional, Any, Union, cast
+from typing import List, Tuple, Sequence, Callable, Optional, Any, Union, cast
 from collections import Counter
 from torchvision import transforms
 from torch.utils.data import Dataset
@@ -102,9 +102,7 @@ def generate_input_transforms(batch: int, height: int, width: int, channels: int
     return transforms.Compose(out_transforms)
 
 
-T = TypeVar('T')
-
-def _fast_levenshtein(seq1: Sequence[T], seq2: Sequence[T]) -> int:
+def _fast_levenshtein(seq1: Sequence[Any], seq2: Sequence[Any]) -> int:
 
     oneago = None
     thisrow = list(range(1, len(seq2) + 1)) + [0]
@@ -118,7 +116,7 @@ def _fast_levenshtein(seq1: Sequence[T], seq2: Sequence[T]) -> int:
     return thisrow[len(seq2) - 1]
 
 
-def compute_error(model: TorchSeqRecognizer, test_set: List[Tuple[str, str]]) -> Tuple[int, int]:
+def compute_error(model: TorchSeqRecognizer, test_set: Sequence[Tuple[str, str]]) -> Tuple[int, int]:
     """
     Computes detailed error report from a model and a list of line image-text
     pairs.

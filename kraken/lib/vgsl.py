@@ -12,7 +12,7 @@ import torch
 import logging
 
 from torch import nn
-from typing import List, Tuple, Union, Optional, Iterable, Callable, Dict
+from typing import Sequence, List, Tuple, Union, Optional, Iterable, Callable, Dict, Any
 
 import kraken.lib.lstm
 
@@ -99,7 +99,8 @@ class TorchVGSLModel(object):
         self.named_spec: List[str] = []
         self.ops = [self.build_rnn, self.build_dropout, self.build_maxpool, self.build_conv, self.build_output, self.build_reshape]
         self.codec: Optional[PytorchCodec] = None
-        self.criterion = None
+        self.criterion: Any = None
+        self.nn = torch.nn.Sequential()
 
         self.idx = -1
         spec = spec.strip()
@@ -113,12 +114,10 @@ class TorchVGSLModel(object):
         if not m:
             raise ValueError('Invalid input spec.')
         batch, height, width, channels = [int(x) for x in m.groups()]
-        input = [batch, channels, height, width]
-        self.input = tuple(input)
-        self.nn = torch.nn.Sequential()
-        self._parse(input, blocks)
+        self.input = (batch, channels, height, width)
+        self._parse(self.input, blocks)
 
-    def _parse(self, input: Tuple[int, int, int, int], blocks: List[str]) -> None:
+    def _parse(self, input: Tuple[int, int, int, int], blocks: Sequence[str]) -> None:
         """
         Parses VGSL spec and appends layers to self.nn
         """

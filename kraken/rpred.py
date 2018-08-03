@@ -23,9 +23,10 @@ import logging
 import bidi.algorithm as bd
 
 from PIL import Image
-from typing import List, Tuple, Optional, Generator, Union
+from typing import List, Tuple, Optional, Generator, Union, Dict, Any
 
 from kraken.lib.util import get_im_str
+from kraken.lib.models import TorchSeqRecognizer
 from kraken.lib.exceptions import KrakenInputException
 from kraken.lib.dataset import generate_input_transforms
 
@@ -39,7 +40,7 @@ class ocr_record(object):
     """
     A record object containing the recognition result of a single line
     """
-    def __init__(self, prediction: str, cuts, confidences):
+    def __init__(self, prediction: str, cuts, confidences: List[float]) -> None:
         self.prediction = prediction
         self.cuts = cuts
         self.confidences = confidences
@@ -184,7 +185,7 @@ def mm_rpred(nets: Dict[str, TorchSeqRecognizer],
 
     # build dictionary for line preprocessing
     ts = {}
-    for script, network in nets.iteritems():
+    for script, network in nets.items():
         logger.debug('Loading line transforms for {}'.format(script))
         batch, channels, height, width = network.nn.input
         ts[script] = generate_input_transforms(batch, height, width, channels, pad)
@@ -195,7 +196,7 @@ def mm_rpred(nets: Dict[str, TorchSeqRecognizer],
                                          extract_boxes(im, {'text_direction': bounds['text_direction'],
                                                             'boxes': map(lambda x: x[1], line)})):
             # skip if script is set to ignore
-            if script in script_ignore:
+            if script_ignore is not None and script in script_ignore:
                 logger.info('Ignoring {} line segment.'.format(script))
                 continue
             # check if boxes are non-zero in any dimension

@@ -20,6 +20,8 @@ import unicodedata
 
 from bidi.algorithm import get_display
 
+from typing import cast, Iterable, Set, List
+
 from kraken.lib import log
 from kraken.lib.exceptions import KrakenCairoSurfaceException
 from kraken.lib.exceptions import KrakenEncodeException
@@ -100,23 +102,24 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
     Trains a model from image-text pairs.
     """
     import re
+    import torch
     import numpy as np
 
     from torch.optim import SGD, RMSprop, Adam
     from torch.utils.data import DataLoader
 
     from kraken.lib import models, vgsl
-    from kraken.lib.train import EarlyStopping, EpochStopping
+    from kraken.lib.train import EarlyStopping, EpochStopping, TrainStopper
     from kraken.lib.codec import PytorchCodec
     from kraken.lib.dataset import GroundTruthDataset, compute_error, generate_input_transforms
 
     logger.info('Building ground truth set from {} line images'.format(len(ground_truth) + len(training_files)))
 
     if not load and append:
-        raise click.BadOptionUsage('append', 'append option requires loading an existing model')
+        raise click.BadOptionUsage('append option requires loading an existing model')
 
     if resize != 'fail' and not load:
-        raise click.BadOptionUsage('resize', 'resize option requires loading an existing model')
+        raise click.BadOptionUsage('resize option requires loading an existing model')
 
     # load model if given. if a new model has to be created we need to do that
     # after data set initialization, otherwise to output size is still unknown.
@@ -214,6 +217,8 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
 
     # use model codec when given
     if append:
+        # is already loaded
+        nn = cast(vgsl.TorchVGSLModel, nn)
         gt_set.encode(codec)
         message('Slicing and dicing model ', nl=False)
         # now we can create a new model
@@ -224,6 +229,9 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
         message('\u2713', fg='green')
         logger.info('Assembled model spec: {}'.format(nn.spec))
     elif load:
+        # is already loaded
+        nn = cast(vgsl.TorchVGSLModel, nn)
+
         # prefer explicitly given codec over network codec if mode is 'both'
         codec = codec if (codec and resize == 'both') else nn.codec
 
@@ -287,6 +295,7 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
     elif optimizer == 'Adam':
         optim = Adam(nn.nn.parameters(), lr=lrate)
 
+    st_it: TrainStopper
     if quit == 'early':
         st_it = EarlyStopping(train_loader, min_delta, lag)
     elif quit == 'dumb':
@@ -320,7 +329,10 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
                 o = o.squeeze(2)
                 optim.zero_grad()
                 # NCW -> WNC
-                loss = nn.criterion(o.permute(2, 0, 1), target.permute(2, 0, 1), torch.tensor((o.size(2),)), torch.tensor((target.size(2),)))
+                loss = nn.criterion(o.permute(2, 0, 1), # type: ignore
+                                    target.permute(2, 0, 1),
+                                    torch.tensor((o.size(2),)),
+                                    torch.tensor((target.size(2),)))
                 logger.info('trial {} - loss {}'.format(trial, float(loss)))
                 loss.backward()
                 optim.step()
@@ -534,7 +546,7 @@ def line_generator(ctx, font, maxlines, encoding, normalization, renormalize,
 
     from kraken import linegen
 
-    lines = set()
+    lines: Set[str] = set()
     if not text:
         return
     with log.progressbar(text, label='Reading texts') as bar:
@@ -553,8 +565,8 @@ def line_generator(ctx, font, maxlines, encoding, normalization, renormalize,
     message('Read {} unique lines'.format(len(lines)))
     if maxlines and maxlines < len(lines):
         message('Sampling {} lines\t'.format(maxlines), nl=False)
-        lines = list(lines)
-        lines = [lines[idx] for idx in np.random.randint(0, len(lines), maxlines)]
+        llist = list(lines)
+        lines = set(llist[idx] for idx in np.random.randint(0, len(llist), maxlines))
         message('\u2713', fg='green')
     try:
         os.makedirs(output)
@@ -563,7 +575,7 @@ def line_generator(ctx, font, maxlines, encoding, normalization, renormalize,
             raise
 
     # calculate the alphabet and print it for verification purposes
-    alphabet = set()
+    alphabet: Set[str] = set()
     for line in lines:
         alphabet.update(line)
     chars = []

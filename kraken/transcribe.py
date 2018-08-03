@@ -19,6 +19,8 @@ Utility functions for ground truth transcription.
 from kraken.lib.exceptions import KrakenInputException
 from kraken.lib.util import get_im_str
 
+from typing import List
+
 from jinja2 import Environment, PackageLoader
 from io import BytesIO
 
@@ -37,7 +39,7 @@ class TranscriptionInterface(object):
         env = Environment(loader=PackageLoader('kraken', 'templates'))
         logger.debug(u'Loading transcription template.')
         self.tmpl = env.get_template('layout.html')
-        self.pages = []
+        self.pages: List[dict] = []
         self.font = {'font': font, 'style': font_style}
         self.text_direction = 'horizontal-tb'
         self.page_idx = 1

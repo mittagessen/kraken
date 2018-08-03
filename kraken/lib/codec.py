@@ -32,7 +32,7 @@ class PytorchCodec(object):
     """
     Translates between labels and graphemes.
     """
-    def __init__(self, charset: Union[Dict[str, Sequence[int]], List[str], str]) -> None:
+    def __init__(self, charset: Union[Dict[str, Sequence[int]], Sequence[str], str]) -> None:
         """
         Builds a codec converting between graphemes/code points and integer
         label sequences.
@@ -94,7 +94,7 @@ class PytorchCodec(object):
             labels.extend(self.c2l[c])
         return IntTensor(labels)
 
-    def decode(self, labels: List[Tuple[int, int, int, float]]) -> List[Tuple[str, int, int, float]]:
+    def decode(self, labels: Sequence[Tuple[int, int, int, float]]) -> List[Tuple[str, int, int, float]]:
         """
         Decodes a labelling.
 
