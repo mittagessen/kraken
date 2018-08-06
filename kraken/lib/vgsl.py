@@ -555,7 +555,7 @@ class TorchVGSLModel(object):
             legacy = 'ocropy'
         hidden = int(m.group(7))
         fn = layers.TransposedSummarizingRNN(input[1], hidden, direction, dim, summarize, legacy)
-        logger.debug('{}\t\tRNN\tdirection {} transposed {} summarize {} out {} legacy {}'.format(self.idx+1, direction, dim, summarize, hidden, legacy))
+        logger.debug('{}\t\trnn\tdirection {} transposed {} summarize {} out {} legacy {}'.format(self.idx+1, direction, dim, summarize, hidden, legacy))
         return fn.get_shape(input), self.get_layer_name(type, m.group('name')), fn
 
     def build_dropout(self, input: Tuple[int, int, int, int], block: str) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:

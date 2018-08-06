@@ -175,7 +175,7 @@ class Reshape(Module):
 
     def get_shape(self, input: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
         input_shape = torch.zeros([x if x else 1 for x in input])
-        with torch.no_grad:
+        with torch.no_grad():
             o = self.forward(input_shape)
         return tuple(o.shape) # type: ignore
 
