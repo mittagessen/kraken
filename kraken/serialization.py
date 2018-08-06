@@ -18,6 +18,8 @@ from jinja2 import Environment, PackageLoader
 import regex
 import logging
 
+from kraken.rpred import ocr_record
+
 from typing import List, Tuple, Iterable, Optional, Sequence
 
 logger = logging.getLogger(__name__)
@@ -57,11 +59,11 @@ def max_bbox(boxes: Iterable[Tuple[int, int, int, int]]) -> Tuple[int, int, int,
     return (sbox[0][0], sbox[1][0], sbox[2][-1], sbox[3][-1]) # type: ignore
 
 
-def serialize(records: Sequence,
+def serialize(records: Sequence[ocr_record],
               image_name: str = None,
               image_size: Tuple[int, int] = (0, 0),
               writing_mode: str = 'horizontal-tb',
-              scripts: Optional[List] = None,
+              scripts: Optional[Iterable[str]] = None,
               template: str = 'hocr') -> str:
     """
     Serializes a list of ocr_records into an output document.

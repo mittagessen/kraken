@@ -23,7 +23,7 @@ import os
 import warnings
 import logging
 
-from typing import Dict, Union, List
+from typing import Dict, Union, List, cast, Any, IO, Iterable
 from functools import partial
 from PIL import Image
 
@@ -84,6 +84,7 @@ def segmenter(text_direction, script_detect, allowed_scripts, scale,
         message('\u2717', fg='red')
         raise
     with open_file(output, 'w') as fp:
+        fp = cast(IO[Any], fp)
         json.dump(res, fp)
     message('\u2713', fg='green')
 
@@ -109,6 +110,7 @@ def recognizer(model, pad, bidi_reordering, script_ignore, base_image, input, ou
         raise click.UsageError('No line segmentation given. Add one with `-l` or run `segment` first.')
     with open_file(lines, 'r') as fp:
         try:
+            fp = cast(IO[Any], fp)
             bounds = json.load(fp)
         except ValueError as e:
             raise click.UsageError('{} invalid segmentation: {}'.format(lines, str(e)))
@@ -133,6 +135,7 @@ def recognizer(model, pad, bidi_reordering, script_ignore, base_image, input, ou
 
     ctx = click.get_current_context()
     with open_file(output, 'w', encoding='utf-8') as fp:
+        fp = cast(IO[Any], fp)
         message('Writing recognition results for {}\t'.format(base_image), nl=False)
         logger.info('Serializing as {} into {}'.format(ctx.meta['mode'], output))
         if ctx.meta['mode'] != 'text':
@@ -149,7 +152,7 @@ def recognizer(model, pad, bidi_reordering, script_ignore, base_image, input, ou
 
 @click.group(chain=True)
 @click.version_option()
-@click.option('-i', '--input', type=(click.Path(exists=True),
+@click.option('-i', '--input', type=(click.Path(exists=True), # type: ignore
                                      click.Path(writable=True)), multiple=True)
 @click.option('-v', '--verbose', default=0, count=True, show_default=True)
 @click.option('-d', '--device', default='cpu', show_default=True, help='Select device to use (cpu, cuda:0, cuda:1, ...)')
