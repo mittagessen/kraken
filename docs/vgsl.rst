@@ -8,8 +8,8 @@ processing purposes using a short definition string.
 Basics
 ------
 
-A VGSL specification consists of an input spec, one or more layers, and an
-output spec. For example:
+A VGSL specification consists of an input block, one or more layers, and an
+output block. For example:
 
 .. code-block:: console
 
@@ -23,7 +23,7 @@ in either dimension.
 When channels are set to 1 grayscale or B/W inputs are expected, 3 expects RGB
 color images. Higher values in combination with a height of 1 result in the
 network being fed 1 pixel wide grayscale strips scaled to the size of the
-channel dimension. 
+channel dimension.
 
 After the input, a number of layers are defined. Layers operate on the channel
 dimension; this is intuitive for convolutional layers but a recurrent layer
@@ -35,23 +35,80 @@ e.g.:
 
         [1,48,0,1 S1(1x48)1,3 Lbx100 O1c103]
 
-or using the alternative slightly faster  formulation:
+or using the alternative slightly faster formulation:
 
 .. code-block:: console
 
-        [1,1,0,48 Lbx100 Oc1c103]
+        [1,1,0,48 Lbx100 O1c103]
 
 Finally an output definition is appended. When training sequence classification
 networks with the provided tools the appropriate output definition is
 automatically appended to the network based on the alphabet of the training
 data.
 
+Examples
+--------
+
+.. code-block:: console
+
+        [1,1,0,48 Lbx100 Do 01c59]
+
+        Creating new model [1,1,0,48 Lbx100 Do] with 59 outputs 
+        layer		type	params 
+        0		rnn	direction b transposed False summarize False out 100 legacy None
+        1		dropout	probability 0.5 dims 1 
+        2		linear	augmented False out 59 
+
+A simple recurrent recognition model with a single LSTM layer classifying lines
+normalized to 48 pixels in height.
+
+.. code-block:: console
+
+        [1,48,0,1 Cr3,3,32 Do0.1,2 Mp2,2 Cr3,3,64 Do0.1,2 Mp2,2 S1(1x12)1,3 Lbx100 Do 01c59]
+
+        Creating new model [1,48,0,1 Cr3,3,32 Do0.1,2 Mp2,2 Cr3,3,64 Do0.1,2 Mp2,2 S1(1x12)1,3 Lbx100 Do] with 59 outputs 
+        layer		type	params 
+        0		conv	kernel 3 x 3 filters 32 activation r 
+        1		dropout	probability 0.1 dims 2 
+        2		maxpool	kernel 2 x 2 stride 2 x 2 
+        3		conv	kernel 3 x 3 filters 64 activation r 
+        4		dropout	probability 0.1 dims 2 
+        5		maxpool	kernel 2 x 2 stride 2 x 2 
+        6		reshape from 1 1 x 12 to 1/3 
+        7		rnn	direction b transposed False summarize False out 100 legacy None 
+        8		dropout	probability 0.5 dims 1 
+        9		linear	augmented False out 59 
+
+A model with a small convolutional stack before a recurrent LSTM layer. The
+extended dropout layer syntax is used to reduce drop probability on the depth
+dimension as the default is too high for convolutional layers. The remainder of
+the height dimension (`12`) is reshaped into the depth dimensions before
+applying the final recurrent and linear layers.
+
+.. code-block:: console
+
+        [1,0,0,3 Cr3,3,16 Mp3,3 Lfys64 Lbx128 Lbx256 Do 01c59]
+
+        Creating new model [1,0,0,3 Cr3,3,16 Mp3,3 Lfys64 Lbx128 Lbx256 Do] with 59 outputs
+        layer		type	params
+        0		conv	kernel 3 x 3 filters 16 activation r
+        1		maxpool	kernel 3 x 3 stride 3 x 3
+        2		rnn	direction f transposed True summarize True out 64 legacy None
+        3		rnn	direction b transposed False summarize False out 128 legacy None
+        4		rnn	direction b transposed False summarize False out 256 legacy None
+        5		dropout	probability 0.5 dims 1
+        6		linear	augmented False out 59
+
+A model with arbitrary sized color image input, an initial summarizing
+recurrent layer to squash the height to 64, followed by 2 bi-directional
+recurrent layers and a linear projection.
+
 Convolutional Layers
 --------------------
 
 .. code-block:: console
 
-        C(s|t|r|l|m)[{name}]<y>,<x>,<d>
+        C[{name}](s|t|r|l|m)[{name}]<y>,<x>,<d>
         s = sigmoid
         t = tanh
         r = relu
@@ -66,20 +123,18 @@ Recurrent Layers
 
 .. code-block:: console
 
-        L(f|r|b)(x|y)[s][{name}]<n> LSTM cell with n outputs.
-        G(f|r|b)(x|y)[s][{name}]<n> GRU cell with n outputs.
-          The RNN must have one of:
-            f runs the RNN forward only.
-            r runs the RNN reversed only.
-            b runs the RNN bidirectionally.
-          s (optional) summarizes the output in the requested dimension, return
-          the last step.
+        L[{name}](f|r|b)(x|y)[s][{name}]<n> LSTM cell with n outputs.
+        G[{name}](f|r|b)(x|y)[s][{name}]<n> GRU cell with n outputs.
+        f runs the RNN forward only.
+        r runs the RNN reversed only.
+        b runs the RNN bidirectionally.
+        s (optional) summarizes the output in the requested dimension, return the last step.
 
 Adds either an LSTM or GRU recurrent layer to the network using eiter the `x`
 (width) or `y` (height) dimension as the time axis. Input features are the
 channel dimension and the non-time-axis dimension (height/width) is treated as
 another batch dimension. For example, a `Lfx25` layer on an `1, 16, 906, 32`
-input will execute 16 indepedent forward passes on `906x32` tensors resulting
+input will execute 16 independent forward passes on `906x32` tensors resulting
 in an output of shape `1, 16, 906, 25`. If this isn't desired either run a
 summarizing layer in the other direction, e.g. `Lfys20` for an input `1, 1,
 906, 20`, or prepend a reshape layer `S1(1x16)1,3` combining the height and
@@ -88,10 +143,19 @@ channel dimension for an `1, 1, 906, 512` input to the recurrent layer.
 Helper and Plumbing Layers
 --------------------------
 
+Max Pool
+^^^^^^^^
 .. code-block:: console
 
-        Mp[{name}]<y>,<x>[,<y_stride>,<x_stride>] maxpool the input, reducing the (y,x) rectangle to a
-                single vector value
+        Mp[{name}]<y>,<x>[,<y_stride>,<x_stride>]
+
+Adds a maximum pooling with `(y, x)` kernel_size and `(y_stride, x_stride)` stride.
+
+Reshape
+^^^^^^^
+
+.. code-block:: console
+
         S[{name}]<d>(<a>x<b>)<e>,<f> Splits one dimension, moves one part to another
                 dimension.
 
@@ -102,7 +166,12 @@ dimension `e`, respectively `b` into `f`.  Either `e` or `f` has to be equal to
 the `48` sized tensor into the channel dimension resulting in a `1, 1, 1024,
 48*8=384` sized output. `S` layers are mostly used to remove undesirable non-1
 height before a recurrent layer.
-        
+
+.. note::
+
+        This `S` layer is equivalent to the one implemented in the tensorflow
+        implementation of VGSL, i.e. behaves differently from tesseract.
+
 Regularization Layers
 ---------------------
 
