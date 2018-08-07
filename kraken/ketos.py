@@ -337,7 +337,10 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
                 loss.backward()
                 optim.step()
                 bar.update(1)
-
+    if quit == 'early':
+        message('Moving best model {0}_{1}.mlmdel to {0}_best.mlmodel'.format(output, st_it.best_epoch))
+        logger.info('Moving best model {0}_{1}.mlmdel to {0}_best.mlmodel'.format(output, st_it.best_epoch))
+        shutil.copy('{}_{}.mlmodel'.format(output, st_it.best_epoch), '{}_best.mlmodel'.format(output))
 
 @cli.command('extract')
 @click.pass_context
