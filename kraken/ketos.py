@@ -330,9 +330,9 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
                 optim.zero_grad()
                 # NCW -> WNC
                 loss = nn.criterion(o.permute(2, 0, 1), # type: ignore
-                                    target.permute(2, 0, 1),
-                                    torch.tensor((o.size(2),)),
-                                    torch.tensor((target.size(2),)))
+                                    target,
+                                    (o.size(2),),
+                                    (target.size(1),))
                 logger.info('trial {} - loss {}'.format(trial, float(loss)))
                 loss.backward()
                 optim.step()
