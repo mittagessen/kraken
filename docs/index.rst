@@ -23,7 +23,7 @@ kraken's main features are:
   - `Right-to-Left <https://en.wikipedia.org/wiki/Right-to-left>`_, `BiDi
     <https://en.wikipedia.org/wiki/Bi-directional_text>`_, and Top-to-Bottom
     script support
-  - `ALTO <https://www.loc.gov/standards/alto/>`_ and hOCR output
+  - `ALTO <https://www.loc.gov/standards/alto/>`_, abbyXML, and hOCR output
   - Word bounding boxes and character cuts
   - `Public repository <https://github.com/mittagessen/kraken-models>`_ of model files
   - :ref:`Lightweight model files <models>`
@@ -47,15 +47,6 @@ installed using:
 pip
 ---
 
-Because the build behavior of pip versions older than 6.1.0 interferes with the
-scipy build process numpy has to be installed before doing the actual install:
-
-.. code-block:: console
-
-  $ pip3 install numpy
-
-Install kraken either from pypi:
-
 .. code-block:: console
 
   $ pip3 install kraken
@@ -78,9 +69,9 @@ If you are running `Anaconda <https://www.anaconda.com/download/>`_/miniconda, u
 Models
 ------
 
-Finally you'll have to scrounge up an RNN to do the actual recognition of
-characters. To download ocropus' default RNN converted to the new format and
-place it in the kraken directory for the current user:
+Finally you'll have to scrounge up a recognition model to do the actual
+recognition of characters. To download the default English text recognition
+model and place it in the user's kraken directory:
 
 .. code-block:: console
 
@@ -89,13 +80,13 @@ place it in the kraken directory for the current user:
 A list of libre models available in the central repository can be retrieved by
 running:
 
-::
+.. code-block:: console
 
   $ kraken list
 
 Model metadata can be extracted using:
 
-::
+.. code-block:: console
 
   $ kraken show arabic-alam-al-kutub
   name: arabic-alam-al-kutub.clstm
@@ -120,7 +111,7 @@ Quickstart
 Recognizing text on an image using the default parameters including the
 prerequisite steps of binarization and page segmentation:
 
-::
+.. code-block:: console
 
   $ kraken -i image.tif image.txt binarize segment ocr
   Loading RNN     ✓
@@ -128,20 +119,20 @@ prerequisite steps of binarization and page segmentation:
 
 To binarize a single image using the nlbin algorithm:
 
-::
+.. code-block:: console
 
   $ kraken -i image.tif bw.tif binarize
 
 To segment a binarized image into reading-order sorted lines:
 
-::
+.. code-block:: console
 
   $ kraken -i bw.tif lines.json segment
 
 To OCR a binarized image using the default RNN and the previously generated
 page segmentation:
 
-::
+.. code-block:: console
 
   $ kraken -i bw.tif image.txt ocr --lines lines.json
 
