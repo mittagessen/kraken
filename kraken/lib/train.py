@@ -52,6 +52,8 @@ class EarlyStopping(TrainStopper):
         self.it = it
         self.best_loss = 0.0
         self.wait = 0
+        self.best_epoch = 0
+        self.epoch = 0
 
     def __iter__(self):
         return self
@@ -59,6 +61,7 @@ class EarlyStopping(TrainStopper):
     def __next__(self):
         if self.wait >= self.lag:
             raise StopIteration
+        self.epoch += 1
         return self.it
 
     def update(self, val_loss: float) -> None:
@@ -70,6 +73,7 @@ class EarlyStopping(TrainStopper):
         else:
             self.wait = 0
             self.best_loss = val_loss
+            self.best_epoch = self.epoch
 
 
 class EpochStopping(TrainStopper):
