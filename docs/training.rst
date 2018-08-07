@@ -118,19 +118,10 @@ extracted through the ``ketos extract`` command:
 
 .. code-block:: console 
 
-        $ ketos extract --reorder --output output_directory --normalization NFD *.html
+        $ ketos extract --output output_directory --normalization NFD *.html
 
 with
 
---reorder
-        Tells ketos to reorder the code point for each line into left-to-right
-        order. Unicode code points are always in reading order, e.g. the first
-        code point in an Arabic line will be the rightmost character. This
-        option reorders them into ``display order``, i.e. the first code point
-        is the leftmost, the second one the next from the left and so on. As
-        the neural network does not know beforehand if part of an image
-        contains left-to-right or right-to-left text, all glyphs are assumed to
-        be left-to-right and later reordered for correct display.
 --output
         The output directory where all line image-text pairs (training data)
         are written, defaulting to ``training/``
@@ -159,120 +150,190 @@ Training
 --------
 
 The training data in ``output_dir`` may now be used to train a new model by
-invoking the ``train.sh`` script in the vagrant box's home directory. 100 lines
-will be split off from the actual training set into a separate test set for
-validation purposes. These are never shown to the network for training purposes
-but will be periodically recognized to evaluate the accuracy of the model.
+invoking the ``ketos train`` command. Just hand a list of images to the command
+such as:
 
-Model training is mostly automatic albeit there are parameters in the training
-script that may be adjusted if necessary:
+.. code-block:: console
 
-save_every
-        Sets the frequence the model is saved during training. Per default the
-        network is serialized after 1000 epochs of training. An epoch is the
-        number of training steps after which each randomly drawn line has been
-        seens once by the network (on average).
-test_every
-        How often the trained network is evaluated on the test set.
-hidden
-        The number of nodes in the internal ``hidden`` layer of the network.
-        Larger networks are capable of capturing more complex patterns but will
-        slow down training and recognition significantly.
-lrate
-        Learning rate of the network. Lower values cause training to take
-        longer while higher values may cause the network not to converge at
-        all, i.e. not learn a set of weights producing high recognition
-        accuracy.
+        $ ketos train output_dir/*.png
+
+to start training.
+
+A number of lines will be split off into a separate held-out set that is used
+to estimate the actual recognition accuracy achieved in the real world. These
+are never shown to the network during training but will be recognized
+periodically to evaluate the accuracy of the model. Per default the test set
+will comprise of 10% of the training data.
+
+Basic model training is mostly automatic albeit there are multiple parameters
+that can be adjusted:
+
+--output
+        Sets the prefix for models generated during training. They will best as
+        ``prefix_iterations.mlmodel``.
+--report
+        How often evaluation passes are run on the test set. It is a number
+        between 0 and 1 with 1 meaning a report is created each time the
+        complete training set has been seen by the network.
+--savefreq
+        How often intermediate models are saved to disk. It is a number between
+        0 and 1 with the same semantics as ``--report``.
+--load
+        Continuing training is possible by loading an existing model file with
+        ``--load``. To continue training from a base model with another
+        training set refer to the full :ref:`ketos <ketos>` documentation.
+--preload/--no-preload
+        Enables/disables preloading of the training set into memory for
+        accelerated training. The default setting preloads data sets with less
+        than 2500 lines, explicitly adding ``--preload`` will preload arbitrary
+        sized sets.
 
 Training a network will take some time on a modern computer, even with the
 default parameters. While the exact time required is unpredictable as training
 is a somewhat random process a rough guide is that accuracy seldomly improves
-after 40000 epochs reached between 8 and 24 hours of training. 
+after 50 epochs reached between 8 and 24 hours of training. 
 
-When to stop is a matter of experience (and personal preference); a fairly
-reliable approach known as `early stopping
-<https://en.wikipedia.org/wiki/Early_stopping>`_ is stopping training
-immediately as soon as the error rate on the test set worsens. This will
-prevent `overfitting <https://en.wikipedia.org/wiki/Overfitting>`_, i.e. fitting
-the model to recognize only the training data properly instead of the general
+When to stop training is a matter of experience; the default setting employs a
+fairly reliable approach known as `early stopping
+<https://en.wikipedia.org/wiki/Early_stopping>`_ that stops training as soon as
+the error rate on the test set doesn't improve anymore.  This will prevent
+`overfitting <https://en.wikipedia.org/wiki/Overfitting>`_, i.e. fitting the
+model to recognize only the training data properly instead of the general
 patterns contained therein. 
-
-Running the script will look like this after a couple of minutes:
 
 .. code-block:: console
         
-        $ ./train.sh output_dir model_name
-        *** charsep 
-        got 778 files, 100 tests
-        got 55 classes
-        .stacked: 0.0001 0.9 in 0 48 out 0 55
-        .stacked.parallel: 0.0001 0.9 in 0 48 out 0 200
-        .stacked.parallel.lstm: 0.0001 0.9 in 0 48 out 0 100
-        .stacked.parallel.reversed: 0.0001 0.9 in 0 48 out 0 100
-        .stacked.parallel.reversed.lstm: 0.0001 0.9 in 0 48 out 0 100
-        .stacked.softmax: 0.0001 0.9 in 0 200 out 0 55
-        0
-        TRU ܇ܢܝܬܝܡ ܐܠܕ ܐ̈ܝܚ .̣ܢܘܗܠ ̣ܒܗܝ ܐܬܘܒܝܛܒ ܡܕܡ ܠܘܟ
-        ALN 
-        OUT 
-        ERROR 1000 0.60224     2474 4108
-        1000
-        TRU ܀ܐ̣ܘܗ ܛܝܠܫ ܐܝܬ̈ܚܬ ܠܥܘ ܐܝܠ̈ܥ ܠܥܕ
-        ALN ܀܀ܐ̣ܘܗ ܛܛܝܠܫ ܐܝܬܚܬ ܠܥܘ ܐܝܠ ܠܠܠܥܕ
-        OUT ܘ ܐܘܘ ܘ ܝܫ ܐܢܘܢ ܢܘ ܐܝ  
-        ERROR 2000 0.204236     839 4108
-        2000
-        TRU ܐܘܚ .ܗܠ ܐ̣ܘܗ ܚܫܚ ܗܬܘܟܐܕ ܐܣܢܓ ܪܒ ܐܠܐ .̣ܐܢ̈ܪܕܥܡ
-        ALN ܐܘܚ .ܗܠ ܐ̣ܘܗ ܚܫܚ ܗܬܘܟܐ ܐܣܢܓ ܪܒ ܐܠܐ .ܐܢ̈ܪܕܥܡ
-        OUT ܐܘܬܚ .ܗ ܐܘܗ ܚܫܚ ܗܬܘܟܐ ܐܘܢܓ ܪ ܐܠܐ .ܐܢܪܕܥܡa
-        ERROR 3000 0.0946933     389 4108
-        3000
-        TRU ܢܘܗܝ̈ܒܘܥ ܘܓ ܢܡ ܢܕܥ ܠܟܒܕ ܐ̈ܝܡܠܘ ܐܥܪܐܠ ̇ܗܠ ܕܩܦܬܐ
-        ALN ܢܘܗܝ̈ܒܘܥ ܘܓ ܢܡ  ܢܕܥ ܠܟܒܕ ܐ̈ܝܡܠܘ ܐܥܪܐܠ ̇ܗܠ ܕܩܦܬܐ
-        OUT ܢܘܗܝܒܘܥ ܘܓ ܢܒܢܕܥ ܠܟܒܕܐܝܡܠܘ ܐܥܪܐܠ ܗܠ ܕܩܦܬܐ
+        $ ketos train output_dir/*.png
+        Building training set  [####################################]  100%
+        Building test set  [####################################]  100%
+        [270.2364] alphabet mismatch {'9', '8', '݂', '3', '݀', '4', '1', '7', '5', '\xa0'}
+        Initializing model ✓
+        Accuracy report (0) -1.5951 3680 9550
+        epoch 0/-1  [####################################]  788/788
+        Accuracy report (1) 0.0245 3504 3418
+        epoch 1/-1  [####################################]  788/788
+        Accuracy report (2) 0.8445 3504 545
+        epoch 2/-1  [####################################]  788/788             
+        Accuracy report (3) 0.9541 3504 161
+        epoch 3/-1  [------------------------------------]  13/788  0d 00:22:09
         ...
 
-By now there should be a couple of models model_name-1000.clstm,
-model_name-2000.clstm, ... in the directory the script was executed in. Lets
+By now there should be a couple of models model_name-1.mlmodel,
+model_name-2.mlmodel, ... in the directory the script was executed in. Lets
 take a look at each part of the output.
 
 .. code-block:: console
+        Building training set  [####################################]  100%
+        Building test set  [####################################]  100%
 
-        got 778 files, 100 tests
-        got 55 classes
-
-indicates that the training is running on 778 transcribed lines and a test set
-of 100 lines. 55 different classes, i.e. Unicode code points, where found in
-these 778 lines. These affect the output size of the network; obviously only
-these 55 different classes/code points can later be output by the network.
-
-.. code-block:: console
-
-        ERROR 1000 0.60224     2474 4108
-
-this line shows the results of the test set evaluation. The error after the
-``1000`` epochs is ``2474`` incorrect code points out of ``4108`` in the set or
-``0.60224``/60%. It should decrease fairly rapidly, in the example it drops to
-0.20 after 2000 epochs.
-
-If it remains around 0.70 something is amiss, e.g. non-reordered right-to-left
-or wildly incorrect transcriptions. Abort training, correct the error(s) and
-start again.
-
-The next part is just the network output for a random line where ``TRU`` is the
-transcription and ``OUT`` is the recognized text. ``ALN`` is a derivative
-output used internally for adjusting the network's weights. It should not be
-used for any kind of evaluation and is purely for informational purposes.
+shows the progress of loading the training and test set into memory. This might
+take a while as preprocessing the whole set and putting it into memory is
+computationally intensive. Loading can be made faster without preloading at the
+cost of performing preprocessing repeatedlyduring the training process. 
 
 .. code-block:: console
 
-        TRU ܐܘܚ .ܗܠ ܐ̣ܘܗ ܚܫܚ ܗܬܘܟܐܕ ܐܣܢܓ ܪܒ ܐܠܐ .̣ܐܢ̈ܪܕܥܡ
-        ALN ܐܘܚ .ܗܠ ܐ̣ܘܗ ܚܫܚ ܗܬܘܟܐ ܐܣܢܓ ܪܒ ܐܠܐ .ܐܢ̈ܪܕܥܡ
-        OUT ܐܘܬܚ .ܗ ܐܘܗ ܚܫܚ ܗܬܘܟܐ ܐܘܢܓ ܪ ܐܠܐ .ܐܢܪܕܥܡ
+        [270.2364] alphabet mismatch {'9', '8', '݂', '3', '݀', '4', '1', '7', '5', '\xa0'}
 
-After stoppig training, pick your chosen model and copy it somehwere safe. It
-is highly recommended to also archive the training log and data for later
-reference.
+is a warning about missing characters in either the test or training set, i.e.
+that the alphabets of the sets are not equal. Increasing the size of the test
+set will often remedy this warning.
+
+.. code-block:: console
+
+        Accuracy report (2) 0.8445 3504 545
+
+this line shows the results of the test set evaluation. The error after 2
+epochs is 545 incorrect characters out of 3504 characters in the test set for a
+character accuracy of 84.4%. It should decrease fairly rapidly.  If accuracy
+remains around 0.30 something is amiss, e.g. non-reordered right-to-left or
+wildly incorrect transcriptions. Abort training, correct the error(s) and start
+again.
+
+After training is finished the best model is saved as
+``model_name_best.mlmodel``. It is highly recommended to also archive the
+training log and data for later reference.
+
+``ketos`` can also produce more verbose output with training set and network
+information by appending one or more ``-v`` to the command:
+
+.. code-block:: console
+
+        $ ketos -vv train syr/*.png
+        [0.7272] Building ground truth set from 876 line images 
+        [0.7281] Taking 88 lines from training for evaluation 
+        ...
+        [0.8479] Training set 788 lines, test set 88 lines, alphabet 48 symbols
+        [0.8481] alphabet mismatch {'\xa0', '0', ':', '݀', '܇', '݂', '5'}
+        [0.8482] grapheme	count
+        [0.8484] SPACE	5258
+        [0.8484] 	ܐ	3519
+        [0.8485] 	ܘ	2334
+        [0.8486] 	ܝ	2096
+        [0.8487] 	ܠ	1754
+        [0.8487] 	ܢ	1724
+        [0.8488] 	ܕ	1697
+        [0.8489] 	ܗ	1681
+        [0.8489] 	ܡ	1623
+        [0.8490] 	ܪ	1359
+        [0.8491] 	ܬ	1339
+        [0.8491] 	ܒ	1184
+        [0.8492] 	ܥ	824
+        [0.8492] 	.	811
+        [0.8493] COMBINING DOT BELOW	646
+        [0.8493] 	ܟ	599
+        [0.8494] 	ܫ	577
+        [0.8495] COMBINING DIAERESIS	488
+        [0.8495] 	ܚ	431
+        [0.8496] 	ܦ	428
+        [0.8496] 	ܩ	307
+        [0.8497] COMBINING DOT ABOVE	259
+        [0.8497] 	ܣ	256
+        [0.8498] 	ܛ	204
+        [0.8498] 	ܓ	176
+        [0.8499] 	܀	132
+        [0.8499] 	ܙ	81
+        [0.8500] 	*	66
+        [0.8501] 	ܨ	59
+        [0.8501] 	܆	40
+        [0.8502] 	[	40
+        [0.8503] 	]	40
+        [0.8503] 	1	18
+        [0.8504] 	2	11
+        [0.8504] 	܇	9
+        [0.8505] 	3	8
+        [0.8505] 		6
+        [0.8506] 	5	5
+        [0.8506] NO-BREAK SPACE	4
+        [0.8507] 	0	4
+        [0.8507] 	6	4
+        [0.8508] 	:	4
+        [0.8508] 	8	4
+        [0.8509] 	9	3
+        [0.8510] 	7	3
+        [0.8510] 	4	3
+        [0.8511] SYRIAC FEMININE DOT	1
+        [0.8511] SYRIAC RUKKAKHA	1
+        [0.8512] Encoding training set
+        [0.9315] Creating new model [1,1,0,48 Lbx100 Do] with 49 outputs
+        [0.9318] layer		type	params
+        [0.9350] 0		rnn	direction b transposed False summarize False out 100 legacy None
+        [0.9361] 1		dropout	probability 0.5 dims 1
+        [0.9381] 2		linear	augmented False out 49
+        [0.9918] Constructing RMSprop optimizer (lr: 0.001, momentum: 0.9)
+        [0.9920] Set OpenMP threads to 4
+        [0.9920] Moving model to device cpu
+        [0.9924] Starting evaluation run
+
+
+indicates that the training is running on 788 transcribed lines and a test set
+of 88 lines. 49 different classes, i.e. Unicode code points, where found in
+these 788 lines. These affect the output size of the network; obviously only
+these 49 different classes/code points can later be output by the network.
+Importantly, we can see that certain characters occur markedly less often than
+others. Characters like the Syriac feminine dot and numerals that occur less
+than 10 times will most likely not be recognized well by the trained net.
+
 
 Evaluation and Validation
 -------------------------
@@ -462,7 +523,7 @@ Retrieving model metadata for a particular model:
 .. code-block:: console
 
 	$ kraken show arabic-alam-al-kutub
-	name: arabic-alam-al-kutub.clstm
+	name: arabic-alam-al-kutub.mlmodel
 	
 	An experimental model for Classical Arabic texts.
 	
@@ -488,6 +549,6 @@ The downloaded model can then be used for recognition by the name shown in its m
 
 .. code-block:: console
 
-        $ kraken -i INPUT_IMAGE OUTPUT_FILE binarize segment ocr -m arabic-alam-al-kutub.clstm
+        $ kraken -i INPUT_IMAGE OUTPUT_FILE binarize segment ocr -m arabic-alam-al-kutub.mlmodel
 
 For more documentation see the kraken `website <http://kraken.re>`_.
