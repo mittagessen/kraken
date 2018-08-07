@@ -63,6 +63,8 @@ def progressbar(*args, **kwargs):
     import logging
     logger = logging.getLogger(__name__)
     bar = click.progressbar(*args, **kwargs)
+    if logger.getEffectiveLevel() < 30:
+        bar.is_hidden = True # type: ignore
     return bar
 
 
