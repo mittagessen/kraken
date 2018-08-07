@@ -1,3 +1,5 @@
+.. _vgsl:
+
 VGSL network specification
 ==========================
 

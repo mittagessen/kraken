@@ -1,3 +1,5 @@
+.. _advanced:
+
 Advanced Usage
 ==============
 
@@ -47,6 +49,9 @@ option          type
 Page Segmentation and Script Detection
 --------------------------------------
 
+The `segment` subcommand access two operations page segmentation into lines and
+script detection of those lines.
+
 Page segmentation is mostly parameterless, although a switch to change the
 color of column separators has been retained. The segmentation is written as a
 `JSON <http://json.org/>`_ file containing bounding boxes in reading order and
@@ -54,10 +59,14 @@ the general text direction (horizontal, i.e. LTR or RTL text in top-to-bottom
 reading order or vertical-ltr/rtl for vertical lines read from left-to-right or
 right-to-left).
 
-Each list in the `boxes` field corresponds to a topographical line and contains
-one or more bounding boxes of a particular script. Identifiers are `ISO 15924
+The script detection splits extracted lines from the segmenter into strip
+sharing a particular script that can then be recognized by supplying
+appropriate models for each detected script to the `ocr` subcommand.
+
+Combined output from both consists of lists in the `boxes` field corresponding
+to a topographical line and containing one or more bounding boxes of a
+particular script. Identifiers are `ISO 15924
 <http://www.unicode.org/iso15924/iso15924-codes.html>`_ 4 character codes.
-Script-aware page segmentation is a prerequisite for multi-script recognition.
 
 .. code-block:: console
 
@@ -84,9 +93,8 @@ Script-aware page segmentation is a prerequisite for multi-script recognition.
            "text_direction" : "horizontal-tb"
 	}
 
-Script detection is automatically enabled when the CLSTM bindings are
-installed. Without the bindings or by explicitly disabling script detection the
-`boxes` field will contain only a list of line bounding boxes:
+Script detection is automatically enabled; by explicitly disabling script
+detection the `boxes` field will contain only a list of line bounding boxes:
 
 .. code-block:: console
 
@@ -101,11 +109,20 @@ Available page segmentation parameters are:
 =============================================== ======
 option                                          action
 =============================================== ======
--d, --text-direction                            Sets principal text direction. Valid values are `horizontal-tb`, `vertical-lr`, and `vertical-rl`.
--s, --script-detect / -n, --no-script-detect    Enables/Disables script detection on segmenter output.
+-d, --text-direction                            Sets principal text direction. Valid values are `horizontal-lr`, `horizontal-rl`, `vertical-lr`, and `vertical-rl`.
 --scale FLOAT                                   Estimate of the average line height on the page
 -m, --maxcolseps                                Maximum number of columns in the input document. Set to `0` for uni-column layouts.
--b, --black_colseps / -w, --white_colseps       Switch to black column separators.
+-b, --black-colseps / -w, --white-colseps       Switch to black column separators.
+-r, --remove-hlines / -l, --hlines              Disables prefiltering of small horizontal lines. Improves segmenter output on some Arabic texts.
+=============================================== ======
+
+The parameters specific to the script identification are:
+
+=============================================== ======
+option                                          action
+=============================================== ======
+-s/-n                                           Enables/disables script detection
+-a, --allowed-script                            Whitelists specific scripts for detection output. Other detected script runs are merged with their adjacent scripts, after a heuristic pre-merging step.
 =============================================== ======
 
 Model Repository
@@ -127,6 +144,7 @@ description):
         Retrieving model list   ✓
         default (pyrnn) - A converted version of en-default.pyrnn.gz
         toy (clstm) - A toy model trained on 400 lines of the UW3 data set.
+        ...
 
 To access more detailed information the ``show`` subcommand may be used:
 
@@ -162,9 +180,9 @@ Recognition
 -----------
 
 Recognition requires a grey-scale or binarized image, a page segmentation for
-that image, and a pyrnn or protobuf model. In particular there is no
-requirement to use the page segmentation algorithm contained in the ``segment``
-subcommand or the binarization provided by kraken. 
+that image, and a model file. In particular there is no requirement to use the
+page segmentation algorithm contained in the ``segment`` subcommand or the
+binarization provided by kraken. 
 
 Multi-script recognition is possible by supplying a script-annotated
 segmentation and a mapping between scripts and models:
@@ -181,20 +199,21 @@ possible to define a fallback model that other text will be fed to:
 
         $ kraken -i ... ... ocr -m ... -m ... -m default:porson.clstm
 
-Because script detection is not 100% reliable and sometimes single characters
-are misclassified, the main text should usually be recognized using the
-`default` model and secondary scripts explicitly assigned other models.
+It is also possible to disable recognition on a particular script by mapping to
+the special model keyword `ignore`. Ignored lines will still be serialized but
+will not contain any recognition results.
 
 The ``ocr`` subcommand is able to serialize the recognition results either as
-plain text (default), as `hOCR <http://hocr.info>`_, or into `ALTO
-<http://www.loc.gov/standards/alto/>`_ containing additional metadata such as
-bounding boxes and confidences:
+plain text (default), as `hOCR <http://hocr.info>`_, into `ALTO
+<http://www.loc.gov/standards/alto/>`_, or abbyyXML containing additional
+metadata such as bounding boxes and confidences:
 
 .. code-block:: console
 
         $ kraken -i ... ... ocr -t # text output
         $ kraken -i ... ... ocr -h # hOCR output
         $ kraken -i ... ... ocr -a # ALTO output
+        $ kraken -i ... ... ocr -y # abbyyXML output
 
 hOCR output is slightly different from hOCR files produced by ocropus. Each
 ``ocr_line`` span contains not only the bounding box of the line but also

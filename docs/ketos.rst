@@ -1,13 +1,17 @@
+.. _ketos:
+
 Training
 ========
+
+This page describes the training utilities available through the ``ketos``
+command line utility in depth. For a gentle introduction on model training
+please refer to the :ref:`tutorial <training>`. 
 
 Thanks to the magic of `Connectionist Temporal Classification
 <ftp://ftp.idsia.ch/pub/juergen/icml2006.pdf>`_ prerequisites for creating a
 new recognition model are quite modest. The basic requirement is a number of
 text lines (``ground truth``) that correspond to line images and some time for
 training.
-
-Training tasks are covered by subcommands attached to the ``ketos`` command.
 
 Transcription
 -------------
@@ -21,12 +25,13 @@ HTML file to:
 
         $ ketos transcribe -o output.html image_1.png image_2.png ...
 
+
 While it is possible to put multiple images into a single transcription
 environment splitting into one-image-per-HTML will ease parallel transcription
 by multiple people.
 
 The above command reads in the image files, converts them to black and white if
-necessary, tries to split them into line images, and puts an editable text
+desired, tries to split them into line images, and puts an editable text
 field next to the image in the HTML.
 
 Transcription has to be diplomatic, i.e. contain the exact character sequence

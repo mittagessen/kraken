@@ -1,3 +1,5 @@
+.. _training:
+
 Training a kraken model
 =======================
 
@@ -182,11 +184,11 @@ that can be adjusted:
         Continuing training is possible by loading an existing model file with
         ``--load``. To continue training from a base model with another
         training set refer to the full :ref:`ketos <ketos>` documentation.
---preload/--no-preload
+--preload
         Enables/disables preloading of the training set into memory for
         accelerated training. The default setting preloads data sets with less
         than 2500 lines, explicitly adding ``--preload`` will preload arbitrary
-        sized sets.
+        sized sets. ``--no-preload`` disables preloading in all circumstances.
 
 Training a network will take some time on a modern computer, even with the
 default parameters. While the exact time required is unpredictable as training
@@ -223,6 +225,7 @@ model_name-2.mlmodel, ... in the directory the script was executed in. Lets
 take a look at each part of the output.
 
 .. code-block:: console
+
         Building training set  [####################################]  100%
         Building test set  [####################################]  100%
 

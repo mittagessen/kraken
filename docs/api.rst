@@ -86,13 +86,6 @@ kraken.lib.dataset module
     :members:
     :show-inheritance:
 
-kraken.lib.ctc
---------------
-
-.. automodule:: kraken.lib.ctc
-    :members:
-    :show-inheritance:
-
 kraken.lib.ctc_decoder
 ----------------------
 
