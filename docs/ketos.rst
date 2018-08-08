@@ -25,34 +25,38 @@ HTML file to:
 
         $ ketos transcribe -o output.html image_1.png image_2.png ...
 
-
 While it is possible to put multiple images into a single transcription
 environment splitting into one-image-per-HTML will ease parallel transcription
 by multiple people.
 
-The above command reads in the image files, converts them to black and white if
-desired, tries to split them into line images, and puts an editable text
-field next to the image in the HTML.
+The above command reads in the image files, converts them to black and white,
+tries to split them into line images, and puts an editable text field next to
+the image in the HTML. There are a handful of option changing the output:
+
+=============================================== ======
+option                                          action
+=============================================== ======
+-d, --text-direction                            Sets the principal text direction both for the segmenter and in the HTML. Can be one of horizontal-lr, horizontal-rl, vertical-lr, vertical-rl.
+--scale                                         A segmenter parameter giving an estimate of average line height. Usually it shouldn't be set manually.
+--bw / --orig                                   Disables binarization of input images. If color or grayscale training data is desired this option has to be set.
+-m, --maxcolseps                                A segmenter parameter limiting the number of columns that can be found in the input image by setting the maximum number of column separators. Set to 0 to disable column detection.
+-b, --black_colseps / -w, --white_colseps       A segmenter parameter selecting white or black column separators.
+-f, --font                                      The font family to use for rendering the text in the HTML.
+-fs, --font-style                               The font style to use in the HTML.
+-p, --prefill                                   A model to use for prefilling the transcription. (Optional)
+-o, --output                                    Output HTML file.
+=============================================== ======
+
+It is possible to use an existing model to prefill the transcription environments:
+
+.. code-block:: console
+
+        $ ketos transcribe -p ~/arabic.mlmodel -p output.html image_1.png image_2.png ...
 
 Transcription has to be diplomatic, i.e. contain the exact character sequence
 in the line image, including original orthography. Some deviations, such as
 consistently omitting vocalization in Arabic texts, is possible as long as they
 are systematic and relatively minor.
-
-.. note::
-
-        The page segmentation algorithm extracting lines from images is
-        optimized for ``western`` page layouts and may recognize lines
-        erroneously, lumping multiple lines together or cutting them in half.
-        The most efficient way to deal with these errors is just skipping the
-        affected lines by leaving the text box empty.
-
-.. tip::
-
-        Copy-paste transcription can significantly speed up the whole process.
-        Either transcribe scans of a work where a digital edition already
-        exists (but does not for typographically similar prints) or find a
-        sufficiently similar edition as a base.
 
 After transcribing a number of lines the results have to be saved, either using
 the ``Download`` button on the lower right or through the regular ``Save Page
@@ -65,37 +69,37 @@ extracted through the ``ketos extract`` command:
 
 .. code-block:: console 
 
-        $ ketos extract --reorder --output output_directory --normalization NFD *.html
+        $ ketos extract --output output_directory *.html
 
-with
 
---reorder
-        Tells ketos to reorder the code point for each line into left-to-right
-        order. Unicode code points are always in reading order, e.g. the first
-        code point in an Arabic line will be the rightmost character. This
-        option reorders them into ``display order``, i.e. the first code point
-        is the leftmost, the second one the next from the left and so on. As
-        the neural network does not know beforehand if part of an image
-        contains left-to-right or right-to-left text, all glyphs are assumed to
-        be left-to-right and later reordered for correct display.
---output
-        The output directory where all line image-text pairs (training data)
-        are written.
---normalization
-        Unicode has code points to encode most glyphs encountered in the wild.
-        A lesser known feature is that there usually are multiple ways to
-        encode a string of printed characters, i.e. a series of what a human
-        would consider a single character (in Unicode jargon ``grapheme
-        clusters``) in multiple ways. Crucially, accented characters marks may
-        either be a single code point (``precomposed``) or two or more separate
-        symbols (``decomposed``). Many texts contain a mixture of both.
-        `Unicode normalization <http://www.unicode.org/reports/tr15/>`_ ensures
-        that equal grapheme cluster are encoded in the same way, i.e. that the
-        encoded representation across the training data set is consistent and
-        there is only one way the network can recognize a particular feature on
-        the page. Usually it is sufficient to set the normalization to
-        Normalization Form Decomposed (NFD), as it reduces the the size of the
-        overall script to be recognized slightly.
+There are some options dealing with color images and text normalization:
+
+======================================================= ======
+option                                                  action
+======================================================= ======
+-b, --binarize / --no-binarize                          Binarizes color/grayscale images (default) or retains the original in the output.
+-u, --normalization                                     Normalizes text to one of the following Unicode normalization forms: NFD, NFKD, NFC, NFKC
+-s, --normalize-whitespace / --no-normalize-whitespace  Normalizes whitespace in extracted text. There are several different Unicode `whitespace
+                                                        <https://en.wikipedia.org/wiki/Whitespace_character#Unicode>`_ characters that
+                                                        are replaced by a standard space when not disabled.
+--reorder / --no-reorder                                Tells ketos to reorder the code
+                                                        point for each line into
+                                                        left-to-right order. Unicode
+                                                        code points are always in
+                                                        reading order, e.g. the first
+                                                        code point in an Arabic line
+                                                        will be the rightmost
+                                                        character. This option reorders
+                                                        them into ``display order``,
+                                                        i.e. the first code point is
+                                                        the leftmost, the second one
+                                                        the next from the left and so
+                                                        on. The ``train`` subcommand
+                                                        does this automatically, so it
+                                                        usually isn't needed.
+-r, --rotate / --no-rotate                              Skips rotation of vertical lines.
+-o, --output                                            Output directory, defaults to ``training``
+======================================================= ======
 
 The result will be a directory filled with line image text pairs ``NNNNNN.png``
 and ``NNNNNN.gt.txt`` and a ``manifest.txt`` containing a list of all extracted
@@ -104,8 +108,193 @@ lines.
 Training
 --------
 
-Currently kraken does not contain a training interface. Use the
-``clstmocrtrain`` command contained in the CLSTM distribution.
+The training utility allows training of :ref:`VGSL <vgsl>` specified models
+both from scratch and from existing models. Training data is in all cases just
+a directory containing image-text file pairs as produced by the
+``transcribe/extract`` tools. Here are its command line options:
+
+======================================================= ======
+option                                                  action
+======================================================= ======
+-p, --pad                                               Left and right padding around lines
+-o, --output                                            Output model file prefix. Defaults to model.
+-s, --spec                                              VGSL spec of the network to train. CTC layer
+                                                        will be added automatically. default:
+                                                        [1,48,0,1 Cr3,3,32 Do0.1,2 Mp2,2 Cr3,3,64
+                                                        Do0.1,2 Mp2,2 S1(1x12)1,3 Lbx100 Do]
+-a, --append                                            Removes layers before argument and then
+                                                        appends spec. Only works when loading an
+                                                        existing model
+-i, --load                                              Load existing file to continue training
+-F, --savefreq                                          Model save frequency in epochs during
+                                                        training
+-R, --report                                            Report creation frequency in epochs
+-q, --quit                                              Stop condition for training. Set to `early`
+                                                        for early stopping (default) or `dumb` for fixed
+                                                        number of epochs.
+-N, --epochs                                            Number of epochs to train for. Set to -1 for indefinite training.
+--lag                                                   Number of epochs to wait before stopping
+                                                        training without improvement. Only used when using early stopping.
+--min-delta                                             Minimum improvement between epochs to reset
+                                                        early stopping. Defaults to 0.005.
+-d, --device                                            Select device to use (cpu, cuda:0, cuda:1,...). GPU acceleration requires CUDA.
+--optimizer                                             Select optimizer (Adam, SGD, RMSprop).
+-r, --lrate                                             Learning rate  [default: 0.001]
+-m, --momentum                                          Momentum used with SGD optimizer. Ignored otherwise.
+-p, --partition                                         Ground truth data partition ratio between train/test set
+-u, --normalization                                     Ground truth Unicode normalization. One of NFC, NFKC, NFD, NFKD.
+-c, --codec                                             Load a codec JSON definition (invalid if loading existing model)
+--resize                                                Codec/output layer resizing option. If set
+                                                        to `add` code points will be added, `both`
+                                                        will set the layer to match exactly the
+                                                        training data, `fail` will abort if training
+                                                        data and model codec do not match. Only valid when refining an existing model.
+-n, --reorder / --no-reorder                            Reordering of code points to display order.
+-t, --training-files                                    File(s) with additional paths to training data. Used to 
+                                                        enforce an explicit train/test set split and deal with 
+                                                        training sets with more lines than the command line can process. Can be used more than once.
+-e, --evaluation-files                                  File(s) with paths to evaluation data. Overrides the `-p` parameter.
+--preload / --no-preload                                Hard enable/disable for training data preloading. Preloading 
+                                                        training data into memory is enabled per default for sets with less than 2500 lines.
+--threads                                               Number of OpenMP threads when running on CPU. Defaults to min(4, #cores).
+======================================================= ======
+
+From Scratch
+~~~~~~~~~~~~
+
+The absolut minimal example to train a new model is:
+
+.. code-block:: console
+
+        $ ketos train training_data/*.png
+
+Training will continue until the error does not improve anymore and the best
+model (among intermediate results) will be saved in the current directory.
+
+In some cases, such as color inputs, changing the network architecture might be
+useful:
+
+.. code-block:: console
+
+        $ ketos train -s '[1,0,0,3 Cr3,3,16 Mp3,3 Lfys64 Lbx128 Lbx256 Do]' syr/*.png
+
+Complete documentation for the network description language can be found on the
+:ref:`VGSL <vgsl>` page.
+
+Sometimes the early stopping default parameters might produce suboptimal
+results such as stopping training too soon. Adjusting the minimum delta an/or
+lag can be useful:
+
+.. code-block:: console
+
+        $ ketos train --lag 10 --min-delta 0.001 syr/*.png
+
+To switch optimizers from SGD to Adam or RMSprop just set the option:
+
+.. code-block:: console
+
+        $ ketos train --optimizer Adam syr/*.png
+
+It is possible to resume training from a previously saved model:
+
+.. code-block:: console
+
+        $ ketos train -i model_25.mlmodel syr/*.png
+
+Fine Tuning
+~~~~~~~~~~~
+
+Fine tuning an existing model for another typeface or new characters is also
+possible with the same syntax as resuming regular training:
+
+.. code-block:: console
+
+        $ ketos train -i model_best.mlmodel syr/*.png
+
+The caveat is that the alphabet of the base model and training data have to be
+an exact match. Otherwise an error will be raised:
+
+.. code-block:: console
+
+        $ ketos train -i model_5.mlmodel --no-preload kamil/*.png
+        Building training set  [####################################]  100%
+        Building test set  [####################################]  100%
+        [0.8616] alphabet mismatch {'~', '»', '8', '9', 'ـ'} 
+        Network codec not compatible with training set
+        [0.8620] Training data and model codec alphabets mismatch: {'ٓ', '؟', '!', 'ص', '،', 'ذ', 'ة', 'ي', 'و', 'ب', 'ز', 'ح', 'غ', '~', 'ف', ')', 'د', 'خ', 'م', '»', 'ع', 'ى', 'ق', 'ش', 'ا', 'ه', 'ك', 'ج', 'ث', '(', 'ت', 'ظ', 'ض', 'ل', 'ط', '؛', 'ر', 'س', 'ن', 'ء', 'ٔ', '«', 'ـ', 'ٕ'} 
+        
+There are two modes dealing with mismatching alphabets, ``add`` and ``both``.
+``add`` resizes the output layer and codec of the loaded model to include all
+characters in the new training set without removing any characters. ``both``
+will make the resulting model an exact match with the new training set by both
+removing unused characters from the model and adding new ones.
+
+.. code-block:: console
+
+        $ ketos -v train --resize add -i model_5.mlmodel syr/*.png
+        ...
+        [0.7943] Training set 788 lines, test set 88 lines, alphabet 50 symbols
+        ...
+        [0.8337] Resizing codec to include 3 new code points
+        [0.8374] Resizing last layer in network to 52 outputs
+        ...
+
+In this example 3 characters were added for a network that is able to
+recognize 52 different characters after sufficient additional training.
+
+.. code-block:: console
+
+        $ ketos -v train --resize both -i model_5.mlmodel syr/*.png
+        ...
+        [0.7593] Training set 788 lines, test set 88 lines, alphabet 49 symbols
+        ...
+        [0.7857] Resizing network or given codec to 49 code sequences
+        [0.8344] Deleting 2 output classes from network (46 retained)
+        ...
+
+In ``both`` mode 2 of the original characters were removed and 3 new ones were added.
+
+
+Slicing
+~~~~~~~
+
+Refining on mismatched alphabets has its limits. If the alphabets are highly
+different the modification of the final linear layer to add/remove character
+will destroy the inference capabilities of the network. In those cases it is
+often faster to slice off the last few layers of the network and only train
+those instead of a complete network from scratch.
+
+Taking the default network definition as printed in the debug log we can see
+the layer indices of the model:
+
+.. code-block:: console
+
+        [0.8760] Creating new model [1,48,0,1 Cr3,3,32 Do0.1,2 Mp2,2 Cr3,3,64 Do0.1,2 Mp2,2 S1(1x12)1,3 Lbx100 Do] with 48 outputs
+        [0.8762] layer		type	params
+        [0.8790] 0		conv	kernel 3 x 3 filters 32 activation r
+        [0.8795] 1		dropout	probability 0.1 dims 2
+        [0.8797] 2		maxpool	kernel 2 x 2 stride 2 x 2
+        [0.8802] 3		conv	kernel 3 x 3 filters 64 activation r
+        [0.8804] 4		dropout	probability 0.1 dims 2
+        [0.8806] 5		maxpool	kernel 2 x 2 stride 2 x 2
+        [0.8813] 6		reshape from 1 1 x 12 to 1/3
+        [0.8876] 7		rnn	direction b transposed False summarize False out 100 legacy None
+        [0.8878] 8		dropout	probability 0.5 dims 1
+        [0.8883] 9		linear	augmented False out 48
+
+To remove everything after the initial convolutional stack and add untrained
+layers we define a network stub and index for appending:
+
+.. code-block:: console
+
+        $ ketos train -i model_1.mlmodel --append 7 -s '[Lbx256 Do]' syr/*.png 
+        Building training set  [####################################]  100%
+        Building test set  [####################################]  100%
+        [0.8014] alphabet mismatch {'8', '3', '9', '7', '܇', '݀', '݂', '4', ':', '0'} 
+        Slicing and dicing model ✓
+
+The new model will behave exactly like a new one, except potentially training a
+lot faster.
 
 Validation
 ----------
