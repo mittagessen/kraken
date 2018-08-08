@@ -351,7 +351,7 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
               help='Normalize ground truth')
 @click.option('-s', '--normalize-whitespace/--no-normalize-whitespace',
               show_default=True, default=True, help='Normalizes unicode whitespace')
-@click.option('-n', '--reorder/--no-reorder', default=True, show_default=True,
+@click.option('-n', '--reorder/--no-reorder', default=False, show_default=True,
               help='Reorder transcribed lines to display order')
 @click.option('-r', '--rotate/--no-rotate', default=True, show_default=True,
               help='Skip rotation of vertical lines')
