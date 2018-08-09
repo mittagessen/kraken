@@ -52,7 +52,7 @@ def beam_decoder(outputs: np.ndarray, beam_size: int = 3) -> List[Tuple[int, int
 
     # loop over each time step
     for t in range(w):
-        next_beam: dict  = collections.defaultdict(lambda: 2*(float('-inf'),))
+        next_beam: dict = collections.defaultdict(lambda: 2*(float('-inf'),))
         # p_b -> prob for prefix ending in blank
         # p_nb -> prob for prefix not ending in blank
         for prefix, (p_b, p_nb) in beam:

@@ -56,7 +56,7 @@ def max_bbox(boxes: Iterable[Tuple[int, int, int, int]]) -> Tuple[int, int, int,
     """
     # XXX: fix type hinting
     sbox = list(map(sorted, list(zip(*boxes))))
-    return (sbox[0][0], sbox[1][0], sbox[2][-1], sbox[3][-1]) # type: ignore
+    return (sbox[0][0], sbox[1][0], sbox[2][-1], sbox[3][-1])  # type: ignore
 
 
 def serialize(records: Sequence[ocr_record],

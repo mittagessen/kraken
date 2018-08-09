@@ -35,8 +35,15 @@ __all__ = ['nlbin']
 logger = logging.getLogger(__name__)
 
 
-def nlbin(im: Image, threshold: float = 0.5, zoom: float = 0.5, escale: float = 1.0, border: float = 0.1, perc: int = 80,
-        range: int = 20, low: int = 5, high: int = 90) -> Image:
+def nlbin(im: Image,
+          threshold: float = 0.5,
+          zoom: float = 0.5,
+          escale: float = 1.0,
+          border: float = 0.1,
+          perc: int = 80,
+          range: int = 20,
+          low: int = 5,
+          high: int = 90) -> Image:
     """
     Performs binarization using non-linear processing.
 

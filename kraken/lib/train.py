@@ -18,8 +18,6 @@ Training loop interception helpers
 """
 import abc
 
-from collections.abc import Iterable
-
 from torch.utils import data
 from collections.abc import Iterable
 

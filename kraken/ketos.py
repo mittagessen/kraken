@@ -20,7 +20,7 @@ import unicodedata
 
 from bidi.algorithm import get_display
 
-from typing import cast, Iterable, Set, List
+from typing import cast, Set
 
 from kraken.lib import log
 from kraken.lib.exceptions import KrakenCairoSurfaceException
@@ -102,7 +102,7 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
     Trains a model from image-text pairs.
     """
     import re
-    import torch
+    import shutil
     import numpy as np
 
     from torch.optim import SGD, RMSprop, Adam
@@ -329,7 +329,7 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
                 o = o.squeeze(2)
                 optim.zero_grad()
                 # NCW -> WNC
-                loss = nn.criterion(o.permute(2, 0, 1), # type: ignore
+                loss = nn.criterion(o.permute(2, 0, 1),  # type: ignore
                                     target,
                                     (o.size(2),),
                                     (target.size(1),))
@@ -341,6 +341,7 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
         message('Moving best model {0}_{1}.mlmdel ({2}) to {0}_best.mlmodel'.format(output, st_it.best_epoch, st_it.best_loss))
         logger.info('Moving best model {0}_{1}.mlmdel ({2}) to {0}_best.mlmodel'.format(output, st_it.best_epoch, st_it.best_loss))
         shutil.copy('{}_{}.mlmodel'.format(output, st_it.best_epoch), '{}_best.mlmodel'.format(output))
+
 
 @cli.command('extract')
 @click.pass_context

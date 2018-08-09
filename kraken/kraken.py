@@ -23,7 +23,7 @@ import os
 import warnings
 import logging
 
-from typing import Dict, Union, List, cast, Any, IO, Iterable
+from typing import Dict, Union, List, cast, Any, IO
 from functools import partial
 from PIL import Image
 
@@ -152,7 +152,7 @@ def recognizer(model, pad, bidi_reordering, script_ignore, base_image, input, ou
 
 @click.group(chain=True)
 @click.version_option()
-@click.option('-i', '--input', type=(click.Path(exists=True), # type: ignore
+@click.option('-i', '--input', type=(click.Path(exists=True),  # type: ignore
                                      click.Path(writable=True)), multiple=True)
 @click.option('-v', '--verbose', default=0, count=True, show_default=True)
 @click.option('-d', '--device', default='cpu', show_default=True, help='Select device to use (cpu, cuda:0, cuda:1, ...)')
@@ -238,7 +238,7 @@ def _validate_mm(ctx, param, value):
         for m in value:
             k, v = m.split(':')
             if v == 'ignore':
-                model_dict['ignore'].append(k) # type: ignore
+                model_dict['ignore'].append(k)  # type: ignore
             else:
                 model_dict[k] = os.path.expanduser(v)
     except Exception as e:

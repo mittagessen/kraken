@@ -54,6 +54,7 @@ class record(object):
         self.bounds: List
         self.mask: np.array
 
+
 def find(condition):
     "Return the indices where ravel(condition) is true"
     res, = np.nonzero(np.ravel(condition))

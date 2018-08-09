@@ -134,18 +134,18 @@ pangocairo.pango_cairo_create_context.restype = ctypes.POINTER(PangoContext)
 pangocairo.pango_cairo_update_layout.argtypes = [ctypes.POINTER(CairoContext), ctypes.POINTER(PangoLayout)]
 pangocairo.pango_cairo_show_layout.argtypes = [ctypes.POINTER(CairoContext), ctypes.POINTER(PangoLayout)]
 
-pango.pango_language_from_string.argtypes = [ensureBytes] # type: ignore
+pango.pango_language_from_string.argtypes = [ensureBytes]  # type: ignore
 pango.pango_language_from_string.restype = ctypes.POINTER(PangoLanguage)
 
 pango.pango_context_set_language.argtypes = [ctypes.POINTER(PangoContext), ctypes.POINTER(PangoLanguage)]
 
 pango.pango_font_description_new.restype = ctypes.POINTER(PangoFontDescription)
-pango.pango_font_description_set_family.argtypes = [ctypes.POINTER(PangoFontDescription), ensureBytes] # type: ignore
+pango.pango_font_description_set_family.argtypes = [ctypes.POINTER(PangoFontDescription), ensureBytes]  # type: ignore
 pango.pango_font_description_set_size.argtypes = [ctypes.POINTER(PangoFontDescription), ctypes.c_int]
 pango.pango_font_description_set_weight.argtypes = [ctypes.POINTER(PangoFontDescription), ctypes.c_uint]
 
 pango.pango_layout_new.restype = ctypes.POINTER(PangoLayout)
-pango.pango_layout_set_markup.argtypes = [ctypes.POINTER(PangoLayout), ensureBytes, ctypes.c_int] # type: ignore
+pango.pango_layout_set_markup.argtypes = [ctypes.POINTER(PangoLayout), ensureBytes, ctypes.c_int]  # type: ignore
 pango.pango_layout_set_font_description.argtypes = [ctypes.POINTER(PangoLayout), ctypes.POINTER(PangoFontDescription)]
 pango.pango_layout_get_context.argtypes = [ctypes.POINTER(PangoLayout)]
 pango.pango_layout_get_context.restype = ctypes.POINTER(PangoContext)

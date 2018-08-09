@@ -177,7 +177,7 @@ class Reshape(Module):
         input_shape = torch.zeros([x if x else 1 for x in input])
         with torch.no_grad():
             o = self.forward(input_shape)
-        return tuple(o.shape) # type: ignore
+        return tuple(o.shape)  # type: ignore
 
     def deserialize(self, name, spec):
         """
@@ -371,7 +371,7 @@ class TransposedSummarizingRNN(Module):
         else:
             layer = (input[2], input[3])
         self.output_shape = (input[0], self.output_size) + layer
-        return self.output_shape # type: ignore
+        return self.output_shape  # type: ignore
 
     def deserialize(self, name: str, spec) -> None:
         """

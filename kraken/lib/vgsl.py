@@ -131,7 +131,7 @@ class TorchVGSLModel(object):
                     break
             if oshape:
                 input = oshape
-                self.named_spec.append(self.set_layer_name(block, name)) # type: ignore
+                self.named_spec.append(self.set_layer_name(block, name))  # type: ignore
                 self.nn.add_module(name, layer)
             else:
                 raise ValueError('{} invalid layer definition'.format(block))

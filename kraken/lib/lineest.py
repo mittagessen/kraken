@@ -83,4 +83,3 @@ def dewarp(normalizer: CenterNormalizer, im: PIL.Image) -> PIL.Image:
     normalizer.measure(temp)
     line = normalizer.normalize(line, cval=np.amax(line))
     return array2pil(line)
-
