@@ -185,7 +185,7 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
             except KrakenInputException as e:
                 logger.warning(str(e))
 
-    train_loader = DataLoader(gt_set, batch_size=1, shuffle=True)
+    train_loader = DataLoader(gt_set, batch_size=1, shuffle=True, pin_memory=True)
 
     test_set = GroundTruthDataset(normalization=normalization, reorder=reorder, im_transforms=transforms, preload=preload)
     with log.progressbar(te_im, label='Building test set') as bar:
@@ -319,8 +319,8 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
             st_it.update(accuracy)
         with log.progressbar(label='epoch {}/{}'.format(epoch, epochs), length=len(loader), show_pos=True) as bar:
             for trial, (input, target) in enumerate(loader):
-                input = input.to(device)
-                target = target.to(device)
+                input = input.to(device, non_blocking=True)
+                target = target.to(device, non_blocking=True)
                 input = input.requires_grad_()
                 o = nn.nn(input)
                 # height should be 1 by now
