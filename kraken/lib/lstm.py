@@ -12,8 +12,8 @@ class Codec(object):
     """Translate between integer codes and characters."""
     def init(self, charset):
         charset = sorted(list(set(charset)))
-        self.code2char: Dict[int, str] = {}
-        self.char2code: Dict[str, int] = {}
+        self.code2char = {}  # type: Dict[int, str]
+        self.char2code = {}  # type:  Dict[str, int]
         for code,char in enumerate(charset):
             self.code2char[code] = char
             self.char2code[char] = code
