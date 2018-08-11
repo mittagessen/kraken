@@ -24,6 +24,10 @@ from collections.abc import Iterable
 
 class TrainStopper(Iterable):
 
+    def __init__(self):
+        self.best_loss = 0.0
+        self.best_epoch = 0
+
     @abc.abstractmethod
     def update(self, val_loss: float) -> None:
         """
@@ -45,12 +49,11 @@ class EarlyStopping(TrainStopper):
             lag (int): Number of epochs to wait for improvement before
                        terminating.
         """
+        super().__init__()
         self.min_delta = min_delta
         self.lag = lag
         self.it = it
-        self.best_loss = 0.0
         self.wait = 0
-        self.best_epoch = 0
         self.epoch = 0
 
     def __iter__(self):
@@ -84,22 +87,25 @@ class EpochStopping(TrainStopper):
             it (torch.utils.data.DataLoader): training data loader
             epochs (int): Number of epochs to train for
         """
+        super().__init__()
         self.epochs = epochs
-        self.compl_epochs = 0
+        self.epoch = 0
         self.it = it
 
     def __iter__(self):
         return self
 
     def __next__(self):
-        if self.compl_epochs < self.epochs:
-            self.compl_epochs += 1
+        if self.epoch< self.epochs:
+            self.epoch+= 1
             return self.it
         else:
             raise StopIteration
 
     def update(self, val_loss: float) -> None:
         """
-        No-Op for this stopper
+        Only update internal best epoch
         """
-        pass
+        if val_loss < self.best_loss:
+            self.best_loss = val_loss
+            self.best_epoch = self.epoch

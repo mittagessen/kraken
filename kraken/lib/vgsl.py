@@ -96,10 +96,10 @@ class TorchVGSLModel(object):
                           dimension.
         """
         self.spec = spec
-        self.named_spec: List[str] = []
+        self.named_spec = []  # type:  List[str]
         self.ops = [self.build_rnn, self.build_dropout, self.build_maxpool, self.build_conv, self.build_output, self.build_reshape]
-        self.codec: Optional[PytorchCodec] = None
-        self.criterion: Any = None
+        self.codec = None  # type: Optional[PytorchCodec]
+        self.criterion = None  # type: Any
         self.nn = torch.nn.Sequential()
 
         self.idx = -1
@@ -366,7 +366,7 @@ class TorchVGSLModel(object):
 
         hidden = int(nets['lstm1'].attribute[0].value)
 
-        weights: Dict[str, torch.Tensor] = {}
+        weights = {}  # type: Dict[str, torch.Tensor]
         for n in nets:
             weights[n] = {}
             for w in list(nets[n].weights):

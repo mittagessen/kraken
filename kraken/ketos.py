@@ -295,11 +295,13 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
     elif optimizer == 'Adam':
         optim = Adam(nn.nn.parameters(), lr=lrate)
 
-    st_it: TrainStopper
+    st_it = cast(TrainStopper, None)  # type: TrainStopper
     if quit == 'early':
         st_it = EarlyStopping(train_loader, min_delta, lag)
     elif quit == 'dumb':
         st_it = EpochStopping(train_loader, epochs)
+    else:
+        raise click.BadOptionUsage('Invalid training interruption scheme {}'.format(quit))
 
     for epoch, loader in enumerate(st_it):
         if epoch and not epoch % savefreq:

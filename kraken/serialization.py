@@ -90,7 +90,7 @@ def serialize(records: Sequence[ocr_record],
             (str) rendered template.
     """
     logger.info(u'Serialize {} records from {} with template {}.'.format(len(records), image_name, template))
-    page: dict = {'lines': [], 'size': image_size, 'name': image_name, 'writing_mode': writing_mode, 'scripts': scripts}
+    page = {'lines': [], 'size': image_size, 'name': image_name, 'writing_mode': writing_mode, 'scripts': scripts}  # type: dict
     seg_idx = 0
     char_idx = 0
     for idx, record in enumerate(records):

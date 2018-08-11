@@ -50,9 +50,9 @@ class record(object):
     """
     def __init__(self, **kw):
         self.__dict__.update(kw)
-        self.label: int
-        self.bounds: List
-        self.mask: np.array
+        self.label = 0  # type: int
+        self.bounds = []  # type: List
+        self.mask = None  # type: np.array
 
 
 def find(condition):

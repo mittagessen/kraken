@@ -230,7 +230,7 @@ def segment(text_direction, script_detect, allowed_scripts, scale, maxcolseps, b
 
 
 def _validate_mm(ctx, param, value):
-    model_dict: Dict[str, Union[str, List[str]]] = {'ignore': []}
+    model_dict = {'ignore': []}  # type: Dict[str, Union[str, List[str]]]
     if len(value) == 1 and len(value[0].split(':')) == 1:
         model_dict['default'] = value[0]
         return model_dict
@@ -282,7 +282,7 @@ def ocr(ctx, model, pad, reorder, serializer, text_direction, lines, threads):
 
     # first we try to find the model in the absolue path, then ~/.kraken, then
     # LEGACY_MODEL_DIR
-    nm: Dict[str, models.TorchSeqRecognizer] = {}
+    nm = {}  # type: Dict[str, models.TorchSeqRecognizer]
     ign_scripts = model.pop('ignore')
     for k, v in model.items():
         search = [v,
@@ -308,7 +308,7 @@ def ocr(ctx, model, pad, reorder, serializer, text_direction, lines, threads):
     if 'default' in nm:
         from collections import defaultdict
 
-        nn: Dict[str, models.TorchSeqRecognizer] = defaultdict(lambda: nm['default'])
+        nn = defaultdict(lambda: nm['default'])  # type: Dict[str, models.TorchSeqRecognizer]
         nn.update(nm)
         nm = nn
     # thread count is global so setting it once is sufficient

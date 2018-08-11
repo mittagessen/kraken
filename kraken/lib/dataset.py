@@ -56,7 +56,7 @@ def generate_input_transforms(batch: int, height: int, width: int, channels: int
         A torchvision transformation composition converting the input image to
         the appropriate tensor.
     """
-    scale: Union[Tuple[int, int], int]
+    scale = 0  # type: Union[Tuple[int, int], int]
     if height == 1 and width == 0 and channels > 3:
         perm = (1, 0, 2)
         scale = channels
@@ -180,10 +180,10 @@ class GroundTruthDataset(Dataset):
         """
         self.suffix = suffix
         self.split = lambda x: split(x) + self.suffix
-        self._images: Union[List[Image], List[torch.Tensor]] = []
-        self._gt: List[str] = []
-        self.alphabet: Counter = Counter()
-        self.text_transforms: List[Callable[[str], str]] = []
+        self._images = []  # type:  Union[List[Image], List[torch.Tensor]]
+        self._gt = []  # type:  List[str]
+        self.alphabet = Counter()  # type: Counter
+        self.text_transforms = []  # type: List[Callable[[str], str]]
         self.transforms = im_transforms
         self.preload = preload
         # built text transformations
@@ -227,7 +227,7 @@ class GroundTruthDataset(Dataset):
             self.codec = codec
         else:
             self.codec = PytorchCodec(''.join(self.alphabet.keys()))
-        self.training_set: List[Tuple[Union[Image, torch.Tensor], torch.Tensor]] = []
+        self.training_set = []  # type: List[Tuple[Union[Image, torch.Tensor], torch.Tensor]]
         for im, gt in zip(self._images, self._gt):
             self.training_set.append((im, self.codec.encode(gt)))
 
