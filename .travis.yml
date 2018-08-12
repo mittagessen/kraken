@@ -17,7 +17,7 @@ install:
 - conda install pbr nose pip
 - sed '/coremltools\|python-bidi\|regex\|torch/d' requirements.txt | xargs conda install
 - conda install cuda80 pytorch-master -c mittagessen
-- conda install torchvision-cpu -c pytorch
+- conda install torchvision-cpu -c mittagessen
 - pip install -r requirements.txt
 - conda list
 - pip freeze
