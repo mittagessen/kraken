@@ -372,7 +372,7 @@ def rotate_lines(lines, angle, offset):
 
 
 def segment(im, text_direction='horizontal-lr', scale=None, maxcolseps=2,
-            black_colseps=False, no_hlines=True):
+            black_colseps=False, no_hlines=True, pad=0):
     """
     Segments a page into text lines.
 
@@ -388,6 +388,9 @@ def segment(im, text_direction='horizontal-lr', scale=None, maxcolseps=2,
         black_colseps (bool): Whether column separators are assumed to be
                               vertical black lines or not
         no_hlines (bool): Switch for horizontal line removal
+        pad (int or tuple): Padding to add to line bounding boxes. If int the
+                            same padding is used both left and right. If a
+                            2-tuple, uses (padding_left, padding_right).
 
     Returns:
         {'text_direction': '$dir', 'boxes': [(x1, y1, x2, y2),...]}: A
@@ -458,6 +461,11 @@ def segment(im, text_direction='horizontal-lr', scale=None, maxcolseps=2,
     lsort = topsort(order)
     lines = [lines[i].bounds for i in lsort]
     lines = [(s2.start, s1.start, s2.stop, s1.stop) for s1, s2 in lines]
+
+    if isinstance(pad, int):
+        pad = (pad, pad)
+    lines = [(max(x[0]-pad[0], 0), x[1], min(x[2]+pad[1], im.size[0]), x[3]) for x in lines]
+
     return {'text_direction': text_direction, 'boxes':  rotate_lines(lines, 360-angle, offset).tolist(), 'script_detection': False}
 
 

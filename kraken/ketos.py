@@ -447,11 +447,14 @@ def extract(ctx, binarize, normalization, normalize_whitespace, reorder,
               help='Font style to use')
 @click.option('-p', '--prefill', default=None,
               help='Use given model for prefill mode.')
+@click.option('-p', '--pad', show_default=True, type=(int, int), default=(0, 0),
+              help='Left and right padding around lines')
 @click.option('-o', '--output', type=click.File(mode='wb'), default='transcription.html',
               help='Output file')
 @click.argument('images', nargs=-1, type=click.File(mode='rb', lazy=True))
 def transcription(ctx, text_direction, scale, bw, maxcolseps,
-                  black_colseps, font, font_style, prefill, output, images):
+                  black_colseps, font, font_style, prefill, pad, output,
+                  images):
     from PIL import Image
 
     from kraken import rpred
@@ -481,7 +484,7 @@ def transcription(ctx, text_direction, scale, bw, maxcolseps,
             logger.info('Segmenting page')
             if bw:
                 im = im_bin
-            res = pageseg.segment(im_bin, text_direction, scale, maxcolseps, black_colseps)
+            res = pageseg.segment(im_bin, text_direction, scale, maxcolseps, black_colseps, pad=pad)
             if prefill:
                 it = rpred.rpred(prefill, im_bin, res)
                 preds = []

@@ -65,7 +65,7 @@ def binarizer(threshold, zoom, escale, border, perc, range, low, high, base_imag
 
 
 def segmenter(text_direction, script_detect, allowed_scripts, scale,
-              maxcolseps, black_colseps, remove_hlines, base_image, input,
+              maxcolseps, black_colseps, remove_hlines, pad, base_image, input,
               output) -> None:
     import json
 
@@ -77,7 +77,7 @@ def segmenter(text_direction, script_detect, allowed_scripts, scale,
         raise click.BadParameter(str(e))
     message('Segmenting\t', nl=False)
     try:
-        res = pageseg.segment(im, text_direction, scale, maxcolseps, black_colseps, no_hlines=remove_hlines)
+        res = pageseg.segment(im, text_direction, scale, maxcolseps, black_colseps, no_hlines=remove_hlines, pad=pad)
         if script_detect:
             res = pageseg.detect_scripts(im, res, valid_scripts=allowed_scripts)
     except Exception:
@@ -170,7 +170,7 @@ def cli(input, verbose, device):
 
 
 @cli.resultcallback()
-def process_pipeline(subcommands, input, verbose):
+def process_pipeline(subcommands, input, **args):
     """
     Helper function calling the partials returned by each subcommand and
     placing their respective outputs in temporary files.
@@ -214,19 +214,22 @@ def binarize(threshold, zoom, escale, border, perc, range, low, high):
 @click.option('-s/-n', '--script-detect/--no-script-detect', default=True,
               show_default=True,
               help='Enable script detection on segmenter output')
-@click.option('-a', '--allowed-script', default=None, multiple=True,
+@click.option('-a', '--allowed-scripts', default=None, multiple=True,
               show_default=True,
               help='List of allowed scripts in script detection output. Ignored if disabled.')
 @click.option('--scale', show_default=True, default=None, type=click.FLOAT)
 @click.option('-m', '--maxcolseps', show_default=True, default=2, type=click.INT)
 @click.option('-b/-w', '--black-colseps/--white_colseps', show_default=True, default=False)
 @click.option('-r/-l', '--remove_hlines/--hlines', show_default=True, default=True)
-def segment(text_direction, script_detect, allowed_scripts, scale, maxcolseps, black_colseps, remove_hlines):
+@click.option('-p', '--pad', show_default=True, type=(int, int), default=(0, 0),
+              help='Left and right padding around lines')
+def segment(text_direction, script_detect, allowed_scripts, scale, maxcolseps,
+            black_colseps, remove_hlines, pad):
     """
     Segments page images into text lines.
     """
     return partial(segmenter, text_direction, script_detect, allowed_scripts,
-                   scale, maxcolseps, black_colseps, remove_hlines)
+                   scale, maxcolseps, black_colseps, remove_hlines, pad)
 
 
 def _validate_mm(ctx, param, value):
