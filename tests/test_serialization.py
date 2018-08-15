@@ -56,8 +56,7 @@ class TestSerializations(unittest.TestCase):
         fp = StringIO()
 
         fp.write(serialization.serialize(self.records, image_name='foo.png', template='alto'))
-        doc = etree.fromstring(fp.getvalue())
-        print(fp.getvalue()[:2000])
-        with open(os.path.join(resources, 'alto-4.0.xsd')) as schema_fp:
+        doc = etree.fromstring(fp.getvalue().encode('utf-8'))
+        with open(os.path.join(resources, 'alto-4-0.xsd')) as schema_fp:
             alto_schema = etree.XMLSchema(etree.parse(schema_fp))
             alto_schema.assertValid(doc)

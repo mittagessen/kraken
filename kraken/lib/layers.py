@@ -523,7 +523,11 @@ class LinSoftmax(Module):
         if self.augmentation:
             inputs = torch.cat([torch.ones(inputs.shape[:3] + (1,)), inputs], dim=3)
         o = self.lin(inputs)
-        o = F.log_softmax(o, dim=3)
+        # switch between log softmax (needed by ctc) and regular (for inference). 
+        if not self.training:
+            o = F.softmax(o, dim=3)
+        else:
+            o = F.log_softmax(o, dim=3)
         # and swap again
         return o.transpose(1, 3)
 

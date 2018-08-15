@@ -104,6 +104,7 @@ def recognizer(model, pad, bidi_reordering, script_ignore, base_image, input, ou
     # input may either be output from the segmenter then it is a JSON file or
     # be an image file when running the OCR subcommand alone. might still come
     # from some other subcommand though.
+    scripts = set()
     if not lines and base_image != input:
         lines = input
     if not lines:
@@ -116,7 +117,6 @@ def recognizer(model, pad, bidi_reordering, script_ignore, base_image, input, ou
             raise click.UsageError('{} invalid segmentation: {}'.format(lines, str(e)))
         # script detection
         if bounds['script_detection']:
-            scripts = set()
             for l in bounds['boxes']:
                 for t in l:
                     scripts.add(t[0])

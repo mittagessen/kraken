@@ -41,17 +41,18 @@
 								VPOS="{{ segment.bbox[1] }}"
 								WIDTH="{{ segment.bbox[2] - segment.bbox[0] }}" 
 								HEIGHT="{{ segment.bbox[3] - segment.bbox[1] }}" 
-								WC="{{ (segment.confidences|sum / segment.confidences|length)|round(4) }}"
+								WC="{{ (segment.confidences|sum / segment.confidences|length)|round(4) }}">
 								{% for char in segment.recognition %}
 								<Glyph ID="char_{{ char.index }}" 
-								       CONTENT="{{ char.text|e }}
+								       CONTENT="{{ char.text|e }}"
 								       HPOS="{{ char.bbox[0] }}"
 								       VPOS="{{ char.bbox[1] }}"
 								       WIDTH="{{ char.bbox[2] - char.bbox[0] }}"
 								       HEIGHT="{{ char.bbox[3] - char.bbox[1] }}"
-								       GC="{{ char.conf|round(4) }}">
-								</Glyph>>
+								       GC="{{ char.confidence|round(4) }}">
+								</Glyph>
 								{% endfor %}
+							</String>
 							{% endif %}
 						{% endfor %}
 					</TextLine>
