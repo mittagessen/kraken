@@ -418,12 +418,12 @@ def extract(ctx, binarize, normalization, normalize_whitespace, reorder,
                         l_img = im.crop([int(x) for x in line.get('data-bbox').split(',')])
                         if rotate and td.startswith('vertical'):
                             im.rotate(90, expand=True)
-                        l_img.save('{}/{:06d}.png'.format(output, idx))
-                        manifest.append('{:06d}.png'.format(idx))
+                        l_img.save('{}/{}-{:06d}.png'.format(output, fp.name, idx))
+                        manifest.append('{}-{:06d}.png'.format(fp.name, idx))
                         text = u''.join(line.itertext()).strip()
                         for func in text_transforms:
                             text = func(text)
-                        with open('{}/{:06d}.gt.txt'.format(output, idx), 'wb') as t:
+                        with open('{}/{}-{:06d}.gt.txt'.format(output, fp.name, idx), 'wb') as t:
                             t.write(text.encode('utf-8'))
                         idx += 1
     logger.info('Extracted {} lines'.format(idx))
