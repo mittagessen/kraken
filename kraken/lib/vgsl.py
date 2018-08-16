@@ -177,6 +177,7 @@ class TorchVGSLModel(object):
         """
         self.nn.train()
         # set last layer back to eval mode if not CTC output layer
+        # (log_softmax/softmax switch).
         if not self.criterion:
             self.nn[-1].eval()
         torch.set_grad_enabled(True)

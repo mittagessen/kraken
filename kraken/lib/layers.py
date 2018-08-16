@@ -604,16 +604,16 @@ class ActConv2D(Module):
         self.nl = None
         self.nl_name = None
         if nl == 's':
-            self.nl = F.sigmoid
+            self.nl = torch.sigmoid
             self.nl_name = 'SIGMOID'
         elif nl == 't':
-            self.nl = F.tanh
+            self.nl = torch.tanh
             self.nl_name = 'TANH'
         elif nl == 'm':
-            self.nl = F.softmax
+            self.nl = torch.nn.Softmax(dim=1)
             self.nl_name = 'SOFTMAX'
         elif nl == 'r':
-            self.nl = F.relu
+            self.nl = torch.relu
             self.nl_name = 'RELU'
         else:
             self.nl_name = 'LINEAR'

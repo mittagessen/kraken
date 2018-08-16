@@ -97,7 +97,7 @@ class EpochStopping(TrainStopper):
 
     def __next__(self):
         if self.epoch< self.epochs:
-            self.epoch+= 1
+            self.epoch += 1
             return self.it
         else:
             raise StopIteration
@@ -106,6 +106,6 @@ class EpochStopping(TrainStopper):
         """
         Only update internal best epoch
         """
-        if val_loss < self.best_loss:
+        if val_loss > self.best_loss:
             self.best_loss = val_loss
-            self.best_epoch = self.epoch
+            self.best_epoch = self.epoch - 1
