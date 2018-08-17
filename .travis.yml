@@ -1,12 +1,11 @@
 language: python
-python:
 matrix:
   include:
     - python: 3.5
     - python: 3.6
     - python: 3.7
       dist: xenial
-      sudo: true
+      sudo: required
 notifications:
   email: false
 sudo: false
