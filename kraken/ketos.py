@@ -418,6 +418,7 @@ def extract(ctx, binarize, normalization, normalize_whitespace, reorder,
                 for line in section.iter('li'):
                     if line.get('contenteditable') and (not u''.join(line.itertext()).isspace() and u''.join(line.itertext())):
                         dest_dict['idx'] = idx
+                        dest_dict['uuid'] = str(uuid.uuid4())
                         logger.debug('Writing line {:06d}'.format(idx))
                         l_img = im.crop([int(x) for x in line.get('data-bbox').split(',')])
                         if rotate and td.startswith('vertical'):
