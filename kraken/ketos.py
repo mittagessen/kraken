@@ -14,6 +14,7 @@
 # or implied. See the License for the specific language governing
 # permissions and limitations under the License.
 import os
+import uuid
 import click
 import logging
 import unicodedata
@@ -360,9 +361,10 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
               help='Skip rotation of vertical lines')
 @click.option('-o', '--output', type=click.Path(), default='training', show_default=True,
               help='Output directory')
+@click.option('--format', default='{idx:06d}.png', show_default=True, help='Format for extractor output. valid fields are `src` (source file), `idx` (line number), and `uuid` (v4 uuid)')
 @click.argument('transcriptions', nargs=-1, type=click.File(lazy=True))
 def extract(ctx, binarize, normalization, normalize_whitespace, reorder,
-            rotate, output, transcriptions):
+            rotate, output, format, transcriptions):
     """
     Extracts image-text pairs from a transcription environment created using
     ``ketos transcribe``.
@@ -403,6 +405,7 @@ def extract(ctx, binarize, normalization, normalize_whitespace, reorder,
                 td = td.attrib['content']
 
             im = None
+            dest_dict = {'output': output, 'idx': 0, 'src': fp.name, 'uuid': str(uuid.uuid4())}
             for section in doc.xpath('//section'):
                 img = section.xpath('.//img')[0].get('src')
                 fd = BytesIO(base64.b64decode(img.split(',')[1]))
@@ -414,16 +417,17 @@ def extract(ctx, binarize, normalization, normalize_whitespace, reorder,
                     im = binarization.nlbin(im)
                 for line in section.iter('li'):
                     if line.get('contenteditable') and (not u''.join(line.itertext()).isspace() and u''.join(line.itertext())):
+                        dest_dict['idx'] = idx
                         logger.debug('Writing line {:06d}'.format(idx))
                         l_img = im.crop([int(x) for x in line.get('data-bbox').split(',')])
                         if rotate and td.startswith('vertical'):
                             im.rotate(90, expand=True)
-                        l_img.save('{}/{}-{:06d}.png'.format(output, fp.name, idx))
-                        manifest.append('{}-{:06d}.png'.format(fp.name, idx))
+                        l_img.save(('{output}/' + format + '.png').format(**dest_dict))
+                        manifest.append((format + '.png').format(**dest_dict))
                         text = u''.join(line.itertext()).strip()
                         for func in text_transforms:
                             text = func(text)
-                        with open('{}/{}-{:06d}.gt.txt'.format(output, fp.name, idx), 'wb') as t:
+                        with open(('{output}/' + format + '.gt.txt').format(**dest_dict), 'wb') as t:
                             t.write(text.encode('utf-8'))
                         idx += 1
     logger.info('Extracted {} lines'.format(idx))
