@@ -438,7 +438,7 @@ class TorchVGSLModel(object):
         outputs = [('output', datatypes.Array(*self.output))]
         net_builder = NeuralNetworkBuilder(inputs, outputs)
         input = 'input'
-        for name, layer in self.nn.named_children():
+        for name, layer in self.nn.to('cpu').named_children():
             input = layer.serialize(name, input, net_builder)
         mlmodel = MLModel(net_builder.spec)
         mlmodel.short_description = 'kraken recognition model'
