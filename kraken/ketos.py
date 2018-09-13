@@ -14,6 +14,7 @@
 # or implied. See the License for the specific language governing
 # permissions and limitations under the License.
 import os
+import glob
 import uuid
 import click
 import logging
@@ -49,6 +50,13 @@ def _validate_manifests(ctx, param, value):
     images = []
     for manifest in value:
         images.extend([x.rstrip('\r\n') for x in manifest.readlines() if os.path.isfile(x.rstrip('\r\n'))])
+    return images
+
+
+def _expand_gt(ctx, param, value):
+    images = []
+    for expression in value:
+        images.extend([x for x in glob.iglob(expression, recursive=True) if os.path.isfile(x)])
     return images
 
 
@@ -94,7 +102,7 @@ def _validate_manifests(ctx, param, value):
 @click.option('--preload/--no-preload', show_default=True, default=None, help='Hard enable/disable for training data preloading')
 @click.option('--threads', show_default=True, default=min(4, len(os.sched_getaffinity(0))),
               help='Number of OpenMP threads when running on CPU. Defaults to min(4, #cores).')
-@click.argument('ground_truth', nargs=-1, type=click.Path(exists=True, dir_okay=False))
+@click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
           lag, min_delta, device, optimizer, lrate, momentum, partition,
           normalization, codec, resize, reorder, training_files,
