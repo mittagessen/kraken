@@ -27,7 +27,7 @@ class TestSerializations(unittest.TestCase):
 
     def test_vertical_hocr_serialization(self):
         """
-        Test vertical line hOCR  serialization
+        Test vertical line hOCR serialization
         """
         fp = StringIO()
 

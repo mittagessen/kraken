@@ -62,5 +62,3 @@ class TestModels(unittest.TestCase):
         """
         rnn = models.load_any(os.path.join(resources, 'model.pronn'))
         self.assertIsInstance(rnn, kraken.lib.models.TorchSeqRecognizer)
-
-

@@ -52,4 +52,3 @@ class TestBinarization(unittest.TestCase):
             # calculate histogram and check if only pixels of value 0/255 exist
             self.assertEqual(254, res.histogram().count(0), msg='Output not '
                              'binarized')
-       
