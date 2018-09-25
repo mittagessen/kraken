@@ -194,8 +194,6 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
             except KrakenInputException as e:
                 logger.warning(str(e))
 
-    train_loader = DataLoader(gt_set, batch_size=1, shuffle=True, pin_memory=True)
-
     test_set = GroundTruthDataset(normalization=normalization, reorder=reorder, im_transforms=transforms, preload=preload)
     with log.progressbar(te_im, label='Building test set') as bar:
         for im in bar:
@@ -282,6 +280,8 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
         nn.add_codec(gt_set.codec)
         # initialize codec
         message('\u2713', fg='green')
+
+    train_loader = DataLoader(gt_set, batch_size=1, shuffle=True, pin_memory=True)
 
     # don't encode test set as the alphabets may not match causing encoding failures
     test_set.training_set = list(zip(test_set._images, test_set._gt))
