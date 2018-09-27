@@ -438,7 +438,7 @@ class TorchVGSLModel(object):
         outputs = [('output', datatypes.Array(*self.output))]
         net_builder = NeuralNetworkBuilder(inputs, outputs)
         input = 'input'
-        prev_device = next(next(nn.nn.children()).parameters()).device
+        prev_device = next(next(self.nn.children()).parameters()).device
         for name, layer in self.nn.to('cpu').named_children():
             input = layer.serialize(name, input, net_builder)
         mlmodel = MLModel(net_builder.spec)
