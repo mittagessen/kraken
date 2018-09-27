@@ -49,7 +49,7 @@ class TorchSeqRecognizer(object):
         self.decoder = decoder
         self.train = train
         self.device = device
-        self.nn = self.nn.to(device)
+        self.nn.to(device)
 
     def to(self, device):
         """
