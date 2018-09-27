@@ -80,7 +80,7 @@ def _expand_gt(ctx, param, value):
 @click.option('--min-delta', show_default=True, default=0.005, help='Minimum improvement between epochs to reset early stopping')
 @click.option('-d', '--device', show_default=True, default='cpu', help='Select device to use (cpu, cuda:0, cuda:1, ...)')
 @click.option('--optimizer', show_default=True, default='RMSprop', type=click.Choice(['Adam', 'SGD', 'RMSprop']), help='Select optimizer')
-@click.option('-r', '--lrate', show_default=True, default=1e-3, help='Learning rate')
+@click.option('-r', '--lrate', show_default=True, default=1e-4, help='Learning rate')
 @click.option('-m', '--momentum', show_default=True, default=0.9, help='Momentum')
 @click.option('-p', '--partition', show_default=True, default=0.9, help='Ground truth data partition ratio between train/test set')
 @click.option('-u', '--normalization', show_default=True, type=click.Choice(['NFD', 'NFKD', 'NFC', 'NFKC']),
