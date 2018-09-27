@@ -158,9 +158,9 @@ class TorchVGSLModel(object):
         self.init_weights(slice(idx, -1))
 
     def to(self, device: Union[str, torch.device]) -> None:
-        self.nn.to(device)
+        self.nn = self.nn.to(device)
         if self.criterion:
-            self.criterion.to(device)
+            self.criterion = self.criterion.to(device)
 
     def eval(self) -> None:
         """
@@ -438,6 +438,7 @@ class TorchVGSLModel(object):
         outputs = [('output', datatypes.Array(*self.output))]
         net_builder = NeuralNetworkBuilder(inputs, outputs)
         input = 'input'
+        prev_device = next(next(nn.nn.children()).parameters()).device
         for name, layer in self.nn.to('cpu').named_children():
             input = layer.serialize(name, input, net_builder)
         mlmodel = MLModel(net_builder.spec)
@@ -446,6 +447,7 @@ class TorchVGSLModel(object):
         if self.codec:
             mlmodel.user_defined_metadata['codec'] = json.dumps(self.codec.c2l)
         mlmodel.save(path)
+        self.nn.to(prev_device)
 
     def add_codec(self, codec: PytorchCodec) -> None:
         """
