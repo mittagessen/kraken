@@ -71,8 +71,8 @@ def _expand_gt(ctx, param, value):
 @click.option('-a', '--append', show_default=True, default=None, type=click.INT,
               help='Removes layers before argument and then appends spec. Only works when loading an existing model')
 @click.option('-i', '--load', show_default=True, type=click.Path(exists=True, readable=True), help='Load existing file to continue training')
-@click.option('-F', '--savefreq', show_default=True, default=1, type=click.FLOAT, help='Model save frequency in epochs during training')
-@click.option('-R', '--report', show_default=True, default=1, type=click.FLOAT, help='Report creation frequency in epochs')
+@click.option('-F', '--savefreq', show_default=True, default=1, type=click.INT, help='Model save frequency in epochs during training')
+@click.option('-R', '--report', show_default=True, default=1, type=click.INT, help='Report creation frequency in epochs')
 @click.option('-q', '--quit', show_default=True, default='early', type=click.Choice(['early', 'dumb']),
               help='Stop condition for training. Set to `early` for early stooping or `dumb` for fixed number of epochs')
 @click.option('-N', '--epochs', show_default=True, default=-1, help='Number of epochs to train for')
