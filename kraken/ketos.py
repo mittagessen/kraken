@@ -369,7 +369,7 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
               help='Skip rotation of vertical lines')
 @click.option('-o', '--output', type=click.Path(), default='training', show_default=True,
               help='Output directory')
-@click.option('--format', default='{idx:06d}.png', show_default=True, help='Format for extractor output. valid fields are `src` (source file), `idx` (line number), and `uuid` (v4 uuid)')
+@click.option('--format', default='{idx:06d}', show_default=True, help='Format for extractor output. valid fields are `src` (source file), `idx` (line number), and `uuid` (v4 uuid)')
 @click.argument('transcriptions', nargs=-1, type=click.File(lazy=True))
 def extract(ctx, binarize, normalization, normalize_whitespace, reorder,
             rotate, output, format, transcriptions):

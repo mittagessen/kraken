@@ -98,9 +98,6 @@ def greedy_decoder(outputs: np.ndarray) -> List[Tuple[int, int, int, float]]:
     Translates back the network output to a label sequence using greedy/best
     path decoding as described in [0].
 
-    Thresholds on class 0, then assigns the maximum (non-zero) class to each
-    region.
-
     [0] Graves, Alex, et al. "Connectionist temporal classification: labelling
     unsegmented sequence data with recurrent neural networks." Proceedings of
     the 23rd international conference on Machine learning. ACM, 2006.
