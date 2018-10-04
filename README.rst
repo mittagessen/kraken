@@ -5,33 +5,24 @@ Description
     :target: https://travis-ci.org/mittagessen/kraken
 
 kraken is a fork of ocropus intended to rectify a number of issues while
-preserving (mostly) functional equivalence. Its main goals are:
+preserving (mostly) functional equivalence. Its main features are:
 
-  - Explicit input/output handling ✓
-  - Word and character bounding boxes in hOCR ✓
-  - Removal of runtime dependency on gcc ✓
-  - `clstm <https://github.com/tmbdev/clstm>`_ compatibility ✓
-  - Right-to-left/BiDi support ✓
+  - Script detection and multiscript recognition support
+  - `Right-to-Left <https://en.wikipedia.org/wiki/Right-to-left>`_, `BiDi
+    <https://en.wikipedia.org/wiki/Bi-directional_text>`_, and Top-to-Bottom
+    script support
+  - `ALTO <https://www.loc.gov/standards/alto/>`_, abbyXML, and hOCR output
+  - Word bounding boxes and character cuts
+  - `Public repository <https://github.com/mittagessen/kraken-models>`_ of model files
+  - Dynamic recognition model architectures and GPU acceleration
   - Clean public API 
-  - Tests
-
-Ticked of goals have been realized while some others still require further
-work. Pull requests and code contributions are always welcome.
 
 Installation
 ============
 
-kraken does not require a working C compiler on run-time anymore. When using a
-recent version of pip all dependencies will be installed from binary wheel
-packages, so installing build-essential or your distributions equivalent is
-often unnecessary.
-
-``clstm`` is supported through automatically installed binary wheels now, that
-should work on most Linux systems except for non-x86 architectures. If the
-install process fails because the fallback source compilation does not work
-refer to the `readme
-<https://github.com/tmbdev/clstm/blob/master/README.md>`_ to install build
-dependencies.
+When using a recent version of pip all dependencies will be installed from
+binary wheel packages, so installing build-essential or your distributions
+equivalent is often unnecessary.
 
 Install kraken either from pypi:
 
@@ -45,9 +36,9 @@ or by running pip in the git repository:
 
   $ pip install .
 
-Finally you'll have to scrounge up an RNN to do the actual recognition of
-characters. To download ocropus' default RNN and place it in the kraken
-directory for the current user:
+Finally you'll have to scrounge up a model to do the actual recognition of
+characters. To download the default model for printed English text and place it
+in the kraken directory for the current user:
 
 ::
 
@@ -96,3 +87,9 @@ Documentation
 =============
 
 Have a look at the `docs <http://kraken.re>`_
+
+Funding
+=======
+
+Funding of kraken development is provided by `École Pratique des Hautes Études
+- Université PSL <http://ephe.fr>`_.
