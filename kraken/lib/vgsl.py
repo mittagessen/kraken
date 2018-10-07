@@ -643,7 +643,7 @@ class TorchVGSLModel(object):
         if nl not in ['s', 'c']:
             raise ValueError('only softmax and ctc supported in output')
         if nl == 'c':
-            self.criterion = nn.CTCLoss()
+            self.criterion = nn.CTCLoss(reduction='none')
         aug = True if m.group('aug') else False
         lin = layers.LinSoftmax(input[1], int(m.group('out')), aug)
         logger.debug('{}\t\tlinear\taugmented {} out {}'.format(self.idx+1, aug, m.group('out')))
