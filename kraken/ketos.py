@@ -79,10 +79,10 @@ def _expand_gt(ctx, param, value):
 @click.option('--lag', show_default=True, default=5, help='Number of epochs to wait before stopping training without improvement')
 @click.option('--min-delta', show_default=True, default=0.005, help='Minimum improvement between epochs to reset early stopping')
 @click.option('-d', '--device', show_default=True, default='cpu', help='Select device to use (cpu, cuda:0, cuda:1, ...)')
-@click.option('--optimizer', show_default=True, default='RMSprop', type=click.Choice(['Adam', 'SGD', 'RMSprop']), help='Select optimizer')
-@click.option('-r', '--lrate', show_default=True, default=1e-4, help='Learning rate')
+@click.option('--optimizer', show_default=True, default='Adam', type=click.Choice(['Adam', 'SGD', 'RMSprop']), help='Select optimizer')
+@click.option('-r', '--lrate', show_default=True, default=2e-3, help='Learning rate')
 @click.option('-m', '--momentum', show_default=True, default=0.9, help='Momentum')
-@click.option('-p', '--partition', show_default=True, default=0.9, help='Ground truth data partition ratio between train/test set')
+@click.option('-p', '--partition', show_default=True, default=0.9, help='Ground truth data partition ratio between train/validation set')
 @click.option('-u', '--normalization', show_default=True, type=click.Choice(['NFD', 'NFKD', 'NFC', 'NFKC']),
               default=None, help='Ground truth normalization')
 @click.option('-c', '--codec', show_default=True, default=None, type=click.File(mode='r', lazy=True),
@@ -125,10 +125,10 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
     logger.info('Building ground truth set from {} line images'.format(len(ground_truth) + len(training_files)))
 
     if not load and append:
-        raise click.BadOptionUsage('append option requires loading an existing model')
+        raise click.BadOptionUsage('append', 'append option requires loading an existing model')
 
     if resize != 'fail' and not load:
-        raise click.BadOptionUsage('resize option requires loading an existing model')
+        raise click.BadOptionUsage('resize', 'resize option requires loading an existing model')
 
     # load model if given. if a new model has to be created we need to do that
     # after data set initialization, otherwise to output size is still unknown.
@@ -144,18 +144,18 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
     if not nn:
         spec = spec.strip()
         if spec[0] != '[' or spec[-1] != ']':
-            raise click.BadOptionUsage('VGSL spec {} not bracketed'.format(spec))
+            raise click.BadOptionUsage('spec', 'VGSL spec {} not bracketed'.format(spec))
         blocks = spec[1:-1].split(' ')
         m = re.match(r'(\d+),(\d+),(\d+),(\d+)', blocks[0])
         if not m:
-            raise click.BadOptionUsage('Invalid input spec {}'.format(blocks[0]))
+            raise click.BadOptionUsage('spec', 'Invalid input spec {}'.format(blocks[0]))
         batch, height, width, channels = [int(x) for x in m.groups()]
     else:
         batch, channels, height, width = nn.input
     try:
         transforms = generate_input_transforms(batch, height, width, channels, pad)
     except KrakenInputException as e:
-        raise click.BadOptionUsage(str(e))
+        raise click.BadOptionUsage('spec', str(e))
 
     # disable automatic partition when given evaluation set explicitly
     if evaluation_files:
@@ -165,6 +165,9 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
     # merge training_files into ground_truth list
     if training_files:
         ground_truth.extend(training_files)
+
+    if len(ground_truth) == 0:
+        raise click.UsageError('No training data was provided to the train command. Use `-t` or the `ground_truth` argument.')
 
     np.random.shuffle(ground_truth)
 
@@ -194,19 +197,19 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
             except KrakenInputException as e:
                 logger.warning(str(e))
 
-    test_set = GroundTruthDataset(normalization=normalization, reorder=reorder, im_transforms=transforms, preload=preload)
-    with log.progressbar(te_im, label='Building test set') as bar:
+    val_set = GroundTruthDataset(normalization=normalization, reorder=reorder, im_transforms=transforms, preload=preload)
+    with log.progressbar(te_im, label='Building validation set') as bar:
         for im in bar:
-            logger.debug('Adding line {} to test set'.format(im))
+            logger.debug('Adding line {} to validation set'.format(im))
             try:
-                test_set.add(im)
+                val_set.add(im)
             except FileNotFoundError as e:
                 logger.warning('{}: {}. Skipping.'.format(e.strerror, e.filename))
             except KrakenInputException as e:
                 logger.warning(str(e))
 
-    logger.info('Training set {} lines, test set {} lines, alphabet {} symbols'.format(len(gt_set._images), len(test_set._images), len(gt_set.alphabet)))
-    alpha_diff = set(gt_set.alphabet).symmetric_difference(set(test_set.alphabet))
+    logger.info('Training set {} lines, validation set {} lines, alphabet {} symbols'.format(len(gt_set._images), len(val_set._images), len(gt_set.alphabet)))
+    alpha_diff = set(gt_set.alphabet).symmetric_difference(set(val_set.alphabet))
     if alpha_diff:
         logger.warn('alphabet mismatch {}'.format(alpha_diff))
     logger.info('grapheme\tcount')
@@ -268,7 +271,7 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
                 nn.resize_output(ncodec.max_label()+1, del_labels)
                 message('\u2713', fg='green')
             else:
-                raise click.BadOptionUsage('Invalid resize value {}'.format(resize))
+                raise click.BadOptionUsage('resize', 'Invalid resize value {}'.format(resize))
     else:
         gt_set.encode(codec)
         logger.info('Creating new model {} with {} outputs'.format(spec, gt_set.codec.max_label()+1))
@@ -283,8 +286,8 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
 
     train_loader = DataLoader(gt_set, batch_size=1, shuffle=True, pin_memory=True)
 
-    # don't encode test set as the alphabets may not match causing encoding failures
-    test_set.training_set = list(zip(test_set._images, test_set._gt))
+    # don't encode validation set as the alphabets may not match causing encoding failures
+    val_set.training_set = list(zip(val_set._images, val_set._gt))
 
     logger.debug('Constructing {} optimizer (lr: {}, momentum: {})'.format(optimizer, lrate, momentum))
 
@@ -310,7 +313,7 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
     elif quit == 'dumb':
         st_it = EpochStopping(train_loader, epochs)
     else:
-        raise click.BadOptionUsage('Invalid training interruption scheme {}'.format(quit))
+        raise click.BadOptionUsage('quit', 'Invalid training interruption scheme {}'.format(quit))
 
     for epoch, loader in enumerate(st_it):
         if epoch and not epoch % savefreq:
@@ -322,7 +325,7 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
         if not epoch % report:
             logger.debug('Starting evaluation run')
             nn.eval()
-            chars, error = compute_error(rec, list(test_set))
+            chars, error = compute_error(rec, list(val_set))
             nn.train()
             accuracy = (chars-error)/chars
             logger.info('Accuracy report ({}) {:0.4f} {} {}'.format(epoch, accuracy, chars, error))

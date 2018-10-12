@@ -116,22 +116,22 @@ def _fast_levenshtein(seq1: Sequence[Any], seq2: Sequence[Any]) -> int:
     return thisrow[len(seq2) - 1]
 
 
-def compute_error(model: TorchSeqRecognizer, test_set: Sequence[Tuple[str, str]]) -> Tuple[int, int]:
+def compute_error(model: TorchSeqRecognizer, validation_set: Sequence[Tuple[str, str]]) -> Tuple[int, int]:
     """
     Computes detailed error report from a model and a list of line image-text
     pairs.
 
     Args:
         model (kraken.lib.models.TorchSeqRecognizer): Model used for recognition
-        test_set (list): List of tuples (image, text) for testing
+        validation_set (list): List of tuples (image, text) for validation
 
     Returns:
         A tuple with total number of characters and edit distance across the
-        whole test set.
+        whole validation set.
     """
     total_chars = 0
     error = 0
-    for im, text in test_set:
+    for im, text in validation_set:
         pred = model.predict_string(im)
         total_chars += len(text)
         error += _fast_levenshtein(pred, text)
@@ -143,12 +143,6 @@ class GroundTruthDataset(Dataset):
     Dataset for ground truth used during training.
 
     All data is cached in memory.
-
-    Attributes:
-        training_set (list): List of tuples (image, text) for training
-        test_set (list): List of tuples (image, text) for testing
-        alphabet (str): Sorted string of all code points found in the ground
-                        truth
     """
     def __init__(self, split: Callable[[str], str] = lambda x: os.path.splitext(x)[0],
                  suffix: str = '.gt.txt',
