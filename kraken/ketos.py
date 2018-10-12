@@ -100,8 +100,7 @@ def _expand_gt(ctx, param, value):
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
 @click.option('--preload/--no-preload', show_default=True, default=None, help='Hard enable/disable for training data preloading')
-@click.option('--threads', show_default=True, default=min(4, len(os.sched_getaffinity(0))),
-              help='Number of OpenMP threads when running on CPU. Defaults to min(4, #cores).')
+@click.option('--threads', show_default=True, default=1, help='Number of OpenMP threads when running on CPU.')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
           lag, min_delta, device, optimizer, lrate, momentum, partition,

@@ -274,9 +274,8 @@ def _validate_mm(ctx, param, value):
               help='Sets principal text direction in serialization output')
 @click.option('-l', '--lines', type=click.Path(exists=True), show_default=True,
               help='JSON file containing line coordinates')
-@click.option('--threads', default=min(len(os.sched_getaffinity(0)), 4),
-              show_default=True, help='Number of threads to use for OpenMP '
-              'parallelization. Defaults to min(4, #cores)')
+@click.option('--threads', default=1, show_default=True,
+              help='Number of threads to use for OpenMP parallelization.')
 def ocr(ctx, model, pad, reorder, serializer, text_direction, lines, threads):
     """
     Recognizes text in line images.
