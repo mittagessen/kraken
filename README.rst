@@ -71,7 +71,7 @@ To segment a binarized image into reading-order sorted lines:
 
 ::
 
-  $ kraken -i bw.tif lines.txt segment bw.png
+  $ kraken -i bw.tif lines.json segment bw.png
 
 To OCR a binarized image using the default RNN and the previously generated
 page segmentation:
