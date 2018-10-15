@@ -92,4 +92,4 @@ Funding
 =======
 
 Funding of kraken development is provided by `École Pratique des Hautes Études
-- Université PSL <http://ephe.fr>`_.
+- Université PSL <http://www.ephe.fr>`_.
