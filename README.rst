@@ -65,20 +65,20 @@ To binarize a single image using the nlbin algorithm:
 
 ::
 
-  $ kraken -i image.tif bw.tif binarize
+  $ kraken -i image.tif bw.png binarize
 
 To segment a binarized image into reading-order sorted lines:
 
 ::
 
-  $ kraken -i bw.tif lines.json segment bw.png
+  $ kraken -i bw.png lines.json segment
 
 To OCR a binarized image using the default RNN and the previously generated
 page segmentation:
 
 ::
 
-  $ kraken -i bw.tif image.txt ocr --lines lines.txt
+  $ kraken -i bw.png image.txt ocr --lines lines.json
 
 All subcommands and options are documented. Use the ``help`` option to get more
 information.
