@@ -153,7 +153,9 @@ def recognizer(model, pad, bidi_reordering, script_ignore, base_image, input, ou
 @click.group(chain=True)
 @click.version_option()
 @click.option('-i', '--input', type=(click.Path(exists=True),  # type: ignore
-                                     click.Path(writable=True)), multiple=True)
+                                     click.Path(writable=True)), multiple=True,
+                                     help='Input-output file pairs. Each input file (first argument) is mapped to one '
+                                          'output file (second argument), e.g. `-i input.png output.txt`')
 @click.option('-v', '--verbose', default=0, count=True, show_default=True)
 @click.option('-d', '--device', default='cpu', show_default=True, help='Select device to use (cpu, cuda:0, cuda:1, ...)')
 def cli(input, verbose, device):
