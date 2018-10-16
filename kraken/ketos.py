@@ -118,7 +118,7 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
 
     from torch.utils.data import DataLoader
 
-    from kraken.lib import models, vgsl
+    from kraken.lib import models, vgsl, train
     from kraken.lib.train import EarlyStopping, EpochStopping, TrainStopper, TrainScheduler, add_1cycle
     from kraken.lib.codec import PytorchCodec
     from kraken.lib.dataset import GroundTruthDataset, compute_error, generate_input_transforms
@@ -308,7 +308,7 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
         add_1cycle(tr_it, 10 * len(gt_set), lrate, momentum, momentum - 0.10, weight_decay)
     else:
         # constant learning rate scheduler
-        tr_it.add_phase(1, [lrate, lrate], [momentum, momentum], weight_decay, kraken.lib.train.annealing_const)
+        tr_it.add_phase(1, [lrate, lrate], [momentum, momentum], weight_decay, train.annealing_const)
 
     st_it = cast(TrainStopper, None)  # type: TrainStopper
     if quit == 'early':
