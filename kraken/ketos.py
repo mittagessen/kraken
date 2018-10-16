@@ -82,6 +82,8 @@ def _expand_gt(ctx, param, value):
 @click.option('--optimizer', show_default=True, default='Adam', type=click.Choice(['Adam', 'SGD', 'RMSprop']), help='Select optimizer')
 @click.option('-r', '--lrate', show_default=True, default=2e-3, help='Learning rate')
 @click.option('-m', '--momentum', show_default=True, default=0.9, help='Momentum')
+@click.option('-w', '--weight-decay', show_default=True, default=0.0, help='Weight decay')
+@click.option('--schedule', show_default=True, type=click.Choice(['constant', '1cycle']), default='constant', help='Set learning rate scheduler')
 @click.option('-p', '--partition', show_default=True, default=0.9, help='Ground truth data partition ratio between train/validation set')
 @click.option('-u', '--normalization', show_default=True, type=click.Choice(['NFD', 'NFKD', 'NFC', 'NFKC']),
               default=None, help='Ground truth normalization')
@@ -103,21 +105,21 @@ def _expand_gt(ctx, param, value):
 @click.option('--threads', show_default=True, default=1, help='Number of OpenMP threads when running on CPU.')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
-          lag, min_delta, device, optimizer, lrate, momentum, partition,
-          normalization, codec, resize, reorder, training_files,
-          evaluation_files, preload, threads, ground_truth):
+          lag, min_delta, device, optimizer, lrate, momentum, weight_decay,
+          schedule, partition, normalization, codec, resize, reorder,
+          training_files, evaluation_files, preload, threads, ground_truth):
     """
     Trains a model from image-text pairs.
     """
     import re
+    import torch
     import shutil
     import numpy as np
 
-    from torch.optim import SGD, RMSprop, Adam
     from torch.utils.data import DataLoader
 
     from kraken.lib import models, vgsl
-    from kraken.lib.train import EarlyStopping, EpochStopping, TrainStopper
+    from kraken.lib.train import EarlyStopping, EpochStopping, TrainStopper, TrainScheduler, add_1cycle
     from kraken.lib.codec import PytorchCodec
     from kraken.lib.dataset import GroundTruthDataset, compute_error, generate_input_transforms
 
@@ -299,12 +301,14 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
 
     logger.debug('Moving model to device {}'.format(device))
     rec = models.TorchSeqRecognizer(nn, train=True, device=device)
-    if optimizer == 'SGD':
-        optim = SGD(nn.nn.parameters(), lr=lrate, momentum=momentum)
-    elif optimizer == 'RMSprop':
-        optim = RMSprop(nn.nn.parameters(), lr=lrate, momentum=momentum)
-    elif optimizer == 'Adam':
-        optim = Adam(nn.nn.parameters(), lr=lrate)
+    optim = getattr(torch.optim, optimizer)(nn.nn.parameters(), lr=0)
+
+    tr_it = TrainScheduler(optim)
+    if schedule == '1cycle':
+        add_1cycle(tr_it, 10 * len(gt_set), lrate, momentum, momentum - 0.10, weight_decay)
+    else:
+        # constant learning rate scheduler
+        tr_it.add_phase(1, [lrate, lrate], [momentum, momentum], weight_decay, kraken.lib.train.annealing_const)
 
     st_it = cast(TrainStopper, None)  # type: TrainStopper
     if quit == 'early':
@@ -332,6 +336,7 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
             st_it.update(accuracy)
         with log.progressbar(label='epoch {}/{}'.format(epoch, epochs), length=len(loader), show_pos=True) as bar:
             for trial, (input, target) in enumerate(loader):
+                tr_it.step()
                 input = input.to(device, non_blocking=True)
                 target = target.to(device, non_blocking=True)
                 input = input.requires_grad_()
