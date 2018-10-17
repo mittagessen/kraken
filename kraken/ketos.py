@@ -305,7 +305,7 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
 
     tr_it = TrainScheduler(optim)
     if schedule == '1cycle':
-        add_1cycle(tr_it, 10 * len(gt_set), lrate, momentum, momentum - 0.10, weight_decay)
+        add_1cycle(tr_it, epochs * len(gt_set), lrate, momentum, momentum - 0.10, weight_decay)
     else:
         # constant learning rate scheduler
         tr_it.add_phase(1, [lrate, lrate], [momentum, momentum], weight_decay, train.annealing_const)
@@ -359,6 +359,78 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
         message('Moving best model {0}_{1}.mlmdel ({2}) to {0}_best.mlmodel'.format(output, st_it.best_epoch, st_it.best_loss))
         logger.info('Moving best model {0}_{1}.mlmdel ({2}) to {0}_best.mlmodel'.format(output, st_it.best_epoch, st_it.best_loss))
         shutil.copy('{}_{}.mlmodel'.format(output, st_it.best_epoch), '{}_best.mlmodel'.format(output))
+
+
+@cli.command('test')
+@click.pass_context
+@click.option('-m', '--model', show_default=True, type=click.Path(exists=True, readable=True),
+              multiple=True, help='Model(s) to evaluate')
+@click.option('-e', '--evaluation-files', show_default=True, default=None, multiple=True,
+              callback=_validate_manifests, type=click.File(mode='r', lazy=True),
+              help='File(s) with paths to evaluation data.')
+@click.option('-d', '--device', show_default=True, default='cpu', help='Select device to use (cpu, cuda:0, cuda:1, ...)')
+@click.option('-p', '--pad', show_default=True, type=click.INT, default=16, help='Left and right '
+              'padding around lines')
+@click.option('--threads', show_default=True, default=1, help='Number of OpenMP threads when running on CPU.')
+@click.argument('test_set', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
+def test(ctx, model, evaluation_files, device, pad, threads, test_set):
+    """
+    Evaluate on a test set.
+    """
+    import numpy as np
+    from PIL import Image
+
+    from kraken.lib import models
+    from kraken.lib.dataset import _fast_levenshtein, generate_input_transforms
+
+    logger.info('Building test set from {} line images'.format(len(test_set) + len(evaluation_files)))
+
+    if not model:
+        raise click.UsageError('No model to evaluate given.')
+
+    nn = {}
+    for p in model:
+        message('Loading model {}\t'.format(p), nl=False)
+        nn[p] = models.load_any(p)
+        message('\u2713', fg='green')
+
+    test_set = list(test_set)
+
+    # set number of OpenMP threads
+    logger.debug('Set OpenMP threads to {}'.format(threads))
+    next(iter(nn.values())).nn.set_num_threads(threads)
+
+    # merge training_files into ground_truth list
+    if evaluation_files:
+        test_set.extend(evaluation_files)
+
+    if len(test_set) == 0:
+        raise click.UsageError('No evaluation data was provided to the test command. Use `-e` or the `test_set` argument.')
+
+    def _get_text(im):
+        with open(os.path.splitext(im)[0] + '.gt.txt', 'r') as fp:
+            return fp.read()
+
+    acc_list = []
+    for p, net in nn.items():
+        chars = 0
+        error = 0
+        message('Evaluating {}'.format(p))
+        logger.info('Evaluating {}'.format(p))
+        batch, channels, height, width = net.nn.input
+        ts = generate_input_transforms(batch, height, width, channels, pad)
+        with log.progressbar(test_set, label='Evaluating') as bar:
+            for im_path in bar:
+                i = ts(Image.open(im_path))
+                text = _get_text(im_path)
+                pred = net.predict_string(i)
+                chars += len(text)
+                error += _fast_levenshtein(pred, text)
+        acc_list.append((chars-error)/chars)
+        logger.info('Accuracy report {:0.4f} {} {}'.format(acc_list[-1], chars, error))
+        message('Accuracy report {:0.4f} {} {}'.format(acc_list[-1], chars, error))
+    logger.info('Average accuracy: {:0.4f}, (stddev: {:0.4f})'.format(np.mean(acc_list), np.std(acc_list)))
+    message('Average accuracy: {:0.4f}, (stddev: {:0.4f})'.format(np.mean(acc_list), np.std(acc_list)))
 
 
 @cli.command('extract')
