@@ -83,7 +83,8 @@ def _expand_gt(ctx, param, value):
 @click.option('-r', '--lrate', show_default=True, default=2e-3, help='Learning rate')
 @click.option('-m', '--momentum', show_default=True, default=0.9, help='Momentum')
 @click.option('-w', '--weight-decay', show_default=True, default=0.0, help='Weight decay')
-@click.option('--schedule', show_default=True, type=click.Choice(['constant', '1cycle']), default='constant', help='Set learning rate scheduler')
+@click.option('--schedule', show_default=True, type=click.Choice(['constant', '1cycle']), default='constant',
+              help='Set learning rate scheduler. For 1cycle, cycle length is determined by the `--epoch` option.')
 @click.option('-p', '--partition', show_default=True, default=0.9, help='Ground truth data partition ratio between train/validation set')
 @click.option('-u', '--normalization', show_default=True, type=click.Choice(['NFD', 'NFKD', 'NFC', 'NFKC']),
               default=None, help='Ground truth normalization')
