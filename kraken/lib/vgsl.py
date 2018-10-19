@@ -616,11 +616,17 @@ class TorchVGSLModel(object):
         high = int(m.group('high'))
         low = int(m.group('low'))
         dim_map = {0: 0, 1: 2, 2: 3, 3: 1}
+
+        if part_a == 0:
+            part_a = -1
+        if part_b == 0:
+            part_b = -1
+
         if src_dim != high and src_dim != low:
             raise ValueError('Either high ({}) or low ({}) must be source dimension ({})'.format(high, low, src_dim))
         if part_a == 0 or part_b == 0:
             raise ValueError('Expected non-zero size for part_a ({}) or part_b ({})'.format(part_a, part_b))
-        if (part_a == -1 and part_b < 0) or (part_b == -1 and part_b < 0):
+        if part_a == -1 and part_b == -1:
             raise ValueError('Only one size may be -1')
         logger.debug('{}\t\treshape from {} {} x {} to {}/{}'.format(self.idx+1, src_dim, part_a, part_b, high, low))
         src_dim = dim_map[src_dim]
