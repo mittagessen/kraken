@@ -58,7 +58,7 @@ def binarizer(threshold, zoom, escale, border, perc, range, low, high, base_imag
         res = binarization.nlbin(im, threshold, zoom, escale, border, perc, range,
                                  low, high)
         form = None
-        if os.path.splitext(output)[1] in ['.jpg', '.jpeg', '.JPG', '.JPEG']:
+        if os.path.splitext(output)[1] in ['.jpg', '.jpeg', '.JPG', '.JPEG', '']:
             form = 'png'
             logger.warning('jpeg does not support 1bpp images. Forcing to png.')
         res.save(output, format=form)
