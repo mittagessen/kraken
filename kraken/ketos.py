@@ -320,7 +320,7 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
         raise click.BadOptionUsage('quit', 'Invalid training interruption scheme {}'.format(quit))
 
     for epoch, loader in enumerate(st_it):
-        with log.progressbar(label='epoch {}/{}'.format(epoch, epochs), length=len(loader), show_pos=True) as bar:
+        with log.progressbar(label='epoch {}/{}'.format(epoch, epochs - 1 if epochs > 0 else '∞'), length=len(loader), show_pos=True) as bar:
             for trial, (input, target) in enumerate(loader):
                 tr_it.step()
                 input = input.to(device, non_blocking=True)
