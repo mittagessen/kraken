@@ -49,7 +49,12 @@ def cli(verbose):
 def _validate_manifests(ctx, param, value):
     images = []
     for manifest in value:
-        images.extend([x.rstrip('\r\n') for x in manifest.readlines() if os.path.isfile(x.rstrip('\r\n'))])
+        for entry in manifest.readlines():
+            im_p = entry.rstrip('\r\n')
+            if os.path.isfile(im_p):
+                images.append(im_p)
+            else:
+                logger.warning('Invalid entry "{}" in {}'.format(im_p, manifest.name))
     return images
 
 
