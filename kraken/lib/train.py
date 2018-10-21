@@ -171,7 +171,7 @@ class EpochStopping(TrainStopper):
         """
         super().__init__()
         self.epochs = epochs
-        self.epoch = -1
+        self.epoch = 0
         self.it = it
 
     def __iter__(self):
