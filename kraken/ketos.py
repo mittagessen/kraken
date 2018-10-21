@@ -320,21 +320,6 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
         raise click.BadOptionUsage('quit', 'Invalid training interruption scheme {}'.format(quit))
 
     for epoch, loader in enumerate(st_it):
-        if epoch and not epoch % savefreq:
-            logger.info('Saving to {}_{}'.format(output, epoch))
-            try:
-                nn.save_model('{}_{}.mlmodel'.format(output, epoch))
-            except Exception as e:
-                logger.error('Saving model failed: {}'.format(str(e)))
-        if not epoch % report:
-            logger.debug('Starting evaluation run')
-            nn.eval()
-            chars, error = compute_error(rec, list(val_set))
-            nn.train()
-            accuracy = (chars-error)/chars
-            logger.info('Accuracy report ({}) {:0.4f} {} {}'.format(epoch, accuracy, chars, error))
-            message('Accuracy report ({}) {:0.4f} {} {}'.format(epoch, accuracy, chars, error))
-            st_it.update(accuracy)
         with log.progressbar(label='epoch {}/{}'.format(epoch, epochs), length=len(loader), show_pos=True) as bar:
             for trial, (input, target) in enumerate(loader):
                 tr_it.step()
@@ -356,6 +341,21 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
                 loss.backward()
                 optim.step()
                 bar.update(1)
+        if epoch and not epoch % savefreq:
+            logger.info('Saving to {}_{}'.format(output, epoch))
+            try:
+                nn.save_model('{}_{}.mlmodel'.format(output, epoch))
+            except Exception as e:
+                logger.error('Saving model failed: {}'.format(str(e)))
+        if not epoch % report:
+            logger.debug('Starting evaluation run')
+            nn.eval()
+            chars, error = compute_error(rec, list(val_set))
+            nn.train()
+            accuracy = (chars-error)/chars
+            logger.info('Accuracy report ({}) {:0.4f} {} {}'.format(epoch, accuracy, chars, error))
+            message('Accuracy report ({}) {:0.4f} {} {}'.format(epoch, accuracy, chars, error))
+            st_it.update(accuracy)
     if quit == 'early':
         message('Moving best model {0}_{1}.mlmdel ({2}) to {0}_best.mlmodel'.format(output, st_it.best_epoch, st_it.best_loss))
         logger.info('Moving best model {0}_{1}.mlmdel ({2}) to {0}_best.mlmodel'.format(output, st_it.best_epoch, st_it.best_loss))

@@ -136,7 +136,7 @@ class EarlyStopping(TrainStopper):
         self.lag = lag
         self.it = it
         self.wait = 0
-        self.epoch = 0
+        self.epoch = -1
 
     def __iter__(self):
         return self
@@ -171,14 +171,14 @@ class EpochStopping(TrainStopper):
         """
         super().__init__()
         self.epochs = epochs
-        self.epoch = 0
+        self.epoch = -1
         self.it = it
 
     def __iter__(self):
         return self
 
     def __next__(self):
-        if self.epoch< self.epochs:
+        if self.epoch < self.epochs:
             self.epoch += 1
             return self.it
         else:
@@ -190,4 +190,4 @@ class EpochStopping(TrainStopper):
         """
         if val_loss > self.best_loss:
             self.best_loss = val_loss
-            self.best_epoch = self.epoch - 1
+            self.best_epoch = self.epoch
