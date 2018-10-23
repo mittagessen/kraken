@@ -346,7 +346,7 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
                 loss.backward()
                 optim.step()
                 bar.update(1)
-        if epoch and not epoch % savefreq:
+        if not epoch % savefreq:
             logger.info('Saving to {}_{}'.format(output, epoch))
             try:
                 nn.save_model('{}_{}.mlmodel'.format(output, epoch))
