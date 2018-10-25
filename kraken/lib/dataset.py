@@ -17,9 +17,11 @@
 Utility functions for data loading and training of VGSL networks.
 """
 import os
+import json
 import torch
 import unicodedata
 import numpy as np
+import pkg_resources
 import bidi.algorithm as bd
 
 from PIL import Image
@@ -106,6 +108,7 @@ def _fast_levenshtein(seq1: Sequence[Any], seq2: Sequence[Any]) -> int:
 
     oneago = None
     thisrow = list(range(1, len(seq2) + 1)) + [0]
+    rows = [thisrow]
     for x in range(len(seq1)):
         oneago, thisrow = thisrow, [0] * len(seq2) + [x + 1]
         for y in range(len(seq2)):
@@ -113,13 +116,101 @@ def _fast_levenshtein(seq1: Sequence[Any], seq2: Sequence[Any]) -> int:
             addcost = thisrow[y - 1] + 1
             subcost = oneago[y - 1] + (seq1[x] != seq2[y])
             thisrow[y] = min(delcost, addcost, subcost)
+        rows.append(thisrow)
     return thisrow[len(seq2) - 1]
 
 
+def global_align(seq1: Sequence[Any], seq2: Sequence[Any]) -> Tuple[int, str, str]:
+    """
+    Computes a global alignment of two strings.
+
+    Args:
+        seq1 (Sequence[Any]):
+        seq2 (Sequence[Any]):
+
+    Returns a tuple (distance, list(algn1), list(algn2))
+    """
+    # calculate cost and direction matrix
+    cost = [[0] * (len(seq2) + 1) for x in range(len(seq1) + 1)]
+    for i in range(1, len(cost)):
+        cost[i][0] = i
+    for i in range(1, len(cost[0])):
+        cost[0][i] = i
+    direction = [[(0, 0)] * (len(seq2) + 1) for x in range(len(seq1) + 1)]
+    direction[0] = [(0, x) for x in range(-1, len(seq2))]
+    for i in range(-1, len(direction) - 1):
+        direction[i + 1][0] = (i, 0)
+    for i in range(1, len(cost)):
+        for j in range(1, len(cost[0])):
+            delcost = ((i - 1, j), cost[i - 1][j] + 1)
+            addcost = ((i, j - 1), cost[i][j - 1] + 1)
+            subcost = ((i - 1, j - 1), cost[i - 1][j - 1] + (seq1[i - 1] != seq2[j - 1]))
+            best = min(delcost, addcost, subcost, key=lambda x: x[1])
+            cost[i][j] = best[1]
+            direction[i][j] = best[0]
+    d = cost[-1][-1]
+    # backtrace
+    algn1 = []
+    algn2 = []
+    i = len(direction) - 1
+    j = len(direction[0]) - 1
+    while direction[i][j] != (-1, 0):
+        k, l = direction[i][j]
+        if k == i - 1 and l == j - 1:
+            algn1.insert(0, seq1[i - 1])
+            algn2.insert(0, seq2[j - 1])
+        elif k < i:
+            algn1.insert(0, seq1[i - 1])
+            algn2.insert(0, '')
+        elif l < j:
+            algn1.insert(0, '')
+            algn2.insert(0, seq2[j - 1])
+        i, j = k, l
+    return d, algn1, algn2
+
+
+def compute_confusions(algn1: Sequence[str], algn2: Sequence[str]):
+    """
+    Compute confusion matrices from two globally aligned strings.
+
+    Args:
+        align1 (Sequence[str]): sequence 1
+        align2 (Sequence[str]): sequence 2
+
+    Returns:
+        A tuple (counts, ins, dels, subs) with `counts` being per-character
+        confusions, `ins` a dict with per script insertions, `del` an integer
+        of the number of deletions, `subs` per script substitutions.
+    """
+    counts = Counter()
+    with pkg_resources.resource_stream(__name__, 'scripts.json') as fp:
+        script_map = json.load(fp)
+
+    def _get_script(c):
+        for s, e, n in script_map:
+            if ord(c) == s or (e and s <= ord(c) <= e):
+                return n
+        return 'Unknown'
+
+    ins = Counter()
+    dels = 0
+    subs = Counter()
+    for u,v in zip(algn1, algn2):
+        counts[(u, v)] += 1
+    for k, v in counts.items():
+        if k[0] == '':
+            dels += 1
+        elif k[1] == '':
+            script = _get_script(k[0])
+            ins[script] += 1
+        elif k[0] != k[1]:
+            script = _get_script(k[0])
+            subs[script] += 1
+    return counts, ins, dels, subs
+
 def compute_error(model: TorchSeqRecognizer, validation_set: Sequence[Tuple[str, str]]) -> Tuple[int, int]:
     """
-    Computes detailed error report from a model and a list of line image-text
-    pairs.
+    Computes error report from a model and a list of line image-text pairs.
 
     Args:
         model (kraken.lib.models.TorchSeqRecognizer): Model used for recognition
