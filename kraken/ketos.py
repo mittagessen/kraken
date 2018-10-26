@@ -440,7 +440,7 @@ def test(ctx, model, evaluation_files, device, pad, threads, test_set):
                 error += c
         acc_list.append((chars-error)/chars)
         confusions, scripts, ins, dels, subs = compute_confusions(algn_gt, algn_pred)
-        rep = render_report(nn, chars, error, confusions, scripts, ins, dels, subs)
+        rep = render_report(p, chars, error, confusions, scripts, ins, dels, subs)
         logger.info(rep)
         message(rep)
     logger.info('Average accuracy: {:0.2f}%, (stddev: {:0.2f})'.format(np.mean(acc_list) * 100, np.std(acc_list) * 100))

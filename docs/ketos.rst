@@ -141,7 +141,10 @@ option                                                  action
 --optimizer                                             Select optimizer (Adam, SGD, RMSprop).
 -r, --lrate                                             Learning rate  [default: 0.001]
 -m, --momentum                                          Momentum used with SGD optimizer. Ignored otherwise.
--p, --partition                                         Ground truth data partition ratio between train/test set
+-w, --weight-decay                                      Weight decay.
+--schedule                                              Sets the learning rate scheduler. May be either constant or 1cycle. For 1cycle 
+                                                        the cycle length is determined by the `--epoch` option.
+-p, --partition                                         Ground truth data partition ratio between train/validation set
 -u, --normalization                                     Ground truth Unicode normalization. One of NFC, NFKC, NFD, NFKD.
 -c, --codec                                             Load a codec JSON definition (invalid if loading existing model)
 --resize                                                Codec/output layer resizing option. If set
@@ -151,7 +154,7 @@ option                                                  action
                                                         data and model codec do not match. Only valid when refining an existing model.
 -n, --reorder / --no-reorder                            Reordering of code points to display order.
 -t, --training-files                                    File(s) with additional paths to training data. Used to 
-                                                        enforce an explicit train/test set split and deal with 
+                                                        enforce an explicit train/validation set split and deal with 
                                                         training sets with more lines than the command line can process. Can be used more than once.
 -e, --evaluation-files                                  File(s) with paths to evaluation data. Overrides the `-p` parameter.
 --preload / --no-preload                                Hard enable/disable for training data preloading. Preloading 
@@ -189,11 +192,11 @@ lag can be useful:
 
         $ ketos train --lag 10 --min-delta 0.001 syr/*.png
 
-To switch optimizers from SGD to Adam or RMSprop just set the option:
+To switch optimizers from Adam to SGD or RMSprop just set the option:
 
 .. code-block:: console
 
-        $ ketos train --optimizer Adam syr/*.png
+        $ ketos train --optimizer SGD syr/*.png
 
 It is possible to resume training from a previously saved model:
 
@@ -218,7 +221,7 @@ an exact match. Otherwise an error will be raised:
 
         $ ketos train -i model_5.mlmodel --no-preload kamil/*.png
         Building training set  [####################################]  100%
-        Building test set  [####################################]  100%
+        Building validation set  [####################################]  100%
         [0.8616] alphabet mismatch {'~', '»', '8', '9', 'ـ'} 
         Network codec not compatible with training set
         [0.8620] Training data and model codec alphabets mismatch: {'ٓ', '؟', '!', 'ص', '،', 'ذ', 'ة', 'ي', 'و', 'ب', 'ز', 'ح', 'غ', '~', 'ف', ')', 'د', 'خ', 'م', '»', 'ع', 'ى', 'ق', 'ش', 'ا', 'ه', 'ك', 'ج', 'ث', '(', 'ت', 'ظ', 'ض', 'ل', 'ط', '؛', 'ر', 'س', 'ن', 'ء', 'ٔ', '«', 'ـ', 'ٕ'} 
@@ -233,7 +236,7 @@ removing unused characters from the model and adding new ones.
 
         $ ketos -v train --resize add -i model_5.mlmodel syr/*.png
         ...
-        [0.7943] Training set 788 lines, test set 88 lines, alphabet 50 symbols
+        [0.7943] Training set 788 lines, validation set 88 lines, alphabet 50 symbols
         ...
         [0.8337] Resizing codec to include 3 new code points
         [0.8374] Resizing last layer in network to 52 outputs
@@ -246,7 +249,7 @@ recognize 52 different characters after sufficient additional training.
 
         $ ketos -v train --resize both -i model_5.mlmodel syr/*.png
         ...
-        [0.7593] Training set 788 lines, test set 88 lines, alphabet 49 symbols
+        [0.7593] Training set 788 lines, validation set 88 lines, alphabet 49 symbols
         ...
         [0.7857] Resizing network or given codec to 49 code sequences
         [0.8344] Deleting 2 output classes from network (46 retained)
@@ -261,8 +264,8 @@ Slicing
 Refining on mismatched alphabets has its limits. If the alphabets are highly
 different the modification of the final linear layer to add/remove character
 will destroy the inference capabilities of the network. In those cases it is
-often faster to slice off the last few layers of the network and only train
-those instead of a complete network from scratch.
+faster to slice off the last few layers of the network and only train those
+instead of a complete network from scratch.
 
 Taking the default network definition as printed in the debug log we can see
 the layer indices of the model:
@@ -289,17 +292,106 @@ layers we define a network stub and index for appending:
 
         $ ketos train -i model_1.mlmodel --append 7 -s '[Lbx256 Do]' syr/*.png 
         Building training set  [####################################]  100%
-        Building test set  [####################################]  100%
+        Building validation set  [####################################]  100%
         [0.8014] alphabet mismatch {'8', '3', '9', '7', '܇', '݀', '݂', '4', ':', '0'} 
         Slicing and dicing model ✓
 
 The new model will behave exactly like a new one, except potentially training a
 lot faster.
 
-Validation
-----------
+Testing
+-------
 
-TODO
+Picking a particular model from a pool or getting a more detailled look on the
+recognition accuracy can be done with the `test` command. It uses transcribed
+lines, the test set, in the same format as the `train` command, recognizes the
+line images with one or more models, and creates a detailled report of the
+differences from the ground truth for each of them.
+
+======================================================= ======
+option                                                  action
+======================================================= ======
+-m, --model                                             Model(s) to evaluate.
+-e, --evaluation-files                                  File(s) with paths to evaluation data.
+-d, --device                                            Select device to use.
+-p, --pad                                               Left and right padding around lines.
+
+
+Transcriptions are handed to the command in the same way as for the `train`
+command, either through a manifest with `-e/--evaluation-files` or by just
+adding a number of image files as the final argument:
+
+.. code-block:: console
+
+   $ ketos test -m $model -e test.txt test/*.png
+   Evaluating $model
+   Evaluating  [####################################]  100%
+   === report test_model.mlmodel ===
+   
+   7012	Characters
+   6022	Errors
+   14.12%	Accuracy
+   
+   5226	Insertions
+   2	Deletions
+   794	Substitutions
+   
+   Count Missed   %Right
+   1567  575	63.31%	Common
+   5230	 5230	0.00%	Arabic
+   215	 215	0.00%	Inherited
+   
+   Errors	Correct-Generated
+   773	{ ا } - {  }
+   536	{ ل } - {  }
+   328	{ و } - {  }
+   274	{ ي } - {  }
+   266	{ م } - {  }
+   256	{ ب } - {  }
+   246	{ ن } - {  }
+   241	{ SPACE } - {  }
+   207	{ ر } - {  }
+   199	{ ف } - {  }
+   192	{ ه } - {  }
+   174	{ ع } - {  }
+   172	{ ARABIC HAMZA ABOVE } - {  }
+   144	{ ت } - {  }
+   136	{ ق } - {  }
+   122	{ س } - {  }
+   108	{ ، } - {  }
+   106	{ د } - {  }
+   82	{ ك } - {  }
+   81	{ ح } - {  }
+   71	{ ج } - {  }
+   66	{ خ } - {  }
+   62	{ ة } - {  }
+   60	{ ص } - {  }
+   39	{ ، } - { - }
+   38	{ ش } - {  }
+   30	{ ا } - { - }
+   30	{ ن } - { - }
+   29	{ ى } - {  }
+   28	{ ذ } - {  }
+   27	{ ه } - { - }
+   27	{ ARABIC HAMZA BELOW } - {  }
+   25	{ ز } - {  }
+   23	{ ث } - {  }
+   22	{ غ } - {  }
+   20	{ م } - { - }
+   20	{ ي } - { - }
+   20	{ ) } - {  }
+   19	{ : } - {  }
+   19	{ ط } - {  }
+   19	{ ل } - { - }
+   18	{ ، } - { . }
+   17	{ ة } - { - }
+   16	{ ض } - {  }
+   ...
+   Average accuracy: 14.12%, (stddev: 0.00)
+
+The report(s) contains character accuracy measured per script and a detailled
+list of confusions. When evaluating multiple models the last line of the output
+will the average accuracy and the standard deviation across all of them.
 
 Artificial Training Data
 ------------------------
@@ -310,6 +402,7 @@ text in the target language will be needed.
 
 For many popular historical fonts there are free reproductions which quite
 closely match printed editions. Most are available in your distribution's
+
 repositories and often shipped with TeX Live.
 
 Some good places to start for non-Latin scripts are:
