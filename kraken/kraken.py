@@ -162,9 +162,11 @@ def recognizer(model, pad, bidi_reordering, script_ignore, base_image, input, ou
                                      click.Path(writable=True)), multiple=True,
                                      help='Input-output file pairs. Each input file (first argument) is mapped to one '
                                           'output file (second argument), e.g. `-i input.png output.txt`')
+@click.option('-I', '--batch-input', multiple=True, help='Glob expression to add multiple files at once.')
+@click.option('-o', '--suffix', help='Suffix for output files from batch inputs.')
 @click.option('-v', '--verbose', default=0, count=True, show_default=True)
 @click.option('-d', '--device', default='cpu', show_default=True, help='Select device to use (cpu, cuda:0, cuda:1, ...)')
-def cli(input, verbose, device):
+def cli(input, batch_input, suffix, verbose, device):
     """
     Base command for recognition functionality.
 
@@ -178,12 +180,19 @@ def cli(input, verbose, device):
 
 
 @cli.resultcallback()
-def process_pipeline(subcommands, input, **args):
+def process_pipeline(subcommands, input, batch_input, suffix, **args):
     """
     Helper function calling the partials returned by each subcommand and
     placing their respective outputs in temporary files.
     """
+    import glob
     import tempfile
+
+    input = list(input)
+    if batch_input and suffix:
+        for batch_expr in batch_input:
+            for in_file in glob.glob(batch_expr, recursive=True):
+                input.append((in_file, '{}{}'.format(os.path.splitext(in_file)[0], suffix)))
 
     for io_pair in input:
         try:
