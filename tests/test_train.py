@@ -18,7 +18,7 @@ class TestTrain(unittest.TestCase):
         for epoch, _ in enumerate(it):
             it.update(epoch if epoch < 10 else 10)
         self.assertEqual(15, epoch)
-        self.assertEqual(it.best_epoch, 11)
+        self.assertEqual(it.best_epoch, 10)
         self.assertEqual(it.best_loss, 10)
 
     def test_epoch_stopping(self):
