@@ -1,0 +1,19 @@
+=== report {{ report.name }} ===
+
+{{ report.chars }}	Characters
+{{ report.errors }}	Errors
+{{ '%0.2f'| format(report.accuracy) }}%	Accuracy
+
+{{ report.insertions }}	Insertions
+{{ report.deletions }}	Deletions
+{{ report.substitutions }}	Substitutions
+
+Count	Missed	%Right
+{% for script in report.scripts %}
+{{ script.count }}	{{ script.errors }}	{{'%0.2f'| format(script.accuracy) }}%	{{ script.script }}
+{% endfor %}
+
+Errors	Correct-Generated
+{% for count in report.counts %}
+{{ count.errors }}	{{ '{ ' }}{{ count.correct }}{{ ' }' }} - {{ '{ ' }}{{ count.generated }}{{ ' }' }}
+{% endfor %}

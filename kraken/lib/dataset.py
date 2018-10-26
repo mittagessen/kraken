@@ -178,9 +178,10 @@ def compute_confusions(algn1: Sequence[str], algn2: Sequence[str]):
         align2 (Sequence[str]): sequence 2
 
     Returns:
-        A tuple (counts, ins, dels, subs) with `counts` being per-character
-        confusions, `ins` a dict with per script insertions, `del` an integer
-        of the number of deletions, `subs` per script substitutions.
+        A tuple (counts, scripts, ins, dels, subs) with `counts` being per-character
+        confusions, `scripts` per-script counts, `ins` a dict with per script
+        insertions, `del` an integer of the number of deletions, `subs` per
+        script substitutions.
     """
     counts = Counter()
     with pkg_resources.resource_stream(__name__, 'scripts.json') as fp:
@@ -192,6 +193,7 @@ def compute_confusions(algn1: Sequence[str], algn2: Sequence[str]):
                 return n
         return 'Unknown'
 
+    scripts = Counter()
     ins = Counter()
     dels = 0
     subs = Counter()
@@ -199,14 +201,15 @@ def compute_confusions(algn1: Sequence[str], algn2: Sequence[str]):
         counts[(u, v)] += 1
     for k, v in counts.items():
         if k[0] == '':
-            dels += 1
-        elif k[1] == '':
+            dels += v
+        else:
             script = _get_script(k[0])
-            ins[script] += 1
-        elif k[0] != k[1]:
-            script = _get_script(k[0])
-            subs[script] += 1
-    return counts, ins, dels, subs
+            scripts[script] += v
+            if k[1] == '':
+                ins[script] += v
+            elif k[0] != k[1]:
+                subs[script] += v
+    return counts, scripts, ins, dels, subs
 
 def compute_error(model: TorchSeqRecognizer, validation_set: Sequence[Tuple[str, str]]) -> Tuple[int, int]:
     """

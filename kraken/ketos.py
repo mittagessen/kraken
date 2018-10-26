@@ -117,6 +117,12 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
     """
     Trains a model from image-text pairs.
     """
+    if not load and append:
+        raise click.BadOptionUsage('append', 'append option requires loading an existing model')
+
+    if resize != 'fail' and not load:
+        raise click.BadOptionUsage('resize', 'resize option requires loading an existing model')
+
     import re
     import torch
     import shutil
@@ -130,12 +136,6 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
     from kraken.lib.dataset import GroundTruthDataset, compute_error, generate_input_transforms
 
     logger.info('Building ground truth set from {} line images'.format(len(ground_truth) + len(training_files)))
-
-    if not load and append:
-        raise click.BadOptionUsage('append', 'append option requires loading an existing model')
-
-    if resize != 'fail' and not load:
-        raise click.BadOptionUsage('resize', 'resize option requires loading an existing model')
 
     # load model if given. if a new model has to be created we need to do that
     # after data set initialization, otherwise to output size is still unknown.
@@ -383,16 +383,17 @@ def test(ctx, model, evaluation_files, device, pad, threads, test_set):
     """
     Evaluate on a test set.
     """
+    if not model:
+        raise click.UsageError('No model to evaluate given.')
+
     import numpy as np
     from PIL import Image
 
+    from kraken.serialization import render_report
     from kraken.lib import models
-    from kraken.lib.dataset import _fast_levenshtein, generate_input_transforms
+    from kraken.lib.dataset import global_align, compute_confusions, generate_input_transforms
 
     logger.info('Building test set from {} line images'.format(len(test_set) + len(evaluation_files)))
-
-    if not model:
-        raise click.UsageError('No model to evaluate given.')
 
     nn = {}
     for p in model:
@@ -419,6 +420,8 @@ def test(ctx, model, evaluation_files, device, pad, threads, test_set):
 
     acc_list = []
     for p, net in nn.items():
+        algn_gt = []
+        algn_pred = []
         chars = 0
         error = 0
         message('Evaluating {}'.format(p))
@@ -431,12 +434,17 @@ def test(ctx, model, evaluation_files, device, pad, threads, test_set):
                 text = _get_text(im_path)
                 pred = net.predict_string(i)
                 chars += len(text)
-                error += _fast_levenshtein(pred, text)
+                c, algn1, algn2 = global_align(text, pred)
+                algn_gt.extend(algn1)
+                algn_pred.extend(algn2)
+                error += c
         acc_list.append((chars-error)/chars)
-        logger.info('Accuracy report {:0.4f} {} {}'.format(acc_list[-1], chars, error))
-        message('Accuracy report {:0.4f} {} {}'.format(acc_list[-1], chars, error))
-    logger.info('Average accuracy: {:0.4f}, (stddev: {:0.4f})'.format(np.mean(acc_list), np.std(acc_list)))
-    message('Average accuracy: {:0.4f}, (stddev: {:0.4f})'.format(np.mean(acc_list), np.std(acc_list)))
+        confusions, scripts, ins, dels, subs = compute_confusions(algn_gt, algn_pred)
+        rep = render_report(nn, chars, error, confusions, scripts, ins, dels, subs)
+        logger.info(rep)
+        message(rep)
+    logger.info('Average accuracy: {:0.2f}%, (stddev: {:0.2f})'.format(np.mean(acc_list) * 100, np.std(acc_list) * 100))
+    message('Average accuracy: {:0.2f}%, (stddev: {:0.2f})'.format(np.mean(acc_list) * 100, np.std(acc_list) * 100))
 
 
 @cli.command('extract')

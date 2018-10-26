@@ -17,6 +17,9 @@ from jinja2 import Environment, PackageLoader
 
 import regex
 import logging
+import unicodedata
+
+from collections import Counter
 
 from kraken.rpred import ocr_record
 
@@ -89,14 +92,14 @@ def serialize(records: Sequence[ocr_record],
     Returns:
             (str) rendered template.
     """
-    logger.info(u'Serialize {} records from {} with template {}.'.format(len(records), image_name, template))
+    logger.info('Serialize {} records from {} with template {}.'.format(len(records), image_name, template))
     page = {'lines': [], 'size': image_size, 'name': image_name, 'writing_mode': writing_mode, 'scripts': scripts}  # type: dict
     seg_idx = 0
     char_idx = 0
     for idx, record in enumerate(records):
         # skip empty records
         if not record.prediction:
-            logger.debug(u'Empty record. Skipping')
+            logger.debug('Empty record. Skipping')
             continue
         line = {'index': idx,
                 'bbox': max_bbox(record.cuts),
@@ -106,7 +109,7 @@ def serialize(records: Sequence[ocr_record],
                 }
         splits = regex.split(r'(\s+)', record.prediction)
         line_offset = 0
-        logger.debug(u'Record contains {} segments'.format(len(splits)))
+        logger.debug('Record contains {} segments'.format(len(splits)))
         for segment in splits:
             if len(segment) == 0:
                 continue
@@ -127,11 +130,72 @@ def serialize(records: Sequence[ocr_record],
             seg_idx += 1
             line_offset += len(segment)
         page['lines'].append(line)
-    logger.debug(u'Initializing jinja environment.')
+    logger.debug('Initializing jinja environment.')
     env = Environment(loader=PackageLoader('kraken', 'templates'), trim_blocks=True, lstrip_blocks=True)
     env.tests['whitespace'] = str.isspace
     env.filters['rescale'] = _rescale
-    logger.debug(u'Retrieving template.')
+    logger.debug('Retrieving template.')
     tmpl = env.get_template(template)
-    logger.debug(u'Rendering data.')
+    logger.debug('Rendering data.')
     return tmpl.render(page=page)
+
+
+def render_report(model: str,
+                  chars: int,
+                  errors: int,
+                  char_confusions: Counter,
+                  scripts: Counter,
+                  insertions: Counter,
+                  deletions: int,
+                  substitutions: Counter) -> str:
+    """
+    Renders an accuracy report.
+
+    Args:
+        model (str): Model name.
+        errors (int): Number of errors on test set.
+        char_confusions (dict): Dictionary mapping a tuple (gt, pred) to a
+                                number of occurrences.
+        scripts (dict): Dictionary counting character per script.
+        insertions (dict): Dictionary counting insertion operations per Unicode
+                           script
+        deletions (int): Number of deletions
+        substitutions (dict): Dictionary counting substitution operations per
+                              Unicode script.
+
+    Returns:
+        A string containing the rendered report.
+    """
+    logger.info('Serializing report for {}'.format(model))
+
+    def _make_printable(c):
+        if c and unicodedata.combining(c) or c.isspace():
+            return unicodedata.name(c)
+        else:
+            return c
+
+    report = {'model': model,
+              'chars': chars,
+              'errors': errors,
+              'accuracy': (chars-errors)/chars * 100,
+              'insertions': sum(insertions.values()),
+              'deletions': deletions,
+              'substitutions': sum(substitutions.values()),
+              'scripts': sorted([{'script': k,
+                                  'count': v,
+                                  'errors': insertions[k] + substitutions[k],
+                                  'accuracy': 100 * (v-(insertions[k] + substitutions[k]))/v} for k, v in scripts.items()],
+                                key=lambda x: x['accuracy'],
+                                reverse=True),
+              'counts': sorted([{'correct': _make_printable(k[0]),
+                                 'generated': _make_printable(k[1]),
+                                 'errors': v} for k, v in char_confusions.items() if k[0] != k[1]],
+                               key=lambda x: x['errors'],
+                               reverse=True)}
+    logger.debug('Initializing jinja environment.')
+    env = Environment(loader=PackageLoader('kraken', 'templates'), trim_blocks=True, lstrip_blocks=True)
+    logger.debug('Retrieving template.')
+    tmpl = env.get_template('report')
+    logger.debug('Rendering data.')
+    return tmpl.render(report=report)
+
