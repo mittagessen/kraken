@@ -1,0 +1,23 @@
+name: kraken
+channels:
+  - pytorch
+  - fastai
+  - defaults
+dependencies:
+  - python>=3.6
+  - lxml
+  - future
+  - regex
+  - requests
+  - click>=7.0
+  - numpy
+  - pillow
+  - scipy
+  - protobuf>=3.0.0
+  - jinja2
+  - torchvision-nightly
+  - pytorch-nightly
+  - pip:
+    - coremltools
+    - python-bidi
+    - git+https://github.com/mittagessen/kraken.git@master
