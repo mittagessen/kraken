@@ -117,8 +117,8 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, script_ignore, base
         lines = input
     if not lines:
         if no_segmentation:
-            logger.info('Running in no_segmentation mode. Creating temporary segmentation file.')
             lines = tempfile.NamedTemporaryFile(mode='w', delete=False)
+            logger.info('Running in no_segmentation mode. Creating temporary segmentation {}.'.format(lines.name))
             json.dump({'script_detection': False,
                        'text_direction': 'horizontal-lr',
                        'boxes': [(0, 0) + im.size]}, lines)
