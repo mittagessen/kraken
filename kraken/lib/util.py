@@ -81,7 +81,7 @@ def make_printable(char: str) -> str:
         combining mark, whitespace etc., or the hex code if it is a control
         symbol.
     """
-    if is_printable(char):
+    if not char or is_printable(char):
         return char
     elif unicodedata.category(char) in ('Cc', 'Cs', 'Co'):
         return '0x{:x}'.format(ord(char))
