@@ -126,6 +126,9 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, script_ignore, base
             lines = lines.name
         else:
             raise click.UsageError('No line segmentation given. Add one with `-l` or run `segment` first.')
+    elif no_segmentation:
+        logger.warning('no_segmentation mode enabled but segmentation defined. Ignoring --no-segmentation option.')
+
     with open_file(lines, 'r') as fp:
         try:
             fp = cast(IO[Any], fp)
