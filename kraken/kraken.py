@@ -95,8 +95,10 @@ def segmenter(text_direction, script_detect, allowed_scripts, scale,
     message('\u2713', fg='green')
 
 
-def recognizer(model, pad, bidi_reordering, script_ignore, base_image, input, output, lines) -> None:
+def recognizer(model, pad, no_segmentation, bidi_reordering, script_ignore, base_image, input, output, lines) -> None:
+
     import json
+    import tempfile
 
     from kraken import rpred
 
@@ -114,7 +116,16 @@ def recognizer(model, pad, bidi_reordering, script_ignore, base_image, input, ou
     if not lines and base_image != input:
         lines = input
     if not lines:
-        raise click.UsageError('No line segmentation given. Add one with `-l` or run `segment` first.')
+        if no_segmentation:
+            logger.info('Running in no_segmentation mode. Creating temporary segmentation file.')
+            lines = tempfile.NamedTemporaryFile(mode='w', delete=False)
+            json.dump({'script_detection': False,
+                       'text_direction': 'horizontal-lr',
+                       'boxes': [(0, 0) + im.size]}, lines)
+            lines.close()
+            lines = lines.name
+        else:
+            raise click.UsageError('No line segmentation given. Add one with `-l` or run `segment` first.')
     with open_file(lines, 'r') as fp:
         try:
             fp = cast(IO[Any], fp)
@@ -132,6 +143,10 @@ def recognizer(model, pad, bidi_reordering, script_ignore, base_image, input, ou
         else:
             it = rpred.rpred(model['default'], im, bounds, pad,
                              bidi_reordering=bidi_reordering)
+
+    if not lines and no_segmentation:
+        logger.debug('Removing temporary segmentation file.')
+        os.unlink(lines.name)
 
     preds = []
 
@@ -279,6 +294,8 @@ def _validate_mm(ctx, param, value):
               'padding around lines')
 @click.option('-n', '--reorder/--no-reorder', show_default=True, default=True,
               help='Reorder code points to logical order')
+@click.option('-s', '--no-segmentation', default=False, show_default=True, is_flag=True,
+              help='Enables non-segmentation mode treating each input image as a whole line.')
 @click.option('-h', '--hocr', 'serializer', help='Switch between hOCR, '
               'ALTO, and plain text output', flag_value='hocr')
 @click.option('-a', '--alto', 'serializer', flag_value='alto')
@@ -293,7 +310,7 @@ def _validate_mm(ctx, param, value):
               help='JSON file containing line coordinates')
 @click.option('--threads', default=1, show_default=True,
               help='Number of threads to use for OpenMP parallelization.')
-def ocr(ctx, model, pad, reorder, serializer, text_direction, lines, threads):
+def ocr(ctx, model, pad, reorder, no_segmentation, serializer, text_direction, lines, threads):
     """
     Recognizes text in line images.
     """
@@ -336,7 +353,13 @@ def ocr(ctx, model, pad, reorder, serializer, text_direction, lines, threads):
     # set output mode
     ctx.meta['mode'] = serializer
     ctx.meta['text_direction'] = text_direction
-    return partial(recognizer, model=nm, pad=pad, bidi_reordering=reorder, script_ignore=ign_scripts, lines=lines)
+    return partial(recognizer,
+                   model=nm,
+                   pad=pad,
+                   no_segmentation=no_segmentation,
+                   bidi_reordering=reorder,
+                   script_ignore=ign_scripts,
+                   lines=lines)
 
 
 @cli.command('show')
