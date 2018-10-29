@@ -18,23 +18,22 @@ training data are just transcriptions aligned to line images.
 Installing kraken
 -----------------
 
-The easiest way to install and use kraken is through a `vagrant
-<https://vagrantup.com>`_ virtual machine. After downloading and installing
-vagrant, the box can be provisioned.
+The easiest way to install and use kraken is through `conda
+<https://www.anaconda.com/download/>`_. kraken works both on Linux and Mac OS
+X. After installing conda, download the environment file and create the
+environment for kraken:
 
 .. code-block:: console
 
-        $ vagrant init openphilology/kraken
-        $ vagrant up
+   $ wget https://raw.githubusercontent.com/mittagessen/kraken/master/environment.yml
+   $ conda env create -f environment.yml
 
-After running the above commands, the box should be up and running. The
-directory these commands are executed in is mapped into the virtual machine and
-can be used to exchange data with the host system. The virtual machine can be
-accessed through running:
+Each time you want to use the kraken environment in a shell is has to be
+activated first:
 
 .. code-block:: console
 
-        $ vagrant ssh
+   $ conda activate kraken
 
 Image acquisition and preprocessing
 -----------------------------------
@@ -164,22 +163,22 @@ to start training.
 A number of lines will be split off into a separate held-out set that is used
 to estimate the actual recognition accuracy achieved in the real world. These
 are never shown to the network during training but will be recognized
-periodically to evaluate the accuracy of the model. Per default the test set
-will comprise of 10% of the training data.
+periodically to evaluate the accuracy of the model. Per default the validation
+set will comprise of 10% of the training data.
 
 Basic model training is mostly automatic albeit there are multiple parameters
 that can be adjusted:
 
 --output
         Sets the prefix for models generated during training. They will best as
-        ``prefix_iterations.mlmodel``.
+        ``prefix_epochs.mlmodel``.
 --report
-        How often evaluation passes are run on the test set. It is a number
-        between 0 and 1 with 1 meaning a report is created each time the
-        complete training set has been seen by the network.
+        How often evaluation passes are run on the validation set. It is an
+        integer equal or larger than 1 with 1 meaning a report is created each
+        time the complete training set has been seen by the network.
 --savefreq
-        How often intermediate models are saved to disk. It is a number between
-        0 and 1 with the same semantics as ``--report``.
+        How often intermediate models are saved to disk. It is an integer with
+        the same semantics as ``--report``.
 --load
         Continuing training is possible by loading an existing model file with
         ``--load``. To continue training from a base model with another
@@ -198,16 +197,16 @@ after 50 epochs reached between 8 and 24 hours of training.
 When to stop training is a matter of experience; the default setting employs a
 fairly reliable approach known as `early stopping
 <https://en.wikipedia.org/wiki/Early_stopping>`_ that stops training as soon as
-the error rate on the test set doesn't improve anymore.  This will prevent
-`overfitting <https://en.wikipedia.org/wiki/Overfitting>`_, i.e. fitting the
-model to recognize only the training data properly instead of the general
-patterns contained therein. 
+the error rate on the validation set doesn't improve anymore.  This will
+prevent `overfitting <https://en.wikipedia.org/wiki/Overfitting>`_, i.e.
+fitting the model to recognize only the training data properly instead of the
+general patterns contained therein. 
 
 .. code-block:: console
         
         $ ketos train output_dir/*.png
         Building training set  [####################################]  100%
-        Building test set  [####################################]  100%
+        Building validation set  [####################################]  100%
         [270.2364] alphabet mismatch {'9', '8', '݂', '3', '݀', '4', '1', '7', '5', '\xa0'}
         Initializing model ✓
         Accuracy report (0) -1.5951 3680 9550
@@ -227,10 +226,10 @@ take a look at each part of the output.
 .. code-block:: console
 
         Building training set  [####################################]  100%
-        Building test set  [####################################]  100%
+        Building validation set  [####################################]  100%
 
-shows the progress of loading the training and test set into memory. This might
-take a while as preprocessing the whole set and putting it into memory is
+shows the progress of loading the training and validation set into memory. This
+might take a while as preprocessing the whole set and putting it into memory is
 computationally intensive. Loading can be made faster without preloading at the
 cost of performing preprocessing repeatedlyduring the training process. 
 
@@ -238,20 +237,20 @@ cost of performing preprocessing repeatedlyduring the training process.
 
         [270.2364] alphabet mismatch {'9', '8', '݂', '3', '݀', '4', '1', '7', '5', '\xa0'}
 
-is a warning about missing characters in either the test or training set, i.e.
-that the alphabets of the sets are not equal. Increasing the size of the test
-set will often remedy this warning.
+is a warning about missing characters in either the validation or training set,
+i.e.  that the alphabets of the sets are not equal. Increasing the size of the
+validation set will often remedy this warning.
 
 .. code-block:: console
 
         Accuracy report (2) 0.8445 3504 545
 
-this line shows the results of the test set evaluation. The error after 2
-epochs is 545 incorrect characters out of 3504 characters in the test set for a
-character accuracy of 84.4%. It should decrease fairly rapidly.  If accuracy
-remains around 0.30 something is amiss, e.g. non-reordered right-to-left or
-wildly incorrect transcriptions. Abort training, correct the error(s) and start
-again.
+this line shows the results of the validation set evaluation. The error after 2
+epochs is 545 incorrect characters out of 3504 characters in the validation set
+for a character accuracy of 84.4%. It should decrease fairly rapidly.  If
+accuracy remains around 0.30 something is amiss, e.g. non-reordered
+right-to-left or wildly incorrect transcriptions. Abort training, correct the
+error(s) and start again.
 
 After training is finished the best model is saved as
 ``model_name_best.mlmodel``. It is highly recommended to also archive the
@@ -266,7 +265,7 @@ information by appending one or more ``-v`` to the command:
         [0.7272] Building ground truth set from 876 line images 
         [0.7281] Taking 88 lines from training for evaluation 
         ...
-        [0.8479] Training set 788 lines, test set 88 lines, alphabet 48 symbols
+        [0.8479] Training set 788 lines, validation set 88 lines, alphabet 48 symbols
         [0.8481] alphabet mismatch {'\xa0', '0', ':', '݀', '܇', '݂', '5'}
         [0.8482] grapheme	count
         [0.8484] SPACE	5258
@@ -329,13 +328,14 @@ information by appending one or more ``-v`` to the command:
         [0.9924] Starting evaluation run
 
 
-indicates that the training is running on 788 transcribed lines and a test set
-of 88 lines. 49 different classes, i.e. Unicode code points, where found in
-these 788 lines. These affect the output size of the network; obviously only
-these 49 different classes/code points can later be output by the network.
-Importantly, we can see that certain characters occur markedly less often than
-others. Characters like the Syriac feminine dot and numerals that occur less
-than 10 times will most likely not be recognized well by the trained net.
+indicates that the training is running on 788 transcribed lines and a
+validation set of 88 lines. 49 different classes, i.e. Unicode code points,
+where found in these 788 lines. These affect the output size of the network;
+obviously only these 49 different classes/code points can later be output by
+the network.  Importantly, we can see that certain characters occur markedly
+less often than others. Characters like the Syriac feminine dot and numerals
+that occur less than 10 times will most likely not be recognized well by the
+trained net.
 
 
 Evaluation and Validation
@@ -348,104 +348,68 @@ data, e.g. above average error rates for numerals indicate either a lack of
 representation of numerals in the training data or erroneous transcription in
 the first place.
 
-First the trained model has to be applied to the line images by invoking
-``eval.py`` with the model and a directory containing line images:
+First the trained model has to be applied to some line transcriptions with the
+`ketos test` command:
 
 .. code-block:: console
 
-        $ ./eval.py output_dir model_file
+      $ ketos test -m syriac_best.mlmodel lines/*.png
+      Loading model syriac_best.mlmodel	✓
+      Evaluating syriac_best.mlmodel
+      Evaluating  [#-----------------------------------]    3%  00:04:56
+      ...
 
-The recognition output is written into ``rec.txt``, the ground truth is
-concatenated into a file called ``gt.txt``. There will also be a file
-``report.txt`` containing the detailed accuracy report:
+After all lines have been processed a evaluation report will be printed:
 
 .. code-block:: console
 
-	UNLV-ISRI OCR Accuracy Report Version 5.1
-	-----------------------------------------
-	   35632   Characters
-	    1477   Errors
-	   95.85%  Accuracy
-	
-	       0   Reject Characters
-	       0   Suspect Markers
-	       0   False Marks
-	    0.00%  Characters Marked
-	   95.85%  Accuracy After Correction
-	
-	     Ins    Subst      Del   Errors
-	       0        0        0        0   Marked
-	     151      271     1055     1477   Unmarked
-	     151      271     1055     1477   Total
-	
-	   Count   Missed   %Right
-	   27046      155    99.43   Unassigned
-	    5843       13    99.78   ASCII Spacing Characters
-	    1089      108    90.08   ASCII Special Symbols
-	      77       53    31.17   ASCII Digits
-	      15       15     0.00   ASCII Uppercase Letters
-	       4        4     0.00   Latin1 Spacing Characters
-	    1558       74    95.25   Combining Diacritical Marks
-	   35632      422    98.82   Total
-	
-	  Errors   Marked   Correct-Generated
-	     815        0   {}-{ }
-	      29        0   {}-{̈}
-	      29        0   {}-{̣}
-	      20        0   {[}-{ ]}
-	      18        0   {̈}-{}
-	      18        0   {̣}-{}
-	      15        0   {̇}-{}
-	      13        0   {}-{.}
-	      12        0   {}-{. }
-	      12        0   {}-{ܝ}
-	       9        0   {}-{ܠ}
-	       9        0   {}-{ܢ}
-	       8        0   { }-{}
-	       8        0   {ܨ}-{ܢ}
-	       8        0   {[SECTIO}-{ ] ܐܘܘ...}
-	
-	.....
-
-	Count   Missed   %Right
-	 5843       13    99.78   { }
-	   72        0   100.00   {*}
-	  909       13    98.57   {.}
-	    4        4     0.00   {0}
-	   22        6    72.73   {1}
-	   15       12    20.00   {2}
-	    9        7    22.22   {3}
-	    4        4     0.00   {4}
-	    5        3    40.00   {5}
-	    5        5     0.00   {6}
-	    4        4     0.00   {7}
-	    5        4    20.00   {8}
-	    4        4     0.00   {9}
-	    4        4     0.00   {:}
-	    2        2     0.00   {C}
-	    2        2     0.00   {E}
-	    5        5     0.00   {I}
-	    2        2     0.00   {O}
-	    2        2     0.00   {S}
-	    2        2     0.00   {T}
-	   52       45    13.46   {[}
-	   52       46    11.54   {]}
-	    4        4     0.00   { }
-	  297       22    92.59   {̇}
-	  538       26    95.17   {̈}
-	  723       26    96.40   {̣}
-	  149        6    95.97   {܀}
-	   46       12    73.91   {܆}
-	    9        8    11.11   {܇}
-	 3891       16    99.59   {ܐ}
-	 1309        6    99.54   {ܒ}
-	  190        1    99.47   {ܓ}
-	 1868        9    99.52   {ܕ}
-	 1862        7    99.62   {ܗ}
-	 2588       10    99.61   {ܘ}
-	   87        2    97.70   {ܙ}
-	  484        2    99.59   {ܚ}
-	  225        0   100.00   {ܛ}
+      === report  ===
+      
+      35619	Characters
+      336	Errors
+      99.06%	Accuracy
+      
+      157	Insertions
+      81	Deletions
+      98	Substitutions
+      
+      Count	Missed	%Right
+      27046	143	99.47%	Syriac
+      7015	52	99.26%	Common
+      1558	60	96.15%	Inherited
+      
+      Errors	Correct-Generated
+      25	{  } - { COMBINING DOT BELOW }
+      25	{ COMBINING DOT BELOW } - {  }
+      15	{ . } - {  }
+      15	{ COMBINING DIAERESIS } - {  }
+      12	{ ܢ } - {  }
+      10	{  } - { . }
+      8	{ COMBINING DOT ABOVE } - {  }
+      8	{ ܝ } - {  }
+      7	{ ZERO WIDTH NO-BREAK SPACE } - {  }
+      7	{ ܆ } - {  }
+      7	{ SPACE } - {  }
+      7	{ ܣ } - {  }
+      6	{  } - { ܝ }
+      6	{ COMBINING DOT ABOVE } - { COMBINING DIAERESIS }
+      5	{ ܙ } - {  }
+      5	{ ܬ } - {  }
+      5	{  } - { ܢ }
+      4	{ NO-BREAK SPACE } - {  }
+      4	{ COMBINING DIAERESIS } - { COMBINING DOT ABOVE }
+      4	{  } - { ܒ }
+      4	{  } - { COMBINING DIAERESIS }
+      4	{ ܗ } - {  }
+      4	{  } - { ܬ }
+      4	{  } - { ܘ }
+      4	{ ܕ } - { ܢ }
+      3	{  } - { ܕ }
+      3	{ ܐ } - {  }
+      3	{ ܗ } - { ܐ }
+      3	{ ܝ } - { ܢ }
+      3	{ ܀ } - { . }
+      3	{  } - { ܗ }
 
 	.....
 
@@ -453,28 +417,20 @@ The first section of the report consists of a simple accounting of the number
 of characters in the ground truth, the errors in the recognition output and the
 resulting accuracy in per cent.
 
-The next section can be ignored.
-
 The next table lists the number of insertions (characters occuring in the
 ground truth but not in the recognition output), substitutions (misrecognized
 characters), and deletions (superfluous characters recognized by the model).
 
-Next is a grouping of errors (insertions and substitutions) by Unicode
-character class. As the report tool does not have proper Unicode support,
-Syriac characters are classified as ``Unassigned``. Nevertheless it is apparent
-that numerals are recognized markedly worse than every other class, presumably
-because they are severely underrepresented (77) in the training set. Further
-all Latin text is misrecognized, as the training set did not contain any and
-there is a small inconsistency in the test set caused by Latin-1 spacing
-characters. 
+Next is a grouping of errors (insertions and substitutions) by Unicode script.
 
-The final two parts of the report are errors sorted by frequency and a per
-character accuracy report. Importantly, over half the overall errors are caused
-by incorrect whitespace produced by the model. These may have several sources:
-different spacing in training and test set, incorrect transcription such as
-leading/trailing whitespace, or. Depending on the error source, correction most
-often involves adding more training data and fixing transcriptions. Sometimes
-it may even be advisable to remove unrepresentative data from the training set.
+The final part of the report are errors sorted by frequency and a per
+character accuracy report. Importantly most errors are incorrect recognition of
+combining marks such as dots and diaereses. These may have several sources:
+different dot placement in training and validation set, incorrect transcription
+such as non-systematic transcription, or unclean speckled scans. Depending on
+the error source, correction most often involves adding more training data and
+fixing transcriptions. Sometimes it may even be advisable to remove
+unrepresentative data from the training set.
 
 Recognition
 -----------
