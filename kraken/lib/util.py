@@ -2,6 +2,7 @@
 Ocropus's magic PIL-numpy array conversion routines. They express slightly
 different behavior from PIL.Image.toarray().
 """
+import unicodedata
 import numpy as np
 
 from PIL import Image
@@ -47,3 +48,42 @@ def is_bitonal(im: Image) -> bool:
 
 def get_im_str(im: Image) -> str:
     return im.filename if hasattr(im, 'filename') else str(im)
+
+
+def is_printable(char: str) -> bool:
+    """
+    Determines if a chode point is printable/visible when printed.
+
+    Args:
+        char (str): Input code point.
+
+    Returns:
+        True if printable, False otherwise.
+    """
+    letters     = ('LC', 'Ll', 'Lm', 'Lo', 'Lt', 'Lu')
+    numbers     = ('Nd', 'Nl', 'No')
+    punctuation = ('Pc', 'Pd', 'Pe', 'Pf', 'Pi', 'Po', 'Ps')
+    symbol      = ('Sc', 'Sk', 'Sm', 'So')
+    printable = letters + numbers + punctuation + symbol
+
+    return unicodedata.category(char) in printable
+
+
+def make_printable(char: str) -> str:
+    """
+    Takes a Unicode code point and return a printable representation of it.
+
+    Args:
+        char (str): Input code point
+
+    Returns:
+        Either the original code point, the name of the code point if it is a
+        combining mark, whitespace etc., or the hex code if it is a control
+        symbol.
+    """
+    if is_printable(char):
+        return char
+    elif unicodedata.category(char) in ('Cc', 'Cs', 'Co'):
+        return '0x{:x}'.format(ord(char))
+    else:
+        return unicodedata.name(char)

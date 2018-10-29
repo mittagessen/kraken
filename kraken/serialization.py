@@ -22,6 +22,7 @@ import unicodedata
 from collections import Counter
 
 from kraken.rpred import ocr_record
+from kraken.lib.util import make_printable
 
 from typing import List, Tuple, Iterable, Optional, Sequence
 
@@ -168,12 +169,6 @@ def render_report(model: str,
     """
     logger.info('Serializing report for {}'.format(model))
 
-    def _make_printable(c):
-        if c and unicodedata.combining(c) or c.isspace():
-            return unicodedata.name(c)
-        else:
-            return c
-
     report = {'model': model,
               'chars': chars,
               'errors': errors,
@@ -187,8 +182,8 @@ def render_report(model: str,
                                   'accuracy': 100 * (v-(insertions[k] + substitutions[k]))/v} for k, v in scripts.items()],
                                 key=lambda x: x['accuracy'],
                                 reverse=True),
-              'counts': sorted([{'correct': _make_printable(k[0]),
-                                 'generated': _make_printable(k[1]),
+              'counts': sorted([{'correct': make_printable(k[0]),
+                                 'generated': make_printable(k[1]),
                                  'errors': v} for k, v in char_confusions.items() if k[0] != k[1]],
                                key=lambda x: x['errors'],
                                reverse=True)}
