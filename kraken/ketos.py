@@ -22,7 +22,7 @@ import unicodedata
 
 from bidi.algorithm import get_display
 
-from typing import cast, Set
+from typing import cast, Set, List
 
 from kraken.lib import log
 from kraken.lib.exceptions import KrakenCairoSurfaceException
@@ -131,6 +131,7 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
     from torch.utils.data import DataLoader
 
     from kraken.lib import models, vgsl, train
+    from kraken.lib.util import make_printable
     from kraken.lib.train import EarlyStopping, EpochStopping, TrainStopper, TrainScheduler, add_1cycle
     from kraken.lib.codec import PytorchCodec
     from kraken.lib.dataset import GroundTruthDataset, compute_error, generate_input_transforms
@@ -221,14 +222,10 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
         logger.warn('alphabet mismatch {}'.format(alpha_diff))
     logger.info('grapheme\tcount')
     for k, v in sorted(gt_set.alphabet.items(), key=lambda x: x[1], reverse=True):
-        if unicodedata.combining(k) or k.isspace():
-            try:
-                k = unicodedata.name(k)
-            except ValueError as e:
-                k = '0x{:x}'.format(ord(k))
-        else:
-            k = '\t' + k
-        logger.info(u'{}\t{}'.format(k, v))
+        char = make_printable(k)
+        if char == k:
+            char = '\t' + char
+        logger.info(u'{}\t{}'.format(char, v))
 
     logger.debug('Encoding training set')
 
@@ -314,7 +311,7 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
         add_1cycle(tr_it, epochs * len(gt_set), lrate, momentum, momentum - 0.10, weight_decay)
     else:
         # constant learning rate scheduler
-        tr_it.add_phase(1, [lrate, lrate], [momentum, momentum], weight_decay, train.annealing_const)
+        tr_it.add_phase(1, (lrate, lrate), (momentum, momentum), weight_decay, train.annealing_const)
 
     st_it = cast(TrainStopper, None)  # type: TrainStopper
     if quit == 'early':
@@ -420,8 +417,8 @@ def test(ctx, model, evaluation_files, device, pad, threads, test_set):
 
     acc_list = []
     for p, net in nn.items():
-        algn_gt = []
-        algn_pred = []
+        algn_gt: List[str] = []
+        algn_pred: List[str] = []
         chars = 0
         error = 0
         message('Evaluating {}'.format(p))
@@ -660,6 +657,7 @@ def line_generator(ctx, font, maxlines, encoding, normalization, renormalize,
     import numpy as np
 
     from kraken import linegen
+    from kraken.lib.util import make_printable
 
     lines: Set[str] = set()
     if not text:
@@ -696,10 +694,11 @@ def line_generator(ctx, font, maxlines, encoding, normalization, renormalize,
     chars = []
     combining = []
     for char in sorted(alphabet):
-        if unicodedata.combining(char):
-            combining.append(unicodedata.name(char))
+        k = make_printable(char)
+        if k != char:
+            combining.append(k)
         else:
-            chars.append(char)
+            chars.append(k)
     message('Σ (len: {})'.format(len(alphabet)))
     message('Symbols: {}'.format(''.join(chars)))
     if combining:

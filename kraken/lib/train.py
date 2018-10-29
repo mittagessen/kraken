@@ -23,7 +23,7 @@ import numpy as np
 from itertools import cycle
 from torch.utils import data
 from functools import partial
-from typing import Tuple, Union, Optional, Callable
+from typing import Tuple, Union, Optional, Callable, List, Dict, Any
 from collections.abc import Iterable
 
 class TrainStopper(Iterable):
@@ -55,17 +55,17 @@ class TrainScheduler(object):
     """
     Implements learning rate scheduling.
     """
-    def __init__(self, optimizer: torch.optim.Optimizer = None) -> None:
-        self.steps = []
+    def __init__(self, optimizer: torch.optim.Optimizer) -> None:
+        self.steps: List[Dict[str, Any]] = []
         self.optimizer = optimizer
-        self.cycle = None
+        self.cycle: Any = None
 
     def add_phase(self,
-                  iterations: int = None,
-                  lrate: Tuple[float, float] = [1e-4, 1e-4],
-                  momentum: Tuple[float, float] = [0.9, 0.9],
+                  iterations: int,
+                  lrate: Tuple[float, float] = (1e-4, 1e-4),
+                  momentum: Tuple[float, float] = (0.9, 0.9),
                   wd: float = 0.0,
-                  annealing_fn: Callable[[int, int, float], float] = annealing_const) -> None:
+                  annealing_fn: Callable[[float, float, float], float] = annealing_const) -> None:
         """
         Adds a new phase to the scheduler.
 
@@ -97,7 +97,7 @@ class TrainScheduler(object):
             param_group.update(kwargs)
 
 
-def add_1cycle(sched: TrainScheduler = None, iterations: int = None,
+def add_1cycle(sched: TrainScheduler, iterations: int,
                max_lr: float = 1e-4, div: float = 25.0,
                max_mom: float = 0.95, min_mom: float = 0.85, wd: float = 0.0):
     """
@@ -114,8 +114,8 @@ def add_1cycle(sched: TrainScheduler = None, iterations: int = None,
         min_mon (float): Minimum momentum
         wd (float): Weight decay
     """
-    sched.add_phase(iterations//2, [max_lr/div, max_lr], [max_mom, min_mom], wd, annealing_linear)
-    sched.add_phase(iterations//2, [max_lr, max_lr/div], [min_mom, max_mom], wd, annealing_cos)
+    sched.add_phase(iterations//2, (max_lr/div, max_lr), (max_mom, min_mom), wd, annealing_linear)
+    sched.add_phase(iterations//2, (max_lr, max_lr/div), (min_mom, max_mom), wd, annealing_cos)
 
 
 class EarlyStopping(TrainStopper):

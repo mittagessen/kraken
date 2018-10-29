@@ -25,7 +25,7 @@ import pkg_resources
 import bidi.algorithm as bd
 
 from PIL import Image
-from typing import List, Tuple, Sequence, Callable, Optional, Any, Union, cast
+from typing import Dict, List, Tuple, Sequence, Callable, Optional, Any, Union, cast
 from collections import Counter
 from torchvision import transforms
 from torch.utils.data import Dataset
@@ -120,7 +120,7 @@ def _fast_levenshtein(seq1: Sequence[Any], seq2: Sequence[Any]) -> int:
     return thisrow[len(seq2) - 1]
 
 
-def global_align(seq1: Sequence[Any], seq2: Sequence[Any]) -> Tuple[int, str, str]:
+def global_align(seq1: Sequence[Any], seq2: Sequence[Any]) -> Tuple[int, List[str], List[str]]:
     """
     Computes a global alignment of two strings.
 
@@ -150,8 +150,8 @@ def global_align(seq1: Sequence[Any], seq2: Sequence[Any]) -> Tuple[int, str, st
             direction[i][j] = best[0]
     d = cost[-1][-1]
     # backtrace
-    algn1 = []
-    algn2 = []
+    algn1: List[Any] = []
+    algn2: List[Any] = []
     i = len(direction) - 1
     j = len(direction[0]) - 1
     while direction[i][j] != (-1, 0):
@@ -183,7 +183,7 @@ def compute_confusions(algn1: Sequence[str], algn2: Sequence[str]):
         insertions, `del` an integer of the number of deletions, `subs` per
         script substitutions.
     """
-    counts = Counter()
+    counts: Dict[Tuple[str, str], int] = Counter()
     with pkg_resources.resource_stream(__name__, 'scripts.json') as fp:
         script_map = json.load(fp)
 
@@ -193,10 +193,10 @@ def compute_confusions(algn1: Sequence[str], algn2: Sequence[str]):
                 return n
         return 'Unknown'
 
-    scripts = Counter()
-    ins = Counter()
-    dels = 0
-    subs = Counter()
+    scripts: Dict[Tuple[str, str], int] = Counter()
+    ins: Dict[Tuple[str, str], int] = Counter()
+    dels: int = 0
+    subs: Dict[Tuple[str, str], int] = Counter()
     for u,v in zip(algn1, algn2):
         counts[(u, v)] += 1
     for k, v in counts.items():

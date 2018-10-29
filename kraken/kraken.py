@@ -375,14 +375,15 @@ def show(ctx, model_id):
     import unicodedata
 
     from kraken import repo
+    from kraken.lib.util import make_printable, is_printable
 
     desc = repo.get_description(model_id)
 
     chars = []
     combining = []
     for char in sorted(desc['graphemes']):
-        if unicodedata.combining(char):
-            combining.append(unicodedata.name(char))
+        if not is_printable(char):
+            combining.append(make_printable(char))
         else:
             chars.append(char)
     message('name: {}\n\n{}\n\n{}\nscripts: {}\nalphabet: {} {}\nlicense: {}\nauthor: {} ({})\n{}'.format(desc['name'],
