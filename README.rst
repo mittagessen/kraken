@@ -24,17 +24,27 @@ When using a recent version of pip all dependencies will be installed from
 binary wheel packages, so installing build-essential or your distributions
 equivalent is often unnecessary.
 
-Install kraken either from pypi:
+Install the latest master version through `conda <https://anaconda.org>`_:
+
+::
+
+  $ wget https://raw.githubusercontent.com/mittagessen/kraken/master/environment.yml
+  $ conda env create -f environment.yml
+
+or:
+
+::
+
+  $ wget https://raw.githubusercontent.com/mittagessen/kraken/master/environment_cuda.yml
+  $ conda env create -f environment_cuda.yml
+
+for CUDA acceleration with the appropriate hardware.
+
+It is also possible to install the stable version with the old clstm backend from pypi:
 
 ::
 
   $ pip install kraken
-
-or by running pip in the git repository:
-
-::
-
-  $ pip install .
 
 Finally you'll have to scrounge up a model to do the actual recognition of
 characters. To download the default model for printed English text and place it
@@ -91,5 +101,5 @@ Have a look at the `docs <http://kraken.re>`_
 Funding
 =======
 
-Funding of kraken development is provided by `École Pratique des Hautes Études
-- Université PSL <http://www.ephe.fr>`_.
+kraken is developed at `École Pratique des Hautes Études - Université PSL
+<http://www.ephe.fr>`_.
