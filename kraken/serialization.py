@@ -132,7 +132,10 @@ def serialize(records: Sequence[ocr_record],
             line_offset += len(segment)
         page['lines'].append(line)
     logger.debug('Initializing jinja environment.')
-    env = Environment(loader=PackageLoader('kraken', 'templates'), trim_blocks=True, lstrip_blocks=True)
+    env = Environment(loader=PackageLoader('kraken', 'templates'),
+                      trim_blocks=True,
+                      lstrip_blocks=True,
+                      autoescape=True)
     env.tests['whitespace'] = str.isspace
     env.filters['rescale'] = _rescale
     logger.debug('Retrieving template.')
@@ -188,7 +191,10 @@ def render_report(model: str,
                                key=lambda x: x['errors'],
                                reverse=True)}
     logger.debug('Initializing jinja environment.')
-    env = Environment(loader=PackageLoader('kraken', 'templates'), trim_blocks=True, lstrip_blocks=True)
+    env = Environment(loader=PackageLoader('kraken', 'templates'),
+                      trim_blocks=True,
+                      lstrip_blocks=True,
+                      autoescape=True)
     logger.debug('Retrieving template.')
     tmpl = env.get_template('report')
     logger.debug('Rendering data.')

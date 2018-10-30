@@ -36,7 +36,7 @@ class TranscriptionInterface(object):
     def __init__(self, font=None, font_style=None):
         logging.info(u'Initializing transcription object.')
         logger.debug(u'Initializing jinja environment.')
-        env = Environment(loader=PackageLoader('kraken', 'templates'))
+        env = Environment(loader=PackageLoader('kraken', 'templates'), autoescape=True)
         logger.debug(u'Loading transcription template.')
         self.tmpl = env.get_template('layout.html')
         self.pages = []  # type: List[dict]
