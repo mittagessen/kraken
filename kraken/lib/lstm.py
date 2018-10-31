@@ -101,7 +101,6 @@ def BIDILSTM(Ni,Ns,No):
     lstm1 = LSTM(Ni,Ns)
     lstm2 = Reversed(LSTM(Ni,Ns))
     bidi = Parallel(lstm1,lstm2)
-    assert No>1
     logreg = Softmax(2*Ns,No)
     stacked = Stacked([bidi,logreg])
     return stacked
@@ -112,7 +111,6 @@ class SeqRecognizer(Network):
     def __init__(self,ninput,nstates,noutput=-1,codec=None,normalize=None):
         self.Ni = ninput
         if codec: noutput = codec.size()
-        assert noutput>0
         self.No = noutput
         self.lstm = BIDILSTM(ninput,nstates,noutput)
         self.codec = codec

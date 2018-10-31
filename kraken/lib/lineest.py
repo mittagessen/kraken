@@ -47,7 +47,8 @@ class CenterNormalizer(object):
         self.r = int(1+self.range*self.mad)
 
     def dewarp(self, img, cval=0, dtype=np.dtype('f')):
-        assert img.shape == self.shape
+        if img.shape != self.shape:
+            raise Exception('Measured and dewarp image shapes different')
         h, w = img.shape
         padded = np.vstack([cval*np.ones((h, w)), img, cval*np.ones((h, w))])
         center = self.center+h

@@ -300,20 +300,26 @@ def rpred(network: TorchSeqRecognizer,
 
         preds = network.predict(line)
         # calculate recognized LSTM locations of characters
-        scale = box.size[0]/(len(network.outputs)-2 * pad)
+        # scale between network output and network input
+        net_scale = line.shape[2]/network.outputs.shape[1]
+        # scale between network input and original line
+        in_scale = box.size[0]/(line.shape[2]-2*pad)
+
+        def _scale_val(val, min_val, max_val):
+            return int(round(min(max(((val*net_scale)-pad)*in_scale, min_val), max_val)))
+
         # XXX: fix bounding box calculation ocr_record for multi-codepoint labels.
         pred = ''.join(x[0] for x in preds)
         pos = []
         conf = []
-
         for _, start, end, c in preds:
             if bounds['text_direction'].startswith('horizontal'):
-                xmin = coords[0] + int(max((start-pad)*scale, 0))
-                xmax = coords[0] + max(int(min((end-pad)*scale, coords[2]-coords[0])), 1)
+                xmin = coords[0] + _scale_val(start, 0, box.size[0])
+                xmax = coords[0] + _scale_val(end, 0, box.size[0])
                 pos.append((xmin, coords[1], xmax, coords[3]))
             else:
-                ymin = coords[1] + int(max((start-pad)*scale, 0))
-                ymax = coords[1] + max(int(min((end-pad)*scale, coords[3]-coords[1])), 1)
+                ymin = coords[1] + _scale_val(start, 0, box.size[1])
+                ymax = coords[1] + _scale_val(start, 0, box.size[1])
                 pos.append((coords[0], ymin, coords[2], ymax))
             conf.append(c)
         if bidi_reordering:

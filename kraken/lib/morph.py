@@ -92,8 +92,6 @@ def correspondences(labels1, labels2):
     """Given two labeled images, compute an array giving the correspondences
     between labels in the two images."""
     q = 100000
-    assert np.amin(labels1) >= 0 and np.amin(labels2) >= 0
-    assert np.amax(labels2) < q
     combo = labels1 * q + labels2
     result = np.unique(combo)
     result = np.array([result // q, result % q])

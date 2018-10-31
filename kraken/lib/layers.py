@@ -52,7 +52,6 @@ def StackedRNN(inners, num_layers: int, num_directions: int):
     total_layers = num_layers * num_directions
 
     def forward(input, hidden, weight):
-        assert (len(weight) == total_layers)
         next_hidden = []
         for i in range(num_layers):
             all_output = []
