@@ -100,7 +100,7 @@ def _expand_gt(ctx, param, value):
                    'points will be added, `both` will set the layer to match exactly '
                    'the training data, `fail` will abort if training data and model '
                    'codec do not match.')
-@click.option('-n', '--reorder/--no-reorder', show_default=True, default=True, help='Reordering of code points to display order')
+@click.option('--reorder/--no-reorder', show_default=True, default=True, help='Reordering of code points to display order')
 @click.option('-t', '--training-files', show_default=True, default=None, multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with additional paths to training data')
@@ -323,6 +323,7 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
 
     for epoch, loader in enumerate(st_it):
         with log.progressbar(label='epoch {}/{}'.format(epoch, epochs - 1 if epochs > 0 else '∞'), length=len(loader), show_pos=True) as bar:
+            acc_loss = torch.tensor(0.0).to(device, non_blocking=True)
             for trial, (input, target) in enumerate(loader):
                 tr_it.step()
                 input = input.to(device, non_blocking=True)
@@ -331,7 +332,7 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
                 o = nn.nn(input)
                 # height should be 1 by now
                 if o.size(2) != 1:
-                    raise KrakenInputException('Expected dimension 3 to be 1, actual {}'.format(output.size()))
+                    raise KrakenInputException('Expected dimension 3 to be 1, actual {}'.format(o.size(2)))
                 o = o.squeeze(2)
                 optim.zero_grad()
                 # NCW -> WNC
@@ -339,9 +340,10 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
                                     target,
                                     (o.size(2),),
                                     (target.size(1),))
-                logger.info('trial {} - loss {}'.format(trial, float(loss)))
-                loss.backward()
-                optim.step()
+                logger.info('trial {}'.format(trial))
+                if not torch.isinf(loss):
+                    loss.backward()
+                    optim.step()
                 bar.update(1)
         if not epoch % savefreq:
             logger.info('Saving to {}_{}'.format(output, epoch))
@@ -359,8 +361,8 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
             message('Accuracy report ({}) {:0.4f} {} {}'.format(epoch, accuracy, chars, error))
             st_it.update(accuracy)
     if quit == 'early':
-        message('Moving best model {0}_{1}.mlmdel ({2}) to {0}_best.mlmodel'.format(output, st_it.best_epoch, st_it.best_loss))
-        logger.info('Moving best model {0}_{1}.mlmdel ({2}) to {0}_best.mlmodel'.format(output, st_it.best_epoch, st_it.best_loss))
+        message('Moving best model {0}_{1}.mlmodel ({2}) to {0}_best.mlmodel'.format(output, st_it.best_epoch, st_it.best_loss))
+        logger.info('Moving best model {0}_{1}.mlmodel ({2}) to {0}_best.mlmodel'.format(output, st_it.best_epoch, st_it.best_loss))
         shutil.copy('{}_{}.mlmodel'.format(output, st_it.best_epoch), '{}_best.mlmodel'.format(output))
 
 
