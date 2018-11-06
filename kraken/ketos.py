@@ -417,7 +417,7 @@ def test(ctx, model, evaluation_files, device, pad, threads, test_set):
 
     def _get_text(im):
         with open(os.path.splitext(im)[0] + '.gt.txt', 'r') as fp:
-            return fp.read()
+            return get_display(fp.read())
 
     acc_list = []
     for p, net in nn.items():
