@@ -101,5 +101,4 @@ Have a look at the `docs <http://kraken.re>`_
 Funding
 =======
 
-kraken is developed at `École Pratique des Hautes Études - Université PSL
-<http://www.ephe.fr>`_.
+kraken is developed at `Université PSL <http://www.psl.eu>`_.
