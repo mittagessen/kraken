@@ -14,15 +14,17 @@
 # or implied. See the License for the specific language governing
 # permissions and limitations under the License.
 import os
+import json
 import glob
 import uuid
 import click
 import logging
 import unicodedata
 
+from click import open_file
 from bidi.algorithm import get_display
 
-from typing import cast, Set, List
+from typing import cast, Set, List, IO, Any
 
 from kraken.lib import log
 from kraken.lib.exceptions import KrakenCairoSurfaceException
@@ -542,12 +544,12 @@ def extract(ctx, binarize, normalization, normalize_whitespace, reorder,
 @click.pass_context
 @click.option('-d', '--text-direction', default='horizontal-lr',
               type=click.Choice(['horizontal-lr', 'horizontal-rl', 'vertical-lr', 'vertical-rl']),
-              help='Sets principal text direction')
+              help='Sets principal text direction', show_default=True)
 @click.option('--scale', default=None, type=click.FLOAT)
-@click.option('--bw/--orig', default=True,
+@click.option('--bw/--orig', default=True, show_default=True,
               help="Put nonbinarized images in output")
-@click.option('-m', '--maxcolseps', default=2, type=click.INT)
-@click.option('-b/-w', '--black_colseps/--white_colseps', default=False)
+@click.option('-m', '--maxcolseps', default=2, type=click.INT, show_default=True)
+@click.option('-b/-w', '--black_colseps/--white_colseps', default=False, show_default=True)
 @click.option('-f', '--font', default='',
               help='Font family to use')
 @click.option('-fs', '--font-style', default=None,
@@ -556,11 +558,13 @@ def extract(ctx, binarize, normalization, normalize_whitespace, reorder,
               help='Use given model for prefill mode.')
 @click.option('-p', '--pad', show_default=True, type=(int, int), default=(0, 0),
               help='Left and right padding around lines')
+@click.option('-l', '--lines', type=click.Path(exists=True), show_default=True,
+              help='JSON file containing line coordinates')
 @click.option('-o', '--output', type=click.File(mode='wb'), default='transcription.html',
-              help='Output file')
+              help='Output file', show_default=True)
 @click.argument('images', nargs=-1, type=click.File(mode='rb', lazy=True))
 def transcription(ctx, text_direction, scale, bw, maxcolseps,
-                  black_colseps, font, font_style, prefill, pad, output,
+                  black_colseps, font, font_style, prefill, pad, lines, output,
                   images):
     from PIL import Image
 
@@ -573,6 +577,9 @@ def transcription(ctx, text_direction, scale, bw, maxcolseps,
     from kraken.lib.util import is_bitonal
 
     ti = transcribe.TranscriptionInterface(font, font_style)
+
+    if len(images) > 1 and lines:
+        raise click.UsageError('--lines option is incompatible with multiple image files')
 
     if prefill:
         logger.info('Loading model {}'.format(prefill))
@@ -591,7 +598,15 @@ def transcription(ctx, text_direction, scale, bw, maxcolseps,
             logger.info('Segmenting page')
             if bw:
                 im = im_bin
-            res = pageseg.segment(im_bin, text_direction, scale, maxcolseps, black_colseps, pad=pad)
+            if not lines:
+                res = pageseg.segment(im_bin, text_direction, scale, maxcolseps, black_colseps, pad=pad)
+            else:
+                with open_file(lines, 'r') as fp:
+                    try:
+                        fp = cast(IO[Any], fp)
+                        res = json.load(fp)
+                    except ValueError as e:
+                        raise click.UsageError('{} invalid segmentation: {}'.format(lines, str(e)))
             if prefill:
                 it = rpred.rpred(prefill, im_bin, res)
                 preds = []
