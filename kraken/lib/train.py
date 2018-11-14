@@ -30,7 +30,7 @@ class TrainStopper(Iterable):
 
     def __init__(self):
         self.best_loss = 0.0
-        self.best_epoch = 0
+        self.best_iteration= 0
 
     @abc.abstractmethod
     def update(self, val_loss: float) -> None:
@@ -123,20 +123,20 @@ class EarlyStopping(TrainStopper):
     Early stopping to terminate training when validation loss doesn't improve
     over a certain time.
     """
-    def __init__(self, it: data.DataLoader = None, min_delta: float = 0.002, lag: int = 5) -> None:
+    def __init__(self, it: data.DataLoader, min_delta: float = 0.002, lag: int = 1000) -> None:
         """
         Args:
             it (torch.utils.data.DataLoader): training data loader
             min_delta (float): minimum change in validation loss to qualify as improvement.
-            lag (int): Number of epochs to wait for improvement before
+            lag (int): Number of iterations to wait for improvement before
                        terminating.
         """
         super().__init__()
         self.min_delta = min_delta
         self.lag = lag
-        self.it = it
+        self.it = iter(it)
         self.wait = 0
-        self.epoch = -1
+        self.iteration = -1
 
     def __iter__(self):
         return self
@@ -144,8 +144,8 @@ class EarlyStopping(TrainStopper):
     def __next__(self):
         if self.wait >= self.lag:
             raise StopIteration
-        self.epoch += 1
-        return self.it
+        self.iteration += 1
+        return next(self.it)
 
     def update(self, val_loss: float) -> None:
         """
@@ -156,38 +156,38 @@ class EarlyStopping(TrainStopper):
         else:
             self.wait = 0
             self.best_loss = val_loss
-            self.best_epoch = self.epoch
+            self.best_iteration = self.iteration
 
 
 class EpochStopping(TrainStopper):
     """
-    Dumb stopping after a fixed number of epochs.
+    Dumb stopping after a fixed number of iterations.
     """
-    def __init__(self, it: data.DataLoader = None, epochs: int = 100) -> None:
+    def __init__(self, it: data.DataLoader, iterations: int) -> None:
         """
         Args:
             it (torch.utils.data.DataLoader): training data loader
-            epochs (int): Number of epochs to train for
+            iterations (int): Number of iterations to train for
         """
         super().__init__()
-        self.epochs = epochs
-        self.epoch = -1
-        self.it = it
+        self.iterations = iterations
+        self.iteration = -1
+        self.it = iter(it)
 
     def __iter__(self):
         return self
 
     def __next__(self):
-        if self.epoch < self.epochs - 1:
-            self.epoch += 1
-            return self.it
+        if self.iteration < self.iterations - 1:
+            self.iteration += 1
+            return next(self.it)
         else:
             raise StopIteration
 
     def update(self, val_loss: float) -> None:
         """
-        Only update internal best epoch
+        Only update internal best iteration
         """
         if val_loss > self.best_loss:
             self.best_loss = val_loss
-            self.best_epoch = self.epoch
+            self.best_iteration = self.iteration

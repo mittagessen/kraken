@@ -15,19 +15,19 @@ class TestTrain(unittest.TestCase):
         Tests early stopping interrupter.
         """
         it = train.EarlyStopping(cycle('a'), min_delta = 1, lag = 5)
-        for epoch, _ in enumerate(it):
-            it.update(epoch if epoch < 10 else 10)
-        self.assertEqual(15, epoch)
-        self.assertEqual(it.best_epoch, 10)
+        for iteration, _ in enumerate(it):
+            it.update(iteration if iteration < 10 else 10)
+        self.assertEqual(15, iteration)
+        self.assertEqual(it.best_iteration, 10)
         self.assertEqual(it.best_loss, 10)
 
     def test_epoch_stopping(self):
         """
         Tests stopping after n epochs.
         """
-        it = train.EpochStopping(cycle('a'), epochs = 57)
-        for epoch, _ in enumerate(it):
-            it.update(epoch)
-        self.assertEqual(56, epoch)
-        self.assertEqual(it.best_epoch, 56)
+        it = train.EpochStopping(cycle('a'), iterations = 57)
+        for iteration, _ in enumerate(it):
+            it.update(iteration)
+        self.assertEqual(56, iteration)
+        self.assertEqual(it.best_iteration, 56)
         self.assertEqual(it.best_loss, 56)

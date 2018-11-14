@@ -78,12 +78,12 @@ def _expand_gt(ctx, param, value):
 @click.option('-a', '--append', show_default=True, default=None, type=click.INT,
               help='Removes layers before argument and then appends spec. Only works when loading an existing model')
 @click.option('-i', '--load', show_default=True, type=click.Path(exists=True, readable=True), help='Load existing file to continue training')
-@click.option('-F', '--savefreq', show_default=True, default=1, type=click.INT, help='Model save frequency in epochs during training')
-@click.option('-R', '--report', show_default=True, default=1, type=click.INT, help='Report creation frequency in epochs')
+@click.option('-F', '--savefreq', show_default=True, default=1.0, type=click.FLOAT, help='Model save frequency in epochs during training')
+@click.option('-R', '--report', show_default=True, default=1.0, type=click.FLOAT, help='Report creation frequency in epochs')
 @click.option('-q', '--quit', show_default=True, default='early', type=click.Choice(['early', 'dumb']),
               help='Stop condition for training. Set to `early` for early stooping or `dumb` for fixed number of epochs')
 @click.option('-N', '--epochs', show_default=True, default=-1, help='Number of epochs to train for')
-@click.option('--lag', show_default=True, default=5, help='Number of epochs to wait before stopping training without improvement')
+@click.option('--lag', show_default=True, default=5, help='Number of evaluations (--report frequence) to wait before stopping training without improvement')
 @click.option('--min-delta', show_default=True, default=0.002, help='Minimum improvement between epochs to reset early stopping')
 @click.option('-d', '--device', show_default=True, default='cpu', help='Select device to use (cpu, cuda:0, cuda:1, ...)')
 @click.option('--optimizer', show_default=True, default='Adam', type=click.Choice(['Adam', 'SGD', 'RMSprop']), help='Select optimizer')
@@ -130,6 +130,7 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
     import shutil
     import numpy as np
 
+    from itertools import count
     from torch.utils.data import DataLoader
 
     from kraken.lib import models, vgsl, train
@@ -308,9 +309,15 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
     rec = models.TorchSeqRecognizer(nn, train=True, device=device)
     optim = getattr(torch.optim, optimizer)(nn.nn.parameters(), lr=0)
 
+    iterations = int(len(gt_set) * epochs)
+    save_it = int(len(gt_set) * savefreq)
+    eval_it = int(len(gt_set) * report)
+    # calculate how many training stages (epochs / eval frequency)
+    stages = int((epochs / report) + 0.5)
+
     tr_it = TrainScheduler(optim)
     if schedule == '1cycle':
-        add_1cycle(tr_it, epochs * len(gt_set), lrate, momentum, momentum - 0.10, weight_decay)
+        add_1cycle(tr_it, iterations, lrate, momentum, momentum - 0.10, weight_decay)
     else:
         # constant learning rate scheduler
         tr_it.add_phase(1, (lrate, lrate), (momentum, momentum), weight_decay, train.annealing_const)
@@ -319,14 +326,13 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
     if quit == 'early':
         st_it = EarlyStopping(train_loader, min_delta, lag)
     elif quit == 'dumb':
-        st_it = EpochStopping(train_loader, epochs)
+        st_it = EpochStopping(train_loader, iterations)
     else:
         raise click.BadOptionUsage('quit', 'Invalid training interruption scheme {}'.format(quit))
 
-    for epoch, loader in enumerate(st_it):
-        with log.progressbar(label='epoch {}/{}'.format(epoch, epochs - 1 if epochs > 0 else '∞'), length=len(loader), show_pos=True) as bar:
-            acc_loss = torch.tensor(0.0).to(device, non_blocking=True)
-            for trial, (input, target) in enumerate(loader):
+    for stage in count():
+        with log.progressbar(label='stage {}/{}'.format(stage, stages if epochs > 0 else '∞'), length=eval_it, show_pos=True) as bar:
+            for i, (input, target) in zip(range(eval_it), st_it):
                 tr_it.step()
                 input = input.to(device, non_blocking=True)
                 target = target.to(device, non_blocking=True)
@@ -342,32 +348,31 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
                                     target,
                                     (o.size(2),),
                                     (target.size(1),))
-                logger.info('trial {}'.format(trial))
                 if not torch.isinf(loss):
                     loss.backward()
                     optim.step()
                 else:
                     logger.debug('infinite loss in trial {}'.format(trial))
                 bar.update(1)
-        if not epoch % savefreq:
-            logger.info('Saving to {}_{}'.format(output, epoch))
-            try:
-                nn.save_model('{}_{}.mlmodel'.format(output, epoch))
-            except Exception as e:
-                logger.error('Saving model failed: {}'.format(str(e)))
-        if not epoch % report:
-            logger.debug('Starting evaluation run')
-            nn.eval()
-            chars, error = compute_error(rec, list(val_set))
-            nn.train()
-            accuracy = (chars-error)/chars
-            logger.info('Accuracy report ({}) {:0.4f} {} {}'.format(epoch, accuracy, chars, error))
-            message('Accuracy report ({}) {:0.4f} {} {}'.format(epoch, accuracy, chars, error))
-            st_it.update(accuracy)
+                # savefreq might not be the same as evaluation frequency
+                if not (st_it.iteration + 1) % save_it:
+                    logger.info('Saving to {}_{}'.format(output, st_it.iteration))
+                    try:
+                        nn.save_model('{}_{}.mlmodel'.format(output, st_it.iteration))
+                    except Exception as e:
+                        logger.error('Saving model failed: {}'.format(str(e)))
+        logger.debug('Starting evaluation run')
+        nn.eval()
+        chars, error = compute_error(rec, list(val_set))
+        nn.train()
+        accuracy = (chars-error)/chars
+        logger.info('Accuracy report ({}) {:0.4f} {} {}'.format(st_it.iteration, accuracy, chars, error))
+        message('Accuracy report ({}) {:0.4f} {} {}'.format(st_it.iteration, accuracy, chars, error))
+        st_it.update(accuracy)
     if quit == 'early':
-        message('Moving best model {0}_{1}.mlmodel ({2}) to {0}_best.mlmodel'.format(output, st_it.best_epoch, st_it.best_loss))
-        logger.info('Moving best model {0}_{1}.mlmodel ({2}) to {0}_best.mlmodel'.format(output, st_it.best_epoch, st_it.best_loss))
-        shutil.copy('{}_{}.mlmodel'.format(output, st_it.best_epoch), '{}_best.mlmodel'.format(output))
+        message('Moving best model {0}_{1}.mlmodel ({2}) to {0}_best.mlmodel'.format(output, st_it.best_iteration, st_it.best_loss))
+        logger.info('Moving best model {0}_{1}.mlmodel ({2}) to {0}_best.mlmodel'.format(output, st_it.best_iteration, st_it.best_loss))
+        shutil.copy('{}_{}.mlmodel'.format(output, st_it.best_iteration), '{}_best.mlmodel'.format(output))
 
 
 @cli.command('test')
