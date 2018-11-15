@@ -134,7 +134,7 @@ class EarlyStopping(TrainStopper):
         super().__init__()
         self.min_delta = min_delta
         self.lag = lag
-        self.it = iter(it)
+        self.it = cycle(it)
         self.wait = 0
         self.iteration = -1
 
@@ -172,7 +172,7 @@ class EpochStopping(TrainStopper):
         super().__init__()
         self.iterations = iterations
         self.iteration = -1
-        self.it = iter(it)
+        self.it = cycle(it)
 
     def __iter__(self):
         return self

@@ -312,6 +312,7 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
     iterations = int(len(gt_set) * epochs)
     save_it = int(len(gt_set) * savefreq)
     eval_it = int(len(gt_set) * report)
+    lag_it = int(eval_it * lag)
     # calculate how many training stages (epochs / eval frequency)
     stages = int((epochs / report) + 0.5)
 
@@ -324,13 +325,14 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
 
     st_it = cast(TrainStopper, None)  # type: TrainStopper
     if quit == 'early':
-        st_it = EarlyStopping(train_loader, min_delta, lag)
+        st_it = EarlyStopping(train_loader, min_delta, lag_it)
     elif quit == 'dumb':
         st_it = EpochStopping(train_loader, iterations)
     else:
         raise click.BadOptionUsage('quit', 'Invalid training interruption scheme {}'.format(quit))
 
-    for stage in count():
+    stage_it = range(1, stages + 1) if epochs > 0 else count()
+    for stage in stage_it:
         with log.progressbar(label='stage {}/{}'.format(stage, stages if epochs > 0 else '∞'), length=eval_it, show_pos=True) as bar:
             for i, (input, target) in zip(range(eval_it), st_it):
                 tr_it.step()
