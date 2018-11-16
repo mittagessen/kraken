@@ -246,7 +246,7 @@ def binarize(threshold, zoom, escale, border, perc, range, low, high):
               type=click.Choice(['horizontal-lr', 'horizontal-rl',
                                  'vertical-lr', 'vertical-rl']),
               help='Sets principal text direction')
-@click.option('-s/-n', '--script-detect/--no-script-detect', default=True,
+@click.option('-s/-n', '--script-detect/--no-script-detect', default=False,
               show_default=True,
               help='Enable script detection on segmenter output')
 @click.option('-a', '--allowed-scripts', default=None, multiple=True,
