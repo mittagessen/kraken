@@ -17,6 +17,7 @@
 Training loop interception helpers
 """
 import abc
+import math
 import torch
 import numpy as np
 
@@ -26,10 +27,12 @@ from functools import partial
 from typing import Tuple, Union, Optional, Callable, List, Dict, Any
 from collections.abc import Iterable
 
+from kraken.lib.exceptions import KrakenStopTrainingException
+
 class TrainStopper(Iterable):
 
     def __init__(self):
-        self.best_loss = 0.0
+        self.best_loss = -math.inf
         self.best_iteration= 0
 
     @abc.abstractmethod
@@ -135,7 +138,7 @@ class EarlyStopping(TrainStopper):
         self.min_delta = min_delta
         self.lag = lag
         self.it = cycle(it)
-        self.wait = 0
+        self.wait = -1
         self.iteration = -1
 
     def __iter__(self):
@@ -143,17 +146,16 @@ class EarlyStopping(TrainStopper):
 
     def __next__(self):
         if self.wait >= self.lag:
-            raise StopIteration
+            raise KrakenStopTrainingException
         self.iteration += 1
+        self.wait += 1
         return next(self.it)
 
     def update(self, val_loss: float) -> None:
         """
         Updates the internal validation loss state
         """
-        if (val_loss - self.best_loss) < self.min_delta:
-            self.wait += 1
-        else:
+        if (val_loss - self.best_loss) >= self.min_delta:
             self.wait = 0
             self.best_loss = val_loss
             self.best_iteration = self.iteration
@@ -182,7 +184,7 @@ class EpochStopping(TrainStopper):
             self.iteration += 1
             return next(self.it)
         else:
-            raise StopIteration
+            raise KrakenStopTrainingException
 
     def update(self, val_loss: float) -> None:
         """

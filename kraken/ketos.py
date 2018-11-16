@@ -138,6 +138,7 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
     from kraken.lib.train import EarlyStopping, EpochStopping, TrainStopper, TrainScheduler, add_1cycle
     from kraken.lib.codec import PytorchCodec
     from kraken.lib.dataset import GroundTruthDataset, compute_error, generate_input_transforms
+    from kraken.lib.exceptions import KrakenStopTrainingException
 
     logger.info('Building ground truth set from {} line images'.format(len(ground_truth) + len(training_files)))
 
@@ -334,35 +335,38 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
     stage_it = range(1, stages + 1) if epochs > 0 else count()
     for stage in stage_it:
         with log.progressbar(label='stage {}/{}'.format(stage, stages if epochs > 0 else '∞'), length=eval_it, show_pos=True) as bar:
-            for i, (input, target) in zip(range(eval_it), st_it):
-                tr_it.step()
-                input = input.to(device, non_blocking=True)
-                target = target.to(device, non_blocking=True)
-                input = input.requires_grad_()
-                o = nn.nn(input)
-                # height should be 1 by now
-                if o.size(2) != 1:
-                    raise KrakenInputException('Expected dimension 3 to be 1, actual {}'.format(o.size(2)))
-                o = o.squeeze(2)
-                optim.zero_grad()
-                # NCW -> WNC
-                loss = nn.criterion(o.permute(2, 0, 1),  # type: ignore
-                                    target,
-                                    (o.size(2),),
-                                    (target.size(1),))
-                if not torch.isinf(loss):
-                    loss.backward()
-                    optim.step()
-                else:
-                    logger.debug('infinite loss in trial {}'.format(trial))
-                bar.update(1)
-                # savefreq might not be the same as evaluation frequency
-                if not (st_it.iteration + 1) % save_it:
-                    logger.info('Saving to {}_{}'.format(output, st_it.iteration))
-                    try:
-                        nn.save_model('{}_{}.mlmodel'.format(output, st_it.iteration))
-                    except Exception as e:
-                        logger.error('Saving model failed: {}'.format(str(e)))
+            try:
+                for _, (input, target) in zip(range(eval_it), st_it):
+                    tr_it.step()
+                    input = input.to(device, non_blocking=True)
+                    target = target.to(device, non_blocking=True)
+                    input = input.requires_grad_()
+                    o = nn.nn(input)
+                    # height should be 1 by now
+                    if o.size(2) != 1:
+                        raise KrakenInputException('Expected dimension 3 to be 1, actual {}'.format(o.size(2)))
+                    o = o.squeeze(2)
+                    optim.zero_grad()
+                    # NCW -> WNC
+                    loss = nn.criterion(o.permute(2, 0, 1),  # type: ignore
+                                        target,
+                                        (o.size(2),),
+                                        (target.size(1),))
+                    if not torch.isinf(loss):
+                        loss.backward()
+                        optim.step()
+                    else:
+                        logger.debug('infinite loss in trial {}'.format(trial))
+                    bar.update(1)
+                    # savefreq might not be the same as evaluation frequency
+                    if not (st_it.iteration + 1) % save_it:
+                        logger.info('Saving to {}_{}'.format(output, st_it.iteration))
+                        try:
+                            nn.save_model('{}_{}.mlmodel'.format(output, st_it.iteration))
+                        except Exception as e:
+                            logger.error('Saving model failed: {}'.format(str(e)))
+            except KrakenStopTrainingException as e:
+                break
         logger.debug('Starting evaluation run')
         nn.eval()
         chars, error = compute_error(rec, list(val_set))
