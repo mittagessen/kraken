@@ -268,6 +268,7 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
                 nn.add_codec(PytorchCodec(codec.c2l))
                 logger.info('Resizing last layer in network to {} outputs'.format(codec.max_label()+1))
                 nn.resize_output(codec.max_label()+1)
+                gt_set.encode(nn.codec)
                 message('\u2713', fg='green')
             elif resize == 'both':
                 message('Fitting network exactly to training set ', nl=False)
