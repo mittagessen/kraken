@@ -357,7 +357,7 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
                         loss.backward()
                         optim.step()
                     else:
-                        logger.debug('infinite loss in trial {}'.format(trial))
+                        logger.debug('infinite loss in trial')
                     bar.update(1)
                     # savefreq might not be the same as evaluation frequency
                     if not (st_it.iteration + 1) % save_it:
