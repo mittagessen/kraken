@@ -439,15 +439,17 @@ class TorchVGSLModel(object):
         net_builder = NeuralNetworkBuilder(inputs, outputs)
         input = 'input'
         prev_device = next(next(self.nn.children()).parameters()).device
-        for name, layer in self.nn.to('cpu').named_children():
-            input = layer.serialize(name, input, net_builder)
-        mlmodel = MLModel(net_builder.spec)
-        mlmodel.short_description = 'kraken recognition model'
-        mlmodel.user_defined_metadata['vgsl'] = '[' + ' '.join(self.named_spec) + ']'
-        if self.codec:
-            mlmodel.user_defined_metadata['codec'] = json.dumps(self.codec.c2l)
-        mlmodel.save(path)
-        self.nn.to(prev_device)
+        try:
+            for name, layer in self.nn.to('cpu').named_children():
+                input = layer.serialize(name, input, net_builder)
+            mlmodel = MLModel(net_builder.spec)
+            mlmodel.short_description = 'kraken recognition model'
+            mlmodel.user_defined_metadata['vgsl'] = '[' + ' '.join(self.named_spec) + ']'
+            if self.codec:
+                mlmodel.user_defined_metadata['codec'] = json.dumps(self.codec.c2l)
+            mlmodel.save(path)
+        finally:
+            self.nn.to(prev_device)
 
     def add_codec(self, codec: PytorchCodec) -> None:
         """
