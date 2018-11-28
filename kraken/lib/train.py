@@ -19,6 +19,7 @@ Training loop interception helpers
 import abc
 import math
 import torch
+import logging
 import numpy as np
 
 from itertools import cycle
@@ -28,6 +29,9 @@ from typing import Tuple, Union, Optional, Callable, List, Dict, Any
 from collections.abc import Iterable
 
 from kraken.lib.exceptions import KrakenStopTrainingException
+
+logger = logging.getLogger(__name__)
+
 
 class TrainStopper(Iterable):
 
@@ -126,16 +130,20 @@ class EarlyStopping(TrainStopper):
     Early stopping to terminate training when validation loss doesn't improve
     over a certain time.
     """
-    def __init__(self, it: data.DataLoader, min_delta: float = 0.002, lag: int = 1000) -> None:
+    def __init__(self, it: data.DataLoader, min_delta: float = None, lag: int = 1000) -> None:
         """
         Args:
             it (torch.utils.data.DataLoader): training data loader
-            min_delta (float): minimum change in validation loss to qualify as improvement.
+            min_delta (float): minimum change in validation loss to qualify as
+                               improvement. If `None` then linear auto-scaling
+                               of the delta is used with
+                               min_delta = (1 - val_loss)/20.
             lag (int): Number of iterations to wait for improvement before
                        terminating.
         """
         super().__init__()
         self.min_delta = min_delta
+        self.auto_delta = False if min_delta else True
         self.lag = lag
         self.it = cycle(it)
         self.wait = -1
@@ -155,7 +163,11 @@ class EarlyStopping(TrainStopper):
         """
         Updates the internal validation loss state
         """
+        if self.auto_delta:
+            self.min_delta = (1 - self.best_loss)/20
+            logger.debug('Rescaling early stopping loss to {}'.format(self.min_delta))
         if (val_loss - self.best_loss) >= self.min_delta:
+            logger.debug('Resetting early stopping counter')
             self.wait = 0
             self.best_loss = val_loss
             self.best_iteration = self.iteration
