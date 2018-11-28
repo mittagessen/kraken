@@ -110,7 +110,7 @@ def _expand_gt(ctx, param, value):
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
 @click.option('--preload/--no-preload', show_default=True, default=None, help='Hard enable/disable for training data preloading')
-@click.option('--threads', show_default=True, default=1, help='Number of OpenMP threads when running on CPU.')
+@click.option('--threads', show_default=True, default=1, help='Number of OpenMP threads and workers when running on CPU.')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
           lag, min_delta, device, optimizer, lrate, momentum, weight_decay,
@@ -293,7 +293,13 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
         # initialize codec
         message('\u2713', fg='green')
 
-    train_loader = DataLoader(gt_set, batch_size=1, shuffle=True, pin_memory=True)
+    # half the number of data loading processes if device isn't cuda and we haven't enabled preloading
+    if device == 'cpu' and not preload:
+        loader_threads = threads // 2
+    else:
+        loader_thread = threads
+    train_loader = DataLoader(gt_set, batch_size=1, shuffle=True, num_workers=loader_threads, pin_memory=True)
+    threads -= loader_threads
 
     # don't encode validation set as the alphabets may not match causing encoding failures
     val_set.training_set = list(zip(val_set._images, val_set._gt))
