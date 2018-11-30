@@ -297,7 +297,7 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
     if device == 'cpu' and not preload:
         loader_threads = threads // 2
     else:
-        loader_thread = threads
+        loader_threads = threads
     train_loader = DataLoader(gt_set, batch_size=1, shuffle=True, num_workers=loader_threads, pin_memory=True)
     threads -= loader_threads
 
