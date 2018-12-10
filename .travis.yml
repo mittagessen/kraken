@@ -13,16 +13,12 @@ install:
 - bash miniconda.sh -b -p $HOME/miniconda
 - export PATH="$HOME/miniconda/bin:$PATH"
 - conda config --set always_yes yes --set changeps1 no --set show_channel_urls yes
-- conda update conda
-- conda create -n test-environment python=$TRAVIS_PYTHON_VERSION
+- conda update -q conda
+- conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION
 - source activate test-environment
-- conda install pbr nose pip
-- sed '/coremltools\|python-bidi\|regex\|torch/d' requirements.txt | xargs conda install
-- conda install torchvision-cpu -c pytorch
-- conda uninstall pytorch-cpu -c pytorch
-- conda install pytorch-nightly-cpu -c pytorch
+- conda install -q pbr nose pip
+- sed '/coremltools/d' requirements.txt | xargs conda install -q
 - pip install -r requirements.txt
-- conda list
 - pip freeze
 - python setup.py install
 script:
