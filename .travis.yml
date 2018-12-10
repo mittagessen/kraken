@@ -33,6 +33,7 @@ deploy:
   distributions: sdist bdist_wheel
   skip_cleanup: true
   skip_upload_docs: true
+  skip_existing: true
   on:
     tags: true
   password:
