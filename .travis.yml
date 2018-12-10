@@ -14,6 +14,8 @@ install:
 - export PATH="$HOME/miniconda/bin:$PATH"
 - conda config --set always_yes yes --set changeps1 no --set show_channel_urls yes
 - conda update -q conda
+- conda config --add channels conda-forge
+- conda config --add channels pytorch
 - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION
 - source activate test-environment
 - conda install -q pbr nose pip
