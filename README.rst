@@ -24,7 +24,7 @@ When using a recent version of pip all dependencies will be installed from
 binary wheel packages, so installing build-essential or your distributions
 equivalent is often unnecessary.
 
-Install the latest master version through `conda <https://anaconda.org>`_:
+Install the latest 1.0 release through `conda <https://anaconda.org>`_:
 
 ::
 
@@ -40,7 +40,7 @@ or:
 
 for CUDA acceleration with the appropriate hardware.
 
-It is also possible to install the stable version with the old clstm backend from pypi:
+It is also possible to install the same version from pypi:
 
 ::
 
