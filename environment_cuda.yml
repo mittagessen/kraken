@@ -1,7 +1,6 @@
 name: kraken
 channels:
   - pytorch
-  - fastai
   - defaults
 dependencies:
   - python==3.6
@@ -15,8 +14,8 @@ dependencies:
   - scipy
   - protobuf>=3.0.0
   - jinja2
-  - torchvision-nightly
-  - pytorch-nightly
+  - torchvision
+  - pytorch>=1.0.0
   - pip:
     - coremltools
     - python-bidi

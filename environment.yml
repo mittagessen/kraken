@@ -1,7 +1,6 @@
-name: kraken_forge
+name: kraken
 channels:
   - pytorch
-  - fastai
   - conda-forge
   - defaults
 dependencies:
@@ -17,8 +16,8 @@ dependencies:
   - scipy
   - protobuf>=3.0.0
   - jinja2
-  - torchvision-nightly-cpu
-  - pytorch-nightly-cpu
+  - torchvision-cpu
+  - pytorch-cpu>=1.0.0
   - pip:
     - coremltools
     - git+https://github.com/mittagessen/kraken.git@master
