@@ -10,5 +10,5 @@ protobuf>=3.0.0
 jinja2
 python-bidi
 torchvision
-torch>=0.4.1
+torch>=1.0.0
 coremltools
