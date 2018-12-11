@@ -494,6 +494,7 @@ def detect_scripts(im, bounds, model=pkg_resources.resource_filename(__name__, '
     Raises:
         KrakenInvalidModelException if no clstm module is available.
     """
+    raise NotImplementedError('Temporarily unavailable. Please open a github ticket if you want this fixed sooner.')
     im_str = get_im_str(im)
     logger.info(u'Detecting scripts with {} in {} lines on {}'.format(model, len(bounds['boxes']), im_str))
     logger.debug(u'Loading detection model {}'.format(model))
