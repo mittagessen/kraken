@@ -18,6 +18,7 @@ Utility functions for data loading and training of VGSL networks.
 """
 import os
 import json
+import regex
 import torch
 import unicodedata
 import numpy as np
@@ -241,6 +242,7 @@ class GroundTruthDataset(Dataset):
     def __init__(self, split: Callable[[str], str] = lambda x: os.path.splitext(x)[0],
                  suffix: str = '.gt.txt',
                  normalization: Optional[str] = None,
+                 whitespace_normalization: bool = True,
                  reorder: bool = True,
                  im_transforms: Callable[[Any], torch.Tensor] = transforms.Compose([]),
                  preload: bool = True) -> None:
@@ -260,6 +262,8 @@ class GroundTruthDataset(Dataset):
                                 CenterLineNormalizer, resizing with Lanczos
                                 interpolation. Set to 0 to disable.
             normalization (str): Unicode normalization for gt
+            whitespace_normalization (str): Normalizes unicode whitespace and
+                                            strips whitespace.
             reorder (bool): Whether to rearrange code points in "display"/LTR
                             order
             im_transforms (func): Function taking an PIL.Image and returning a
@@ -277,6 +281,8 @@ class GroundTruthDataset(Dataset):
         # built text transformations
         if normalization:
             self.text_transforms.append(lambda x: unicodedata.normalize(cast(str, normalization), x))
+        if whitespace_normalization:
+            self.text_transforms.append(lambda x: regex.sub('\s', ' ', x).strip())
         if reorder:
             self.text_transforms.append(bd.get_display)
 

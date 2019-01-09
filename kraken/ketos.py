@@ -95,6 +95,8 @@ def _expand_gt(ctx, param, value):
 @click.option('-p', '--partition', show_default=True, default=0.9, help='Ground truth data partition ratio between train/validation set')
 @click.option('-u', '--normalization', show_default=True, type=click.Choice(['NFD', 'NFKD', 'NFC', 'NFKC']),
               default=None, help='Ground truth normalization')
+@click.option('-n', '--normalize-whitespace/--no-normalize-whitespace',
+              show_default=True, default=True, help='Normalizes unicode whitespace')
 @click.option('-c', '--codec', show_default=True, default=None, type=click.File(mode='r', lazy=True),
               help='Load a codec JSON definition (invalid if loading existing model)')
 @click.option('--resize', show_default=True, default='fail', type=click.Choice(['add', 'both', 'fail']),
@@ -114,8 +116,9 @@ def _expand_gt(ctx, param, value):
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
           lag, min_delta, device, optimizer, lrate, momentum, weight_decay,
-          schedule, partition, normalization, codec, resize, reorder,
-          training_files, evaluation_files, preload, threads, ground_truth):
+          schedule, partition, normalization, normalize_whitespace, codec,
+          resize, reorder, training_files, evaluation_files, preload, threads,
+          ground_truth):
     """
     Trains a model from image-text pairs.
     """
@@ -198,7 +201,11 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
         te_im = ground_truth[int(len(ground_truth) * partition):]
         logger.debug('Taking {} lines from training for evaluation'.format(len(te_im)))
 
-    gt_set = GroundTruthDataset(normalization=normalization, reorder=reorder, im_transforms=transforms, preload=preload)
+    gt_set = GroundTruthDataset(normalization=normalization,
+                                whitespace_normalization=normalize_whitespace,
+                                reorder=reorder,
+                                im_transforms=transforms,
+                                preload=preload)
     with log.progressbar(tr_im, label='Building training set') as bar:
         for im in bar:
             logger.debug('Adding line {} to training set'.format(im))
@@ -209,7 +216,11 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
             except KrakenInputException as e:
                 logger.warning(str(e))
 
-    val_set = GroundTruthDataset(normalization=normalization, reorder=reorder, im_transforms=transforms, preload=preload)
+    val_set = GroundTruthDataset(normalization=normalization,
+                                 whitespace_normalization=normalize_whitespace,
+                                 reorder=reorder,
+                                 im_transforms=transforms,
+                                 preload=preload)
     with log.progressbar(te_im, label='Building validation set') as bar:
         for im in bar:
             logger.debug('Adding line {} to validation set'.format(im))
