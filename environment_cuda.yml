@@ -3,7 +3,7 @@ channels:
   - pytorch
   - defaults
 dependencies:
-  - python==3.6
+  - python==3.6.6
   - lxml
   - future
   - regex
