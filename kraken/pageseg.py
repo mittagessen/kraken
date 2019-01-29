@@ -217,7 +217,7 @@ def compute_colseps_conv(binary: np.array, scale: float = 1.0, minheight: int = 
     Returns:
         Separators
     """
-    logger.debug(u'Finding column separators')
+    logger.debug('Finding column separators')
     # find vertical whitespace by thresholding
     smoothed = gaussian_filter(1.0*binary, (scale, scale*0.5))
     smoothed = uniform_filter(smoothed, (5.0*scale, 1))
@@ -246,7 +246,7 @@ def compute_black_colseps(binary: np.array, scale: float, maxcolseps: int) -> Tu
     Returns:
         (colseps, binary):
     """
-    logger.debug(u'Extract vertical black column separators from lines')
+    logger.debug('Extract vertical black column separators from lines')
     seps = compute_separators_morph(binary, scale, maxcolseps)
     colseps = np.maximum(compute_colseps_conv(binary, scale, maxcolseps), seps)
     binary = np.minimum(binary, 1-seps)
@@ -287,7 +287,7 @@ def compute_gradmaps(binary, scale, gauss=False):
         (bottom, top, boxmap)
     """
     # use gradient filtering to find baselines
-    logger.debug(u'Computing gradient maps')
+    logger.debug('Computing gradient maps')
     boxmap = compute_boxmap(binary, scale)
     cleaned = boxmap*binary
     if gauss:
@@ -372,7 +372,7 @@ def rotate_lines(lines, angle, offset):
 
 
 def segment(im, text_direction='horizontal-lr', scale=None, maxcolseps=2,
-            black_colseps=False, no_hlines=True, pad=0):
+            black_colseps=False, no_hlines=True, pad=0, mask=None):
     """
     Segments a page into text lines.
 
@@ -391,6 +391,9 @@ def segment(im, text_direction='horizontal-lr', scale=None, maxcolseps=2,
         pad (int or tuple): Padding to add to line bounding boxes. If int the
                             same padding is used both left and right. If a
                             2-tuple, uses (padding_left, padding_right).
+        mask (PIL.Image): A bi-level mask image of the same size as `im` where
+                          0-valued regions are ignored for segmentation
+                          purposes. Disables column detection.
 
     Returns:
         {'text_direction': '$dir', 'boxes': [(x1, y1, x2, y2),...]}: A
@@ -441,12 +444,15 @@ def segment(im, text_direction='horizontal-lr', scale=None, maxcolseps=2,
     # emptyish images wll cause exceptions here.
 
     try:
-        if black_colseps:
+        if mask:
+            logger.info('Masking enabled in segmenter. Disabling column detection.')
+            colseps = pil2array(mask)
+        elif black_colseps:
             colseps, binary = compute_black_colseps(binary, scale, maxcolseps)
         else:
             colseps = compute_white_colseps(binary, scale, maxcolseps)
     except ValueError:
-        logger.warning(u'Exception in column finder (probably empty image) for {}.'.format(im_str))
+        logger.warning('Exception in column finder (probably empty image) for {}.'.format(im_str))
         return {'text_direction': text_direction, 'boxes':  []}
 
     bottom, top, boxmap = compute_gradmaps(binary, scale)
