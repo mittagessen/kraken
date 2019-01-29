@@ -44,7 +44,16 @@ def message(msg, **styles):
 @click.group()
 @click.version_option()
 @click.option('-v', '--verbose', default=0, count=True)
-def cli(verbose):
+@click.option('-s', '--seed', default=None, type=click.INT,
+              help='Seed for numpy\'s and torch\'s RNG. Set to a fixed value to '
+                   'ensure reproducable random splits of data')
+def cli(verbose, seed):
+    if seed:
+        import numpy.random
+        numpy.random.seed(seed)
+        from torch import manual_seed
+        manual_seed(seed)
+
     log.set_logger(logger, level=30-min(10*verbose, 20))
 
 
