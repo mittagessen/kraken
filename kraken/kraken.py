@@ -71,7 +71,7 @@ def binarizer(threshold, zoom, escale, border, perc, range, low, high, base_imag
 
 
 def segmenter(text_direction, script_detect, allowed_scripts, scale,
-              maxcolseps, black_colseps, remove_hlines, pad, base_image, input,
+              maxcolseps, black_colseps, remove_hlines, pad, mask, base_image, input,
               output) -> None:
     import json
 
@@ -81,9 +81,14 @@ def segmenter(text_direction, script_detect, allowed_scripts, scale,
         im = Image.open(input)
     except IOError as e:
         raise click.BadParameter(str(e))
+    if mask:
+        try:
+            mask = Image.open(mask)
+        except IOError as e:
+            raise click.BadParameter(str(e))
     message('Segmenting\t', nl=False)
     try:
-        res = pageseg.segment(im, text_direction, scale, maxcolseps, black_colseps, no_hlines=remove_hlines, pad=pad)
+        res = pageseg.segment(im, text_direction, scale, maxcolseps, black_colseps, no_hlines=remove_hlines, pad=pad, mask=mask)
         if script_detect:
             res = pageseg.detect_scripts(im, res, valid_scripts=allowed_scripts)
     except Exception:
@@ -258,13 +263,18 @@ def binarize(threshold, zoom, escale, border, perc, range, low, high):
 @click.option('-r/-l', '--remove_hlines/--hlines', show_default=True, default=True)
 @click.option('-p', '--pad', show_default=True, type=(int, int), default=(0, 0),
               help='Left and right padding around lines')
+@click.option('-m', '--mask', show_default=True, default=None,
+              type=click.File(mode='rb', lazy=True), help='Segmentation mask '
+              'suppressing page areas for line detection. 0-valued image '
+              'regions are ignored for segmentation purposes. Disables column '
+              'detection.')
 def segment(text_direction, script_detect, allowed_scripts, scale, maxcolseps,
-            black_colseps, remove_hlines, pad):
+            black_colseps, remove_hlines, pad, mask):
     """
     Segments page images into text lines.
     """
     return partial(segmenter, text_direction, script_detect, allowed_scripts,
-                   scale, maxcolseps, black_colseps, remove_hlines, pad)
+                   scale, maxcolseps, black_colseps, remove_hlines, pad, mask)
 
 
 def _validate_mm(ctx, param, value):
@@ -411,8 +421,8 @@ def list_models(ctx):
     model_list = repo.get_listing(partial(message, '.', nl=False))
     message('\b\u2713', fg='green', nl=False)
     message('\033[?25h\n', nl=False)
-    for m in model_list:
-        message('{} ({}) - {}'.format(m, model_list[m]['type'], model_list[m]['summary']))
+    for id, metadata in model_list.items():
+        message('{} ({}) - {}'.format(id, ', '.join(metadata['type']), metadata['summary']))
     ctx.exit(0)
 
 
@@ -431,10 +441,11 @@ def get(ctx, model_id):
         pass
 
     message('Retrieving model ', nl=False)
-    repo.get_model(model_id, click.get_app_dir(APP_NAME),
-                   partial(message, '.', nl=False))
+    filename = repo.get_model(model_id, click.get_app_dir(APP_NAME),
+                              partial(message, '.', nl=False))
     message('\b\u2713', fg='green', nl=False)
-    message('\033[?25h\n', nl=False)
+    message('\033[?25h')
+    message('Model name: {}'.format(filename))
     ctx.exit(0)
 
 

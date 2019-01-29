@@ -405,10 +405,10 @@ def segment(im, text_direction='horizontal-lr', scale=None, maxcolseps=2,
         direction is invalid.
     """
     im_str = get_im_str(im)
-    logger.info(u'Segmenting {}'.format(im_str))
+    logger.info('Segmenting {}'.format(im_str))
 
     if im.mode != '1' and not is_bitonal(im):
-        logger.error(u'Image {} is not bi-level'.format(im_str))
+        logger.error('Image {} is not bi-level'.format(im_str))
         raise KrakenInputException('Image {} is not bi-level'.format(im_str))
 
     # rotate input image for vertical lines
@@ -422,10 +422,10 @@ def segment(im, text_direction='horizontal-lr', scale=None, maxcolseps=2,
         angle = 90
         offset = (im.size[0], 0)
     else:
-        logger.error(u'Invalid text direction \'{}\''.format(text_direction))
+        logger.error('Invalid text direction \'{}\''.format(text_direction))
         raise KrakenInputException('Invalid text direction {}'.format(text_direction))
 
-    logger.debug(u'Rotating input image by {} degrees'.format(angle))
+    logger.debug('Rotating input image by {} degrees'.format(angle))
     im = im.rotate(angle, expand=True)
 
     # honestly I've got no idea what's going on here. In theory a simple
@@ -445,7 +445,15 @@ def segment(im, text_direction='horizontal-lr', scale=None, maxcolseps=2,
 
     try:
         if mask:
+            if mask.mode != '1' and not is_bitonal(mask):
+                logger.error('Mask is not bitonal')
+                raise KrakenInputException('Mask is not bitonal')
+            mask = mask.convert('1')
+            if mask.size != im.size:
+                logger.error('Mask size {} doesn\'t match image size {}'.format(mask.size, im.size))
+                raise KrakenInputException('Mask size {} doesn\'t match image size {}'.format(mask.size, im.size))
             logger.info('Masking enabled in segmenter. Disabling column detection.')
+            mask = mask.rotate(angle, expand=True)
             colseps = pil2array(mask)
         elif black_colseps:
             colseps, binary = compute_black_colseps(binary, scale, maxcolseps)
