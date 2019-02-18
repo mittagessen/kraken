@@ -396,16 +396,15 @@ def show(ctx, model_id):
             combining.append(make_printable(char))
         else:
             chars.append(char)
-    message('name: {}\n\n{}\n\n{}\nscripts: {}\nalphabet: {} {}\nlicense: {}\nauthor: {} ({})\n{}'.format(desc['name'],
+    message('name: {}\n\n{}\n\n{}\nscripts: {}\nalphabet: {} {}\nlicense: {}\nauthor(s): {}\ndate: {}'.format(model_id,
                                                                                                           desc['summary'],
                                                                                                           desc['description'],
                                                                                                           ' '.join(desc['script']),
                                                                                                           ''.join(chars),
                                                                                                           ', '.join(combining),
-                                                                                                          desc['license'],
-                                                                                                          desc['author'],
-                                                                                                          desc['author-email'],
-                                                                                                          desc['url']))
+                                                                                                          desc['license']['id'],
+                                                                                                          '; '.join(x['name'] for x in desc['creators']),
+                                                                                                          desc['publication_date']))
     ctx.exit(0)
 
 

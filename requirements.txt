@@ -1,3 +1,4 @@
+jsonschema
 lxml
 future
 requests

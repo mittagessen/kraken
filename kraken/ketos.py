@@ -790,15 +790,62 @@ def line_generator(ctx, font, maxlines, encoding, normalization, renormalize,
 
 @cli.command('publish')
 @click.pass_context
-def publish(ctx):
+@click.option('-i', '--metadata', show_default=True,
+              type=click.File(mode='r', lazy=True), help='Metadata for the '
+              'model. Will be prompted from the user if not given')
+@click.option('-a', '--access-token', prompt=True, help='Zenodo access token')
+@click.argument('model', nargs=1, type=click.Path(exists=False, readable=True, dir_okay=False))
+def publish(ctx, metadata, access_token, model):
     """
     Publishes a model on the zenodo model repository.
     """
     import json
+    import pkg_resources
+
+    from functools import partial
+    from jsonschema import validate
+    from jsonschema.exceptions import ValidationError
 
     from kraken import repo
+    from kraken.lib import models
 
-    pass
+    with pkg_resources.resource_stream(__name__, 'metadata.schema.json') as fp:
+        schema = json.load(fp)
+
+    if not metadata:
+        author = click.prompt('author')
+        affiliation = click.prompt('affiliation')
+        summary = click.prompt('summary')
+        description = click.edit('Write long form description (training data, transcription standards) of the model here')
+        accuracy = click.prompt('accuracy on test set', type=float)
+        script = [click.prompt('script', type=click.Choice(schema['properties']['script']['items']['enum']), show_choices=True)]
+        license = click.prompt('license', type=click.Choice(schema['properties']['license']['enum']), show_choices=True)
+        metadata = {
+                'authors': [{'name': author, 'affiliation': affiliation}],
+                'summary': summary,
+                'description': description,
+                'accuracy': accuracy,
+                'license': license,
+                'script': script,
+                'name': os.path.basename(model),
+                'graphemes': ['a']
+        }
+        while True:
+            try:
+                validate(metadata, schema)
+            except ValidationError as e:
+                message(e.message)
+                metadata[e.path[-1]] = click.prompt(e.path[-1], type=float if e.schema['type'] == 'number' else str)
+                continue
+            break
+
+    else:
+        metadata = json.load(metadata)
+        validate(metadata, schema)
+    nn = models.load_any(model)
+    metadata['graphemes'] = [char for char in ''.join(nn.codec.c2l.keys())]
+    oid = repo.publish_model(model, metadata, access_token, partial(message, '.', nl=False))
+    print('\nmodel PID: {}'.format(oid))
 
 if __name__ == '__main__':
     cli()
