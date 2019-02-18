@@ -632,13 +632,13 @@ def transcription(ctx, text_direction, scale, bw, maxcolseps,
         for fp in bar:
             logger.info('Reading {}'.format(fp.name))
             im = Image.open(fp)
-            im_bin = im
-            if not is_bitonal(im):
-                logger.info('Binarizing page')
-                im_bin = binarization.nlbin(im)
+            if im.mode not in ['1', 'L', 'P', 'RGB']:
+                logger.warning('Input {} is in {} color mode. Converting to RGB'.format(fp.name, im.mode))
+                im = im.convert('RGB')
+            logger.info('Binarizing page')
+            im_bin = binarization.nlbin(im)
+            im_bin = im_bin.convert('1')
             logger.info('Segmenting page')
-            if bw:
-                im = im_bin
             if not lines:
                 res = pageseg.segment(im_bin, text_direction, scale, maxcolseps, black_colseps, pad=pad)
             else:
