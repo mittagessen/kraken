@@ -604,6 +604,9 @@ def extract(ctx, binarize, normalization, normalize_whitespace, reorder,
 def transcription(ctx, text_direction, scale, bw, maxcolseps,
                   black_colseps, font, font_style, prefill, pad, lines, output,
                   images):
+    """
+    Creates transcription environments for ground truth generation.
+    """
     from PIL import Image
 
     from kraken import rpred
@@ -784,6 +787,18 @@ def line_generator(ctx, font, maxlines, encoding, normalization, renormalize,
                 else:
                     fp.write(line.encode('utf-8'))
 
+
+@cli.command('publish')
+@click.pass_context
+def publish(ctx):
+    """
+    Publishes a model on the zenodo model repository.
+    """
+    import json
+
+    from kraken import repo
+
+    pass
 
 if __name__ == '__main__':
     cli()
