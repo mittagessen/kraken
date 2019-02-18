@@ -13,18 +13,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
 # or implied. See the License for the specific language governing
 # permissions and limitations under the License.
-
-# -*- coding: utf-8 -*-
 """
-Access functions to the model repository on github.
+Accessors to the model repository on zenodo.
 """
 from collections import defaultdict
-from typing import Callable, Any
+from typing import Callable, Any, BinaryIO
 from contextlib import closing
 
 from kraken.lib.exceptions import KrakenRepoException
 
-import base64
+import urllib
 import requests
 import json
 import os
@@ -34,116 +32,204 @@ __all__ = ['get_model', 'get_description', 'get_listing']
 
 logger = logging.getLogger(__name__)
 
-MODEL_REPO = 'https://api.github.com/repos/mittagessen/kraken-models/'
+MODEL_REPO = 'https://sandbox.zenodo.org/api/'
+SUPPORTED_MODELS = set(['kraken_pytorch'])
 
+def publish_model(model_file: BinaryIO = None, metadata: dict = None, access_token: str = None, callback: Callable[..., Any] = lambda: None) -> str:
+    """
+    Publishes a model to the repository.
 
-def get_model(model_id: str, path: str, callback: Callable[..., Any]) -> None:
+    Args:
+        model_file (file): I/O stream to read model from.
+        metadata (dict):
+        access_token (str):
+        callback (func): Function called for every 1024 octet chunk uploaded.
+    """
+    headers = {"Content-Type": "application/json"}
+    r = requests.post('{}deposit/depositions'.format(MODEL_REPO),
+                      params={'access_token': access_token}, json={},
+                      headers=headers)
+    r.raise_for_status()
+    callback()
+    deposition_id = r.json()['id']
+    data = {'filename': 'metadata.json'}
+    files = {'file': ('metadata.json', json.dumps(metadata))}
+    r = requests.post('{}deposit/depositions/{}/files'.format(MODEL_REPO, deposition_id),
+                      params={'access_token': access_token}, data=data,
+                      files=files)
+    r.raise_for_status()
+    callback()
+    data = {'filename': metadata['name']}
+    files = {'file': open(model_file, 'rb')}
+    r = requests.post('{}deposit/depositions/{}/files'.format(MODEL_REPO, deposition_id),
+                      params={'access_token': access_token}, data=data,
+                      files=files)
+    r.raise_for_status()
+    callback()
+    # fill zenodo metadata
+    data = {'metadata': {
+                        'title': metadata['summary'],
+                        'upload_type': 'publication',
+                        'publication_type': 'other',
+                        'description': metadata['description'],
+                        'creators': metadata['authors'],
+                        'access_right': 'open',
+                        'communities': [{'identifier': 'ocr_models'}],
+                        'keywords': ['kraken_pytorch'],
+                        'license': metadata['license'],
+                        }
+           }
+    # add link to training data to metadata
+    if 'source' in metadata:
+        data['metadata']['related_identifiers'] = [{'relation': 'isSupplementTo', 'identifier': metadata['source']}]
+    r = requests.put('{}deposit/depositions/{}'.format(MODEL_REPO, deposition_id),
+                     params={'access_token': access_token},
+                     data=json.dumps(data),
+                     headers=headers)
+    r.raise_for_status()
+    callback()
+    r = requests.post('{}deposit/depositions/{}/actions/publish'.format(MODEL_REPO, deposition_id),
+                      params={'access_token': access_token})
+    r.raise_for_status()
+    callback()
+    return r.json()['doi']
+
+def get_model(model_id: str, path: str, callback: Callable[..., Any] = lambda: None) -> str:
     """
     Retrieves a model and saves it to a path.
 
     Args:
-        model_id (str): Identifier of the model
+        model_id (str): DOI of the model
         path (str): Destination to write model to.
         callback (func): Function called for every 1024 octet chunk received.
+
+    Returns:
+        The identifier the model can be called through on the command line.
+        Will usually be the file name of the model.
     """
-    logger.info(u'Saving model {} to {}'.format(model_id, path))
-    logger.debug(u'Retrieving head of model repository')
-    r = requests.get('{}{}'.format(MODEL_REPO, 'git/refs/heads/master'))
+    logger.info('Saving model {} to {}'.format(model_id, path))
+    r = requests.get('{}{}'.format(MODEL_REPO, 'records'), params={'q': 'doi:"{}"'.format(model_id), 'communities': 'ocr_models'})
+    r.raise_for_status()
     callback()
     resp = r.json()
-    if 'object' not in resp:
-        logger.error(u'No \'object\' field in repo head API response.')
-        raise KrakenRepoException('{}: {}'.format(r.status_code, resp['message']))
-    head = resp['object']['sha']
-    logger.debug(u'Retrieving tree of model repository')
-    r = requests.get('{}{}{}'.format(MODEL_REPO, 'git/trees/', head), params={'recursive': 1})
-    callback()
-    resp = r.json()
-    if 'tree' not in resp:
-        logger.error(u'No \'tree\' field in repo API response.')
-        raise KrakenRepoException('{}: {}'.format(r.status_code, resp['message']))
-    url = None
-    for el in resp['tree']:
-        components = el['path'].split('/')
-        if len(components) > 2 and components[1] == model_id and components[2] == 'DESCRIPTION':
-            logger.debug(u'Retrieving description for {}'.format(components[1]))
-            raw = base64.b64decode(requests.get(el['url']).json()['content']).decode('utf-8')
-            desc = json.loads(raw)
-            spath = os.path.join(path, desc['name'])
-        elif len(components) > 2 and components[1] == model_id:
-            url = el['url']
-            break
-    if not url:
-        logger.error(u'Model {} not in repository.'.format(model_id))
-        raise KrakenRepoException('Modle {} not in repository'.format(model_id))
-    with closing(requests.get(url, headers={'Accept': 'application/vnd.github.v3.raw'},
-                 stream=True)) as r:
+    if  resp['hits']['total'] != 1:
+        logger.error('Found {} models when querying for id \'{}\''.format(model_id))
+        raise KrakenRepoException('Found {} models when querying for id \'{}\''.format(model_id))
+
+    metadata = resp['hits']['hits'][0]
+    model_url = [x['links']['self'] for x in metadata['files'] if x['type'] == 'mlmodel'][0]
+    # callable model identifier 
+    nat_id = os.path.basename(urllib.parse.urlparse(model_url).path)
+    spath = os.path.join(path, nat_id)
+    logger.debug('downloading model file {} to {}'.format(model_url, spath))
+    with closing(requests.get(model_url, stream=True)) as r:
         with open(spath, 'wb') as f:
-            logger.debug(u'Downloading model')
             for chunk in r.iter_content(chunk_size=1024):
                 callback()
                 f.write(chunk)
-    return
+    return nat_id
 
 
-def get_description(model_id: str) -> dict:
+def get_description(model_id: str, callback: Callable[..., Any] = lambda: None) -> dict:
+    """
+    Fetches the metadata for a single model from the zenodo repository.
+
+    Args:
+        model_id (str): DOI of the model.
+        callback (callable): Optional function called once per HTTP request.
+
+    Returns:
+        Dict
+    """
     logger.info('Retrieving metadata for {}'.format(model_id))
-    logger.debug('Retrieving head of model repository')
-    r = requests.get('{}{}'.format(MODEL_REPO, 'git/refs/heads/master'))
-    resp = r.json()
-    if 'object' not in resp:
-        logger.error('No \'object\' field in repo head API response.')
-        raise KrakenRepoException('{}: {}'.format(r.status_code, resp['message']))
-    head = resp['object']['sha']
-    logger.debug('Retrieving tree of model repository')
-    r = requests.get('{}{}{}'.format(MODEL_REPO, 'git/trees/', head), params={'recursive': 1})
-    resp = r.json()
-    if 'tree' not in resp:
-        logger.error('No \'tree\' field in repo API response.')
-        raise KrakenRepoException('{}: {}'.format(r.status_code, resp['message']))
-    for el in resp['tree']:
-        components = el['path'].split('/')
-        if len(components) > 2 and components[1] == model_id and components[2] == 'DESCRIPTION':
-            logger.debug('Retrieving description for {}'.format(components[1]))
-            raw = base64.b64decode(requests.get(el['url']).json()['content']).decode('utf-8')
-            return defaultdict(str, json.loads(raw))
-    raise KrakenRepoException('No description for {} found'.format(model_id))
-
-
-def get_listing(callback: Callable[..., Any]) -> dict:
-    logger.info(u'Retrieving model list')
-    r = requests.get('{}{}'.format(MODEL_REPO, 'git/refs/heads/master'))
+    r = requests.get('{}{}'.format(MODEL_REPO, 'records'), params={'q': 'doi:"{}"'.format(model_id), 'communities': 'ocr_models'})
+    r.raise_for_status()
     callback()
     resp = r.json()
-    if 'object' not in resp:
-        logger.error(u'No \'object\' field in repo head API response.')
-        raise KrakenRepoException('{}: {}'.format(r.status_code, resp['message']))
-    head = resp['object']['sha']
-    logger.debug(u'Retrieving tree of model repository')
-    r = requests.get('{}{}{}'.format(MODEL_REPO, 'git/trees/', head), params={'recursive': 1})
-    callback()
-    resp = r.json()
-    if 'tree' not in resp:
-        logger.error(u'No \'tree\' field in repo API response.')
-        raise KrakenRepoException('{}: {}'.format(r.status_code, resp['message']))
-    models = {}
-    for el in resp['tree']:
-        components = el['path'].split('/')
-        # new model
-        if len(components) == 2:
-            models[components[1]] = {'type': components[0]}
-        if len(components) > 2 and components[2] == 'DESCRIPTION':
-            logger.debug(u'Retrieving description for {}'.format(components[1]))
-            r = requests.get(el['url'])
-            if not r.ok:
-                logger.error(u'Requests to \'{}\' failed with status {}'.format(el['url'], r.status_code))
-                raise KrakenRepoException('{}: {}'.format(r.status_code, r.json()['message']))
-            raw = base64.b64decode(requests.get(el['url']).json()['content']).decode('utf-8')
+    if  resp['hits']['total'] != 1:
+        logger.error('Found {} models when querying for id \'{}\''.format(model_id))
+        raise KrakenRepoException('Found {} models when querying for id \'{}\''.format(model_id))
+    record = resp['hits']['hits'][0]
+    metadata = record['metadata']
+    if 'keywords' not in metadata:
+        logger.error('No keywords included on deposit')
+        raise KrakenRepoException('No keywords included on deposit.')
+    model_type = SUPPORTED_MODELS.intersection(metadata['keywords'])
+    if not model_type:
+        msg = 'Unsupported model type(s): {}'.format(', '.format(metadata['keywords']))
+        logger.error(msg)
+        raise KrakenRepoException(msg)
+    meta_json = None
+    for file in record['files']:
+        if file['key'] == 'metadata.json':
+            callback()
+            r = requests.get(file['links']['self'])
+            r.raise_for_status()
             callback()
             try:
-                models[components[1]].update(json.loads(raw))
-            except Exception:
-                del models[components[1]]
-        elif len(components) > 2 and components[1] in models:
-            models[components[1]]['model'] = el['url']
+                meta_json = r.json()
+            except:
+                msg = 'Metadata for \'{}\' ({}) not in JSON format'.format(record['metadata']['title'], record['metadata']['doi'])
+                logger.error(msg)
+                raise KrakenRepoException(msg)
+    if not meta_json:
+        msg = 'Mo metadata.jsn found for \'{}\' ({})'.format(record['metadata']['title'], record['metadata']['doi'])
+        logger.error(msg)
+        raise KrakenRepoException(msg)
+    # merge metadata.json into DataCite
+    metadata.update({'graphemes': meta_json['graphemes'],
+                     'summary': meta_json['summary'],
+                     'script': meta_json['script'],
+                     'link': record['links']['latest'],
+                     'type': [x.split('_')[1] for x in model_type]})
+    return metadata
+
+
+def get_listing(callback: Callable[..., Any] = lambda: None) -> dict:
+    """
+    Fetches a listing of all kraken models from the zenodo repository.
+
+    Args:
+        callback (Callable): Function called after each HTTP request.
+
+    Returns:
+        Dict of models with each model.
+    """
+    logger.info(u'Retrieving model list')
+    r = requests.get('{}{}'.format(MODEL_REPO, 'records'), params={'communities': 'ocr_models'})
+    r.raise_for_status()
+    callback()
+    resp = r.json()
+    if not resp['hits']['total']:
+        logger.error('No models found in community \'ocr_models\'')
+        raise KrakenRepoException('No models found in repository \'ocr_models\'')
+    logger.debug(u'Retrieving model metadata')
+    records = resp['hits']['hits']
+    models = {}
+    # fetch metadata.jsn for each model
+    for record in records:
+        if 'keywords' not in record['metadata']:
+            continue
+        model_type = SUPPORTED_MODELS.intersection(record['metadata']['keywords'])
+        if not model_type:
+            continue
+        for file in record['files']:
+            if file['key'] == 'metadata.json':
+                callback()
+                r = requests.get(file['links']['self'])
+                r.raise_for_status()
+                try:
+                    metadata = r.json()
+                except:
+                    msg = 'Metadata for \'{}\' ({}) not in JSON format'.format(record['metadata']['title'], record['metadata']['doi'])
+                    logger.error(msg)
+                    raise KrakenRepoException(msg)
+        # merge metadata.jsn into DataCite
+        key = record['metadata']['doi']
+        models[key] = record['metadata']
+        models[key].update({'graphemes': metadata['graphemes'],
+                            'summary': metadata['summary'],
+                            'script': metadata['script'],
+                            'link': record['links']['latest'],
+                            'type': [x.split('_')[1] for x in model_type]})
     return models
