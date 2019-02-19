@@ -12,7 +12,7 @@ from coremltools.proto import NeuralNetwork_pb2
 # all tensors are ordered NCHW, the "feature" dimension is C, so the output of
 # an LSTM will be put into C same as the filters of a CNN.
 
-__all__ = ['MaxPool', 'Reshape', 'Dropout', 'TransposedSummarizingRNN', 'LinSoftmax', 'ActConv2D']
+__all__ = ['MaxPool', 'Reshape', 'Dropout', 'TransposedSummarizingRNN', 'LinSoftmax', 'ActConv2D', 'BatchNorm']
 
 
 def PeepholeLSTMCell(input: torch.Tensor,
@@ -666,4 +666,52 @@ class ActConv2D(Module):
             builder.add_activation(act_name, self.nl_name, conv_name, name)
         else:
             builder.add_softmax(act_name, conv_name, name)
+        return name
+
+
+class GroupNorm(Module):
+    """
+    A group normalization layer
+    """
+    def __init__(self, in_channels: int, num_groups: int) -> None:
+        super(GroupNorm, self).__init__()
+        self.in_channels = in_channels
+        self.num_groups = num_groups
+
+        self.layer = torch.nn.GroupNorm(num_groups, in_channels)
+
+    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+        o = self.layer(inputs)
+        return o
+
+    def get_shape(self, input: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
+        return input
+
+    def deserialize(self, name: str, spec) -> None:
+        """
+        Sets the weight of an initialized model from a CoreML protobuf spec.
+        """
+        gn = [x for x in spec.neuralNetwork.layers if x.name == '{}'.format(name)][0].custom
+        self.layer.weight = torch.nn.Parameter(torch.Tensor(gn.weights[0].floatValue).resize_as_(self.layer.weight))
+        self.layer.bias = torch.nn.Parameter(torch.Tensor(gn.weights[1].floatValue).resize_as_(self.layer.bias))
+
+    def serialize(self, name: str, input: str, builder) -> str:
+        """
+        Serializes the module using a NeuralNetworkBuilder.
+        """
+        params = NeuralNetwork_pb2.CustomLayerParams()
+        params.className = 'groupnorm'
+        params.description = 'A Group Normalization layer'
+        params.parameters['in_channels'].intValue = self.in_channels
+        params.parameters['num_groups'].intValue = self.num_groups
+
+        weight = params.weights.add()
+        weight.floatValue.extend(self.layer.weight.data.numpy())
+        bias = params.weights.add()
+        bias.floatValue.extend(self.layer.bias.data.numpy())
+
+        builder.add_custom(name,
+                           input_names=[input],
+                           output_names=[name],
+                           custom_proto_spec=params)
         return name

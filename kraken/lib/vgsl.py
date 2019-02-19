@@ -53,6 +53,9 @@ class TorchVGSLModel(object):
         input (tuple): Expected input tensor as a 4-tuple.
         nn (torch.nn.Sequential): Stack of layers parsed from the spec.
         criterion (torch.nn.Module): Fully parametrized loss function.
+        user_metdata (dict): dict with user defined metadata. Is flushed into
+                             model file during saving/overwritten by loading
+                             operations.
 
     """
     def __init__(self, spec: str) -> None:
@@ -97,10 +100,11 @@ class TorchVGSLModel(object):
         """
         self.spec = spec
         self.named_spec = []  # type:  List[str]
-        self.ops = [self.build_rnn, self.build_dropout, self.build_maxpool, self.build_conv, self.build_output, self.build_reshape]
+        self.ops = [self.build_rnn, self.build_dropout, self.build_maxpool, self.build_conv, self.build_output, self.build_reshape, self.build_groupnorm]
         self.codec = None  # type: Optional[PytorchCodec]
         self.criterion = None  # type: Any
         self.nn = torch.nn.Sequential()
+        self.user_metadata = {} # type: dict[str, str]
 
         self.idx = -1
         spec = spec.strip()
@@ -425,6 +429,8 @@ class TorchVGSLModel(object):
 
         if 'codec' in mlmodel.user_defined_metadata:
             nn.add_codec(PytorchCodec(json.loads(mlmodel.user_defined_metadata['codec'])))
+        if 'kraken_meta' in mlmodel.user_defined_metadata:
+            nn.user_metadata = json.loads(mlmodel.user_defined_metadata['kraken_meta'])
         return nn
 
     def save_model(self, path: str):
@@ -447,6 +453,8 @@ class TorchVGSLModel(object):
             mlmodel.user_defined_metadata['vgsl'] = '[' + ' '.join(self.named_spec) + ']'
             if self.codec:
                 mlmodel.user_defined_metadata['codec'] = json.dumps(self.codec.c2l)
+            if self.user_metadata:
+                mlmodel.user_defined_metadata['kraken_meta'] = json.dumps(self.user_metadata)
             mlmodel.save(path)
         finally:
             self.nn.to(prev_device)
@@ -572,6 +580,16 @@ class TorchVGSLModel(object):
         dim = int(m.group('dim')) if m.group('dim') else 1
         fn = layers.Dropout(prob, dim)
         logger.debug('{}\t\tdropout\tprobability {} dims {}'.format(self.idx+1, prob, dim))
+        return fn.get_shape(input), self.get_layer_name(m.group('type'), m.group('name')), fn
+
+    def build_groupnorm(self, input: Tuple[int, int, int, int], block: str) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
+        pattern = re.compile(r'(?P<type>Gn)(?P<name>{\w+})?(?P<groups>\d+)')
+        m = pattern.match(block)
+        if not m:
+            return None, None, None
+        groups = int(m.group('groups'))
+        fn = layers.GroupNorm(input[1], groups)
+        logger.debug('{}\t\tgroupnorm\tgroups {}'.format(self.idx+1, groups))
         return fn.get_shape(input), self.get_layer_name(m.group('type'), m.group('name')), fn
 
     def build_conv(self, input: Tuple[int, int, int, int], block: str) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
