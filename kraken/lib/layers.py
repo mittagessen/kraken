@@ -114,10 +114,12 @@ class PeepholeBidiLSTM(Module):
                 setattr(self, name, param)
             self._all_weights.append(param_names)
 
-    def forward(self, input: torch.Tensor, hidden: Tuple[torch.Tensor, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, input: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         layer = (Recurrent(PeepholeLSTMCell), Recurrent(PeepholeLSTMCell, reverse=True))
         func = StackedRNN(layer, 1, 2)
         input = input.transpose(0, 1)
+        hidden = (torch.zeros(2, input.shape[1], self.hidden_size).to(input.device),
+                  torch.zeros(2, input.shape[1], self.hidden_size).to(input.device))
         hidden, output = func(input, hidden, self.all_weights)
         output = output.transpose(0, 1)
         return output, hidden
