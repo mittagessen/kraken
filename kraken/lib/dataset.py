@@ -311,6 +311,27 @@ class GroundTruthDataset(Dataset):
         self._gt.append(gt)
         self.alphabet.update(gt)
 
+    def add_loaded(self, image: Image, gt: str) -> None:
+        """
+        Adds an already loaded  line-image-text pair to the dataset.
+
+        Args:
+            image (PIL.Image): Line image
+            gt (str): Text contained in the line image
+        """
+        if self.preload:
+            try:
+                im = self.transforms(image)
+            except ValueError as e:
+                raise KrakenInputException('Image transforms failed on {}'.format(image))
+            self._images.append(im)
+        else:
+            self._images.append(image)
+        for func in self.text_transforms:
+            gt = func(gt)
+        self._gt.append(gt)
+        self.alphabet.update(gt)
+
     def encode(self, codec: Optional[PytorchCodec] = None) -> None:
         """
         Adds a codec to the dataset and encodes all text lines.
@@ -332,7 +353,10 @@ class GroundTruthDataset(Dataset):
             item = self.training_set[index]
             try:
                 logger.debug('Attempting to load {}'.format(item[0]))
-                return (self.transforms(Image.open(item[0])), item[1])
+                im = item[0]
+                if not isinstance(im, Image.Image):
+                    im = Image.open(im)
+                return (self.transforms(im), item[1])
             except Exception:
                 idx = np.random.randint(0, len(self.training_set))
                 logger.debug('Failed. Replacing with sample {}'.format(idx))
