@@ -108,7 +108,7 @@ def get_model(model_id: str, path: str, callback: Callable[..., Any] = lambda: N
         Will usually be the file name of the model.
     """
     logger.info('Saving model {} to {}'.format(model_id, path))
-    r = requests.get('{}{}'.format(MODEL_REPO, 'records'), params={'q': 'doi:"{}"'.format(model_id), 'communities': 'ocr_models'})
+    r = requests.get('{}{}'.format(MODEL_REPO, 'records'), params={'q': 'doi:"{}"'.format(model_id)})
     r.raise_for_status()
     callback()
     resp = r.json()
@@ -142,7 +142,7 @@ def get_description(model_id: str, callback: Callable[..., Any] = lambda: None) 
         Dict
     """
     logger.info('Retrieving metadata for {}'.format(model_id))
-    r = requests.get('{}{}'.format(MODEL_REPO, 'records'), params={'q': 'doi:"{}"'.format(model_id), 'communities': 'ocr_models'})
+    r = requests.get('{}{}'.format(MODEL_REPO, 'records'), params={'q': 'doi:"{}"'.format(model_id)})
     r.raise_for_status()
     callback()
     resp = r.json()
@@ -195,7 +195,8 @@ def get_listing(callback: Callable[..., Any] = lambda: None) -> dict:
     Returns:
         Dict of models with each model.
     """
-    logger.info(u'Retrieving model list')
+    logger.info('Retrieving model list')
+    records = []
     r = requests.get('{}{}'.format(MODEL_REPO, 'records'), params={'communities': 'ocr_models'})
     r.raise_for_status()
     callback()
@@ -203,8 +204,16 @@ def get_listing(callback: Callable[..., Any] = lambda: None) -> dict:
     if not resp['hits']['total']:
         logger.error('No models found in community \'ocr_models\'')
         raise KrakenRepoException('No models found in repository \'ocr_models\'')
-    logger.debug(u'Retrieving model metadata')
-    records = resp['hits']['hits']
+    logger.debug('Total of {} records in repository'.format(resp['hits']['total']))
+    records.extend(resp['hits']['hits'])
+    while 'next' in resp['links']:
+        logger.debug('Fetching next page')
+        r = requests.get(resp['links']['next'])
+        r.raise_for_status()
+        resp = r.json()
+        logger.debug('Found {} new records'.format(len(resp['hits']['hits'])))
+        records.extend(resp['hits']['hits'])
+    logger.debug('Retrieving model metadata')
     models = {}
     # fetch metadata.jsn for each model
     for record in records:
