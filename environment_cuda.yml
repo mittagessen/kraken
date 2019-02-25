@@ -16,6 +16,7 @@ dependencies:
   - jinja2
   - torchvision
   - pytorch>=1.0.0
+  - jsonschema
   - pip:
     - coremltools
     - python-bidi

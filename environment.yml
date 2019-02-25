@@ -18,6 +18,7 @@ dependencies:
   - jinja2
   - torchvision-cpu
   - pytorch-cpu>=1.0.0
+  - jsonschema
   - pip:
     - coremltools
     - git+https://github.com/mittagessen/kraken.git@master
