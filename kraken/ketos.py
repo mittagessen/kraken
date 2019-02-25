@@ -87,8 +87,8 @@ def _expand_gt(ctx, param, value):
 @click.option('-a', '--append', show_default=True, default=None, type=click.INT,
               help='Removes layers before argument and then appends spec. Only works when loading an existing model')
 @click.option('-i', '--load', show_default=True, type=click.Path(exists=True, readable=True), help='Load existing file to continue training')
-@click.option('-F', '--savefreq', show_default=True, default=1.0, type=click.FLOAT, help='Model save frequency in epochs during training')
-@click.option('-R', '--report', show_default=True, default=1.0, type=click.FLOAT, help='Report creation frequency in epochs')
+@click.option('-F', '--freq', show_default=True, default=1.0, type=click.FLOAT,
+              help='Model saving and report generation frequency in epochs during training')
 @click.option('-q', '--quit', show_default=True, default='early', type=click.Choice(['early', 'dumb']),
               help='Stop condition for training. Set to `early` for early stooping or `dumb` for fixed number of epochs')
 @click.option('-N', '--epochs', show_default=True, default=-1, help='Number of epochs to train for')
@@ -122,12 +122,14 @@ def _expand_gt(ctx, param, value):
               help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
 @click.option('--preload/--no-preload', show_default=True, default=None, help='Hard enable/disable for training data preloading')
 @click.option('--threads', show_default=True, default=1, help='Number of OpenMP threads and workers when running on CPU.')
+@click.option('--load-hyper-parameters/--no-load-hyper-parameters', show_default=True, default=False,
+              help='When loading an existing model, retrieve hyperparameters from the model')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
-def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
+def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
           lag, min_delta, device, optimizer, lrate, momentum, weight_decay,
           schedule, partition, normalization, normalize_whitespace, codec,
           resize, reorder, training_files, evaluation_files, preload, threads,
-          ground_truth):
+          load_hyper_parameters, ground_truth):
     """
     Trains a model from image-text pairs.
     """
@@ -142,25 +144,32 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
     import shutil
     import numpy as np
 
-    from itertools import count
     from torch.utils.data import DataLoader
 
     from kraken.lib import models, vgsl, train
     from kraken.lib.util import make_printable
     from kraken.lib.train import EarlyStopping, EpochStopping, TrainStopper, TrainScheduler, add_1cycle
     from kraken.lib.codec import PytorchCodec
-    from kraken.lib.dataset import GroundTruthDataset, compute_error, generate_input_transforms
-    from kraken.lib.exceptions import KrakenStopTrainingException
+    from kraken.lib.dataset import GroundTruthDataset, generate_input_transforms
 
     logger.info('Building ground truth set from {} line images'.format(len(ground_truth) + len(training_files)))
 
+    completed_epochs = 0
     # load model if given. if a new model has to be created we need to do that
     # after data set initialization, otherwise to output size is still unknown.
     nn = None
+    hyper_fields = ['freq', 'quit', 'epochs', 'lag', 'min_delta', 'optimizer', 'lrate', 'momentum', 'weight_decay', 'schedule', 'partition', 'normalization', 'normalize_whitespace', 'reorder', 'preload', 'completed_epochs', 'output']
+
     if load:
         logger.info('Loading existing model from {} '.format(load))
-        message('Loading model {}'.format(load), nl=False)
+        message('Loading existing model from {}'.format(load), nl=False)
         nn = vgsl.TorchVGSLModel.load_model(load)
+        if nn.user_metadata and load_hyper_parameters:
+            for param in hyper_fields:
+                if param in nn.user_metadata:
+                    logger.info('Setting \'{}\' to \'{}\''.format(param, nn.user_metadata[param]))
+                    message('Setting \'{}\' to \'{}\''.format(param, nn.user_metadata[param]))
+                    locals()[param] = nn.user_metadata[param]
         message('\u2713', fg='green', nl=False)
 
     # preparse input sizes from vgsl string to seed ground truth data set
@@ -209,6 +218,11 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
     else:
         te_im = ground_truth[int(len(ground_truth) * partition):]
         logger.debug('Taking {} lines from training for evaluation'.format(len(te_im)))
+
+    # set multiprocessing tensor sharing strategy
+    if 'file_system' in torch.multiprocessing.get_all_sharing_strategies():
+        logger.debug('Setting multiprocessing tensor sharing strategy to file_system')
+        torch.multiprocessing.set_sharing_strategy('file_system')
 
     gt_set = GroundTruthDataset(normalization=normalization,
                                 whitespace_normalization=normalize_whitespace,
@@ -334,78 +348,56 @@ def train(ctx, pad, output, spec, append, load, savefreq, report, quit, epochs,
     nn.set_num_threads(threads)
 
     logger.debug('Moving model to device {}'.format(device))
-    rec = models.TorchSeqRecognizer(nn, train=True, device=device)
     optim = getattr(torch.optim, optimizer)(nn.nn.parameters(), lr=0)
 
-    iterations = int(len(gt_set) * epochs)
-    save_it = int(len(gt_set) * savefreq)
-    eval_it = int(len(gt_set) * report)
-    lag_it = int(eval_it * lag)
-    # calculate how many training stages (epochs / eval frequency)
-    stages = int((epochs / report) + 0.5)
+    if 'accuracy' not in  nn.user_metadata:
+        nn.user_metadata['accuracy'] = []
 
     tr_it = TrainScheduler(optim)
     if schedule == '1cycle':
-        add_1cycle(tr_it, iterations, lrate, momentum, momentum - 0.10, weight_decay)
+        add_1cycle(tr_it, int(len(gt_set) * epochs), lrate, momentum, momentum - 0.10, weight_decay)
     else:
         # constant learning rate scheduler
         tr_it.add_phase(1, (lrate, lrate), (momentum, momentum), weight_decay, train.annealing_const)
 
-    st_it = cast(TrainStopper, None)  # type: TrainStopper
     if quit == 'early':
-        st_it = EarlyStopping(train_loader, min_delta, lag_it)
+        st_it = EarlyStopping(min_delta, lag)
     elif quit == 'dumb':
-        st_it = EpochStopping(train_loader, iterations)
+        st_it = EpochStopping(epochs - completed_epochs)
     else:
         raise click.BadOptionUsage('quit', 'Invalid training interruption scheme {}'.format(quit))
 
-    stage_it = range(1, stages + 1) if epochs > 0 else count()
-    for stage in stage_it:
-        with log.progressbar(label='stage {}/{}'.format(stage, stages if epochs > 0 else '∞'), length=eval_it, show_pos=True) as bar:
-            try:
-                for _, (input, target) in zip(range(eval_it), st_it):
-                    tr_it.step()
-                    input = input.to(device, non_blocking=True)
-                    target = target.to(device, non_blocking=True)
-                    input = input.requires_grad_()
-                    o = nn.nn(input)
-                    # height should be 1 by now
-                    if o.size(2) != 1:
-                        raise KrakenInputException('Expected dimension 3 to be 1, actual {}'.format(o.size(2)))
-                    o = o.squeeze(2)
-                    optim.zero_grad()
-                    # NCW -> WNC
-                    loss = nn.criterion(o.permute(2, 0, 1),  # type: ignore
-                                        target,
-                                        (o.size(2),),
-                                        (target.size(1),))
-                    if not torch.isinf(loss):
-                        loss.backward()
-                        optim.step()
-                    else:
-                        logger.debug('infinite loss in trial')
-                    bar.update(1)
-                    # savefreq might not be the same as evaluation frequency
-                    if not (st_it.iteration + 1) % save_it:
-                        logger.info('Saving to {}_{}'.format(output, st_it.iteration))
-                        try:
-                            nn.save_model('{}_{}.mlmodel'.format(output, st_it.iteration))
-                        except Exception as e:
-                            logger.error('Saving model failed: {}'.format(str(e)))
-            except KrakenStopTrainingException as e:
-                break
-        logger.debug('Starting evaluation run')
-        nn.eval()
-        chars, error = compute_error(rec, list(val_set))
-        nn.train()
-        accuracy = (chars-error)/chars
-        logger.info('Accuracy report ({}) {:0.4f} {} {}'.format(st_it.iteration, accuracy, chars, error))
-        message('Accuracy report ({}) {:0.4f} {} {}'.format(st_it.iteration, accuracy, chars, error))
-        st_it.update(accuracy)
+    for param in hyper_fields:
+        logger.debug('Setting \'{}\' to \'{}\' in model metadata'.format(param, locals()[param]))
+        nn.user_metadata[param] = locals()[param]
+
+    trainer = train.KrakenTrainer(model=nn,
+                                  optimizer=optim,
+                                  device=device,
+                                  filename_prefix=output,
+                                  event_frequency=freq,
+                                  train_set=train_loader,
+                                  val_set=val_set,
+                                  stopper=st_it)
+
+    bar = log.progressbar(label='stage {}/{}'.format(1, trainer.stopper.epochs if trainer.stopper.epochs > 0 else '∞'),
+                          length=trainer.event_it, show_pos=True)
+
+    def _draw_progressbar():
+        bar.update(1)
+
+    def _print_eval(epoch, accuracy, chars, error):
+        message('Accuracy report ({}) {:0.4f} {} {}'.format(epoch, accuracy, chars, error))
+        # replace progress bar
+        bar = log.progressbar(label='stage {}/{}'.format(epoch, trainer.stopper.epochs if trainer.stopper.epochs > 0 else '∞'),
+                              length=trainer.event_it, show_pos=True)
+
+    trainer.run(_print_eval, _draw_progressbar)
+
     if quit == 'early':
-        message('Moving best model {0}_{1}.mlmodel ({2}) to {0}_best.mlmodel'.format(output, st_it.best_iteration, st_it.best_loss))
-        logger.info('Moving best model {0}_{1}.mlmodel ({2}) to {0}_best.mlmodel'.format(output, st_it.best_iteration, st_it.best_loss))
-        shutil.copy('{}_{}.mlmodel'.format(output, st_it.best_iteration), '{}_best.mlmodel'.format(output))
+        message('Moving best model {0}_{1}.mlmodel ({2}) to {0}_best.mlmodel'.format(output, trainer.stopper.best_epoch, trainer.stopper.best_loss))
+        logger.info('Moving best model {0}_{1}.mlmodel ({2}) to {0}_best.mlmodel'.format(output, trainer.stopper.best_epoch, trainer.stopper.best_loss))
+        shutil.copy('{}_{}.mlmodel'.format(output, trainer.stopper.best_epoch), '{}_best.mlmodel'.format(output))
 
 
 @cli.command('test')
@@ -818,8 +810,8 @@ def publish(ctx, metadata, access_token, model):
         summary = click.prompt('summary')
         description = click.edit('Write long form description (training data, transcription standards) of the model here')
         accuracy = click.prompt('accuracy on test set', type=float)
-        script = [click.prompt('script', type=click.Choice(schema['properties']['script']['items']['enum']), show_choices=True)]
-        license = click.prompt('license', type=click.Choice(schema['properties']['license']['enum']), show_choices=True)
+        script = [click.prompt('script', type=click.Choice(sorted(schema['properties']['script']['items']['enum'])), show_choices=True)]
+        license = click.prompt('license', type=click.Choice(sorted(schema['properties']['license']['enum'])), show_choices=True)
         metadata = {
                 'authors': [{'name': author, 'affiliation': affiliation}],
                 'summary': summary,
