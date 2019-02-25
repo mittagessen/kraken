@@ -32,7 +32,7 @@ __all__ = ['get_model', 'get_description', 'get_listing']
 
 logger = logging.getLogger(__name__)
 
-MODEL_REPO = 'https://sandbox.zenodo.org/api/'
+MODEL_REPO = 'https://zenodo.org/api/'
 SUPPORTED_MODELS = set(['kraken_pytorch'])
 
 def publish_model(model_file: BinaryIO = None, metadata: dict = None, access_token: str = None, callback: Callable[..., Any] = lambda: None) -> str:
