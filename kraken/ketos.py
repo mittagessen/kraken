@@ -805,12 +805,18 @@ def publish(ctx, metadata, access_token, model):
     with pkg_resources.resource_stream(__name__, 'metadata.schema.json') as fp:
         schema = json.load(fp)
 
+    nn = models.load_any(model)
+
     if not metadata:
         author = click.prompt('author')
         affiliation = click.prompt('affiliation')
         summary = click.prompt('summary')
         description = click.edit('Write long form description (training data, transcription standards) of the model here')
-        accuracy = click.prompt('accuracy on test set', type=float)
+        accuracy_default = None
+        # take last accuracy measurement in model metadata
+        if nn.nn.user_metadata['accuracy']:
+           accuracy_default = nn.nn.user_metadata['accuracy'][-1][1] * 100
+        accuracy = click.prompt('accuracy on test set', type=float, default=accuracy_default)
         script = [click.prompt('script', type=click.Choice(sorted(schema['properties']['script']['items']['enum'])), show_choices=True)]
         license = click.prompt('license', type=click.Choice(sorted(schema['properties']['license']['enum'])), show_choices=True)
         metadata = {
@@ -835,7 +841,6 @@ def publish(ctx, metadata, access_token, model):
     else:
         metadata = json.load(metadata)
         validate(metadata, schema)
-    nn = models.load_any(model)
     metadata['graphemes'] = [char for char in ''.join(nn.codec.c2l.keys())]
     oid = repo.publish_model(model, metadata, access_token, partial(message, '.', nl=False))
     print('\nmodel PID: {}'.format(oid))
