@@ -15,22 +15,22 @@ class TestTrain(unittest.TestCase):
         """
         Tests early stopping interrupter.
         """
-        it = train.EarlyStopping(cycle('a'), min_delta = 1, lag = 5)
-        with self.assertRaises(KrakenStopTrainingException):
-            for iteration, _ in enumerate(it):
-                it.update(iteration if iteration < 10 else 10)
-        self.assertEqual(15, iteration)
-        self.assertEqual(it.best_iteration, 10)
+        it = train.EarlyStopping(min_delta = 1, lag = 5)
+        for iteration in range(16):
+            self.assertTrue(it.trigger())
+            it.update(iteration if iteration < 10 else 10)
+        self.assertFalse(it.trigger())
+        self.assertEqual(it.best_epoch, 11) # epochs are 1-indexed now
         self.assertEqual(it.best_loss, 10)
 
     def test_epoch_stopping(self):
         """
         Tests stopping after n epochs.
         """
-        it = train.EpochStopping(cycle('a'), iterations = 57)
-        with self.assertRaises(KrakenStopTrainingException):
-            for iteration, _ in enumerate(it):
-                it.update(iteration)
-        self.assertEqual(56, iteration)
-        self.assertEqual(it.best_iteration, 56)
+        it = train.EpochStopping(epochs=57)
+        for iteration in range(57):
+            self.assertTrue(it.trigger())
+            it.update(iteration)
+        self.assertFalse(it.trigger())
+        self.assertEqual(it.best_epoch, 56)
         self.assertEqual(it.best_loss, 56)

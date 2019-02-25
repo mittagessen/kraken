@@ -367,9 +367,9 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
     else:
         raise click.BadOptionUsage('quit', 'Invalid training interruption scheme {}'.format(quit))
 
-    for param in hyper_fields:
-        logger.debug('Setting \'{}\' to \'{}\' in model metadata'.format(param, locals()[param]))
-        nn.user_metadata[param] = locals()[param]
+    #for param in hyper_fields:
+    #    logger.debug('Setting \'{}\' to \'{}\' in model metadata'.format(param, locals()[param]))
+    #    nn.user_metadata[param] = locals()[param]
 
     trainer = train.KrakenTrainer(model=nn,
                                   optimizer=optim,
