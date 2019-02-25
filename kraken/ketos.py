@@ -380,6 +380,8 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
                                   val_set=val_set,
                                   stopper=st_it)
 
+    trainer.add_lr_scheduler(tr_it)
+
     with  log.progressbar(label='stage {}/{}'.format(1, trainer.stopper.epochs if trainer.stopper.epochs > 0 else '∞'),
                           length=trainer.event_it, show_pos=True) as bar:
 
