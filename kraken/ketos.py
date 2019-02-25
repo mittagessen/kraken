@@ -122,14 +122,14 @@ def _expand_gt(ctx, param, value):
               help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
 @click.option('--preload/--no-preload', show_default=True, default=None, help='Hard enable/disable for training data preloading')
 @click.option('--threads', show_default=True, default=1, help='Number of OpenMP threads and workers when running on CPU.')
-@click.option('--load-hyper-parameters/--no-load-hyper-parameters', show_default=True, default=False,
-              help='When loading an existing model, retrieve hyperparameters from the model')
+#@click.option('--load-hyper-parameters/--no-load-hyper-parameters', show_default=True, default=False,
+#              help='When loading an existing model, retrieve hyperparameters from the model')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
           lag, min_delta, device, optimizer, lrate, momentum, weight_decay,
           schedule, partition, normalization, normalize_whitespace, codec,
           resize, reorder, training_files, evaluation_files, preload, threads,
-          load_hyper_parameters, ground_truth):
+          ground_truth):
     """
     Trains a model from image-text pairs.
     """
@@ -158,18 +158,18 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
     # load model if given. if a new model has to be created we need to do that
     # after data set initialization, otherwise to output size is still unknown.
     nn = None
-    hyper_fields = ['freq', 'quit', 'epochs', 'lag', 'min_delta', 'optimizer', 'lrate', 'momentum', 'weight_decay', 'schedule', 'partition', 'normalization', 'normalize_whitespace', 'reorder', 'preload', 'completed_epochs', 'output']
+    #hyper_fields = ['freq', 'quit', 'epochs', 'lag', 'min_delta', 'optimizer', 'lrate', 'momentum', 'weight_decay', 'schedule', 'partition', 'normalization', 'normalize_whitespace', 'reorder', 'preload', 'completed_epochs', 'output']
 
     if load:
         logger.info('Loading existing model from {} '.format(load))
         message('Loading existing model from {}'.format(load), nl=False)
         nn = vgsl.TorchVGSLModel.load_model(load)
-        if nn.user_metadata and load_hyper_parameters:
-            for param in hyper_fields:
-                if param in nn.user_metadata:
-                    logger.info('Setting \'{}\' to \'{}\''.format(param, nn.user_metadata[param]))
-                    message('Setting \'{}\' to \'{}\''.format(param, nn.user_metadata[param]))
-                    locals()[param] = nn.user_metadata[param]
+        #if nn.user_metadata and load_hyper_parameters:
+        #    for param in hyper_fields:
+        #        if param in nn.user_metadata:
+        #            logger.info('Setting \'{}\' to \'{}\''.format(param, nn.user_metadata[param]))
+        #            message('Setting \'{}\' to \'{}\''.format(param, nn.user_metadata[param]))
+        #            locals()[param] = nn.user_metadata[param]
         message('\u2713', fg='green', nl=False)
 
     # preparse input sizes from vgsl string to seed ground truth data set
@@ -380,19 +380,20 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
                                   val_set=val_set,
                                   stopper=st_it)
 
-    bar = log.progressbar(label='stage {}/{}'.format(1, trainer.stopper.epochs if trainer.stopper.epochs > 0 else '∞'),
-                          length=trainer.event_it, show_pos=True)
+    with  log.progressbar(label='stage {}/{}'.format(1, trainer.stopper.epochs if trainer.stopper.epochs > 0 else '∞'),
+                          length=trainer.event_it, show_pos=True) as bar:
 
-    def _draw_progressbar():
-        bar.update(1)
+        def _draw_progressbar():
+            bar.update(1)
 
-    def _print_eval(epoch, accuracy, chars, error):
-        message('Accuracy report ({}) {:0.4f} {} {}'.format(epoch, accuracy, chars, error))
-        # replace progress bar
-        bar = log.progressbar(label='stage {}/{}'.format(epoch, trainer.stopper.epochs if trainer.stopper.epochs > 0 else '∞'),
-                              length=trainer.event_it, show_pos=True)
+        def _print_eval(epoch, accuracy, chars, error):
+            message('Accuracy report ({}) {:0.4f} {} {}'.format(epoch, accuracy, chars, error))
+            # reset progress bar
+            bar.label = 'stage {}/{}'.format(epoch+1, trainer.stopper.epochs if trainer.stopper.epochs > 0 else '∞')
+            bar.pos = 0
+            bar.finished = False
 
-    trainer.run(_print_eval, _draw_progressbar)
+        trainer.run(_print_eval, _draw_progressbar)
 
     if quit == 'early':
         message('Moving best model {0}_{1}.mlmodel ({2}) to {0}_best.mlmodel'.format(output, trainer.stopper.best_epoch, trainer.stopper.best_loss))
