@@ -396,15 +396,16 @@ def show(ctx, model_id):
             combining.append(make_printable(char))
         else:
             chars.append(char)
-    message('name: {}\n\n{}\n\n{}\nscripts: {}\nalphabet: {} {}\nlicense: {}\nauthor(s): {}\ndate: {}'.format(model_id,
-                                                                                                          desc['summary'],
-                                                                                                          desc['description'],
-                                                                                                          ' '.join(desc['script']),
-                                                                                                          ''.join(chars),
-                                                                                                          ', '.join(combining),
-                                                                                                          desc['license']['id'],
-                                                                                                          '; '.join(x['name'] for x in desc['creators']),
-                                                                                                          desc['publication_date']))
+    message('name: {}\n\n{}\n\n{}\nscripts: {}\nalphabet: {} {}\naccuracy: {:.2f}%\nlicense: {}\nauthor(s): {}\ndate: {}'.format(model_id,
+                                                                                                                                 desc['summary'],
+                                                                                                                                 desc['description'],
+                                                                                                                                 ' '.join(desc['script']),
+                                                                                                                                 ''.join(chars),
+                                                                                                                                 ', '.join(combining),
+                                                                                                                                 desc['accuracy'],
+                                                                                                                                 desc['license']['id'],
+                                                                                                                                 '; '.join(x['name'] for x in desc['creators']),
+                                                                                                                                 desc['publication_date']))
     ctx.exit(0)
 
 

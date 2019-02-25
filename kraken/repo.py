@@ -181,7 +181,8 @@ def get_description(model_id: str, callback: Callable[..., Any] = lambda: None) 
                      'summary': meta_json['summary'],
                      'script': meta_json['script'],
                      'link': record['links']['latest'],
-                     'type': [x.split('_')[1] for x in model_type]})
+                     'type': [x.split('_')[1] for x in model_type],
+                     'accuracy': meta_json['accuracy']})
     return metadata
 
 
