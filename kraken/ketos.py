@@ -816,7 +816,7 @@ def publish(ctx, metadata, access_token, model):
         description = click.edit('Write long form description (training data, transcription standards) of the model here')
         accuracy_default = None
         # take last accuracy measurement in model metadata
-        if nn.nn.user_metadata['accuracy']:
+        if 'accuracy' in nn.nn.user_metadata and nn.nn.user_metadata['accuracy']:
            accuracy_default = nn.nn.user_metadata['accuracy'][-1][1] * 100
         accuracy = click.prompt('accuracy on test set', type=float, default=accuracy_default)
         script = [click.prompt('script', type=click.Choice(sorted(schema['properties']['script']['items']['enum'])), show_choices=True)]
