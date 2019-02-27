@@ -255,7 +255,9 @@ class KrakenTrainer(object):
 
     def run(self, event_callback = lambda *args, **kwargs: None, iteration_callback = lambda *args, **kwargs: None):
         logger.debug('Starting up training...')
-        # determine number of stages
+
+        if 'accuracy' not in self.model.user_metadata:
+            self.model.user_metadata['accuracy'] = []
 
         while self.stopper.trigger():
             for _, (input, target) in zip(range(self.event_it), self.train_set):
