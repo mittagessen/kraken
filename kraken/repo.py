@@ -113,8 +113,8 @@ def get_model(model_id: str, path: str, callback: Callable[..., Any] = lambda: N
     callback()
     resp = r.json()
     if  resp['hits']['total'] != 1:
-        logger.error('Found {} models when querying for id \'{}\''.format(model_id))
-        raise KrakenRepoException('Found {} models when querying for id \'{}\''.format(model_id))
+        logger.error('Found {} models when querying for id \'{}\''.format(resp['hits']['total'], model_id))
+        raise KrakenRepoException('Found {} models when querying for id \'{}\''.format(resp['hits']['total'], model_id))
 
     metadata = resp['hits']['hits'][0]
     model_url = [x['links']['self'] for x in metadata['files'] if x['type'] == 'mlmodel'][0]
