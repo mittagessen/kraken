@@ -147,7 +147,7 @@ def get_description(model_id: str, callback: Callable[..., Any] = lambda: None) 
     callback()
     resp = r.json()
     if  resp['hits']['total'] != 1:
-        logger.error('Found {} models when querying for id \'{}\''.format(model_id))
+        logger.error('Found {} models when querying for id \'{}\''.format(resp['hits']['total'], model_id))
         raise KrakenRepoException('Found {} models when querying for id \'{}\''.format(model_id))
     record = resp['hits']['hits'][0]
     metadata = record['metadata']
