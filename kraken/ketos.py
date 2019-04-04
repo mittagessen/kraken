@@ -255,9 +255,12 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
                 logger.warning(str(e))
 
     logger.info('Training set {} lines, validation set {} lines, alphabet {} symbols'.format(len(gt_set._images), len(val_set._images), len(gt_set.alphabet)))
-    alpha_diff = set(gt_set.alphabet).symmetric_difference(set(val_set.alphabet))
-    if alpha_diff:
-        logger.warn('alphabet mismatch {}'.format(alpha_diff))
+    alpha_diff_only_train = set(gt_set.alphabet).difference(set(val_set.alphabet))
+    alpha_diff_only_val = set(val_set.alphabet).difference(set(gt_set.alphabet))
+    if alpha_diff_only_train:
+        logger.warning('alphabet mismatch: chars in training set only: {} (not included in accuracy test during training)'.format(alpha_diff_only_train))
+    if alpha_diff_only_val:
+        logger.warning('alphabet mismatch: chars in validation set only: {} (not trained)'.format(alpha_diff_only_val))        
     logger.info('grapheme\tcount')
     for k, v in sorted(gt_set.alphabet.items(), key=lambda x: x[1], reverse=True):
         char = make_printable(k)
