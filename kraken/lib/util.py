@@ -10,7 +10,7 @@ from PIL import Image
 __all__ = ['pil2array', 'array2pil']
 
 
-def pil2array(im: Image, alpha: int = 0) -> np.array:
+def pil2array(im: Image.Image, alpha: int = 0) -> np.array:
     if im.mode == '1':
         return np.array(im.convert('L'))
     return np.array(im)
@@ -32,12 +32,12 @@ def array2pil(a: np.array) -> Image:
         raise Exception("unknown image type")
 
 
-def is_bitonal(im: Image) -> bool:
+def is_bitonal(im: Image.Image) -> bool:
     """
     Tests a PIL.Image for bitonality.
 
     Args:
-        im (PIL.Image): Image to test
+        im (PIL.Image.Image): Image to test
 
     Returns:
         True if the image contains only two different color values. False
@@ -46,7 +46,7 @@ def is_bitonal(im: Image) -> bool:
     return im.getcolors(2) is not None and len(im.getcolors(2)) == 2
 
 
-def get_im_str(im: Image) -> str:
+def get_im_str(im: Image.Image) -> str:
     return im.filename if hasattr(im, 'filename') else str(im)
 
 

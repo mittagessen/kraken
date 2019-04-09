@@ -35,7 +35,7 @@ __all__ = ['nlbin']
 logger = logging.getLogger(__name__)
 
 
-def nlbin(im: Image,
+def nlbin(im: Image.Image,
           threshold: float = 0.5,
           zoom: float = 0.5,
           escale: float = 1.0,
@@ -48,7 +48,7 @@ def nlbin(im: Image,
     Performs binarization using non-linear processing.
 
     Args:
-        im (PIL.Image):
+        im (PIL.Image.Image):
         threshold (float):
         zoom (float): Zoom for background page estimation
         escale (float): Scale for estimating a mask over the text region

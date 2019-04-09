@@ -115,13 +115,13 @@ def bidi_record(record: ocr_record) -> ocr_record:
     return ocr_record(prediction, cuts, confidences)
 
 
-def extract_boxes(im: Image, bounds: Dict[str, Any]) -> Image:
+def extract_boxes(im: Image.Image, bounds: Dict[str, Any]) -> Image:
     """
     Yields the subimages of image im defined in the list of bounding boxes in
     bounds preserving order.
 
     Args:
-        im (PIL.Image): Input image
+        im (PIL.Image.Image): Input image
         bounds (list): A list of tuples (x1, y1, x2, y2)
 
     Yields:
@@ -142,7 +142,7 @@ def extract_boxes(im: Image, bounds: Dict[str, Any]) -> Image:
 
 
 def mm_rpred(nets: Dict[str, TorchSeqRecognizer],
-             im: Image,
+             im: Image.Image,
              bounds: dict,
              pad: int = 16,
              bidi_reordering: bool = True,
@@ -157,7 +157,7 @@ def mm_rpred(nets: Dict[str, TorchSeqRecognizer],
     Args:
         nets (dict): A dict mapping ISO15924 identifiers to TorchSegRecognizer
                      objects. Recommended to be an defaultdict.
-        im (PIL.Image): Image to extract text from
+        im (PIL.Image.Image): Image to extract text from
         bounds (dict): A dictionary containing a 'boxes' entry
                         with a list of lists of coordinates (script, (x0, y0,
                         x1, y1)) of a text line in the image and an entry
@@ -250,7 +250,7 @@ def mm_rpred(nets: Dict[str, TorchSeqRecognizer],
 
 
 def rpred(network: TorchSeqRecognizer,
-          im: Image,
+          im: Image.Image,
           bounds: dict,
           pad: int = 16,
           bidi_reordering: bool = True) -> Generator[ocr_record, None, None]:
@@ -260,7 +260,7 @@ def rpred(network: TorchSeqRecognizer,
     Args:
         network (kraken.lib.models.TorchSeqRecognizer): A TorchSegRecognizer
                                                         object
-        im (PIL.Image): Image to extract text from
+        im (PIL.Image.Image): Image to extract text from
         bounds (dict): A dictionary containing a 'boxes' entry with a list of
                        coordinates (x0, y0, x1, y1) of a text line in the image
                        and an entry 'text_direction' containing
