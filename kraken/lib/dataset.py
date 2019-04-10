@@ -311,12 +311,12 @@ class GroundTruthDataset(Dataset):
         self._gt.append(gt)
         self.alphabet.update(gt)
 
-    def add_loaded(self, image: Image, gt: str) -> None:
+    def add_loaded(self, image: Image.Image, gt: str) -> None:
         """
         Adds an already loaded  line-image-text pair to the dataset.
 
         Args:
-            image (PIL.Image): Line image
+            image (PIL.Image.Image): Line image
             gt (str): Text contained in the line image
         """
         if self.preload:
