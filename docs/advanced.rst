@@ -90,6 +90,7 @@ particular script. Identifiers are `ISO 15924
             ],
             ...
    	   ],
+           "script_detection": true,
            "text_direction" : "horizontal-tb"
 	}
 
