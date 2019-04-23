@@ -9,5 +9,6 @@ setup(
     test_suite="nose.collector",
     tests_require=['nose', 'hocr-spec'],
     setup_requires=['pbr'],
+    python_requires='>=3.6',
     pbr=True,
 )
