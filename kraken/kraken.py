@@ -343,7 +343,7 @@ def ocr(ctx, model, pad, reorder, no_segmentation, serializer, text_direction, l
                 location = loc
                 break
         if not location:
-            raise click.BadParameter('No model for {} found'.format(k))
+            raise click.BadParameter('No model {} for {} found'.format(v, k))
         message('Loading RNN {}\t'.format(k), nl=False)
         try:
             rnn = models.load_any(location, device=ctx.meta['device'])
