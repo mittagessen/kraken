@@ -1,0 +1,11 @@
+package:
+  name: kraken
+  version: {{ environ['VERSION'] }}
+
+source:
+  path: .
+
+about:
+  home: http://kraken.re
+  license: Apache License
+  summary: 'OCR/HTR engine for all the languages'
