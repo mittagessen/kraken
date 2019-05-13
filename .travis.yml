@@ -13,7 +13,7 @@ install:
 - bash miniconda.sh -b -p $HOME/miniconda
 - export PATH="$HOME/miniconda/bin:$PATH"
 - conda config --set always_yes yes --set changeps1 no --set show_channel_urls yes
-- conda update -q conda
+- conda update -q --all
 - conda install conda-build anaconda-client
 - conda config --add channels conda-forge
 - conda config --add channels pytorch
