@@ -22,7 +22,8 @@ Installation
 
 When using a recent version of pip all dependencies will be installed from
 binary wheel packages, so installing build-essential or your distributions
-equivalent is often unnecessary.
+equivalent is often unnecessary. kraken only runs on **Linux or Mac OS X**.
+Windows is not supported.
 
 Install the latest 1.0 release through `conda <https://anaconda.org>`_:
 
