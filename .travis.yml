@@ -38,4 +38,4 @@ deploy:
   password:
     secure: i/TwRgfux3ebFtTgg8Od/7KGHr1AZgHJ/9r4Yop7HoZhKsgSW8Q3e65K/LJ9aQFxmggeneAdOZFboStl9li48FpfFTqJy9TioSyaDoxDv5oPmUDFKHzbjExlupa7BzeL/OaNYSzkD8S2CIcnaiQspFASCWy0pHvveTU0MvdeaFbZ+lEdwH7Kb4DotzRA2p0wOwuq84P6Vunqi9UEvVP4e/f2j1Hin+zGs08nnxfC8A1XXkKZlnnRtbaGqKkzcSyeYFDcHfFENU1E3KEbeR6xqpWgZla/WIxnQTjUaZy9/RVLja8JLoPI86WofYScKcvYRUBPX74RBgjQhpNusuZ1umGxG+1C5TzF705YqWdYCM96qqUA/hBlDSngk+ZjraPJAtSPlJCx6VaiuIu8VPgP2jcazKaMduq5C6NT0XJtNUS22cdoox3Fzhhf/f6mLPMeBxQJewYo3Qbj86Ll5M8O5SmGdwAnmGDEwL0+cqb5oULXQcK1fJMnqR68KqSoFq89zNdTEEHTjMCLJO9Yfjmpd6iY33nOXhCEWNFRKEQVbeyFcudQemDxSSGTq2LNrgzMjJj4O3chjqbU9y5KiQF5lpH28/S/ele7VrbpX9bbn3/QmSQnJhByiypOQ2vEricn3aEoToE8Ws//OCmqItoOYTzRNHs/EUST0Zah2W/LTX8=
 after_success:
-  - test $TRAVIS_BRANCH = 'master' && bash conda/conda_upload.sh
+  - test $TRAVIS_TAG && bash conda/conda_upload.sh
