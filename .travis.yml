@@ -14,7 +14,7 @@ install:
 - export PATH="$HOME/miniconda/bin:$PATH"
 - conda config --set always_yes yes --set changeps1 no --set show_channel_urls yes
 - conda update -q --all
-- conda install conda-build=3.14 anaconda-client
+- conda install conda-build anaconda-client
 - conda config --add channels conda-forge
 - conda config --add channels mittagessen
 - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION
