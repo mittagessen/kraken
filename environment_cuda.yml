@@ -1,7 +1,8 @@
 name: kraken
 channels:
-  - pytorch
+  - conda-forge
   - defaults
+  - mittagessen
 dependencies:
   - python==3.6.6
   - lxml
@@ -17,7 +18,5 @@ dependencies:
   - torchvision
   - pytorch>=1.0.0
   - jsonschema
-  - pip:
-    - coremltools
-    - python-bidi
-    - git+https://github.com/mittagessen/kraken.git@master
+  - kraken
+  - coremltools
