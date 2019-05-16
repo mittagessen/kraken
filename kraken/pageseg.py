@@ -27,7 +27,7 @@ import logging
 import numpy as np
 import pkg_resources
 
-from typing import Tuple, Sequence, List
+from typing import Tuple, Sequence, List, Optional, Dict, Any
 from scipy.ndimage.filters import (gaussian_filter, uniform_filter,
                                    maximum_filter)
 
@@ -85,7 +85,9 @@ def estimate_scale(binary: np.array) -> float:
     return scale
 
 
-def compute_boxmap(binary: np.array, scale: float, threshold: Tuple[float, int] = (.5, 4), dtype: str = 'i') -> np.array:
+def compute_boxmap(binary: np.array, scale: float,
+                   threshold: Tuple[float, int] = (.5, 4),
+                   dtype: str = 'i') -> np.array:
     """
     Returns grapheme cluster-like boxes based on connected components.
     """
@@ -173,7 +175,7 @@ def topsort(order: np.array) -> np.array:
     """Given a binary array defining a partial order (o[i,j]==True means i<j),
     compute a topological sort.  This is a quick and dirty implementation
     that works for up to a few thousand elements."""
-    logger.info(u'Perform topological sort on partially ordered lines')
+    logger.info('Perform topological sort on partially ordered lines')
     n = len(order)
     visited = np.zeros(n)
     L = []
@@ -192,9 +194,10 @@ def topsort(order: np.array) -> np.array:
     return L
 
 
-def compute_separators_morph(binary: np.array, scale: float, sepwiden: int = 10, maxcolseps: int = 2) -> np.array:
+def compute_separators_morph(binary: np.array, scale: float,
+                             sepwiden: int = 10, maxcolseps: int = 2) -> np.array:
     """Finds vertical black lines corresponding to column separators."""
-    logger.debug(u'Finding vertical black column lines')
+    logger.debug('Finding vertical black column lines')
     d0 = int(max(5, scale/4))
     d1 = int(max(5, scale)) + sepwiden
     thick = morph.r_dilation(binary, (d0, d1))
@@ -205,7 +208,8 @@ def compute_separators_morph(binary: np.array, scale: float, sepwiden: int = 10,
     return vert
 
 
-def compute_colseps_conv(binary: np.array, scale: float = 1.0, minheight: int = 10, maxcolseps: int = 2) -> np.array:
+def compute_colseps_conv(binary: np.array, scale: float = 1.0,
+                         minheight: int = 10, maxcolseps: int = 2) -> np.array:
     """Find column separators by convolution and thresholding.
 
     Args:
@@ -253,7 +257,7 @@ def compute_black_colseps(binary: np.array, scale: float, maxcolseps: int) -> Tu
     return colseps, binary
 
 
-def compute_white_colseps(binary, scale, maxcolseps):
+def compute_white_colseps(binary: np.array, scale: float, maxcolseps: int) -> Tuple[np.array, np.array]:
     """
     Computes column separators either from vertical black lines or whitespace.
 
@@ -267,14 +271,14 @@ def compute_white_colseps(binary, scale, maxcolseps):
     return compute_colseps_conv(binary, scale, maxcolseps)
 
 
-def norm_max(v):
+def norm_max(v: np.array) -> np.array:
     """
     Normalizes the input array by maximum value.
     """
     return v/np.amax(v)
 
 
-def compute_gradmaps(binary, scale, gauss=False):
+def compute_gradmaps(binary: np.array, scale: float, gauss: bool = False):
     """
     Use gradient filtering to find baselines
 
@@ -301,12 +305,13 @@ def compute_gradmaps(binary, scale, gauss=False):
     return bottom, top, boxmap
 
 
-def compute_line_seeds(binary, bottom, top, colseps, scale, threshold=0.2):
+def compute_line_seeds(binary: np.array, bottom: np.array, top: np.array,
+                       colseps: np.array, scale: float, threshold: float = 0.2) -> np.array:
     """
     Base on gradient maps, computes candidates for baselines and xheights.
     Then, it marks the regions between the two as a line seed.
     """
-    logger.debug(u'Finding line seeds')
+    logger.debug('Finding line seeds')
     vrange = int(scale)
     bmarked = maximum_filter(bottom == maximum_filter(bottom, (vrange, 0)),
                              (2, 2))
@@ -334,7 +339,7 @@ def compute_line_seeds(binary, bottom, top, colseps, scale, threshold=0.2):
     return seeds
 
 
-def remove_hlines(binary, scale, maxsize=10):
+def remove_hlines(binary: np.array, scale: float, maxsize: int = 10) -> np.array:
     """
     Removes horizontal black lines that only interfere with page segmentation.
 
@@ -347,7 +352,7 @@ def remove_hlines(binary, scale, maxsize=10):
             numpy.array containing the filtered image.
 
     """
-    logger.debug(u'Filtering horizontal lines')
+    logger.debug('Filtering horizontal lines')
     labels, _ = morph.label(binary)
     objects = morph.find_objects(labels)
     for i, b in enumerate(objects):
@@ -356,11 +361,11 @@ def remove_hlines(binary, scale, maxsize=10):
     return np.array(labels != 0, 'B')
 
 
-def rotate_lines(lines, angle, offset):
+def rotate_lines(lines: np.array, angle: float, offset: int) -> np.array:
     """
     Rotates line bounding boxes around the origin and adding and offset.
     """
-    logger.debug(u'Rotate line coordinates by {} with offset {}'.format(angle, offset))
+    logger.debug('Rotate line coordinates by {} with offset {}'.format(angle, offset))
     angle = np.radians(angle)
     r = np.array([[np.cos(angle), -np.sin(angle)], [np.sin(angle), np.cos(angle)]])
     p = np.array(lines).reshape((-1, 2))
@@ -371,8 +376,14 @@ def rotate_lines(lines, angle, offset):
     return np.column_stack((x.flatten(), y.flatten())).reshape(-1, 4)
 
 
-def segment(im, text_direction='horizontal-lr', scale=None, maxcolseps=2,
-            black_colseps=False, no_hlines=True, pad=0, mask=None):
+def segment(im, text_direction: str = 'horizontal-lr',
+            scale: Optional[float] = None,
+            maxcolseps: float = 2,
+            black_colseps: bool = False,
+            no_hlines: bool = True,
+            pad: int = 0,
+            mask: Optional[np.array] = None,
+            skip_order: bool = False) -> Dict[str, Any]:
     """
     Segments a page into text lines.
 
@@ -394,6 +405,7 @@ def segment(im, text_direction='horizontal-lr', scale=None, maxcolseps=2,
         mask (PIL.Image): A bi-level mask image of the same size as `im` where
                           0-valued regions are ignored for segmentation
                           purposes. Disables column detection.
+        skip_order (bool): Skips reading order determination of lines.
 
     Returns:
         {'text_direction': '$dir', 'boxes': [(x1, y1, x2, y2),...]}: A
@@ -428,10 +440,6 @@ def segment(im, text_direction='horizontal-lr', scale=None, maxcolseps=2,
     logger.debug('Rotating input image by {} degrees'.format(angle))
     im = im.rotate(angle, expand=True)
 
-    # honestly I've got no idea what's going on here. In theory a simple
-    # np.array(im, 'i') should suffice here but for some reason the
-    # tostring/fromstring magic in pil2array alters the array in a way that is
-    # needed for the algorithm to work correctly.
     a = pil2array(im)
     binary = np.array(a > 0.5*(np.amin(a) + np.amax(a)), 'i')
     binary = 1 - binary
@@ -471,9 +479,12 @@ def segment(im, text_direction='horizontal-lr', scale=None, maxcolseps=2,
     segmentation = llabels*binary
 
     lines = compute_lines(segmentation, scale)
-    order = reading_order([l.bounds for l in lines], text_direction[-2:])
-    lsort = topsort(order)
-    lines = [lines[i].bounds for i in lsort]
+    if not skip_order:
+        order = reading_order([l.bounds for l in lines], text_direction[-2:])
+        lsort = topsort(order)
+        lines = [lines[i].bounds for i in lsort]
+    else:
+        lines = [l.bounds for l in lines]
     lines = [(s2.start, s1.start, s2.stop, s1.stop) for s1, s2 in lines]
 
     if isinstance(pad, int):
