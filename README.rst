@@ -53,7 +53,7 @@ in the kraken directory for the current user:
 
 ::
 
-  $ kraken get default
+  $ kraken get 10.5281/zenodo.2577813 
 
 A list of libre models available in the central repository can be retrieved by
 running:
