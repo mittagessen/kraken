@@ -64,8 +64,7 @@ If you are running `Anaconda <https://www.anaconda.com/download/>`_/miniconda, u
 
 .. code-block:: console
 
-  $ wget https://raw.githubusercontent.com/mittagessen/kraken/master/environment.yml
-  $ conda env create -f environment.yml
+  $ conda install -c mittagessen kraken
 
 Models
 ------
