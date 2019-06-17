@@ -110,7 +110,7 @@ Convolutional Layers
 
 .. code-block:: console
 
-        C[{name}](s|t|r|l|m)[{name}]<y>,<x>,<d>
+        C[{name}](s|t|r|l|m)[{name}]<y>,<x>,<d>,[stride_y,stride_x]
         s = sigmoid
         t = tanh
         r = relu
@@ -118,7 +118,8 @@ Convolutional Layers
         m = softmax
 
 Adds a 2D convolution with kernel size `(y, x)` and `d` output channels, applying
-the selected nonlinearity.
+the selected nonlinearity. The stride can be adjusted with the optional last
+two parameters.
 
 Recurrent Layers
 ----------------
