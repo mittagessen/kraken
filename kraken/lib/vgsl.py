@@ -596,15 +596,16 @@ class TorchVGSLModel(object):
         """
         Builds a 2D convolution layer.
         """
-        pattern = re.compile(r'(?P<type>C)(?P<nl>s|t|r|l|m)(?P<name>{\w+})?(\d+),(\d+),(?P<out>\d+)')
+        pattern = re.compile(r'(?P<type>C)(?P<nl>s|t|r|l|m)(?P<name>{\w+})?(\d+),(\d+),(?P<out>\d+)(,(?P<stride>\d+))?')
         m = pattern.match(block)
         if not m:
             return None, None, None
         kernel_size = (int(m.group(4)), int(m.group(5)))
         filters = int(m.group('out'))
+        stride = int(m.group('stride')) if m.group('stride') else 1
         nl = m.group('nl')
-        fn = layers.ActConv2D(input[1], filters, kernel_size, nl)
-        logger.debug('{}\t\tconv\tkernel {} x {} filters {} activation {}'.format(self.idx+1, kernel_size[0], kernel_size[1], filters, nl))
+        fn = layers.ActConv2D(input[1], filters, kernel_size, stride, nl)
+        logger.debug('{}\t\tconv\tkernel {} x {} filters {} stride {} activation {}'.format(self.idx+1, kernel_size[0], kernel_size[1], filters, stride, nl))
         return fn.get_shape(input), self.get_layer_name(m.group('type'), m.group('name')), fn
 
     def build_maxpool(self, input: Tuple[int, int, int, int], block: str) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:

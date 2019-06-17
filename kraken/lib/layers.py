@@ -90,7 +90,7 @@ def Recurrent(inner, reverse: bool = False):
 class PeepholeBidiLSTM(Module):
 
     def __init__(self, input_size: int, hidden_size: int) -> None:
-        super(PeepholeBidiLSTM, self).__init__()
+        super().__init__()
 
         self.input_size = input_size
         self.hidden_size = hidden_size
@@ -149,7 +149,7 @@ class Reshape(Module):
               height, and `W` width.
             - Outputs output :math:`(N, C, H, W)`
         """
-        super(Reshape, self).__init__()
+        super().__init__()
         self.src_dim = src_dim
         self.part_a = part_a
         self.part_b = part_b
@@ -211,7 +211,7 @@ class MaxPool(Module):
         """
         A wrapper around MaxPool layers with serialization and layer arithmetic.
         """
-        super(MaxPool, self).__init__()
+        super().__init__()
         self.kernel_size = kernel_size
         self.stride = stride
         self.layer = torch.nn.MaxPool2d(kernel_size, stride)
@@ -253,7 +253,7 @@ class Dropout(Module):
         """
         A wrapper around dropout layers with serialization and layer arithmetic.
         """
-        super(Dropout, self).__init__()
+        super().__init__()
         self.p = p
         self.dim = dim
         if dim == 1:
@@ -316,7 +316,7 @@ class TransposedSummarizingRNN(Module):
             - Outputs output :math:`(N, hidden_size * num_directions, H, S)`
               S (or H) being 1 if summarize (and transpose) are true
         """
-        super(TransposedSummarizingRNN, self).__init__()
+        super().__init__()
         self.transpose = transpose
         self.summarize = summarize
         self.legacy = legacy
@@ -506,7 +506,7 @@ class LinSoftmax(Module):
               height, and `W` width.
             - Outputs output :math:`(N, output_size, H, S)`
         """
-        super(LinSoftmax, self).__init__()
+        super().__init__()
 
         self.input_size = input_size
         self.output_size = output_size
@@ -596,11 +596,12 @@ class ActConv2D(Module):
     A wrapper for convolution + activation with automatic padding ensuring no
     dropped columns.
     """
-    def __init__(self, in_channels: int, out_channels: int, kernel_size: Tuple[int, int], nl: str = 'l') -> None:
-        super(ActConv2D, self).__init__()
+    def __init__(self, in_channels: int, out_channels: int, kernel_size: Tuple[int, int], stride: int, nl: str = 'l') -> None:
+        super().__init__()
         self.in_channels = in_channels
         self.kernel_size = kernel_size
         self.out_channels = out_channels
+        self.stride = stride
         self.padding = tuple((k - 1) // 2 for k in kernel_size)
         self.nl = None
         self.nl_name = None
@@ -619,7 +620,7 @@ class ActConv2D(Module):
         else:
             self.nl_name = 'LINEAR'
         self.co = torch.nn.Conv2d(in_channels, out_channels, kernel_size,
-                                  padding=self.padding)
+                                  stride=stride, padding=self.padding)
 
     def forward(self, inputs: torch.Tensor) -> torch.Tensor:
         o = self.co(inputs)
@@ -630,8 +631,8 @@ class ActConv2D(Module):
     def get_shape(self, input: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
         self.output_shape = (input[0],
                              self.out_channels,
-                             int(max(np.floor((input[2]+2*self.padding[0]-(self.kernel_size[0]-1)-1)+1), 1) if input[2] != 0 else 0),
-                             int(max(np.floor((input[3]+2*self.padding[1]-(self.kernel_size[1]-1)-1)+1), 1) if input[3] != 0 else 0))
+                             int(max(np.floor((input[2]+2*self.padding[0]-(self.kernel_size[0]-1)-1)/self.stride +1), 1) if input[2] != 0 else 0),
+                             int(max(np.floor((input[3]+2*self.padding[1]-(self.kernel_size[1]-1)-1)/self.stride+1), 1) if input[3] != 0 else 0))
         return self.output_shape
 
     def deserialize(self, name: str, spec) -> None:
@@ -676,7 +677,7 @@ class GroupNorm(Module):
     A group normalization layer
     """
     def __init__(self, in_channels: int, num_groups: int) -> None:
-        super(GroupNorm, self).__init__()
+        super().__init__()
         self.in_channels = in_channels
         self.num_groups = num_groups
 
