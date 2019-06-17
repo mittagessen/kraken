@@ -25,11 +25,12 @@ import numpy as np
 import pkg_resources
 import bidi.algorithm as bd
 
-from PIL import Image
-from typing import Dict, List, Tuple, Sequence, Callable, Optional, Any, Union, cast
+from PIL import Image, ImageDraw
 from collections import Counter
 from torchvision import transforms
 from torch.utils.data import Dataset
+from scipy.ndimage import gaussian_filter
+from typing import Dict, List, Tuple, Sequence, Callable, Optional, Any, Union, cast
 
 from kraken.lib.codec import PytorchCodec
 from kraken.lib.models import TorchSeqRecognizer
@@ -235,7 +236,7 @@ def compute_error(model: TorchSeqRecognizer, validation_set: Sequence[Tuple[str,
 
 class GroundTruthDataset(Dataset):
     """
-    Dataset for ground truth used during training.
+    Dataset for training a line recognition model.
 
     All data is cached in memory.
     """
@@ -364,3 +365,55 @@ class GroundTruthDataset(Dataset):
 
     def __len__(self) -> int:
         return len(self.training_set)
+
+
+class BaselineSet(data.Dataset):
+    """
+    Dataset for training a baseline recognition model.
+    """
+    def __init__(self, imgs, smooth: bool = False, line_width: int = 4, target_size: int = 1200):
+        """
+        Reads a list of image-json pairs and creates a data set.
+
+        Args:
+            imgs (list):
+            smooth (bool): Smooths target with a gaussian filter
+            line_width (int): Height of the baseline in the scaled input.
+            target_size (int): Target size of the image on the longest size.
+        """
+        super().__init__()
+        self.smooth = smooth
+        self.imgs = imgs
+
+    def __getitem__(self, idx):
+        im = self.imgs[idx]
+        with open('{}.path'.format(path.splitext(im)[0]), 'r') as fp:
+            target = json.load(fp)
+        orig = Image.open(im)
+        return self.transform(orig, target)
+
+    def transform(self, image, target):
+        resize = transforms.Resize(1200)
+        normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                         std=[0.229, 0.224, 0.225])
+        orig_size = image.size
+        image = resize(image)
+        scale = image.size[0]/orig_size[0]
+        t = Image.new('L', image.size)
+        draw = ImageDraw.Draw(t)
+        lines = []
+        for line in target:
+            l = []
+            for point in line:
+                l.append((int(point[0]*scale), int(point[1]*scale)))
+            draw.line(l, fill=255, width=4)
+        del draw
+        target = np.array(t)
+        if self.smooth:
+            target = gaussian_filter(target, sigma=2)
+        target = Image.fromarray(target)
+        return normalize(tf.to_tensor(image.convert('RGB'))), tf.to_tensor(target)
+
+    def __len__(self):
+        return len(self.imgs)
+
