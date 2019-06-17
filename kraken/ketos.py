@@ -75,6 +75,47 @@ def _expand_gt(ctx, param, value):
         images.extend([x for x in glob.iglob(expression, recursive=True) if os.path.isfile(x)])
     return images
 
+@cli.command('segtrain')
+@click.pass_context
+@click.option('-o', '--output', show_default=True, type=click.Path(), default='model', help='Output model file')
+@click.option('-s', '--spec', show_default=True,
+              default='[1,0,0,3 Cr3,3,64,2 Gn32 Cr3,3,128,2 Gn32 Cr3,3,64 Gn32 Lbx32 Lby32 Cr1,1,32 Gn32 Lbx32 Lby32 Cs1,1,1]',
+              help='VGSL spec of the baseline labeling network')
+@click.option('-i', '--load', show_default=True, type=click.Path(exists=True, readable=True), help='Load existing file to continue training')
+@click.option('-F', '--freq', show_default=True, default=1.0, type=click.FLOAT,
+              help='Model saving and report generation frequency in epochs during training')
+@click.option('-q', '--quit', show_default=True, default='early', type=click.Choice(['early', 'dumb']),
+              help='Stop condition for training. Set to `early` for early stooping or `dumb` for fixed number of epochs')
+@click.option('-N', '--epochs', show_default=True, default=-1, help='Number of epochs to train for')
+@click.option('--lag', show_default=True, default=5, help='Number of evaluations (--report frequence) to wait before stopping training without improvement')
+@click.option('--min-delta', show_default=True, default=None, type=click.FLOAT, help='Minimum improvement between epochs to reset early stopping. Default is scales the delta by the best loss')
+@click.option('-d', '--device', show_default=True, default='cpu', help='Select device to use (cpu, cuda:0, cuda:1, ...)')
+@click.option('--optimizer', show_default=True, default='Adam', type=click.Choice(['Adam', 'SGD', 'RMSprop']), help='Select optimizer')
+@click.option('-r', '--lrate', show_default=True, default=2e-4, help='Learning rate')
+@click.option('-m', '--momentum', show_default=True, default=0.9, help='Momentum')
+@click.option('-w', '--weight-decay', show_default=True, default=1e-5, help='Weight decay')
+@click.option('--schedule', show_default=True, type=click.Choice(['constant', '1cycle']), default='constant',
+              help='Set learning rate scheduler. For 1cycle, cycle length is determined by the `--epoch` option.')
+@click.option('-p', '--partition', show_default=True, default=0.9, help='Ground truth data partition ratio between train/validation set')
+@click.option('-t', '--training-files', show_default=True, default=None, multiple=True,
+              callback=_validate_manifests, type=click.File(mode='r', lazy=True),
+              help='File(s) with additional paths to training data')
+@click.option('-e', '--evaluation-files', show_default=True, default=None, multiple=True,
+              callback=_validate_manifests, type=click.File(mode='r', lazy=True),
+              help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
+@click.option('--threads', show_default=True, default=1, help='Number of OpenMP threads and workers when running on CPU.')
+#@click.option('--load-hyper-parameters/--no-load-hyper-parameters', show_default=True, default=False,
+#              help='When loading an existing model, retrieve hyperparameters from the model')
+@click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
+def segtrain(ctx, output, spec, load, freq, quit, epochs,
+          lag, min_delta, device, optimizer, lrate, momentum, weight_decay,
+          schedule, partition,
+          resize, training_files, evaluation_files, preload, threads,
+          ground_truth):
+    """
+    Trains a baseline labeling model for layout analysis
+    """
+    pass
 
 @cli.command('train')
 @click.pass_context
