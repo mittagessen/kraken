@@ -65,8 +65,9 @@ class TorchVGSLModel(object):
         Args:
             spec (str): Model definition similar to tesseract as follows:
                         ============ FUNCTIONAL OPS ============
-                        C(s|t|r|l|m)[{name}]<y>,<x>,<d> Convolves using a y,x window, with no
-                          shrinkage, SAME infill, d outputs, with s|t|r|l|m non-linear layer.
+                        C(s|t|r|l|m)[{name}]<y>,<x>,<d>[,<y_stride>,<x_stride>]
+                          Convolves using a y,x window, with no shrinkage, SAME
+                          infill, d outputs, with s|t|r|l|m non-linear layer.
                           (s|t|r|l|m) specifies the type of non-linearity:
                           s = sigmoid
                           t = tanh
@@ -596,13 +597,13 @@ class TorchVGSLModel(object):
         """
         Builds a 2D convolution layer.
         """
-        pattern = re.compile(r'(?P<type>C)(?P<nl>s|t|r|l|m)(?P<name>{\w+})?(\d+),(\d+),(?P<out>\d+)(,(?P<stride>\d+))?')
+        pattern = re.compile(r'(?P<type>C)(?P<nl>s|t|r|l|m)(?P<name>{\w+})?(\d+),(\d+),(?P<out>\d+)(,(?P<stride_y>\d+),(?P<stride_x>\d+))?')
         m = pattern.match(block)
         if not m:
             return None, None, None
         kernel_size = (int(m.group(4)), int(m.group(5)))
         filters = int(m.group('out'))
-        stride = int(m.group('stride')) if m.group('stride') else 1
+        stride = (int(m.group('stride_y')), int(m.group('stride_x'))) if m.group('stride_x') else (1, 1)
         nl = m.group('nl')
         fn = layers.ActConv2D(input[1], filters, kernel_size, stride, nl)
         logger.debug('{}\t\tconv\tkernel {} x {} filters {} stride {} activation {}'.format(self.idx+1, kernel_size[0], kernel_size[1], filters, stride, nl))

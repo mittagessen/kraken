@@ -596,7 +596,7 @@ class ActConv2D(Module):
     A wrapper for convolution + activation with automatic padding ensuring no
     dropped columns.
     """
-    def __init__(self, in_channels: int, out_channels: int, kernel_size: Tuple[int, int], stride: int, nl: str = 'l') -> None:
+    def __init__(self, in_channels: int, out_channels: int, kernel_size: Tuple[int, int], stride: Tuple[int, int], nl: str = 'l') -> None:
         super().__init__()
         self.in_channels = in_channels
         self.kernel_size = kernel_size
@@ -631,8 +631,8 @@ class ActConv2D(Module):
     def get_shape(self, input: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
         self.output_shape = (input[0],
                              self.out_channels,
-                             int(max(np.floor((input[2]+2*self.padding[0]-(self.kernel_size[0]-1)-1)/self.stride +1), 1) if input[2] != 0 else 0),
-                             int(max(np.floor((input[3]+2*self.padding[1]-(self.kernel_size[1]-1)-1)/self.stride+1), 1) if input[3] != 0 else 0))
+                             int(max(np.floor((input[2]+2*self.padding[0]-(self.kernel_size[0]-1)-1)/self.stride[0] +1), 1) if input[2] != 0 else 0),
+                             int(max(np.floor((input[3]+2*self.padding[1]-(self.kernel_size[1]-1)-1)/self.stride[1]+1), 1) if input[3] != 0 else 0))
         return self.output_shape
 
     def deserialize(self, name: str, spec) -> None:
@@ -656,8 +656,8 @@ class ActConv2D(Module):
                                 output_channels=self.out_channels,
                                 height=self.kernel_size[0],
                                 width=self.kernel_size[1],
-                                stride_height=1,
-                                stride_width=1,
+                                stride_height=self.stride[0],
+                                stride_width=self.stride[1],
                                 border_mode='same',
                                 groups=1,
                                 W=self.co.weight.permute(2, 3, 1, 0).data.numpy(),
