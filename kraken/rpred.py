@@ -115,10 +115,10 @@ def bidi_record(record: ocr_record) -> ocr_record:
     return ocr_record(prediction, cuts, confidences)
 
 
-def extract_boxes(im: Image.Image, bounds: Dict[str, Any]) -> Image:
+def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image:
     """
-    Yields the subimages of image im defined in the list of bounding boxes in
-    bounds preserving order.
+    Yields the subimages of image im defined in the list of bounding polygons
+    with baselines preserving order.
 
     Args:
         im (PIL.Image.Image): Input image

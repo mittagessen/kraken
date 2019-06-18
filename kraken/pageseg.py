@@ -428,10 +428,6 @@ def segment(im, text_direction='horizontal-lr', scale=None, maxcolseps=2,
     logger.debug('Rotating input image by {} degrees'.format(angle))
     im = im.rotate(angle, expand=True)
 
-    # honestly I've got no idea what's going on here. In theory a simple
-    # np.array(im, 'i') should suffice here but for some reason the
-    # tostring/fromstring magic in pil2array alters the array in a way that is
-    # needed for the algorithm to work correctly.
     a = pil2array(im)
     binary = np.array(a > 0.5*(np.amin(a) + np.amax(a)), 'i')
     binary = 1 - binary
