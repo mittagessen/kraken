@@ -16,7 +16,6 @@
 """
 Utility functions for data loading and training of VGSL networks.
 """
-import os
 import json
 import regex
 import torch
@@ -24,7 +23,9 @@ import unicodedata
 import numpy as np
 import pkg_resources
 import bidi.algorithm as bd
+import torchvision.transforms.functional as tf
 
+from os import path
 from PIL import Image, ImageDraw
 from collections import Counter
 from torchvision import transforms
@@ -37,14 +38,14 @@ from kraken.lib.models import TorchSeqRecognizer
 from kraken.lib.exceptions import KrakenInputException
 from kraken.lib.lineest import CenterNormalizer, dewarp
 
-__all__ = ['GroundTruthDataset', 'compute_error', 'generate_input_transforms']
+__all__ = ['BaselineSet', 'GroundTruthDataset', 'compute_error', 'generate_input_transforms']
 
 import logging
 
 logger = logging.getLogger(__name__)
 
 
-def generate_input_transforms(batch: int, height: int, width: int, channels: int, pad: int) -> transforms.Compose:
+def generate_input_transforms(batch: int, height: int, width: int, channels: int, pad: int, valid_norm: bool = True) -> transforms.Compose:
     """
     Generates a torchvision transformation converting a PIL.Image into a
     tensor usable in a network forward pass.
@@ -55,48 +56,53 @@ def generate_input_transforms(batch: int, height: int, width: int, channels: int
         width (int): width of input image in pixels
         channels (int): color channels of input
         pad (int): Amount of padding on horizontal ends of image
+        valid_norm (bool): Enables/disables baseline normalization as a valid
+                           preprocessing step. If disabled we will fall back to
+                           standard scaling.
 
     Returns:
         A torchvision transformation composition converting the input image to
         the appropriate tensor.
     """
-    scale = 0  # type: Union[Tuple[int, int], int]
+    scale = (height, width) # type: Tuple[int, int]
+    center_norm = False
+    mode = 'RGB' if channels == 3 else 'L'
     if height == 1 and width == 0 and channels > 3:
         perm = (1, 0, 2)
-        scale = channels
+        scale = (channels, 0)
+        if valid_norm:
+            center_norm = True
         mode = 'L'
-    # arbitrary (or fixed) height and width and channels 1 or 3 => needs a
-    # summarizing network (or a not yet implemented scale operation) to move
-    # height to the channel dimension.
     elif height > 1 and width == 0 and channels in (1, 3):
         perm = (0, 1, 2)
-        scale = height
-        mode = 'RGB' if channels == 3 else 'L'
+        if valid_norm and channels == 1:
+            center_norm = True
+    elif height == 0 and width > 1 and channels in (1, 3):
+        perm = (0, 1, 2)
     # fixed height and width image => bicubic scaling of the input image, disable padding
     elif height > 0 and width > 0 and channels in (1, 3):
         perm = (0, 1, 2)
         pad = 0
-        scale = (height, width)
-        mode = 'RGB' if channels == 3 else 'L'
     elif height == 0 and width == 0 and channels in (1, 3):
         perm = (0, 1, 2)
         pad = 0
-        scale = 0
-        mode = 'RGB' if channels == 3 else 'L'
     else:
-        raise KrakenInputException('Invalid input spec (variable height and fixed width not supported)')
+        raise KrakenInputException('Invalid input spec {}, {}, {}, {}, {}'.format(batch,
+                                                                                  height,
+                                                                                  width,
+                                                                                  channels,
+                                                                                  pad))
 
     out_transforms = []
     out_transforms.append(transforms.Lambda(lambda x: x.convert(mode)))
-    if scale:
-        if isinstance(scale, int):
-            if mode not in ['1', 'L']:
-                raise KrakenInputException('Invalid mode {} for line dewarping'.format(mode))
-            lnorm = CenterNormalizer(scale)
+
+    if scale != (0, 0):
+        if center_norm:
+            lnorm = CenterNormalizer(scale[0])
             out_transforms.append(transforms.Lambda(lambda x: dewarp(lnorm, x)))
             out_transforms.append(transforms.Lambda(lambda x: x.convert(mode)))
-        elif isinstance(scale, tuple):
-            out_transforms.append(transforms.Resize(scale, Image.LANCZOS))
+        else:
+            out_transforms.append(transforms.Lambda(lambda x: _fixed_resize(x, scale, Image.LANCZOS)))
     if pad:
         out_transforms.append(transforms.Pad((pad, 0), fill=255))
     out_transforms.append(transforms.ToTensor())
@@ -105,6 +111,22 @@ def generate_input_transforms(batch: int, height: int, width: int, channels: int
     out_transforms.append(transforms.Lambda(lambda x: x.permute(*perm)))
     return transforms.Compose(out_transforms)
 
+def _fixed_resize(img, size, interpolation=Image.LANCZOS):
+    """
+    Doesn't do the annoying runtime scale dimension switching the default
+    pytorch transform does.
+
+    Args:
+        img (PIL.Image): image to resize
+        size (tuple): Tuple (height, width)
+    """
+    w, h = img.size
+    oh, ow = size
+    if oh == 0:
+        oh = int(h * ow/w)
+    elif ow == 0:
+        ow = int(w * oh/h)
+    return img.resize((ow, oh), interpolation)
 
 def _fast_levenshtein(seq1: Sequence[Any], seq2: Sequence[Any]) -> int:
 
@@ -240,7 +262,7 @@ class GroundTruthDataset(Dataset):
 
     All data is cached in memory.
     """
-    def __init__(self, split: Callable[[str], str] = lambda x: os.path.splitext(x)[0],
+    def __init__(self, split: Callable[[str], str] = lambda x: path.splitext(x)[0],
                  suffix: str = '.gt.txt',
                  normalization: Optional[str] = None,
                  whitespace_normalization: bool = True,
@@ -367,11 +389,11 @@ class GroundTruthDataset(Dataset):
         return len(self.training_set)
 
 
-class BaselineSet(data.Dataset):
+class BaselineSet(Dataset):
     """
     Dataset for training a baseline recognition model.
     """
-    def __init__(self, imgs, smooth: bool = False, line_width: int = 4, target_size: int = 1200):
+    def __init__(self, imgs, smooth: bool = False, line_width: int = 4, target_height: int = 1200):
         """
         Reads a list of image-json pairs and creates a data set.
 
@@ -393,7 +415,7 @@ class BaselineSet(data.Dataset):
         return self.transform(orig, target)
 
     def transform(self, image, target):
-        resize = transforms.Resize(1200)
+        resize = lambda x: _fixed_resize(x, (1200, 0), interpolation=Image.LANCZOS)
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                          std=[0.229, 0.224, 0.225])
         orig_size = image.size
