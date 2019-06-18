@@ -393,7 +393,10 @@ class BaselineSet(Dataset):
     """
     Dataset for training a baseline recognition model.
     """
-    def __init__(self, imgs, smooth: bool = False, line_width: int = 4, target_height: int = 1200):
+    def __init__(self, imgs: Sequence[str],
+                 smooth: bool = False,
+                 line_width: int = 4,
+                 im_transforms: Callable[[Any], torch.Tensor] = transforms.Compose([])):
         """
         Reads a list of image-json pairs and creates a data set.
 
@@ -401,11 +404,13 @@ class BaselineSet(Dataset):
             imgs (list):
             smooth (bool): Smooths target with a gaussian filter
             line_width (int): Height of the baseline in the scaled input.
-            target_size (int): Target size of the image on the longest size.
+            target_size (tuple): Target size of the image as a (height, width) tuple.
         """
         super().__init__()
         self.smooth = smooth
         self.imgs = imgs
+        self.line_width = line_width
+        self.im_transforms = im_transforms
 
     def __getitem__(self, idx):
         im = self.imgs[idx]
@@ -415,26 +420,23 @@ class BaselineSet(Dataset):
         return self.transform(orig, target)
 
     def transform(self, image, target):
-        resize = lambda x: _fixed_resize(x, (1200, 0), interpolation=Image.LANCZOS)
-        normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                         std=[0.229, 0.224, 0.225])
         orig_size = image.size
-        image = resize(image)
-        scale = image.size[0]/orig_size[0]
-        t = Image.new('L', image.size)
+        image = self.im_transforms(image)
+        scale = image.shape[2]/orig_size[0]
+        t = Image.new('L', image.shape[:0:-1])
         draw = ImageDraw.Draw(t)
         lines = []
         for line in target:
             l = []
             for point in line:
                 l.append((int(point[0]*scale), int(point[1]*scale)))
-            draw.line(l, fill=255, width=4)
+            draw.line(l, fill=255, width=self.line_width)
         del draw
         target = np.array(t)
         if self.smooth:
             target = gaussian_filter(target, sigma=2)
         target = Image.fromarray(target)
-        return normalize(tf.to_tensor(image.convert('RGB'))), tf.to_tensor(target)
+        return image, tf.to_tensor(target)
 
     def __len__(self):
         return len(self.imgs)

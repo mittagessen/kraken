@@ -79,8 +79,10 @@ def _expand_gt(ctx, param, value):
 @click.pass_context
 @click.option('-o', '--output', show_default=True, type=click.Path(), default='model', help='Output model file')
 @click.option('-s', '--spec', show_default=True,
-              default='[1,0,0,3 Cr3,3,64,2 Gn32 Cr3,3,128,2 Gn32 Cr3,3,64 Gn32 Lbx32 Lby32 Cr1,1,32 Gn32 Lbx32 Lby32 Cs1,1,1]',
+              default='[1,1200,0,3 Cr3,3,64,2,2 Gn32 Cr3,3,128,2,2 Gn32 Cr3,3,64 Gn32 Lbx32 Lby32 Cr1,1,32 Gn32 Lbx32 Lby32 Cs1,1,1]',
               help='VGSL spec of the baseline labeling network')
+@click.option('--smooth/--no-smooth', show_default=True, default=True, help='Smooth the target image with a gaussian filter')
+@click.option('--line-width', show_default=True, default=4, help='The height of each baseline in the target after scaling')
 @click.option('-i', '--load', show_default=True, type=click.Path(exists=True, readable=True), help='Load existing file to continue training')
 @click.option('-F', '--freq', show_default=True, default=1.0, type=click.FLOAT,
               help='Model saving and report generation frequency in epochs during training')
@@ -104,18 +106,153 @@ def _expand_gt(ctx, param, value):
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
 @click.option('--threads', show_default=True, default=1, help='Number of OpenMP threads and workers when running on CPU.')
-#@click.option('--load-hyper-parameters/--no-load-hyper-parameters', show_default=True, default=False,
-#              help='When loading an existing model, retrieve hyperparameters from the model')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
-def segtrain(ctx, output, spec, load, freq, quit, epochs,
-          lag, min_delta, device, optimizer, lrate, momentum, weight_decay,
-          schedule, partition,
-          resize, training_files, evaluation_files, preload, threads,
-          ground_truth):
+def segtrain(ctx, output, spec, smooth, line_width, load, freq, quit, epochs,
+             lag, min_delta, device, optimizer, lrate, momentum, weight_decay,
+             schedule, partition, training_files, evaluation_files, threads,
+             ground_truth):
     """
     Trains a baseline labeling model for layout analysis
     """
-    pass
+    import re
+    import torch
+    import shutil
+    import numpy as np
+
+    from torch.utils.data import DataLoader
+
+    from kraken.lib import models, vgsl, train
+    from kraken.lib.util import make_printable
+    from kraken.lib.train import EarlyStopping, EpochStopping, TrainStopper, TrainScheduler, add_1cycle
+    from kraken.lib.codec import PytorchCodec
+    from kraken.lib.dataset import BaselineSet, generate_input_transforms
+
+    logger.info('Building ground truth set from {} document images'.format(len(ground_truth) + len(training_files)))
+
+    completed_epochs = 0
+    # load model if given. if a new model has to be created we need to do that
+    # after data set initialization, otherwise to output size is still unknown.
+    nn = None
+
+    if load:
+        logger.info('Loading existing model from {} '.format(load))
+        message('Loading existing model from {}'.format(load), nl=False)
+        nn = vgsl.TorchVGSLModel.load_model(load)
+        message('\u2713', fg='green')
+    else:
+        logger.info('Creating model {} '.format(spec))
+        message('Creating model {} '.format(spec), nl=False)
+        nn = vgsl.TorchVGSLModel(spec)
+        message('\u2713', fg='green')
+
+    # preparse input sizes from vgsl string to seed ground truth data set
+    # sizes and dimension ordering.
+    if not nn:
+        spec = spec.strip()
+        if spec[0] != '[' or spec[-1] != ']':
+            raise click.BadOptionUsage('spec', 'VGSL spec {} not bracketed'.format(spec))
+        blocks = spec[1:-1].split(' ')
+        m = re.match(r'(\d+),(\d+),(\d+),(\d+)', blocks[0])
+        if not m:
+            raise click.BadOptionUsage('spec', 'Invalid input spec {}'.format(blocks[0]))
+        batch, height, width, channels = [int(x) for x in m.groups()]
+    else:
+        batch, channels, height, width = nn.input
+    try:
+        transforms = generate_input_transforms(batch, height, width, channels, 0, valid_norm=False)
+    except KrakenInputException as e:
+        raise click.BadOptionUsage('spec', str(e))
+
+    # disable automatic partition when given evaluation set explicitly
+    if evaluation_files:
+        partition = 1
+    ground_truth = list(ground_truth)
+
+    # merge training_files into ground_truth list
+    if training_files:
+        ground_truth.extend(training_files)
+
+    if len(ground_truth) == 0:
+        raise click.UsageError('No training data was provided to the train command. Use `-t` or the `ground_truth` argument.')
+
+    np.random.shuffle(ground_truth)
+
+    tr_im = ground_truth[:int(len(ground_truth) * partition)]
+    if evaluation_files:
+        logger.debug('Using {} images from explicit eval set'.format(len(evaluation_files)))
+        te_im = evaluation_files
+    else:
+        te_im = ground_truth[int(len(ground_truth) * partition):]
+        logger.debug('Taking {} images from training for evaluation'.format(len(te_im)))
+
+    # set multiprocessing tensor sharing strategy
+    if 'file_system' in torch.multiprocessing.get_all_sharing_strategies():
+        logger.debug('Setting multiprocessing tensor sharing strategy to file_system')
+        torch.multiprocessing.set_sharing_strategy('file_system')
+
+    gt_set = BaselineSet(tr_im, smooth=smooth, line_width=line_width,
+                         im_transforms=transforms)
+    val_set = BaselineSet(te_im, smooth=smooth, line_width=line_width,
+                         im_transforms=transforms)
+    train_loader = DataLoader(gt_set, batch_size=1, shuffle=True, num_workers=loader_threads, pin_memory=True)
+    test_loader = DataLoader(val_set, batch_size=1, shuffle=True, num_workers=loader_threads, pin_memory=True)
+
+    # set mode to training
+    nn.train()
+
+    logger.debug('Set OpenMP threads to {}'.format(threads))
+    nn.set_num_threads(threads)
+
+    optim = getattr(torch.optim, optimizer)(nn.nn.parameters(), lr=0)
+
+    if 'accuracy' not in  nn.user_metadata:
+        nn.user_metadata['accuracy'] = []
+
+    tr_it = TrainScheduler(optim)
+    if schedule == '1cycle':
+        add_1cycle(tr_it, int(len(gt_set) * epochs), lrate, momentum, momentum - 0.10, weight_decay)
+    else:
+        # constant learning rate scheduler
+        tr_it.add_phase(1, (lrate, lrate), (momentum, momentum), weight_decay, train.annealing_const)
+
+    if quit == 'early':
+        st_it = EarlyStopping(min_delta, lag)
+    elif quit == 'dumb':
+        st_it = EpochStopping(epochs - completed_epochs)
+    else:
+        raise click.BadOptionUsage('quit', 'Invalid training interruption scheme {}'.format(quit))
+
+    trainer = train.KrakenPagesegTrainer(model=nn,
+                                         optimizer=optim,
+                                         device=device,
+                                         filename_prefix=output,
+                                         event_frequency=freq,
+                                         train_set=train_loader,
+                                         val_set=val_set,
+                                         stopper=st_it)
+
+    trainer.add_lr_scheduler(tr_it)
+
+    with  log.progressbar(label='stage {}/{}'.format(1, trainer.stopper.epochs if trainer.stopper.epochs > 0 else '∞'),
+                          length=trainer.event_it, show_pos=True) as bar:
+
+        def _draw_progressbar():
+            bar.update(1)
+
+        def _print_eval(epoch, f1, recall, precision):
+            message('Accuracy report ({}) {:0.4f} {:0.4f} {:0.4f}'.format(epoch, f1, recall, precision))
+            # reset progress bar
+            bar.label = 'stage {}/{}'.format(epoch+1, trainer.stopper.epochs if trainer.stopper.epochs > 0 else '∞')
+            bar.pos = 0
+            bar.finished = False
+
+        trainer.run(_print_eval, _draw_progressbar)
+
+    if quit == 'early':
+        message('Moving best model {0}_{1}.mlmodel ({2}) to {0}_best.mlmodel'.format(output, trainer.stopper.best_epoch, trainer.stopper.best_loss))
+        logger.info('Moving best model {0}_{1}.mlmodel ({2}) to {0}_best.mlmodel'.format(output, trainer.stopper.best_epoch, trainer.stopper.best_loss))
+        shutil.copy('{}_{}.mlmodel'.format(output, trainer.stopper.best_epoch), '{}_best.mlmodel'.format(output))
+
 
 @cli.command('train')
 @click.pass_context
@@ -301,7 +438,7 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
     if alpha_diff_only_train:
         logger.warning('alphabet mismatch: chars in training set only: {} (not included in accuracy test during training)'.format(alpha_diff_only_train))
     if alpha_diff_only_val:
-        logger.warning('alphabet mismatch: chars in validation set only: {} (not trained)'.format(alpha_diff_only_val))        
+        logger.warning('alphabet mismatch: chars in validation set only: {} (not trained)'.format(alpha_diff_only_val))
     logger.info('grapheme\tcount')
     for k, v in sorted(gt_set.alphabet.items(), key=lambda x: x[1], reverse=True):
         char = make_printable(k)
@@ -391,7 +528,6 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
     logger.debug('Set OpenMP threads to {}'.format(threads))
     nn.set_num_threads(threads)
 
-    logger.debug('Moving model to device {}'.format(device))
     optim = getattr(torch.optim, optimizer)(nn.nn.parameters(), lr=0)
 
     if 'accuracy' not in  nn.user_metadata:

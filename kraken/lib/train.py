@@ -224,9 +224,85 @@ class NoStopping(TrainStopper):
         return True
 
 
+class KrakenPagesegTrainer(object):
+    """
+    Class encapsulating the page segmentation training process.
+    """
+    def __init__(self,
+                 model: vgsl.TorchVGSLModel,
+                 optimizer: torch.optim.Optimizer,
+                 device: str = 'cpu',
+                 filename_prefix: str = 'model',
+                 event_frequency: float = 1.0,
+                 train_set: torch.utils.data.DataLoader = None,
+                 val_set = None,
+                 stopper = None):
+        self.model = model
+        self.rec = models.TorchSeqRecognizer(model, train=True, device=device)
+        self.optimizer = optimizer
+        self.device = device
+        self.filename_prefix = filename_prefix
+        self.event_frequency = event_frequency
+        self.event_it = int(len(train_set) * event_frequency)
+        self.train_set = cycle(train_set)
+        self.val_set = val_set
+        self.stopper = stopper if stopper else NoStopping()
+        self.iterations = 0
+        self.lr_scheduler = None
+
+    def add_lr_scheduler(self, lr_scheduler: TrainScheduler):
+        self.lr_scheduler = lr_scheduler
+
+    def run(self, event_callback = lambda *args, **kwargs: None, iteration_callback = lambda *args, **kwargs: None):
+        logger.debug('Starting up training...')
+
+        if 'accuracy' not in self.model.user_metadata:
+            self.model.user_metadata['accuracy'] = []
+
+        while self.stopper.trigger():
+            for _, (input, target) in zip(range(self.event_it), self.train_set):
+                if self.lr_scheduler:
+                    self.lr_scheduler.step()
+                input = input.to(self.device, non_blocking=True)
+                target = target.to(self.device, non_blocking=True)
+                input = input.requires_grad_()
+                o = self.model.nn(input)
+                # height should be 1 by now
+                if o.size(2) != 1:
+                    raise KrakenInputException('Expected dimension 3 to be 1, actual {}'.format(o.size(2)))
+                o = o.squeeze(2)
+                self.optimizer.zero_grad()
+                # NCW -> WNC
+                loss = self.model.criterion(o.permute(2, 0, 1),  # type: ignore
+                                            target,
+                                            (o.size(2),),
+                                            (target.size(1),))
+                if not torch.isinf(loss):
+                    loss.backward()
+                    self.optimizer.step()
+                else:
+                    logger.debug('infinite loss in trial')
+                iteration_callback()
+            self.iterations += self.event_it
+            logger.debug('Starting evaluation run')
+            self.model.eval()
+            chars, error = compute_error(self.rec, list(self.val_set))
+            self.model.train()
+            accuracy = (chars-error)/chars
+            logger.info('Accuracy report ({}) {:0.4f} {} {}'.format(self.stopper.epoch, accuracy, chars, error))
+            self.stopper.update(accuracy)
+            self.model.user_metadata['accuracy'].append((self.iterations, accuracy))
+            logger.info('Saving to {}_{}'.format(self.filename_prefix, self.stopper.epoch))
+            event_callback(epoch=self.stopper.epoch, accuracy=accuracy, chars=chars, error=error)
+            try:
+                self.model.user_metadata['completed_epochs'] = self.stopper.epoch
+                self.model.save_model('{}_{}.mlmodel'.format(self.filename_prefix, self.stopper.epoch))
+            except Exception as e:
+                logger.error('Saving model failed: {}'.format(str(e)))
+
 class KrakenTrainer(object):
     """
-    Class encapsulating the training process.
+    Class encapsulating the recognition model training process.
     """
     def __init__(self,
                  model: vgsl.TorchVGSLModel,
