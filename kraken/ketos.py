@@ -549,7 +549,6 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
     else:
         raise click.BadOptionUsage('quit', 'Invalid training interruption scheme {}'.format(quit))
 
-    eval_fn = recognition_evaluator_fn(nn, val_set, device)
     trainer = train.KrakenTrainer(model=nn,
                                   optimizer=optim,
                                   device=device,
