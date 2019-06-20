@@ -227,7 +227,7 @@ def recognition_loss_fn(criterion, output, target):
     # height should be 1 by now
     if output.size(2) != 1:
         raise KrakenInputException('Expected dimension 3 to be 1, actual {}'.format(output.size(2)))
-    ooutput = output.squeeze(2)
+    output = output.squeeze(2)
     # NCW -> WNC
     loss = criterion(output.permute(2, 0, 1),  # type: ignore
                      target,
@@ -240,7 +240,7 @@ def baseline_label_loss_fn(criterion, output, target):
     return loss
 
 def recognition_evaluator_fn(model, val_set, device):
-    rec = model.TorchSeqRecognizer(model, device)
+    rec = models.TorchSeqRecognizer(model, device)
     chars, error = compute_error(rec, list(self.val_set))
     model.train()
     accuracy = (chars-error)/chars

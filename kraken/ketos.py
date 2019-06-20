@@ -241,7 +241,7 @@ def segtrain(ctx, output, spec, smooth, line_width, load, freq, quit, epochs,
         def _draw_progressbar():
             bar.update(1)
 
-        def _print_eval(epoch, f1, recall, precision):
+        def _print_eval(epoch, f1, recall, precision, **kwargs):
             message('Accuracy report ({}) {:0.4f} {:0.4f} {:0.4f}'.format(epoch, f1, recall, precision))
             # reset progress bar
             bar.label = 'stage {}/{}'.format(epoch+1, trainer.stopper.epochs if trainer.stopper.epochs > 0 else '∞')
@@ -566,7 +566,7 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
         def _draw_progressbar():
             bar.update(1)
 
-        def _print_eval(epoch, accuracy, chars, error):
+        def _print_eval(epoch, accuracy, chars, error, **kwargs):
             message('Accuracy report ({}) {:0.4f} {} {}'.format(epoch, accuracy, chars, error))
             # reset progress bar
             bar.label = 'stage {}/{}'.format(epoch+1, trainer.stopper.epochs if trainer.stopper.epochs > 0 else '∞')
