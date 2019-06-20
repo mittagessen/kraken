@@ -294,7 +294,7 @@ class KrakenTrainer(object):
                  val_set = None,
                  stopper = None,
                  loss_fn = recognition_loss_fn,
-                 evaluator = None):
+                 evaluator = recognition_evaluator_fn):
         self.model = model
         self.optimizer = optimizer
         self.device = device

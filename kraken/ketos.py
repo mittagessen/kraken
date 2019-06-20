@@ -222,14 +222,16 @@ def segtrain(ctx, output, spec, smooth, line_width, load, freq, quit, epochs,
     else:
         raise click.BadOptionUsage('quit', 'Invalid training interruption scheme {}'.format(quit))
 
-    trainer = train.KrakenPagesegTrainer(model=nn,
-                                         optimizer=optim,
-                                         device=device,
-                                         filename_prefix=output,
-                                         event_frequency=freq,
-                                         train_set=train_loader,
-                                         val_set=val_set,
-                                         stopper=st_it)
+    trainer = train.KrakenTrainer(model=nn,
+                                  optimizer=optim,
+                                  device=device,
+                                  filename_prefix=output,
+                                  event_frequency=freq,
+                                  train_set=train_loader,
+                                  val_set=val_set,
+                                  stopper=st_it,
+                                  loss_fn=train.baseline_label_loss_fn,
+                                  evaluator=train.baseline_label_evaluator_fn)
 
     trainer.add_lr_scheduler(tr_it)
 
@@ -555,7 +557,6 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
                                   event_frequency=freq,
                                   train_set=train_loader,
                                   val_set=val_set,
-                                  evaluator=eval_fn,
                                   stopper=st_it)
 
     trainer.add_lr_scheduler(tr_it)
