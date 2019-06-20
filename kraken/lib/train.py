@@ -313,7 +313,7 @@ class KrakenTrainer(object):
         self.lr_scheduler = lr_scheduler
 
     def run(self, event_callback = lambda *args, **kwargs: None, iteration_callback = lambda *args, **kwargs: None):
-        logger.debug('Moving model to device {}'.format(self.deice))
+        logger.debug('Moving model to device {}'.format(self.device))
         self.model.to(self.device)
 
         logger.debug('Starting up training...')
