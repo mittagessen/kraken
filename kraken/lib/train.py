@@ -223,82 +223,62 @@ class NoStopping(TrainStopper):
     def trigger(self) -> bool:
         return True
 
+def recognition_loss_fn(criterion, output, target):
+    # height should be 1 by now
+    if output.size(2) != 1:
+        raise KrakenInputException('Expected dimension 3 to be 1, actual {}'.format(output.size(2)))
+    ooutput = output.squeeze(2)
+    # NCW -> WNC
+    loss = criterion(output.permute(2, 0, 1),  # type: ignore
+                     target,
+                     (output.size(2),),
+                     (target.size(1),))
+    return loss
 
-class KrakenPagesegTrainer(object):
-    """
-    Class encapsulating the page segmentation training process.
-    """
-    def __init__(self,
-                 model: vgsl.TorchVGSLModel,
-                 optimizer: torch.optim.Optimizer,
-                 device: str = 'cpu',
-                 filename_prefix: str = 'model',
-                 event_frequency: float = 1.0,
-                 train_set: torch.utils.data.DataLoader = None,
-                 val_set = None,
-                 stopper = None):
-        self.model = model
-        self.rec = models.TorchSeqRecognizer(model, train=True, device=device)
-        self.optimizer = optimizer
-        self.device = device
-        self.filename_prefix = filename_prefix
-        self.event_frequency = event_frequency
-        self.event_it = int(len(train_set) * event_frequency)
-        self.train_set = cycle(train_set)
-        self.val_set = val_set
-        self.stopper = stopper if stopper else NoStopping()
-        self.iterations = 0
-        self.lr_scheduler = None
+def baseline_label_loss_fn(criterion, output, target):
+    loss = criterion(output, target)
+    return loss
 
-    def add_lr_scheduler(self, lr_scheduler: TrainScheduler):
-        self.lr_scheduler = lr_scheduler
+def recognition_evaluator_fn(model, val_set, device):
+    rec = model.TorchSeqRecognizer(model, device)
+    chars, error = compute_error(rec, list(self.val_set))
+    model.train()
+    accuracy = (chars-error)/chars
+    logger.info('Accuracy report ({}) {:0.4f} {} {}'.format(self.stopper.epoch, accuracy, chars, error))
+    return {'val_metric': accuracy, 'accuracy': accuracy, 'chars': chars, 'error': error}
 
-    def run(self, event_callback = lambda *args, **kwargs: None, iteration_callback = lambda *args, **kwargs: None):
-        logger.debug('Starting up training...')
+def baseline_label_evaluator_fn(model, val_set, device):
 
-        if 'accuracy' not in self.model.user_metadata:
-            self.model.user_metadata['accuracy'] = []
-
-        while self.stopper.trigger():
-            for _, (input, target) in zip(range(self.event_it), self.train_set):
-                if self.lr_scheduler:
-                    self.lr_scheduler.step()
-                input = input.to(self.device, non_blocking=True)
-                target = target.to(self.device, non_blocking=True)
-                input = input.requires_grad_()
-                o = self.model.nn(input)
-                # height should be 1 by now
-                if o.size(2) != 1:
-                    raise KrakenInputException('Expected dimension 3 to be 1, actual {}'.format(o.size(2)))
-                o = o.squeeze(2)
-                self.optimizer.zero_grad()
-                # NCW -> WNC
-                loss = self.model.criterion(o.permute(2, 0, 1),  # type: ignore
-                                            target,
-                                            (o.size(2),),
-                                            (target.size(1),))
-                if not torch.isinf(loss):
-                    loss.backward()
-                    self.optimizer.step()
-                else:
-                    logger.debug('infinite loss in trial')
-                iteration_callback()
-            self.iterations += self.event_it
-            logger.debug('Starting evaluation run')
-            self.model.eval()
-            chars, error = compute_error(self.rec, list(self.val_set))
-            self.model.train()
-            accuracy = (chars-error)/chars
-            logger.info('Accuracy report ({}) {:0.4f} {} {}'.format(self.stopper.epoch, accuracy, chars, error))
-            self.stopper.update(accuracy)
-            self.model.user_metadata['accuracy'].append((self.iterations, accuracy))
-            logger.info('Saving to {}_{}'.format(self.filename_prefix, self.stopper.epoch))
-            event_callback(epoch=self.stopper.epoch, accuracy=accuracy, chars=chars, error=error)
-            try:
-                self.model.user_metadata['completed_epochs'] = self.stopper.epoch
-                self.model.save_model('{}_{}.mlmodel'.format(self.filename_prefix, self.stopper.epoch))
-            except Exception as e:
-                logger.error('Saving model failed: {}'.format(str(e)))
+    true_positives = 0
+    all_positives = 0
+    actual_positives = 0
+    all_n = 0
+    with torch.no_grad():
+        for x, y in val_set:
+            pred = model(x).view(-1)
+            y = y.view(-1)
+            correct = y * pred
+            all_p = pred.sum(dim=0).type(torch.DoubleTensor)
+            actual_p = y.sum(dim=0).type(torch.DoubleTensor)
+            if correct.sum() == 0:
+                tp = torch.zeros_like(all_positives)
+            else:
+                tp = correct.sum(dim=0)
+            tp = tp.type(torch.DoubleTensor)
+            true_positives += tp
+            all_positives += all_p
+            actual_positives += actual_p
+            all_n += len(y)
+    # all_positives = tp + fp
+    # actual_positives = tp + fn
+    # true_positivies = tp
+    precision = true_positives / (all_positives + 1e-20)
+    recall = true_positives / (actual_positives + 1e-20)
+    f1 = precision * recall * 2 / (precision + recall + 1e-20)
+    s = actual_positives/all_n
+    p = all_positives/all_n
+    mcc = ((true_positives/all_n) - s*p)/np.sqrt(p*s(1-s)(1-p))
+    return {'precision': precision, 'recall': recall, 'f1': f1, 'mcc': mcc, 'val_metric': mcc}
 
 class KrakenTrainer(object):
     """
@@ -312,9 +292,10 @@ class KrakenTrainer(object):
                  event_frequency: float = 1.0,
                  train_set: torch.utils.data.DataLoader = None,
                  val_set = None,
-                 stopper = None):
+                 stopper = None,
+                 loss_fn = recognition_loss_fn,
+                 evaluator = None):
         self.model = model
-        self.rec = models.TorchSeqRecognizer(model, train=True, device=device)
         self.optimizer = optimizer
         self.device = device
         self.filename_prefix = filename_prefix
@@ -325,6 +306,8 @@ class KrakenTrainer(object):
         self.stopper = stopper if stopper else NoStopping()
         self.iterations = 0
         self.lr_scheduler = None
+        self.loss_fn = loss_fn
+        self.evaluator = evaluator
 
     def add_lr_scheduler(self, lr_scheduler: TrainScheduler):
         self.lr_scheduler = lr_scheduler
@@ -343,16 +326,8 @@ class KrakenTrainer(object):
                 target = target.to(self.device, non_blocking=True)
                 input = input.requires_grad_()
                 o = self.model.nn(input)
-                # height should be 1 by now
-                if o.size(2) != 1:
-                    raise KrakenInputException('Expected dimension 3 to be 1, actual {}'.format(o.size(2)))
-                o = o.squeeze(2)
                 self.optimizer.zero_grad()
-                # NCW -> WNC
-                loss = self.model.criterion(o.permute(2, 0, 1),  # type: ignore
-                                            target,
-                                            (o.size(2),),
-                                            (target.size(1),))
+                loss = loss_fn(o)
                 if not torch.isinf(loss):
                     loss.backward()
                     self.optimizer.step()
@@ -361,15 +336,11 @@ class KrakenTrainer(object):
                 iteration_callback()
             self.iterations += self.event_it
             logger.debug('Starting evaluation run')
-            self.model.eval()
-            chars, error = compute_error(self.rec, list(self.val_set))
-            self.model.train()
-            accuracy = (chars-error)/chars
-            logger.info('Accuracy report ({}) {:0.4f} {} {}'.format(self.stopper.epoch, accuracy, chars, error))
-            self.stopper.update(accuracy)
-            self.model.user_metadata['accuracy'].append((self.iterations, accuracy))
+            eval_res = self.evaluator(self.model, self.val_set, self.device)
+            self.stopper.update(eval_res['val_metric'])
+            self.model.user_metadata['accuracy'].append((self.iterations, eval_res['val_metric']))
             logger.info('Saving to {}_{}'.format(self.filename_prefix, self.stopper.epoch))
-            event_callback(epoch=self.stopper.epoch, accuracy=accuracy, chars=chars, error=error)
+            event_callback(epoch=self.stopper.epoch, **eval_res)
             try:
                 self.model.user_metadata['completed_epochs'] = self.stopper.epoch
                 self.model.save_model('{}_{}.mlmodel'.format(self.filename_prefix, self.stopper.epoch))
