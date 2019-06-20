@@ -330,7 +330,7 @@ class KrakenTrainer(object):
                 input = input.requires_grad_()
                 o = self.model.nn(input)
                 self.optimizer.zero_grad()
-                loss = loss_fn(self.model.criterion, o, target)
+                loss = self.loss_fn(self.model.criterion, o, target)
                 if not torch.isinf(loss):
                     loss.backward()
                     self.optimizer.step()
