@@ -313,6 +313,9 @@ class KrakenTrainer(object):
         self.lr_scheduler = lr_scheduler
 
     def run(self, event_callback = lambda *args, **kwargs: None, iteration_callback = lambda *args, **kwargs: None):
+        logger.debug('Moving model to device {}'.format(self.deice))
+        self.model.to(self.device)
+
         logger.debug('Starting up training...')
 
         if 'accuracy' not in self.model.user_metadata:
