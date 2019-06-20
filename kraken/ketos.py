@@ -547,10 +547,7 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
     else:
         raise click.BadOptionUsage('quit', 'Invalid training interruption scheme {}'.format(quit))
 
-    #for param in hyper_fields:
-    #    logger.debug('Setting \'{}\' to \'{}\' in model metadata'.format(param, locals()[param]))
-    #    nn.user_metadata[param] = locals()[param]
-
+    eval_fn = recognition_evaluator_fn(nn, val_set, device)
     trainer = train.KrakenTrainer(model=nn,
                                   optimizer=optim,
                                   device=device,
@@ -558,6 +555,7 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
                                   event_frequency=freq,
                                   train_set=train_loader,
                                   val_set=val_set,
+                                  evaluator=eval_fn,
                                   stopper=st_it)
 
     trainer.add_lr_scheduler(tr_it)
