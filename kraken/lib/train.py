@@ -258,8 +258,9 @@ def baseline_label_evaluator_fn(model, val_set, device):
         for x, y in val_set:
             x = x.to(device)
             y = y.to(device).unsqueeze(0)
-            pred = model.nn(x.unsqueeze(0)).view(-1)
+            pred = model.nn(x.unsqueeze(0))
             pred = F.interpolate(pred, size=(y.size(2), y.size(3)))
+            pred = pred.view(-1)
             y = y.view(-1)
             correct = y * pred
             all_p = pred.sum(dim=0).type(torch.DoubleTensor)
