@@ -282,7 +282,7 @@ def baseline_label_evaluator_fn(model, val_set, device):
     f1 = precision * recall * 2 / (precision + recall + 1e-20)
     s = actual_positives/all_n
     p = all_positives/all_n
-    mcc = ((true_positives/all_n) - s*p)/np.sqrt(p*s(1-s)(1-p))
+    mcc = ((true_positives/all_n) - s*p)/torch.sqrt(p*s*(1-s)*(1-p))
     return {'precision': precision, 'recall': recall, 'f1': f1, 'mcc': mcc, 'val_metric': mcc}
 
 class KrakenTrainer(object):
