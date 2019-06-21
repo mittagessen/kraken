@@ -256,7 +256,9 @@ def baseline_label_evaluator_fn(model, val_set, device):
     all_n = 0
     with torch.no_grad():
         for x, y in val_set:
-            pred = model.nn(x).view(-1)
+            x = x.to(device)
+            y = y.to(device)
+            pred = model.nn(x.unsqueeze(0)).view(-1)
             y = y.view(-1)
             correct = y * pred
             all_p = pred.sum(dim=0).type(torch.DoubleTensor)
