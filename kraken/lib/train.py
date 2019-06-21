@@ -21,6 +21,7 @@ import math
 import torch
 import logging
 import numpy as np
+import torch.nn.functional as F
 
 from itertools import cycle, count
 from torch.utils import data
@@ -236,6 +237,7 @@ def recognition_loss_fn(criterion, output, target):
     return loss
 
 def baseline_label_loss_fn(criterion, output, target):
+    output = F.interpolate(output, size=(target.size(2), target.size(3)))
     loss = criterion(output, target)
     return loss
 

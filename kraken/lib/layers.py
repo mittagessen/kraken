@@ -488,7 +488,6 @@ class TransposedSummarizingRNN(Module):
                                 output_all=not self.summarize)
         return name
 
-
 class LinSoftmax(Module):
     """
     A wrapper for linear projection + softmax dealing with dimensionality mangling.

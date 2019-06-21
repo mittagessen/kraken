@@ -665,14 +665,27 @@ class TorchVGSLModel(object):
         m = pattern.match(block)
         if not m:
             return None, None, None
-        if int(m.group('dim')) != 1:
-            raise ValueError('non-2d output not supported, yet')
+        dim = int(m.group('dim'))
         nl = m.group('type')
-        if nl not in ['s', 'c']:
-            raise ValueError('only softmax and ctc supported in output')
-        if nl == 'c':
+        outdim = int(m.group('out'))
+        if dim == 0:
+            raise ValueError('categorical output not supported, yet.')
+        if nl == 'c' and dim == 2:
+            raise ValueError('CTC not supported for heatmap output')
+        if nl == 'l' and int(m.group('out')) == 1:
+            self.criterion = nn.BCELoss()
+        elif nl == 'c':
             self.criterion = nn.CTCLoss(reduction='none')
-        aug = True if m.group('aug') else False
-        lin = layers.LinSoftmax(input[1], int(m.group('out')), aug)
-        logger.debug('{}\t\tlinear\taugmented {} out {}'.format(self.idx+1, aug, m.group('out')))
-        return lin.get_shape(input), self.get_layer_name(m.group(1), m.group('name')), lin
+        else:
+            raise ValueError('unsupported output specification')
+        # heatmap output
+        if dim == 2:
+            act = 's' if nl == 'l' else 'm'
+            fn = layers.ActConv2D(input[1], outdim, (1, 1), (1, 1), act)
+            logger.debug('{}\t\tconv\tkernel 1 x 1 filters {} stride 1 activation {}'.format(self.idx+1, outdim, nl))
+            return fn.get_shape(input), self.get_layer_name(m.group('type'), m.group('name')), fn
+        else:
+            aug = True if m.group('aug') else False
+            lin = layers.LinSoftmax(input[1], int(m.group('out')), aug)
+            logger.debug('{}\t\tlinear\taugmented {} out {}'.format(self.idx+1, aug, m.group('out')))
+            return lin.get_shape(input), self.get_layer_name(m.group(1), m.group('name')), lin
