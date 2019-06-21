@@ -194,8 +194,14 @@ def segtrain(ctx, output, spec, smooth, line_width, load, freq, quit, epochs,
                          im_transforms=transforms)
     val_set = BaselineSet(te_im, smooth=smooth, line_width=line_width,
                          im_transforms=transforms)
+
+    if device == 'cpu':
+        loader_threads = threads // 2
+    else:
+        loader_threads = threads
     train_loader = DataLoader(gt_set, batch_size=1, shuffle=True, num_workers=loader_threads, pin_memory=True)
     test_loader = DataLoader(val_set, batch_size=1, shuffle=True, num_workers=loader_threads, pin_memory=True)
+    threads -= loader_threads
 
     # set mode to training
     nn.train()
