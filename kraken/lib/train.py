@@ -347,7 +347,7 @@ class KrakenTrainer(object):
             logger.debug('Starting evaluation run')
             eval_res = self.evaluator(self.model, self.val_set, self.device)
             self.stopper.update(eval_res['val_metric'])
-            self.model.user_metadata['accuracy'].append((self.iterations, eval_res['val_metric']))
+            self.model.user_metadata['accuracy'].append((self.iterations, float(eval_res['val_metric'])))
             logger.info('Saving to {}_{}'.format(self.filename_prefix, self.stopper.epoch))
             event_callback(epoch=self.stopper.epoch, **eval_res)
             try:
