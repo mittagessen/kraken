@@ -192,8 +192,8 @@ def segtrain(ctx, output, spec, smooth, line_width, load, freq, quit, epochs,
 
     gt_set = BaselineSet(tr_im, smooth=smooth, line_width=line_width,
                          im_transforms=transforms)
-    val_set = BaselineSet(te_im, smooth=smooth, line_width=line_width,
-                         im_transforms=transforms)
+    val_set = BaselineSet(te_im, smooth=False, line_width=line_width,
+                          im_transforms=transforms)
 
     if device == 'cpu':
         loader_threads = threads // 2
