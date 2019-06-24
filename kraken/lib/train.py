@@ -29,7 +29,7 @@ from functools import partial
 from typing import Tuple, Union, Optional, Callable, List, Dict, Any
 from collections.abc import Iterable
 
-from kraken.lib import models, vgsl
+from kraken.lib import models, vgsl, segmentation
 from kraken.lib.dataset import compute_error
 from kraken.lib.exceptions import KrakenStopTrainingException, KrakenInputException
 
@@ -260,7 +260,8 @@ def baseline_label_evaluator_fn(model, val_set, device):
             y = y.to(device).unsqueeze(0)
             pred = model.nn(x.unsqueeze(0))
             pred = F.interpolate(pred, size=(y.size(2), y.size(3)))
-            pred = pred.view(-1)
+            pred = segmentation.denoising_hysteresis_thresh(pred.detach().squeeze().cpu().numpy(), 0.4, 0.5, 0)
+            pred = torch.from_numpy(pred.astype('f')).to(device).view(-1)
             y = y.view(-1)
             correct = y * pred
             all_p = pred.sum(dim=0).type(torch.DoubleTensor)
