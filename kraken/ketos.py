@@ -82,7 +82,7 @@ def _expand_gt(ctx, param, value):
               default='[1,1200,0,3 Cr3,3,64,2,2 Gn32 Cr3,3,128,2,2 Gn32 Cr3,3,64 Gn32 Lbx32 Lby32 Cr1,1,32 Gn32 Lbx32 Lby32 O2l1]',
               help='VGSL spec of the baseline labeling network')
 @click.option('--smooth/--no-smooth', show_default=True, default=True, help='Smooth the target image with a gaussian filter')
-@click.option('--line-width', show_default=True, default=4, help='The height of each baseline in the target after scaling')
+@click.option('--line-width', show_default=True, default=8, help='The height of each baseline in the target after scaling')
 @click.option('-i', '--load', show_default=True, type=click.Path(exists=True, readable=True), help='Load existing file to continue training')
 @click.option('-F', '--freq', show_default=True, default=1.0, type=click.FLOAT,
               help='Model saving and report generation frequency in epochs during training')
