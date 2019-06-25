@@ -25,7 +25,7 @@ from scipy.ndimage.filters import gaussian_filter
 
 from skimage.draw import line
 from skimage.graph import MCP_Connect
-from skimage.filters import apply_hysteresis_threshold
+from skimage.filters import apply_hysteresis_threshold, threshold_sauvola
 from skimage.measure import approximate_polygon
 from skimage.morphology import skeletonize_3d
 
@@ -96,3 +96,39 @@ def vectorize_lines(im: np.ndarray, error: int = 3):
     except ValueError as e:
         return []
     return [approximate_polygon(line, erro).tolist() for line in mcp.get_connections()]
+
+
+def calculate_polygonal_environment(im, baselines):
+    """
+    Given a list of baselines and an input image, calculates a polygonal
+    environment around each baseline.
+
+    Args:
+        im (PIL.Image): Input image
+        baselines (sequence): List of lists containing a single baseline per
+                              entry.
+
+    Returns:
+        List of tuples (baseline, polygonization) where each is a list of coordinates.
+    """
+    dist = 30
+    def _unit_ortho_vec(p1, p2):
+        vy = p1[0] - p2[0]
+        vx = p1[1] - p2[1]
+        dist = math.sqrt(vx**2 + vy**2)
+        return (vx/dist, vy/dist)
+
+    blpl = []
+    for baseline in baselines:
+        if baseline[0][1] > baseline[-1][1]:
+            baseline = list(reversed(baseline))
+        upper_pts = []
+        lower_pts = []
+        for lineseg in zip(baseline, baseline[1::]):
+            uy, ux = _unit_ortho_vec(*lineseg)
+            samples = line(lineseg[0][0], lineseg[0][1], lineseg[1][0], lineseg[1][1])
+            lower_pts.append(samples[0] - int(context * uy), samples[1] + int(context * ux))
+            upper_pts.append(samples[0] + int(context * uy), samples[1] - int(context * ux))
+        blpl.append((baseline, [*lower_pts, *list(reversed(upper_pts))]))
+    return blpl
+
