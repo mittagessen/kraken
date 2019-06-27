@@ -18,7 +18,7 @@ Processing for baseline segmenter output
 """
 import math
 import numpy as np
-from scipy.spatial import distance
+from scipy.spatial.distance import pdist, squareform
 from scipy.signal import convolve2d
 from scipy.ndimage import label
 from scipy.ndimage.filters import gaussian_filter
@@ -63,7 +63,7 @@ def vectorize_lines(im: np.ndarray, error: int = 3):
         candidates[label_im[tuple(pt)]].append(pt)
     cc_extrema = []
     for pts in candidates.values():
-        distance = distance.squareform(distance.pdist(np.stack(pts), 'euclidean'))
+        distance = squareform(pdist(np.stack(pts), 'euclidean'))
         i, j = np.unravel_index(distance.argmax(), distance.shape)
         cc_extrema.append(pts[i])
         cc_extrema.append(pts[j])
@@ -95,7 +95,7 @@ def vectorize_lines(im: np.ndarray, error: int = 3):
         mcp.find_costs(cc_extrema)
     except ValueError as e:
         return []
-    return [approximate_polygon(line, erro).tolist() for line in mcp.get_connections()]
+    return [approximate_polygon(line, error).tolist() for line in mcp.get_connections()]
 
 
 def calculate_polygonal_environment(im, baselines):
@@ -111,7 +111,7 @@ def calculate_polygonal_environment(im, baselines):
     Returns:
         List of tuples (baseline, polygonization) where each is a list of coordinates.
     """
-    dist = 30
+    context = 30
     def _unit_ortho_vec(p1, p2):
         vy = p1[0] - p2[0]
         vx = p1[1] - p2[1]
@@ -127,8 +127,8 @@ def calculate_polygonal_environment(im, baselines):
         for lineseg in zip(baseline, baseline[1::]):
             uy, ux = _unit_ortho_vec(*lineseg)
             samples = line(lineseg[0][0], lineseg[0][1], lineseg[1][0], lineseg[1][1])
-            lower_pts.append(samples[0] - int(context * uy), samples[1] + int(context * ux))
-            upper_pts.append(samples[0] + int(context * uy), samples[1] - int(context * ux))
+            lower_pts.append((samples[0] - int(context * uy), samples[1] + int(context * ux)))
+            upper_pts.append((samples[0] + int(context * uy), samples[1] - int(context * ux)))
         blpl.append((baseline, [*lower_pts, *list(reversed(upper_pts))]))
     return blpl
 

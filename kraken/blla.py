@@ -21,15 +21,17 @@ Trainable baseline layout analysis tools for kraken
 """
 
 import json
+import torch
 import logging
 import numpy as np
 import pkg_resources
+import torch.nn.functional as F
 
 from typing import Tuple, Sequence, List
 from scipy.ndimage.filters import (gaussian_filter, uniform_filter,
                                    maximum_filter)
 
-from kraken.lib import morph, sl, vgsl, segmentation
+from kraken.lib import morph, sl, vgsl, segmentation, dataset
 from kraken.lib.util import pil2array, is_bitonal, get_im_str
 from kraken.lib.exceptions import KrakenInputException
 
@@ -50,16 +52,22 @@ def segment(im, text_direction='horizontal-lr', mask=None, model=pkg_resources.r
 
     Args:
         im (PIL.Image): An RGB image.
-        text_direction (str): Principal direction of the text
-                              (horizontal-lr/rl/vertical-lr/rl)
+        text_direction (str): Ignored by the segmenter but kept for
+                              serialization.
         mask (PIL.Image): A bi-level mask image of the same size as `im` where
                           0-valued regions are ignored for segmentation
                           purposes. Disables column detection.
 
     Returns:
-        {'text_direction': '$dir', 'boxes': [(x1, y1, x2, y2, ..., xn, yn),...]}: A
-        dictionary containing the text direction and a list of reading order
-        sorted baselines under the key 'boxes'.
+        {'text_direction': '$dir',
+         'lines': [
+            {'baseline': [x0, y0, x1, y1, ..., x_n, y_n], 'boundary': [x0, y0, x1, y1, ... x_m, y_m]},
+            {'baseline': [x0, ...], 'boundary': [x0, ...]}
+          ]
+        }: A dictionary containing the text direction and under the key 'lines'
+        a list of reading order sorted baselines (polylines) and their
+        respective polygonal boundaries. The last and first point of each
+        boundary polygon is connected.
 
     Raises:
         KrakenInputException if the input image is not binarized or the text
@@ -67,13 +75,6 @@ def segment(im, text_direction='horizontal-lr', mask=None, model=pkg_resources.r
     """
     im_str = get_im_str(im)
     logger.info('Segmenting {}'.format(im_str))
-
-    logger.debug('Rotating input image by {} degrees'.format(angle))
-    im = im.rotate(angle, expand=True)
-
-    a = pil2array(im)
-    binary = np.array(a > 0.5*(np.amin(a) + np.amax(a)), 'i')
-    binary = 1 - binary
 
     if mask:
         if mask.mode != '1' and not is_bitonal(mask):
@@ -84,13 +85,15 @@ def segment(im, text_direction='horizontal-lr', mask=None, model=pkg_resources.r
             logger.error('Mask size {} doesn\'t match image size {}'.format(mask.size, im.size))
             raise KrakenInputException('Mask size {} doesn\'t match image size {}'.format(mask.size, im.size))
         logger.info('Masking enabled in segmenter. Disabling column detection.')
-        mask = mask.rotate(angle, expand=True)
-        colseps = pil2array(mask)
+        mask = pil2array(mask)
 
-    nn = vgsl.TorchVGSLModel(model)
-    batch, channels, height, width = nn.input
-    transforms = generate_input_transforms(batch, height, width, channels, 0, valid_norm=False)
+    batch, channels, height, width = model.input
+    transforms = dataset.generate_input_transforms(batch, height, width, channels, 0, valid_norm=False)
 
-    o = nn.nn(im)
-    o = segmentation.denoising_hysteresis_thresh(o, 0.4, 0.5, 0)
+    with torch.no_grad():
+        o = model.nn(transforms(im).unsqueeze(0))
+    o = F.interpolate(o, size=im.size[::-1])
+    o = segmentation.denoising_hysteresis_thresh(o.detach().squeeze().cpu().numpy(), 0.4, 0.5, 0)
     baselines = segmentation.vectorize_lines(o)
+    polygons = segmentation.calculate_polygonal_environment(im, baselines)
+    return polygons
