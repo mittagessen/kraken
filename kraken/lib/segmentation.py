@@ -43,6 +43,10 @@ def vectorize_lines(im: np.ndarray, error: int = 3):
     Args:
         im (np.ndarray): Boolean array of baseline candidates
         error (int): Maximum error in polyline vectorization
+
+    Returns:
+        [[x0, y0, ... xn, yn], [xm, ym, ..., xk, yk], ... ]
+        A list of lists containing the points of all baseline polylines.
     """
 
     line_skel = skeletonize_3d(im)
@@ -95,10 +99,10 @@ def vectorize_lines(im: np.ndarray, error: int = 3):
         mcp.find_costs(cc_extrema)
     except ValueError as e:
         return []
-    return [approximate_polygon(line, error).tolist() for line in mcp.get_connections()]
+    return [approximate_polygon(line, error)[:,::-1].tolist() for line in mcp.get_connections()]
 
 
-def calculate_polygonal_environment(im, baselines):
+def calculate_polygonal_environment(im, baselines, error=3):
     """
     Given a list of baselines and an input image, calculates a polygonal
     environment around each baseline.
@@ -107,28 +111,30 @@ def calculate_polygonal_environment(im, baselines):
         im (PIL.Image): Input image
         baselines (sequence): List of lists containing a single baseline per
                               entry.
+        error (int): Maximum boundary polygon approximation error
 
     Returns:
         List of tuples (baseline, polygonization) where each is a list of coordinates.
     """
     context = 30
     def _unit_ortho_vec(p1, p2):
-        vy = p1[0] - p2[0]
-        vx = p1[1] - p2[1]
+        vy = p1[1] - p2[1]
+        vx = p1[0] - p2[0]
         dist = math.sqrt(vx**2 + vy**2)
         return (vx/dist, vy/dist)
 
     blpl = []
     for baseline in baselines:
-        if baseline[0][1] > baseline[-1][1]:
+        if baseline[0][0] > baseline[-1][0]:
             baseline = list(reversed(baseline))
         upper_pts = []
         lower_pts = []
         for lineseg in zip(baseline, baseline[1::]):
             uy, ux = _unit_ortho_vec(*lineseg)
-            samples = line(lineseg[0][0], lineseg[0][1], lineseg[1][0], lineseg[1][1])
-            lower_pts.append((samples[0] - int(context * uy), samples[1] + int(context * ux)))
-            upper_pts.append((samples[0] + int(context * uy), samples[1] - int(context * ux)))
-        blpl.append((baseline, [*lower_pts, *list(reversed(upper_pts))]))
+            lower_pts.append((lineseg[0][0] - int(context * ux), lineseg[0][1] + int(context * uy)))
+            lower_pts.append((lineseg[1][0] - int(context * ux), lineseg[1][1] + int(context * uy)))
+            upper_pts.append((lineseg[0][0] + int(context * ux), lineseg[0][1] - int(context * uy)))
+            upper_pts.append((lineseg[1][0] + int(context * ux), lineseg[1][1] - int(context * uy)))
+        lower_pts.extend(reversed(upper_pts))
+        blpl.append((baseline, approximate_polygon(np.array(lower_pts), error).tolist()))
     return blpl
-
