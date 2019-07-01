@@ -116,12 +116,16 @@ def calculate_polygonal_environment(im, baselines, error=3):
     Returns:
         List of tuples (baseline, polygonization) where each is a list of coordinates.
     """
+    siz = im.size
     context = 30
     def _unit_ortho_vec(p1, p2):
         vy = p1[1] - p2[1]
         vx = p1[0] - p2[0]
         dist = math.sqrt(vx**2 + vy**2)
         return (vx/dist, vy/dist)
+
+    def _clamp(x, bound):
+        return min(max(0, x), bound)
 
     blpl = []
     for baseline in baselines:
@@ -131,10 +135,14 @@ def calculate_polygonal_environment(im, baselines, error=3):
         lower_pts = []
         for lineseg in zip(baseline, baseline[1::]):
             uy, ux = _unit_ortho_vec(*lineseg)
-            lower_pts.append((lineseg[0][0] - int(context * ux), lineseg[0][1] + int(context * uy)))
-            lower_pts.append((lineseg[1][0] - int(context * ux), lineseg[1][1] + int(context * uy)))
-            upper_pts.append((lineseg[0][0] + int(context * ux), lineseg[0][1] - int(context * uy)))
-            upper_pts.append((lineseg[1][0] + int(context * ux), lineseg[1][1] - int(context * uy)))
+            lower_pts.append((_clamp(lineseg[0][0] - int(context * ux), siz[0]),
+                              _clamp(lineseg[0][1] + int(context * uy), siz[1])))
+            lower_pts.append((_clamp(lineseg[1][0] - int(context * ux), siz[0]),
+                              _clamp(lineseg[1][1] + int(context * uy), siz[1])))
+            upper_pts.append((_clamp(lineseg[0][0] + int(context * ux), siz[0]),
+                              _clamp(lineseg[0][1] - int(context * uy), siz[1])))
+            upper_pts.append((_clamp(lineseg[1][0] + int(context * ux), siz[0]),
+                              _clamp(lineseg[1][1] - int(context * uy), siz[1])))
         lower_pts.extend(reversed(upper_pts))
         blpl.append((baseline, approximate_polygon(np.array(lower_pts), error).tolist()))
     return blpl

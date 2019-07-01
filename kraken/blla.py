@@ -60,9 +60,10 @@ def segment(im, text_direction='horizontal-lr', mask=None, model=pkg_resources.r
 
     Returns:
         {'text_direction': '$dir',
+         'type': 'baseline',
          'lines': [
-            {'baseline': [x0, y0, x1, y1, ..., x_n, y_n], 'boundary': [x0, y0, x1, y1, ... x_m, y_m]},
-            {'baseline': [x0, ...], 'boundary': [x0, ...]}
+            {'baseline': [[x0, y0], [x1, y1], ..., [x_n, y_n]], 'boundary': [[x0, y0, x1, y1], ... [x_m, y_m]]},
+            {'baseline': [[x0, ...]], 'boundary': [[x0, ...]]}
           ]
         }: A dictionary containing the text direction and under the key 'lines'
         a list of reading order sorted baselines (polylines) and their
@@ -96,4 +97,6 @@ def segment(im, text_direction='horizontal-lr', mask=None, model=pkg_resources.r
     o = segmentation.denoising_hysteresis_thresh(o.detach().squeeze().cpu().numpy(), 0.4, 0.5, 0)
     baselines = segmentation.vectorize_lines(o)
     polygons = segmentation.calculate_polygonal_environment(im, baselines)
-    return polygons
+    return {'text_direction': text_direction,
+            'type': 'baselines',
+            'lines': [{'baseline': bl, 'boundary': pl} for bl, pl in polygons]}
