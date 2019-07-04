@@ -127,18 +127,63 @@ def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image:
     Yields:
         (PIL.Image) the extracted subimage
     """
-    if bounds['text_direction'].startswith('vertical'):
-        angle = 90
+    if 'type' in bounds and bounds['type'] == 'baseline':
+        old_settings = np.seterr(all='ignore')
+
+        from kraken.lib.ray import lineRayIntersectionPoint
+
+        def _test_intersect(bp, uv, bs):
+            """
+            Returns the intersection points of a ray with direction `uv` from
+            `bp` with a polygon `bs`.
+            """
+            u = bp - np.roll(bs, 2)
+            v = bs - np.roll(bs, 2)
+            points = []
+            for dir in ((1,-1), (-1,1)):
+                w = (uv * dir * (1,-1))[::-1]
+                z = np.dot(v, w)
+                t1 = np.cross(v, u) / z
+                t2 = np.dot(u, w) / z
+                t1 = t1[np.logical_and(t2 >= 0.0, t2 <= 1.0)]
+                points.extend(bp + (t1[np.where(t1 >= 0)[0].min()] * (uv * dir)))
+            return np.array(points)
+
+        siz = im.size
+        white = Image.new(im.mode, siz)
+        for line in bounds['lines']:
+            mask = Image.new('1', siz, 0)
+            draw = ImageDraw.Draw(mask)
+            draw.polygon([tuple(x) for x in line['boundary']], outline=1, fill=1)
+            masked_line = Image.composite(im, white, mask)
+            bl = np.array(line['baseline'])
+            ls = np.dstack((bl[:-1:], bl[1::]))
+            bisect_points = np.mean(ls, 2)
+            norm_vec = (ls[...,1] - ls[...,0])[:,::-1]
+            norm_vec_len = np.sqrt(np.sum(norm_vec**2, axis=1))
+            unit_vec = norm_vec / np.tile(norm_vec_len, (2, 1)).T # without
+                                                                  # multiplication
+                                                                  # with (1,-1)-upper/
+                                                                  # (-1, 1)-lower
+            bounds = np.array(line['boundary'])
+            src_points = np.stack([_test_intersect(bp, uv, bounds) for bp, uv in zip(bisect_points, unit_vec)])
+            upper_dist = np.diag(distance_matrix(src_points[:,:2], bisect_points))
+            lower_dist = np.diag(distance_matrix(src_points[:,2:], bisect_points))
+
+        np.seterr(**old_settings)
     else:
-        angle = 0
-    for box in bounds['boxes']:
-        if isinstance(box, tuple):
-            box = list(box)
-        if (box < [0, 0, 0, 0] or box[::2] > [im.size[0], im.size[0]] or
-                box[1::2] > [im.size[1], im.size[1]]):
-            logger.error('bbox {} is outside of image bounds {}'.format(box, im.size))
-            raise KrakenInputException('Line outside of image bounds')
-        yield im.crop(box).rotate(angle, expand=True), box
+        if bounds['text_direction'].startswith('vertical'):
+            angle = 90
+        else:
+            angle = 0
+        for box in bounds['boxes']:
+            if isinstance(box, tuple):
+                box = list(box)
+            if (box < [0, 0, 0, 0] or box[::2] > [im.size[0], im.size[0]] or
+                    box[1::2] > [im.size[1], im.size[1]]):
+                logger.error('bbox {} is outside of image bounds {}'.format(box, im.size))
+                raise KrakenInputException('Line outside of image bounds')
+            yield im.crop(box).rotate(angle, expand=True), box
 
 
 def mm_rpred(nets: Dict[str, TorchSeqRecognizer],
