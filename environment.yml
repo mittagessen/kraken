@@ -19,6 +19,7 @@ dependencies:
   - torchvision-cpu
   - pytorch-cpu>=1.0.0
   - jsonschema
+  - scikit-image
   - pip:
     - coremltools
     - git+https://github.com/mittagessen/kraken.git@master

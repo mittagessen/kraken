@@ -1,6 +1,6 @@
 name: kraken
 channels:
-  - pytorch
+  - conda-forge
   - defaults
 dependencies:
   - python==3.6.6
@@ -17,6 +17,7 @@ dependencies:
   - torchvision
   - pytorch>=1.0.0
   - jsonschema
+  - scikit-image
   - pip:
     - coremltools
     - python-bidi

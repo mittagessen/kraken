@@ -13,3 +13,4 @@ python-bidi
 torchvision
 torch>=1.0.0
 coremltools
+scikit-image
