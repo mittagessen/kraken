@@ -29,7 +29,6 @@ from typing import List, Tuple, Optional, Generator, Union, Dict, Any
 from scipy.spatial import distance_matrix
 from scipy.spatial.distance import pdist, squareform
 from skimage.transform import PiecewiseAffineTransform, warp
-from skimage.measure import subdivide_polygon
 
 from kraken.lib.util import get_im_str
 from kraken.lib.models import TorchSeqRecognizer
@@ -136,22 +135,6 @@ def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image:
     if 'type' in bounds and bounds['type'] == 'baselines':
         old_settings = np.seterr(all='ignore')
 
-        def _test_intersect(bp, uv, bs):
-            """
-            Returns the intersection points of a ray with direction `uv` from
-            `bp` with a polygon `bs`.
-            """
-            u = bp - np.roll(bs, 2)
-            v = bs - np.roll(bs, 2)
-            points = []
-            for dir in ((1,-1), (-1,1)):
-                w = (uv * dir * (1,-1))[::-1]
-                z = np.dot(v, w)
-                t1 = np.cross(v, u) / z
-                t2 = np.dot(u, w) / z
-                t1 = t1[np.logical_and(t2 >= 0.0, t2 <= 1.0)]
-                points.extend(bp + (t1[np.where(t1 >= 0)[0].min()] * (uv * dir)))
-            return np.array(points)
 
         siz = im.size
         white = Image.new(im.mode, siz)
@@ -160,7 +143,7 @@ def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image:
             draw = ImageDraw.Draw(mask)
             draw.polygon([tuple(x) for x in line['boundary']], outline=1, fill=1)
             masked_line = Image.composite(im, white, mask)
-            bl = subdivide_polygon(np.array(line['baseline']))
+            bl = np.array(line['baseline'])
             ls = np.dstack((bl[:-1:], bl[1::]))
             bisect_points = np.mean(ls, 2)
             norm_vec = (ls[...,1] - ls[...,0])[:,::-1]
@@ -201,6 +184,44 @@ def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image:
                 raise KrakenInputException('Line outside of image bounds')
             yield im.crop(box).rotate(angle, expand=True), box
 
+def _test_intersect(bp, uv, bs):
+    """
+    Returns the intersection points of a ray with direction `uv` from
+    `bp` with a polygon `bs`.
+    """
+    u = bp - np.roll(bs, 2)
+    v = bs - np.roll(bs, 2)
+    points = []
+    for dir in ((1,-1), (-1,1)):
+        w = (uv * dir * (1,-1))[::-1]
+        z = np.dot(v, w)
+        t1 = np.cross(v, u) / z
+        t2 = np.dot(u, w) / z
+        t1 = t1[np.logical_and(t2 >= 0.0, t2 <= 1.0)]
+        points.extend(bp + (t1[np.where(t1 >= 0)[0].min()] * (uv * dir)))
+    return np.array(points)
+
+def _compute_polygon_section(baseline, boundary, dist1, dist2):
+    """
+    Given a baseline, polygonal boundary, and two points on the baseline return
+    the rectangle formed by the orthogonal cuts on that baseline segment.
+    """
+    # find baseline segments the points are in
+    bl = np.array(baseline)
+    dists = np.cumsum(np.diag(np.roll(squareform(pdist(bl)), 1)))
+    segs_idx = np.searchsorted(dists, [dist1, dist2])
+    segs = np.dstack((bl[segs_idx-1], bl[segs_idx+1]))
+    # compute unit vector of segments (NOT orthogonal)
+    norm_vec = (segs[...,1] - segs[...,0])
+    norm_vec_len = np.sqrt(np.sum(norm_vec**2, axis=1))
+    unit_vec = norm_vec / np.tile(norm_vec_len, (2, 1)).T
+    # find point start/end point on segments
+    seg_dists = [dist1, dist2] - dists[segs_idx-1]
+    seg_points = segs[...,0] + (seg_dists * unit_vec.T).T
+    # get intersects
+    bounds = np.array(boundary)
+    points = [_test_intersect(point, uv[::-1], bounds).round() for point, uv in zip(seg_points, unit_vec)]
+    return points[0].tolist() + np.roll(points[1], 2).tolist()
 
 def mm_rpred(nets: Dict[str, TorchSeqRecognizer],
              im: Image.Image,
@@ -377,7 +398,12 @@ def rpred(network: TorchSeqRecognizer,
         pos = []
         conf = []
         for _, start, end, c in preds:
-            if bounds['text_direction'].startswith('horizontal'):
+            if 'type' in bounds and bounds['type'] == 'baseline':
+                pos.append(_compute_polygon_section(coords['baseline'],
+                                                    coords['boundary'],
+                                                    _scale_val(start, 0, box.size[0]),
+                                                    _scale_val(end, 0, box.size[0])))
+            elif bounds['text_direction'].startswith('horizontal'):
                 xmin = coords[0] + _scale_val(start, 0, box.size[0])
                 xmax = coords[0] + _scale_val(end, 0, box.size[0])
                 pos.append((xmin, coords[1], xmin, coords[3], xmax, coords[3], xmax, coords[1]))
