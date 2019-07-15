@@ -20,10 +20,16 @@ kraken.rpred
 Generators for recognition on lines images.
 """
 import logging
+import numpy as np
 import bidi.algorithm as bd
 
-from PIL import Image
+from PIL import Image, ImageDraw
 from typing import List, Tuple, Optional, Generator, Union, Dict, Any
+
+from scipy.spatial import distance_matrix
+from scipy.spatial.distance import pdist, squareform
+from skimage.transform import PiecewiseAffineTransform, warp
+from skimage.measure import subdivide_polygon
 
 from kraken.lib.util import get_im_str
 from kraken.lib.models import TorchSeqRecognizer
@@ -127,10 +133,8 @@ def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image:
     Yields:
         (PIL.Image) the extracted subimage
     """
-    if 'type' in bounds and bounds['type'] == 'baseline':
+    if 'type' in bounds and bounds['type'] == 'baselines':
         old_settings = np.seterr(all='ignore')
-
-        from kraken.lib.ray import lineRayIntersectionPoint
 
         def _test_intersect(bp, uv, bs):
             """
@@ -156,7 +160,7 @@ def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image:
             draw = ImageDraw.Draw(mask)
             draw.polygon([tuple(x) for x in line['boundary']], outline=1, fill=1)
             masked_line = Image.composite(im, white, mask)
-            bl = np.array(line['baseline'])
+            bl = subdivide_polygon(np.array(line['baseline']))
             ls = np.dstack((bl[:-1:], bl[1::]))
             bisect_points = np.mean(ls, 2)
             norm_vec = (ls[...,1] - ls[...,0])[:,::-1]
@@ -168,9 +172,21 @@ def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image:
             bounds = np.array(line['boundary'])
             src_points = np.stack([_test_intersect(bp, uv, bounds) for bp, uv in zip(bisect_points, unit_vec)])
             upper_dist = np.diag(distance_matrix(src_points[:,:2], bisect_points))
+            upper_dist = np.dstack((np.zeros_like(upper_dist), upper_dist)).squeeze(0)
             lower_dist = np.diag(distance_matrix(src_points[:,2:], bisect_points))
-
-        np.seterr(**old_settings)
+            lower_dist = np.dstack((np.zeros_like(lower_dist), lower_dist)).squeeze(0)
+            # map baseline points to straight baseline
+            bl_dists = np.cumsum(np.diag(np.roll(squareform(pdist(bl)), 1)))
+            bl_dst_pts = bl[0] + np.dstack((bl_dists, np.zeros_like(bl_dists))).squeeze(0)
+            rect_bisect_pts = np.mean(np.dstack((bl_dst_pts[:-1:], bl_dst_pts[1::])), 2)
+            upper_dst_pts = rect_bisect_pts - upper_dist
+            lower_dst_pts = rect_bisect_pts + lower_dist
+            src_points = np.concatenate((bl, src_points[:,:2], src_points[:,2:]))
+            dst_points = np.concatenate((bl_dst_pts, upper_dst_pts, lower_dst_pts))
+            tform = PiecewiseAffineTransform()
+            tform.estimate(src_points, dst_points)
+            i = Image.fromarray((warp(masked_line, tform) * 255).astype('uint8'))
+            yield i.crop(i.getbbox()), line
     else:
         if bounds['text_direction'].startswith('vertical'):
             angle = 90
@@ -324,11 +340,14 @@ def rpred(network: TorchSeqRecognizer,
     logger.info('Running recognizer on {} with {} lines'.format(im_str, len(bounds['boxes'])))
     logger.debug('Loading line transform')
     batch, channels, height, width = network.nn.input
-    ts = generate_input_transforms(batch, height, width, channels, pad)
+    valid_norm = True
+    if 'type' in bounds and bounds['type'] == 'baseline':
+        valid_norm = False
+    ts = generate_input_transforms(batch, height, width, channels, pad, valid_norm)
 
     for box, coords in extract_boxes(im, bounds):
         # check if boxes are non-zero in any dimension
-        if sum(coords[::2]) == 0 or coords[3] - coords[1] == 0:
+        if 0 in box.size:
             logger.warning('bbox {} with zero dimension. Emitting empty record.'.format(coords))
             yield ocr_record('', [], [])
             continue
@@ -361,11 +380,11 @@ def rpred(network: TorchSeqRecognizer,
             if bounds['text_direction'].startswith('horizontal'):
                 xmin = coords[0] + _scale_val(start, 0, box.size[0])
                 xmax = coords[0] + _scale_val(end, 0, box.size[0])
-                pos.append((xmin, coords[1], xmax, coords[3]))
+                pos.append((xmin, coords[1], xmin, coords[3], xmax, coords[3], xmax, coords[1]))
             else:
                 ymin = coords[1] + _scale_val(start, 0, box.size[1])
                 ymax = coords[1] + _scale_val(start, 0, box.size[1])
-                pos.append((coords[0], ymin, coords[2], ymax))
+                pos.append((coords[0], ymin, coords[2], ymin, coords[2], ymax, coords[0], ymax))
             conf.append(c)
         if bidi_reordering:
             logger.debug('BiDi reordering record.')
