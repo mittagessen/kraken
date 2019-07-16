@@ -45,10 +45,16 @@ class ocr_record(object):
     """
     A record object containing the recognition result of a single line
     """
-    def __init__(self, prediction: str, cuts, confidences: List[float]) -> None:
+    def __init__(self, prediction: str, cuts, confidences: List[float], line: Union[List, Dict[str, List]]) -> None:
         self.prediction = prediction
         self.cuts = cuts
         self.confidences = confidences
+        self.type = bounds['type'] if 'type' in bounds else 'box'
+        if self.type == 'baseline':
+            self.line = line['boundary']
+            self.baseline = line['baseline']
+        else:
+            self.line = line
 
     def __len__(self) -> int:
         return len(self.prediction)
@@ -117,7 +123,12 @@ def bidi_record(record: ocr_record) -> ocr_record:
         prediction = prediction + ch['ch']
         cuts.append(ch['record'][1])
         confidences.append(ch['record'][2])
-    return ocr_record(prediction, cuts, confidences)
+    # carry over whole line information
+    if record.type == 'baseline':
+        line = {'boundary': record.line, 'baseline': record.baseline}
+    else:
+        line = record.line
+    return ocr_record(prediction, cuts, confidences, line)
 
 
 def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image:
@@ -267,16 +278,19 @@ def mm_rpred(nets: Dict[str, TorchSeqRecognizer],
 
     # build dictionary for line preprocessing
     ts = {}
+    if 'type' in bounds and bounds['type'] == 'baseline':
+        valid_norm = False
+
     for script, network in nets.items():
         logger.debug('Loading line transforms for {}'.format(script))
         batch, channels, height, width = network.nn.input
-        ts[script] = generate_input_transforms(batch, height, width, channels, pad)
+        ts[script] = generate_input_transforms(batch, height, width, channels, pad, valid_norm)
 
     for line in bounds['boxes']:
-        rec = ocr_record('', [], [])
+        rec = ocr_record('', [], [], line)
         for script, (box, coords) in zip(map(lambda x: x[0], line),
-                                         extract_boxes(im, {'text_direction': bounds['text_direction'],
-                                                            'boxes': map(lambda x: x[1], line)})):
+                                         extract_polygons(im, {'text_direction': bounds['text_direction'],
+                                                               'boxes': map(lambda x: x[1], line)})):
             # skip if script is set to ignore
             if script_ignore is not None and script in script_ignore:
                 logger.info('Ignoring {} line segment.'.format(script))
@@ -305,20 +319,33 @@ def mm_rpred(nets: Dict[str, TorchSeqRecognizer],
 
             # calculate recognized LSTM locations of characters
             logger.debug('Convert to absolute coordinates')
-            scale = box.size[0]/(len(nets[script].outputs)-2 * pad)
+            # calculate recognized LSTM locations of characters
+            # scale between network output and network input
+            net_scale = line.shape[2]/nets[script].outputs.shape[1]
+            # scale between network input and original line
+            in_scale = box.size[0]/(line.shape[2]-2*pad)
+
+            def _scale_val(val, min_val, max_val):
+                return int(round(min(max(((val*net_scale)-pad)*in_scale, min_val), max_val)))
+
             pred = ''.join(x[0] for x in preds)
             pos = []
             conf = []
 
             for _, start, end, c in preds:
-                if bounds['text_direction'].startswith('horizontal'):
-                    xmin = coords[0] + int(max((start-pad)*scale, 0))
-                    xmax = coords[0] + max(int(min((end-pad)*scale, coords[2]-coords[0])), 1)
-                    pos.append((xmin, coords[1], xmax, coords[3]))
+                if 'type' in bounds and bounds['type'] == 'baseline':
+                    pos.append(_compute_polygon_section(coords['baseline'],
+                                                        coords['boundary'],
+                                                        _scale_val(start, 0, box.size[0]),
+                                                        _scale_val(end, 0, box.size[0])))
+                elif bounds['text_direction'].startswith('horizontal'):
+                    xmin = coords[0] + _scale_val(start, 0, box.size[0])
+                    xmax = coords[0] + _scale_val(end, 0, box.size[0])
+                    pos.append((xmin, coords[1], xmin, coords[3], xmax, coords[3], xmax, coords[1]))
                 else:
-                    ymin = coords[1] + int(max((start-pad)*scale, 0))
-                    ymax = coords[1] + max(int(min((end-pad)*scale, coords[3]-coords[1])), 1)
-                    pos.append((coords[0], ymin, coords[2], ymax))
+                    ymin = coords[1] + _scale_val(start, 0, box.size[1])
+                    ymax = coords[1] + _scale_val(start, 0, box.size[1])
+                    pos.append((coords[0], ymin, coords[2], ymin, coords[2], ymax, coords[0], ymax))
                 conf.append(c)
             rec.prediction += pred
             rec.cuts.extend(pos)
@@ -366,21 +393,21 @@ def rpred(network: TorchSeqRecognizer,
         valid_norm = False
     ts = generate_input_transforms(batch, height, width, channels, pad, valid_norm)
 
-    for box, coords in extract_boxes(im, bounds):
+    for box, coords in extract_polygons(im, bounds):
         # check if boxes are non-zero in any dimension
         if 0 in box.size:
             logger.warning('bbox {} with zero dimension. Emitting empty record.'.format(coords))
-            yield ocr_record('', [], [])
+            yield ocr_record('', [], [], coords)
             continue
         # try conversion into tensor
         try:
             line = ts(box)
         except Exception:
-            yield ocr_record('', [], [])
+            yield ocr_record('', [], [], coords)
             continue
         # check if line is non-zero
         if line.max() == line.min():
-            yield ocr_record('', [], [])
+            yield ocr_record('', [], [], coords)
             continue
 
         preds = network.predict(line)
@@ -414,7 +441,7 @@ def rpred(network: TorchSeqRecognizer,
             conf.append(c)
         if bidi_reordering:
             logger.debug('BiDi reordering record.')
-            yield bidi_record(ocr_record(pred, pos, conf))
+            yield bidi_record(ocr_record(pred, pos, conf, coords))
         else:
             logger.debug('Emitting raw record')
-            yield ocr_record(pred, pos, conf)
+            yield ocr_record(pred, pos, conf, coords)
