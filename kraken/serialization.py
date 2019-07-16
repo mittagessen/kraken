@@ -126,22 +126,22 @@ def serialize(records: Sequence[ocr_record],
             if len(segment) == 0:
                 continue
             seg_bbox = max_bbox(record.cuts[line_offset:line_offset + len(segment)])
-            line_struct = {'bbox': seg_bbox,
-                           'confidences': record.confidences[line_offset:line_offset + len(segment)],
-                           'cuts': record.cuts[line_offset:line_offset + len(segment)],
-                           'text': segment,
-                           'recognition': [{'bbox': cut, 'confidence': conf, 'text': char, 'index': cid}
-                                            for conf, cut, char, cid in
-                                            zip(record.confidences[line_offset:line_offset + len(segment)],
-                                                record.cuts[line_offset:line_offset + len(segment)],
-                                                segment,
-                                                range(char_idx, char_idx + len(segment)))],
-                           'index': seg_idx}
+            seg_struct = {'bbox': seg_bbox,
+                          'confidences': record.confidences[line_offset:line_offset + len(segment)],
+                          'cuts': record.cuts[line_offset:line_offset + len(segment)],
+                          'text': segment,
+                          'recognition': [{'bbox': max_bbox(cut), 'boundary': cut, 'confidence': conf, 'text': char, 'index': cid}
+                                           for conf, cut, char, cid in
+                                           zip(record.confidences[line_offset:line_offset + len(segment)],
+                                               record.cuts[line_offset:line_offset + len(segment)],
+                                               segment,
+                                               range(char_idx, char_idx + len(segment)))],
+                          'index': seg_idx}
             # compute complex hull of all characters in segment
             if record.type == 'baseline':
                 hull = ConvexHull(record.cuts[line_offset:line_offset + len(segment)])
-                line_struct['boundary'] = hull.points.tolist()
-            line['recognition'].extend(line_struct)
+                seg_struct['boundary'] = hull.points.tolist()
+            line['recognition'].extend(seg_struct)
             char_idx += len(segment)
             seg_idx += 1
             line_offset += len(segment)
