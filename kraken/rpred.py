@@ -305,13 +305,13 @@ def mm_rpred(nets: Dict[str, TorchSeqRecognizer],
                 line = ts[script](box)
             except Exception:
                 logger.warning('Conversion of line {} failed. Skipping.'.format(coords))
-                yield ocr_record('', [], [])
+                yield ocr_record('', [], [], line)
                 continue
 
             # check if line is non-zero
             if line.max() == line.min():
                 logger.warning('Empty run. Skipping.')
-                yield ocr_record('', [], [])
+                yield ocr_record('', [], [], line)
                 continue
 
             logger.debug('Forward pass with model {}'.format(script))
