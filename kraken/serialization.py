@@ -21,6 +21,8 @@ import unicodedata
 
 from collections import Counter
 
+from scipy.spatial import ConvexHull
+
 from kraken.rpred import ocr_record
 from kraken.lib.util import make_printable
 
@@ -47,20 +49,22 @@ def _rescale(val: Sequence[float], low: float, high: float) -> List[float]:
     return [(high - low) * x + low for x in val]
 
 
-def max_bbox(boxes: Iterable[Tuple[int, int, int, int]]) -> Tuple[int, int, int, int]:
+def max_bbox(boxes: Iterable[Sequence[int]]) -> Tuple[int, int, int, int]:
     """
-    Calculates the minimal bounding box containing all boxes contained in an
+    Calculates the minimal bounding box containing all contained in an
     iterator.
 
     Args:
         boxes (iterator): An iterator returning tuples of the format (x0, y0,
-                          x1, y1)
+        x1, y1, ... xn, yn).
     Returns:
-        A box covering all bounding boxes in the input argument
+        A box (x0, y0, x1, y1) covering all bounding boxes in the input
+        argument.
     """
-    # XXX: fix type hinting
-    sbox = list(map(sorted, list(zip(*boxes))))
-    return (sbox[0][0], sbox[1][0], sbox[2][-1], sbox[3][-1])  # type: ignore
+    flat_box = [point for pol in boxes for point in pol]
+    xmin, xmax = min(flat_box[::2]), max(flat_box[::2])
+    ymin, ymax = min(flat_box[1::2]), max(flat_box[1::2])
+    return (xmin, ymin), (xmax, ymax)  # type: ignore
 
 
 def serialize(records: Sequence[ocr_record],
@@ -98,16 +102,23 @@ def serialize(records: Sequence[ocr_record],
     seg_idx = 0
     char_idx = 0
     for idx, record in enumerate(records):
+        # set field to indicate the availability of baseline segmentation in
+        # addition to bounding boxes
+        if record.type == 'baseline':
+            page['seg_type'] = 'baseline'
         # skip empty records
         if not record.prediction:
             logger.debug('Empty record. Skipping')
             continue
         line = {'index': idx,
-                'bbox': max_bbox(record.cuts),
+                'bbox': max_bbox(record.line),
                 'cuts': record.cuts,
                 'confidences': record.confidences,
-                'recognition': []
+                'recognition': [],
+                'boundary': record.line
                 }
+        if record.type == 'baseline':
+            line['baseline'] = record.baseline
         splits = regex.split(r'(\s+)', record.prediction)
         line_offset = 0
         logger.debug('Record contains {} segments'.format(len(splits)))
@@ -115,18 +126,22 @@ def serialize(records: Sequence[ocr_record],
             if len(segment) == 0:
                 continue
             seg_bbox = max_bbox(record.cuts[line_offset:line_offset + len(segment)])
-
-            line['recognition'].extend([{'bbox': seg_bbox,
-                                         'confidences': record.confidences[line_offset:line_offset + len(segment)],
-                                         'cuts': record.cuts[line_offset:line_offset + len(segment)],
-                                         'text': segment,
-                                         'recognition': [{'bbox': cut, 'confidence': conf, 'text': char, 'index': cid}
-                                                         for conf, cut, char, cid in
-                                                         zip(record.confidences[line_offset:line_offset + len(segment)],
-                                                             record.cuts[line_offset:line_offset + len(segment)],
-                                                             segment,
-                                                             range(char_idx, char_idx + len(segment)))],
-                                         'index': seg_idx}])
+            line_struct = {'bbox': seg_bbox,
+                           'confidences': record.confidences[line_offset:line_offset + len(segment)],
+                           'cuts': record.cuts[line_offset:line_offset + len(segment)],
+                           'text': segment,
+                           'recognition': [{'bbox': cut, 'confidence': conf, 'text': char, 'index': cid}
+                                            for conf, cut, char, cid in
+                                            zip(record.confidences[line_offset:line_offset + len(segment)],
+                                                record.cuts[line_offset:line_offset + len(segment)],
+                                                segment,
+                                                range(char_idx, char_idx + len(segment)))],
+                           'index': seg_idx}
+            # compute complex hull of all characters in segment
+            if record.type == 'baseline':
+                hull = ConvexHull(record.cuts[line_offset:line_offset + len(segment)])
+                line_struct['boundary'] = hull.points.tolist()
+            line['recognition'].extend(line_struct)
             char_idx += len(segment)
             seg_idx += 1
             line_offset += len(segment)
