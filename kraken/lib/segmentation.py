@@ -99,7 +99,7 @@ def vectorize_lines(im: np.ndarray, error: int = 3):
         mcp.find_costs(cc_extrema)
     except ValueError as e:
         return []
-    return [approximate_polygon(line, error)[:,::-1].tolist() for line in mcp.get_connections()]
+    return [line[:,::-1].tolist() if line[0][0] > line[-1][0] else line.tolist() for line in mcp.get_connections()]
 
 
 def calculate_polygonal_environment(im, baselines, error=3):
@@ -127,9 +127,10 @@ def calculate_polygonal_environment(im, baselines, error=3):
 
     blpl = []
     for baseline in baselines:
-        if baseline[0][0] > baseline[-1][0]:
-            baseline = list(reversed(baseline))
-        bl = LineString(baseline)
+        bl = approximate_polygon(np.array(baseline), error)
+        if bl[0][0] > bl[-1][0]:
+            bl = list(reversed(bl))
+        bl = LineString(bl)
         upper = list(bl.parallel_offset(low_context, 'right').coords)
         if upper[0][0] > upper[-1][0]:
             upper = list(reversed(upper))
