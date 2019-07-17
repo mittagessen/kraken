@@ -99,7 +99,7 @@ def vectorize_lines(im: np.ndarray, error: int = 3):
         mcp.find_costs(cc_extrema)
     except ValueError as e:
         return []
-    return [line[:,::-1].tolist() if line[0][0] > line[-1][0] else line.tolist() for line in mcp.get_connections()]
+    return [line[:,::-1][::-10].tolist() if line[0][0] > line[-1][0] else line[:,::-1][::10].tolist() for line in mcp.get_connections()]
 
 
 def calculate_polygonal_environment(im, baselines, error=3):

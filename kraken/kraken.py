@@ -146,7 +146,7 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, script_ignore, base
         except ValueError as e:
             raise click.UsageError('{} invalid segmentation: {}'.format(lines, str(e)))
         # script detection
-        if bounds['script_detection']:
+        if 'script_detection' in bounds and bounds['script_detection']:
             for l in bounds['boxes']:
                 for t in l:
                     scripts.add(t[0])
@@ -163,7 +163,7 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, script_ignore, base
 
     preds = []
 
-    with log.progressbar(it, label='Processing', length=len(bounds['boxes'])) as bar:
+    with log.progressbar(it, label='Processing') as bar:
         for pred in bar:
             preds.append(pred)
 
