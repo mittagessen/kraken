@@ -22,6 +22,7 @@ Command line drivers for recognition functionality.
 import os
 import warnings
 import logging
+import pkg_resources
 
 from typing import Dict, Union, List, cast, Any, IO
 from functools import partial
@@ -70,12 +71,13 @@ def binarizer(threshold, zoom, escale, border, perc, range, low, high, base_imag
     message('\u2713', fg='green')
 
 
-def segmenter(text_direction, script_detect, allowed_scripts, scale,
-              maxcolseps, black_colseps, remove_hlines, pad, mask, base_image, input,
-              output) -> None:
+def segmenter(legacy, model, text_direction, script_detect, allowed_scripts,
+              scale, maxcolseps, black_colseps, remove_hlines, pad, mask,
+              base_image, input, output) -> None:
     import json
 
     from kraken import pageseg
+    from kraken import blla
 
     try:
         im = Image.open(input)
@@ -88,7 +90,10 @@ def segmenter(text_direction, script_detect, allowed_scripts, scale,
             raise click.BadParameter(str(e))
     message('Segmenting\t', nl=False)
     try:
-        res = pageseg.segment(im, text_direction, scale, maxcolseps, black_colseps, no_hlines=remove_hlines, pad=pad, mask=mask)
+        if legacy:
+            res = pageseg.segment(im, text_direction, scale, maxcolseps, black_colseps, no_hlines=remove_hlines, pad=pad, mask=mask)
+        else:
+            res = blla.segment(im, text_direction, mask=mask, model=model)
         if script_detect:
             res = pageseg.detect_scripts(im, res, valid_scripts=allowed_scripts)
     except Exception:
@@ -246,6 +251,12 @@ def binarize(threshold, zoom, escale, border, perc, range, low, high):
 
 
 @cli.command('segment')
+@click.option('-i', '--model',
+              default=pkg_resources.resource_filename(__name__, 'blla.mlmodel'),
+              show_default=True, type=click.Path(exists=True),
+              help='Baseline detection model to use')
+@click.option('-x/-bl', '--boxes/--baseline', default=True, show_default=True,
+              help='Switch between legacy box segmenter and neural baseline segmenter')
 @click.option('-d', '--text-direction', default='horizontal-lr',
               show_default=True,
               type=click.Choice(['horizontal-lr', 'horizontal-rl',
@@ -268,13 +279,14 @@ def binarize(threshold, zoom, escale, border, perc, range, low, high):
               'suppressing page areas for line detection. 0-valued image '
               'regions are ignored for segmentation purposes. Disables column '
               'detection.')
-def segment(text_direction, script_detect, allowed_scripts, scale, maxcolseps,
-            black_colseps, remove_hlines, pad, mask):
+def segment(model, boxes, text_direction, script_detect, allowed_scripts,
+            scale, maxcolseps, black_colseps, remove_hlines, pad, mask):
     """
     Segments page images into text lines.
     """
-    return partial(segmenter, text_direction, script_detect, allowed_scripts,
-                   scale, maxcolseps, black_colseps, remove_hlines, pad, mask)
+    return partial(segmenter, boxes, model, text_direction, script_detect,
+                   allowed_scripts, scale, maxcolseps, black_colseps,
+                   remove_hlines, pad, mask)
 
 
 def _validate_mm(ctx, param, value):
