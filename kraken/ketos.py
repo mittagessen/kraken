@@ -79,7 +79,7 @@ def _expand_gt(ctx, param, value):
 @click.pass_context
 @click.option('-o', '--output', show_default=True, type=click.Path(), default='model', help='Output model file')
 @click.option('-s', '--spec', show_default=True,
-              default='[1,1200,0,3 Cr3,3,64,2,2 Gn32 Cr3,3,128,2,2 Gn32 Cr3,3,64 Gn32 Lbx32 Lby32 Cr1,1,32 Gn32 Lbx32 Lby32 O2l1]',
+              default='[1,1200,0,3 Cr3,3,64,2,2 Gn32 Cr3,3,128,2,2 Gn32 Cr3,3,64 Gn32 Lbx32 Lby32 Cr1,1,32 Gn32 Lby32 Lbx32 O2l1]',
               help='VGSL spec of the baseline labeling network')
 @click.option('--smooth/--no-smooth', show_default=True, default=True, help='Smooth the target image with a gaussian filter')
 @click.option('--line-width', show_default=True, default=8, help='The height of each baseline in the target after scaling')

@@ -233,208 +233,127 @@ def _compute_polygon_section(baseline, boundary, dist1, dist2):
     points = [_test_intersect(point, uv[::-1], bounds).round() for point, uv in zip(seg_points, unit_vec)]
     return points[0].tolist() + np.roll(points[1], 2).tolist()
 
-def mm_rpred(nets: Dict[str, TorchSeqRecognizer],
-             im: Image.Image,
-             bounds: dict,
-             pad: int = 16,
-             bidi_reordering: bool = True,
-             script_ignore: Optional[List[str]] = None) -> Generator[ocr_record, None, None]:
+
+class mm_rpred(object):
     """
-    Multi-model version of kraken.rpred.rpred.
-
-    Takes a dictionary of ISO15924 script identifiers->models and an
-    script-annotated segmentation to dynamically select appropriate models for
-    these lines.
-
-    Args:
-        nets (dict): A dict mapping ISO15924 identifiers to TorchSegRecognizer
-                     objects. Recommended to be an defaultdict.
-        im (PIL.Image.Image): Image to extract text from
-        bounds (dict): A dictionary containing a 'boxes' entry
-                        with a list of lists of coordinates (script, (x0, y0,
-                        x1, y1)) of a text line in the image and an entry
-                        'text_direction' containing
-                        'horizontal-lr/rl/vertical-lr/rl'.
-        pad (int): Extra blank padding to the left and right of text line
-        bidi_reordering (bool): Reorder classes in the ocr_record according to
-                                the Unicode bidirectional algorithm for correct
-                                display.
-        script_ignore (list): List of scripts to ignore during recognition
-    Yields:
-        An ocr_record containing the recognized text, absolute character
-        positions, and confidence values for each character.
-
-    Raises:
-        KrakenInputException if the mapping between segmentation scripts and
-        networks is incomplete.
+    Multi-model version of kraken.rpred.rpred
     """
-    im_str = get_im_str(im)
-    logger.info('Running {} multi-script recognizers on {} with {} lines'.format(len(nets), im_str, len(bounds['boxes'])))
+    def __init__(self,
+                 nets: Dict[str, TorchSeqRecognizer],
+                 im: Image.Image,
+                 bounds: dict,
+                 pad: int = 16,
+                 bidi_reordering: bool = True,
+                 script_ignore: Optional[List[str]] = None) -> Generator[ocr_record, None, None]:
+        """
+        Multi-model version of kraken.rpred.rpred.
 
-    miss = [x[0] for x in bounds['boxes'] if not nets.get(x[0])]
-    if miss:
-        raise KrakenInputException('Missing models for scripts {}'.format(miss))
+        Takes a dictionary of ISO15924 script identifiers->models and an
+        script-annotated segmentation to dynamically select appropriate models for
+        these lines.
 
-    # build dictionary for line preprocessing
-    ts = {}
-    if 'type' in bounds and bounds['type'] == 'baseline':
-        valid_norm = False
+        Args:
+            nets (dict): A dict mapping ISO15924 identifiers to TorchSegRecognizer
+                         objects. Recommended to be an defaultdict.
+            im (PIL.Image.Image): Image to extract text from
+            bounds (dict): A dictionary containing a 'boxes' entry
+                            with a list of lists of coordinates (script, (x0, y0,
+                            x1, y1)) of a text line in the image and an entry
+                            'text_direction' containing
+                            'horizontal-lr/rl/vertical-lr/rl'.
+            pad (int): Extra blank padding to the left and right of text line
+            bidi_reordering (bool): Reorder classes in the ocr_record according to
+                                    the Unicode bidirectional algorithm for correct
+                                    display.
+            script_ignore (list): List of scripts to ignore during recognition
+        Yields:
+            An ocr_record containing the recognized text, absolute character
+            positions, and confidence values for each character.
 
-    for script, network in nets.items():
-        logger.debug('Loading line transforms for {}'.format(script))
-        batch, channels, height, width = network.nn.input
-        ts[script] = generate_input_transforms(batch, height, width, channels, pad, valid_norm)
+        Raises:
+            KrakenInputException if the mapping between segmentation scripts and
+            networks is incomplete.
+        """
+        if 'type' in bounds and bounds['type'] == 'baselines':
+            valid_norm = False
+            self.len = len(bounds['lines'])
+            self.seg_key = 'lines'
+            self.next_iter = self._recognize_baseline_line
+            self.line_iter = iter(bounds['lines'])
+            scripts = [x['script'] for x in bounds['lines']]
+        else:
+            valid_norm = True
+            self.len = len(bounds['boxes'])
+            self.seg_key = 'boxes'
+            self.next_iter = self._recognize_box_line
+            self.line_iter = iter(bounds['boxes'])
+            scripts = [x[0] for line in bounds['boxes'] for x in line]
 
-    for line in bounds['boxes']:
+        im_str = get_im_str(im)
+        logger.info('Running {} multi-script recognizers on {} with {} lines'.format(len(nets), im_str, self.len))
+
+        miss = [script for script in scripts if not nets.get(script)]
+        if miss:
+            raise KrakenInputException('Missing models for scripts {}'.format(miss))
+
+        # build dictionary for line preprocessing
+        self.ts = {}
+        for script, network in nets.items():
+            logger.debug('Loading line transforms for {}'.format(script))
+            batch, channels, height, width = network.nn.input
+            self.ts[script] = generate_input_transforms(batch, height, width, channels, pad, valid_norm)
+
+        self.im = im
+        self.nets = nets
+        self.bidi_reordering = bidi_reordering
+        self.pad = pad
+        self.bounds = bounds
+        self.script_ignore = script_ignore
+
+    def _recognize_box_line(self, line):
         rec = ocr_record('', [], [], line)
-        for script, (box, coords) in zip(map(lambda x: x[0], line),
-                                         extract_polygons(im, {'text_direction': bounds['text_direction'],
-                                                               'boxes': map(lambda x: x[1], line)})):
+        for script, (box, coords) in zip(map(lambda x: x[0], line['boxes'][0]),
+                                         extract_polygons(self.im, {'text_direction': line['text_direction'],
+                                                                    'boxes': map(lambda x: x[1], line['boxes'][0])})):
             # skip if script is set to ignore
-            if script_ignore is not None and script in script_ignore:
+            if self.script_ignore is not None and script in self.script_ignore:
                 logger.info('Ignoring {} line segment.'.format(script))
                 continue
             # check if boxes are non-zero in any dimension
-            if sum(coords[::2]) == 0 or coords[3] - coords[1] == 0:
-                logger.warning('Run with zero dimension. Skipping.')
+            if 0 in box.size:
+                logger.warning('bbox {} with zero dimension. Emitting empty record.'.format(coords))
                 continue
             # try conversion into tensor
             try:
                 logger.debug('Preparing run.')
-                line = ts[script](box)
+                line = self.ts[script](box)
             except Exception:
                 logger.warning('Conversion of line {} failed. Skipping.'.format(coords))
-                yield ocr_record('', [], [], line)
                 continue
 
             # check if line is non-zero
             if line.max() == line.min():
                 logger.warning('Empty run. Skipping.')
-                yield ocr_record('', [], [], line)
                 continue
 
             logger.debug('Forward pass with model {}'.format(script))
-            preds = nets[script].predict(line)
+            preds = self.nets[script].predict(line)
 
             # calculate recognized LSTM locations of characters
             logger.debug('Convert to absolute coordinates')
             # calculate recognized LSTM locations of characters
             # scale between network output and network input
-            net_scale = line.shape[2]/nets[script].outputs.shape[1]
-            # scale between network input and original line
-            in_scale = box.size[0]/(line.shape[2]-2*pad)
-
-            def _scale_val(val, min_val, max_val):
-                return int(round(min(max(((val*net_scale)-pad)*in_scale, min_val), max_val)))
-
-            pred = ''.join(x[0] for x in preds)
-            pos = []
-            conf = []
-
-            for _, start, end, c in preds:
-                if 'type' in bounds and bounds['type'] == 'baseline':
-                    pos.append(_compute_polygon_section(coords['baseline'],
-                                                        coords['boundary'],
-                                                        _scale_val(start, 0, box.size[0]),
-                                                        _scale_val(end, 0, box.size[0])))
-                elif bounds['text_direction'].startswith('horizontal'):
-                    xmin = coords[0] + _scale_val(start, 0, box.size[0])
-                    xmax = coords[0] + _scale_val(end, 0, box.size[0])
-                    pos.append((xmin, coords[1], xmin, coords[3], xmax, coords[3], xmax, coords[1]))
-                else:
-                    ymin = coords[1] + _scale_val(start, 0, box.size[1])
-                    ymax = coords[1] + _scale_val(start, 0, box.size[1])
-                    pos.append((coords[0], ymin, coords[2], ymin, coords[2], ymax, coords[0], ymax))
-                conf.append(c)
-            rec.prediction += pred
-            rec.cuts.extend(pos)
-            rec.confidences.extend(conf)
-        if bidi_reordering:
-            logger.debug('BiDi reordering record.')
-            yield bidi_record(rec)
-        else:
-            logger.debug('Emitting raw record')
-            yield rec
-
-
-
-class rpred(object):
-    """
-    Iterator for text recognition.
-    """
-    def __init__(self,
-                 network: TorchSeqRecognizer,
-                 im: Image.Image,
-                 bounds: dict,
-                 pad: int = 16,
-                 bidi_reordering: bool = True) -> Generator[ocr_record, None, None]:
-        """
-        Uses a TorchSeqRecognizer and a segmentation to recognize text
-
-        Args:
-            network (kraken.lib.models.TorchSeqRecognizer): A TorchSegRecognizer
-                                                            object
-            im (PIL.Image.Image): Image to extract text from
-            bounds (dict): A dictionary containing a 'boxes' entry with a list of
-                           coordinates (x0, y0, x1, y1) of a text line in the image
-                           and an entry 'text_direction' containing
-                           'horizontal-lr/rl/vertical-lr/rl'.
-            pad (int): Extra blank padding to the left and right of text line.
-                       Auto-disabled when expected network inputs are incompatible
-                       with padding.
-            bidi_reordering (bool): Reorder classes in the ocr_record according to
-                                    the Unicode bidirectional algorithm for correct
-                                    display.
-        Yields:
-            An ocr_record containing the recognized text, absolute character
-            positions, and confidence values for each character.
-        """
-        im_str = get_im_str(im)
-        logger.debug('Loading line transform')
-        batch, channels, height, width = network.nn.input
-        if 'type' in bounds and bounds['type'] == 'baselines':
-            valid_norm = False
-            self.len = len(bounds['lines'])
-        else:
-            valid_norm = True
-            self.len = len(bounds['boxes'])
-        logger.info('Running recognizer on {} with {} lines'.format(im_str, self.len))
-        self.ts = generate_input_transforms(batch, height, width, channels, pad, valid_norm)
-        self.image_extractor = extract_polygons(im, bounds)
-        self.network = network
-        self.bidi_reordering = bidi_reordering
-        self.pad = pad
-        self.bounds = bounds
-
-    def __next__(self):
-        for box, coords in self.image_extractor:
-            # check if boxes are non-zero in any dimension
-            if 0 in box.size:
-                logger.warning('bbox {} with zero dimension. Emitting empty record.'.format(coords))
-                return ocr_record('', [], [], coords)
-            # try conversion into tensor
-            try:
-                line = self.ts(box)
-            except Exception:
-                return ocr_record('', [], [], coords)
-            # check if line is non-zero
-            if line.max() == line.min():
-                return ocr_record('', [], [], coords)
-
-            preds = self.network.predict(line)
-            # calculate recognized LSTM locations of characters
-            # scale between network output and network input
-            net_scale = line.shape[2]/self.network.outputs.shape[1]
+            net_scale = line.shape[2]/self.nets[script].outputs.shape[1]
             # scale between network input and original line
             in_scale = box.size[0]/(line.shape[2]-2*self.pad)
 
             def _scale_val(val, min_val, max_val):
                 return int(round(min(max(((val*net_scale)-self.pad)*in_scale, min_val), max_val)))
 
-            # XXX: fix bounding box calculation ocr_record for multi-codepoint labels.
             pred = ''.join(x[0] for x in preds)
             pos = []
             conf = []
+
             for _, start, end, c in preds:
                 if 'type' in self.bounds and self.bounds['type'] == 'baselines':
                     pos.append(_compute_polygon_section(coords['baseline'],
@@ -450,15 +369,111 @@ class rpred(object):
                     ymax = coords[1] + _scale_val(start, 0, box.size[1])
                     pos.append((coords[0], ymin, coords[2], ymin, coords[2], ymax, coords[0], ymax))
                 conf.append(c)
-            if self.bidi_reordering:
-                logger.debug('BiDi reordering record.')
-                return bidi_record(ocr_record(pred, pos, conf, coords))
+            rec.prediction += pred
+            rec.cuts.extend(pos)
+            rec.confidences.extend(conf)
+        if self.bidi_reordering:
+            logger.debug('BiDi reordering record.')
+            return bidi_record(rec)
+        else:
+            logger.debug('Emitting raw record')
+            return rec
+
+    def _recognize_baseline_line(self, line):
+        box, coords = next(extract_polygons(self.im, line))
+        script = coords['script']
+        # check if boxes are non-zero in any dimension
+        if 0 in box.size:
+            logger.warning('bbox {} with zero dimension. Emitting empty record.'.format(coords))
+            return ocr_record('', [], [], coords)
+        # try conversion into tensor
+        try:
+            line = self.ts[script](box)
+        except Exception:
+            return ocr_record('', [], [], coords)
+        # check if line is non-zero
+        if line.max() == line.min():
+            return ocr_record('', [], [], coords)
+
+        preds = self.nets[script].predict(line)
+        # calculate recognized LSTM locations of characters
+        # scale between network output and network input
+        net_scale = line.shape[2]/self.nets[script].outputs.shape[1]
+        # scale between network input and original line
+        in_scale = box.size[0]/(line.shape[2]-2*self.pad)
+
+        def _scale_val(val, min_val, max_val):
+            return int(round(min(max(((val*net_scale)-self.pad)*in_scale, min_val), max_val)))
+
+        # XXX: fix bounding box calculation ocr_record for multi-codepoint labels.
+        pred = ''.join(x[0] for x in preds)
+        pos = []
+        conf = []
+        for _, start, end, c in preds:
+            if 'type' in self.bounds and self.bounds['type'] == 'baselines':
+                pos.append(_compute_polygon_section(coords['baseline'],
+                                                    coords['boundary'],
+                                                    _scale_val(start, 0, box.size[0]),
+                                                    _scale_val(end, 0, box.size[0])))
+            elif self.bounds['text_direction'].startswith('horizontal'):
+                xmin = coords[0] + _scale_val(start, 0, box.size[0])
+                xmax = coords[0] + _scale_val(end, 0, box.size[0])
+                pos.append((xmin, coords[1], xmin, coords[3], xmax, coords[3], xmax, coords[1]))
             else:
-                logger.debug('Emitting raw record')
-                return ocr_record(pred, pos, conf, coords)
+                ymin = coords[1] + _scale_val(start, 0, box.size[1])
+                ymax = coords[1] + _scale_val(start, 0, box.size[1])
+                pos.append((coords[0], ymin, coords[2], ymin, coords[2], ymax, coords[0], ymax))
+            conf.append(c)
+        if self.bidi_reordering:
+            logger.debug('BiDi reordering record.')
+            return bidi_record(ocr_record(pred, pos, conf, coords))
+        else:
+            logger.debug('Emitting raw record')
+            return ocr_record(pred, pos, conf, coords)
+
+    def __next__(self):
+        bound = self.bounds
+        bound[self.seg_key] = [next(self.line_iter)]
+        return self.next_iter(bound)
 
     def __iter__(self):
         return self
 
     def __len__(self):
         return self.len
+
+
+def rpred(network: TorchSeqRecognizer,
+          im: Image.Image,
+          bounds: dict,
+          pad: int = 16,
+          bidi_reordering: bool = True) -> Generator[ocr_record, None, None]:
+    """
+    Uses a TorchSeqRecognizer and a segmentation to recognize text
+
+    Args:
+        network (kraken.lib.models.TorchSeqRecognizer): A TorchSegRecognizer
+                                                        object
+        im (PIL.Image.Image): Image to extract text from
+        bounds (dict): A dictionary containing a 'boxes' entry with a list of
+                       coordinates (x0, y0, x1, y1) of a text line in the image
+                       and an entry 'text_direction' containing
+                       'horizontal-lr/rl/vertical-lr/rl'.
+        pad (int): Extra blank padding to the left and right of text line.
+                   Auto-disabled when expected network inputs are incompatible
+                   with padding.
+        bidi_reordering (bool): Reorder classes in the ocr_record according to
+                                the Unicode bidirectional algorithm for correct
+                                display.
+    Yields:
+        An ocr_record containing the recognized text, absolute character
+        positions, and confidence values for each character.
+    """
+    if 'boxes' in bounds:
+        boxes = bounds['boxes']
+        rewrite_boxes = []
+        for box in boxes:
+            rewrite_boxes.append([('default', box)])
+        bounds['boxes'] = rewrite_boxes
+        bounds['script_detection'] = True
+    return mm_rpred({'default': network}, im, bounds, pad, bidi_reordering)
