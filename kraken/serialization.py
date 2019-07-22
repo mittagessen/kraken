@@ -64,7 +64,8 @@ def max_bbox(boxes: Iterable[Sequence[int]]) -> Tuple[int, int, int, int]:
     flat_box = [point for pol in boxes for point in pol]
     xmin, xmax = min(flat_box[::2]), max(flat_box[::2])
     ymin, ymax = min(flat_box[1::2]), max(flat_box[1::2])
-    return (xmin, ymin), (xmax, ymax)  # type: ignore
+    o = xmin, ymin, xmax, ymax # type: ignore
+    return o
 
 
 def serialize(records: Sequence[ocr_record],
@@ -117,7 +118,7 @@ def serialize(records: Sequence[ocr_record],
                 'recognition': [],
                 'boundary': record.line
                 }
-        if record.type == 'baseline':
+        if record.type == 'baselines':
             line['baseline'] = record.baseline
         splits = regex.split(r'(\s+)', record.prediction)
         line_offset = 0
@@ -126,11 +127,12 @@ def serialize(records: Sequence[ocr_record],
             if len(segment) == 0:
                 continue
             seg_bbox = max_bbox(record.cuts[line_offset:line_offset + len(segment)])
+
             seg_struct = {'bbox': seg_bbox,
                           'confidences': record.confidences[line_offset:line_offset + len(segment)],
                           'cuts': record.cuts[line_offset:line_offset + len(segment)],
                           'text': segment,
-                          'recognition': [{'bbox': max_bbox(cut), 'boundary': cut, 'confidence': conf, 'text': char, 'index': cid}
+                          'recognition': [{'bbox': max_bbox([cut]), 'boundary': cut, 'confidence': conf, 'text': char, 'index': cid}
                                            for conf, cut, char, cid in
                                            zip(record.confidences[line_offset:line_offset + len(segment)],
                                                record.cuts[line_offset:line_offset + len(segment)],
@@ -141,7 +143,7 @@ def serialize(records: Sequence[ocr_record],
             if record.type == 'baseline':
                 hull = ConvexHull(record.cuts[line_offset:line_offset + len(segment)])
                 seg_struct['boundary'] = hull.points.tolist()
-            line['recognition'].extend(seg_struct)
+            line['recognition'].append(seg_struct)
             char_idx += len(segment)
             seg_idx += 1
             line_offset += len(segment)

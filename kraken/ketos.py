@@ -1029,7 +1029,7 @@ def publish(ctx, metadata, access_token, model):
         validate(metadata, schema)
     metadata['graphemes'] = [char for char in ''.join(nn.codec.c2l.keys())]
     oid = repo.publish_model(model, metadata, access_token, partial(message, '.', nl=False))
-    print('\nmodel PID: {}'.format(oid))
+    message('\nmodel PID: {}'.format(oid))
 
 if __name__ == '__main__':
     cli()

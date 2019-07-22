@@ -50,7 +50,7 @@ class ocr_record(object):
         self.cuts = cuts
         self.confidences = confidences
         self.type = 'baselines' if 'baseline' in line else 'box'
-        if self.type == 'baseline':
+        if self.type == 'baselines':
             self.line = line['boundary']
             self.baseline = line['baseline']
         else:
@@ -311,7 +311,10 @@ class mm_rpred(object):
         self.script_ignore = script_ignore
 
     def _recognize_box_line(self, line):
-        rec = ocr_record('', [], [], line)
+        flat_box = [point for box in line['boxes'][0] for point in box[1]]
+        xmin, xmax = min(flat_box[::2]), max(flat_box[::2])
+        ymin, ymax = min(flat_box[1::2]), max(flat_box[1::2])
+        rec = ocr_record('', [], [], [[xmin, ymin], [xmin, ymax], [xmax, ymax], [xmax, ymin]])
         for script, (box, coords) in zip(map(lambda x: x[0], line['boxes'][0]),
                                          extract_polygons(self.im, {'text_direction': line['text_direction'],
                                                                     'boxes': map(lambda x: x[1], line['boxes'][0])})):
