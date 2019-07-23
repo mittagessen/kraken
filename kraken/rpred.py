@@ -124,7 +124,7 @@ def bidi_record(record: ocr_record) -> ocr_record:
         cuts.append(ch['record'][1])
         confidences.append(ch['record'][2])
     # carry over whole line information
-    if record.type == 'baseline':
+    if record.type == 'baselines':
         line = {'boundary': record.line, 'baseline': record.baseline}
     else:
         line = record.line
@@ -231,7 +231,9 @@ def _compute_polygon_section(baseline, boundary, dist1, dist2):
     # get intersects
     bounds = np.array(boundary)
     points = [_test_intersect(point, uv[::-1], bounds).round() for point, uv in zip(seg_points, unit_vec)]
-    return points[0].tolist() + np.roll(points[1], 2).tolist()
+    o =  np.int_(points[0]).reshape(-1, 2).tolist()
+    o.extend(np.int_(np.roll(points[1], 2)).reshape(-1, 2).tolist())
+    return o
 
 
 class mm_rpred(object):
@@ -358,19 +360,14 @@ class mm_rpred(object):
             conf = []
 
             for _, start, end, c in preds:
-                if 'type' in self.bounds and self.bounds['type'] == 'baselines':
-                    pos.append(_compute_polygon_section(coords['baseline'],
-                                                        coords['boundary'],
-                                                        _scale_val(start, 0, box.size[0]),
-                                                        _scale_val(end, 0, box.size[0])))
-                elif self.bounds['text_direction'].startswith('horizontal'):
+                if self.bounds['text_direction'].startswith('horizontal'):
                     xmin = coords[0] + _scale_val(start, 0, box.size[0])
                     xmax = coords[0] + _scale_val(end, 0, box.size[0])
-                    pos.append((xmin, coords[1], xmin, coords[3], xmax, coords[3], xmax, coords[1]))
+                    pos.append([[xmin, coords[1]], [xmin, coords[3]], [xmax, coords[3]], [xmax, coords[1]]])
                 else:
                     ymin = coords[1] + _scale_val(start, 0, box.size[1])
                     ymax = coords[1] + _scale_val(start, 0, box.size[1])
-                    pos.append((coords[0], ymin, coords[2], ymin, coords[2], ymax, coords[0], ymax))
+                    pos.append([[coords[0], ymin], [coords[2], ymin], [coords[2], ymax], [coords[0], ymax]])
                 conf.append(c)
             rec.prediction += pred
             rec.cuts.extend(pos)
@@ -413,23 +410,15 @@ class mm_rpred(object):
         pos = []
         conf = []
         for _, start, end, c in preds:
-            if 'type' in self.bounds and self.bounds['type'] == 'baselines':
-                pos.append(_compute_polygon_section(coords['baseline'],
-                                                    coords['boundary'],
-                                                    _scale_val(start, 0, box.size[0]),
-                                                    _scale_val(end, 0, box.size[0])))
-            elif self.bounds['text_direction'].startswith('horizontal'):
-                xmin = coords[0] + _scale_val(start, 0, box.size[0])
-                xmax = coords[0] + _scale_val(end, 0, box.size[0])
-                pos.append((xmin, coords[1], xmin, coords[3], xmax, coords[3], xmax, coords[1]))
-            else:
-                ymin = coords[1] + _scale_val(start, 0, box.size[1])
-                ymax = coords[1] + _scale_val(start, 0, box.size[1])
-                pos.append((coords[0], ymin, coords[2], ymin, coords[2], ymax, coords[0], ymax))
+            pos.append(_compute_polygon_section(coords['baseline'],
+                                                coords['boundary'],
+                                                _scale_val(start, 0, box.size[0]),
+                                                _scale_val(end, 0, box.size[0])))
             conf.append(c)
         if self.bidi_reordering:
             logger.debug('BiDi reordering record.')
-            return bidi_record(ocr_record(pred, pos, conf, coords))
+            rec = bidi_record(ocr_record(pred, pos, conf, coords))
+            return rec
         else:
             logger.debug('Emitting raw record')
             return ocr_record(pred, pos, conf, coords)
@@ -437,7 +426,8 @@ class mm_rpred(object):
     def __next__(self):
         bound = self.bounds
         bound[self.seg_key] = [next(self.line_iter)]
-        return self.next_iter(bound)
+        o = self.next_iter(bound)
+        return o
 
     def __iter__(self):
         return self

@@ -11,7 +11,7 @@
 	<body>
 		<div class="ocr_page" title="bbox 0 0 {{ page.size|join(' ') }}; image {{ page.name }}" style="writing-mode: {{ page.writing_mode }};">
 			{% for line in page.lines %}
-			<span class="ocr_line" id="line_{{ line.index }}" title="bbox {{ line.bbox|join(' ') }}; x_bboxes {{ line.cuts|map('join', ' ')|join(' ') }}">
+			<span class="ocr_line" id="line_{{ line.index }}" title="bbox {{ line.bbox|join(' ') }}; x_bboxes {{ line.cuts|sum(start=[])|map('join', ' ')|join(' ') }}">
 			{% for segment in line.recognition %}
 				<span class="ocrx_word" id="segment_{{ segment.index }}" title="bbox {{ segment.bbox|join(' ') }}; x_confs {{ segment.confidences|join(' ') }}">{{ segment.text }}</span>
 			{% endfor %}

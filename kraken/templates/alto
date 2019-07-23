@@ -27,11 +27,11 @@
 						  WIDTH="{{ line.bbox[2] - line.bbox[0] }}" 
 						  HEIGHT="{{ line.bbox[3] - line.bbox[1] }}"
 						  {% if line.baseline %}
-						  BASELINE="{{ line.baseline|join(' ') }}"
+						  BASELINE="{{ line.baseline|sum(start=[])|join(' ') }}"
 						  {% endif %}>
 						{% if line.boundary %}
 							<Shape>
-								<Polygon POINTS="{{ line.boundary|join(' ') }}"/>
+								<Polygon POINTS="{{ line.boundary|sum(start=[])|join(' ') }}"/>
 							</Shape>
 						{% endif %}
 						{% for segment in line.recognition %}
@@ -52,7 +52,7 @@
 								WC="{{ (segment.confidences|sum / segment.confidences|length)|round(4) }}">
 								{% if segment.boundary %}
 								<Shape>
-									<Polygon POINTS="{{ segment.boundary|join(' ') }}"/>
+									<Polygon POINTS="{{ segment.boundary|sum(start=[])|join(' ') }}"/>
 								</Shape>
 								{% endif %}
 								{% for char in segment.recognition %}
@@ -65,7 +65,7 @@
 								       GC="{{ char.confidence|round(4) }}">
 								{% if char.boundary %}
 								<Shape>
-									<Polygon POINTS="{{ char.boundary|join(' ') }}"/>
+									<Polygon POINTS="{{ char.boundary|sum(start=[])|join(' ') }}"/>
 								</Shape>
 								{% endif %}
 								</Glyph>

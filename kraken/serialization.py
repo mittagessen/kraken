@@ -55,13 +55,14 @@ def max_bbox(boxes: Iterable[Sequence[int]]) -> Tuple[int, int, int, int]:
     iterator.
 
     Args:
-        boxes (iterator): An iterator returning tuples of the format (x0, y0,
-        x1, y1, ... xn, yn).
+        boxes (iterator): An iterator returning tuples of the format ((x0, y0),
+        (x1, y1), ... (xn, yn)).
     Returns:
         A box (x0, y0, x1, y1) covering all bounding boxes in the input
         argument.
     """
     flat_box = [point for pol in boxes for point in pol]
+    flat_box = [x for point in flat_box for x in point]
     xmin, xmax = min(flat_box[::2]), max(flat_box[::2])
     ymin, ymax = min(flat_box[1::2]), max(flat_box[1::2])
     o = xmin, ymin, xmax, ymax # type: ignore
@@ -105,14 +106,14 @@ def serialize(records: Sequence[ocr_record],
     for idx, record in enumerate(records):
         # set field to indicate the availability of baseline segmentation in
         # addition to bounding boxes
-        if record.type == 'baseline':
-            page['seg_type'] = 'baseline'
+        if record.type == 'baselines':
+            page['seg_type'] = 'baselines'
         # skip empty records
         if not record.prediction:
             logger.debug('Empty record. Skipping')
             continue
         line = {'index': idx,
-                'bbox': max_bbox(record.line),
+                'bbox': max_bbox([record.line]),
                 'cuts': record.cuts,
                 'confidences': record.confidences,
                 'recognition': [],
@@ -127,7 +128,6 @@ def serialize(records: Sequence[ocr_record],
             if len(segment) == 0:
                 continue
             seg_bbox = max_bbox(record.cuts[line_offset:line_offset + len(segment)])
-
             seg_struct = {'bbox': seg_bbox,
                           'confidences': record.confidences[line_offset:line_offset + len(segment)],
                           'cuts': record.cuts[line_offset:line_offset + len(segment)],
