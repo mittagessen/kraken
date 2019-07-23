@@ -106,11 +106,17 @@ def _expand_gt(ctx, param, value):
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
 @click.option('--threads', show_default=True, default=1, help='Number of OpenMP threads and workers when running on CPU.')
+@click.option('-f', '--format-type', type=click.Choice(['path', 'alto', 'page']), default='path',
+              help='Sets the training data format. In ALTO and PageXML mode all'
+              'data is extracted from xml files containing both baselines and a'
+              'link to source images. In `path` mode arguments are image files'
+              'sharing a prefix up to the last extension with JSON `.path` files'
+              'containing the baseline information'.)
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def segtrain(ctx, output, spec, smooth, line_width, load, freq, quit, epochs,
              lag, min_delta, device, optimizer, lrate, momentum, weight_decay,
              schedule, partition, training_files, evaluation_files, threads,
-             ground_truth):
+             format_type, ground_truth):
     """
     Trains a baseline labeling model for layout analysis
     """
@@ -191,9 +197,9 @@ def segtrain(ctx, output, spec, smooth, line_width, load, freq, quit, epochs,
         torch.multiprocessing.set_sharing_strategy('file_system')
 
     gt_set = BaselineSet(tr_im, smooth=smooth, line_width=line_width,
-                         im_transforms=transforms)
+                         im_transforms=transforms, mode=format_type)
     val_set = BaselineSet(te_im, smooth=False, line_width=line_width,
-                          im_transforms=transforms)
+                          im_transforms=transforms, mode=format_type)
 
     if device == 'cpu':
         loader_threads = threads // 2

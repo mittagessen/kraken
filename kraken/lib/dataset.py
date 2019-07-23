@@ -33,6 +33,7 @@ from torch.utils.data import Dataset
 from scipy.ndimage import gaussian_filter
 from typing import Dict, List, Tuple, Sequence, Callable, Optional, Any, Union, cast
 
+from kraken.lib.xml import parse_alto, parse_page
 from kraken.lib.codec import PytorchCodec
 from kraken.lib.models import TorchSeqRecognizer
 from kraken.lib.exceptions import KrakenInputException
@@ -412,11 +413,15 @@ class BaselineSet(Dataset):
         """
         super().__init__()
         self.mode = mode
-        if mode == 'alto':
+        if mode in ['alto', 'page']:
+            if mode == 'alto':
+                fn = parse_alto
+            else:
+                fn = parse_page
             im_paths = []
             self.targets = []
             for img in imgs:
-                data = parse_alto(img)
+                data = fn(img)
                 im_path.append(data['image'])
                 self.targets.append([line['baseline'] for line in data['lines']])
             imgs = im_paths
