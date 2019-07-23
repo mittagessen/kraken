@@ -35,7 +35,7 @@ def parse_alto(filename):
         filename (str): path to an ALTO file.
 
     Returns:
-        A dict {'image': im, lines: [{'boundary': [[x0, y0], ...], 'baseline':
+        A dict {'image': impath, lines: [{'boundary': [[x0, y0], ...], 'baseline':
         [[x0, y0], ...]}, {...], 'text': 'apdjfqpf'}
     """
     with open(filename, 'rb') as fp:
@@ -43,11 +43,10 @@ def parse_alto(filename):
         image = doc.find('.//{*}fileName')
         if image is None or not image.text:
             raise KrakenInputException('No valid filename found in ALTO file')
-        im = Image.open(image.text)
         lines = doc.findall('.//{*}TextLine')
-        data = {'image': im, 'lines': []}
+        data = {'image': image.text, 'lines': []}
         for line in lines:
-            if not line.find('./{*}Shape') or line.get('BASELINE'):
+            if not line.find('./{*}Shape') or not line.get('BASELINE'):
                 raise KrakenInputException('ALTO file {} contains no baseline information'.format(filename))
             pol = line.find('./{*}Shape/{*}Polygon')
             points = [int(x) for x in pol.get('POINTS').split(' ')]

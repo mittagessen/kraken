@@ -396,7 +396,8 @@ class BaselineSet(Dataset):
     def __init__(self, imgs: Sequence[str],
                  smooth: bool = False,
                  line_width: int = 4,
-                 im_transforms: Callable[[Any], torch.Tensor] = transforms.Compose([])):
+                 im_transforms: Callable[[Any], torch.Tensor] = transforms.Compose([]),
+                 mode: str = 'path'):
         """
         Reads a list of image-json pairs and creates a data set.
 
@@ -405,8 +406,24 @@ class BaselineSet(Dataset):
             smooth (bool): Smooths target with a gaussian filter
             line_width (int): Height of the baseline in the scaled input.
             target_size (tuple): Target size of the image as a (height, width) tuple.
+            mode (str): Either path, alto, or page. In alto and page mode the
+                        baseline paths and image data is retrieved from an
+                        ALTO/PageXML file.
         """
         super().__init__()
+        self.mode = mode
+        if mode == 'alto':
+            im_paths = []
+            self.targets = []
+            for img in imgs:
+                data = parse_alto(img)
+                im_path.append(data['image'])
+                self.targets.append([line['baseline'] for line in data['lines']])
+            imgs = im_paths
+        elif mode == 'path':
+            pass
+        else:
+            raise Exception('invalid dataset mode')
         self.smooth = smooth
         self.imgs = imgs
         self.line_width = line_width
@@ -414,8 +431,11 @@ class BaselineSet(Dataset):
 
     def __getitem__(self, idx):
         im = self.imgs[idx]
-        with open('{}.path'.format(path.splitext(im)[0]), 'r') as fp:
-            target = json.load(fp)
+        if self.mode != 'path':
+            target = self.targets[idx]
+        else:
+            with open('{}.path'.format(path.splitext(im)[0]), 'r') as fp:
+                target = json.load(fp)
         orig = Image.open(im)
         return self.transform(orig, target)
 
