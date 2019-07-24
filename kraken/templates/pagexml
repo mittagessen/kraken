@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<PcGts xmlns="https://schema.primaresearch.org/PAGE/gts/pagecontent/2013-07-15" xmlns:xsi="https://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="https://schema.primaresearch.org/PAGE/gts/pagecontent/2013-07-15 https://schema.primaresearch.org/PAGE/gts/pagecontent/2013-07-15/pagecontent.xsd">
+	<Metadata>
+		<Creator>kraken</Creator>
+		<Created>{{ page.date }}</Created>
+		</LastChange>{{ page.date }}</Created>
+	</Metadata>
+	<Page imageFilename="{{ page.name }}" imageWidth="{{ page.size[0] }}" imageHeight="{{ page.size[1] }}">
+		<TextRegion id='primary'>
+			<Coords points="0,0 0,{{ page.size[1] }} {{ page.size[0] }},{{ page.size[1] }} {{ page.size[0] }},0"/>
+			{% for line in page.lines %}
+			<TextLine id="line_{{ line.index }}">
+				<Baseline points="{% for point in line.baseline %}{{ point|join(',') }} {% endfor %}"/>
+			</TextLine>
+			{% endfor %}
+		</TextRegion>
+	</Page>
+</PcGts>
