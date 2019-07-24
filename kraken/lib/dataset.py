@@ -257,6 +257,104 @@ def compute_error(model: TorchSeqRecognizer, validation_set: Sequence[Tuple[str,
     return total_chars, error
 
 
+def preparse_xml_data(filenames, format_type):
+    """
+    Loads training data from a set of xml files.
+
+    Extracts line information from Page/ALTO xml files for training purposes.
+
+    Args:
+        filenames (list): List of XML files.
+        format_type (str): Either `page` or `alto`
+
+    Returns:
+        A list of dicts {'text': text, 'baseline': [[x0, y0], ...], 'boundary':
+        [[x0, y0], ...], 'image': PIL.Image}.
+    """
+    training_pairs = []
+    for fn in filenames:
+        if format_type == 'alto':
+            data = parse_alto(fn)
+        elif format_type == 'page':
+            data = parse_page(fn)
+        else:
+            raise Exception('invalid format {} for preparse_xml_data'.format(format_type))
+        training_pairs.append(data)
+    return training_pairs
+
+
+class PolygonGTDataset(Dataset):
+    """
+    Dataset for training a line recognition model from polygonal/baseline data.
+    """
+    def __init__(self,
+                 normalization: Optional[str] = None,
+                 whitespace_normalization: bool = True,
+                 reorder: bool = True,
+                 im_transforms: Callable[[Any], torch.Tensor] = transforms.Compose([]),
+                 preload: bool = True) -> None:
+
+        def add(self, im: Image, text: str, baseline: List, boundary: List):
+        """
+        Adds a line to the dataset.
+
+        Args:
+            im (PIL.Image): Whole page image the line is sourced from.
+            text (str): Transcription of the line.
+            baseline (list): A list of coordinates [[x0, y0], ..., [xn, yn]].
+            boundary (list): A polygon mask for the line.
+        """
+        for func in self.text_transforms:
+            gt = func(gt)
+            if not gt:
+                raise KrakenInputException('Text line is empty after transformations')
+        if self.preload:
+            im = Image.open(image)
+            try:
+                im = self.transforms(im)
+            except ValueError as e:
+                raise KrakenInputException('Image transforms failed on {}'.format(image))
+            im, _ = next(extract_polygons(im, {'lines': [{'baseline': baseline, 'boundary': boundary}]}))
+            self._images.append(im)
+        else:
+            self._images.append((image, baseline, boundary))
+        self._gt.append(gt)
+        self.alphabet.update(gt)
+
+    def encode(self, codec: Optional[PytorchCodec] = None) -> None:
+        """
+        Adds a codec to the dataset and encodes all text lines.
+
+        Has to be run before sampling from the dataset.
+        """
+        if codec:
+            self.codec = codec
+        else:
+            self.codec = PytorchCodec(''.join(self.alphabet.keys()))
+        self.training_set = []  # type: List[Tuple[Union[Image, torch.Tensor], torch.Tensor]]
+        for im, gt in zip(self._images, self._gt):
+            self.training_set.append((im, self.codec.encode(gt)))
+
+    def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor]:
+        if self.preload:
+            return self.training_set[index]
+        else:
+            item = self.training_set[index]
+            try:
+                logger.debug('Attempting to load {}'.format(item[0]))
+                im = item[0]
+                if not isinstance(im, Image.Image):
+                    im = Image.open(im)
+                return (self.transforms(im), item[1])
+            except Exception:
+                idx = np.random.randint(0, len(self.training_set))
+                logger.debug('Failed. Replacing with sample {}'.format(idx))
+                return self[np.random.randint(0, len(self.training_set))]
+
+    def __len__(self) -> int:
+        return len(self.training_set)
+
+
 class GroundTruthDataset(Dataset):
     """
     Dataset for training a line recognition model.

@@ -316,12 +316,18 @@ def segtrain(ctx, output, spec, smooth, line_width, load, freq, quit, epochs,
 @click.option('--threads', show_default=True, default=1, help='Number of OpenMP threads and workers when running on CPU.')
 #@click.option('--load-hyper-parameters/--no-load-hyper-parameters', show_default=True, default=False,
 #              help='When loading an existing model, retrieve hyperparameters from the model')
+@click.option('-f', '--format-type', type=click.Choice(['path', 'alto', 'page']), default='path',
+              help='Sets the training data format. In ALTO and PageXML mode all'
+              'data is extracted from xml files containing both line definitions and a'
+              'link to source images. In `path` mode arguments are image files'
+              'sharing a prefix up to the last extension with text `.gt.txt` files'
+              'containing the transcription'.)
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
           lag, min_delta, device, optimizer, lrate, momentum, weight_decay,
           schedule, partition, normalization, normalize_whitespace, codec,
           resize, reorder, training_files, evaluation_files, preload, threads,
-          ground_truth):
+          format_type, ground_truth):
     """
     Trains a model from image-text pairs.
     """
@@ -395,6 +401,10 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
         raise click.UsageError('No training data was provided to the train command. Use `-t` or the `ground_truth` argument.')
 
     np.random.shuffle(ground_truth)
+
+    if format_type != 'path':
+        logger.info('Parsing {} XML files for training data'.format(len(ground_truth)))
+        ground_truth = preparse_xml_data(ground_truth, format_type)
 
     if len(ground_truth) > 2500 and not preload:
         logger.info('Disabling preloading for large (>2500) training data set. Enable by setting --preload parameter')
