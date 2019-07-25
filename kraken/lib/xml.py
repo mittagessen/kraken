@@ -40,22 +40,29 @@ def parse_page(filename):
     """
     with open(filename, 'rb') as fp:
         doc = etree.parse(fp)
-        image = doc.find('.//{*}fileName')
-        if image is None or not image.text:
-            raise KrakenInputException('No valid filename found in ALTO file')
+        image = doc.find('.//{*}Page')
+        if image is None or image.get('imageFilename') is None:
+            raise KrakenInputException('No valid filename found in PageXML file')
         lines = doc.findall('.//{*}TextLine')
-        data = {'image': image.text, 'lines': []}
+        data = {'image': image.get('imageFilename'), 'lines': []}
         for line in lines:
-            if not line.find('./{*}Shape') or not line.get('BASELINE'):
-                raise KrakenInputException('ALTO file {} contains no baseline information'.format(filename))
-            pol = line.find('./{*}Shape/{*}Polygon')
-            points = [int(x) for x in pol.get('POINTS').split(' ')]
-            boundary = list(zip(points[::2], points[1::2]))
-            points = [int(x) for x in line.get('BASELINE').split(' ')]
-            baseline = list(zip(points[::2], points[1::2]))
+            if line.find('./{*}Baseline') is None:
+                raise KrakenInputException('PageXML file {} contains no baseline information'.format(filename))
+            pol = line.find('./{*}Coords')
+            boundary = None
+            if pol is not None:
+                points = [x for x in pol.get('points').split(' ')]
+                points = [int(c) for point in points for c in point.split(',')]
+                boundary = list(zip(points[::2], points[1::2]))
+            base = line.find('./{*}Baseline')
+            baseline = None
+            if base is not None:
+                points = [x for x in base.get('points').split(' ')]
+                points = [int(c) for point in points for c in point.split(',')]
+                baseline = list(zip(points[::2], points[1::2]))
             text = ''
-            for el in line.xpath(".//*[local-name() = 'String'] | .//*[local-name() = 'SP']"):
-                text += el.get('CONTENT') if el.get('CONTENT') else ' '
+            for el in line.findall('.//{*}Unicode'):
+                text += el.text
             data['lines'].append({'baseline': baseline, 'boundary': boundary, 'text': text})
         return data
 
@@ -79,11 +86,13 @@ def parse_alto(filename):
         lines = doc.findall('.//{*}TextLine')
         data = {'image': image.text, 'lines': []}
         for line in lines:
-            if not line.find('./{*}Shape') or not line.get('BASELINE'):
+            if line.get('BASELINE') is None:
                 raise KrakenInputException('ALTO file {} contains no baseline information'.format(filename))
             pol = line.find('./{*}Shape/{*}Polygon')
-            points = [int(x) for x in pol.get('POINTS').split(' ')]
-            boundary = list(zip(points[::2], points[1::2]))
+            boundary = None
+            if pol is not None:
+                points = [int(x) for x in pol.get('POINTS').split(' ')]
+                boundary = list(zip(points[::2], points[1::2]))
             points = [int(x) for x in line.get('BASELINE').split(' ')]
             baseline = list(zip(points[::2], points[1::2]))
             text = ''
