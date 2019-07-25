@@ -111,7 +111,7 @@ def _expand_gt(ctx, param, value):
               'data is extracted from xml files containing both baselines and a'
               'link to source images. In `path` mode arguments are image files'
               'sharing a prefix up to the last extension with JSON `.path` files'
-              'containing the baseline information'.)
+              'containing the baseline information.')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def segtrain(ctx, output, spec, smooth, line_width, load, freq, quit, epochs,
              lag, min_delta, device, optimizer, lrate, momentum, weight_decay,
@@ -321,7 +321,7 @@ def segtrain(ctx, output, spec, smooth, line_width, load, freq, quit, epochs,
               'data is extracted from xml files containing both line definitions and a'
               'link to source images. In `path` mode arguments are image files'
               'sharing a prefix up to the last extension with text `.gt.txt` files'
-              'containing the transcription'.)
+              'containing the transcription.')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
           lag, min_delta, device, optimizer, lrate, momentum, weight_decay,

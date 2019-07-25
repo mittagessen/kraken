@@ -17,12 +17,14 @@
 ALTO/Page data loaders for segmentation training
 """
 
+import os.path
 import logging
 
 logger = logging.getLogger(__name__)
 
 from PIL import Image
 from lxml import etree
+from os.path import dirname
 
 from kraken.lib.exceptions import KrakenInputException
 
@@ -39,12 +41,13 @@ def parse_page(filename):
         [[x0, y0], ...]}, {...], 'text': 'apdjfqpf'}
     """
     with open(filename, 'rb') as fp:
+        base_dir = dirname(filename)
         doc = etree.parse(fp)
         image = doc.find('.//{*}Page')
         if image is None or image.get('imageFilename') is None:
             raise KrakenInputException('No valid filename found in PageXML file')
         lines = doc.findall('.//{*}TextLine')
-        data = {'image': image.get('imageFilename'), 'lines': []}
+        data = {'image': os.path.join(base_dir, image.get('imageFilename')), 'lines': []}
         for line in lines:
             if line.find('./{*}Baseline') is None:
                 raise KrakenInputException('PageXML file {} contains no baseline information'.format(filename))
@@ -79,12 +82,13 @@ def parse_alto(filename):
         [[x0, y0], ...]}, {...], 'text': 'apdjfqpf'}
     """
     with open(filename, 'rb') as fp:
+        base_dir = dirname(filename)
         doc = etree.parse(fp)
         image = doc.find('.//{*}fileName')
         if image is None or not image.text:
             raise KrakenInputException('No valid filename found in ALTO file')
         lines = doc.findall('.//{*}TextLine')
-        data = {'image': image.text, 'lines': []}
+        data = {'image': os.path.join(base_dir, image.text), 'lines': []}
         for line in lines:
             if line.get('BASELINE') is None:
                 raise KrakenInputException('ALTO file {} contains no baseline information'.format(filename))

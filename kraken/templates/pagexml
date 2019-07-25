@@ -3,14 +3,14 @@
 	<Metadata>
 		<Creator>kraken</Creator>
 		<Created>{{ page.date }}</Created>
-		</LastChange>{{ page.date }}</Created>
+		<LastChange>{{ page.date }}</LastChange>
 	</Metadata>
 	<Page imageFilename="{{ page.name }}" imageWidth="{{ page.size[0] }}" imageHeight="{{ page.size[1] }}">
 		<TextRegion id='primary'>
 			<Coords points="0,0 0,{{ page.size[1] }} {{ page.size[0] }},{{ page.size[1] }} {{ page.size[0] }},0"/>
 			{% for line in page.lines %}
 			<TextLine id="line_{{ line.index }}">
-				<Baseline points="{% for point in line.baseline %}{{ point|join(',') }} {% endfor %}"/>
+				<Baseline points="{% for point in line.baseline %}{{ point|join(',') }}{% endfor %}"/>
 			</TextLine>
 			{% endfor %}
 		</TextRegion>
