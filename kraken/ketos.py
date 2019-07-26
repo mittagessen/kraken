@@ -348,7 +348,7 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
     from kraken.lib.util import make_printable
     from kraken.lib.train import EarlyStopping, EpochStopping, TrainStopper, TrainScheduler, add_1cycle
     from kraken.lib.codec import PytorchCodec
-    from kraken.lib.dataset import GroundTruthDataset, generate_input_transforms
+    from kraken.lib.dataset import GroundTruthDataset, PolygonGTDataset, generate_input_transforms, preparse_xml_data
 
     logger.info('Building ground truth set from {} line images'.format(len(ground_truth) + len(training_files)))
 
@@ -370,23 +370,7 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
         #            locals()[param] = nn.user_metadata[param]
         message('\u2713', fg='green', nl=False)
 
-    # preparse input sizes from vgsl string to seed ground truth data set
-    # sizes and dimension ordering.
-    if not nn:
-        spec = spec.strip()
-        if spec[0] != '[' or spec[-1] != ']':
-            raise click.BadOptionUsage('spec', 'VGSL spec {} not bracketed'.format(spec))
-        blocks = spec[1:-1].split(' ')
-        m = re.match(r'(\d+),(\d+),(\d+),(\d+)', blocks[0])
-        if not m:
-            raise click.BadOptionUsage('spec', 'Invalid input spec {}'.format(blocks[0]))
-        batch, height, width, channels = [int(x) for x in m.groups()]
-    else:
-        batch, channels, height, width = nn.input
-    try:
-        transforms = generate_input_transforms(batch, height, width, channels, pad)
-    except KrakenInputException as e:
-        raise click.BadOptionUsage('spec', str(e))
+
 
     # disable automatic partition when given evaluation set explicitly
     if evaluation_files:
@@ -402,9 +386,33 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
 
     np.random.shuffle(ground_truth)
 
+    DatasetClass = GroundTruthDataset
     if format_type != 'path':
         logger.info('Parsing {} XML files for training data'.format(len(ground_truth)))
         ground_truth = preparse_xml_data(ground_truth, format_type)
+        DatasetClass = PolygonGTDataset
+        valid_norm = False
+    else:
+        ground_truth = [{'image': im} for im in ground_truth]
+        valid_norm = True
+
+    # preparse input sizes from vgsl string to seed ground truth data set
+    # sizes and dimension ordering.
+    if not nn:
+        spec = spec.strip()
+        if spec[0] != '[' or spec[-1] != ']':
+            raise click.BadOptionUsage('spec', 'VGSL spec {} not bracketed'.format(spec))
+        blocks = spec[1:-1].split(' ')
+        m = re.match(r'(\d+),(\d+),(\d+),(\d+)', blocks[0])
+        if not m:
+            raise click.BadOptionUsage('spec', 'Invalid input spec {}'.format(blocks[0]))
+        batch, height, width, channels = [int(x) for x in m.groups()]
+    else:
+        batch, channels, height, width = nn.input
+    try:
+        transforms = generate_input_transforms(batch, height, width, channels, pad, valid_norm)
+    except KrakenInputException as e:
+        raise click.BadOptionUsage('spec', str(e))
 
     if len(ground_truth) > 2500 and not preload:
         logger.info('Disabling preloading for large (>2500) training data set. Enable by setting --preload parameter')
@@ -426,31 +434,31 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
         logger.debug('Setting multiprocessing tensor sharing strategy to file_system')
         torch.multiprocessing.set_sharing_strategy('file_system')
 
-    gt_set = GroundTruthDataset(normalization=normalization,
-                                whitespace_normalization=normalize_whitespace,
-                                reorder=reorder,
-                                im_transforms=transforms,
-                                preload=preload)
+    gt_set = DatasetClass(normalization=normalization,
+                          whitespace_normalization=normalize_whitespace,
+                          reorder=reorder,
+                          im_transforms=transforms,
+                          preload=preload)
     with log.progressbar(tr_im, label='Building training set') as bar:
         for im in bar:
             logger.debug('Adding line {} to training set'.format(im))
             try:
-                gt_set.add(im)
+                gt_set.add(**im)
             except FileNotFoundError as e:
                 logger.warning('{}: {}. Skipping.'.format(e.strerror, e.filename))
             except KrakenInputException as e:
                 logger.warning(str(e))
 
-    val_set = GroundTruthDataset(normalization=normalization,
-                                 whitespace_normalization=normalize_whitespace,
-                                 reorder=reorder,
-                                 im_transforms=transforms,
-                                 preload=preload)
+    val_set = DatasetClass(normalization=normalization,
+                           whitespace_normalization=normalize_whitespace,
+                           reorder=reorder,
+                           im_transforms=transforms,
+                           preload=preload)
     with log.progressbar(te_im, label='Building validation set') as bar:
         for im in bar:
             logger.debug('Adding line {} to validation set'.format(im))
             try:
-                val_set.add(im)
+                val_set.add(**im)
             except FileNotFoundError as e:
                 logger.warning('{}: {}. Skipping.'.format(e.strerror, e.filename))
             except KrakenInputException as e:

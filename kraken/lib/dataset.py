@@ -36,6 +36,7 @@ from typing import Dict, List, Tuple, Sequence, Callable, Optional, Any, Union, 
 from kraken.lib.xml import parse_alto, parse_page
 from kraken.lib.codec import PytorchCodec
 from kraken.lib.models import TorchSeqRecognizer
+from kraken.lib.segmentation import extract_polygons
 from kraken.lib.exceptions import KrakenInputException
 from kraken.lib.lineest import CenterNormalizer, dewarp
 
@@ -279,7 +280,8 @@ def preparse_xml_data(filenames, format_type):
             data = parse_page(fn)
         else:
             raise Exception('invalid format {} for preparse_xml_data'.format(format_type))
-        training_pairs.append(data)
+        for line in data['lines']:
+            training_pairs.append({'image': data['image'], **line})
     return training_pairs
 
 
@@ -307,7 +309,7 @@ class PolygonGTDataset(Dataset):
         if reorder:
             self.text_transforms.append(bd.get_display)
 
-    def add(self, im: Union[str, Image.Image], text: str, baseline: List[Tuple[int, int]], boundary: List[Tuple[int, int]]):
+    def add(self, image: Union[str, Image.Image], text: str, baseline: List[Tuple[int, int]], boundary: List[Tuple[int, int]]):
         """
         Adds a line to the dataset.
 
@@ -318,21 +320,21 @@ class PolygonGTDataset(Dataset):
             boundary (list): A polygon mask for the line.
         """
         for func in self.text_transforms:
-            gt = func(gt)
-            if not gt:
+            text = func(text)
+            if not text:
                 raise KrakenInputException('Text line is empty after transformations')
         if self.preload:
             im = Image.open(image)
+            im, _ = next(extract_polygons(im, {'type': 'baselines', 'lines': [{'baseline': baseline, 'boundary': boundary}]}))
             try:
                 im = self.transforms(im)
             except ValueError as e:
                 raise KrakenInputException('Image transforms failed on {}'.format(image))
-            im, _ = next(extract_polygons(im, {'lines': [{'baseline': baseline, 'boundary': boundary}]}))
             self._images.append(im)
         else:
             self._images.append((image, baseline, boundary))
-        self._gt.append(gt)
-        self.alphabet.update(gt)
+        self._gt.append(text)
+        self.alphabet.update(text)
 
     def encode(self, codec: Optional[PytorchCodec] = None) -> None:
         """
@@ -358,6 +360,7 @@ class PolygonGTDataset(Dataset):
                 im = item[0]
                 if not isinstance(im, Image.Image):
                     im = Image.open(im)
+                im, _ = next(extract_polygons(im, {'type': 'baselines', 'lines': [{'baseline': item[0][1], 'boundary': item[0][2]}]}))
                 return (self.transforms(im), item[1])
             except Exception:
                 idx = np.random.randint(0, len(self.training_set))
@@ -421,7 +424,7 @@ class GroundTruthDataset(Dataset):
         if reorder:
             self.text_transforms.append(bd.get_display)
 
-    def add(self, image: str) -> None:
+    def add(self, image: Union[str, Image.Image]) -> None:
         """
         Adds a line-image-text pair to the dataset.
 
