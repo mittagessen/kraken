@@ -17,11 +17,12 @@
 Processing for baseline segmenter output
 """
 import math
+import logging
 import numpy as np
 
 from PIL import Image, ImageDraw
 
-from scipy.spatial import distance_matrix
+from scipy.spatial import distance_matrix, Delaunay
 from scipy.spatial.distance import pdist, squareform
 from scipy.signal import convolve2d
 from scipy.ndimage import label
@@ -38,6 +39,10 @@ from itertools import combinations
 from collections import defaultdict
 
 from typing import List, Tuple, Optional, Generator, Union, Dict, Any
+
+from kraken.lib import morph
+
+logger = logging.getLogger('kraken')
 
 
 def denoising_hysteresis_thresh(im, low, high, sigma):
@@ -124,30 +129,47 @@ def calculate_polygonal_environment(im, baselines, error=3):
     Returns:
         List of tuples (baseline, polygonization) where each is a list of coordinates.
     """
-    siz = im.size
-    context = 10
-    low_context = 50
+    if im.mode != '1':
+        logger.info('Converting input in polygon estimation to binary')
+        im = binarization.nlbin(im).convert('1')
+    im = 1-np.array(im)*1
+    label_mask = np.zeros_like(im)
+    for idx, l in enumerate(baselines):
+        for start, end in zip(l, l[1::]):
+            rr, cc = line(*start[::-1], *end[::-1])
+            label_mask[rr, cc] = idx
+    labels = morph.propagate_labels(im, label_mask)
+    out_lines = []
+    for idx, l in enumerate(baselines):
+        hull = alpha_shape(np.dstack(np.nonzero(labels == idx)), 0.4)
+        out_lines.append((hull, l))
+    reutn out_lines
 
-    from shapely.geometry import LineString, Polygon
+def alpha_shape(points, alpha):
+    """
+    Calculates an alpha shape of a set of points.
 
-    def _clamp(x, bound):
-        return min(max(0, x), bound)
-
-    blpl = []
-    for baseline in baselines:
-        bl = approximate_polygon(np.array(baseline), error)
-        if bl[0][0] > bl[-1][0]:
-            bl = list(reversed(bl))
-        bl = LineString(bl)
-        upper = list(bl.parallel_offset(low_context, 'right').coords)
-        if upper[0][0] > upper[-1][0]:
-            upper = list(reversed(upper))
-        lower = list(bl.parallel_offset(context, 'left').coords)
-        if lower[0][0] < lower[-1][0]:
-            lower = list(reversed(lower))
-        blpl.append((baseline, approximate_polygon(np.array(upper + lower), error).astype('int').tolist()))
-    return blpl
-
+    Args:
+        points (array): Array of shape (N, 2)
+        alpha (float):
+    """
+    triangulation = Delaunay(points)
+    # filter out points not in triangulation
+    triangles = coords[tri.vertices]
+    a = ((triangles[:,0,0] - triangles[:,1,0]) ** 2 + (triangles[:,0,1] - triangles[:,1,1]) ** 2) ** 0.5
+    b = ((triangles[:,1,0] - triangles[:,2,0]) ** 2 + (triangles[:,1,1] - triangles[:,2,1]) ** 2) ** 0.5
+    c = ((triangles[:,2,0] - triangles[:,0,0]) ** 2 + (triangles[:,2,1] - triangles[:,0,1]) ** 2) ** 0.5
+    s = ( a + b + c ) / 2.0
+    areas = (s*(s-a)*(s-b)*(s-c)) ** 0.5
+    circums = a * b * c / (4.0 * areas)
+    filtered = triangles[circums < (1.0 / alpha)]
+    edge1 = filtered[:,(0,1)]
+    edge2 = filtered[:,(1,2)]
+    edge3 = filtered[:,(2,0)]
+    edge_points = np.unique(np.concatenate((edge1,edge2,edge3)), axis = 0).tolist()
+    m = MultiLineString(edge_points)
+    triangles = list(polygonize(m))
+    return unary_union(triangles)
 
 def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image:
     """
