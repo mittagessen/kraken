@@ -97,7 +97,7 @@ def segment(im, text_direction='horizontal-lr', mask=None, model=pkg_resources.r
     o = F.interpolate(o, size=im.size[::-1])
     o = segmentation.denoising_hysteresis_thresh(o.detach().squeeze().cpu().numpy(), 0.4, 0.5, 0)
     baselines = segmentation.vectorize_lines(o)
-    polygons = segmentation.calculate_polygonal_environment(im, baselines)
+    polygons = segmentation.calculate_polygonal_environment(im, baselines, o)
     return {'text_direction': text_direction,
             'type': 'baselines',
             'lines': [{'script': 'default', 'baseline': bl, 'boundary': pl} for bl, pl in polygons]}
