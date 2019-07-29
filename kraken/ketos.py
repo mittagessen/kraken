@@ -89,7 +89,7 @@ def _expand_gt(ctx, param, value):
 @click.option('-q', '--quit', show_default=True, default='early', type=click.Choice(['early', 'dumb']),
               help='Stop condition for training. Set to `early` for early stooping or `dumb` for fixed number of epochs')
 @click.option('-N', '--epochs', show_default=True, default=-1, help='Number of epochs to train for')
-@click.option('--lag', show_default=True, default=5, help='Number of evaluations (--report frequence) to wait before stopping training without improvement')
+@click.option('--lag', show_default=True, default=10, help='Number of evaluations (--report frequence) to wait before stopping training without improvement')
 @click.option('--min-delta', show_default=True, default=None, type=click.FLOAT, help='Minimum improvement between epochs to reset early stopping. Default is scales the delta by the best loss')
 @click.option('-d', '--device', show_default=True, default='cpu', help='Select device to use (cpu, cuda:0, cuda:1, ...)')
 @click.option('--optimizer', show_default=True, default='Adam', type=click.Choice(['Adam', 'SGD', 'RMSprop']), help='Select optimizer')
