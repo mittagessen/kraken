@@ -324,7 +324,8 @@ class PolygonGTDataset(Dataset):
             if not text:
                 raise KrakenInputException('Text line is empty after transformations')
         if self.preload:
-            im = Image.open(image)
+            if not isinstance(image, Image.Image):
+                im = Image.open(image)
             im, _ = next(extract_polygons(im, {'type': 'baselines', 'lines': [{'baseline': baseline, 'boundary': boundary}]}))
             try:
                 im = self.transforms(im)
@@ -357,12 +358,13 @@ class PolygonGTDataset(Dataset):
             item = self.training_set[index]
             try:
                 logger.debug('Attempting to load {}'.format(item[0]))
-                im = item[0]
+                im = item[0][0]
                 if not isinstance(im, Image.Image):
                     im = Image.open(im)
                 im, _ = next(extract_polygons(im, {'type': 'baselines', 'lines': [{'baseline': item[0][1], 'boundary': item[0][2]}]}))
                 return (self.transforms(im), item[1])
             except Exception:
+                raise
                 idx = np.random.randint(0, len(self.training_set))
                 logger.debug('Failed. Replacing with sample {}'.format(idx))
                 return self[np.random.randint(0, len(self.training_set))]
