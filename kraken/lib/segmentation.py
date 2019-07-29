@@ -132,28 +132,22 @@ def calculate_polygonal_environment(im, baselines, bl_mask=None):
     Returns:
         List of tuples (baseline, polygonization) where each is a list of coordinates.
     """
-    from scipy.misc import imshow
     if not util.is_bitonal(im):
         logger.info('Converting input in polygon estimation to binary')
         im = nlbin(im)
     im = im.convert('1')
-    im.show()
     im = 1-np.array(im)*1
     im = binary_dilation(im, iterations=2)*1
-    imshow(im)
     label_mask = np.zeros_like(im)
     for idx, l in enumerate(baselines):
         for start, end in zip(l, l[1::]):
             rr, cc = line(*start[::-1], *end[::-1])
             label_mask[rr, cc] = idx
-    imshow(label_mask)
     if bl_mask is not None:
         label_mask = morph.propagate_labels(bl_mask, label_mask)
     else:
         label_mask = grey_dilation(label_mask, (5, 5))
-    imshow(label_mask)
     labels = morph.propagate_labels(im, label_mask)
-    imshow(labels)
     out_lines = []
     for idx, l in enumerate(baselines):
         points = np.dstack(np.nonzero(labels == idx)).squeeze()
