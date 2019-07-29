@@ -39,13 +39,81 @@ from skimage.transform import PiecewiseAffineTransform, warp
 from itertools import combinations
 from collections import defaultdict
 
-from typing import List, Tuple, Optional, Generator, Union, Dict, Any
+from typing import List, Tuple, Optional, Generator, Union, Dict, Any, Sequence
 
 from kraken.lib import morph, util
 from kraken.binarization import nlbin
 
 logger = logging.getLogger('kraken')
 
+
+def reading_order(lines: Sequence, text_direction: str = 'lr') -> List:
+    """Given the list of lines (a list of 2D slices), computes
+    the partial reading order.  The output is a binary 2D array
+    such that order[i,j] is true if line i comes before line j
+    in reading order."""
+
+    logger.info('Compute reading order on {} lines in {} direction'.format(len(lines), text_direction))
+
+    order = np.zeros((len(lines), len(lines)), 'B')
+
+    def _x_overlaps(u, v):
+        return u[1].start < v[1].stop and u[1].stop > v[1].start
+
+    def _above(u, v):
+        return u[0].start < v[0].start
+
+    def _left_of(u, v):
+        return u[1].stop < v[1].start
+
+    def _separates(w, u, v):
+        if w[0].stop < min(u[0].start, v[0].start):
+            return 0
+        if w[0].start > max(u[0].stop, v[0].stop):
+            return 0
+        if w[1].start < u[1].stop and w[1].stop > v[1].start:
+            return 1
+        return 0
+
+    if text_direction == 'rl':
+        def horizontal_order(u, v):
+            return not _left_of(u, v)
+    else:
+        horizontal_order = _left_of
+
+    for i, u in enumerate(lines):
+        for j, v in enumerate(lines):
+            if _x_overlaps(u, v):
+                if _above(u, v):
+                    order[i, j] = 1
+            else:
+                if [w for w in lines if _separates(w, u, v)] == []:
+                    if horizontal_order(u, v):
+                        order[i, j] = 1
+    return order
+
+
+def topsort(order: np.array) -> np.array:
+    """Given a binary array defining a partial order (o[i,j]==True means i<j),
+    compute a topological sort.  This is a quick and dirty implementation
+    that works for up to a few thousand elements."""
+    logger.info('Perform topological sort on partially ordered lines')
+    n = len(order)
+    visited = np.zeros(n)
+    L = []
+
+    def _visit(k):
+        if visited[k]:
+            return
+        visited[k] = 1
+        a, = np.nonzero(np.ravel(order[:, k]))
+        for l in a:
+            _visit(l)
+        L.append(k)
+
+    for k in range(n):
+        _visit(k)
+    return L
 
 def denoising_hysteresis_thresh(im, low, high, sigma):
     im = gaussian_filter(im, sigma)
