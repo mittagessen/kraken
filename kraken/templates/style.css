@@ -1,53 +1,104 @@
 body {
 	background: #f3f3f3;
-	{% if font.family %}
-	font-family: {{ font.family }};
-	{% endif %}
-	{% if font.style %}
-	font-style: {{ font.style }};
-	{% endif %}
-	{% if font.weight %}
-	font-style: {{ font.weight }};
-	{% endif %}
+	height: 100vh;
+	margin: 0;
 }
 
-[contenteditable=true]:empty:before {
-	content: attr(data-placeholder);
-	display: block; /* For Firefox */
+div, ul, li {
+	box-sizing: border-box;
 }
 
-li[contenteditable=true]:hover, li[contenteditable=true].hovered, span[contenteditable=true]:hover, span[contenteditable=true].hovered {
-	border: 1px solid #ff0000;
+#pages {
+	height: 100vh;
+	margin-left: 15%;
+	overflow: hidden;
 }
 
-.rect:hover, a.hovered {
-	box-shadow: inset 0 0 0 1px #ff0000;
+section.page {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
 }
 
-li[contenteditable=true]{
-	border: 1px dashed #000;
+/* Left column: facsimile */
+.facsimile {
+	align-self: center;
+	justify-self: center;
+	position: relative;
+	margin: 1em;
+}
+
+.facsimile > a {
+	position: absolute;
+	z-index: 2;
+}
+
+.facsimile > img {
 	width: 100%;
-	padding: 2px;
-	margin: 0 0 5px 0;
 }
 
-ul {
-	list-style-type:none;
+/* Line highlights on facsimile */
+a.rect:hover, a.hovered {
+	border: 2px solid rgba(255, 0, 0, .33);
 }
 
+a.active, li[contenteditable=true].active {
+	border: 2px solid red;
+}
+
+/* Right column: list of input fields */
+section.page > ul {
+	counter-reset: mycounter;
+	height: 100vh;
+	list-style-type: none;
+	margin: 0;
+	overflow: auto;
+	padding: 1em 1em 10vh 3em;
+	position: relative;
+}
+
+li[contenteditable=true] {
+	border: 2px dashed #CCC;
+	height: 1.8em;
+	margin: 0 0 1em 0;
+	outline: none;
+	padding: .2em;
+	width: 100%;
+}
+
+li[contenteditable=true]:before {
+	color: #BBB;
+	content: counter(mycounter);
+	counter-increment: mycounter;
+	font-family: monospace;
+	font-size: 1.2em;
+	left: 0;
+	position: absolute;
+	text-align: right;
+	width: 28px;
+}
+
+li[contenteditable=true].active:before {
+	color: #222;
+}
+
+li[contenteditable=true]:hover,
+li[contenteditable=true].hovered {
+	border: 2px solid rgba(255, 0, 0, .33);
+}
+
+li[contenteditable=true].corrected {
+	background-color: #a6e6a6;
+}
+
+/* Left aside navigation menu */
 nav {
 	background: #444;
+	font-family: sans-serif;
 	position: fixed;
-	top: 0;
 	left: 0;
-	height: 100%;
-	width: 10%;
-	font-family: "Helvetica Neue", Arial, sans-serif;
-}
-
-nav ul {
-	list-style: none;
-	margin-right: 1em;
+	top: 0;
+	bottom: 0;
+	width: 15%;
 }
 
 nav li {
@@ -63,35 +114,19 @@ nav a:hover {
 	text-decoration: underline;	
 }
 
-.container {
-	position: relative;
-	margin-left: 15%;
-	display: table;
-	height: 100%;
-	width: 85%;
-}
-
-.img_container {
-	position: relative;
-}
-
-.column {
-	display: table-cell;
-	vertical-align: top;
-	width: 50%;
-	height: 100%;
-	padding: 1rem;
-}
-
-#download_button {
-	position: fixed;
-	padding: 0;
-	text-align: center;
-	width: 10%;
+button.download {
+	background: white;
+	border-radius: 0.3em;
+	border: 3px solid #CCC;
 	bottom: 50px;
+	cursor: pointer;
+	font-size: 1.1em;
+	margin-left: 2.5%;
+	position: fixed;
+	width: 10%;
 }
 
-.corrected {
-	background-color: #73AD21;
+button.download > a {
+	color: #222;
 }
 

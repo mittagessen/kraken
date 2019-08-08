@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html {% if text_direction == "horizontal-rl" %}dir="rtl"{% endif %}>
+	
 	<head>
 		<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
 		<meta name="uuid" content="{{ uuid }}"/>
@@ -7,100 +8,42 @@
 		<style>
 			{% include 'style.css' %}
 		</style>
+		<script>
+			{% include 'main.js' %}
+		</script>
 	</head>
 	<body>
-		<script language="javascript" type="text/javascript">
-			{% include 'jquery-1.11.3.min.js' %}
-		</script>
-		<script>
-			$(document).ready(function() {
-				var uuid = $('meta[name=uuid]').attr('content');
-				if (localStorage) {
-					$('li[contenteditable=true], span').each(function(index) {
-						if(localStorage[uuid + this.id]) {
-							$(this).text(localStorage[uuid + this.id]);
-						}
-					});
-				}
-				// focus text fields when lines/words are clicked + mouseover
-				$('a.rect').click(function(e) {
-					e.preventDefault();
-					$('#' + $(this).attr('alt')).focus();
-				}).mouseover(function(e) {
-					$('#' + $(this).attr('alt')).addClass("hovered");
-				}).mouseout(function(e) {
-					$('#' + $(this).attr('alt')).removeClass("hovered");
-				});
-
-				// create mouseover effect on text fields
-				$('li[contenteditable=true], span').mouseover(function(e) {
-					console.log(this.id);
-					$('a.rect[alt=' + this.id + ']').addClass("hovered");
-				}).mouseout(function(e) {
-					$('a.rect[alt=' + this.id + ']').removeClass("hovered");
-				}).focusin(function(e) {
-					$('a.rect[alt=' + this.id + ']').addClass("hovered");
-				}).focusout(function(e) {
-					$('a.rect[alt=' + this.id + ']').removeClass("hovered");
-				}).keydown(function(e) {
-					if(e.which == 13) {
-						e.preventDefault();
-						$(this).addClass('corrected');
-						var $els = $('[contenteditable=true]');
-						$els.eq($els.index(this) + 1).focus();
-					}
-				// save to local storage 
-				}).keyup(function () {
-					localStorage[uuid + this.id] = $(this).text();
-				});
-				
-				// smooth scrolling
-				$('.page_anchor').click(function(e) {
-					e.preventDefault();
-					var target = $(this).attr("href");
-					var top = $(target).offset().top;
-					$('html, body').stop().animate({scrollTop: top }, 500);
-				});
-
-				// serializing the DOM to a file
-				$('#download_button').click(function(e) {
-					path = window.location.pathname;
-					$(this).attr('href', 'data:text/html,' + encodeURIComponent($('html')[0].outerHTML));
-					$(this).attr('download', path.substr(path.lastIndexOf('/') + 1));
-				});
-			});
-		</script>
-		<nav>
-			<ul>
-			{% for page in pages %}
-				<li><a class="page_anchor" href='#page_{{ page.index }}'>{{ page.index }}</a></li>
-			{% endfor %}
-			</ul>
-			<a id="download_button" href="#">Download</a>
-		</nav>
-
-		{% for page in pages %}
-		<section class="page container" id="page_{{ page.index }}">
-			<div class="column">
-				<div class="img_container">
-					<img style="width: 100%;" src="{{ page.img }}" alt="photo"/>
-					{% for line in page.lines %}
-						<a class="rect" alt="line_{{ line.index }}" href="" title="" style="position: absolute; left: {{ line.left }}%; top: {{ line.top }}%; width: {{ line.width }}%; height: {{ line.height }}%; z-index: 2;"></a>
-					{% endfor %}
-				</div>
-			</div>
-			<div class="column">
+		<div id="wrapper">
+			<nav>
 				<ul>
-				{% for line in page.lines %}
-					<li id="line_{{ line.index }}" contenteditable="true" spellcheck="true" data-bbox="{{ line.bbox }}" data-placeholder="Enter text for line {{ line.index }}">
-						{% if line.text %}
-							{{ line.text }}
-						{% endif %}
-					</li>
+				{% for page in pages %}
+					<li><a class="page_anchor" href='#page_{{ page.index }}'>{{ page.index }}</a></li>
 				{% endfor %}
 				</ul>
+				<button class="download"><a href="#">Download</a></button>
+			</nav>
+
+			<div id="pages">
+				{% for page in pages %}
+				<section class="page" id="page_{{ page.index }}">
+					<div class="facsimile">
+						<img src="{{ page.img }}" alt="photo"/>
+						{% for line in page.lines %}
+							<a class="rect" alt="line_{{ line.index }}" href="" title="" style="left: {{ line.left }}%; top: {{ line.top }}%; width: {{ line.width }}%; height: {{ line.height }}%;"></a>
+						{% endfor %}
+					</div>
+					<ul>
+					{% for line in page.lines %}
+						<li id="line_{{ line.index }}" contenteditable="true" spellcheck="true" data-bbox="{{ line.bbox }}" data-placeholder="Enter text for line {{ line.index }}">
+							{% if line.text %}
+								{{ line.text }}
+							{% endif %}
+						</li>
+					{% endfor %}
+					</ul>
+				</section>
+				{% endfor %}
 			</div>
-		</section>
-		{% endfor %}
+		</div>
 	</body>
 </html>
