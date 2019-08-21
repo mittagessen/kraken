@@ -100,4 +100,4 @@ def segment(im, text_direction='horizontal-lr', mask=None, model=pkg_resources.r
     polygons = segmentation.calculate_polygonal_environment(im, baselines, o)
     return {'text_direction': text_direction,
             'type': 'baselines',
-            'lines': [{'script': 'default', 'baseline': bl, 'boundary': pl} for bl, pl in polygons]}
+            'lines': [{'script': 'default', 'baseline': bl, 'boundary': pl} for pl, bl in polygons]}
