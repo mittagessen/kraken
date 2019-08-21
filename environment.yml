@@ -1,6 +1,5 @@
 name: kraken
 channels:
-  - pytorch
   - conda-forge
   - defaults
 dependencies:
