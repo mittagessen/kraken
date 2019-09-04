@@ -198,7 +198,7 @@ def calculate_polygonal_environment(im, baselines, bl_mask=None):
                                recognition net.
 
     Returns:
-        List of tuples (baseline, polygonization) where each is a list of coordinates.
+        List of tuples (polygonization, baseline) where each is a list of coordinates.
     """
     if not util.is_bitonal(im):
         logger.info('Converting input in polygon estimation to binary')
@@ -210,7 +210,7 @@ def calculate_polygonal_environment(im, baselines, bl_mask=None):
     for idx, l in enumerate(baselines):
         for start, end in zip(l, l[1::]):
             rr, cc = line(*start[::-1], *end[::-1])
-            label_mask[rr, cc] = idx
+            label_mask[rr, cc] = idx+1
     if bl_mask is not None:
         label_mask = morph.propagate_labels(bl_mask, label_mask)
     else:
@@ -218,12 +218,12 @@ def calculate_polygonal_environment(im, baselines, bl_mask=None):
     labels = morph.propagate_labels(im, label_mask)
     out_lines = []
     for idx, l in enumerate(baselines):
-        points = np.dstack(np.nonzero(labels == idx)).squeeze()
+        points = np.dstack(np.nonzero(labels == idx+1)).squeeze()
         if len(points) > 0:
             hull = ConvexHull(points)
             vertices = points[hull.vertices]
         else:
-            logger.warning('No points under baseline {}. Skipping.'.format(idx))
+            logger.warning('No points under baseline {}. Skipping.'.format(idx+1))
             vertices = None
         out_lines.append((vertices, l))
     return out_lines
