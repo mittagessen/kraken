@@ -50,7 +50,7 @@ def parse_page(filename):
         data = {'image': os.path.join(base_dir, image.get('imageFilename')), 'lines': []}
         for line in lines:
             if line.find('./{*}Baseline') is None:
-                raise KrakenInputException('PageXML file {} contains no baseline information'.format(filename))
+                logger.warning('TextLine {} without baseline'.format(line.get('id')))
             pol = line.find('./{*}Coords')
             boundary = None
             if pol is not None:
