@@ -674,12 +674,14 @@ class TorchVGSLModel(object):
             raise ValueError('CTC not supported for heatmap output')
         if nl == 'l' and int(m.group('out')) == 1:
             self.criterion = nn.BCELoss()
+        elif nl == 'l' and int(m.group('out')) > 1:
+            self.criterion = nn.NLLLoss()
         elif nl == 'c':
             self.criterion = nn.CTCLoss(reduction='none')
         else:
             raise ValueError('unsupported output specification')
         # heatmap output
-        if dim == 2:
+        if dim == 2 and nl != 'l':
             act = 's' if nl == 'l' else 'm'
             fn = layers.ActConv2D(input[1], outdim, (1, 1), (1, 1), act)
             logger.debug('{}\t\tconv\tkernel 1 x 1 filters {} stride 1 activation {}'.format(self.idx+1, outdim, nl))

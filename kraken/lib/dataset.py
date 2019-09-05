@@ -560,24 +560,46 @@ class BaselineSet(Dataset):
         orig = Image.open(im)
         return self.transform(orig, target)
 
+    @staticmethod
+    def _get_ortho_line(lineseg, point):
+        lineseg = np.array(lineseg)
+        norm_vec = lineseg[1,...] - lineseg[0,...]
+        norm_vec_len = np.sqrt(np.sum(norm_vec**2))
+        unit_vec = norm_vec / norm_vec_len
+        ortho_vec = unit_vec[::-1] * ((1,-1), (-1,1))
+        return (ortho_vec * 10 + point).astype('int').tolist()
+
     def transform(self, image, target):
         orig_size = image.size
         image = self.im_transforms(image)
         scale = image.shape[2]/orig_size[0]
         t = Image.new('L', image.shape[:0:-1])
-        draw = ImageDraw.Draw(t)
+        line_mask = ImageDraw.Draw(t)
+        s = Image.new('L', image.shape[:0:-1])
+        separator_mask = ImageDraw.Draw(s)
         lines = []
         for line in target:
             l = []
             for point in line:
                 l.append((int(point[0]*scale), int(point[1]*scale)))
-            draw.line(l, fill=255, width=self.line_width)
-        del draw
+            line_mask.line(l, fill=255, width=self.line_width)
+            sep_1 = [tuple(x) for x in self._get_ortho_line(l[:2], l[0])]
+            separator_mask.line(sep_1, fill=255, width=self.line_width)
+            sep_2 = [tuple(x) for x in self._get_ortho_line(l[-2:], l[-1])]
+            separator_mask.line(sep_2, fill=255, width=self.line_width)
+        del line_mask
+        del separator_mask
         target = np.array(t)
+        separator = np.array(s)
         if self.smooth:
             target = gaussian_filter(target, sigma=2)
-        target = Image.fromarray(target)
-        return image, tf.to_tensor(target)
+            separator = gaussian_filter(separator, sigma=2)
+        target = tf.to_tensor(Image.fromarray(target)).long()
+        separator = tf.to_tensor(Image.fromarray(separator)).long()
+        target[separator != 0] = 2
+        # squeeze away channel dimension for NLLLoss
+        target = target.squeeze()
+        return image, target
 
     def __len__(self):
         return len(self.imgs)

@@ -101,3 +101,6 @@ def segment(im, text_direction='horizontal-lr', mask=None, model=pkg_resources.r
     return {'text_direction': text_direction,
             'type': 'baselines',
             'lines': [{'script': 'default', 'baseline': bl, 'boundary': pl} for pl, bl in polygons]}
+
+
+

@@ -237,7 +237,7 @@ def recognition_loss_fn(criterion, output, target):
     return loss
 
 def baseline_label_loss_fn(criterion, output, target):
-    output = F.interpolate(output, size=(target.size(2), target.size(3)))
+    output = F.interpolate(output, size=(target.size(1), target.size(2)))
     loss = criterion(output, target)
     return loss
 
