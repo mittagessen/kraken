@@ -266,9 +266,9 @@ def baseline_label_evaluator_fn(model, val_set, device):
             pred = torch.from_numpy(pred.astype('f')).to(device)
             pred = pred.argmax(dim=0).view(-1)
             y = y.view(-1)
-            correct = y == pred
-            all_p = pred.sum(dim=0).type(torch.DoubleTensor)
-            actual_p = y.sum(dim=0).type(torch.DoubleTensor)
+            correct = torch.eq(y, pred)
+            all_p = (pred != 0).sum(dim=0).type(torch.DoubleTensor)
+            actual_p = (y != 0).sum(dim=0).type(torch.DoubleTensor)
             if correct.sum() == 0:
                 tp = torch.zeros_like(all_p)
             else:
