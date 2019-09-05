@@ -267,6 +267,8 @@ def baseline_label_evaluator_fn(model, val_set, device):
             pred = pred.argmax(dim=0).view(-1)
             y = y.view(-1)
             correct = torch.eq(y, pred)
+            correct[y == 0] = 0
+            correct[pred == 0] = 0
             all_p = (pred != 0).sum(dim=0).type(torch.DoubleTensor)
             actual_p = (y != 0).sum(dim=0).type(torch.DoubleTensor)
             if correct.sum() == 0:
