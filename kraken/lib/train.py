@@ -254,6 +254,7 @@ def baseline_label_evaluator_fn(model, val_set, device):
     all_positives = 0
     actual_positives = 0
     all_n = 0
+    model.eval()
     with torch.no_grad():
         for x, y in val_set:
             x = x.to(device)
@@ -280,6 +281,7 @@ def baseline_label_evaluator_fn(model, val_set, device):
             all_positives += all_p
             actual_positives += actual_p
             all_n += len(y)
+    model.train()
     # all_positives = tp + fp
     # actual_positives = tp + fn
     # true_positivies = tp
