@@ -511,7 +511,6 @@ class BaselineSet(Dataset):
     Dataset for training a baseline recognition model.
     """
     def __init__(self, imgs: Sequence[str],
-                 smooth: bool = False,
                  line_width: int = 4,
                  im_transforms: Callable[[Any], torch.Tensor] = transforms.Compose([]),
                  mode: str = 'path'):
@@ -520,7 +519,6 @@ class BaselineSet(Dataset):
 
         Args:
             imgs (list):
-            smooth (bool): Smooths target with a gaussian filter
             line_width (int): Height of the baseline in the scaled input.
             target_size (tuple): Target size of the image as a (height, width) tuple.
             mode (str): Either path, alto, or page. In alto and page mode the
@@ -545,7 +543,6 @@ class BaselineSet(Dataset):
             pass
         else:
             raise Exception('invalid dataset mode')
-        self.smooth = smooth
         self.imgs = imgs
         self.line_width = line_width
         self.im_transforms = im_transforms
@@ -591,9 +588,6 @@ class BaselineSet(Dataset):
         del separator_mask
         target = np.array(t)
         separator = np.array(s)
-        if self.smooth:
-            target = gaussian_filter(target, sigma=2)
-            separator = gaussian_filter(separator, sigma=2)
         target = tf.to_tensor(Image.fromarray(target)).long()
         separator = tf.to_tensor(Image.fromarray(separator)).long()
         target[separator != 0] = 2

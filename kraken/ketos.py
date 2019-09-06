@@ -81,7 +81,6 @@ def _expand_gt(ctx, param, value):
 @click.option('-s', '--spec', show_default=True,
               default='[1,1200,0,3 Cr3,3,64,2,2 Gn32 Cr3,3,128,2,2 Gn32 Cr3,3,64 Gn32 Lbx32 Lby32 Cr1,1,32 Gn32 Lby32 Lbx32 O2l3]',
               help='VGSL spec of the baseline labeling network')
-@click.option('--smooth/--no-smooth', show_default=True, default=True, help='Smooth the target image with a gaussian filter')
 @click.option('--line-width', show_default=True, default=8, help='The height of each baseline in the target after scaling')
 @click.option('-i', '--load', show_default=True, type=click.Path(exists=True, readable=True), help='Load existing file to continue training')
 @click.option('-F', '--freq', show_default=True, default=1.0, type=click.FLOAT,
@@ -113,7 +112,7 @@ def _expand_gt(ctx, param, value):
               'sharing a prefix up to the last extension with JSON `.path` files'
               'containing the baseline information.')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
-def segtrain(ctx, output, spec, smooth, line_width, load, freq, quit, epochs,
+def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
              lag, min_delta, device, optimizer, lrate, momentum, weight_decay,
              schedule, partition, training_files, evaluation_files, threads,
              format_type, ground_truth):
@@ -169,6 +168,7 @@ def segtrain(ctx, output, spec, smooth, line_width, load, freq, quit, epochs,
     except KrakenInputException as e:
         raise click.BadOptionUsage('spec', str(e))
 
+    print('{} {} {} {}'.format(batch, height, width, channels))
     # disable automatic partition when given evaluation set explicitly
     if evaluation_files:
         partition = 1
@@ -196,15 +196,16 @@ def segtrain(ctx, output, spec, smooth, line_width, load, freq, quit, epochs,
         logger.debug('Setting multiprocessing tensor sharing strategy to file_system')
         torch.multiprocessing.set_sharing_strategy('file_system')
 
-    gt_set = BaselineSet(tr_im, smooth=smooth, line_width=line_width,
+    gt_set = BaselineSet(tr_im, line_width=line_width,
                          im_transforms=transforms, mode=format_type)
-    val_set = BaselineSet(te_im, smooth=False, line_width=line_width,
+    val_set = BaselineSet(te_im, line_width=line_width,
                           im_transforms=transforms, mode=format_type)
 
     if device == 'cpu':
         loader_threads = threads // 2
     else:
         loader_threads = threads
+
     train_loader = DataLoader(gt_set, batch_size=1, shuffle=True, num_workers=loader_threads, pin_memory=True)
     test_loader = DataLoader(val_set, batch_size=1, shuffle=True, num_workers=loader_threads, pin_memory=True)
     threads -= loader_threads
