@@ -14,6 +14,7 @@
 # or implied. See the License for the specific language governing
 # permissions and limitations under the License.
 import os
+import time
 import json
 import glob
 import uuid
@@ -260,6 +261,7 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
             bar.label = 'stage {}/{}'.format(epoch+1, trainer.stopper.epochs if trainer.stopper.epochs > 0 else '∞')
             bar.pos = 0
             bar.finished = False
+            bar.start = bar.last_eta = time.time()
 
         trainer.run(_print_eval, _draw_progressbar)
 
@@ -603,6 +605,7 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
             bar.label = 'stage {}/{}'.format(epoch+1, trainer.stopper.epochs if trainer.stopper.epochs > 0 else '∞')
             bar.pos = 0
             bar.finished = False
+            bar.start = bar.last_eta = time.time()
 
         trainer.run(_print_eval, _draw_progressbar)
 
