@@ -336,7 +336,7 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
     else:
         loader_threads = threads
     train_loader = DataLoader(gt_set, batch_size=1, shuffle=True, num_workers=loader_threads, pin_memory=True)
-    threads -= loader_threads
+    threads = max(threads-loader_threads, 1)
 
     # don't encode validation set as the alphabets may not match causing encoding failures
     val_set.training_set = list(zip(val_set._images, val_set._gt))
