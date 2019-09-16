@@ -681,7 +681,7 @@ class TorchVGSLModel(object):
         else:
             raise ValueError('unsupported output specification')
         # heatmap output
-        if dim == 2 and nl != 'l':
+        if dim == 2 and outdim == 1:
             act = 's' if nl == 'l' else 'm'
             fn = layers.ActConv2D(input[1], outdim, (1, 1), (1, 1), act)
             logger.debug('{}\t\tconv\tkernel 1 x 1 filters {} stride 1 activation {}'.format(self.idx+1, outdim, nl))
