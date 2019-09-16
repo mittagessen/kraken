@@ -222,11 +222,11 @@ def calculate_polygonal_environment(im, baselines, bl_mask=None):
         if len(points) > 0:
             hull = ConvexHull(points)
             vertices = points[hull.vertices]
-            vertices = np.flip(vertices, -1)
+            vertices = np.flip(vertices, -1).tolist()
         else:
             logger.warning('No points under baseline {}. Skipping.'.format(idx+1))
             vertices = None
-        out_lines.append((vertices.tolist(), l))
+        out_lines.append((vertices, l))
     return out_lines
 
 
