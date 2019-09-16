@@ -226,7 +226,7 @@ def calculate_polygonal_environment(im, baselines, bl_mask=None):
         else:
             logger.warning('No points under baseline {}. Skipping.'.format(idx+1))
             vertices = None
-        out_lines.append((vertices, l))
+        out_lines.append((vertices.tolist(), l))
     return out_lines
 
 
