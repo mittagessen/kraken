@@ -169,7 +169,6 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
     except KrakenInputException as e:
         raise click.BadOptionUsage('spec', str(e))
 
-    print('{} {} {} {}'.format(batch, height, width, channels))
     # disable automatic partition when given evaluation set explicitly
     if evaluation_files:
         partition = 1
@@ -393,10 +392,14 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
     if format_type != 'path':
         logger.info('Parsing {} XML files for training data'.format(len(ground_truth)))
         ground_truth = preparse_xml_data(ground_truth, format_type)
+        if evaluation_files:
+            evaluation_files = preparse_xml_data(evaluation_files, format_type)
         DatasetClass = PolygonGTDataset
         valid_norm = False
     else:
         ground_truth = [{'image': im} for im in ground_truth]
+        if evaluation_files:
+            evaluation_files = [{'image': im} for im in evaluation_files]
         valid_norm = True
 
     # preparse input sizes from vgsl string to seed ground truth data set
