@@ -562,6 +562,8 @@ class BaselineSet(Dataset):
             im (path): Path to the whole page image
             baseline (list): A list of lists of coordinates [[x0, y0], ..., [xn, yn]]].
         """
+        if self.mode:
+            raise Exception('The `add` method is incompatible with dataset mode {}'.format(self.mode))
         self.imgs.append(image)
         self.targets.append(baselines)
 
