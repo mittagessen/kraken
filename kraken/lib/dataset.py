@@ -510,7 +510,8 @@ class BaselineSet(Dataset):
     """
     Dataset for training a baseline recognition model.
     """
-    def __init__(self, imgs: Sequence[str],
+    def __init__(self, imgs: Sequence[str] = None,
+                 suffix: str = '.path',
                  line_width: int = 4,
                  im_transforms: Callable[[Any], torch.Tensor] = transforms.Compose([]),
                  mode: str = 'path'):
@@ -519,11 +520,14 @@ class BaselineSet(Dataset):
 
         Args:
             imgs (list):
+            suffix (int): Suffix to attach to image base name to load JSON
+                          files from.
             line_width (int): Height of the baseline in the scaled input.
             target_size (tuple): Target size of the image as a (height, width) tuple.
-            mode (str): Either path, alto, or page. In alto and page mode the
-                        baseline paths and image data is retrieved from an
-                        ALTO/PageXML file.
+            mode (str): Either path, alto, page, or None. In alto and page mode
+                        the baseline paths and image data is retrieved from an
+                        ALTO/PageXML file. In `None` mode data is iteratively
+                        added through the `add` method.
         """
         super().__init__()
         self.mode = mode
@@ -541,11 +545,25 @@ class BaselineSet(Dataset):
             imgs = im_paths
         elif mode == 'path':
             pass
+        elif mode is None:
+            imgs = []
+            self.targets = []
         else:
             raise Exception('invalid dataset mode')
         self.imgs = imgs
         self.line_width = line_width
         self.im_transforms = im_transforms
+
+    def add(self, image: Union[str, Image.Image], baselines: List[List[Tuple[int, int]]]):
+        """
+        Adds a line to the dataset.
+
+        Args:
+            im (path): Path to the whole page image
+            baseline (list): A list of lists of coordinates [[x0, y0], ..., [xn, yn]]].
+        """
+        self.imgs.append(image)
+        self.targets.append(baselines)
 
     def __getitem__(self, idx):
         im = self.imgs[idx]
@@ -554,8 +572,9 @@ class BaselineSet(Dataset):
         else:
             with open('{}.path'.format(path.splitext(im)[0]), 'r') as fp:
                 target = json.load(fp)
-        orig = Image.open(im)
-        return self.transform(orig, target)
+        if not isinstance(im, Image.Image):
+            im = Image.open(im)
+        return self.transform(im, target)
 
     @staticmethod
     def _get_ortho_line(lineseg, point):
