@@ -681,14 +681,19 @@ def test(ctx, model, evaluation_files, device, pad, threads, test_set):
         ts = generate_input_transforms(batch, height, width, channels, pad)
         with log.progressbar(test_set, label='Evaluating') as bar:
             for im_path in bar:
-                i = ts(Image.open(im_path))
-                text = _get_text(im_path)
-                pred = net.predict_string(i)
-                chars += len(text)
-                c, algn1, algn2 = global_align(text, pred)
-                algn_gt.extend(algn1)
-                algn_pred.extend(algn2)
-                error += c
+                try:
+                    i = ts(Image.open(im_path))
+                    text = _get_text(im_path)
+                    pred = net.predict_string(i)
+                    chars += len(text)
+                    c, algn1, algn2 = global_align(text, pred)
+                    algn_gt.extend(algn1)
+                    algn_pred.extend(algn2)
+                    error += c
+                except FileNotFoundError as e:
+                    logger.warning('{} {}. Skipping.'.format(e.strerror, e.filename))
+                except KrakenInputException as e:
+                    logger.warning(str(e))
         acc_list.append((chars-error)/chars)
         confusions, scripts, ins, dels, subs = compute_confusions(algn_gt, algn_pred)
         rep = render_report(p, chars, error, confusions, scripts, ins, dels, subs)
