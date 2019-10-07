@@ -227,26 +227,48 @@ def vectorize_lines(im: np.ndarray, threshold: float = 0.2, min_sp_dist: int = 1
             cl_p1 = _point_in_cluster(edge[1])
             # new cluster casea
             if not cl_p0 and not cl_p1:
-                print('new')
                 edge_list.remove(edge)
                 clusters.append([edge])
             # extend case
             elif cl_p0 and not cl_p1:
-                print('extend')
                 edge_list.remove(edge)
                 clusters[cl_p0].append(edge)
             elif cl_p1 and not cl_p0:
-                print('extend')
                 edge_list.remove(edge)
                 clusters[cl_p1].append(edge)
             # merge case
             elif cl_p0 != cl_p1 and cl_p0 and cl_p1:
-                print('merge')
                 edge_list.remove(edge)
                 clusters[min(cl_p0, cl_p1)].extend(clusters.pop(max(cl_p0, cl_p1)))
                 clusters[min(cl_p0, cl_p1)].append(edge)
 
     # sort clusters
+    sorted_clusters = []
+    for cluster in clusters[1:]:
+        try:
+            edge_nodes = defaultdict(list)
+            # find extreme point
+            for edge in cluster:
+                for node in edge:
+                    edge_nodes[node].append(list(edge))
+            edge_nodes.default_factory = None
+            for k, v in edge_nodes.items():
+                if len(v) == 1:
+                    point = k
+                    break
+            path = [point]
+            while edge_nodes:
+                edge = edge_nodes[point].pop()
+                del edge_nodes[point]
+                path.append(edge[1] if edge[0] == point else edge[0])
+                point = edge[1 - edge.index(point)]
+                if len(edge_nodes[point]) == 1:
+                    del edge_nodes[point]
+                else:
+                    edge_nodes[point].remove(edge)
+        except:
+            logger.warning('cluster sorting failed for cluster {}'.format(cluster))
+        sorted_clusters.append(path)
 
     return [approximate_polygon(line[:,::-1], 5)[::-1].tolist() if line[0][1] > line[-1][1] else approximate_polygon(line[:,::-1], 5).tolist() for line in mcp.get_connections()]
 
