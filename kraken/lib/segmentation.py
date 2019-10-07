@@ -37,7 +37,7 @@ from skimage.morphology import skeletonize_3d
 from skimage.transform import PiecewiseAffineTransform, warp
 
 from itertools import combinations
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 
 from typing import List, Tuple, Optional, Generator, Union, Dict, Any, Sequence
 
@@ -119,69 +119,135 @@ def denoising_hysteresis_thresh(im, low, high, sigma):
     im = gaussian_filter(im, sigma)
     return apply_hysteresis_threshold(im, low, high)
 
-def vectorize_lines(im: np.ndarray, error: int = 3):
+def vectorize_lines(im: np.ndarray, threshold: float = 0.2, min_sp_dist: int = 10, radii: Sequence[int] = [16, 32, 64, 128], ):
     """
     Vectorizes lines from a binarized array.
 
     Args:
-        im (np.ndarray): Boolean array of baseline candidates
+        im (np.ndarray): Array of shape (3, H, W) with the first dimension
+                         being a probability distribution over (background,
+                         baseline, separators).
         error (int): Maximum error in polyline vectorization
 
     Returns:
         [[x0, y0, ... xn, yn], [xm, ym, ..., xk, yk], ... ]
         A list of lists containing the points of all baseline polylines.
     """
+    # split into baseline and separator map
+    bl_map = im[1]
+    sep_map = im[2]
+    # binarize
+    bin = im > threshold
+    # skeletonize 
+    skel = skeletonize(bin[1])
+    conf_map = bl_map * skel
+    sp_idx = np.unravel_index(np.argsort(1.-conf_map, axis=None), conf_map.shape)
+    zeroes_idx = conf_map[sp_idx].argmin()
+    sp_idx = sp_idx[0][:zeroes_idx], sp_idx[1][:zeroes_idx]
+    sp_can = [(sp_idx[0][0], sp_idx[1][0])]
+    for x in range(len(sp_idx[0])):
+        loc = np.array([[sp_idx[0][x], sp_idx[1][x]]])
+        if min(cdist(sp_can, loc)) > min_sp_dist:
+            sp_can.extend(loc.tolist())
+    sp_can = np.array(sp_can)
+    tri = Delaunay(sp_can)
+    indices, indptr = tri.vertex_neighbor_vertices
+    # dict mapping each edge to its intensity. Needed for subsequent clustering step.
+    intensities = {}
+    states = {}
+    dists = squareform(pdist(sp_can))
+    # radius of circular environment around SP for ILD estimation
+    nb_indices = tuple(np.nonzero(dists < proj_env) for proj_env in radii)
+    for vertex in range(len(sp_can)):
+        # look up neighboring indices
+        neighbors = tri.points[indptr[indices[vertex]:indices[vertex+1]]]
+        # calculate intensity of line segments to neighbors in both bl map and separator map
+        intensity = []
+        for nb in neighbors.astype('int'):
+            key = [tuple(sp_can[vertex]), tuple(nb)]
+            key.sort()
+            key = tuple(key)
+            line_locs = line(*(key[0] + key[1]))
+            intensities[key] = (bl_map[line_locs].mean(), sep_map[line_locs].mean(), sep_map[line_locs].max())
+            intensity.append(intensities[key][0])
+        slope_pts = neighbors[np.argsort(1-np.array(intensity))[:2]]
+        # orientation
+        theta = np.arctan((slope_pts[1,0]-slope_pts[0,0])/(slope_pts[1,1]-slope_pts[0,1]))
+        # calculate projection profiles
+        data_energy = []
+        for nbs in nb_indices:
+            env_nbs = nbs[1][nbs[0] == vertex]
+            vecs = np.abs(tri.points[env_nbs] - sp_can[vertex])
+            vals = np.abs(np.cross(vecs, np.array((np.sin(theta), np.cos(theta)))).astype('int'))
+            frqs = np.fft.fft(np.bincount(vals))
+            frqs = np.abs(frqs)
+            de = (np.abs(frqs)**2)/(np.linalg.norm(frqs, 2)**2)
+            data_energy.extend(de[3:6].tolist())
+        data_energy = np.array(data_energy)
+        ild = radii[data_energy.argmax() // 3] * 2 / (data_energy.argmax() % 3 + 3)
+        states[tuple(sp_can[vertex])] = (theta, ild)
+    for k, v in list(intensities.items()):
+        if v[0] < 0.5:
+            del intensities[k]
+            continue
+#        # filter edges with high separator affinity
+#        if v[1] > 0.125 or v[2] > 0.25 or v[0] < 0.5:
+#            del intensities[k]
+#            continue
+#        # filter edges of different local orientations
+#        if np.abs(states[k[0]][0] - states[k[1]][0]) % np.pi > np.pi/4:
+#           del intensities[k]
 
-    line_skel = skeletonize_3d(im)
-    # find extremities by convolving with 3x3 filter (value == 2 on the line because of
-    # 8-connected skeleton)
-    line_skel = line_skel > 0
-    kernel = np.array([[1,1,1],[1,10,1],[1,1,1]])
-    line_extrema = np.transpose(np.where((convolve2d(line_skel, kernel, mode='same') == 11) * line_skel))
+    # sort edges by (1 - off_orientation) * intensity
+    def _off_orientation(p, q):
+        theta = np.mean((states[p][0], states[q][0]))
+        return np.abs((p[1]-q[1])*np.sin(theta) - (p[0]-q[0])*np.cos(theta))
 
-    # this is the ugly hack from dhSegment. Instead calculating the graph
-    # diameter to find the centerline of the skeleton (which is unbearably
-    # slow) just take the two points with the largest euclidian distance as
-    # endpoints. This breaks down in case of folded or spiral lines as the true
-    # end points are closer closer than random branches on the skeleton.
-    candidates = defaultdict(list)
-    label_im, _ = label(line_skel, structure=np.ones((3, 3)))
-    for pt in line_extrema:
-        candidates[label_im[tuple(pt)]].append(pt)
-    cc_extrema = []
-    for pts in candidates.values():
-        distance = squareform(pdist(np.stack(pts), 'euclidean'))
-        i, j = np.unravel_index(distance.argmax(), distance.shape)
-        cc_extrema.append(pts[i])
-        cc_extrema.append(pts[j])
+    def _oow_intensity(edge):
+        p = edge[0]
+        q = edge[1]
+        return (1 - (_off_orientation(p, q)/np.linalg.norm(np.array(p)-np.array(q)))) * intensities[edge][0]
 
-    class LineMCP(MCP_Connect):
-        def __init__(self, *args, **kwargs):
-           super().__init__(*args, **kwargs)
-           self.connections = dict()
-           self.scores = defaultdict(lambda: np.inf)
+    edge_list = list(intensities.keys())
+    edge_list.sort(key=lambda x:_oow_intensity(x), reverse=True)
 
-        def create_connection(self, id1, id2, pos1, pos2, cost1, cost2):
-            k = (min(id1, id2), max(id1, id2))
-            s = cost1 + cost2
-            if self.scores[k] > s:
-                self.connections[k] = (pos1, pos2, s)
-                self.scores[k] = s
+    def _point_in_cluster(p):
+        for idx, cluster in enumerate(clusters[1:]):
+            if p in [point for edge in cluster for point in edge]:
+                return idx+1
+        return 0
 
-        def get_connections(self):
-            results = []
-            for k, (pos1, pos2, s) in self.connections.items():
-                results.append(np.concatenate([self.traceback(pos1), self.traceback(pos2)[::-1]]))
-            return results
+    # cluster 
+    n = 0
+    clusters = [edge_list]
+    while len(edge_list) != n:
+        n = len(edge_list)
+        for edge in edge_list:
+            cl_p0 = _point_in_cluster(edge[0])
+            cl_p1 = _point_in_cluster(edge[1])
+            # new cluster casea
+            if not cl_p0 and not cl_p1:
+                print('new')
+                edge_list.remove(edge)
+                clusters.append([edge])
+            # extend case
+            elif cl_p0 and not cl_p1:
+                print('extend')
+                edge_list.remove(edge)
+                clusters[cl_p0].append(edge)
+            elif cl_p1 and not cl_p0:
+                print('extend')
+                edge_list.remove(edge)
+                clusters[cl_p1].append(edge)
+            # merge case
+            elif cl_p0 != cl_p1 and cl_p0 and cl_p1:
+                print('merge')
+                edge_list.remove(edge)
+                clusters[min(cl_p0, cl_p1)].extend(clusters.pop(max(cl_p0, cl_p1)))
+                clusters[min(cl_p0, cl_p1)].append(edge)
 
-        def goal_reached(self, int_index, float_cumcost):
-            return 2 if float_cumcost else 0
+    # sort clusters
 
-    mcp = LineMCP(~line_skel)
-    try:
-        mcp.find_costs(cc_extrema)
-    except ValueError as e:
-        return []
     return [approximate_polygon(line[:,::-1], 5)[::-1].tolist() if line[0][1] > line[-1][1] else approximate_polygon(line[:,::-1], 5).tolist() for line in mcp.get_connections()]
 
 
