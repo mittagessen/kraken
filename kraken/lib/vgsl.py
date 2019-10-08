@@ -26,6 +26,7 @@ from coremltools.models import MLModel
 from coremltools.models import datatypes
 from coremltools.models.neural_network import NeuralNetworkBuilder
 
+from google.protobuf.message import DecodeError
 
 # all tensors are ordered NCHW, the "feature" dimension is C, so the output of
 # an LSTM will be put into C same as the filters of a CNN.
@@ -419,10 +420,23 @@ class TorchVGSLModel(object):
 
         Args:
             path (str): CoreML file
+
+        Returns:
+            A TorchVGSLModel instance.
+
+        Raises:
+            KrakenInvalidModelException if the model data is invalid (not a
+            string, protobuf file, or without appropriate metadata).
+            FileNotFoundError if the path doesn't point to a file.
         """
-        mlmodel = MLModel(path)
+        try:
+            mlmodel = MLModel(path)
+        except TypeError as e:
+            raise KrakenInvalidModelException(str(e))
+        except DecodeError as e:
+            raise KrakenInvalidModelException('Failure parsing model protobuf: {}'.format(str(e)))
         if 'vgsl' not in mlmodel.user_defined_metadata:
-            raise ValueError('No VGSL spec in model metadata')
+            raise KrakenInvalidModelException('No VGSL spec in model metadata')
         vgsl_spec = mlmodel.user_defined_metadata['vgsl']
         nn = cls(vgsl_spec)
         for name, layer in nn.nn.named_children():
