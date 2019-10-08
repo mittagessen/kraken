@@ -270,8 +270,28 @@ def vectorize_lines(im: np.ndarray, threshold: float = 0.2, min_sp_dist: int = 1
             logger.warning('cluster sorting failed for cluster {}'.format(cluster))
         sorted_clusters.append(path)
 
-    return [approximate_polygon(line[:,::-1], 5)[::-1].tolist() if line[0][1] > line[-1][1] else approximate_polygon(line[:,::-1], 5).tolist() for line in mcp.get_connections()]
+    # enrich baseline with polygon information and switches back to x-y coordinate order
+    clusters = []
+    for cluster in sorted_clusters:
+        ilds = []
+        for point in cluster:
+            ilds.append(states[point][1])
+        # gaussian smoothing
+        ilds = gaussian_filter1d(ilds, 0.5)
+        # do not use the state direction but the more reliable actual line direction
+        pts = [cluster[0]] + cluster + [cluster[-1]]
+        up = []
+        low = []
+        cl = []
+        for idx, slope_pts in enumerate(zip(pts[:-1], pts[2:])):
+            slope_pts = np.array(slope_pts)
+            theta = np.pi/2 - np.arctan((slope_pts[1,0]-slope_pts[0,0])/(slope_pts[1,1]-slope_pts[0,1]))
+            cl.append(cluster[idx][::-1])
+            low.insert(0, (cluster[idx][::-1] + np.array((np.cos(theta), np.sin(theta))) * ilds[idx] * 1/3).astype('int').tolist())
+            up.append((cluster[idx][::-1] - np.array((np.cos(theta), np.sin(theta))) * ilds[idx] * 2/3).astype('int').tolist())
+        clusters.append((cl, up + low))
 
+    return clusters
 
 def calculate_polygonal_environment(im, baselines, bl_mask=None):
     """
