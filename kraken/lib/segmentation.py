@@ -22,18 +22,16 @@ import numpy as np
 
 from PIL import Image, ImageDraw
 
-from scipy.spatial import distance_matrix, ConvexHull
-from scipy.spatial.distance import pdist, squareform
-from scipy.signal import convolve2d
 from scipy.ndimage import label
-from scipy.ndimage.filters import gaussian_filter
+from scipy.ndimage.filters import gaussian_filter, gaussian_filter1d
 from scipy.ndimage.morphology import grey_dilation, binary_dilation
+from scipy.spatial import distance_matrix, ConvexHull, Delaunay
+from scipy.spatial.distance import cdist, pdist, squareform
 
 from skimage.draw import line
-from skimage.graph import MCP_Connect
 from skimage.filters import apply_hysteresis_threshold
 from skimage.measure import approximate_polygon
-from skimage.morphology import skeletonize_3d
+from skimage.morphology import skeletonize
 from skimage.transform import PiecewiseAffineTransform, warp
 
 from itertools import combinations
@@ -119,7 +117,7 @@ def denoising_hysteresis_thresh(im, low, high, sigma):
     im = gaussian_filter(im, sigma)
     return apply_hysteresis_threshold(im, low, high)
 
-def vectorize_lines(im: np.ndarray, threshold: float = 0.2, min_sp_dist: int = 10, radii: Sequence[int] = [16, 32, 64, 128], ):
+def vectorize_lines(im: np.ndarray, threshold: float = 0.2, min_sp_dist: int = 10, radii: Sequence[int] = [32, 64, 128, 256]):
     """
     Vectorizes lines from a binarized array.
 
@@ -139,9 +137,13 @@ def vectorize_lines(im: np.ndarray, threshold: float = 0.2, min_sp_dist: int = 1
     # binarize
     bin = im > threshold
     # skeletonize 
+    logger.debug('Finding superpixels')
     skel = skeletonize(bin[1])
     conf_map = bl_map * skel
     sp_idx = np.unravel_index(np.argsort(1.-conf_map, axis=None), conf_map.shape)
+    if not sp_idx[0].any():
+        logger.info('No superpixel candidates found for line vectorizer. Likely empty page.')
+        return []
     zeroes_idx = conf_map[sp_idx].argmin()
     sp_idx = sp_idx[0][:zeroes_idx], sp_idx[1][:zeroes_idx]
     sp_can = [(sp_idx[0][0], sp_idx[1][0])]
@@ -150,6 +152,7 @@ def vectorize_lines(im: np.ndarray, threshold: float = 0.2, min_sp_dist: int = 1
         if min(cdist(sp_can, loc)) > min_sp_dist:
             sp_can.extend(loc.tolist())
     sp_can = np.array(sp_can)
+    logger.debug('Triangulating superpixels')
     tri = Delaunay(sp_can)
     indices, indptr = tri.vertex_neighbor_vertices
     # dict mapping each edge to its intensity. Needed for subsequent clustering step.
@@ -158,6 +161,7 @@ def vectorize_lines(im: np.ndarray, threshold: float = 0.2, min_sp_dist: int = 1
     dists = squareform(pdist(sp_can))
     # radius of circular environment around SP for ILD estimation
     nb_indices = tuple(np.nonzero(dists < proj_env) for proj_env in radii)
+    logger.debug('Computing superpixel state information')
     for vertex in range(len(sp_can)):
         # look up neighboring indices
         neighbors = tri.points[indptr[indices[vertex]:indices[vertex+1]]]
@@ -184,7 +188,10 @@ def vectorize_lines(im: np.ndarray, threshold: float = 0.2, min_sp_dist: int = 1
             de = (np.abs(frqs)**2)/(np.linalg.norm(frqs, 2)**2)
             data_energy.extend(de[3:6].tolist())
         data_energy = np.array(data_energy)
-        ild = radii[data_energy.argmax() // 3] * 2 / (data_energy.argmax() % 3 + 3)
+        if not data_energy.any():
+            ild = 0
+        else:
+            ild = radii[data_energy.argmax() // 3] * 2 / (data_energy.argmax() % 3 + 3)
         states[tuple(sp_can[vertex])] = (theta, ild)
     for k, v in list(intensities.items()):
         if v[0] < 0.5:
@@ -218,6 +225,7 @@ def vectorize_lines(im: np.ndarray, threshold: float = 0.2, min_sp_dist: int = 1
         return 0
 
     # cluster 
+    logger.debug('Computing clusters')
     n = 0
     clusters = [edge_list]
     while len(edge_list) != n:
@@ -242,56 +250,34 @@ def vectorize_lines(im: np.ndarray, threshold: float = 0.2, min_sp_dist: int = 1
                 clusters[min(cl_p0, cl_p1)].extend(clusters.pop(max(cl_p0, cl_p1)))
                 clusters[min(cl_p0, cl_p1)].append(edge)
 
-    # sort clusters
-    sorted_clusters = []
+    logger.debug('Reticulating splines')
+    lines = []
     for cluster in clusters[1:]:
-        try:
-            edge_nodes = defaultdict(list)
-            # find extreme point
-            for edge in cluster:
-                for node in edge:
-                    edge_nodes[node].append(list(edge))
-            edge_nodes.default_factory = None
-            for k, v in edge_nodes.items():
-                if len(v) == 1:
-                    point = k
-                    break
-            path = [point]
-            while edge_nodes:
-                edge = edge_nodes[point].pop()
-                del edge_nodes[point]
-                path.append(edge[1] if edge[0] == point else edge[0])
-                point = edge[1 - edge.index(point)]
-                if len(edge_nodes[point]) == 1:
-                    del edge_nodes[point]
-                else:
-                    edge_nodes[point].remove(edge)
-        except:
-            logger.warning('cluster sorting failed for cluster {}'.format(cluster))
-        sorted_clusters.append(path)
-
-    # enrich baseline with polygon information and switches back to x-y coordinate order
-    clusters = []
-    for cluster in sorted_clusters:
+        points = sorted(set(point for edge in cluster for point in edge), key=lambda x: x[1])
+        x = [x[1] for x in points]
+        y = [x[0] for x in points]
+        # very short lines might not have enough superpixels to ensure a well-conditioned regression
+        deg = min(len(x)-1, 3)
+        poly = Polynomial.fit(x, y, deg=deg)
+        deriv = poly.deriv()
+        xp, yp = poly.linspace(np.diff(poly.domain)//deg)
+        xp = xp.astype('int')
+        yp = yp.astype('int')
+        ls = geom.LineString(list(zip(yp, xp)))
         ilds = []
-        for point in cluster:
+        proj_points = []
+        for point in points:
             ilds.append(states[point][1])
-        # gaussian smoothing
-        ilds = gaussian_filter1d(ilds, 0.5)
-        # do not use the state direction but the more reliable actual line direction
-        pts = [cluster[0]] + cluster + [cluster[-1]]
-        up = []
+            proj_points.append(np.array(ls.interpolate(ls.project(geom.Point(point))).coords)[0].astype('int').tolist())
+        ilds = gaussian_filter1d(ilds, 0.5).tolist()
         low = []
-        cl = []
-        for idx, slope_pts in enumerate(zip(pts[:-1], pts[2:])):
-            slope_pts = np.array(slope_pts)
-            theta = np.pi/2 - np.arctan((slope_pts[1,0]-slope_pts[0,0])/(slope_pts[1,1]-slope_pts[0,1]))
-            cl.append(cluster[idx][::-1])
-            low.insert(0, (cluster[idx][::-1] + np.array((np.cos(theta), np.sin(theta))) * ilds[idx] * 1/3).astype('int').tolist())
-            up.append((cluster[idx][::-1] - np.array((np.cos(theta), np.sin(theta))) * ilds[idx] * 2/3).astype('int').tolist())
-        clusters.append((cl, up + low))
-
-    return clusters
+        up = []
+        for idx, pt in enumerate(proj_points):
+            theta = np.pi/2 - np.arctan(deriv(pt[1]))
+            low.insert(0, (pt[::-1] + np.array((np.cos(theta), np.sin(theta))) * ilds[idx] * 1/3).astype('int').tolist())
+            up.append((pt[::-1] - np.array((np.cos(theta), np.sin(theta))) * ilds[idx] * 2/3).astype('int').tolist())
+        lines.append(([point[::-1] for point in proj_points], up + low))
+    return lines
 
 def calculate_polygonal_environment(im, baselines, bl_mask=None):
     """
