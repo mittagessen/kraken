@@ -86,21 +86,24 @@ def segment(im, text_direction='horizontal-lr', mask=None, model=pkg_resources.r
         if mask.size != im.size:
             logger.error('Mask size {} doesn\'t match image size {}'.format(mask.size, im.size))
             raise KrakenInputException('Mask size {} doesn\'t match image size {}'.format(mask.size, im.size))
-        logger.info('Masking enabled in segmenter. Disabling column detection.')
+        logger.info('Masking enabled in segmenter.')
         mask = pil2array(mask)
 
     batch, channels, height, width = model.input
     transforms = dataset.generate_input_transforms(batch, height, width, channels, 0, valid_norm=False)
 
     with torch.no_grad():
+        logger.debug('Running network forward pass')
         o = model.nn(transforms(im).unsqueeze(0))
+    logger.debug('Upsampling network output')
     o = F.interpolate(o, size=im.size[::-1])
-    o = segmentation.denoising_hysteresis_thresh(o.detach().squeeze().cpu().numpy(), 0.4, 0.5, 0)
+    logger.debug('Vectorizing network output')
     baselines = segmentation.vectorize_lines(o)
-    polygons = segmentation.calculate_polygonal_environment(im, baselines, o)
+    logger.debug('Reordering baselines')
+    baselines = segmentation.polygon_order_lines(baselines, text_direction[-2:])
     return {'text_direction': text_direction,
             'type': 'baselines',
-            'lines': [{'script': 'default', 'baseline': bl, 'boundary': pl} for pl, bl in polygons]}
+            'lines': [{'script': 'default', 'baseline': bl, 'boundary': pl} for bl, pl in baselines]}
 
 
 
