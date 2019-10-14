@@ -48,7 +48,7 @@ from kraken.binarization import nlbin
 logger = logging.getLogger('kraken')
 
 
-def neading_order(lines: Sequence, text_direction: str = 'lr') -> List:
+def reading_order(lines: Sequence, text_direction: str = 'lr') -> List:
     """Given the list of lines (a list of 2D slices), computes
     the partial reading order.  The output is a binary 2D array
     such that order[i,j] is true if line i comes before line j
