@@ -18,6 +18,7 @@ dependencies:
   - pytorch>=1.0.0
   - jsonschema
   - scikit-image
+  - shapely
   - pip:
     - coremltools
     - python-bidi
