@@ -19,8 +19,11 @@ Processing for baseline segmenter output
 import math
 import logging
 import numpy as np
+import shapely.geometry as geom
 
 from PIL import Image, ImageDraw
+
+from numpy.polynomial import Polynomial
 
 from scipy.ndimage import label
 from scipy.ndimage.filters import gaussian_filter, gaussian_filter1d
@@ -45,7 +48,7 @@ from kraken.binarization import nlbin
 logger = logging.getLogger('kraken')
 
 
-def reading_order(lines: Sequence, text_direction: str = 'lr') -> List:
+def neading_order(lines: Sequence, text_direction: str = 'lr') -> List:
     """Given the list of lines (a list of 2D slices), computes
     the partial reading order.  The output is a binary 2D array
     such that order[i,j] is true if line i comes before line j
@@ -278,6 +281,30 @@ def vectorize_lines(im: np.ndarray, threshold: float = 0.2, min_sp_dist: int = 1
             up.append((pt[::-1] - np.array((np.cos(theta), np.sin(theta))) * ilds[idx] * 2/3).astype('int').tolist())
         lines.append(([point[::-1] for point in proj_points], up + low))
     return lines
+
+
+def polygonal_reading_order(lines: Sequence[Tuple[List, List]], text_direction: str = 'lr') -> Sequence[Tuple[List, List]]:
+    """
+    Given a list of baselines, calculates the correct reading order and applies
+    it to the input.
+
+    Args:
+        lines (Sequence): List of tuples containing the baseline and it's
+                          polygonization.
+        text_direction (str): Set principal text direction for column ordering.
+                              Can be 'lr' or 'rl'
+
+    Returns:
+        A reordered input.
+    """
+    bounds = []
+    for line in lines:
+        l = geom.LineString(line[0]).bounds
+        bounds.append((slice(l[0], l[1]), slice(l[2], l[3])))
+    order = reading_order(bounds, text_direction)
+    lsort = topsort(order)
+    return [lines[i] for i in lsort]
+
 
 def calculate_polygonal_environment(im, baselines, bl_mask=None):
     """
