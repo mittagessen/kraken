@@ -16,8 +16,8 @@
 """
 Processing for baseline segmenter output
 """
-import math
 import logging
+import warnings
 import numpy as np
 import shapely.geometry as geom
 
@@ -120,7 +120,7 @@ def denoising_hysteresis_thresh(im, low, high, sigma):
     im = gaussian_filter(im, sigma)
     return apply_hysteresis_threshold(im, low, high)
 
-def vectorize_lines(im: np.ndarray, threshold: float = 0.2, min_sp_dist: int = 10, radii: Sequence[int] = [32, 64, 128, 256]):
+def vectorize_lines(im: np.ndarray, threshold: float = 0.2, min_sp_dist: int = 3, radii: Sequence[int] = [32, 64, 128, 256]):
     """
     Vectorizes lines from a binarized array.
 
@@ -179,7 +179,9 @@ def vectorize_lines(im: np.ndarray, threshold: float = 0.2, min_sp_dist: int = 1
             intensity.append(intensities[key][0])
         slope_pts = neighbors[np.argsort(1-np.array(intensity))[:2]]
         # orientation
-        theta = np.arctan((slope_pts[1,0]-slope_pts[0,0])/(slope_pts[1,1]-slope_pts[0,1]))
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            theta = np.arctan((slope_pts[1,0]-slope_pts[0,0])/(slope_pts[1,1]-slope_pts[0,1]))
         # calculate projection profiles
         data_energy = []
         for nbs in nb_indices:
@@ -263,7 +265,7 @@ def vectorize_lines(im: np.ndarray, threshold: float = 0.2, min_sp_dist: int = 1
         deg = min(len(x)-1, 3)
         poly = Polynomial.fit(x, y, deg=deg)
         deriv = poly.deriv()
-        xp, yp = poly.linspace(np.diff(poly.domain)//deg)
+        xp, yp = poly.linspace(max(np.diff(poly.domain)//deg, 2))
         xp = xp.astype('int')
         yp = yp.astype('int')
         ls = geom.LineString(list(zip(yp, xp)))
@@ -306,15 +308,17 @@ def polygonal_reading_order(lines: Sequence[Tuple[List, List]], text_direction: 
     return [lines[i] for i in lsort]
 
 
-def scale_polygonal_lines(lines: Sequence[Tuple[List, List]], scale: float) -> Sequence[Tuple[List, List]]:
+def scale_polygonal_lines(lines: Sequence[Tuple[List, List]], scale: Union[float, Tuple[float, float]]) -> Sequence[Tuple[List, List]]:
     """
     Scales baselines/polygon coordinates by a certain factor.
 
     Args:
         lines (Sequence): List of tuples containing the baseline and it's
                           polygonization.
-        scale (float): Scaling factor
+        scale (float or tuple of floats): Scaling factor
     """
+    if isinstance(scale, float):
+        scale = (scale, scale)
     scaled_lines = []
     for line in lines:
         bl, pl = line
