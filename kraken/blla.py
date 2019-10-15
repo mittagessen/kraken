@@ -78,6 +78,7 @@ def segment(im, text_direction='horizontal-lr', mask=None, model=pkg_resources.r
     logger.info('Segmenting {}'.format(im_str))
 
     model = vgsl.TorchVGSLModel.load_model(model)
+    model.eval()
     if mask:
         if mask.mode != '1' and not is_bitonal(mask):
             logger.error('Mask is not bitonal')
@@ -96,11 +97,15 @@ def segment(im, text_direction='horizontal-lr', mask=None, model=pkg_resources.r
         logger.debug('Running network forward pass')
         o = model.nn(transforms(im).unsqueeze(0))
     logger.debug('Upsampling network output')
-    o = F.interpolate(o, size=im.size[::-1])
+    o = o.squeeze(0).numpy()
+#    o = F.interpolate(o, size=im.size[::-1]).squeeze(0).numpy()
     logger.debug('Vectorizing network output')
     baselines = segmentation.vectorize_lines(o)
+    logger.debug('Scaling vectorized lines')
+    scale = np.divide(im.size, o.shape[:0:-1])
+    baselines = segmentation.scale_polygonal_lines(baselines, scale)
     logger.debug('Reordering baselines')
-    baselines = segmentation.polygon_order_lines(baselines, text_direction[-2:])
+    baselines = segmentation.polygonal_reading_order(baselines, text_direction[-2:])
     return {'text_direction': text_direction,
             'type': 'baselines',
             'lines': [{'script': 'default', 'baseline': bl, 'boundary': pl} for bl, pl in baselines]}
