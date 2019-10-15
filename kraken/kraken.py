@@ -47,6 +47,8 @@ def message(msg: str, **styles) -> None:
         click.secho(msg, **styles)
 
 
+# chainable functions of functional components (binarization/segmentation/recognition
+
 def binarizer(threshold, zoom, escale, border, perc, range, low, high, base_image, input, output) -> None:
     from kraken import binarization
 
@@ -79,6 +81,9 @@ def segmenter(legacy, model, text_direction, script_detect, allowed_scripts,
     from kraken import pageseg
     from kraken import blla
 
+    if model and legacy:
+        logger.warning('Baseline model ({}) given but legacy segmenter selected. Forcing to -bl.'.format(model))
+        legacy = False
     try:
         im = Image.open(input)
     except IOError as e:
@@ -290,6 +295,9 @@ def segment(model, boxes, text_direction, script_detect, allowed_scripts,
 
 
 def _validate_mm(ctx, param, value):
+    """
+    Maps model mappings to a dictionary.
+    """
     model_dict = {'ignore': []}  # type: Dict[str, Union[str, List[str]]]
     if len(value) == 1 and len(value[0].split(':')) == 1:
         model_dict['default'] = value[0]
