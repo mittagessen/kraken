@@ -197,7 +197,7 @@ def vectorize_lines(im: np.ndarray, threshold: float = 0.2, min_sp_dist: int = 1
             ild = radii[data_energy.argmax() // 3] * 2 / (data_energy.argmax() % 3 + 3)
         states[tuple(sp_can[vertex])] = (theta, ild)
     for k, v in list(intensities.items()):
-        if v[0] < 0.5:
+        if v[0] < 0.4:
             del intensities[k]
             continue
 #        # filter edges with high separator affinity
@@ -306,49 +306,21 @@ def polygonal_reading_order(lines: Sequence[Tuple[List, List]], text_direction: 
     return [lines[i] for i in lsort]
 
 
-def calculate_polygonal_environment(im, baselines, bl_mask=None):
+def scale_polygonal_lines(lines: Sequence[Tuple[List, List]], scale: float) -> Sequence[Tuple[List, List]]:
     """
-    Given a list of baselines and an input image, calculates a polygonal
-    environment around each baseline.
+    Scales baselines/polygon coordinates by a certain factor.
 
     Args:
-        im (PIL.Image): Input image
-        baselines (sequence): List of lists containing a single baseline per
-                              entry.
-        bl_mask (numpy.array): Optional raw baselines output maps from the
-                               recognition net.
-
-    Returns:
-        List of tuples (polygonization, baseline) where each is a list of coordinates.
+        lines (Sequence): List of tuples containing the baseline and it's
+                          polygonization.
+        scale (float): Scaling factor
     """
-    if not util.is_bitonal(im):
-        logger.info('Converting input in polygon estimation to binary')
-        im = nlbin(im)
-    im = im.convert('1')
-    im = 1-np.array(im)*1
-    im = binary_dilation(im, iterations=2)*1
-    label_mask = np.zeros_like(im)
-    for idx, l in enumerate(baselines):
-        for start, end in zip(l, l[1::]):
-            rr, cc = line(*start[::-1], *end[::-1])
-            label_mask[rr, cc] = idx+1
-    if bl_mask is not None:
-        label_mask = morph.propagate_labels(bl_mask, label_mask)
-    else:
-        label_mask = grey_dilation(label_mask, (5, 5))
-    labels = morph.propagate_labels(im, label_mask)
-    out_lines = []
-    for idx, l in enumerate(baselines):
-        points = np.dstack(np.nonzero(labels == idx+1)).squeeze()
-        if len(points) > 0:
-            hull = ConvexHull(points)
-            vertices = points[hull.vertices]
-            vertices = np.flip(vertices, -1).tolist()
-        else:
-            logger.warning('No points under baseline {}. Skipping.'.format(idx+1))
-            vertices = None
-        out_lines.append((vertices, l))
-    return out_lines
+    scaled_lines = []
+    for line in lines:
+        bl, pl = line
+        scaled_lines.append(((np.array(bl) * scale).astype('int').tolist(),
+                             (np.array(pl) * scale).astype('int').tolist()))
+    return scaled_lines
 
 
 def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image:
@@ -413,46 +385,3 @@ def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image:
                 logger.error('bbox {} is outside of image bounds {}'.format(box, im.size))
                 raise KrakenInputException('Line outside of image bounds')
             yield im.crop(box).rotate(angle, expand=True), box
-
-def _test_intersect(bp, uv, bs):
-    """
-    Returns the intersection points of a ray with direction `uv` from
-    `bp` with a polygon `bs`.
-    """
-    u = bp - np.roll(bs, 2)
-    v = bs - np.roll(bs, 2)
-    points = []
-    for dir in ((1,-1), (-1,1)):
-        w = (uv * dir * (1,-1))[::-1]
-        z = np.dot(v, w)
-        t1 = np.cross(v, u) / z
-        t2 = np.dot(u, w) / z
-        t1 = t1[np.logical_and(t2 >= 0.0, t2 <= 1.0)]
-        points.extend(bp + (t1[np.where(t1 >= 0)[0].min()] * (uv * dir)))
-    return np.array(points)
-
-def _compute_polygon_section(baseline, boundary, dist1, dist2):
-    """
-    Given a baseline, polygonal boundary, and two points on the baseline return
-    the rectangle formed by the orthogonal cuts on that baseline segment.
-    """
-    # find baseline segments the points are in
-    bl = np.array(baseline)
-    dists = np.cumsum(np.diag(np.roll(squareform(pdist(bl)), 1)))
-    segs_idx = np.searchsorted(dists, [dist1, dist2])
-    segs = np.dstack((bl[segs_idx-1], bl[segs_idx+1]))
-    # compute unit vector of segments (NOT orthogonal)
-    norm_vec = (segs[...,1] - segs[...,0])
-    norm_vec_len = np.sqrt(np.sum(norm_vec**2, axis=1))
-    unit_vec = norm_vec / np.tile(norm_vec_len, (2, 1)).T
-    # find point start/end point on segments
-    seg_dists = [dist1, dist2] - dists[segs_idx-1]
-    seg_points = segs[...,0] + (seg_dists * unit_vec.T).T
-    # get intersects
-    bounds = np.array(boundary)
-    points = [_test_intersect(point, uv[::-1], bounds).round() for point, uv in zip(seg_points, unit_vec)]
-    o =  np.int_(points[0]).reshape(-1, 2).tolist()
-    o.extend(np.int_(np.roll(points[1], 2)).reshape(-1, 2).tolist())
-    return o
-
-
