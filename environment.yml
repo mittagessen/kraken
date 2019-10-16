@@ -1,10 +1,10 @@
 name: kraken
 channels:
-  - conda-forge
-  - mittagessen
   - defaults
+  - pytorch
+  - conda-forge
 dependencies:
-  - python==3.6.6
+  - python>=3.6
   - python-bidi
   - lxml
   - future
@@ -14,10 +14,14 @@ dependencies:
   - numpy
   - pillow
   - scipy
-  - protobuf>=3.0.0
+  - protobuf>=3.0
   - jinja2
+  - cpuonly
   - torchvision
-  - pytorch-cpu>=1.0.0
+  - pytorch==1.3.0
   - jsonschema
-  - kraken
-  - coremltools
+  - scikit-image
+  - shapely
+  - pip
+  - pip:
+    - coremltools
