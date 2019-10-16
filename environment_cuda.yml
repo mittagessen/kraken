@@ -24,3 +24,4 @@ dependencies:
   - pip
   - pip:
     - coremltools
+    - git+https://github.com/mittagessen/kraken.git@master
