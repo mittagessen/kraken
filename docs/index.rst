@@ -25,7 +25,7 @@ kraken's main features are:
     script support
   - `ALTO <https://www.loc.gov/standards/alto/>`_, abbyXML, and hOCR output
   - Word bounding boxes and character cuts
-  - `Public repository <https://github.com/mittagessen/kraken-models>`_ of model files
+  - `Public repository <https://zenodo.org/communities/ocr_models>`_ of model files
   - :ref:`Lightweight model files <models>`
   - :ref:`Variable recognition network architectures <vgsl>`
 
