@@ -120,29 +120,10 @@ def denoising_hysteresis_thresh(im, low, high, sigma):
     im = gaussian_filter(im, sigma)
     return apply_hysteresis_threshold(im, low, high)
 
-def vectorize_lines(im: np.ndarray, threshold: float = 0.2, min_sp_dist: int = 3, radii: Sequence[int] = [32, 64, 128, 256]):
-    """
-    Vectorizes lines from a binarized array.
 
-    Args:
-        im (np.ndarray): Array of shape (3, H, W) with the first dimension
-                         being a probability distribution over (background,
-                         baseline, separators).
-        error (int): Maximum error in polyline vectorization
-
-    Returns:
-        [[x0, y0, ... xn, yn], [xm, ym, ..., xk, yk], ... ]
-        A list of lists containing the points of all baseline polylines.
-    """
-    # split into baseline and separator map
-    bl_map = im[1]
-    sep_map = im[2]
-    # binarize
-    bin = im > threshold
-    # skeletonize 
+def _find_superpixels(skeleton, heatmap, min_sp_dist):
     logger.debug('Finding superpixels')
-    skel = skeletonize(bin[1])
-    conf_map = bl_map * skel
+    conf_map = heatmap * skeleton
     sp_idx = np.unravel_index(np.argsort(1.-conf_map, axis=None), conf_map.shape)
     if not sp_idx[0].any():
         logger.info('No superpixel candidates found for line vectorizer. Likely empty page.')
@@ -154,7 +135,12 @@ def vectorize_lines(im: np.ndarray, threshold: float = 0.2, min_sp_dist: int = 3
         loc = np.array([[sp_idx[0][x], sp_idx[1][x]]])
         if min(cdist(sp_can, loc)) > min_sp_dist:
             sp_can.extend(loc.tolist())
-    sp_can = np.array(sp_can)
+    return np.array(sp_can)
+
+def _compute_sp_states(sp_can, bl_map, sep_map, radii):
+    """
+    Estimates the superpixel state information.
+    """
     logger.debug('Triangulating superpixels')
     tri = Delaunay(sp_can)
     indices, indptr = tri.vertex_neighbor_vertices
@@ -202,14 +188,19 @@ def vectorize_lines(im: np.ndarray, threshold: float = 0.2, min_sp_dist: int = 3
         if v[0] < 0.4:
             del intensities[k]
             continue
-#        # filter edges with high separator affinity
-#        if v[1] > 0.125 or v[2] > 0.25 or v[0] < 0.5:
-#            del intensities[k]
-#            continue
-#        # filter edges of different local orientations
-#        if np.abs(states[k[0]][0] - states[k[1]][0]) % np.pi > np.pi/4:
-#           del intensities[k]
+#           # filter edges with high separator affinity
+#           if v[1] > 0.125 or v[2] > 0.25 or v[0] < 0.5:
+#               del intensities[k]
+#               continue
+#           # filter edges of different local orientations
+#           if np.abs(states[k[0]][0] - states[k[1]][0]) % np.pi > np.pi/4:
+#              del intensities[k]
+    return intensities, states
 
+def _cluster_lines(intensities, states):
+    """
+    Clusters lines according to their intensities.
+    """
     # sort edges by (1 - off_orientation) * intensity
     def _off_orientation(p, q):
         theta = np.mean((states[p][0], states[q][0]))
@@ -254,7 +245,12 @@ def vectorize_lines(im: np.ndarray, threshold: float = 0.2, min_sp_dist: int = 3
                 edge_list.remove(edge)
                 clusters[min(cl_p0, cl_p1)].extend(clusters.pop(max(cl_p0, cl_p1)))
                 clusters[min(cl_p0, cl_p1)].append(edge)
+    return clusters
 
+def _interpolate_lines(clusters, states):
+    """
+    Interpolates the baseline clusters and adds polygonal information.
+    """
     logger.debug('Reticulating splines')
     lines = []
     for cluster in clusters[1:]:
@@ -283,6 +279,82 @@ def vectorize_lines(im: np.ndarray, threshold: float = 0.2, min_sp_dist: int = 3
             up.append((pt[::-1] - np.array((np.cos(theta), np.sin(theta))) * ilds[idx] * 2/3).astype('int').tolist())
         lines.append(([point[::-1] for point in proj_points], up + low))
     return lines
+
+
+def vectorize_lines(im: np.ndarray, threshold: float = 0.2, min_sp_dist: int = 10, radii: Sequence[int] = [16, 32, 64, 128]):
+    """
+    Vectorizes lines from a binarized array.
+
+    Args:
+        im (np.ndarray): Array of shape (3, H, W) with the first dimension
+                         being a probability distribution over (background,
+                         baseline, separators).
+        error (int): Maximum error in polyline vectorization
+
+    Returns:
+        [[x0, y0, ... xn, yn], [xm, ym, ..., xk, yk], ... ]
+        A list of lists containing the points of all baseline polylines.
+    """
+    # split into baseline and separator map
+    bl_map = im[1]
+    sep_map = im[2]
+    # binarize
+    bin = im > threshold
+    skel = skeletonize(bin[1])
+    sp_can = _find_superpixels(skel, heatmap=sep_map, min_sp_dist=min_sp_dist)
+    intensities, states = _compute_sp_states(sp_can, bl_map, sep_map, radii)
+    clusters = _cluster_lines(intensities, states)
+    lines = _interpolate_lines(clusters, states)
+    return lines
+
+def calculate_polygonal_environment(im, baselines, bl_mask=None):
+    """
+    Given a list of baselines and an input image, calculates a polygonal
+    environment around each baseline.
+
+    This is a helper method that implements a similar algorithm as
+    `vectorize_lines`. It is not necessary to call this method except to find
+    the polygonal environment of pre-computed (or manually annotated)
+    baselines.
+
+    Args:
+        im (PIL.Image): Input image
+        baselines (sequence): List of lists containing a single baseline per
+                              entry.
+        bl_mask (numpy.array): Optional raw baselines output maps from the
+                               recognition net.
+
+    Returns:
+        List of tuples (polygonization, baseline) where each is a list of coordinates.
+    """
+    if not util.is_bitonal(im):
+        logger.info('Converting input in polygon estimation to binary')
+        im = nlbin(im)
+    im = im.convert('1')
+    im = 1-np.array(im)*1
+    im = binary_dilation(im, iterations=2)*1
+    label_mask = np.zeros_like(im)
+    for idx, l in enumerate(baselines):
+        for start, end in zip(l, l[1::]):
+            rr, cc = line(*start[::-1], *end[::-1])
+            label_mask[rr, cc] = idx+1
+    if bl_mask is not None:
+        label_mask = morph.propagate_labels(bl_mask, label_mask)
+    else:
+        label_mask = grey_dilation(label_mask, (5, 5))
+    labels = morph.propagate_labels(im, label_mask)
+    out_lines = []
+    for idx, l in enumerate(baselines):
+        points = np.dstack(np.nonzero(labels == idx+1)).squeeze()
+        if len(points) > 0:
+            hull = ConvexHull(points)
+            vertices = points[hull.vertices]
+            vertices = np.flip(vertices, -1).tolist()
+        else:
+            logger.warning('No points under baseline {}. Skipping.'.format(idx+1))
+            vertices = None
+        out_lines.append((vertices, l))
+    return out_lines
 
 
 def polygonal_reading_order(lines: Sequence[Tuple[List, List]], text_direction: str = 'lr') -> Sequence[Tuple[List, List]]:
