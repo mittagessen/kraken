@@ -629,14 +629,21 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
 @click.option('-p', '--pad', show_default=True, type=click.INT, default=16, help='Left and right '
               'padding around lines')
 @click.option('--threads', show_default=True, default=1, help='Number of OpenMP threads when running on CPU.')
+@click.option('--reorder/--no-reorder', show_default=True, default=True, help='Reordering of code points to display order')
+@click.option('-u', '--normalization', show_default=True, type=click.Choice(['NFD', 'NFKD', 'NFC', 'NFKC']),
+              default=None, help='Ground truth normalization')
+@click.option('-n', '--normalize-whitespace/--no-normalize-whitespace',
+              show_default=True, default=True, help='Normalizes unicode whitespace')
 @click.argument('test_set', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
-def test(ctx, model, evaluation_files, device, pad, threads, test_set):
+def test(ctx, model, evaluation_files, device, pad, threads, reorder, normalization, normalize_whitespace, test_set):
     """
     Evaluate on a test set.
     """
     if not model:
         raise click.UsageError('No model to evaluate given.')
 
+    import regex
+    import unicodedata
     import numpy as np
     from PIL import Image
 
@@ -665,9 +672,21 @@ def test(ctx, model, evaluation_files, device, pad, threads, test_set):
     if len(test_set) == 0:
         raise click.UsageError('No evaluation data was provided to the test command. Use `-e` or the `test_set` argument.')
 
+    text_transforms = []
+    if normalization:
+        text_transforms.append(lambda x: unicodedata.normalize(normalization, x))
+    if normalize_whitespace:
+        text_transforms.append(lambda x: regex.sub('\s', ' ', x))
+        text_transforms.append(lambda x: x.strip())
+    if reorder:
+        text_transforms.append(get_display)
+
     def _get_text(im):
         with open(os.path.splitext(im)[0] + '.gt.txt', 'r') as fp:
-            return get_display(fp.read())
+            text = fp.read()
+            for func in text_transforms:
+                text = func(text)
+            return text
 
     acc_list = []
     for p, net in nn.items():
