@@ -304,7 +304,8 @@ def rotate_lines(lines, angle, offset):
 
 
 def segment(im, text_direction='horizontal-lr', scale=None, maxcolseps=2,
-            black_colseps=False, no_hlines=True, pad=0, mask=None):
+            black_colseps=False, no_hlines=True, pad=0, mask=None,
+            reading_order_fn=reading_order):
     """
     Segments a page into text lines.
 
@@ -326,6 +327,9 @@ def segment(im, text_direction='horizontal-lr', scale=None, maxcolseps=2,
         mask (PIL.Image): A bi-level mask image of the same size as `im` where
                           0-valued regions are ignored for segmentation
                           purposes. Disables column detection.
+        reading_order_fn (Callable): Function to call to order line output.
+                                     Callable accepting a list of slices (y, x)
+                                     and a text direction in (`rl`, `lr`).
 
     Returns:
         {'text_direction': '$dir', 'boxes': [(x1, y1, x2, y2),...]}: A
@@ -399,7 +403,7 @@ def segment(im, text_direction='horizontal-lr', scale=None, maxcolseps=2,
     segmentation = llabels*binary
 
     lines = compute_lines(segmentation, scale)
-    order = reading_order([l.bounds for l in lines], text_direction[-2:])
+    order = reading_order_fn([l.bounds for l in lines], text_direction[-2:])
     lsort = topsort(order)
     lines = [lines[i].bounds for i in lsort]
     lines = [(s2.start, s1.start, s2.stop, s1.stop) for s1, s2 in lines]
