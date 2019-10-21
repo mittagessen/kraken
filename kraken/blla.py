@@ -34,7 +34,7 @@ from scipy.ndimage.filters import (gaussian_filter, uniform_filter,
 from kraken.lib import morph, sl, vgsl, segmentation, dataset
 from kraken.lib.util import pil2array, is_bitonal, get_im_str
 from kraken.lib.exceptions import KrakenInputException
-
+from kraken.lib.segmentation import polygonal_reading_order, vectorize_lines, scale_polygonal_lines
 from kraken.rpred import rpred
 from kraken.serialization import max_bbox
 
@@ -43,7 +43,11 @@ __all__ = ['segment']
 logger = logging.getLogger(__name__)
 
 
-def segment(im, text_direction='horizontal-lr', mask=None, model=pkg_resources.resource_filename(__name__, 'blla.mlmodel')):
+def segment(im,
+            text_direction='horizontal-lr',
+            mask=None,
+            reading_order_fn=polygonal_reading_order,
+            model=pkg_resources.resource_filename(__name__, 'blla.mlmodel')):
     """
     Segments a page into text lines using the baseline segmenter.
 
@@ -57,6 +61,11 @@ def segment(im, text_direction='horizontal-lr', mask=None, model=pkg_resources.r
         mask (PIL.Image): A bi-level mask image of the same size as `im` where
                           0-valued regions are ignored for segmentation
                           purposes. Disables column detection.
+        reading_order_fn (function): Function to determine the reading order.
+                                     Has to accept a list of tuples (baselines,
+                                     polygon) and a text direction (`lr` or
+                                     `rl`).
+        model (str): A path to a segmentation model.
 
     Returns:
         {'text_direction': '$dir',
@@ -97,15 +106,15 @@ def segment(im, text_direction='horizontal-lr', mask=None, model=pkg_resources.r
         logger.debug('Running network forward pass')
         o = model.nn(transforms(im).unsqueeze(0))
     logger.debug('Upsampling network output')
-    o = o.squeeze(0).numpy()
-#    o = F.interpolate(o, size=im.size[::-1]).squeeze(0).numpy()
+#    o = o.squeeze(0).numpy()
+    o = F.interpolate(o, size=im.size[::-1]).squeeze(0).numpy()
     logger.debug('Vectorizing network output')
-    baselines = segmentation.vectorize_lines(o)
+    baselines = vectorize_lines(o)
     logger.debug('Scaling vectorized lines')
     scale = np.divide(im.size, o.shape[:0:-1])
-    baselines = segmentation.scale_polygonal_lines(baselines, scale)
+    baselines = scale_polygonal_lines(baselines, scale)
     logger.debug('Reordering baselines')
-    baselines = segmentation.polygonal_reading_order(baselines, text_direction[-2:])
+    baselines = reading_order_fn(baselines, text_direction[-2:])
     return {'text_direction': text_direction,
             'type': 'baselines',
             'lines': [{'script': 'default', 'baseline': bl, 'boundary': pl} for bl, pl in baselines]}
