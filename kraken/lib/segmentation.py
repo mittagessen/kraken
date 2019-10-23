@@ -142,7 +142,7 @@ def _compute_sp_states(sp_can, bl_map, sep_map, radii):
     Estimates the superpixel state information.
     """
     logger.debug('Triangulating superpixels')
-    tri = Delaunay(sp_can)
+    tri = Delaunay(sp_can, qhull_options="QJ Pp")
     indices, indptr = tri.vertex_neighbor_vertices
     # dict mapping each edge to its intensity. Needed for subsequent clustering step.
     intensities = {}
@@ -307,7 +307,7 @@ def vectorize_lines(im: np.ndarray, threshold: float = 0.2, min_sp_dist: int = 1
     lines = _interpolate_lines(clusters, states)
     return lines
 
-def calculate_polygonal_environment(im, baselines, bl_mask=None):
+def calculate_polygonal_environment(im, baselines, bl_mask=None, min_sp_dist: int = 10, radii: Sequence[int] = [16, 32, 64, 128]):
     """
     Given a list of baselines and an input image, calculates a polygonal
     environment around each baseline.
@@ -327,34 +327,28 @@ def calculate_polygonal_environment(im, baselines, bl_mask=None):
     Returns:
         List of tuples (polygonization, baseline) where each is a list of coordinates.
     """
-    if not util.is_bitonal(im):
-        logger.info('Converting input in polygon estimation to binary')
-        im = nlbin(im)
-    im = im.convert('1')
-    im = 1-np.array(im)*1
-    im = binary_dilation(im, iterations=2)*1
-    label_mask = np.zeros_like(im)
-    for idx, l in enumerate(baselines):
-        for start, end in zip(l, l[1::]):
-            rr, cc = line(*start[::-1], *end[::-1])
-            label_mask[rr, cc] = idx+1
-    if bl_mask is not None:
-        label_mask = morph.propagate_labels(bl_mask, label_mask)
-    else:
-        label_mask = grey_dilation(label_mask, (5, 5))
-    labels = morph.propagate_labels(im, label_mask)
-    out_lines = []
-    for idx, l in enumerate(baselines):
-        points = np.dstack(np.nonzero(labels == idx+1)).squeeze()
-        if len(points) > 0:
-            hull = ConvexHull(points)
-            vertices = points[hull.vertices]
-            vertices = np.flip(vertices, -1).tolist()
-        else:
-            logger.warning('No points under baseline {}. Skipping.'.format(idx+1))
-            vertices = None
-        out_lines.append((vertices, l))
-    return out_lines
+    im = np.zeros(im.size)
+    line_points = []
+    for lin in lines:
+        z = list(zip(lin[:-1], lin[1:]))
+        l_x_points = []
+        l_y_points = []
+        for l in z:
+            line_locs = line(l[0][0], l[0][1], l[1][0], l[1][1])
+            im[line_locs] = 1
+            l_x_points.extend(line_locs[0].tolist())
+            l_y_points.extend(line_locs[1].tolist())
+        line_points.append(list(zip([l_x_points[0]] + l_x_points[1::min_sp_dist] + [l_x_points[-1]],
+                                    [l_y_points[0]] + l_y_points[1::min_sp_dist] + [l_y_points[-1]])))
+    sp_can = [point for l in line_points for point in l]
+    bl_map = im
+    sep_map = np.zeros_like(bl_map)
+    intensities, states = _compute_sp_states(sp_can, bl_map, sep_map, radii)
+    cl_line_points = []
+    for lin in line_points:
+        cl_line_points.append([[point] for point in lin])
+    lines = _interpolate_lines(clusters, states)
+    return lines
 
 
 def polygonal_reading_order(lines: Sequence[Tuple[List, List]], text_direction: str = 'lr') -> Sequence[Tuple[List, List]]:
