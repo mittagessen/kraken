@@ -285,7 +285,7 @@ def _interpolate_lines(clusters, states):
     return lines
 
 
-def vectorize_lines(im: np.ndarray, threshold: float = 0.2, min_sp_dist: int = 10, radii: Sequence[int] = [16, 32, 64, 128]):
+def vectorize_lines(im: np.ndarray, threshold: float = 0.2, min_sp_dist: int = 3, radii: Sequence[int] = [16, 32, 64, 128]):
     """
     Vectorizes lines from a binarized array.
 
@@ -314,7 +314,7 @@ def vectorize_lines(im: np.ndarray, threshold: float = 0.2, min_sp_dist: int = 1
     lines = _interpolate_lines(clusters, states)
     return lines
 
-def calculate_polygonal_environment(im, baselines, bl_mask=None, min_sp_dist: int = 10, radii: Sequence[int] = [16, 32, 64, 128]):
+def calculate_polygonal_environment(im, baselines, bl_mask=None, min_sp_dist: int = 3, radii: Sequence[int] = [16, 32, 64, 128]):
     """
     Given a list of baselines and an input image, calculates a polygonal
     environment around each baseline.
