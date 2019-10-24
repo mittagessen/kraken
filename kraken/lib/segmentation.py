@@ -127,8 +127,11 @@ def _find_superpixels(skeleton, heatmap, min_sp_dist):
     sp_idx = np.unravel_index(np.argsort(1.-conf_map, axis=None), conf_map.shape)
     if not sp_idx[0].any():
         logger.info('No superpixel candidates found for line vectorizer. Likely empty page.')
-        return []
+        return np.empty(0)
     zeroes_idx = conf_map[sp_idx].argmin()
+    if not zeroes_idx:
+        logger.info('No superpixel candidates found for line vectorizer. Likely empty page.')
+        return np.empty(0)
     sp_idx = sp_idx[0][:zeroes_idx], sp_idx[1][:zeroes_idx]
     sp_can = [(sp_idx[0][0], sp_idx[1][0])]
     for x in range(len(sp_idx[0])):
@@ -303,6 +306,9 @@ def vectorize_lines(im: np.ndarray, threshold: float = 0.2, min_sp_dist: int = 1
     bin = im > threshold
     skel = skeletonize(bin[1])
     sp_can = _find_superpixels(skel, heatmap=bl_map, min_sp_dist=min_sp_dist)
+    if not sp_can.size:
+        logger.warning('No superpixel candidates found in network output. Likely empty page.')
+        return []
     intensities, states = _compute_sp_states(sp_can, bl_map, sep_map, radii)
     clusters = _cluster_lines(intensities, states)
     lines = _interpolate_lines(clusters, states)
