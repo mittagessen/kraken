@@ -173,7 +173,7 @@ def _compute_sp_states(sp_can, bl_map, sep_map, radii):
         for nbs in nb_indices:
             env_nbs = nbs[1][nbs[0] == vertex]
             vecs = np.abs(tri.points[env_nbs] - sp_can[vertex])
-            vals = np.abs(np.cross(vecs, np.array((np.sin(theta), np.cos(theta)))).astype('int'))
+            vals = np.abs(np.nan_to_num(np.cross(vecs, np.array((np.sin(theta), np.cos(theta))))).astype('int'))
             frqs = np.fft.fft(np.bincount(vals))
             frqs = np.abs(frqs)
             de = (np.abs(frqs)**2)/(np.linalg.norm(frqs, 2)**2)
@@ -259,6 +259,7 @@ def _interpolate_lines(clusters, states):
         y = [x[0] for x in points]
         # very short lines might not have enough superpixels to ensure a well-conditioned regression
         deg = min(len(x)-1, 3)
+        #print('deg: {} x: {}'.format(deg, x))
         poly = Polynomial.fit(x, y, deg=deg)
         deriv = poly.deriv()
         xp, yp = poly.linspace(max(np.diff(poly.domain)//deg, 2))
@@ -301,7 +302,7 @@ def vectorize_lines(im: np.ndarray, threshold: float = 0.2, min_sp_dist: int = 1
     # binarize
     bin = im > threshold
     skel = skeletonize(bin[1])
-    sp_can = _find_superpixels(skel, heatmap=sep_map, min_sp_dist=min_sp_dist)
+    sp_can = _find_superpixels(skel, heatmap=bl_map, min_sp_dist=min_sp_dist)
     intensities, states = _compute_sp_states(sp_can, bl_map, sep_map, radii)
     clusters = _cluster_lines(intensities, states)
     lines = _interpolate_lines(clusters, states)
@@ -341,13 +342,14 @@ def calculate_polygonal_environment(im, baselines, bl_mask=None, min_sp_dist: in
         line_points.append(list(zip([l_x_points[0]] + l_x_points[1::min_sp_dist] + [l_x_points[-1]],
                                     [l_y_points[0]] + l_y_points[1::min_sp_dist] + [l_y_points[-1]])))
     sp_can = [point for l in line_points for point in l]
+    sp_can = np.array(sp_can)
     bl_map = im
     sep_map = np.zeros_like(bl_map)
     intensities, states = _compute_sp_states(sp_can, bl_map, sep_map, radii)
     cl_line_points = []
     for lin in line_points:
         cl_line_points.append([[point] for point in lin])
-    lines = _interpolate_lines(clusters, states)
+    lines = _interpolate_lines(cl_line_points, states)
     return lines
 
 
