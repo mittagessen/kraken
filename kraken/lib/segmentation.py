@@ -196,8 +196,8 @@ def _compute_sp_states(sp_can, bl_map, sep_map, radii):
 #               del intensities[k]
 #               continue
 #           # filter edges of different local orientations
-#           if np.abs(states[k[0]][0] - states[k[1]][0]) % np.pi > np.pi/4:
-#              del intensities[k]
+        if np.abs(states[k[0]][0] - states[k[1]][0]) % np.pi > np.pi/4:
+            del intensities[k]
     return intensities, states
 
 def _cluster_lines(intensities, states):
@@ -262,7 +262,6 @@ def _interpolate_lines(clusters, states):
         y = [x[0] for x in points]
         # very short lines might not have enough superpixels to ensure a well-conditioned regression
         deg = min(len(x)-1, 3)
-        #print('deg: {} x: {}'.format(deg, x))
         poly = Polynomial.fit(x, y, deg=deg)
         deriv = poly.deriv()
         xp, yp = poly.linspace(max(np.diff(poly.domain)//deg, 2))
@@ -285,7 +284,7 @@ def _interpolate_lines(clusters, states):
     return lines
 
 
-def vectorize_lines(im: np.ndarray, threshold: float = 0.2, min_sp_dist: int = 3, radii: Sequence[int] = [16, 32, 64, 128]):
+def vectorize_lines(im: np.ndarray, threshold: float = 0.2, min_sp_dist: int = 10, radii: Sequence[int] = [16, 32, 64, 128]):
     """
     Vectorizes lines from a binarized array.
 
@@ -336,7 +335,7 @@ def calculate_polygonal_environment(im, baselines, bl_mask=None, min_sp_dist: in
     """
     im = np.zeros(im.size)
     line_points = []
-    for lin in lines:
+    for lin in baselines:
         z = list(zip(lin[:-1], lin[1:]))
         l_x_points = []
         l_y_points = []
