@@ -191,11 +191,11 @@ def _compute_sp_states(sp_can, bl_map, sep_map, radii):
         if v[0] < 0.4:
             del intensities[k]
             continue
-#           # filter edges with high separator affinity
-#           if v[1] > 0.125 or v[2] > 0.25 or v[0] < 0.5:
-#               del intensities[k]
-#               continue
-#           # filter edges of different local orientations
+        # filter edges with high separator affinity
+        if v[1] > 0.125 or v[2] > 0.25 or v[0] < 0.5:
+            del intensities[k]
+            continue
+        # filter edges of different local orientations
         if np.abs(states[k[0]][0] - states[k[1]][0]) % np.pi > np.pi/4:
             del intensities[k]
     return intensities, states
@@ -399,6 +399,22 @@ def scale_polygonal_lines(lines: Sequence[Tuple[List, List]], scale: Union[float
                              (np.array(pl) * scale).astype('int').tolist()))
     return scaled_lines
 
+def _test_intersect(bp, uv, bs):
+    """
+    Returns the intersection points of a ray with direction `uv` from
+    `bp` with a polygon `bs`.
+    """
+    u = bp - np.roll(bs, 2)
+    v = bs - np.roll(bs, 2)
+    points = []
+    for dir in ((1,-1), (-1,1)):
+        w = (uv * dir * (1,-1))[::-1]
+        z = np.dot(v, w)
+        t1 = np.cross(v, u) / z
+        t2 = np.dot(u, w) / z
+        t1 = t1[np.logical_and(t2 >= 0.0, t2 <= 1.0)]
+        points.extend(bp + (t1[np.where(t1 >= 0)[0].min()] * (uv * dir)))
+    return np.array(points)
 
 def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image:
     """
