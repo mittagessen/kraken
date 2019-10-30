@@ -276,7 +276,7 @@ def preparse_xml_data(filenames, format_type):
     if format_type == 'alto':
         parse_fn = parse_alto
     elif format_type == 'page':
-        parse_fn = parge_page
+        parse_fn = parse_page
     else:
         raise Exception('invalid format {} for preparse_xml_data'.format(format_type))
     for fn in filenames:
