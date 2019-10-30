@@ -49,20 +49,22 @@ def parse_page(filename):
         lines = doc.findall('.//{*}TextLine')
         data = {'image': os.path.join(base_dir, image.get('imageFilename')), 'lines': []}
         for line in lines:
-            if line.find('./{*}Baseline') is None:
-                logger.warning('TextLine {} without baseline'.format(line.get('id')))
             pol = line.find('./{*}Coords')
             boundary = None
-            if pol is not None:
+            if pol is not None and not pol.get('points').isspace() and len(pol.get('points')):
                 points = [x for x in pol.get('points').split(' ')]
                 points = [int(c) for point in points for c in point.split(',')]
                 boundary = list(zip(points[::2], points[1::2]))
+            else:
+                logger.info('TextLine {} without polygon'.format(line.get('id')))
             base = line.find('./{*}Baseline')
             baseline = None
-            if base is not None:
+            if base is not None and not base.get('points').isspace() and len(base.get('points')):
                 points = [x for x in base.get('points').split(' ')]
                 points = [int(c) for point in points for c in point.split(',')]
                 baseline = list(zip(points[::2], points[1::2]))
+            else:
+                logger.warning('TextLine {} without baseline'.format(line.get('id')))
             text = ''
             manual_transcription = line.find('./{*}TextEquiv')
             if manual_transcription is not None:
