@@ -42,10 +42,13 @@ def parse_page(filename):
     """
     with open(filename, 'rb') as fp:
         base_dir = dirname(filename)
-        doc = etree.parse(fp)
+        try:
+            doc = etree.parse(fp)
+        except etree.XMLSyntaxError as e:
+            raise KrakenInputException('Parsing {} failed: {}'.format(filename, e))
         image = doc.find('.//{*}Page')
         if image is None or image.get('imageFilename') is None:
-            raise KrakenInputException('No valid filename found in PageXML file')
+            raise KrakenInputException('No valid image filename found in PageXML file {}'.format(filename))
         lines = doc.findall('.//{*}TextLine')
         data = {'image': os.path.join(base_dir, image.get('imageFilename')), 'lines': []}
         for line in lines:
@@ -89,7 +92,10 @@ def parse_alto(filename):
     """
     with open(filename, 'rb') as fp:
         base_dir = dirname(filename)
-        doc = etree.parse(fp)
+        try:
+            doc = etree.parse(fp)
+        except etree.XMLSyntaxError as e:
+            raise KrakenInputException('Parsing {} failed: {}'.format(filename, e))
         image = doc.find('.//{*}fileName')
         if image is None or not image.text:
             raise KrakenInputException('No valid filename found in ALTO file')
