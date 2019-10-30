@@ -273,13 +273,19 @@ def preparse_xml_data(filenames, format_type):
         [[x0, y0], ...], 'image': PIL.Image}.
     """
     training_pairs = []
+    if format_type == 'alto':
+        parse_fn = parse_alto
+    elif format_type == 'page':
+        parse_fn = parge_page
+    else:
+        raise Exception('invalid format {} for preparse_xml_data'.format(format_type))
     for fn in filenames:
-        if format_type == 'alto':
-            data = parse_alto(fn)
-        elif format_type == 'page':
-            data = parse_page(fn)
-        else:
-            raise Exception('invalid format {} for preparse_xml_data'.format(format_type))
+        data = parse_fn(fn)
+        try:
+            Image.open(data['image'])
+        except FileNotFoundError as e:
+            logger.warning('Could not open file {} in {}'.format(e.filename, fn))
+            continue
         for line in data['lines']:
             training_pairs.append({'image': data['image'], **line})
     return training_pairs
@@ -575,7 +581,14 @@ class BaselineSet(Dataset):
             with open('{}.path'.format(path.splitext(im)[0]), 'r') as fp:
                 target = json.load(fp)
         if not isinstance(im, Image.Image):
-            im = Image.open(im)
+            try:
+                logger.debug('Attempting to load {}'.format(im))
+                im = Image.open(im)
+                return self.transform(im, target)
+            except Exception:
+                idx = np.random.randint(0, len(self.imgs))
+                logger.debug('Failed. Replacing with sample {}'.format(idx))
+                return self[np.random.randint(0, len(self.imgs))]
         return self.transform(im, target)
 
     @staticmethod
