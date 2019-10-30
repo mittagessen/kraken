@@ -280,7 +280,11 @@ def preparse_xml_data(filenames, format_type):
     else:
         raise Exception('invalid format {} for preparse_xml_data'.format(format_type))
     for fn in filenames:
-        data = parse_fn(fn)
+        try:
+            data = parse_fn(fn)
+        except KrakenInputException as e:
+            logger.warning(e)
+            continue
         try:
             Image.open(data['image'])
         except FileNotFoundError as e:
@@ -370,7 +374,6 @@ class PolygonGTDataset(Dataset):
                 im, _ = next(extract_polygons(im, {'type': 'baselines', 'lines': [{'baseline': item[0][1], 'boundary': item[0][2]}]}))
                 return (self.transforms(im), item[1])
             except Exception:
-                raise
                 idx = np.random.randint(0, len(self.training_set))
                 logger.debug('Failed. Replacing with sample {}'.format(idx))
                 return self[np.random.randint(0, len(self.training_set))]
