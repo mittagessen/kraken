@@ -164,7 +164,7 @@ def _compute_sp_states(sp_can, bl_map, sep_map, radii):
             key.sort()
             key = tuple(key)
             line_locs = line(*(key[0] + key[1]))
-            intensities[key] = (bl_map[line_locs].mean(), sep_map[line_locs].mean(), sep_map[line_locs].max())
+            intensities[key] = (bl_map[line_locs].mean(), bl_map[line_locs].var(), sep_map[line_locs].mean(), sep_map[line_locs].max())
             intensity.append(intensities[key][0])
         slope_pts = neighbors[np.argsort(1-np.array(intensity))[:2]]
         # orientation
@@ -191,13 +191,16 @@ def _compute_sp_states(sp_can, bl_map, sep_map, radii):
         if v[0] < 0.4:
             del intensities[k]
             continue
+        if v[1] > 5e-02:
+            del intensities[k]
+            continue
         # filter edges with high separator affinity
-        if v[1] > 0.125 or v[2] > 0.25 or v[0] < 0.5:
+        if v[2] > 0.125 or v[3] > 0.25 or v[0] < 0.5:
             del intensities[k]
             continue
         # filter edges of different local orientations
-        if np.abs(states[k[0]][0] - states[k[1]][0]) % np.pi > np.pi/4:
-            del intensities[k]
+        #if np.abs(states[k[0]][0] - states[k[1]][0]) % np.pi > np.pi/4:
+        #    del intensities[k]
     return intensities, states
 
 def _cluster_lines(intensities, states):
