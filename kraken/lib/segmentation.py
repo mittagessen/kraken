@@ -166,27 +166,29 @@ def _compute_sp_states(sp_can, bl_map, sep_map, radii):
             line_locs = line(*(key[0] + key[1]))
             intensities[key] = (bl_map[line_locs].mean(), bl_map[line_locs].var(), sep_map[line_locs].mean(), sep_map[line_locs].max())
             intensity.append(intensities[key][0])
-        slope_pts = neighbors[np.argsort(1-np.array(intensity))[:2]]
-        # orientation
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            theta = np.arctan((slope_pts[1,0]-slope_pts[0,0])/(slope_pts[1,1]-slope_pts[0,1]))
+        #slope_pts = neighbors[np.argsort(1-np.array(intensity))[:2]]
+        ## orientation
+        #with warnings.catch_warnings():
+        #    warnings.simplefilter("ignore")
+        #    theta = np.arctan((slope_pts[1,0]-slope_pts[0,0])/(slope_pts[1,1]-slope_pts[0,1]))
         # calculate projection profiles
-        data_energy = []
-        for nbs in nb_indices:
-            env_nbs = nbs[1][nbs[0] == vertex]
-            vecs = np.abs(tri.points[env_nbs] - sp_can[vertex])
-            vals = np.abs(np.nan_to_num(np.cross(vecs, np.array((np.sin(theta), np.cos(theta))))).astype('int'))
-            frqs = np.fft.fft(np.bincount(vals))
-            frqs = np.abs(frqs)
-            de = (np.abs(frqs)**2)/(np.linalg.norm(frqs, 2)**2)
-            data_energy.extend(de[3:6].tolist())
-        data_energy = np.array(data_energy)
-        if not data_energy.any():
-            ild = 0
-        else:
-            ild = radii[data_energy.argmax() // 3] * 2 / (data_energy.argmax() % 3 + 3)
-        states[tuple(sp_can[vertex])] = (theta, ild)
+        #data_energy = []
+        #for nbs in nb_indices:
+        #    env_nbs = nbs[1][nbs[0] == vertex]
+        #    vecs = np.abs(tri.points[env_nbs] - sp_can[vertex])
+        #    vals = np.abs(np.nan_to_num(np.cross(vecs, np.array((np.sin(theta), np.cos(theta))))).astype('int'))
+        #    frqs = np.fft.fft(np.bincount(vals))
+        #    frqs = np.abs(frqs)
+        #    de = (np.abs(frqs)**2)/(np.linalg.norm(frqs, 2)**2)
+        #    data_energy.extend(de[3:6].tolist())
+        #data_energy = np.array(data_energy)
+        #if not data_energy.any():
+        #    ild = 0
+        #else:
+        #    ild = radii[data_energy.argmax() // 3] * 2 / (data_energy.argmax() % 3 + 3)
+        #states[tuple(sp_can[vertex])] = (theta, ild)
+        states[tuple(sp_can[vertex])] = (0, 0)
+
     for k, v in list(intensities.items()):
         if v[0] < 0.4:
             del intensities[k]
@@ -315,6 +317,85 @@ def vectorize_lines(im: np.ndarray, threshold: float = 0.2, min_sp_dist: int = 1
     clusters = _cluster_lines(intensities, states)
     lines = _interpolate_lines(clusters, states)
     return lines
+
+def extract_bl_roi(im, lines):
+
+    bounds = np.array(im.size, dtype=np.float)
+    im = np.array(im)
+
+    def _ray_intersect_boundaries(ray, direction, aabb):
+        """
+        Simplified version of [0] for 2d and AABB anchored at (0,0).
+
+        [0] http://gamedev.stackexchange.com/questions/18436/most-efficient-aabb-vs-ray-collision-algorithms
+        """
+        dir_fraction = np.empty(2, dtype=ray.dtype)
+        dir_fraction[direction == 0.0] = np.inf
+        dir_fraction[direction != 0.0] = np.divide(1.0, direction[direction != 0.0])
+
+        t1 = (-ray[0]) * dir_fraction[0]
+        t2 = (aabb[0] - ray[0]) * dir_fraction[0]
+        t3 = (-ray[1]) * dir_fraction[1]
+        t4 = (aabb[1] - ray[1]) * dir_fraction[1]
+
+        tmin = max(min(t1, t2), min(t3, t4))
+        tmax = min(max(t1, t2), max(t3, t4))
+
+        t = min(x for x in [tmin, tmax] if x >= 0)
+        return ray + (direction * t)
+
+
+    def _extract_patch(im, poly):
+        """
+        Extracts a patch of an image based on a given polygon
+        """
+        r, c = polygon(poly[:,0], poly[:,1])
+        mask = np.zeros(bounds.astype('int')[::-1], dtype=np.bool)
+        mask[c, r] = True
+        patch = im.copy()
+        patch[mask != True] = 0
+        patch = Image.fromarray(patch)
+        bbox = patch.getbbox()
+        return patch.crop(bbox), bbox
+
+    for idx, line in enumerate(lines):
+        # calculate spanning polygon on each side of baseline
+        lr = np.array(line[:2], dtype=np.float)
+        lr_dir = lr[1] - lr[0]
+        lr_dir = (lr_dir.T  / np.sqrt(np.sum(lr_dir**2,axis=-1)))
+        lr_up_intersect = _ray_intersect_aabb(lr[0], (lr_dir*(-1,1))[::-1], bounds).astype('int')
+        lr_bottom_intersect = _ray_intersect_aabb(lr[0], (lr_dir*(1,-1))[::-1], bounds).astype('int')
+        rr = np.array(line[-2:], dtype=np.float)
+        rr_dir = rr[1] - rr[0]
+        rr_dir = (rr_dir.T  / np.sqrt(np.sum(rr_dir**2,axis=-1)))
+        rr_up_intersect = _ray_intersect_aabb(rr[0], (rr_dir*(-1,1))[::-1], bounds).astype('int')
+        rr_bottom_intersect = _ray_intersect_aabb(rr[0], (rr_dir*(1,-1))[::-1], bounds).astype('int')
+        upper_polygon = Polygon([lr_up_intersect.tolist()] + line + [rr_up_intersect.tolist()])
+        bottom_polygon = Polygon([lr_bottom_intersect.tolist()] + line + [rr_bottom_intersect.tolist()])
+        side_a = [LineString([lr_up_intersect.tolist(), rr_up_intersect.tolist()])]
+        side_b = [LineString([lr_bottom_intersect.tolist(), rr_bottom_intersect.tolist()])]
+        for adj_line in lines[:idx] + lines[idx+1:]:
+            adj_line = LineString(adj_line)
+            if upper_polygon.intersects(adj_line):
+                side_a.append(adj_line)
+            elif bottom_polygon.intersects(adj_line):
+                side_b.append(adj_line)
+        side_a = unary_union(side_a)
+        side_b = unary_union(side_b)
+        env_up = []
+        env_bottom = []
+        for point in line:
+            _, upper_limit = nearest_points(Point(point), side_a)
+            _, bottom_limit = nearest_points(Point(point), side_b)
+            env_up.extend(list(upper_limit.coords))
+            env_bottom.extend(list(bottom_limit.coords))
+        env_up.extend(reversed(line))
+        env_bottom.extend(reversed(line))
+        env_up = np.array(env_up)
+        env_bottom = np.array(env_bottom)
+        upper, upper_bbox = _extract_patch(im, env_up)
+        bottom, bottom_bbox = _extract_patch(im, env_bottom)
+
 
 def calculate_polygonal_environment(im, baselines, bl_mask=None, min_sp_dist: int = 3, radii: Sequence[int] = [16, 32, 64, 128]):
     """
