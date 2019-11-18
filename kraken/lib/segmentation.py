@@ -395,7 +395,7 @@ def extract_bl_roi(im, lines):
         env_bottom = np.array(env_bottom)
         upper, upper_bbox = _extract_patch(im, env_up)
         bottom, bottom_bbox = _extract_patch(im, env_bottom)
-
+        yield line, upper, upper_bbox, bottom, bottom_bbox
 
 def calculate_polygonal_environment(im, baselines, bl_mask=None, min_sp_dist: int = 3, radii: Sequence[int] = [16, 32, 64, 128]):
     """
