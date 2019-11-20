@@ -25,16 +25,18 @@ from PIL import Image, ImageDraw
 
 from numpy.polynomial import Polynomial
 
-from scipy.ndimage import label
+from scipy.ndimage import label, black_tophat
 from scipy.ndimage.filters import gaussian_filter, gaussian_filter1d
-from scipy.ndimage.morphology import grey_dilation, binary_dilation
+from scipy.ndimage.morphology import grey_dilation
 from scipy.spatial import distance_matrix, ConvexHull, Delaunay
 from scipy.spatial.distance import cdist, pdist, squareform
 
-from skimage.draw import line
+from shapely.ops import nearest_points, unary_union
+
+from skimage import draw
 from skimage.filters import apply_hysteresis_threshold
-from skimage.measure import approximate_polygon
-from skimage.morphology import skeletonize
+from skimage.measure import approximate_polygon, find_contours
+from skimage.morphology import skeletonize, watershed
 from skimage.transform import PiecewiseAffineTransform, warp
 
 from itertools import combinations
@@ -163,7 +165,7 @@ def _compute_sp_states(sp_can, bl_map, sep_map, radii):
             key = [tuple(sp_can[vertex]), tuple(nb)]
             key.sort()
             key = tuple(key)
-            line_locs = line(*(key[0] + key[1]))
+            line_locs = draw.line(*(key[0] + key[1]))
             intensities[key] = (bl_map[line_locs].mean(), bl_map[line_locs].var(), sep_map[line_locs].mean(), sep_map[line_locs].max())
             intensity.append(intensities[key][0])
         #slope_pts = neighbors[np.argsort(1-np.array(intensity))[:2]]
@@ -318,10 +320,25 @@ def vectorize_lines(im: np.ndarray, threshold: float = 0.2, min_sp_dist: int = 1
     lines = _interpolate_lines(clusters, states)
     return lines
 
-def extract_bl_roi(im, lines):
+def calculate_bl_polygons(im, lines):
+    """
+    Calculates a watershed-transform based polygonisation from a list of lines
+    and an input image.
+
+    Args:
+        im (PIL.Image): Input image
+        lines (list): List of lines [[[x0, y0], ... [xn, yn]], [[x'0, y'0], ...
+        [x'm, y'm]], ...]
+
+    Yields:
+        A polygon contour for each baseline.
+    """
 
     bounds = np.array(im.size, dtype=np.float)
     im = np.array(im)
+
+    # compute tophat features of input image
+    im_feats = black_tophat(im, 3)
 
     def _ray_intersect_boundaries(ray, direction, aabb):
         """
@@ -345,37 +362,65 @@ def extract_bl_roi(im, lines):
         return ray + (direction * t)
 
 
-    def _extract_patch(im, poly):
+    def _extract_patch(env_up, env_bottom, baseline):
         """
-        Extracts a patch of an image based on a given polygon
+        Calculate a line image batch from a ROI and the original baseline
         """
-        r, c = polygon(poly[:,0], poly[:,1])
+        markers = np.zeros(bounds.astype('int')[::-1], dtype=np.int)
+        for l in zip(baseline[:-1], baseline[1:]):
+            line_locs = draw.line(l[0][1], l[0][0], l[1][1], l[1][0])
+            markers[line_locs] = 2
+        for l in zip(env_up[:-1], env_up[1:]):
+            line_locs = draw.line(l[0][1], l[0][0], l[1][1], l[1][0])
+            markers[line_locs] = 1
+        for l in zip(env_bottom[:-1], env_bottom[1:]):
+            line_locs = draw.line(l[0][1], l[0][0], l[1][1], l[1][0])
+            markers[line_locs] = 1
+        markers = grey_dilation(markers, size=3)
+        full_polygon = np.concatenate((env_up, env_bottom[::-1]))
+        r, c = draw.polygon(full_polygon[:,0], full_polygon[:,1])
         mask = np.zeros(bounds.astype('int')[::-1], dtype=np.bool)
         mask[c, r] = True
-        patch = im.copy()
+        patch = im_feats.copy()
         patch[mask != True] = 0
-        patch = Image.fromarray(patch)
-        bbox = patch.getbbox()
-        return patch.crop(bbox), bbox
+        coords = np.argwhere(mask)
+        r_min, c_min = coords.min(axis=0)
+        r_max, c_max = coords.max(axis=0)
+        patch = patch[r_min:r_max+1, c_min:c_max+1]
+        markers = markers[r_min:r_max+1, c_min:c_max+1]
+        mask = mask[r_min:r_max+1, c_min:c_max+1]
+        # run watershed
+        ws = watershed(patch, markers, 8, mask=mask)
+        ws = grey_dilation(ws, size=3)
+        # pad output to ensure contour is closed
+        ws = np.pad(ws, 1)
+        # find contour of central basin
+        contour = find_contours(ws, 2, fully_connected='high')[0]
+        contour = approximate_polygon(contour, 5)
+        # approximate + remove offsets + transpose
+        contour = np.transpose((approximate_polygon(contour, 5)-1+(r_min, c_min)), (0, 1))
+        return contour
 
     for idx, line in enumerate(lines):
-        # calculate spanning polygon on each side of baseline
+        # find intercepts with image bounds on each side of baseline
         lr = np.array(line[:2], dtype=np.float)
         lr_dir = lr[1] - lr[0]
         lr_dir = (lr_dir.T  / np.sqrt(np.sum(lr_dir**2,axis=-1)))
-        lr_up_intersect = _ray_intersect_aabb(lr[0], (lr_dir*(-1,1))[::-1], bounds).astype('int')
-        lr_bottom_intersect = _ray_intersect_aabb(lr[0], (lr_dir*(1,-1))[::-1], bounds).astype('int')
+        lr_up_intersect = _ray_intersect_boundaries(lr[0], (lr_dir*(-1,1))[::-1], bounds).astype('int')
+        lr_bottom_intersect = _ray_intersect_boundaries(lr[0], (lr_dir*(1,-1))[::-1], bounds).astype('int')
         rr = np.array(line[-2:], dtype=np.float)
         rr_dir = rr[1] - rr[0]
         rr_dir = (rr_dir.T  / np.sqrt(np.sum(rr_dir**2,axis=-1)))
-        rr_up_intersect = _ray_intersect_aabb(rr[0], (rr_dir*(-1,1))[::-1], bounds).astype('int')
-        rr_bottom_intersect = _ray_intersect_aabb(rr[0], (rr_dir*(1,-1))[::-1], bounds).astype('int')
-        upper_polygon = Polygon([lr_up_intersect.tolist()] + line + [rr_up_intersect.tolist()])
-        bottom_polygon = Polygon([lr_bottom_intersect.tolist()] + line + [rr_bottom_intersect.tolist()])
-        side_a = [LineString([lr_up_intersect.tolist(), rr_up_intersect.tolist()])]
-        side_b = [LineString([lr_bottom_intersect.tolist(), rr_bottom_intersect.tolist()])]
+        rr_up_intersect = _ray_intersect_boundaries(rr[0], (rr_dir*(-1,1))[::-1], bounds).astype('int')
+        rr_bottom_intersect = _ray_intersect_boundaries(rr[0], (rr_dir*(1,-1))[::-1], bounds).astype('int')
+        # build polygon between baseline and bbox intersects
+        upper_polygon = geom.Polygon([lr_up_intersect.tolist()] + line + [rr_up_intersect.tolist()])
+        bottom_polygon = geom.Polygon([lr_bottom_intersect.tolist()] + line + [rr_bottom_intersect.tolist()])
+        # select baselines at least partially in each polygon
+        side_a = [geom.LineString([lr_up_intersect.tolist(), rr_up_intersect.tolist()])]
+        side_b = [geom.LineString([lr_bottom_intersect.tolist(), rr_bottom_intersect.tolist()])]
         for adj_line in lines[:idx] + lines[idx+1:]:
-            adj_line = LineString(adj_line)
+            adj_line = geom.LineString(adj_line)
             if upper_polygon.intersects(adj_line):
                 side_a.append(adj_line)
             elif bottom_polygon.intersects(adj_line):
@@ -384,18 +429,17 @@ def extract_bl_roi(im, lines):
         side_b = unary_union(side_b)
         env_up = []
         env_bottom = []
+        # find nearest points from baseline to previously selected baselines
         for point in line:
-            _, upper_limit = nearest_points(Point(point), side_a)
-            _, bottom_limit = nearest_points(Point(point), side_b)
+            _, upper_limit = nearest_points(geom.Point(point), side_a)
+            _, bottom_limit = nearest_points(geom.Point(point), side_b)
             env_up.extend(list(upper_limit.coords))
             env_bottom.extend(list(bottom_limit.coords))
-        env_up.extend(reversed(line))
-        env_bottom.extend(reversed(line))
-        env_up = np.array(env_up)
-        env_bottom = np.array(env_bottom)
-        upper, upper_bbox = _extract_patch(im, env_up)
-        bottom, bottom_bbox = _extract_patch(im, env_bottom)
-        yield line, upper, upper_bbox, bottom, bottom_bbox
+        env_up = np.array(env_up, dtype='uint')
+        env_bottom = np.array(env_bottom, dtype='uint')
+        polygon = _extract_patch(env_up, env_bottom, line)
+        yield polygon
+
 
 def calculate_polygonal_environment(im, baselines, bl_mask=None, min_sp_dist: int = 3, radii: Sequence[int] = [16, 32, 64, 128]):
     """
@@ -424,7 +468,7 @@ def calculate_polygonal_environment(im, baselines, bl_mask=None, min_sp_dist: in
         l_x_points = []
         l_y_points = []
         for l in z:
-            line_locs = line(l[0][0], l[0][1], l[1][0], l[1][1])
+            line_locs = draw.line(l[0][0], l[0][1], l[1][0], l[1][1])
             im[line_locs] = 1
             l_x_points.extend(line_locs[0].tolist())
             l_y_points.extend(line_locs[1].tolist())
