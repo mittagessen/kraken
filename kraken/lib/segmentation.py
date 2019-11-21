@@ -16,6 +16,7 @@
 """
 Processing for baseline segmenter output
 """
+import PIL
 import logging
 import warnings
 import numpy as np
@@ -142,7 +143,8 @@ def _find_superpixels(skeleton, heatmap, min_sp_dist):
             sp_can.extend(loc.tolist())
     return np.array(sp_can)
 
-def _compute_sp_states(sp_can, bl_map, sep_map, radii):
+
+def _compute_sp_states(sp_can, bl_map, sep_map):
     """
     Estimates the superpixel state information.
     """
@@ -151,10 +153,7 @@ def _compute_sp_states(sp_can, bl_map, sep_map, radii):
     indices, indptr = tri.vertex_neighbor_vertices
     # dict mapping each edge to its intensity. Needed for subsequent clustering step.
     intensities = {}
-    states = {}
-    dists = squareform(pdist(sp_can))
     # radius of circular environment around SP for ILD estimation
-    nb_indices = tuple(np.nonzero(dists < proj_env) for proj_env in radii)
     logger.debug('Computing superpixel state information')
     for vertex in range(len(sp_can)):
         # look up neighboring indices
@@ -168,29 +167,8 @@ def _compute_sp_states(sp_can, bl_map, sep_map, radii):
             line_locs = draw.line(*(key[0] + key[1]))
             intensities[key] = (bl_map[line_locs].mean(), bl_map[line_locs].var(), sep_map[line_locs].mean(), sep_map[line_locs].max())
             intensity.append(intensities[key][0])
-        #slope_pts = neighbors[np.argsort(1-np.array(intensity))[:2]]
-        ## orientation
-        #with warnings.catch_warnings():
-        #    warnings.simplefilter("ignore")
-        #    theta = np.arctan((slope_pts[1,0]-slope_pts[0,0])/(slope_pts[1,1]-slope_pts[0,1]))
-        # calculate projection profiles
-        #data_energy = []
-        #for nbs in nb_indices:
-        #    env_nbs = nbs[1][nbs[0] == vertex]
-        #    vecs = np.abs(tri.points[env_nbs] - sp_can[vertex])
-        #    vals = np.abs(np.nan_to_num(np.cross(vecs, np.array((np.sin(theta), np.cos(theta))))).astype('int'))
-        #    frqs = np.fft.fft(np.bincount(vals))
-        #    frqs = np.abs(frqs)
-        #    de = (np.abs(frqs)**2)/(np.linalg.norm(frqs, 2)**2)
-        #    data_energy.extend(de[3:6].tolist())
-        #data_energy = np.array(data_energy)
-        #if not data_energy.any():
-        #    ild = 0
-        #else:
-        #    ild = radii[data_energy.argmax() // 3] * 2 / (data_energy.argmax() % 3 + 3)
-        #states[tuple(sp_can[vertex])] = (theta, ild)
-        states[tuple(sp_can[vertex])] = (0, 0)
 
+    # filter edges in triangulation
     for k, v in list(intensities.items()):
         if v[0] < 0.4:
             del intensities[k]
@@ -202,27 +180,15 @@ def _compute_sp_states(sp_can, bl_map, sep_map, radii):
         if v[2] > 0.125 or v[3] > 0.25 or v[0] < 0.5:
             del intensities[k]
             continue
-        # filter edges of different local orientations
-        #if np.abs(states[k[0]][0] - states[k[1]][0]) % np.pi > np.pi/4:
-        #    del intensities[k]
-    return intensities, states
 
-def _cluster_lines(intensities, states):
+    return intensities
+
+
+def _cluster_lines(intensities):
     """
     Clusters lines according to their intensities.
     """
-    # sort edges by (1 - off_orientation) * intensity
-    def _off_orientation(p, q):
-        theta = np.mean((states[p][0], states[q][0]))
-        return np.abs((p[1]-q[1])*np.sin(theta) - (p[0]-q[0])*np.cos(theta))
-
-    def _oow_intensity(edge):
-        p = edge[0]
-        q = edge[1]
-        return (1 - (_off_orientation(p, q)/np.linalg.norm(np.array(p)-np.array(q)))) * intensities[edge][0]
-
     edge_list = list(intensities.keys())
-    edge_list.sort(key=lambda x:_oow_intensity(x), reverse=True)
 
     def _point_in_cluster(p):
         for idx, cluster in enumerate(clusters[1:]):
@@ -257,7 +223,8 @@ def _cluster_lines(intensities, states):
                 clusters[min(cl_p0, cl_p1)].append(edge)
     return clusters
 
-def _interpolate_lines(clusters, states):
+
+def _interpolate_lines(clusters):
     """
     Interpolates the baseline clusters and adds polygonal information.
     """
@@ -274,24 +241,11 @@ def _interpolate_lines(clusters, states):
         xp, yp = poly.linspace(max(np.diff(poly.domain)//deg, 2))
         xp = xp.astype('int')
         yp = yp.astype('int')
-        ls = geom.LineString(list(zip(yp, xp)))
-        ilds = []
-        proj_points = []
-        for point in points:
-            ilds.append(states[point][1])
-            proj_points.append(np.array(ls.interpolate(ls.project(geom.Point(point))).coords)[0].astype('int').tolist())
-        ilds = gaussian_filter1d(ilds, 0.5).tolist()
-        low = []
-        up = []
-        for idx, pt in enumerate(proj_points):
-            theta = np.pi/2 - np.arctan(deriv(pt[1]))
-            low.insert(0, (pt[::-1] + np.array((np.cos(theta), np.sin(theta))) * ilds[idx] * 1/3).astype('int').tolist())
-            up.append((pt[::-1] - np.array((np.cos(theta), np.sin(theta))) * ilds[idx] * 2/3).astype('int').tolist())
-        lines.append(([point[::-1] for point in proj_points], up + low))
+        lines.append(list(zip(yp, xp)))
     return lines
 
 
-def vectorize_lines(im: np.ndarray, threshold: float = 0.2, min_sp_dist: int = 10, radii: Sequence[int] = [16, 32, 64, 128]):
+def vectorize_lines(im: np.ndarray, threshold: float = 0.2, min_sp_dist: int = 10):
     """
     Vectorizes lines from a binarized array.
 
@@ -299,7 +253,6 @@ def vectorize_lines(im: np.ndarray, threshold: float = 0.2, min_sp_dist: int = 1
         im (np.ndarray): Array of shape (3, H, W) with the first dimension
                          being a probability distribution over (background,
                          baseline, separators).
-        error (int): Maximum error in polyline vectorization
 
     Returns:
         [[x0, y0, ... xn, yn], [xm, ym, ..., xk, yk], ... ]
@@ -315,25 +268,27 @@ def vectorize_lines(im: np.ndarray, threshold: float = 0.2, min_sp_dist: int = 1
     if not sp_can.size:
         logger.warning('No superpixel candidates found in network output. Likely empty page.')
         return []
-    intensities, states = _compute_sp_states(sp_can, bl_map, sep_map, radii)
-    clusters = _cluster_lines(intensities, states)
-    lines = _interpolate_lines(clusters, states)
+    intensities = _compute_sp_states(sp_can, bl_map, sep_map)
+    clusters = _cluster_lines(intensities)
+    lines = _interpolate_lines(clusters)
     return lines
 
-def calculate_bl_polygons(im, lines):
+
+def calculate_polygonal_environment(im: PIL.Image.Image, baselines: Sequence[Tuple[int, int]]):
     """
-    Calculates a watershed-transform based polygonisation from a list of lines
-    and an input image.
+    Given a list of baselines and an input image, calculates a polygonal
+    environment around each baseline.
 
     Args:
         im (PIL.Image): Input image
-        lines (list): List of lines [[[x0, y0], ... [xn, yn]], [[x'0, y'0], ...
-        [x'm, y'm]], ...]
+        baselines (sequence): List of lists containing a single baseline per
+                              entry.
+        bl_mask (numpy.array): Optional raw baselines output maps from the
+                               recognition net.
 
-    Yields:
-        A polygon contour for each baseline.
+    Returns:
+        List of tuples (polygonization, baseline) where each is a list of coordinates.
     """
-
     bounds = np.array(im.size, dtype=np.float)
     im = np.array(im)
 
@@ -395,13 +350,14 @@ def calculate_bl_polygons(im, lines):
         # pad output to ensure contour is closed
         ws = np.pad(ws, 1)
         # find contour of central basin
-        contour = find_contours(ws, 2, fully_connected='high')[0]
-        contour = approximate_polygon(contour, 5)
-        # approximate + remove offsets + transpose
-        contour = np.transpose((approximate_polygon(contour, 5)-1+(r_min, c_min)), (0, 1))
-        return contour
+        contours = find_contours(ws, 1.5, fully_connected='high')
+        contour = np.array(unary_union([geom.Polygon(contour.tolist()) for contour in contours]).boundary, dtype='uint')
+        ## approximate + remove offsets + transpose
+        contour = np.transpose((approximate_polygon(contour, 5)-1+(r_min, c_min)), (0, 1)).astype('uint')
+        return contour.tolist()
 
-    for idx, line in enumerate(lines):
+    polygons = []
+    for idx, line in enumerate(baselines):
         # find intercepts with image bounds on each side of baseline
         lr = np.array(line[:2], dtype=np.float)
         lr_dir = lr[1] - lr[0]
@@ -419,7 +375,7 @@ def calculate_bl_polygons(im, lines):
         # select baselines at least partially in each polygon
         side_a = [geom.LineString([lr_up_intersect.tolist(), rr_up_intersect.tolist()])]
         side_b = [geom.LineString([lr_bottom_intersect.tolist(), rr_bottom_intersect.tolist()])]
-        for adj_line in lines[:idx] + lines[idx+1:]:
+        for adj_line in baselines[:idx] + baselines[idx+1:]:
             adj_line = geom.LineString(adj_line)
             if upper_polygon.intersects(adj_line):
                 side_a.append(adj_line)
@@ -437,53 +393,8 @@ def calculate_bl_polygons(im, lines):
             env_bottom.extend(list(bottom_limit.coords))
         env_up = np.array(env_up, dtype='uint')
         env_bottom = np.array(env_bottom, dtype='uint')
-        polygon = _extract_patch(env_up, env_bottom, line)
-        yield polygon
-
-
-def calculate_polygonal_environment(im, baselines, bl_mask=None, min_sp_dist: int = 3, radii: Sequence[int] = [16, 32, 64, 128]):
-    """
-    Given a list of baselines and an input image, calculates a polygonal
-    environment around each baseline.
-
-    This is a helper method that implements a similar algorithm as
-    `vectorize_lines`. It is not necessary to call this method except to find
-    the polygonal environment of pre-computed (or manually annotated)
-    baselines.
-
-    Args:
-        im (PIL.Image): Input image
-        baselines (sequence): List of lists containing a single baseline per
-                              entry.
-        bl_mask (numpy.array): Optional raw baselines output maps from the
-                               recognition net.
-
-    Returns:
-        List of tuples (polygonization, baseline) where each is a list of coordinates.
-    """
-    im = np.zeros(im.size)
-    line_points = []
-    for lin in baselines:
-        z = list(zip(lin[:-1], lin[1:]))
-        l_x_points = []
-        l_y_points = []
-        for l in z:
-            line_locs = draw.line(l[0][0], l[0][1], l[1][0], l[1][1])
-            im[line_locs] = 1
-            l_x_points.extend(line_locs[0].tolist())
-            l_y_points.extend(line_locs[1].tolist())
-        line_points.append(list(zip([l_x_points[0]] + l_x_points[1::min_sp_dist] + [l_x_points[-1]],
-                                    [l_y_points[0]] + l_y_points[1::min_sp_dist] + [l_y_points[-1]])))
-    sp_can = [point for l in line_points for point in l]
-    sp_can = np.array(sp_can)
-    bl_map = im
-    sep_map = np.zeros_like(bl_map)
-    intensities, states = _compute_sp_states(sp_can, bl_map, sep_map, radii)
-    cl_line_points = []
-    for lin in line_points:
-        cl_line_points.append([[point] for point in lin])
-    lines = _interpolate_lines(cl_line_points, states)
-    return lines
+        polygons.append(_extract_patch(env_up, env_bottom, line))
+    return polygons
 
 
 def polygonal_reading_order(lines: Sequence[Tuple[List, List]], text_direction: str = 'lr') -> Sequence[Tuple[List, List]]:
@@ -526,6 +437,7 @@ def scale_polygonal_lines(lines: Sequence[Tuple[List, List]], scale: Union[float
         scaled_lines.append(((np.array(bl) * scale).astype('int').tolist(),
                              (np.array(pl) * scale).astype('int').tolist()))
     return scaled_lines
+
 
 def _test_intersect(bp, uv, bs):
     """
