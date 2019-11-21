@@ -26,6 +26,7 @@ import logging
 import numpy as np
 import pkg_resources
 import torch.nn.functional as F
+import torchvision.transforms as tf
 
 from typing import Tuple, Sequence, List
 from scipy.ndimage.filters import (gaussian_filter, uniform_filter,
@@ -102,6 +103,7 @@ def segment(im,
     batch, channels, height, width = model.input
     transforms = dataset.generate_input_transforms(batch, height, width, channels, 0, valid_norm=False)
     res_tf = tf.Compose(transforms.transforms[:2])
+    scal_im = res_tf(im).convert('L')
 
     with torch.no_grad():
         logger.debug('Running network forward pass')
@@ -112,8 +114,7 @@ def segment(im,
     logger.debug('Vectorizing network output')
     baselines = vectorize_lines(o)
     logger.debug('Polygonizing lines')
-    scal_im = res_tf(im).convert('L')
-    lines = calculate_polygonal_environment(scal_im, baselines)
+    lines = list(zip(baselines, calculate_polygonal_environment(scal_im, baselines)))
     logger.debug('Scaling vectorized lines')
     scale = np.divide(im.size, o.shape[:0:-1])
     lines = scale_polygonal_lines(lines, scale)
