@@ -168,6 +168,7 @@ def _compute_sp_states(sp_can, bl_map, sep_map):
             intensities[key] = (bl_map[line_locs].mean(), bl_map[line_locs].var(), sep_map[line_locs].mean(), sep_map[line_locs].max())
             intensity.append(intensities[key][0])
 
+    logger.debug('Filtering triangulation')
     # filter edges in triangulation
     for k, v in list(intensities.items()):
         if v[0] < 0.4:
@@ -241,7 +242,7 @@ def _interpolate_lines(clusters):
         xp, yp = poly.linspace(max(np.diff(poly.domain)//deg, 2))
         xp = xp.astype('int')
         yp = yp.astype('int')
-        lines.append(list(zip(yp, xp)))
+        lines.append(list(zip(xp, yp)))
     return lines
 
 
@@ -362,13 +363,13 @@ def calculate_polygonal_environment(im: PIL.Image.Image, baselines: Sequence[Tup
         lr = np.array(line[:2], dtype=np.float)
         lr_dir = lr[1] - lr[0]
         lr_dir = (lr_dir.T  / np.sqrt(np.sum(lr_dir**2,axis=-1)))
-        lr_up_intersect = _ray_intersect_boundaries(lr[0], (lr_dir*(-1,1))[::-1], bounds).astype('int')
-        lr_bottom_intersect = _ray_intersect_boundaries(lr[0], (lr_dir*(1,-1))[::-1], bounds).astype('int')
+        lr_up_intersect = _ray_intersect_boundaries(lr[0], (lr_dir*(-1,1))[::-1], bounds-1).astype('int')
+        lr_bottom_intersect = _ray_intersect_boundaries(lr[0], (lr_dir*(1,-1))[::-1], bounds-1).astype('int')
         rr = np.array(line[-2:], dtype=np.float)
         rr_dir = rr[1] - rr[0]
         rr_dir = (rr_dir.T  / np.sqrt(np.sum(rr_dir**2,axis=-1)))
-        rr_up_intersect = _ray_intersect_boundaries(rr[0], (rr_dir*(-1,1))[::-1], bounds).astype('int')
-        rr_bottom_intersect = _ray_intersect_boundaries(rr[0], (rr_dir*(1,-1))[::-1], bounds).astype('int')
+        rr_up_intersect = _ray_intersect_boundaries(rr[0], (rr_dir*(-1,1))[::-1], bounds-1).astype('int')
+        rr_bottom_intersect = _ray_intersect_boundaries(rr[0], (rr_dir*(1,-1))[::-1], bounds-1).astype('int')
         # build polygon between baseline and bbox intersects
         upper_polygon = geom.Polygon([lr_up_intersect.tolist()] + line + [rr_up_intersect.tolist()])
         bottom_polygon = geom.Polygon([lr_bottom_intersect.tolist()] + line + [rr_bottom_intersect.tolist()])
@@ -393,6 +394,8 @@ def calculate_polygonal_environment(im: PIL.Image.Image, baselines: Sequence[Tup
             env_bottom.extend(list(bottom_limit.coords))
         env_up = np.array(env_up, dtype='uint')
         env_bottom = np.array(env_bottom, dtype='uint')
+        print(env_up)
+        print(env_bottom)
         polygons.append(_extract_patch(env_up, env_bottom, line))
     return polygons
 
