@@ -76,6 +76,7 @@ def _expand_gt(ctx, param, value):
         images.extend([x for x in glob.iglob(expression, recursive=True) if os.path.isfile(x)])
     return images
 
+
 @cli.command('segtrain')
 @click.pass_context
 @click.option('-o', '--output', show_default=True, type=click.Path(), default='model', help='Output model file')
@@ -127,10 +128,8 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
 
     from torch.utils.data import DataLoader
 
-    from kraken.lib import models, vgsl, train
-    from kraken.lib.util import make_printable
-    from kraken.lib.train import EarlyStopping, EpochStopping, TrainStopper, TrainScheduler, add_1cycle
-    from kraken.lib.codec import PytorchCodec
+    from kraken.lib import vgsl, train
+    from kraken.lib.train import EarlyStopping, EpochStopping, TrainScheduler, add_1cycle
     from kraken.lib.dataset import BaselineSet, generate_input_transforms
 
     logger.info('Building ground truth set from {} document images'.format(len(ground_truth) + len(training_files)))
@@ -218,7 +217,7 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
 
     optim = getattr(torch.optim, optimizer)(nn.nn.parameters(), lr=0)
 
-    if 'accuracy' not in  nn.user_metadata:
+    if 'accuracy' not in nn.user_metadata:
         nn.user_metadata['accuracy'] = []
 
     tr_it = TrainScheduler(optim)
@@ -248,8 +247,8 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
 
     trainer.add_lr_scheduler(tr_it)
 
-    with  log.progressbar(label='stage {}/{}'.format(1, trainer.stopper.epochs if trainer.stopper.epochs > 0 else '∞'),
-                          length=trainer.event_it, show_pos=True) as bar:
+    with log.progressbar(label='stage {}/{}'.format(1, trainer.stopper.epochs if trainer.stopper.epochs > 0 else '∞'),
+                         length=trainer.event_it, show_pos=True) as bar:
 
         def _draw_progressbar():
             bar.update(1)
@@ -508,7 +507,7 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
 
         try:
             gt_set.encode(codec)
-        except KrakenEncodeException as e:
+        except KrakenEncodeException:
             message('Network codec not compatible with training set')
             alpha_diff = set(gt_set.alphabet).difference(set(codec.c2l.keys()))
             if resize == 'fail':
@@ -676,7 +675,7 @@ def test(ctx, model, evaluation_files, device, pad, threads, reorder, normalizat
     if normalization:
         text_transforms.append(lambda x: unicodedata.normalize(normalization, x))
     if normalize_whitespace:
-        text_transforms.append(lambda x: regex.sub('\s', ' ', x))
+        text_transforms.append(lambda x: regex.sub(r'\s', ' ', x))
         text_transforms.append(lambda x: x.strip())
     if reorder:
         text_transforms.append(get_display)
@@ -763,7 +762,7 @@ def extract(ctx, binarize, normalization, normalize_whitespace, reorder,
     if normalization:
         text_transforms.append(lambda x: unicodedata.normalize(normalization, x))
     if normalize_whitespace:
-        text_transforms.append(lambda x: regex.sub('\s', ' ', x))
+        text_transforms.append(lambda x: regex.sub(r'\s', ' ', x))
     if reorder:
         text_transforms.append(get_display)
 
@@ -849,7 +848,6 @@ def transcription(ctx, text_direction, scale, bw, maxcolseps,
     from kraken import binarization
 
     from kraken.lib import models
-    from kraken.lib.util import is_bitonal
 
     ti = transcribe.TranscriptionInterface(font, font_style)
 
@@ -1056,7 +1054,7 @@ def publish(ctx, metadata, access_token, model):
         accuracy_default = None
         # take last accuracy measurement in model metadata
         if 'accuracy' in nn.nn.user_metadata and nn.nn.user_metadata['accuracy']:
-           accuracy_default = nn.nn.user_metadata['accuracy'][-1][1] * 100
+            accuracy_default = nn.nn.user_metadata['accuracy'][-1][1] * 100
         accuracy = click.prompt('accuracy on test set', type=float, default=accuracy_default)
         script = [click.prompt('script', type=click.Choice(sorted(schema['properties']['script']['items']['enum'])), show_choices=True)]
         license = click.prompt('license', type=click.Choice(sorted(schema['properties']['license']['enum'])), show_choices=True)
@@ -1085,6 +1083,7 @@ def publish(ctx, metadata, access_token, model):
     metadata['graphemes'] = [char for char in ''.join(nn.codec.c2l.keys())]
     oid = repo.publish_model(model, metadata, access_token, partial(message, '.', nl=False))
     message('\nmodel PID: {}'.format(oid))
+
 
 if __name__ == '__main__':
     cli()

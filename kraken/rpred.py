@@ -20,11 +20,10 @@ kraken.rpred
 Generators for recognition on lines images.
 """
 import logging
-import numpy as np
 import bidi.algorithm as bd
 
-from PIL import Image, ImageDraw
-from typing import List, Tuple, Optional, Generator, Union, Dict, Any
+from PIL import Image
+from typing import List, Tuple, Optional, Generator, Union, Dict
 
 from kraken.lib.util import get_im_str
 from kraken.lib.models import TorchSeqRecognizer
@@ -128,7 +127,6 @@ def bidi_record(record: ocr_record) -> ocr_record:
     return ocr_record(prediction, cuts, confidences, line)
 
 
-
 class mm_rpred(object):
     """
     Multi-model version of kraken.rpred.rpred
@@ -169,8 +167,6 @@ class mm_rpred(object):
             KrakenInputException if the mapping between segmentation scripts and
             networks is incomplete.
         """
-
-
         if 'type' in bounds and bounds['type'] == 'baselines':
             valid_norm = False
             self.len = len(bounds['lines'])

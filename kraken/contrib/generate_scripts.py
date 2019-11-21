@@ -8,7 +8,7 @@ import regex
 
 uri = 'http://www.unicode.org/Public/UNIDATA/Scripts.txt'
 
-re = regex.compile('^(?P<start>[0-9A-F]{4,6})(..(?P<end>[0-9A-F]{4,6}))?\s+; (?P<name>[A-Za-z]+)')
+re = regex.compile(r'^(?P<start>[0-9A-F]{4,6})(..(?P<end>[0-9A-F]{4,6}))?\s+; (?P<name>[A-Za-z]+)')
 
 with open('scripts.json', 'w') as fp, request.urlopen(uri) as req:
     d = []
@@ -24,7 +24,7 @@ with open('scripts.json', 'w') as fp, request.urlopen(uri) as req:
             if m.group('end'):
                 end = int(m.group('end'), base=16)
             name = m.group('name')
-            if len(d) > 0 and d[-1][2] == name and (start - 1 == d[-1][1] or start -1 == d[-1][0]):
+            if len(d) > 0 and d[-1][2] == name and (start - 1 == d[-1][1] or start - 1 == d[-1][0]):
                 print('merging {} and ({}, {}, {})'.format(d[-1], start, end, name))
                 d[-1] = (d[-1][0], end, name)
             else:

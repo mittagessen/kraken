@@ -60,10 +60,10 @@ def is_printable(char: str) -> bool:
     Returns:
         True if printable, False otherwise.
     """
-    letters     = ('LC', 'Ll', 'Lm', 'Lo', 'Lt', 'Lu')
-    numbers     = ('Nd', 'Nl', 'No')
+    letters = ('LC', 'Ll', 'Lm', 'Lo', 'Lt', 'Lu')
+    numbers = ('Nd', 'Nl', 'No')
     punctuation = ('Pc', 'Pd', 'Pe', 'Pf', 'Pi', 'Po', 'Ps')
-    symbol      = ('Sc', 'Sk', 'Sm', 'So')
+    symbol = ('Sc', 'Sk', 'Sm', 'So')
     printable = letters + numbers + punctuation + symbol
 
     return unicodedata.category(char) in printable

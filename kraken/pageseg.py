@@ -27,7 +27,7 @@ import logging
 import numpy as np
 import pkg_resources
 
-from typing import Tuple, Sequence, List
+from typing import Tuple, List
 from scipy.ndimage.filters import (gaussian_filter, uniform_filter,
                                    maximum_filter)
 

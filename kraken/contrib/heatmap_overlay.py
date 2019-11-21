@@ -5,13 +5,10 @@ Produces semi-transparent neural segmenter output overlays
 
 import sys
 import torch
-import numpy as np
 from PIL import Image
-from kraken.lib import segmentation, vgsl, dataset
+from kraken.lib import vgsl, dataset
 import torch.nn.functional as F
-from typing import *
-import glob
-from os.path import splitext, exists
+from os.path import splitext
 
 model = vgsl.TorchVGSLModel.load_model(sys.argv[1])
 model.eval()
@@ -35,4 +32,3 @@ for img in imgs:
     Image.composite(overlay, im.convert('RGBA'), heat).save(splitext(img)[0] + '.overlay.png')
     del o
     del im
-

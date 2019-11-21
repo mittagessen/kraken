@@ -20,7 +20,6 @@ kraken.blla
 Trainable baseline layout analysis tools for kraken
 """
 
-import json
 import torch
 import logging
 import numpy as np
@@ -28,16 +27,10 @@ import pkg_resources
 import torch.nn.functional as F
 import torchvision.transforms as tf
 
-from typing import Tuple, Sequence, List
-from scipy.ndimage.filters import (gaussian_filter, uniform_filter,
-                                   maximum_filter)
-
-from kraken.lib import morph, sl, vgsl, segmentation, dataset
+from kraken.lib import vgsl, dataset
 from kraken.lib.util import pil2array, is_bitonal, get_im_str
 from kraken.lib.exceptions import KrakenInputException
 from kraken.lib.segmentation import polygonal_reading_order, vectorize_lines, scale_polygonal_lines, calculate_polygonal_environment
-from kraken.rpred import rpred
-from kraken.serialization import max_bbox
 
 __all__ = ['segment']
 
@@ -123,6 +116,3 @@ def segment(im,
     return {'text_direction': text_direction,
             'type': 'baselines',
             'lines': [{'script': 'default', 'baseline': bl, 'boundary': pl} for bl, pl in lines]}
-
-
-

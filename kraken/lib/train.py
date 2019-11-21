@@ -23,15 +23,12 @@ import logging
 import numpy as np
 import torch.nn.functional as F
 
-from itertools import cycle, count
-from torch.utils import data
-from functools import partial
-from typing import Tuple, Union, Optional, Callable, List, Dict, Any
-from collections.abc import Iterable
+from itertools import cycle
+from typing import Tuple, Callable, List, Dict, Any
 
 from kraken.lib import models, vgsl, segmentation
 from kraken.lib.dataset import compute_error
-from kraken.lib.exceptions import KrakenStopTrainingException, KrakenInputException
+from kraken.lib.exceptions import KrakenInputException
 
 logger = logging.getLogger(__name__)
 
@@ -59,11 +56,14 @@ class TrainStopper(object):
         """
         pass
 
+
 def annealing_const(start: float, end: float, pct: float) -> float:
     return start
 
+
 def annealing_linear(start: float, end: float, pct: float) -> float:
     return start + pct * (end-start)
+
 
 def annealing_cos(start: float, end: float, pct: float) -> float:
     co = np.cos(np.pi * pct) + 1
@@ -122,7 +122,9 @@ def add_1cycle(sched: TrainScheduler, iterations: int,
     """
     Adds 1cycle policy [0] phases to a learning rate scheduler.
 
-    [0] Smith, Leslie N. "A disciplined approach to neural network hyper-parameters: Part 1--learning rate, batch size, momentum, and weight decay." arXiv preprint arXiv:1803.09820 (2018).
+    [0] Smith, Leslie N. "A disciplined approach to neural network
+    hyper-parameters: Part 1--learning rate, batch size, momentum, and weight
+    decay." arXiv preprint arXiv:1803.09820 (2018).
 
     Args:
         sched (kraken.lib.train.Trainscheduler): TrainScheduler instance
@@ -212,7 +214,7 @@ class NoStopping(TrainStopper):
     def __init__(self) -> None:
         super().__init__()
 
-    def update(self, val_los: float) -> None:
+    def update(self, val_loss: float) -> None:
         """
         Only update internal best iteration
         """
@@ -223,6 +225,7 @@ class NoStopping(TrainStopper):
 
     def trigger(self) -> bool:
         return True
+
 
 def recognition_loss_fn(criterion, output, target):
     # height should be 1 by now
@@ -236,10 +239,12 @@ def recognition_loss_fn(criterion, output, target):
                      (target.size(1),))
     return loss
 
+
 def baseline_label_loss_fn(criterion, output, target):
     output = F.interpolate(output, size=(target.size(1), target.size(2)))
     loss = criterion(output, target)
     return loss
+
 
 def recognition_evaluator_fn(model, val_set, device):
     rec = models.TorchSeqRecognizer(model, device=device)
@@ -247,6 +252,7 @@ def recognition_evaluator_fn(model, val_set, device):
     model.train()
     accuracy = (chars-error)/chars
     return {'val_metric': accuracy, 'accuracy': accuracy, 'chars': chars, 'error': error}
+
 
 def baseline_label_evaluator_fn(model, val_set, device):
 
@@ -285,13 +291,14 @@ def baseline_label_evaluator_fn(model, val_set, device):
     # all_positives = tp + fp
     # actual_positives = tp + fn
     # true_positivies = tp
-    precision = true_positives / (all_positives + 1e-20)
-    recall = true_positives / (actual_positives + 1e-20)
-    f1 = precision * recall * 2 / (precision + recall + 1e-20)
+    precision = true_positives/(all_positives + 1e-20)
+    recall = true_positives/(actual_positives + 1e-20)
+    f1 = precision * recall * 2/(precision + recall + 1e-20)
     s = actual_positives/all_n
     p = all_positives/all_n
     mcc = ((true_positives/all_n) - s*p)/(torch.sqrt(p*s*(1-s)*(1-p)) + 1e-20)
     return {'precision': precision, 'recall': recall, 'f1': f1, 'mcc': mcc, 'val_metric': mcc}
+
 
 class KrakenTrainer(object):
     """
@@ -304,10 +311,10 @@ class KrakenTrainer(object):
                  filename_prefix: str = 'model',
                  event_frequency: float = 1.0,
                  train_set: torch.utils.data.DataLoader = None,
-                 val_set = None,
-                 stopper = None,
-                 loss_fn = recognition_loss_fn,
-                 evaluator = recognition_evaluator_fn):
+                 val_set=None,
+                 stopper=None,
+                 loss_fn=recognition_loss_fn,
+                 evaluator=recognition_evaluator_fn):
         self.model = model
         self.optimizer = optimizer
         self.device = device
@@ -325,7 +332,7 @@ class KrakenTrainer(object):
     def add_lr_scheduler(self, lr_scheduler: TrainScheduler):
         self.lr_scheduler = lr_scheduler
 
-    def run(self, event_callback = lambda *args, **kwargs: None, iteration_callback = lambda *args, **kwargs: None):
+    def run(self, event_callback=lambda *args, **kwargs: None, iteration_callback=lambda *args, **kwargs: None):
         logger.debug('Moving model to device {}'.format(self.device))
         self.model.to(self.device)
 

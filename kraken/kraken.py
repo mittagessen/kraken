@@ -191,10 +191,12 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, script_ignore, base
 
 @click.group(chain=True)
 @click.version_option()
-@click.option('-i', '--input', type=(click.Path(exists=True),  # type: ignore
-                                     click.Path(writable=True)), multiple=True,
-                                     help='Input-output file pairs. Each input file (first argument) is mapped to one '
-                                          'output file (second argument), e.g. `-i input.png output.txt`')
+@click.option('-i', '--input',
+              type=(click.Path(exists=True),  # type: ignore
+                    click.Path(writable=True)),
+              multiple=True,
+              help='Input-output file pairs. Each input file (first argument) is mapped to one '
+                   'output file (second argument), e.g. `-i input.png output.txt`')
 @click.option('-I', '--batch-input', multiple=True, help='Glob expression to add multiple files at once.')
 @click.option('-o', '--suffix', help='Suffix for output files from batch inputs.')
 @click.option('-v', '--verbose', default=0, count=True, show_default=True)
@@ -309,7 +311,7 @@ def _validate_mm(ctx, param, value):
                 model_dict['ignore'].append(k)  # type: ignore
             else:
                 model_dict[k] = os.path.expanduser(v)
-    except Exception as e:
+    except Exception:
         raise click.BadParameter('Mappings must be in format script:model')
     return model_dict
 
@@ -402,8 +404,6 @@ def show(ctx, model_id):
     """
     Retrieves model metadata from the repository.
     """
-    import unicodedata
-
     from kraken import repo
     from kraken.lib.util import make_printable, is_printable
 

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# 
+#
 # Copyright 2019 Benjamin Kiessling
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -26,10 +26,10 @@ from PIL import Image, ImageDraw
 
 from numpy.polynomial import Polynomial
 
-from scipy.ndimage import label, black_tophat
-from scipy.ndimage.filters import gaussian_filter, gaussian_filter1d
+from scipy.ndimage import black_tophat
+from scipy.ndimage.filters import gaussian_filter
 from scipy.ndimage.morphology import grey_dilation
-from scipy.spatial import distance_matrix, ConvexHull, Delaunay
+from scipy.spatial import distance_matrix, Delaunay
 from scipy.spatial.distance import cdist, pdist, squareform
 
 from shapely.ops import nearest_points, unary_union
@@ -40,13 +40,8 @@ from skimage.measure import approximate_polygon, find_contours
 from skimage.morphology import skeletonize, watershed
 from skimage.transform import PiecewiseAffineTransform, warp
 
-from itertools import combinations
-from collections import defaultdict, OrderedDict
+from typing import List, Tuple, Union, Dict, Any, Sequence
 
-from typing import List, Tuple, Optional, Generator, Union, Dict, Any, Sequence
-
-from kraken.lib import morph, util
-from kraken.binarization import nlbin
 
 logger = logging.getLogger('kraken')
 
@@ -118,6 +113,7 @@ def topsort(order: np.array) -> np.array:
     for k in range(n):
         _visit(k)
     return L
+
 
 def denoising_hysteresis_thresh(im, low, high, sigma):
     im = gaussian_filter(im, sigma)
@@ -238,7 +234,6 @@ def _interpolate_lines(clusters):
         # very short lines might not have enough superpixels to ensure a well-conditioned regression
         deg = min(len(x)-1, 3)
         poly = Polynomial.fit(x, y, deg=deg)
-        deriv = poly.deriv()
         xp, yp = poly.linspace(max(np.diff(poly.domain)//deg, 2))
         xp = xp.astype('int')
         yp = yp.astype('int')
@@ -456,6 +451,7 @@ def _test_intersect(bp, uv, bs):
         t1 = t1[np.logical_and(t2 >= 0.0, t2 <= 1.0)]
         points.extend(bp + (t1[np.where(t1 >= 0)[0].min()] * (uv * dir)))
     return np.array(points)
+
 
 def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image:
     """

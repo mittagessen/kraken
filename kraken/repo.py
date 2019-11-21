@@ -16,7 +16,6 @@
 """
 Accessors to the model repository on zenodo.
 """
-from collections import defaultdict
 from typing import Callable, Any, BinaryIO
 from contextlib import closing
 
@@ -34,6 +33,7 @@ logger = logging.getLogger(__name__)
 
 MODEL_REPO = 'https://zenodo.org/api/'
 SUPPORTED_MODELS = set(['kraken_pytorch'])
+
 
 def publish_model(model_file: BinaryIO = None, metadata: dict = None, access_token: str = None, callback: Callable[..., Any] = lambda: None) -> str:
     """
@@ -94,6 +94,7 @@ def publish_model(model_file: BinaryIO = None, metadata: dict = None, access_tok
     callback()
     return r.json()['doi']
 
+
 def get_model(model_id: str, path: str, callback: Callable[..., Any] = lambda: None) -> str:
     """
     Retrieves a model and saves it to a path.
@@ -112,13 +113,13 @@ def get_model(model_id: str, path: str, callback: Callable[..., Any] = lambda: N
     r.raise_for_status()
     callback()
     resp = r.json()
-    if  resp['hits']['total'] != 1:
+    if resp['hits']['total'] != 1:
         logger.error('Found {} models when querying for id \'{}\''.format(resp['hits']['total'], model_id))
         raise KrakenRepoException('Found {} models when querying for id \'{}\''.format(resp['hits']['total'], model_id))
 
     metadata = resp['hits']['hits'][0]
     model_url = [x['links']['self'] for x in metadata['files'] if x['type'] == 'mlmodel'][0]
-    # callable model identifier 
+    # callable model identifier
     nat_id = os.path.basename(urllib.parse.urlparse(model_url).path)
     spath = os.path.join(path, nat_id)
     logger.debug('downloading model file {} to {}'.format(model_url, spath))
@@ -146,7 +147,7 @@ def get_description(model_id: str, callback: Callable[..., Any] = lambda: None) 
     r.raise_for_status()
     callback()
     resp = r.json()
-    if  resp['hits']['total'] != 1:
+    if resp['hits']['total'] != 1:
         logger.error('Found {} models when querying for id \'{}\''.format(resp['hits']['total'], model_id))
         raise KrakenRepoException('Found {} models when querying for id \'{}\''.format(model_id))
     record = resp['hits']['hits'][0]
@@ -168,7 +169,7 @@ def get_description(model_id: str, callback: Callable[..., Any] = lambda: None) 
             callback()
             try:
                 meta_json = r.json()
-            except:
+            except Exception:
                 msg = 'Metadata for \'{}\' ({}) not in JSON format'.format(record['metadata']['title'], record['metadata']['doi'])
                 logger.error(msg)
                 raise KrakenRepoException(msg)
@@ -230,7 +231,7 @@ def get_listing(callback: Callable[..., Any] = lambda: None) -> dict:
                 r.raise_for_status()
                 try:
                     metadata = r.json()
-                except:
+                except Exception:
                     msg = 'Metadata for \'{}\' ({}) not in JSON format'.format(record['metadata']['title'], record['metadata']['doi'])
                     logger.error(msg)
                     raise KrakenRepoException(msg)

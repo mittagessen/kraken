@@ -12,7 +12,7 @@ from coremltools.proto import NeuralNetwork_pb2
 # all tensors are ordered NCHW, the "feature" dimension is C, so the output of
 # an LSTM will be put into C same as the filters of a CNN.
 
-__all__ = ['MaxPool', 'Reshape', 'Dropout', 'TransposedSummarizingRNN', 'LinSoftmax', 'ActConv2D', 'BatchNorm']
+__all__ = ['MaxPool', 'Reshape', 'Dropout', 'TransposedSummarizingRNN', 'LinSoftmax', 'ActConv2D']
 
 
 def PeepholeLSTMCell(input: torch.Tensor,
@@ -488,6 +488,7 @@ class TransposedSummarizingRNN(Module):
                                 output_all=not self.summarize)
         return name
 
+
 class LinSoftmax(Module):
     """
     A wrapper for linear projection + softmax dealing with dimensionality mangling.
@@ -523,7 +524,7 @@ class LinSoftmax(Module):
         if self.augmentation:
             inputs = torch.cat([torch.ones(inputs.shape[:3] + (1,)), inputs], dim=3)
         o = self.lin(inputs)
-        # switch between log softmax (needed by ctc) and regular (for inference). 
+        # switch between log softmax (needed by ctc) and regular (for inference).
         if not self.training:
             o = F.softmax(o, dim=3)
         else:
@@ -630,7 +631,7 @@ class ActConv2D(Module):
     def get_shape(self, input: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
         self.output_shape = (input[0],
                              self.out_channels,
-                             int(max(np.floor((input[2]+2*self.padding[0]-(self.kernel_size[0]-1)-1)/self.stride[0] +1), 1) if input[2] != 0 else 0),
+                             int(max(np.floor((input[2]+2*self.padding[0]-(self.kernel_size[0]-1)-1)/self.stride[0]+1), 1) if input[2] != 0 else 0),
                              int(max(np.floor((input[3]+2*self.padding[1]-(self.kernel_size[1]-1)-1)/self.stride[1]+1), 1) if input[3] != 0 else 0))
         return self.output_shape
 

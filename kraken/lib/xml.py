@@ -20,13 +20,13 @@ ALTO/Page data loaders for segmentation training
 import os.path
 import logging
 
-logger = logging.getLogger(__name__)
-
-from PIL import Image
 from lxml import etree
 from os.path import dirname
 
 from kraken.lib.exceptions import KrakenInputException
+
+logger = logging.getLogger(__name__)
+
 
 def parse_page(filename):
     """
@@ -77,6 +77,7 @@ def parse_page(filename):
                     text += el.text
             data['lines'].append({'baseline': baseline, 'boundary': boundary, 'text': text})
         return data
+
 
 def parse_alto(filename):
     """

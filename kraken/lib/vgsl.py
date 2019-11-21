@@ -106,7 +106,7 @@ class TorchVGSLModel(object):
         self.codec = None  # type: Optional[PytorchCodec]
         self.criterion = None  # type: Any
         self.nn = torch.nn.Sequential()
-        self.user_metadata = {} # type: dict[str, str]
+        self.user_metadata = {}  # type: dict[str, str]
 
         self.idx = -1
         spec = spec.strip()

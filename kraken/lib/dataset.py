@@ -30,7 +30,6 @@ from PIL import Image, ImageDraw
 from collections import Counter
 from torchvision import transforms
 from torch.utils.data import Dataset
-from scipy.ndimage import gaussian_filter
 from typing import Dict, List, Tuple, Sequence, Callable, Optional, Any, Union, cast
 
 from kraken.lib.xml import parse_alto, parse_page
@@ -113,6 +112,7 @@ def generate_input_transforms(batch: int, height: int, width: int, channels: int
     out_transforms.append(transforms.Lambda(lambda x: x.permute(*perm)))
     return transforms.Compose(out_transforms)
 
+
 def _fixed_resize(img, size, interpolation=Image.LANCZOS):
     """
     Doesn't do the annoying runtime scale dimension switching the default
@@ -129,6 +129,7 @@ def _fixed_resize(img, size, interpolation=Image.LANCZOS):
     elif ow == 0:
         ow = int(w * oh/h)
     return img.resize((ow, oh), interpolation)
+
 
 def _fast_levenshtein(seq1: Sequence[Any], seq2: Sequence[Any]) -> int:
 
@@ -339,7 +340,7 @@ class PolygonGTDataset(Dataset):
             im, _ = next(extract_polygons(im, {'type': 'baselines', 'lines': [{'baseline': baseline, 'boundary': boundary}]}))
             try:
                 im = self.transforms(im)
-            except ValueError as e:
+            except ValueError:
                 raise KrakenInputException('Image transforms failed on {}'.format(image))
             self._images.append(im)
         else:
@@ -452,7 +453,7 @@ class GroundTruthDataset(Dataset):
             im = Image.open(image)
             try:
                 im = self.transforms(im)
-            except ValueError as e:
+            except ValueError:
                 raise KrakenInputException('Image transforms failed on {}'.format(image))
             self._images.append(im)
         else:
@@ -471,7 +472,7 @@ class GroundTruthDataset(Dataset):
         if self.preload:
             try:
                 im = self.transforms(image)
-            except ValueError as e:
+            except ValueError:
                 raise KrakenInputException('Image transforms failed on {}'.format(image))
             self._images.append(im)
         else:

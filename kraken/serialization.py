@@ -17,7 +17,6 @@ from jinja2 import Environment, PackageLoader
 
 import regex
 import logging
-import unicodedata
 
 from collections import Counter
 
@@ -65,7 +64,7 @@ def max_bbox(boxes: Iterable[Sequence[int]]) -> Tuple[int, int, int, int]:
     flat_box = [x for point in flat_box for x in point]
     xmin, xmax = min(flat_box[::2]), max(flat_box[::2])
     ymin, ymax = min(flat_box[1::2]), max(flat_box[1::2])
-    o = xmin, ymin, xmax, ymax # type: ignore
+    o = xmin, ymin, xmax, ymax  # type: ignore
     return o
 
 
@@ -133,11 +132,11 @@ def serialize(records: Sequence[ocr_record],
                           'cuts': record.cuts[line_offset:line_offset + len(segment)],
                           'text': segment,
                           'recognition': [{'bbox': max_bbox([cut]), 'boundary': cut, 'confidence': conf, 'text': char, 'index': cid}
-                                           for conf, cut, char, cid in
-                                           zip(record.confidences[line_offset:line_offset + len(segment)],
-                                               record.cuts[line_offset:line_offset + len(segment)],
-                                               segment,
-                                               range(char_idx, char_idx + len(segment)))],
+                                          for conf, cut, char, cid in
+                                          zip(record.confidences[line_offset:line_offset + len(segment)],
+                                              record.cuts[line_offset:line_offset + len(segment)],
+                                              segment,
+                                              range(char_idx, char_idx + len(segment)))],
                           'index': seg_idx}
             # compute complex hull of all characters in segment
             if record.type == 'baseline':
@@ -216,4 +215,3 @@ def render_report(model: str,
     tmpl = env.get_template('report')
     logger.debug('Rendering data.')
     return tmpl.render(report=report)
-
