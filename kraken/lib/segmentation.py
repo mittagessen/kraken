@@ -394,8 +394,6 @@ def calculate_polygonal_environment(im: PIL.Image.Image, baselines: Sequence[Tup
             env_bottom.extend(list(bottom_limit.coords))
         env_up = np.array(env_up, dtype='uint')
         env_bottom = np.array(env_bottom, dtype='uint')
-        print(env_up)
-        print(env_bottom)
         polygons.append(_extract_patch(env_up, env_bottom, line))
     return polygons
 
