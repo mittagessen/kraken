@@ -34,7 +34,7 @@ from scipy.ndimage.filters import (gaussian_filter, uniform_filter,
 from kraken.lib import morph, sl, vgsl, segmentation, dataset
 from kraken.lib.util import pil2array, is_bitonal, get_im_str
 from kraken.lib.exceptions import KrakenInputException
-from kraken.lib.segmentation import polygonal_reading_order, vectorize_lines, scale_polygonal_lines
+from kraken.lib.segmentation import polygonal_reading_order, vectorize_lines, scale_polygonal_lines, calculate_polygonal_environment
 from kraken.rpred import rpred
 from kraken.serialization import max_bbox
 
@@ -101,23 +101,27 @@ def segment(im,
 
     batch, channels, height, width = model.input
     transforms = dataset.generate_input_transforms(batch, height, width, channels, 0, valid_norm=False)
+    res_tf = tf.Compose(transforms.transforms[:2])
 
     with torch.no_grad():
         logger.debug('Running network forward pass')
         o = model.nn(transforms(im).unsqueeze(0))
     logger.debug('Upsampling network output')
-    o = o.squeeze(0).numpy()
-#    o = F.interpolate(o, size=im.size[::-1]).squeeze(0).numpy()
+    o = F.interpolate(o, size=scal_im.size[::-1])
+    o = o.squeeze().numpy()
     logger.debug('Vectorizing network output')
     baselines = vectorize_lines(o)
+    logger.debug('Polygonizing lines')
+    scal_im = res_tf(im).convert('L')
+    lines = calculate_polygonal_environment(scal_im, baselines)
     logger.debug('Scaling vectorized lines')
     scale = np.divide(im.size, o.shape[:0:-1])
-    baselines = scale_polygonal_lines(baselines, scale)
+    lines = scale_polygonal_lines(lines, scale)
     logger.debug('Reordering baselines')
-    baselines = reading_order_fn(baselines, text_direction[-2:])
+    lines = reading_order_fn(lines, text_direction[-2:])
     return {'text_direction': text_direction,
             'type': 'baselines',
-            'lines': [{'script': 'default', 'baseline': bl, 'boundary': pl} for bl, pl in baselines]}
+            'lines': [{'script': 'default', 'baseline': bl, 'boundary': pl} for bl, pl in lines]}
 
 
 
