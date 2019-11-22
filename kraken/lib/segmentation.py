@@ -276,7 +276,7 @@ def calculate_polygonal_environment(im: PIL.Image.Image, baselines: Sequence[Tup
     environment around each baseline.
 
     Args:
-        im (PIL.Image): Input image
+        im (PIL.Image): grayscale input image (mode 'L')
         baselines (sequence): List of lists containing a single baseline per
                               entry.
         bl_mask (numpy.array): Optional raw baselines output maps from the
@@ -363,8 +363,8 @@ def calculate_polygonal_environment(im: PIL.Image.Image, baselines: Sequence[Tup
         rr = np.array(line[-2:], dtype=np.float)
         rr_dir = rr[1] - rr[0]
         rr_dir = (rr_dir.T  / np.sqrt(np.sum(rr_dir**2,axis=-1)))
-        rr_up_intersect = _ray_intersect_boundaries(rr[0], (rr_dir*(-1,1))[::-1], bounds-1).astype('int')
-        rr_bottom_intersect = _ray_intersect_boundaries(rr[0], (rr_dir*(1,-1))[::-1], bounds-1).astype('int')
+        rr_up_intersect = _ray_intersect_boundaries(rr[1], (rr_dir*(-1,1))[::-1], bounds-1).astype('int')
+        rr_bottom_intersect = _ray_intersect_boundaries(rr[1], (rr_dir*(1,-1))[::-1], bounds-1).astype('int')
         # build polygon between baseline and bbox intersects
         upper_polygon = geom.Polygon([lr_up_intersect.tolist()] + line + [rr_up_intersect.tolist()])
         bottom_polygon = geom.Polygon([lr_bottom_intersect.tolist()] + line + [rr_bottom_intersect.tolist()])
