@@ -10,7 +10,23 @@
 			<Coords points="0,0 0,{{ page.size[1] }} {{ page.size[0] }},{{ page.size[1] }} {{ page.size[0] }},0"/>
 			{% for line in page.lines %}
 			<TextLine id="line_{{ line.index }}">
+				{% if line.boundary %}
+				<Coords points="{% for point in line.boundary %}{{ point|join(',') }}{% endfor %}"/>
+				{% else %}
+				<Coords points="{{ line.bbox[0] }},{{ line.bbox[1] }} {{ line.bbox[0] }},{{ line.bbox[3] }} {{ line.bbox[2]}},{{ line.bbox[3] }} {{ line.bbox[2] }},{{ line.bbox[1] }}"/>
+				{% endif %}
+				{% if line.baseline %}
 				<Baseline points="{% for point in line.baseline %}{{ point|join(',') }}{% endfor %}"/>
+				{% endif %}
+				{% for segment in line.recognition %}
+				<Word id= >
+					{% for char in segment.recognition %}
+					<Glyph>
+						<TextEquiv><Unicode></Unicode></TextEquiv>
+					</Glyph>
+					{% endfor %}
+				</Word>
+				{% endfor %}
 			</TextLine>
 			{% endfor %}
 		</TextRegion>

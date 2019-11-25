@@ -474,6 +474,24 @@ def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image:
         siz = im.size
         white = Image.new(im.mode, siz)
         for line in bounds['lines']:
+            polygon = np.array(line['boundary'])
+            r, c = draw.polygon(full_polygon[:,0], full_polygon[:,1])
+
+            bl = np.array(line['baseline'])
+            ls = np.dstack((bl[:-1:], bl[1::]))
+            bisect_points = np.mean(ls, 2)
+            mask = np.zeros(bounds.astype('int')[::-1], dtype=np.bool)
+            mask[c, r] = True
+            patch = im_feats.copy()
+            patch[mask != True] = 0
+            coords = np.argwhere(mask)
+            r_min, c_min = coords.min(axis=0)
+            r_max, c_max = coords.max(axis=0)
+            patch = patch[r_min:r_max+1, c_min:c_max+1]
+            markers = markers[r_min:r_max+1, c_min:c_max+1]
+            mask = mask[r_min:r_max+1, c_min:c_max+1]
+
+
             mask = Image.new('1', siz, 0)
             draw = ImageDraw.Draw(mask)
             draw.polygon([tuple(x) for x in line['boundary']], outline=1, fill=1)
