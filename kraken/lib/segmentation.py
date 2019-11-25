@@ -223,7 +223,7 @@ def _cluster_lines(intensities):
 
 def _interpolate_lines(clusters):
     """
-    Interpolates the baseline clusters and adds polygonal information.
+    Interpolates the baseline clusters.
     """
     logger.debug('Reticulating splines')
     lines = []
@@ -237,7 +237,10 @@ def _interpolate_lines(clusters):
         xp, yp = poly.linspace(max(np.diff(poly.domain)//deg, 2))
         xp = xp.astype('int')
         yp = yp.astype('int')
-        lines.append(list(zip(xp, yp)))
+        line = np.array(list(zip(xp, yp)))
+        line = approximate_polygon(line, 3)
+        line = line.astype('uint').tolist()
+        lines.append(line)
     return lines
 
 
@@ -328,7 +331,7 @@ def calculate_polygonal_environment(im: PIL.Image.Image, baselines: Sequence[Tup
             line_locs = draw.line(l[0][1], l[0][0], l[1][1], l[1][0])
             markers[line_locs] = 1
         markers = grey_dilation(markers, size=3)
-        full_polygon = np.concatenate((env_up, env_bottom[::-1]))
+        full_polygon = np.concatenate(([baseline[0]], env_up, [baseline[-1]], env_bottom[::-1]))
         r, c = draw.polygon(full_polygon[:,0], full_polygon[:,1])
         mask = np.zeros(bounds.astype('int')[::-1], dtype=np.bool)
         mask[c, r] = True
