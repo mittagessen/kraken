@@ -596,12 +596,18 @@ class BaselineSet(Dataset):
         return self.transform(im, target)
 
     @staticmethod
-    def _get_ortho_line(lineseg, point):
+    def _get_ortho_line(lineseg, point, line_width, offset):
         lineseg = np.array(lineseg)
         norm_vec = lineseg[1,...] - lineseg[0,...]
         norm_vec_len = np.sqrt(np.sum(norm_vec**2))
         unit_vec = norm_vec / norm_vec_len
         ortho_vec = unit_vec[::-1] * ((1,-1), (-1,1))
+        print('{} {}'.format(point, lineseg))
+        if offset == 'l':
+            point -= unit_vec * line_width
+        else:
+            point += unit_vec * line_width
+        print('after: {}'.format(point))
         return (ortho_vec * 10 + point).astype('int').tolist()
 
     def transform(self, image, target):
@@ -618,9 +624,9 @@ class BaselineSet(Dataset):
             for point in line:
                 l.append((int(point[0]*scale), int(point[1]*scale)))
             line_mask.line(l, fill=255, width=self.line_width)
-            sep_1 = [tuple(x) for x in self._get_ortho_line(l[:2], l[0])]
+            sep_1 = [tuple(x) for x in self._get_ortho_line(l[:2], l[0], self.line_width, 'l')]
             separator_mask.line(sep_1, fill=255, width=self.line_width)
-            sep_2 = [tuple(x) for x in self._get_ortho_line(l[-2:], l[-1])]
+            sep_2 = [tuple(x) for x in self._get_ortho_line(l[-2:], l[-1], self.line_width, 'r')]
             separator_mask.line(sep_2, fill=255, width=self.line_width)
         del line_mask
         del separator_mask
