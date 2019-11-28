@@ -352,7 +352,7 @@ def calculate_polygonal_environment(im: PIL.Image.Image, baselines: Sequence[Tup
         contours = find_contours(ws, 1.5, fully_connected='high')
         contour = np.array(unary_union([geom.Polygon(contour.tolist()) for contour in contours]).boundary, dtype='uint')
         ## approximate + remove offsets + transpose
-        contour = (approximate_polygon(contour, 5)-1+(r_min, c_min)).astype('uint')
+        contour = np.transpose((approximate_polygon(contour, 5)-1+(r_min, c_min)).astype('uint'), (0, 1))
         return contour.tolist()
 
     polygons = []
@@ -474,31 +474,31 @@ def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image:
         siz = im.size
         white = Image.new(im.mode, siz)
         for line in bounds['lines']:
-            #pl = np.array(line['boundary'])
-            #pl = measure.subdivide_polygon(pl, preserve_ends=True)
-            #pl = geom.MultiPoint(pl)
-            #bl = np.array(line['baseline'])
-            #bl = np.dstack((bl[:-1:], bl[1::]))
-            #bl = [geom.LineString(x) for x in bl]
-            ## distance of intercept from start point 
+            pl = np.array(line['boundary'])
+            pl = measure.subdivide_polygon(pl, preserve_ends=True)
+            pl = geom.MultiPoint(pl)
+            bl = np.array(line['baseline'])
+            bl = np.dstack((bl[:-1:], bl[1::]))
+            bl = [geom.LineString(x) for x in bl]
+            # distance of intercept from start point 
             #for point in pl.geoms:
             #    line.interpolate(line.project(point)) for line in bl:
             #        line.interpolate(line.project(point))
-            #root_dists = [bl.project(point) for point in pl.geoms]
-            ## actual intercept 
-            #root_points = [bl.interpolate(dist) for dist in zip(pl.geoms, root_dists)]
+            root_dists = [bl.project(point) for point in pl.geoms]
+            # actual intercept 
+            root_points = [bl.interpolate(dist) for dist in zip(pl.geoms, root_dists)]
 
-            #r, c = draw.polygon(full_polygon[:,0], full_polygon[:,1])
-            #mask = np.zeros(bounds.astype('int')[::-1], dtype=np.bool)
-            #mask[c, r] = True
-            #patch = im_feats.copy()
-            #patch[mask != True] = 0
-            #coords = np.argwhere(mask)
-            #r_min, c_min = coords.min(axis=0)
-            #r_max, c_max = coords.max(axis=0)
-            #patch = patch[r_min:r_max+1, c_min:c_max+1]
-            #markers = markers[r_min:r_max+1, c_min:c_max+1]
-            #mask = mask[r_min:r_max+1, c_min:c_max+1]
+            r, c = draw.polygon(full_polygon[:,0], full_polygon[:,1])
+            mask = np.zeros(bounds.astype('int')[::-1], dtype=np.bool)
+            mask[c, r] = True
+            patch = im_feats.copy()
+            patch[mask != True] = 0
+            coords = np.argwhere(mask)
+            r_min, c_min = coords.min(axis=0)
+            r_max, c_max = coords.max(axis=0)
+            patch = patch[r_min:r_max+1, c_min:c_max+1]
+            markers = markers[r_min:r_max+1, c_min:c_max+1]
+            mask = mask[r_min:r_max+1, c_min:c_max+1]
 
 
             mask = Image.new('1', siz, 0)
