@@ -27,7 +27,7 @@ from PIL import Image, ImageDraw
 from numpy.polynomial import Polynomial
 
 from scipy.ndimage import black_tophat
-from scipy.ndimage.filters import gaussian_filter
+from scipy.ndimage.filters import gaussian_filter, gaussian_filter1d
 from scipy.ndimage.morphology import grey_dilation
 from scipy.spatial import distance_matrix, Delaunay
 from scipy.spatial.distance import cdist, pdist, squareform
@@ -352,7 +352,10 @@ def calculate_polygonal_environment(im: PIL.Image.Image, baselines: Sequence[Tup
         contours = find_contours(ws, 1.5, fully_connected='high')
         contour = np.array(unary_union([geom.Polygon(contour.tolist()) for contour in contours]).boundary, dtype='uint')
         ## approximate + remove offsets + transpose
-        contour = np.transpose((approximate_polygon(contour, 5)-1+(r_min, c_min)).astype('uint'), (0, 1))
+        contour_y = gaussian_filter1d(contour[:, 0], 3)
+        contour_x = gaussian_filter1d(contour[:, 1], 3)
+        contour = np.dstack((contour_x, contour_y))[0]
+        contour = (approximate_polygon(contour, 20)-1+(c_min, r_min)).astype('uint')
         return contour.tolist()
 
     polygons = []
