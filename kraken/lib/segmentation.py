@@ -336,7 +336,6 @@ def calculate_polygonal_environment(im: PIL.Image.Image, baselines: Sequence[Tup
         mask = np.zeros(bounds.astype('int')[::-1], dtype=np.bool)
         mask[c, r] = True
         patch = im_feats.copy()
-        patch[mask != True] = 0
         coords = np.argwhere(mask)
         r_min, c_min = coords.min(axis=0)
         r_max, c_max = coords.max(axis=0)
@@ -347,10 +346,10 @@ def calculate_polygonal_environment(im: PIL.Image.Image, baselines: Sequence[Tup
         ws = watershed(patch, markers, 8, mask=mask)
         ws = grey_dilation(ws, size=3)
         # pad output to ensure contour is closed
-        ws = np.pad(ws, 1)
+        ws = np.pad(ws, 1, mode='constant')
         # find contour of central basin
         contours = find_contours(ws, 1.5, fully_connected='high')
-        contour = np.array(unary_union([geom.Polygon(contour.tolist()) for contour in contours]).boundary, dtype='uint')
+        contour = np.array(unary_union([geom.Polygon(contour.tolist()) for contour in contours]).boundary, dtype='int')
         ## approximate + remove offsets + transpose
         contour_y = gaussian_filter1d(contour[:, 0], 3)
         contour_x = gaussian_filter1d(contour[:, 1], 3)
