@@ -354,7 +354,7 @@ def calculate_polygonal_environment(im: PIL.Image.Image, baselines: Sequence[Tup
         contour_y = gaussian_filter1d(contour[:, 0], 3)
         contour_x = gaussian_filter1d(contour[:, 1], 3)
         contour = np.dstack((contour_x, contour_y))[0]
-        contour = (approximate_polygon(contour, 20)-1+(c_min, r_min)).astype('uint')
+        contour = (approximate_polygon(contour, 5)-1+(c_min, r_min)).astype('uint')
         return contour.tolist()
 
     polygons = []
