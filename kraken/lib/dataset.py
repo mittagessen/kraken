@@ -602,12 +602,10 @@ class BaselineSet(Dataset):
         norm_vec_len = np.sqrt(np.sum(norm_vec**2))
         unit_vec = norm_vec / norm_vec_len
         ortho_vec = unit_vec[::-1] * ((1,-1), (-1,1))
-        print('{} {}'.format(point, lineseg))
         if offset == 'l':
             point -= unit_vec * line_width
         else:
             point += unit_vec * line_width
-        print('after: {}'.format(point))
         return (ortho_vec * 10 + point).astype('int').tolist()
 
     def transform(self, image, target):
