@@ -145,6 +145,16 @@ def _compute_sp_states(sp_can, bl_map, sep_map):
     Estimates the superpixel state information.
     """
     logger.debug('Triangulating superpixels')
+    # some pages might not contain
+    if len(sp_can) < 2:
+        logger.warning('Less than 2 superpixels in image. Nothing to vectorize.')
+        return {}
+    elif len(sp_can) < 3:
+        logger.warning('Less than 3 superpixels in image. Skipping triangulation')
+        key = tuple([tuple(sp_can[0]), tuple(sp_can[1])])
+        line_locs = draw.line(*(key[0] + key[1]))
+        intensities = {key: (bl_map[line_locs].mean(), bl_map[line_locs].var(), sep_map[line_locs].mean(), sep_map[line_locs].max())}
+        return intensities
     tri = Delaunay(sp_can, qhull_options="QJ Pp")
     indices, indptr = tri.vertex_neighbor_vertices
     # dict mapping each edge to its intensity. Needed for subsequent clustering step.
