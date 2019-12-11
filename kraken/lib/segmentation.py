@@ -34,7 +34,7 @@ from scipy.spatial.distance import cdist, pdist, squareform
 
 from shapely.ops import nearest_points, unary_union
 
-from skimage import draw
+from skimage import draw, measure
 from skimage.filters import apply_hysteresis_threshold
 from skimage.measure import approximate_polygon, find_contours
 from skimage.morphology import skeletonize, watershed
@@ -483,66 +483,64 @@ def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image:
     if 'type' in bounds and bounds['type'] == 'baselines':
         old_settings = np.seterr(all='ignore')
 
-        siz = im.size
-        white = Image.new(im.mode, siz)
+        siz = np.array(im.size, dtype=np.float)
+        # select proper interpolation scheme depending on shape
+        if im.mode == '1':
+            order = 0
+        else:
+            order = 1
+        im = np.array(im)
+
         for line in bounds['lines']:
             pl = np.array(line['boundary'])
-            pl = measure.subdivide_polygon(pl, preserve_ends=True)
-            pl = geom.MultiPoint(pl)
-            bl = np.array(line['baseline'])
-            bl = np.dstack((bl[:-1:], bl[1::]))
+            full_polygon = measure.subdivide_polygon(pl, preserve_ends=True)
+            pl = geom.MultiPoint(full_polygon)
+            baseline = np.array(line['baseline'])
+            bl = zip(baseline[:-1:], baseline[1::])
             bl = [geom.LineString(x) for x in bl]
-            # distance of intercept from start point 
-            #for point in pl.geoms:
-            #    line.interpolate(line.project(point)) for line in bl:
-            #        line.interpolate(line.project(point))
-            root_dists = [bl.project(point) for point in pl.geoms]
-            # actual intercept 
-            root_points = [bl.interpolate(dist) for dist in zip(pl.geoms, root_dists)]
-
-            r, c = draw.polygon(full_polygon[:,0], full_polygon[:,1])
-            mask = np.zeros(bounds.astype('int')[::-1], dtype=np.bool)
-            mask[c, r] = True
-            patch = im_feats.copy()
+            cum_lens = np.cumsum([0] + [l.length for l in bl])
+            # distance of intercept from start point and number of line segment
+            control_pts = []
+            for point in pl.geoms:
+                npoint = np.array(point)
+                line_idx, dist, intercept = min(((idx, line.project(point), np.array(line.interpolate(line.project(point)))) for idx, line in enumerate(bl)), key=lambda x: np.linalg.norm(npoint-x[2]))
+                # absolute distance from start of line
+                line_dist = cum_lens[line_idx] + dist
+                intercept = np.array(intercept)
+                # side of line the point is at
+                side = np.linalg.det(np.array([[baseline[line_idx+1][0]-baseline[line_idx][0],
+                                                npoint[0]-baseline[line_idx][0]],
+                                               [baseline[line_idx+1][1]-baseline[line_idx][1],
+                                                npoint[1]-baseline[line_idx][1]]]))
+                side = np.sign(side)
+                # signed perpendicular distance from the rectified distance
+                per_dist = side * np.linalg.norm(npoint-intercept)
+                control_pts.append((line_dist, per_dist))
+            # calculate baseline destination points
+            bl_dst_pts = baseline[0] + np.dstack((cum_lens, np.zeros_like(cum_lens)))[0]
+            # calculate bounding polygon destination points
+            pol_dst_pts = np.array([baseline[0] + (line_dist, per_dist) for line_dist, per_dist in control_pts])
+            # extract bounding box patch
+            c_min, c_max = int(full_polygon[:,0].min()), int(full_polygon[:,0].max())
+            r_min, r_max = int(full_polygon[:,1].min()), int(full_polygon[:,1].max())
+            patch = im[r_min:r_max+1,c_min:c_max+1].copy()
+            # offset src/dst points
+            offset_polygon = full_polygon - (c_min, r_min)
+            offset_baseline = baseline - (c_min, r_min)
+            offset_bl_dst_pts = bl_dst_pts - (c_min, r_min)
+            offset_pol_dst_pts = pol_dst_pts - (c_min, r_min)
+            # mask out points outside bounding polygon
+            mask = np.zeros(patch.shape[:2], dtype=np.bool)
+            r, c = draw.polygon(offset_polygon[:,1], offset_polygon[:,0])
+            mask[r, c] = True
             patch[mask != True] = 0
-            coords = np.argwhere(mask)
-            r_min, c_min = coords.min(axis=0)
-            r_max, c_max = coords.max(axis=0)
-            patch = patch[r_min:r_max+1, c_min:c_max+1]
-            markers = markers[r_min:r_max+1, c_min:c_max+1]
-            mask = mask[r_min:r_max+1, c_min:c_max+1]
-
-
-            mask = Image.new('1', siz, 0)
-            draw = ImageDraw.Draw(mask)
-            draw.polygon([tuple(x) for x in line['boundary']], outline=1, fill=1)
-            masked_line = Image.composite(im, white, mask)
-            bl = np.array(line['baseline'])
-            ls = np.dstack((bl[:-1:], bl[1::]))
-            bisect_points = np.mean(ls, 2)
-            norm_vec = (ls[...,1] - ls[...,0])[:,::-1]
-            norm_vec_len = np.sqrt(np.sum(norm_vec**2, axis=1))
-            unit_vec = norm_vec / np.tile(norm_vec_len, (2, 1)).T # without
-                                                                  # multiplication
-                                                                  # with (1,-1)-upper/
-                                                                  # (-1, 1)-lower
-            bounds = np.array(line['boundary'])
-            src_points = np.stack([_test_intersect(bp, uv, bounds) for bp, uv in zip(bisect_points, unit_vec)])
-            upper_dist = np.diag(distance_matrix(src_points[:,:2], bisect_points))
-            upper_dist = np.dstack((np.zeros_like(upper_dist), upper_dist)).squeeze(0)
-            lower_dist = np.diag(distance_matrix(src_points[:,2:], bisect_points))
-            lower_dist = np.dstack((np.zeros_like(lower_dist), lower_dist)).squeeze(0)
-            # map baseline points to straight baseline
-            bl_dists = np.cumsum(np.diag(np.roll(squareform(pdist(bl)), 1)))
-            bl_dst_pts = bl[0] + np.dstack((bl_dists, np.zeros_like(bl_dists))).squeeze(0)
-            rect_bisect_pts = np.mean(np.dstack((bl_dst_pts[:-1:], bl_dst_pts[1::])), 2)
-            upper_dst_pts = rect_bisect_pts - upper_dist
-            lower_dst_pts = rect_bisect_pts + lower_dist
-            src_points = np.concatenate((bl, src_points[:,:2], src_points[:,2:]))
-            dst_points = np.concatenate((bl_dst_pts, upper_dst_pts, lower_dst_pts))
+            # estimate piecewise transform
+            src_points = np.concatenate((offset_baseline, offset_polygon))
+            dst_points = np.concatenate((offset_bl_dst_pts, offset_pol_dst_pts))
             tform = PiecewiseAffineTransform()
             tform.estimate(src_points, dst_points)
-            i = Image.fromarray((warp(masked_line, tform) * 255).astype('uint8'))
+            o = warp(patch, tform.inverse, preserve_range=True, order=order)
+            i = Image.fromarray(o.astype('uint8'))
             yield i.crop(i.getbbox()), line
     else:
         if bounds['text_direction'].startswith('vertical'):
