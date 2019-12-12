@@ -523,12 +523,16 @@ def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image:
             # extract bounding box patch
             c_min, c_max = int(full_polygon[:,0].min()), int(full_polygon[:,0].max())
             r_min, r_max = int(full_polygon[:,1].min()), int(full_polygon[:,1].max())
+            c_dst_min, c_dst_max = int(pol_dst_pts[:,0].min()), int(pol_dst_pts[:,0].max())
+            r_dst_min, r_dst_max = int(pol_dst_pts[:,1].min()), int(pol_dst_pts[:,1].max())
+            output_shape = np.around((r_dst_max - r_dst_min + 1, c_dst_max - c_dst_min + 1))
             patch = im[r_min:r_max+1,c_min:c_max+1].copy()
-            # offset src/dst points
+            # offset src points by patch shape
             offset_polygon = full_polygon - (c_min, r_min)
             offset_baseline = baseline - (c_min, r_min)
-            offset_bl_dst_pts = bl_dst_pts - (c_min, r_min)
-            offset_pol_dst_pts = pol_dst_pts - (c_min, r_min)
+            # offset dst point by dst polygon shape
+            offset_bl_dst_pts = bl_dst_pts - (c_dst_min, r_dst_min)
+            offset_pol_dst_pts = pol_dst_pts - (c_dst_min, r_dst_min)
             # mask out points outside bounding polygon
             mask = np.zeros(patch.shape[:2], dtype=np.bool)
             r, c = draw.polygon(offset_polygon[:,1], offset_polygon[:,0])
@@ -539,7 +543,7 @@ def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image:
             dst_points = np.concatenate((offset_bl_dst_pts, offset_pol_dst_pts))
             tform = PiecewiseAffineTransform()
             tform.estimate(src_points, dst_points)
-            o = warp(patch, tform.inverse, preserve_range=True, order=order)
+            o = warp(patch, tform.inverse, output_shape=output_shape, preserve_range=True, order=order)
             i = Image.fromarray(o.astype('uint8'))
             yield i.crop(i.getbbox()), line
     else:
