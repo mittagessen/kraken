@@ -7,7 +7,7 @@ import numpy as np
 
 from PIL import Image
 
-__all__ = ['pil2array', 'array2pil']
+__all__ = ['pil2array', 'array2pil', 'is_bitonal', 'make_printable', 'get_im_str']
 
 
 def pil2array(im: Image.Image, alpha: int = 0) -> np.array:

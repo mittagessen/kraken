@@ -343,7 +343,7 @@ def _validate_mm(ctx, param, value):
               help='Sets principal text direction in serialization output')
 @click.option('-l', '--lines', type=click.Path(exists=True), show_default=True,
               help='JSON file containing line coordinates')
-@click.option('--threads', default=1, show_default=True,
+@click.option('--threads', default=1, show_default=True, type=click.IntRange(1),
               help='Number of threads to use for OpenMP parallelization.')
 def ocr(ctx, model, pad, reorder, no_segmentation, serializer, text_direction, lines, threads):
     """

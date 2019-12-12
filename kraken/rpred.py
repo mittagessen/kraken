@@ -27,7 +27,7 @@ from typing import List, Tuple, Optional, Generator, Union, Dict
 
 from kraken.lib.util import get_im_str
 from kraken.lib.models import TorchSeqRecognizer
-from kraken.lib.segmentation import extract_polygons
+from kraken.lib.segmentation import extract_polygons, compute_polygon_section
 from kraken.lib.exceptions import KrakenInputException
 from kraken.lib.dataset import generate_input_transforms
 
@@ -301,10 +301,10 @@ class mm_rpred(object):
         pos = []
         conf = []
         for _, start, end, c in preds:
-            pos.append(_compute_polygon_section(coords['baseline'],
-                                                coords['boundary'],
-                                                _scale_val(start, 0, box.size[0]),
-                                                _scale_val(end, 0, box.size[0])))
+            pos.append(compute_polygon_section(coords['baseline'],
+                                               coords['boundary'],
+                                               _scale_val(start, 0, box.size[0]),
+                                               _scale_val(end, 0, box.size[0])))
             conf.append(c)
         if self.bidi_reordering:
             logger.debug('BiDi reordering record.')

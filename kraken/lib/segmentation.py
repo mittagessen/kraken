@@ -45,6 +45,14 @@ from typing import List, Tuple, Union, Dict, Any, Sequence
 
 logger = logging.getLogger('kraken')
 
+__all__ = ['reading_order',
+           'denoising_hysteresis_thresh',
+           'vectorize_lines',
+           'calculate_polygonal_environment',
+           'polygonal_reading_order',
+           'scale_polygonal_lines',
+           'compute_polygon_section',
+           'extract_polygons']
 
 def reading_order(lines: Sequence, text_direction: str = 'lr') -> List:
     """Given the list of lines (a list of 2D slices), computes
@@ -466,6 +474,31 @@ def _test_intersect(bp, uv, bs):
         t1 = t1[np.logical_and(t2 >= 0.0, t2 <= 1.0)]
         points.extend(bp + (t1[np.where(t1 >= 0)[0].min()] * (uv * dir)))
     return np.array(points)
+
+
+def compute_polygon_section(baseline, boundary, dist1, dist2):
+    """
+    Given a baseline, polygonal boundary, and two points on the baseline return
+    the rectangle formed by the orthogonal cuts on that baseline segment.
+    """
+    # find baseline segments the points are in
+    bl = np.array(baseline)
+    dists = np.cumsum(np.diag(np.roll(squareform(pdist(bl)), 1)))
+    segs_idx = np.searchsorted(dists, [dist1, dist2])
+    segs = np.dstack((bl[segs_idx-1], bl[segs_idx+1]))
+    # compute unit vector of segments (NOT orthogonal)
+    norm_vec = (segs[...,1] - segs[...,0])
+    norm_vec_len = np.sqrt(np.sum(norm_vec**2, axis=1))
+    unit_vec = norm_vec / np.tile(norm_vec_len, (2, 1)).T
+    # find point start/end point on segments
+    seg_dists = [dist1, dist2] - dists[segs_idx-1]
+    seg_points = segs[...,0] + (seg_dists * unit_vec.T).T
+    # get intersects
+    bounds = np.array(boundary)
+    points = [_test_intersect(point, uv[::-1], bounds).round() for point, uv in zip(seg_points, unit_vec)]
+    o = np.int_(points[0]).reshape(-1, 2).tolist()
+    o.extend(np.int_(np.roll(points[1], 2)).reshape(-1, 2).tolist())
+    return o
 
 
 def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image:

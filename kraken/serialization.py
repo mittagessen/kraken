@@ -29,7 +29,7 @@ from typing import List, Tuple, Iterable, Optional, Sequence
 
 logger = logging.getLogger(__name__)
 
-__all__ = ['serialize']
+__all__ = ['serialize', 'render_report']
 
 
 def _rescale(val: Sequence[float], low: float, high: float) -> List[float]:

@@ -27,7 +27,7 @@ import json
 import os
 import logging
 
-__all__ = ['get_model', 'get_description', 'get_listing']
+__all__ = ['get_model', 'get_description', 'get_listing', 'publish_model']
 
 logger = logging.getLogger(__name__)
 

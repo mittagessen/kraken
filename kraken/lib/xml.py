@@ -27,6 +27,7 @@ from kraken.lib.exceptions import KrakenInputException
 
 logger = logging.getLogger(__name__)
 
+__all__ = ['parse_page', 'parse_alto']
 
 def parse_page(filename):
     """
