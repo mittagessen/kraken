@@ -479,23 +479,38 @@ def _test_intersect(bp, uv, bs):
 def compute_polygon_section(baseline, boundary, dist1, dist2):
     """
     Given a baseline, polygonal boundary, and two points on the baseline return
-    the rectangle formed by the orthogonal cuts on that baseline segment.
+    the rectangle formed by the orthogonal cuts on that baseline segment. The
+    resulting polygon is not garantueed to have a non-zero area.
+
+    Args:
+        baseline (list): A polyline ((x1, y1), ..., (xn, yn))
+        boundary (list): A bounding polygon around the baseline (same format as
+                         baseline).
+        dist1 (int): Absolute distance along the baseline of the first point.
+        dist2 (int): Absolute distance along the baseline of the second point.
+
+    Returns:
+        A sequence of polygon points.
     """
     # find baseline segments the points are in
     bl = np.array(baseline)
     dists = np.cumsum(np.diag(np.roll(squareform(pdist(bl)), 1)))
     segs_idx = np.searchsorted(dists, [dist1, dist2])
-    segs = np.dstack((bl[segs_idx-1], bl[segs_idx+1]))
+    segs = np.dstack((bl[segs_idx-1], bl[segs_idx]))
     # compute unit vector of segments (NOT orthogonal)
     norm_vec = (segs[...,1] - segs[...,0])
     norm_vec_len = np.sqrt(np.sum(norm_vec**2, axis=1))
     unit_vec = norm_vec / np.tile(norm_vec_len, (2, 1)).T
     # find point start/end point on segments
-    seg_dists = [dist1, dist2] - dists[segs_idx-1]
+    seg_dists = (dist1, dist2) - dists[segs_idx-1]
     seg_points = segs[...,0] + (seg_dists * unit_vec.T).T
     # get intersects
     bounds = np.array(boundary)
-    points = [_test_intersect(point, uv[::-1], bounds).round() for point, uv in zip(seg_points, unit_vec)]
+    try:
+        points = [_test_intersect(point, uv[::-1], bounds).round() for point, uv in zip(seg_points, unit_vec)]
+    except ValueError:
+        logger.warning('No intercepts with polygon (possibly misshaped polygon)')
+        return seg_points.astype('int') 
     o = np.int_(points[0]).reshape(-1, 2).tolist()
     o.extend(np.int_(np.roll(points[1], 2)).reshape(-1, 2).tolist())
     return o

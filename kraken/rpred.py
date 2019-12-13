@@ -294,7 +294,7 @@ class mm_rpred(object):
         in_scale = box.size[0]/(line.shape[2]-2*self.pad)
 
         def _scale_val(val, min_val, max_val):
-            return int(round(min(max(((val*net_scale)-self.pad)*in_scale, min_val), max_val)))
+            return int(round(min(max(((val*net_scale)-self.pad)*in_scale, min_val), max_val-1)))
 
         # XXX: fix bounding box calculation ocr_record for multi-codepoint labels.
         pred = ''.join(x[0] for x in preds)
