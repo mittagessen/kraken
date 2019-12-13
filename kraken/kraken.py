@@ -222,7 +222,8 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, script_ignore, inpu
               help='Input-output file pairs. Each input file (first argument) is mapped to one '
                    'output file (second argument), e.g. `-i input.png output.txt`')
 @click.option('-I', '--batch-input', multiple=True, help='Glob expression to add multiple files at once.')
-@click.option('-o', '--suffix', help='Suffix for output files from batch and PDF inputs.')
+@click.option('-o', '--suffix', default='', show_default=True,
+              help='Suffix for output files from batch and PDF inputs.')
 @click.option('-v', '--verbose', default=0, count=True, show_default=True)
 @click.option('-f', '--format-type', type=click.Choice(['image', 'alto', 'page', 'pdf']), default='image',
               help='Sets the default input type. In image mode inputs are image '
@@ -287,12 +288,14 @@ def process_pipeline(subcommands, input, batch_input, suffix, verbose, format_ty
                         im.background_color = wcolor.Color('white')
                         im.alpha_channel = 'remove'
                         fd, filename = tempfile.mkstemp()
-                        fd.close()
+                        os.close(fd)
                         logger.info(f'Saving temporary image {fpath}:{dest_dict["idx"]} to {filename}')
                         im.save(filename=filename)
                         new_input.append((filename, pdf_format.format(**dest_dict) + suffix))
 #            except WandRuntimeError:
 #                logger.warning(f'{fpath} is not a PDF file. Skipping.')
+
+    ctx = click.get_current_context()
 
     for io_pair in input:
         ctx.meta['first_process'] = True
@@ -300,7 +303,10 @@ def process_pipeline(subcommands, input, batch_input, suffix, verbose, format_ty
         if 'base_image' in ctx.meta:
             del ctx.meta['base_image']
         try:
-            fc = [io_pair[0]] + [tempfile.mkstemp()[1] for cmd in subcommands[1:]] + [io_pair[1]]
+            tmps = [tempfile.mkstemp() for cmd in subcommands[1:]]
+            for tmp in tmps:
+                os.close(tmp[0])
+            fc = [io_pair[0]] + [tmp[1] for tmp in tmps] + [io_pair[1]]
             for task, input, output in zip(subcommands, fc, fc[1:]):
                 task(input=input, output=output)
         finally:
