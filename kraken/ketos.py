@@ -856,7 +856,7 @@ def transcription(ctx, text_direction, scale, bw, maxcolseps,
 
     if prefill:
         logger.info('Loading model {}'.format(prefill))
-        message('Loading RNN', nl=False)
+        message('Loading ANN', nl=False)
         prefill = models.load_any(prefill)
         message('\u2713', fg='green')
 
