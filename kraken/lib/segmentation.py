@@ -28,14 +28,15 @@ from numpy.polynomial import Polynomial
 
 from scipy.ndimage import black_tophat
 from scipy.ndimage.filters import gaussian_filter, gaussian_filter1d
-from scipy.ndimage.morphology import grey_dilation
+from scipy.ndimage.morphology import grey_dilation, distance_transform_cdt
 from scipy.spatial import distance_matrix, Delaunay
 from scipy.spatial.distance import cdist, pdist, squareform
+from scipy.stats import linregress
 
 from shapely.ops import nearest_points, unary_union
 
 from skimage import draw, measure
-from skimage.filters import apply_hysteresis_threshold
+from skimage.filters import apply_hysteresis_threshold, sobel
 from skimage.measure import approximate_polygon, find_contours
 from skimage.morphology import skeletonize, watershed
 from skimage.transform import PiecewiseAffineTransform, warp
@@ -309,8 +310,8 @@ def calculate_polygonal_environment(im: PIL.Image.Image, baselines: Sequence[Tup
     bounds = np.array(im.size, dtype=np.float)
     im = np.array(im)
 
-    # compute tophat features of input image
-    im_feats = black_tophat(im, 3)
+    # compute image gradient
+    im_feats = gaussian_filter(sobel(im), 2)
 
     def _ray_intersect_boundaries(ray, direction, aabb):
         """
@@ -334,52 +335,117 @@ def calculate_polygonal_environment(im: PIL.Image.Image, baselines: Sequence[Tup
         return ray + (direction * t)
 
 
-    def _extract_patch(env_up, env_bottom, baseline):
+    def _rotate(image, angle, center, cval=0):
         """
-        Calculate a line image patch from a ROI and the original baseline
+        Rotate function taken mostly from scikit image. Main difference is that
+        this one records the final translation to ensure no image content is
+        lost. This is needed to rotate the seam back into the original image.
         """
-        markers = np.zeros(bounds.astype('int')[::-1], dtype=np.int)
-        for l in zip(baseline[:-1], baseline[1:]):
-            line_locs = draw.line(l[0][1], l[0][0], l[1][1], l[1][0])
-            markers[line_locs] = 2
-        for l in zip(env_up[:-1], env_up[1:]):
-            line_locs = draw.line(l[0][1], l[0][0], l[1][1], l[1][0])
-            markers[line_locs] = 1
-        for l in zip(env_bottom[:-1], env_bottom[1:]):
-            line_locs = draw.line(l[0][1], l[0][0], l[1][1], l[1][0])
-            markers[line_locs] = 1
-        markers = grey_dilation(markers, size=3)
-        full_polygon = np.concatenate(([baseline[0]], env_up, [baseline[-1]], env_bottom[::-1]))
-        r, c = draw.polygon(full_polygon[:,0], full_polygon[:,1])
-        mask = np.zeros(bounds.astype('int')[::-1], dtype=np.bool)
-        mask[c, r] = True
-        patch = im_feats.copy()
-        coords = np.argwhere(mask)
-        r_min, c_min = coords.min(axis=0)
-        r_max, c_max = coords.max(axis=0)
-        patch = patch[r_min:r_max+1, c_min:c_max+1]
-        markers = markers[r_min:r_max+1, c_min:c_max+1]
-        mask = mask[r_min:r_max+1, c_min:c_max+1]
-        # run watershed
-        ws = watershed(patch, markers, 8, mask=mask)
-        ws = grey_dilation(ws, size=3)
-        # pad output to ensure contour is closed
-        ws = np.pad(ws, 1, mode='constant')
-        # find contour of central basin
-        contours = find_contours(ws, 1.5, fully_connected='high')
-        contour = np.array(unary_union([geom.Polygon(contour.tolist()) for contour in contours]).boundary, dtype='int')
-        ## approximate + remove offsets + transpose
-        contour_y = gaussian_filter1d(contour[:, 0], 3)
-        contour_x = gaussian_filter1d(contour[:, 1], 3)
-        contour = np.dstack((contour_x, contour_y))[0]
-        contour = (approximate_polygon(contour, 1)-1+(c_min, r_min)).astype('uint')
-        return contour.tolist()
+        rows, cols = image.shape[0], image.shape[1]
+        tform1 = SimilarityTransform(translation=center)
+        tform2 = SimilarityTransform(rotation=np.deg2rad(angle))
+        tform3 = SimilarityTransform(translation=-center)
+        tform = tform3 + tform2 + tform1
+        corners = np.array([
+            [0, 0],
+            [0, rows - 1],
+            [cols - 1, rows - 1],
+            [cols - 1, 0]
+        ])
+        corners = tform.inverse(corners)
+        minc = corners[:, 0].min()
+        minr = corners[:, 1].min()
+        maxc = corners[:, 0].max()
+        maxr = corners[:, 1].max()
+        out_rows = maxr - minr + 1
+        out_cols = maxc - minc + 1
+        output_shape = np.around((out_rows, out_cols))
+        # fit output image in new shape
+        translation = (minc, minr)
+        tform4 = SimilarityTransform(translation=translation)
+        tform = tform4 + tform
+        tform.params[2] = (0, 0, 1)
+        return tform, warp(image, tform, output_shape=output_shape, order=0,
+                           mode='edge', cval=cval, clip=False, preserve_range=True)
+
+    def _extract_patch(env_up, env_bottom, baseline, slope):
+        """
+        Calculate a line image patch from a ROI and the original baseline.
+        """
+        upper_polygon = np.concatenate((baseline, env_up[::-1]))
+        bottom_polygon = np.concatenate((baseline, env_bottom[::-1]))
+        angle = np.rad2deg(np.arctan(slope))
+
+        def _calc_seam(polygon, bias=100):
+            """
+            Calculates seam between baseline and ROI boundary on one side.
+
+            Adds a baseline-distance-weighted bias to the feature map, masks
+            out the bounding polygon and rotates the line so it is roughly
+            level.
+            """
+            # we switch to y-x coordinate order here
+            r, c = draw.polygon(polygon[:,1], polygon[:,0])
+            c_min, c_max = int(polygon[:,0].min()), int(polygon[:,0].max())
+            r_min, r_max = int(polygon[:,1].min()), int(polygon[:,1].max())
+            patch = im_feats[r_min:r_max+1, c_min:c_max+1].copy()
+            # bias feature matrix by distance from baseline
+            mask = np.ones((r_max-r_min+1, c_max-c_min+1))
+            for l in zip(baseline[:-1] - (c_min, r_min), baseline[1:] - (c_min, r_min)):
+                line_locs = draw.line(l[0][1], l[0][0], l[1][1], l[1][0])
+                mask[line_locs] = 0
+            dist_bias = distance_transform_cdt(mask)
+            # absolute mask
+            mask = np.ones((r_max-r_min+1, c_max-c_min+1), dtype=np.bool)
+            mask[r-r_min, c-c_min] = False
+            # combine weights with features
+            patch[mask] = 99999
+            patch += (dist_bias*(np.mean(patch[patch != 99999])/bias))
+            rot_pt = baseline[0] - (c_min, r_min)
+            tform, rotated_patch = _rotate(patch, angle, center=rot_pt)
+            r, c = rotated_patch.shape
+            backtrack = np.zeros_like(rotated_patch, dtype=np.int)
+            # populate DP matrix
+            for i in range(1, c):
+                for j in range(0, r):
+                    if j == 0:
+                        idx = np.argmin(rotated_patch[j:j+2,i-1])
+                        backtrack[j, i] = idx + j
+                        min_energy = rotated_patch[idx+j,i-1]
+                    else:
+                        idx = np.argmin(rotated_patch[j-1:j+2,i-1])
+                        backtrack[j, i] = idx + j - 1
+                        min_energy = rotated_patch[idx+j-1,i-1]
+                    rotated_patch[j, i] += min_energy
+            # backtrack
+            seam = []
+            j = np.argmin(rotated_patch[:,-1])
+            boolmask = np.zeros_like(rotated_patch, dtype=np.bool)
+            for i in range(c-1, -1, -1):
+                # we go back to x-y coordinate order 
+                seam.append((i, j))
+                boolmask[j, i] = True
+                j = backtrack[j, i]
+            seam = np.array(seam)[::-1]
+            # seam = approximate_polygon(seam, 1)-1+(r_min, c_min)
+            # rotate back
+            new_rot_pt = tr.inverse(rot_pt).astype('int')[0]
+            rangle = np.radians(angle)
+            sin_angle = np.sin(rangle)
+            cos_angle = np.cos(rangle)
+            seam = np.dot(seam - new_rot_pt, np.array([[cos_angle, sin_angle],[-sin_angle, cos_angle]]))
+            return seam
+
+        upper_seam = _calc_seam(upper_polygon, 1000/avg_up_dist).astype('int')
+        bottom_seam = _calc_seam(bottom_polygon, 1000/avg_bot_dist).astype('int')
+        return np.concatenate((baseline[0], upper_seam, baseline[-1], bottom_seam))
 
     polygons = []
     for idx, line in enumerate(baselines):
         # find intercepts with image bounds on each side of baseline
         lr = np.array(line[:2], dtype=np.float)
         lr_dir = lr[1] - lr[0]
+        lr_dir = (lr_dir.T  / np.sqrt(np.sum(lr_dir**2,axis=-1)))
         lr_dir = (lr_dir.T  / np.sqrt(np.sum(lr_dir**2,axis=-1)))
         lr_up_intersect = _ray_intersect_boundaries(lr[0], (lr_dir*(-1,1))[::-1], bounds-1).astype('int')
         lr_bottom_intersect = _ray_intersect_boundaries(lr[0], (lr_dir*(1,-1))[::-1], bounds-1).astype('int')
@@ -402,17 +468,33 @@ def calculate_polygonal_environment(im: PIL.Image.Image, baselines: Sequence[Tup
                 side_b.append(adj_line)
         side_a = unary_union(side_a)
         side_b = unary_union(side_b)
+        def _find_closest_point(pt, intersects):
+            spt = geom.Point(pt)
+            if intersects.type == 'MultiPoint':
+                return min([p for p in intersects], key=lambda x: spt.distance(x))
+            elif intersects.type == 'Point':
+                return intersects
+            else:
+                raise Exception('No intersection with boundaries')
+        # interpolate baseline
+        ip_line = subdivide_polygon(np.array(line), preserve_ends=True)
         env_up = []
         env_bottom = []
-        # find nearest points from baseline to previously selected baselines
-        for point in line:
-            _, upper_limit = nearest_points(geom.Point(point), side_a)
-            _, bottom_limit = nearest_points(geom.Point(point), side_b)
-            env_up.extend(list(upper_limit.coords))
-            env_bottom.extend(list(bottom_limit.coords))
+        # find orthogonal (to linear regression) intersects with adjacent objects to complete roi
+        line = np.array(line)
+        slope, _, _, _, _ = linregress(line[:, 0], line[:, 1])
+        p_dir = np.array([1, slope])
+        p_dir = (p_dir.T / np.sqrt(np.sum(p_dir**2,axis=-1)))
+        for point in ip_line:
+            upper_bounds_intersect = _ray_intersect_boundaries(point, (p_dir*(-1,1))[::-1], bounds).astype('int')
+            bottom_bounds_intersect = _ray_intersect_boundaries(point, (p_dir*(1,-1))[::-1], bounds).astype('int')
+            upper_limit = _find_closest_point(point, geom.LineString([point, upper_bounds_intersect]).intersection(side_a))
+            bottom_limit = _find_closest_point(point, geom.LineString([point, bottom_bounds_intersect]).intersection(side_b))
+            env_up.append(upper_limit.coords[0])
+            env_bottom.append(bottom_limit.coords[0])
         env_up = np.array(env_up, dtype='uint')
         env_bottom = np.array(env_bottom, dtype='uint')
-        polygons.append(_extract_patch(env_up, env_bottom, line))
+        polygons.append(_extract_patch(env_up, env_bottom, line, slope))
     return polygons
 
 
@@ -510,7 +592,7 @@ def compute_polygon_section(baseline, boundary, dist1, dist2):
         points = [_test_intersect(point, uv[::-1], bounds).round() for point, uv in zip(seg_points, unit_vec)]
     except ValueError:
         logger.warning('No intercepts with polygon (possibly misshaped polygon)')
-        return seg_points.astype('int') 
+        return seg_points.astype('int')
     o = np.int_(points[0]).reshape(-1, 2).tolist()
     o.extend(np.int_(np.roll(points[1], 2)).reshape(-1, 2).tolist())
     return o
