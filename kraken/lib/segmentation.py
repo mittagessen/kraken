@@ -429,11 +429,7 @@ def calculate_polygonal_environment(im: PIL.Image.Image, baselines: Sequence[Tup
             seam = np.array(seam)[::-1]
             # seam = approximate_polygon(seam, 1)-1+(r_min, c_min)
             # rotate back
-            new_rot_pt = tr.inverse(rot_pt).astype('int')[0]
-            rangle = np.radians(angle)
-            sin_angle = np.sin(rangle)
-            cos_angle = np.cos(rangle)
-            seam = np.dot(seam - new_rot_pt, np.array([[cos_angle, sin_angle],[-sin_angle, cos_angle]]))
+            seam = tform(seam).astype('int') + baseline[0]
             return seam
 
         upper_seam = _calc_seam(upper_polygon, 1000/avg_up_dist).astype('int')
