@@ -37,9 +37,9 @@ from shapely.ops import nearest_points, unary_union
 
 from skimage import draw, measure
 from skimage.filters import apply_hysteresis_threshold, sobel
-from skimage.measure import approximate_polygon, find_contours
+from skimage.measure import approximate_polygon, find_contours, subdivide_polygon
 from skimage.morphology import skeletonize, watershed
-from skimage.transform import PiecewiseAffineTransform, warp
+from skimage.transform import PiecewiseAffineTransform, SimilarityTransform, warp
 
 from typing import List, Tuple, Union, Dict, Any, Sequence
 
@@ -365,8 +365,7 @@ def calculate_polygonal_environment(im: PIL.Image.Image, baselines: Sequence[Tup
         tform4 = SimilarityTransform(translation=translation)
         tform = tform4 + tform
         tform.params[2] = (0, 0, 1)
-        return tform, warp(image, tform, output_shape=output_shape, order=0,
-                           mode='edge', cval=cval, clip=False, preserve_range=True)
+        return tform, warp(image, tform, output_shape=output_shape, order=0, cval=cval, clip=False, preserve_range=True)
 
     def _extract_patch(env_up, env_bottom, baseline, slope):
         """
@@ -384,6 +383,7 @@ def calculate_polygonal_environment(im: PIL.Image.Image, baselines: Sequence[Tup
             out the bounding polygon and rotates the line so it is roughly
             level.
             """
+            MASK_VAL = 99999
             # we switch to y-x coordinate order here
             r, c = draw.polygon(polygon[:,1], polygon[:,0])
             c_min, c_max = int(polygon[:,0].min()), int(polygon[:,0].max())
@@ -399,10 +399,10 @@ def calculate_polygonal_environment(im: PIL.Image.Image, baselines: Sequence[Tup
             mask = np.ones((r_max-r_min+1, c_max-c_min+1), dtype=np.bool)
             mask[r-r_min, c-c_min] = False
             # combine weights with features
-            patch[mask] = 99999
-            patch += (dist_bias*(np.mean(patch[patch != 99999])/bias))
+            patch[mask] = MASK_VAL
+            patch += (dist_bias*(np.mean(patch[patch != MASK_VAL])/bias))
             rot_pt = baseline[0] - (c_min, r_min)
-            tform, rotated_patch = _rotate(patch, angle, center=rot_pt)
+            tform, rotated_patch = _rotate(patch, angle, center=rot_pt, cval=MASK_VAL)
             r, c = rotated_patch.shape
             backtrack = np.zeros_like(rotated_patch, dtype=np.int)
             # populate DP matrix
@@ -420,21 +420,24 @@ def calculate_polygonal_environment(im: PIL.Image.Image, baselines: Sequence[Tup
             # backtrack
             seam = []
             j = np.argmin(rotated_patch[:,-1])
-            boolmask = np.zeros_like(rotated_patch, dtype=np.bool)
             for i in range(c-1, -1, -1):
                 # we go back to x-y coordinate order 
                 seam.append((i, j))
-                boolmask[j, i] = True
                 j = backtrack[j, i]
             seam = np.array(seam)[::-1]
-            # seam = approximate_polygon(seam, 1)-1+(r_min, c_min)
             # rotate back
-            seam = tform(seam).astype('int') + baseline[0]
+            seam = tform(seam).astype('int')
+            # filter out seam points in masked area of original patch/in padding
+            seam = seam[seam.min(axis=1)>=0,:]
+            m = (seam < mask.shape[::-1]).T
+            seam = seam[np.logical_and(m[0], m[1]), :]
+            seam = seam[np.invert(mask[seam.T[1], seam.T[0]])]
+            seam += (c_min, r_min)
             return seam
 
-        upper_seam = _calc_seam(upper_polygon, 1000/avg_up_dist).astype('int')
-        bottom_seam = _calc_seam(bottom_polygon, 1000/avg_bot_dist).astype('int')
-        return np.concatenate((baseline[0], upper_seam, baseline[-1], bottom_seam))
+        upper_seam = _calc_seam(upper_polygon).astype('int')
+        bottom_seam = _calc_seam(bottom_polygon).astype('int')[::-1]
+        return np.concatenate(([baseline[0]], upper_seam, [baseline[-1]], bottom_seam)).tolist()
 
     polygons = []
     for idx, line in enumerate(baselines):
@@ -462,8 +465,8 @@ def calculate_polygonal_environment(im: PIL.Image.Image, baselines: Sequence[Tup
                 side_a.append(adj_line)
             elif bottom_polygon.intersects(adj_line):
                 side_b.append(adj_line)
-        side_a = unary_union(side_a)
-        side_b = unary_union(side_b)
+        side_a = unary_union(side_a).buffer(1).boundary
+        side_b = unary_union(side_b).buffer(1).boundary
         def _find_closest_point(pt, intersects):
             spt = geom.Point(pt)
             if intersects.type == 'MultiPoint':
@@ -619,7 +622,7 @@ def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image:
 
         for line in bounds['lines']:
             pl = np.array(line['boundary'])
-            full_polygon = measure.subdivide_polygon(pl, preserve_ends=True)
+            full_polygon = subdivide_polygon(pl, preserve_ends=True)
             pl = geom.MultiPoint(full_polygon)
             baseline = np.array(line['baseline'])
             bl = zip(baseline[:-1:], baseline[1::])
