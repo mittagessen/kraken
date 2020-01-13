@@ -253,7 +253,7 @@ def _interpolate_lines(clusters):
         # very short lines might not have enough superpixels to ensure a well-conditioned regression
         deg = min(len(x)-1, 3)
         poly = Polynomial.fit(x, y, deg=deg)
-        xp, yp = poly.linspace(max(np.diff(poly.domain)//deg, 2))
+        xp, yp = poly.linspace(max(int(np.diff(poly.domain).item()//deg), 2))
         xp = xp.astype('int')
         yp = yp.astype('int')
         line = np.array(list(zip(xp, yp)))
@@ -343,7 +343,7 @@ def calculate_polygonal_environment(im: PIL.Image.Image, baselines: Sequence[Tup
         """
         rows, cols = image.shape[0], image.shape[1]
         tform1 = SimilarityTransform(translation=center)
-        tform2 = SimilarityTransform(rotation=np.deg2rad(angle))
+        tform2 = SimilarityTransform(rotation=angle)
         tform3 = SimilarityTransform(translation=-center)
         tform = tform3 + tform2 + tform1
         corners = np.array([
@@ -367,13 +367,13 @@ def calculate_polygonal_environment(im: PIL.Image.Image, baselines: Sequence[Tup
         tform.params[2] = (0, 0, 1)
         return tform, warp(image, tform, output_shape=output_shape, order=0, cval=cval, clip=False, preserve_range=True)
 
-    def _extract_patch(env_up, env_bottom, baseline, slope):
+    def _extract_patch(env_up, env_bottom, baseline, dir_vec):
         """
         Calculate a line image patch from a ROI and the original baseline.
         """
         upper_polygon = np.concatenate((baseline, env_up[::-1]))
         bottom_polygon = np.concatenate((baseline, env_bottom[::-1]))
-        angle = np.rad2deg(np.arctan(slope))
+        angle = np.arctan2(dir_vec[1], dir_vec[0])
 
         def _calc_seam(polygon, bias=100):
             """
@@ -444,9 +444,15 @@ def calculate_polygonal_environment(im: PIL.Image.Image, baselines: Sequence[Tup
     for idx, line in enumerate(baselines):
         # find intercepts with image bounds on each side of baseline
         line = np.array(line, dtype=np.float)
-        slope, _, _, _, _ = linregress(line[:, 0], line[:, 1])
-        p_dir = np.array([1, slope])
-        p_dir = (p_dir.T / np.sqrt(np.sum(p_dir**2,axis=-1)))
+        # calculate direction vector
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore', RuntimeWarning)
+            slope, _, _, _, _ = linregress(line[:, 0], line[:, 1])
+        if np.isnan(slope):
+            p_dir = np.array([0., 1.])
+        else:
+            p_dir = np.array([1, slope])
+            p_dir = (p_dir.T / np.sqrt(np.sum(p_dir**2,axis=-1)))
         lr_up_intersect = _ray_intersect_boundaries(line[0], (p_dir*(-1,1))[::-1], bounds-1).astype('int')
         lr_bottom_intersect = _ray_intersect_boundaries(line[0], (p_dir*(1,-1))[::-1], bounds-1).astype('int')
         rr_up_intersect = _ray_intersect_boundaries(line[-1], (p_dir*(-1,1))[::-1], bounds-1).astype('int')
@@ -487,8 +493,9 @@ def calculate_polygonal_environment(im: PIL.Image.Image, baselines: Sequence[Tup
             env_bottom.append(bottom_limit.coords[0])
         env_up = np.array(env_up, dtype='uint')
         env_bottom = np.array(env_bottom, dtype='uint')
-        polygons.append(_extract_patch(env_up, env_bottom, line.astype('int'), slope))
-    return polygons
+        #polygons.append(_extract_patch(env_up, env_bottom, line.astype('int'), p_dir))
+    #return polygons
+    return
 
 
 def polygonal_reading_order(lines: Sequence[Tuple[List, List]], text_direction: str = 'lr') -> Sequence[Tuple[List, List]]:
