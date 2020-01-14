@@ -384,7 +384,6 @@ def calculate_polygonal_environment(im: PIL.Image.Image, baselines: Sequence[Tup
             level.
             """
             MASK_VAL = 99999
-            # we switch to y-x coordinate order here
             r, c = draw.polygon(polygon[:,1], polygon[:,0])
             c_min, c_max = int(polygon[:,0].min()), int(polygon[:,0].max())
             r_min, r_max = int(polygon[:,1].min()), int(polygon[:,1].max())
@@ -403,6 +402,9 @@ def calculate_polygonal_environment(im: PIL.Image.Image, baselines: Sequence[Tup
             patch += (dist_bias*(np.mean(patch[patch != MASK_VAL])/bias))
             rot_pt = baseline[0] - (c_min, r_min)
             tform, rotated_patch = _rotate(patch, angle, center=rot_pt, cval=MASK_VAL)
+            # ensure to cut off padding of left after rotation
+            x_offset = int(np.around(tform.inverse(rot_pt))[0][0])
+            rotated_patch = rotated_patch[:,x_offset:]
             r, c = rotated_patch.shape
             backtrack = np.zeros_like(rotated_patch, dtype=np.int)
             # populate DP matrix
@@ -421,8 +423,7 @@ def calculate_polygonal_environment(im: PIL.Image.Image, baselines: Sequence[Tup
             seam = []
             j = np.argmin(rotated_patch[:,-1])
             for i in range(c-1, -1, -1):
-                # we go back to x-y coordinate order 
-                seam.append((i, j))
+                seam.append((i+x_offset, j))
                 j = backtrack[j, i]
             seam = np.array(seam)[::-1]
             # rotate back
