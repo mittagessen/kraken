@@ -383,6 +383,7 @@ def calculate_polygonal_environment(im: PIL.Image.Image, baselines: Sequence[Tup
             out the bounding polygon and rotates the line so it is roughly
             level.
             """
+            LINE_LEN = 1000
             MASK_VAL = 99999
             r, c = draw.polygon(polygon[:,1], polygon[:,0])
             c_min, c_max = int(polygon[:,0].min()), int(polygon[:,0].max())
@@ -400,11 +401,11 @@ def calculate_polygonal_environment(im: PIL.Image.Image, baselines: Sequence[Tup
             # combine weights with features
             patch[mask] = MASK_VAL
             patch += (dist_bias*(np.mean(patch[patch != MASK_VAL])/bias))
-            rot_pt = baseline[0] - (c_min, r_min)
-            tform, rotated_patch = _rotate(patch, angle, center=rot_pt, cval=MASK_VAL)
-            # ensure to cut off padding of left after rotation
-            x_offset = int(np.around(tform.inverse(rot_pt))[0][0])
-            rotated_patch = rotated_patch[:,x_offset:]
+            extrema = baseline[(0,-1),:] - (c_min, r_min)
+            tform, rotated_patch = _rotate(patch, angle, center=extrema[0], cval=MASK_VAL)
+            # ensure to cut off padding after rotation
+            x_offsets = np.sort(np.around(tform.inverse(extrema)[:,0]).astype('int'))
+            rotated_patch  rotated_patch[:,x_offsets[0]+1:x_offsets[1]]
             r, c = rotated_patch.shape
             backtrack = np.zeros_like(rotated_patch, dtype=np.int)
             # populate DP matrix
@@ -423,7 +424,7 @@ def calculate_polygonal_environment(im: PIL.Image.Image, baselines: Sequence[Tup
             seam = []
             j = np.argmin(rotated_patch[:,-1])
             for i in range(c-1, -1, -1):
-                seam.append((i+x_offset, j))
+                seam.append((i+x_offsets[0]+1, j))
                 j = backtrack[j, i]
             seam = np.array(seam)[::-1]
             # rotate back
@@ -450,9 +451,9 @@ def calculate_polygonal_environment(im: PIL.Image.Image, baselines: Sequence[Tup
             warnings.simplefilter('ignore', RuntimeWarning)
             slope, _, _, _, _ = linregress(line[:, 0], line[:, 1])
         if np.isnan(slope):
-            p_dir = np.array([0., 1.])
+            p_dir = np.array([0., np.sign(np.diff(line[(0, -1),1])).item()*1.])
         else:
-            p_dir = np.array([1, slope])
+            p_dir = np.array([1, np.sign(np.diff(line[(0, -1),0])).item()*slope])
             p_dir = (p_dir.T / np.sqrt(np.sum(p_dir**2,axis=-1)))
         lr_up_intersect = _ray_intersect_boundaries(line[0], (p_dir*(-1,1))[::-1], bounds-1).astype('int')
         lr_bottom_intersect = _ray_intersect_boundaries(line[0], (p_dir*(1,-1))[::-1], bounds-1).astype('int')
