@@ -291,7 +291,7 @@ def vectorize_lines(im: np.ndarray, threshold: float = 0.2, min_sp_dist: int = 1
     return lines
 
 
-def calculate_polygonal_environment(im: PIL.Image.Image, baselines: Sequence[Tuple[int, int]]):
+def calculate_polygonal_environment(im: PIL.Image.Image, baselines: Sequence[Tuple[int, int]], suppl_obj: Sequence[Tuple[int, int]]):
     """
     Given a list of baselines and an input image, calculates a polygonal
     environment around each baseline.
@@ -300,11 +300,14 @@ def calculate_polygonal_environment(im: PIL.Image.Image, baselines: Sequence[Tup
         im (PIL.Image): grayscale input image (mode 'L')
         baselines (sequence): List of lists containing a single baseline per
                               entry.
-        bl_mask (numpy.array): Optional raw baselines output maps from the
-                               recognition net.
-
+        suppl_obj (sequence): List of lists containing additional polylines
+                              that should be considered hard boundaries for
+                              polygonizaton purposes. Can be used to prevent
+                              polygonization into non-text areas such as
+                              illustrations or to compute the polygonization of
+                              a subset of the lines in an image.
     Returns:
-        List of tuples (polygonization, baseline) where each is a list of coordinates.
+        List of lists of coordinates.
     """
     bounds = np.array(im.size, dtype=np.float)
     im = np.array(im)
@@ -464,7 +467,7 @@ def calculate_polygonal_environment(im: PIL.Image.Image, baselines: Sequence[Tup
         # select baselines at least partially in each polygon
         side_a = [geom.LineString([lr_up_intersect.tolist(), rr_up_intersect.tolist()])]
         side_b = [geom.LineString([lr_bottom_intersect.tolist(), rr_bottom_intersect.tolist()])]
-        for adj_line in baselines[:idx] + baselines[idx+1:]:
+        for adj_line in baselines[:idx] + baselines[idx+1:] + suppl_obj:
             adj_line = geom.LineString(adj_line)
             if upper_polygon.intersects(adj_line):
                 side_a.append(adj_line)
