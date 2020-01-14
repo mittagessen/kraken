@@ -307,7 +307,8 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None, baselines: Seque
                               illustrations or to compute the polygonization of
                               a subset of the lines in an image.
         im_feats (numpy.array): An optional precomputed seamcarve energy map.
-                                Overrides data in `im`.
+                                Overrides data in `im`. The default map is
+                                `gaussian_filter(sobel(im), 2)`.
     Returns:
         List of lists of coordinates.
     """
