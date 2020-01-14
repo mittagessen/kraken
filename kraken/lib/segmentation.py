@@ -43,7 +43,6 @@ from skimage.transform import PiecewiseAffineTransform, SimilarityTransform, war
 
 from typing import List, Tuple, Union, Dict, Any, Sequence
 
-
 logger = logging.getLogger('kraken')
 
 __all__ = ['reading_order',
@@ -482,7 +481,14 @@ def calculate_polygonal_environment(im: PIL.Image.Image, baselines: Sequence[Tup
             else:
                 raise Exception('No intersection with boundaries')
         # interpolate baseline
-        ip_line = subdivide_polygon(np.array(line), preserve_ends=True)
+        ls = geom.LineString(line)
+        ip_line = [line[0]]
+        dist = 10
+        while dist < ls.length:
+            ip_line.append(np.array(ls.interpolate(dist)))
+            dist += 10
+        ip_line.append(line[-1])
+        ip_line = np.array(ip_line)
         env_up = []
         env_bottom = []
         # find orthogonal (to linear regression) intersects with adjacent objects to complete roi
