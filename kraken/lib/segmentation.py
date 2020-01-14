@@ -291,7 +291,7 @@ def vectorize_lines(im: np.ndarray, threshold: float = 0.2, min_sp_dist: int = 1
     return lines
 
 
-def calculate_polygonal_environment(im: PIL.Image.Image, baselines: Sequence[Tuple[int, int]], suppl_obj: Sequence[Tuple[int, int]] = None):
+def calculate_polygonal_environment(im: PIL.Image.Image = None, baselines: Sequence[Tuple[int, int]] = None, suppl_obj: Sequence[Tuple[int, int]] = None, im_feats: np.array = None):
     """
     Given a list of baselines and an input image, calculates a polygonal
     environment around each baseline.
@@ -306,14 +306,20 @@ def calculate_polygonal_environment(im: PIL.Image.Image, baselines: Sequence[Tup
                               polygonization into non-text areas such as
                               illustrations or to compute the polygonization of
                               a subset of the lines in an image.
+        im_feats (numpy.array): An optional precomputed seamcarve energy map.
+                                Overrides data in `im`.
     Returns:
         List of lists of coordinates.
     """
-    bounds = np.array(im.size, dtype=np.float)
-    im = np.array(im)
-
-    # compute image gradient
-    im_feats = gaussian_filter(sobel(im), 2)
+    if im and im_feats is None:
+        bounds = np.array(im.size, dtype=np.float)
+        im = np.array(im)
+        # compute image gradient
+        im_feats = gaussian_filter(sobel(im), 2)
+    elif im_feats:
+        bounds = im_feats.shape[::-1]
+    else:
+        raise TypeError('Neither `im` nor `im_feats` are set.')
 
     def _ray_intersect_boundaries(ray, direction, aabb):
         """
