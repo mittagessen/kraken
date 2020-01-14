@@ -405,7 +405,7 @@ def calculate_polygonal_environment(im: PIL.Image.Image, baselines: Sequence[Tup
             tform, rotated_patch = _rotate(patch, angle, center=extrema[0], cval=MASK_VAL)
             # ensure to cut off padding after rotation
             x_offsets = np.sort(np.around(tform.inverse(extrema)[:,0]).astype('int'))
-            rotated_patch  rotated_patch[:,x_offsets[0]+1:x_offsets[1]]
+            rotated_patch = rotated_patch[:,x_offsets[0]+1:x_offsets[1]]
             r, c = rotated_patch.shape
             backtrack = np.zeros_like(rotated_patch, dtype=np.int)
             # populate DP matrix
@@ -505,7 +505,7 @@ def polygonal_reading_order(lines: Sequence[Tuple[List, List]], text_direction: 
     it to the input.
 
     Args:
-        lines (Sequence): List of tuples containing the baseline and it's
+        lines (Sequence): List of tuples containing the baseline and its
                           polygonization.
         text_direction (str): Set principal text direction for column ordering.
                               Can be 'lr' or 'rl'
