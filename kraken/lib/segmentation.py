@@ -291,7 +291,7 @@ def vectorize_lines(im: np.ndarray, threshold: float = 0.2, min_sp_dist: int = 1
     return lines
 
 
-def calculate_polygonal_environment(im: PIL.Image.Image, baselines: Sequence[Tuple[int, int]], suppl_obj: Sequence[Tuple[int, int]]):
+def calculate_polygonal_environment(im: PIL.Image.Image, baselines: Sequence[Tuple[int, int]], suppl_obj: Sequence[Tuple[int, int]] = None):
     """
     Given a list of baselines and an input image, calculates a polygonal
     environment around each baseline.
@@ -445,6 +445,8 @@ def calculate_polygonal_environment(im: PIL.Image.Image, baselines: Sequence[Tup
         return approximate_polygon(polygon, 3).tolist()
 
     polygons = []
+    if suppl_obj is None:
+        supply_obj = []
     for idx, line in enumerate(baselines):
         # find intercepts with image bounds on each side of baseline
         line = np.array(line, dtype=np.float)
