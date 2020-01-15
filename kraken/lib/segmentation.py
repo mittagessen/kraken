@@ -39,7 +39,7 @@ from skimage import draw, measure
 from skimage.filters import apply_hysteresis_threshold, sobel
 from skimage.measure import approximate_polygon, find_contours, subdivide_polygon
 from skimage.morphology import skeletonize, watershed
-from skimage.transform import PiecewiseAffineTransform, SimilarityTransform, warp
+from skimage.transform import PiecewiseAffineTransform, SimilarityTransform, AffineTransform, warp
 
 from typing import List, Tuple, Union, Dict, Any, Sequence
 
@@ -167,7 +167,6 @@ def _compute_sp_states(sp_can, bl_map, sep_map):
     indices, indptr = tri.vertex_neighbor_vertices
     # dict mapping each edge to its intensity. Needed for subsequent clustering step.
     intensities = {}
-    # radius of circular environment around SP for ILD estimation
     logger.debug('Computing superpixel state information')
     for vertex in range(len(sp_can)):
         # look up neighboring indices
@@ -312,13 +311,13 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None, baselines: Seque
     Returns:
         List of lists of coordinates.
     """
-    if im and im_feats is None:
+    if im is not None and im_feats is None:
         bounds = np.array(im.size, dtype=np.float)
         im = np.array(im)
         # compute image gradient
         im_feats = gaussian_filter(sobel(im), 2)
     elif im_feats:
-        bounds = im_feats.shape[::-1]
+        bounds = np.array(im_feats.shape[::-1], dtype=np.float)
     else:
         raise TypeError('Neither `im` nor `im_feats` are set.')
 
@@ -344,17 +343,19 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None, baselines: Seque
         return ray + (direction * t)
 
 
-    def _rotate(image, angle, center, cval=0):
+    def _rotate(image, angle, center, scale, cval=0):
         """
         Rotate function taken mostly from scikit image. Main difference is that
-        this one records the final translation to ensure no image content is
-        lost. This is needed to rotate the seam back into the original image.
+        this one allows dimensional scaling and records the final translation
+        to ensure no image content is lost. This is needed to rotate the seam
+        back into the original image.
         """
         rows, cols = image.shape[0], image.shape[1]
         tform1 = SimilarityTransform(translation=center)
         tform2 = SimilarityTransform(rotation=angle)
         tform3 = SimilarityTransform(translation=-center)
-        tform = tform3 + tform2 + tform1
+        tform4 = AffineTransform(scale=(1/scale, 1))
+        tform = tform4 + tform3 + tform2 + tform1
         corners = np.array([
             [0, 0],
             [0, rows - 1],
@@ -371,8 +372,8 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None, baselines: Seque
         output_shape = np.around((out_rows, out_cols))
         # fit output image in new shape
         translation = (minc, minr)
-        tform4 = SimilarityTransform(translation=translation)
-        tform = tform4 + tform
+        tform5 = SimilarityTransform(translation=translation)
+        tform = tform5 + tform
         tform.params[2] = (0, 0, 1)
         return tform, warp(image, tform, output_shape=output_shape, order=0, cval=cval, clip=False, preserve_range=True)
 
@@ -392,7 +393,6 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None, baselines: Seque
             out the bounding polygon and rotates the line so it is roughly
             level.
             """
-            LINE_LEN = 1000
             MASK_VAL = 99999
             r, c = draw.polygon(polygon[:,1], polygon[:,0])
             c_min, c_max = int(polygon[:,0].min()), int(polygon[:,0].max())
@@ -411,7 +411,9 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None, baselines: Seque
             patch[mask] = MASK_VAL
             patch += (dist_bias*(np.mean(patch[patch != MASK_VAL])/bias))
             extrema = baseline[(0,-1),:] - (c_min, r_min)
-            tform, rotated_patch = _rotate(patch, angle, center=extrema[0], cval=MASK_VAL)
+            # scale line image to max 600 pixel width
+            scale = min(1.0, 600/(c_max-c_min))
+            tform, rotated_patch = _rotate(patch, angle, center=extrema[0], scale=scale, cval=MASK_VAL)
             # ensure to cut off padding after rotation
             x_offsets = np.sort(np.around(tform.inverse(extrema)[:,0]).astype('int'))
             rotated_patch = rotated_patch[:,x_offsets[0]+1:x_offsets[1]]
@@ -453,7 +455,7 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None, baselines: Seque
 
     polygons = []
     if suppl_obj is None:
-        supply_obj = []
+        suppl_obj = []
     for idx, line in enumerate(baselines):
         # find intercepts with image bounds on each side of baseline
         line = np.array(line, dtype=np.float)
