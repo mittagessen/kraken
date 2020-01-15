@@ -417,26 +417,27 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None, baselines: Seque
             # ensure to cut off padding after rotation
             x_offsets = np.sort(np.around(tform.inverse(extrema)[:,0]).astype('int'))
             rotated_patch = rotated_patch[:,x_offsets[0]+1:x_offsets[1]]
+            # infinity carve for seamcarve
+            rotated_patch = np.pad(rotated_patch, ((1, 1), (0, 0)), constant_values=np.inf)
             r, c = rotated_patch.shape
-            backtrack = np.zeros_like(rotated_patch, dtype=np.int)
-            # populate DP matrix
-            for i in range(1, c):
-                for j in range(0, r):
-                    if j == 0:
-                        idx = np.argmin(rotated_patch[j:j+2,i-1])
-                        backtrack[j, i] = idx + j
-                        min_energy = rotated_patch[idx+j,i-1]
-                    else:
-                        idx = np.argmin(rotated_patch[j-1:j+2,i-1])
-                        backtrack[j, i] = idx + j - 1
-                        min_energy = rotated_patch[idx+j-1,i-1]
-                    rotated_patch[j, i] += min_energy
+            # fold into shape (r+2, c, 3)
+            A = np.lib.stride_tricks.as_strided(rotated_patch, (c, r-2,3), (rotated_patch.strides[1],
+                                                                            rotated_patch.strides[0],
+                                                                            rotated_patch.strides[0]))
+            B = rotated_patch[1:-1,1:].swapaxes(0, 1)
+            backtrack = np.zeros_like(B, dtype='int')
+            T = np.empty((B.shape[1]), 'f')
+            R = np.arange(len(T))
+            for i in np.arange(c-1):
+                A[i].min(1, T)
+                backtrack[i] = A[i].argmin(1) + R - 1
+                B[i] += T
             # backtrack
             seam = []
             j = np.argmin(rotated_patch[:,-1])
-            for i in range(c-1, -1, -1):
+            for i in range(c-2, 0, -1):
                 seam.append((i+x_offsets[0]+1, j))
-                j = backtrack[j, i]
+                j = backtrack[i, j]
             seam = np.array(seam)[::-1]
             # rotate back
             seam = tform(seam).astype('int')
