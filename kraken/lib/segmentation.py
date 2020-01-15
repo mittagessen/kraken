@@ -418,7 +418,7 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None, baselines: Seque
             x_offsets = np.sort(np.around(tform.inverse(extrema)[:,0]).astype('int'))
             rotated_patch = rotated_patch[:,x_offsets[0]+1:x_offsets[1]]
             # infinity carve for seamcarve
-            rotated_patch = np.pad(rotated_patch, ((1, 1), (0, 0)), constant_values=np.inf)
+            rotated_patch = np.pad(rotated_patch, ((1, 1), (0, 0)),  mode='constant', constant_values=np.inf)
             r, c = rotated_patch.shape
             # fold into shape (r+2, c, 3)
             A = np.lib.stride_tricks.as_strided(rotated_patch, (c, r-2,3), (rotated_patch.strides[1],
