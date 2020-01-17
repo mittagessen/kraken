@@ -34,6 +34,7 @@ from scipy.spatial.distance import cdist, pdist, squareform
 from scipy.stats import linregress
 
 from shapely.ops import nearest_points, unary_union
+from shapely.prepared import prep
 
 from skimage import draw, measure
 from skimage.filters import apply_hysteresis_threshold, sobel
@@ -399,13 +400,13 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None, baselines: Seque
             r_min, r_max = int(polygon[:,1].min()), int(polygon[:,1].max())
             patch = im_feats[r_min:r_max+1, c_min:c_max+1].copy()
             # bias feature matrix by distance from baseline
-            mask = np.ones((r_max-r_min+1, c_max-c_min+1))
+            mask = np.ones_like(patch)
             for l in zip(baseline[:-1] - (c_min, r_min), baseline[1:] - (c_min, r_min)):
                 line_locs = draw.line(l[0][1], l[0][0], l[1][1], l[1][0])
                 mask[line_locs] = 0
             dist_bias = distance_transform_cdt(mask)
             # absolute mask
-            mask = np.ones((r_max-r_min+1, c_max-c_min+1), dtype=np.bool)
+            mask = np.ones_like(patch, dtype=np.bool)
             mask[r-r_min, c-c_min] = False
             # combine weights with features
             patch[mask] = MASK_VAL
@@ -469,16 +470,27 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None, baselines: Seque
         else:
             p_dir = np.array([1, np.sign(np.diff(line[(0, -1),0])).item()*slope])
             p_dir = (p_dir.T / np.sqrt(np.sum(p_dir**2,axis=-1)))
-        lr_up_intersect = _ray_intersect_boundaries(line[0], (p_dir*(-1,1))[::-1], bounds-1).astype('int')
-        lr_bottom_intersect = _ray_intersect_boundaries(line[0], (p_dir*(1,-1))[::-1], bounds-1).astype('int')
-        rr_up_intersect = _ray_intersect_boundaries(line[-1], (p_dir*(-1,1))[::-1], bounds-1).astype('int')
-        rr_bottom_intersect = _ray_intersect_boundaries(line[-1], (p_dir*(1,-1))[::-1], bounds-1).astype('int')
+        # interpolate baseline
+        ls = geom.LineString(line)
+        ip_line = [line[0]]
+        dist = 10
+        while dist < ls.length:
+            ip_line.append(np.array(ls.interpolate(dist)))
+            dist += 10
+        ip_line.append(line[-1])
+        ip_line = np.array(ip_line)
+        upper_bounds_intersects = []
+        bottom_bounds_intersects = []
+        for point in ip_line:
+            upper_bounds_intersects.append(_ray_intersect_boundaries(point, (p_dir*(-1,1))[::-1], bounds+1).astype('int'))
+            bottom_bounds_intersects.append(_ray_intersect_boundaries(point, (p_dir*(1,-1))[::-1], bounds+1).astype('int'))
         # build polygon between baseline and bbox intersects
-        upper_polygon = geom.Polygon([lr_up_intersect.tolist()] + line.tolist() + [rr_up_intersect.tolist()])
-        bottom_polygon = geom.Polygon([lr_bottom_intersect.tolist()] + line.tolist() + [rr_bottom_intersect.tolist()])
+        upper_polygon = prep(geom.Polygon(ip_line.tolist() + upper_bounds_intersects))
+        bottom_polygon = prep(geom.Polygon(ip_line.tolist() + bottom_bounds_intersects))
+
         # select baselines at least partially in each polygon
-        side_a = [geom.LineString([lr_up_intersect.tolist(), rr_up_intersect.tolist()])]
-        side_b = [geom.LineString([lr_bottom_intersect.tolist(), rr_bottom_intersect.tolist()])]
+        side_a = [geom.LineString(upper_bounds_intersects)]
+        side_b = [geom.LineString(bottom_bounds_intersects)]
         for adj_line in baselines[:idx] + baselines[idx+1:] + suppl_obj:
             adj_line = geom.LineString(adj_line)
             if upper_polygon.intersects(adj_line):
@@ -496,20 +508,10 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None, baselines: Seque
             else:
                 raise Exception('No intersection with boundaries')
         # interpolate baseline
-        ls = geom.LineString(line)
-        ip_line = [line[0]]
-        dist = 10
-        while dist < ls.length:
-            ip_line.append(np.array(ls.interpolate(dist)))
-            dist += 10
-        ip_line.append(line[-1])
-        ip_line = np.array(ip_line)
         env_up = []
         env_bottom = []
         # find orthogonal (to linear regression) intersects with adjacent objects to complete roi
-        for point in ip_line:
-            upper_bounds_intersect = _ray_intersect_boundaries(point, (p_dir*(-1,1))[::-1], bounds).astype('int')
-            bottom_bounds_intersect = _ray_intersect_boundaries(point, (p_dir*(1,-1))[::-1], bounds).astype('int')
+        for point, upper_bounds_intersect, bottom_bounds_intersect in zip(ip_line, upper_bounds_intersects, bottom_bounds_intersects):
             upper_limit = _find_closest_point(point, geom.LineString([point, upper_bounds_intersect]).intersection(side_a))
             bottom_limit = _find_closest_point(point, geom.LineString([point, bottom_bounds_intersect]).intersection(side_b))
             env_up.append(upper_limit.coords[0])
