@@ -539,7 +539,7 @@ def polygonal_reading_order(lines: Sequence[Tuple[List, List]], text_direction: 
     bounds = []
     for line in lines:
         l = geom.LineString(line[0]).bounds
-        bounds.append((slice(l[0], l[1]), slice(l[2], l[3])))
+        bounds.append((slice(l[1], l[0]), slice(l[3], l[2])))
     order = reading_order(bounds, text_direction)
     lsort = topsort(order)
     return [lines[i] for i in lsort]
