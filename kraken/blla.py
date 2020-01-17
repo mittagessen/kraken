@@ -36,12 +36,11 @@ __all__ = ['segment']
 
 logger = logging.getLogger(__name__)
 
-
 def segment(im,
             text_direction='horizontal-lr',
             mask=None,
             reading_order_fn=polygonal_reading_order,
-            model=pkg_resources.resource_filename(__name__, 'blla.mlmodel')):
+            model=None):
     """
     Segments a page into text lines using the baseline segmenter.
 
@@ -59,7 +58,9 @@ def segment(im,
                                      Has to accept a list of tuples (baselines,
                                      polygon) and a text direction (`lr` or
                                      `rl`).
-        model (str): A path to a segmentation model.
+        model (vgsl.TorchVGSLModel): A TorchVGSLModel containing a segmentation
+                                     model. If none is given a default model
+                                     will be loaded.
 
     Returns:
         {'text_direction': '$dir',
@@ -80,8 +81,11 @@ def segment(im,
     im_str = get_im_str(im)
     logger.info('Segmenting {}'.format(im_str))
 
-    model = vgsl.TorchVGSLModel.load_model(model)
+    if model is None:
+        logger.info('No segmentation model given. Loading default model.')
+        model = vgsl.TorchVGSLModel.load_model(pkg_resources.resource_filename(__name__, 'blla.mlmodel'))
     model.eval()
+
     if mask:
         if mask.mode != '1' and not is_bitonal(mask):
             logger.error('Mask is not bitonal')
