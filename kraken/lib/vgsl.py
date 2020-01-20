@@ -57,7 +57,10 @@ class TorchVGSLModel(object):
         user_metdata (dict): dict with user defined metadata. Is flushed into
                              model file during saving/overwritten by loading
                              operations.
-
+        one_channel_mode (str): Field indicating the image type used during
+                                training of one-channel images. Is '1' for
+                                models trained on binarized images, 'L' for
+                                grayscale, and None otherwise.
     """
     def __init__(self, spec: str) -> None:
         """
@@ -107,6 +110,7 @@ class TorchVGSLModel(object):
         self.criterion = None  # type: Any
         self.nn = torch.nn.Sequential()
         self.user_metadata = {}  # type: dict[str, str]
+        self.one_channel_mode = None # type: Optional[str]
 
         self.idx = -1
         spec = spec.strip()
@@ -446,6 +450,8 @@ class TorchVGSLModel(object):
             nn.add_codec(PytorchCodec(json.loads(mlmodel.user_defined_metadata['codec'])))
         if 'kraken_meta' in mlmodel.user_defined_metadata:
             nn.user_metadata = json.loads(mlmodel.user_defined_metadata['kraken_meta'])
+            if 'one_channel_mode' in nn.user_metadata:
+                nn.one_channel_mode = nn.user_metadata['one_channel_mode']
         return nn
 
     def save_model(self, path: str):
@@ -460,6 +466,7 @@ class TorchVGSLModel(object):
         net_builder = NeuralNetworkBuilder(inputs, outputs)
         input = 'input'
         prev_device = next(next(self.nn.children()).parameters()).device
+        self.user_metadata['on_channel_mode'] = self.one_channel_mode
         try:
             for name, layer in self.nn.to('cpu').named_children():
                 input = layer.serialize(name, input, net_builder)
