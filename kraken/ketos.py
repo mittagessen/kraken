@@ -317,6 +317,10 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
 @click.option('--threads', show_default=True, default=1, help='Number of OpenMP threads and workers when running on CPU.')
 #@click.option('--load-hyper-parameters/--no-load-hyper-parameters', show_default=True, default=False,
 #              help='When loading an existing model, retrieve hyperparameters from the model')
+@click.option('--force-binarization/--no-binarization', show_default=True,
+              default=False, help='Forces input images to be binary, otherwise'
+              'the appropriate color format will be auto-determined through the'
+              'network specification. Will be ignored in `path` mode.')
 @click.option('-f', '--format-type', type=click.Choice(['path', 'alto', 'page']), default='path',
               help='Sets the training data format. In ALTO and PageXML mode all'
               'data is extracted from xml files containing both line definitions and a'
@@ -328,7 +332,7 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
           lag, min_delta, device, optimizer, lrate, momentum, weight_decay,
           schedule, partition, normalization, normalize_whitespace, codec,
           resize, reorder, training_files, evaluation_files, preload, threads,
-          format_type, ground_truth):
+          force_binarization, format_type, ground_truth):
     """
     Trains a model from image-text pairs.
     """
@@ -372,7 +376,6 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
         message('\u2713', fg='green', nl=False)
 
 
-
     # disable automatic partition when given evaluation set explicitly
     if evaluation_files:
         partition = 1
@@ -396,6 +399,9 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
         DatasetClass = PolygonGTDataset
         valid_norm = False
     else:
+        if force_binarization:
+            logger.warning('Forced binarization enabled in `path` mode. Will be ignored.')
+            force_binarization = False
         ground_truth = [{'image': im} for im in ground_truth]
         if evaluation_files:
             evaluation_files = [{'image': im} for im in evaluation_files]
@@ -415,7 +421,7 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
     else:
         batch, channels, height, width = nn.input
     try:
-        transforms = generate_input_transforms(batch, height, width, channels, pad, valid_norm)
+        transforms = generate_input_transforms(batch, height, width, channels, pad, valid_norm, force_binarization)
     except KrakenInputException as e:
         raise click.BadOptionUsage('spec', str(e))
 
@@ -544,6 +550,13 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
         nn.add_codec(gt_set.codec)
         # initialize codec
         message('\u2713', fg='green')
+
+    if nn.one_channel_mode and gt_set.im_mode != nn.one_channel_mode:
+        logger.warning('Neural network has been trained on mode {} images, training set contains mode {} data. Consider setting `--force-binarization`'.format(nn.one_channel_mode, gt_set.im_mode))
+
+    # set proper image mode on network
+    if gt_set.im_mode in ['1', 'L']:
+        nn.on_channel_mode = gt_set.im_mode
 
     # half the number of data loading processes if device isn't cuda and we haven't enabled preloading
     if device == 'cpu' and not preload:

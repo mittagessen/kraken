@@ -71,13 +71,6 @@ def generate_input_transforms(batch: int, height: int, width: int, channels: int
     scale = (height, width) # type: Tuple[int, int]
     center_norm = False
     mode = 'RGB' if channels == 3 else 'L'
-    if mode != 'L' and force_binarization:
-        raise KrakenInputException('Invalid input spec {}, {}, {}, {} in'
-                                   ' combination with forced binarization.'.format(batch,
-                                                                                   height,
-                                                                                   width,
-                                                                                   channels,
-                                                                                   pad))
     if height == 1 and width == 0 and channels > 3:
         perm = (1, 0, 2)
         scale = (channels, 0)
@@ -103,6 +96,13 @@ def generate_input_transforms(batch: int, height: int, width: int, channels: int
                                                                                   width,
                                                                                   channels,
                                                                                   pad))
+    if mode != 'L' and force_binarization:
+        raise KrakenInputException('Invalid input spec {}, {}, {}, {} in'
+                                   ' combination with forced binarization.'.format(batch,
+                                                                                   height,
+                                                                                   width,
+                                                                                   channels,
+                                                                                   pad))
 
     out_transforms = []
     out_transforms.append(transforms.Lambda(lambda x: x.convert(mode)))
@@ -333,11 +333,6 @@ class PolygonGTDataset(Dataset):
             self.text_transforms.append(bd.get_display)
         self.im_mode = '1'
 
-    def _set_mode(self, im):
-        if im.mode == 'L' and self.im_mode == '1' and not is_bitonal(im):
-            self.im_mode == 'L'
-        elif im.mode == 'RGB' and self.im_mode in ('1', 'L'):
-            self.im_mode = 'RGB'
 
     def add(self, image: Union[str, Image.Image], text: str, baseline: List[Tuple[int, int]], boundary: List[Tuple[int, int]]):
         """
@@ -353,10 +348,6 @@ class PolygonGTDataset(Dataset):
             text = func(text)
             if not text:
                 raise KrakenInputException('Text line is empty after transformations')
-        if not isinstance(image, Image.Image):
-            self._set_mode(Image.open(image))
-        else:
-            self._set_mode(image)
         if self.preload:
             if not isinstance(image, Image.Image):
                 im = Image.open(image)
@@ -460,12 +451,6 @@ class GroundTruthDataset(Dataset):
             self.text_transforms.append(bd.get_display)
         self.im_mode = '1'
 
-    def _set_mode(self, im):
-        if im.mode == 'L' and self.im_mode == '1' and not is_bitonal(im):
-            self.im_mode == 'L'
-        elif im.mode == 'RGB' and self.im_mode in ('1', 'L'):
-            self.im_mode = 'RGB'
-
     def add(self, image: Union[str, Image.Image]) -> None:
         """
         Adds a line-image-text pair to the dataset.
@@ -479,10 +464,9 @@ class GroundTruthDataset(Dataset):
                 gt = func(gt)
             if not gt:
                 raise KrakenInputException('Text line is empty ({})'.format(fp.name))
-        im = Image.open(image)
-        self._set_mode(im)
         if self.preload:
             try:
+                im = Image.open(image)
                 im = self.transforms(im)
             except ValueError:
                 raise KrakenInputException('Image transforms failed on {}'.format(image))
@@ -500,7 +484,6 @@ class GroundTruthDataset(Dataset):
             image (PIL.Image.Image): Line image
             gt (str): Text contained in the line image
         """
-        self._set_mode(im)
         if self.preload:
             try:
                 im = self.transforms(image)
@@ -585,8 +568,6 @@ class BaselineSet(Dataset):
             self.targets = []
             for img in imgs:
                 data = fn(img)
-                im = Image.open(data['image'])
-                self._set_mode(im)
                 im_paths.append(data['image'])
                 self.targets.append([line['baseline'] for line in data['lines']])
             imgs = im_paths
@@ -605,13 +586,6 @@ class BaselineSet(Dataset):
         self.line_width = line_width
         self.im_transforms = im_transforms
 
-    def _set_mode(self, im):
-        if im.mode == 'L' and self.im_mode == '1' and not is_bitonal(im):
-            self.im_mode == 'L'
-        elif im.mode == 'RGB' and self.im_mode in ('1', 'L'):
-            self.im_mode = 'RGB'
-
-
     def add(self, image: Union[str, Image.Image], baselines: List[List[Tuple[int, int]]]):
         """
         Adds a line to the dataset.
@@ -622,10 +596,6 @@ class BaselineSet(Dataset):
         """
         if self.mode:
             raise Exception('The `add` method is incompatible with dataset mode {}'.format(self.mode))
-        if not isinstance(image, Image.Image):
-            self._set_mode(Image.open(image))
-        else:
-            self._set_mode(image)
         self.imgs.append(image)
         self.targets.append(baselines)
 
