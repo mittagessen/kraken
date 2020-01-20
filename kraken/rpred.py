@@ -25,7 +25,7 @@ import bidi.algorithm as bd
 from PIL import Image
 from typing import List, Tuple, Optional, Generator, Union, Dict
 
-from kraken.lib.util import get_im_str
+from kraken.lib.util import get_im_str, is_bitonal
 from kraken.lib.models import TorchSeqRecognizer
 from kraken.lib.segmentation import extract_polygons, compute_polygon_section
 from kraken.lib.exceptions import KrakenInputException
@@ -173,7 +173,13 @@ class mm_rpred(object):
                            'applied to segmentation of type {}. This will likely result'
                            'in severely degraded performace'.format(seg_types,
                             bounds['type']))
-
+        one_channel_modes = set(recognizer.one_channel_mode for recognizer in nets.values())
+        if '1' in one_channel_modes and len(one_channel_modes) > 1:
+            raise KrakenInputException('Mixing binary and non-binary recognition models is not supported.')
+        elif '1' in one_channel_modes and not is_bitonal(im):
+            logger.warning('Running binary models on non-binary input image'
+                           '(mode {}). This will result in severely degraded'
+                           'performance'.format(im.mode))
         if 'type' in bounds and bounds['type'] == 'baselines':
             valid_norm = False
             self.len = len(bounds['lines'])
