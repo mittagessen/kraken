@@ -107,6 +107,10 @@ def _expand_gt(ctx, param, value):
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
 @click.option('--threads', show_default=True, default=1, help='Number of OpenMP threads and workers when running on CPU.')
+@click.option('--force-binarization/--no-binarization', show_default=True,
+              default=False, help='Forces input images to be binary, otherwise'
+              'the appropriate color format will be auto-determined through the'
+              'network specification. Will be ignored in `path` mode.')
 @click.option('-f', '--format-type', type=click.Choice(['path', 'alto', 'page']), default='path',
               help='Sets the training data format. In ALTO and PageXML mode all'
               'data is extracted from xml files containing both baselines and a'
@@ -117,7 +121,7 @@ def _expand_gt(ctx, param, value):
 def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
              lag, min_delta, device, optimizer, lrate, momentum, weight_decay,
              schedule, partition, training_files, evaluation_files, threads,
-             format_type, ground_truth):
+             force_binarization, format_type, ground_truth):
     """
     Trains a baseline labeling model for layout analysis
     """
@@ -317,6 +321,15 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
 @click.option('--threads', show_default=True, default=1, help='Number of OpenMP threads and workers when running on CPU.')
 #@click.option('--load-hyper-parameters/--no-load-hyper-parameters', show_default=True, default=False,
 #              help='When loading an existing model, retrieve hyperparameters from the model')
+@click.option('--repolygonize/--no-repolygonize', show_default=True,
+              default=False, help='Repolygonizes line data in ALTO/PageXML'
+              'files. This ensures that the trained model is compatible with the'
+              'segmenter in kraken even if the original image files either do'
+              'not contain anything but transcriptions and baseline information'
+              'or the polygon data was created using a different method. Will'
+              'be ignored in `path` mode. Note, that this option will be slow'
+              'and will not scale input images to the same size as the segmenter'
+              'does.')
 @click.option('--force-binarization/--no-binarization', show_default=True,
               default=False, help='Forces input images to be binary, otherwise'
               'the appropriate color format will be auto-determined through the'
@@ -332,7 +345,7 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
           lag, min_delta, device, optimizer, lrate, momentum, weight_decay,
           schedule, partition, normalization, normalize_whitespace, codec,
           resize, reorder, training_files, evaluation_files, preload, threads,
-          force_binarization, format_type, ground_truth):
+          repolygonize, force_binarization, format_type, ground_truth):
     """
     Trains a model from image-text pairs.
     """
@@ -393,15 +406,17 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
     DatasetClass = GroundTruthDataset
     if format_type != 'path':
         logger.info('Parsing {} XML files for training data'.format(len(ground_truth)))
-        ground_truth = preparse_xml_data(ground_truth, format_type)
+        ground_truth = preparse_xml_data(ground_truth, format_type, repolygonize)
         if evaluation_files:
-            evaluation_files = preparse_xml_data(evaluation_files, format_type)
+            evaluation_files = preparse_xml_data(evaluation_files, format_type, repolygonize)
         DatasetClass = PolygonGTDataset
         valid_norm = False
     else:
         if force_binarization:
             logger.warning('Forced binarization enabled in `path` mode. Will be ignored.')
             force_binarization = False
+        if repolygonize:
+            logger.warning('Repolygonization enabled in `path` mode. Will be ignored.')
         ground_truth = [{'image': im} for im in ground_truth]
         if evaluation_files:
             evaluation_files = [{'image': im} for im in evaluation_files]

@@ -36,11 +36,11 @@ from kraken.lib.xml import parse_alto, parse_page
 from kraken.lib.util import is_bitonal
 from kraken.lib.codec import PytorchCodec
 from kraken.lib.models import TorchSeqRecognizer
-from kraken.lib.segmentation import extract_polygons
+from kraken.lib.segmentation import extract_polygons, calculate_polygonal_environment
 from kraken.lib.exceptions import KrakenInputException
 from kraken.lib.lineest import CenterNormalizer, dewarp
 
-__all__ = ['BaselineSet', 'GroundTruthDataset', 'compute_error', 'generate_input_transforms']
+__all__ = ['BaselineSet', 'GroundTruthDataset', 'compute_error', 'generate_input_transforms', 'preparse_xml_data']
 
 import logging
 
@@ -271,7 +271,7 @@ def compute_error(model: TorchSeqRecognizer, validation_set: Sequence[Tuple[str,
     return total_chars, error
 
 
-def preparse_xml_data(filenames, format_type):
+def preparse_xml_data(filenames, format_type='page', repolygonize=False):
     """
     Loads training data from a set of xml files.
 
@@ -280,6 +280,8 @@ def preparse_xml_data(filenames, format_type):
     Args:
         filenames (list): List of XML files.
         format_type (str): Either `page` or `alto`
+        repolygonize (bool): (Re-)calculates polygon information using the
+                             kraken algorithm.
 
     Returns:
         A list of dicts {'text': text, 'baseline': [[x0, y0], ...], 'boundary':
@@ -303,9 +305,29 @@ def preparse_xml_data(filenames, format_type):
         except FileNotFoundError as e:
             logger.warning('Could not open file {} in {}'.format(e.filename, fn))
             continue
+        if repolygonize:
+            logger.info('repolygonizing {} lines in {}'.format(len(data['lines']), data['image']))
+            data['lines'] = _repolygonize(data['image'], data['lines'])
         for line in data['lines']:
             training_pairs.append({'image': data['image'], **line})
     return training_pairs
+
+
+def _repolygonize(im: Image.Image, lines):
+    """
+    Helper function taking an output of the lib.xml parse_* functions and
+    recalculating the contained polygonization.
+
+    Args:
+        im (Image.Image): Input image
+        lines (list): List of dicts [{'boundary': [[x0, y0], ...], 'baseline': [[x0, y0], ...], 'text': 'abcvsd'}, {...]
+
+    Returns:
+        A data structure `lines` with a changed polygonization.
+    """
+    im = Image.open(im).convert('L')
+    polygons = calculate_polygonal_environment(im, [x['baseline'] for x in lines])
+    return [{'boundary': polygon, 'baseline': orig['baseline'], 'text': orig['text']} for orig, polygon in zip(lines, polygons)]
 
 
 class PolygonGTDataset(Dataset):
