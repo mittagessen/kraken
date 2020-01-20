@@ -49,6 +49,7 @@ class TorchSeqRecognizer(object):
         self.decoder = decoder
         self.train = train
         self.device = device
+        self.seg_type = self.nn.user_metadata['seg_type']
         self.nn.to(device)
 
     def to(self, device):
@@ -132,7 +133,7 @@ def load_any(fname: str, train: bool = False, device: str = 'cpu') -> TorchSeqRe
     nn = None
     kind = ''
     fname = abspath(expandvars(expanduser(fname)))
-    logger.info(u'Loading model from {}'.format(fname))
+    logger.info('Loading model from {}'.format(fname))
     try:
         nn = TorchVGSLModel.load_model(str(fname))
         kind = 'vgsl'

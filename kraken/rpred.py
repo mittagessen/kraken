@@ -167,6 +167,13 @@ class mm_rpred(object):
             KrakenInputException if the mapping between segmentation scripts and
             networks is incomplete.
         """
+        seg_types = set(recognizer.seg_type for recognizer in nets.values())
+        if bounds['type'] not in seg_types or len(seg_types) > 1:
+            logger.warning('Recognizers with segmentation types {} will be'
+                           'applied to segmentation of type {}. This will likely result'
+                           'in severely degraded performace'.format(seg_types,
+                            bounds['type']))
+
         if 'type' in bounds and bounds['type'] == 'baselines':
             valid_norm = False
             self.len = len(bounds['lines'])
