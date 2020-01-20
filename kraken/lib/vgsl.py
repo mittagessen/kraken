@@ -452,6 +452,8 @@ class TorchVGSLModel(object):
             nn.user_metadata = json.loads(mlmodel.user_defined_metadata['kraken_meta'])
             if 'one_channel_mode' in nn.user_metadata:
                 nn.one_channel_mode = nn.user_metadata['one_channel_mode']
+            if 'seg_type' not in nn.user_metadata:
+                nn.user_metadata['seg_type'] = 'bbox'
         return nn
 
     def save_model(self, path: str):

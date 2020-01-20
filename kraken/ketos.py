@@ -577,6 +577,9 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
     if nn.one_channel_mode and gt_set.im_mode != nn.one_channel_mode:
         logger.warning('Neural network has been trained on mode {} images, training set contains mode {} data. Consider setting `--force-binarization`'.format(nn.one_channel_mode, gt_set.im_mode))
 
+    if format_type != 'path' and nn.user_metadata['seg_type'] == 'bbox':
+        logger.warning('Neural network has been trained on bounding box image information but training set is polygonal.')
+
     # set proper image mode on network
     if gt_set.im_mode in ['1', 'L']:
         nn.on_channel_mode = gt_set.im_mode
@@ -603,8 +606,11 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
 
     optim = getattr(torch.optim, optimizer)(nn.nn.parameters(), lr=0)
 
-    if 'accuracy' not in  nn.user_metadata:
+    if 'accuracy' not in nn.user_metadata:
         nn.user_metadata['accuracy'] = []
+
+    if 'seg_type' not in nn.user_metadata:
+        nn.user_metadata['seg_type'] = 'baseline' if format_type != 'path' else 'bbox'
 
     tr_it = TrainScheduler(optim)
     if schedule == '1cycle':
