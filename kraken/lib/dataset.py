@@ -33,6 +33,7 @@ from torch.utils.data import Dataset
 from typing import Dict, List, Tuple, Sequence, Callable, Optional, Any, Union, cast
 
 from kraken.lib.xml import parse_alto, parse_page
+from kraken.lib.util import is_bitonal
 from kraken.lib.codec import PytorchCodec
 from kraken.lib.models import TorchSeqRecognizer
 from kraken.lib.segmentation import extract_polygons
