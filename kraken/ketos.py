@@ -204,6 +204,9 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
     val_set = BaselineSet(te_im, line_width=line_width,
                           im_transforms=transforms, mode=format_type)
 
+    if len(gt_set.imgs) == 0:
+        raise click.UsageError('No valid training data was provided to the train command. Please add valid XML or line data.')
+
     if device == 'cpu':
         loader_threads = threads // 2
     else:
@@ -406,6 +409,8 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
     DatasetClass = GroundTruthDataset
     if format_type != 'path':
         logger.info('Parsing {} XML files for training data'.format(len(ground_truth)))
+        if repolygonize:
+            message('Repolygonizing data')
         ground_truth = preparse_xml_data(ground_truth, format_type, repolygonize)
         if evaluation_files:
             evaluation_files = preparse_xml_data(evaluation_files, format_type, repolygonize)
@@ -489,6 +494,9 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
                 logger.warning('{}: {}. Skipping.'.format(e.strerror, e.filename))
             except KrakenInputException as e:
                 logger.warning(str(e))
+
+    if len(gt_set._images) == 0:
+        raise click.UsageError('No valid training data was provided to the train command. Please add valid XML or line data.')
 
     logger.info('Training set {} lines, validation set {} lines, alphabet {} symbols'.format(len(gt_set._images), len(val_set._images), len(gt_set.alphabet)))
     alpha_diff_only_train = set(gt_set.alphabet).difference(set(val_set.alphabet))
