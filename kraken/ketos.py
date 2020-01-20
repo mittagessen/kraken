@@ -34,6 +34,7 @@ from kraken.lib.exceptions import KrakenInputException
 
 APP_NAME = 'kraken'
 
+logging.captureWarnings(True)
 logger = logging.getLogger('kraken')
 
 

@@ -35,6 +35,7 @@ from kraken.lib import log
 
 warnings.simplefilter('ignore', UserWarning)
 
+logging.captureWarnings(True)
 logger = logging.getLogger('kraken')
 
 APP_NAME = 'kraken'
