@@ -279,7 +279,7 @@ def vectorize_lines(im: np.ndarray, threshold: float = 0.3, min_sp_dist: int = 1
     bl_map = im[1]
     sep_map = im[2]
     # binarize
-    bin = np.sum(o[1:], axis=0) > threshold
+    bin = np.sum(im[1:], axis=0) > threshold
     skel = skeletonize(bin)
     sp_can = _find_superpixels(skel, heatmap=bl_map, min_sp_dist=min_sp_dist)
     if not sp_can.size:
