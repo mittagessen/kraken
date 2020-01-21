@@ -259,6 +259,7 @@ def binarize(threshold, zoom, escale, border, perc, range, low, high):
 
 
 @cli.command('segment')
+@click.pass_context
 @click.option('-i', '--model',
               default=pkg_resources.resource_filename(__name__, 'blla.mlmodel'),
               show_default=True, type=click.Path(exists=True),
@@ -287,11 +288,22 @@ def binarize(threshold, zoom, escale, border, perc, range, low, high):
               'suppressing page areas for line detection. 0-valued image '
               'regions are ignored for segmentation purposes. Disables column '
               'detection.')
-def segment(model, boxes, text_direction, script_detect, allowed_scripts,
+def segment(ctx, model, boxes, text_direction, script_detect, allowed_scripts,
             scale, maxcolseps, black_colseps, remove_hlines, pad, mask):
     """
     Segments page images into text lines.
     """
+    if boxes == False:
+        from kraken.lib.vgsl import TorchVGSLModel
+        message('Loading ANN {}\t'.format(model), nl=False)
+        try:
+            model = TorchVGSLModel.load_model(model)
+            model.to(ctx.meta['device'])
+        except Exception:
+            message('\u2717', fg='red')
+            ctx.exit(1)
+        message('\u2713', fg='green')
+
     return partial(segmenter, boxes, model, text_direction, script_detect,
                    allowed_scripts, scale, maxcolseps, black_colseps,
                    remove_hlines, pad, mask)
@@ -373,7 +385,6 @@ def ocr(ctx, model, pad, reorder, no_segmentation, serializer, text_direction, l
             nm[k] = rnn
         except Exception:
             message('\u2717', fg='red')
-            raise
             ctx.exit(1)
         message('\u2713', fg='green')
 
