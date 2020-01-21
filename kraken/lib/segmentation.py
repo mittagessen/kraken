@@ -188,11 +188,11 @@ def _compute_sp_states(sp_can, bl_map, sep_map):
         if v[0] < 0.4:
             del intensities[k]
             continue
-        if v[1] > 5e-02:
+        if v[1] > 1e-01:
             del intensities[k]
             continue
         # filter edges with high separator affinity
-        if v[2] > 0.125 or v[3] > 0.25 or v[0] < 0.5:
+        if v[2] > 0.25 or v[3] > 0.5:
             del intensities[k]
             continue
 
@@ -262,7 +262,7 @@ def _interpolate_lines(clusters):
     return lines
 
 
-def vectorize_lines(im: np.ndarray, threshold: float = 0.2, min_sp_dist: int = 10):
+def vectorize_lines(im: np.ndarray, threshold: float = 0.3, min_sp_dist: int = 10):
     """
     Vectorizes lines from a binarized array.
 
@@ -279,8 +279,8 @@ def vectorize_lines(im: np.ndarray, threshold: float = 0.2, min_sp_dist: int = 1
     bl_map = im[1]
     sep_map = im[2]
     # binarize
-    bin = im > threshold
-    skel = skeletonize(bin[1])
+    bin = np.sum(o[1:], axis=0) > threshold
+    skel = skeletonize(bin)
     sp_can = _find_superpixels(skel, heatmap=bl_map, min_sp_dist=min_sp_dist)
     if not sp_can.size:
         logger.warning('No superpixel candidates found in network output. Likely empty page.')
