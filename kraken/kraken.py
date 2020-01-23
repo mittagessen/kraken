@@ -82,9 +82,6 @@ def segmenter(legacy, model, text_direction, script_detect, allowed_scripts,
     from kraken import pageseg
     from kraken import blla
 
-    if model and legacy:
-        logger.warning('Baseline model ({}) given but legacy segmenter selected. Forcing to -bl.'.format(model))
-        legacy = False
     try:
         im = Image.open(input)
     except IOError as e:
@@ -293,6 +290,10 @@ def segment(ctx, model, boxes, text_direction, script_detect, allowed_scripts,
     """
     Segments page images into text lines.
     """
+    if model and boxes:
+        logger.warning('Baseline model ({}) given but legacy segmenter selected. Forcing to -bl.'.format(model))
+        boxes = True
+
     if boxes == False:
         from kraken.lib.vgsl import TorchVGSLModel
         message('Loading ANN {}\t'.format(model), nl=False)

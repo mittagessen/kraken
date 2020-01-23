@@ -450,10 +450,12 @@ class TorchVGSLModel(object):
             nn.add_codec(PytorchCodec(json.loads(mlmodel.user_defined_metadata['codec'])))
         if 'kraken_meta' in mlmodel.user_defined_metadata:
             nn.user_metadata = json.loads(mlmodel.user_defined_metadata['kraken_meta'])
-            if 'one_channel_mode' in nn.user_metadata:
-                nn.one_channel_mode = nn.user_metadata['one_channel_mode']
-            if 'seg_type' not in nn.user_metadata:
-                nn.user_metadata['seg_type'] = 'bbox'
+        if 'one_channel_mode' in nn.user_metadata:
+            nn.one_channel_mode = nn.user_metadata['one_channel_mode']
+        else:
+            nn.one_channel_mode = '1'
+        if 'seg_type' not in nn.user_metadata:
+            nn.user_metadata['seg_type'] = 'bbox'
         return nn
 
     def save_model(self, path: str):
