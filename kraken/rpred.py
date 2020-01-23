@@ -173,7 +173,7 @@ class mm_rpred(object):
                            'applied to segmentation of type {}. This will likely result'
                            'in severely degraded performace'.format(seg_types,
                             bounds['type']))
-        one_channel_modes = set(recognizer.one_channel_mode for recognizer in nets.values())
+        one_channel_modes = set(recognizer.nn.one_channel_mode for recognizer in nets.values())
         if '1' in one_channel_modes and len(one_channel_modes) > 1:
             raise KrakenInputException('Mixing binary and non-binary recognition models is not supported.')
         elif '1' in one_channel_modes and not is_bitonal(im):
