@@ -418,24 +418,24 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None, baselines: Seque
             # ensure to cut off padding after rotation
             x_offsets = np.sort(np.around(tform.inverse(extrema)[:,0]).astype('int'))
             rotated_patch = rotated_patch[:,x_offsets[0]+1:x_offsets[1]]
-            # infinity carve for seamcarve
+            # infinity pad for seamcarve
             rotated_patch = np.pad(rotated_patch, ((1, 1), (0, 0)),  mode='constant', constant_values=np.inf)
             r, c = rotated_patch.shape
-            # fold into shape (r+2, c, 3)
-            A = np.lib.stride_tricks.as_strided(rotated_patch, (c, r-2,3), (rotated_patch.strides[1],
-                                                                            rotated_patch.strides[0],
-                                                                            rotated_patch.strides[0]))
+            # fold into shape (c, r-2 3)
+            A = np.lib.stride_tricks.as_strided(rotated_patch, (c, r-2, 3), (rotated_patch.strides[1],
+                                                                             rotated_patch.strides[0],
+                                                                             rotated_patch.strides[0]))
             B = rotated_patch[1:-1,1:].swapaxes(0, 1)
             backtrack = np.zeros_like(B, dtype='int')
             T = np.empty((B.shape[1]), 'f')
-            R = np.arange(len(T))
+            R = np.arange(-1, len(T)-1)
             for i in np.arange(c-1):
                 A[i].min(1, T)
-                backtrack[i] = A[i].argmin(1) + R - 1
+                backtrack[i] = A[i].argmin(1) + R
                 B[i] += T
             # backtrack
             seam = []
-            j = np.argmin(rotated_patch[:,-1])
+            j = np.argmin(rotated_patch[1:-1,-1])
             for i in range(c-2, 0, -1):
                 seam.append((i+x_offsets[0]+1, j))
                 j = backtrack[i, j]
