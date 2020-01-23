@@ -578,8 +578,8 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
     if nn.one_channel_mode and gt_set.im_mode != nn.one_channel_mode:
         logger.warning('Neural network has been trained on mode {} images, training set contains mode {} data. Consider setting `--force-binarization`'.format(nn.one_channel_mode, gt_set.im_mode))
 
-    if format_type != 'path' and nn.user_metadata['seg_type'] == 'bbox':
-        logger.warning('Neural network has been trained on bounding box image information but training set is polygonal.')
+    #if format_type != 'path' and nn.nn.user_metadata['seg_type'] == 'bbox':
+    #    logger.warning('Neural network has been trained on bounding box image information but training set is polygonal.')
 
     # set proper image mode on network
     if gt_set.im_mode in ['1', 'L']:
