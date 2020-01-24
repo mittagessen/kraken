@@ -168,17 +168,17 @@ class mm_rpred(object):
             networks is incomplete.
         """
         seg_types = set(recognizer.seg_type for recognizer in nets.values())
-        if bounds['type'] not in seg_types or len(seg_types) > 1:
+        if ('type' in bounds and bounds['type'] not in seg_types) or len(seg_types) > 1:
             logger.warning('Recognizers with segmentation types {} will be'
                            'applied to segmentation of type {}. This will likely result'
                            'in severely degraded performace'.format(seg_types,
-                            bounds['type']))
+                            bounds['type'] if 'type' in bounds else None))
         one_channel_modes = set(recognizer.nn.one_channel_mode for recognizer in nets.values())
         if '1' in one_channel_modes and len(one_channel_modes) > 1:
             raise KrakenInputException('Mixing binary and non-binary recognition models is not supported.')
         elif '1' in one_channel_modes and not is_bitonal(im):
-            logger.warning('Running binary models on non-binary input image'
-                           '(mode {}). This will result in severely degraded'
+            logger.warning('Running binary models on non-binary input image '
+                           '(mode {}). This will result in severely degraded '
                            'performance'.format(im.mode))
         if 'type' in bounds and bounds['type'] == 'baselines':
             valid_norm = False

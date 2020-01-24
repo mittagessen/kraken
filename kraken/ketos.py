@@ -611,7 +611,7 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
         nn.user_metadata['accuracy'] = []
 
     if 'seg_type' not in nn.user_metadata:
-        nn.user_metadata['seg_type'] = 'baseline' if format_type != 'path' else 'bbox'
+        nn.user_metadata['seg_type'] = 'baselines' if format_type != 'path' else 'bbox'
 
     tr_it = TrainScheduler(optim)
     if schedule == '1cycle':
