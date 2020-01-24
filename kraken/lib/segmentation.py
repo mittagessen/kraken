@@ -24,22 +24,21 @@ import shapely.geometry as geom
 
 from PIL import Image, ImageDraw
 
-from numpy.polynomial import Polynomial
-
-from scipy.ndimage import black_tophat
-from scipy.ndimage.filters import gaussian_filter, gaussian_filter1d
-from scipy.ndimage.morphology import grey_dilation, distance_transform_cdt
-from scipy.spatial import distance_matrix, Delaunay
-from scipy.spatial.distance import cdist, pdist, squareform
 from scipy.stats import linregress
+from scipy.signal import savgol_filter
+from scipy.spatial import distance_matrix, Delaunay
+from scipy.sparse.csgraph import shortest_path
+from scipy.spatial.distance import cdist, pdist, squareform
+from scipy.ndimage.filters import gaussian_filter, gaussian_filter1d
+from scipy.ndimage.morphology import distance_transform_cdt
 
 from shapely.ops import nearest_points, unary_union
 from shapely.prepared import prep
 
 from skimage import draw, measure
 from skimage.filters import apply_hysteresis_threshold, sobel
-from skimage.measure import approximate_polygon, find_contours, subdivide_polygon
-from skimage.morphology import skeletonize, watershed
+from skimage.measure import approximate_polygon, subdivide_polygon
+from skimage.morphology import skeletonize
 from skimage.transform import PiecewiseAffineTransform, SimilarityTransform, AffineTransform, warp
 
 from typing import List, Tuple, Union, Dict, Any, Sequence
@@ -246,19 +245,34 @@ def _interpolate_lines(clusters):
     logger.debug('Reticulating splines')
     lines = []
     for cluster in clusters[1:]:
-        points = sorted(set(point for edge in cluster for point in edge), key=lambda x: x[1])
-        x = [x[1] for x in points]
-        y = [x[0] for x in points]
-        # very short lines might not have enough superpixels to ensure a well-conditioned regression
-        deg = min(len(x)-1, 3)
-        poly = Polynomial.fit(x, y, deg=deg)
-        xp, yp = poly.linspace(max(int(np.diff(poly.domain).item()//deg), 2))
-        xp = xp.astype('int')
-        yp = yp.astype('int')
-        line = np.array(list(zip(xp, yp)))
-        line = approximate_polygon(line, 3)
-        line = line.astype('uint').tolist()
-        lines.append(line)
+        # find start-end point
+        points = [point for edge in cluster for point in edge]
+        dists = squareform(pdist(points))
+        i, j = np.unravel_index(dists.argmax(), dists.shape)
+        if points[i][1] > points[j][1]:
+            i, j = j, i
+        # build adjacency matrix for shortest path algo
+        adj_mat = np.full_like(dists, np.inf)
+        for l, r in cluster:
+            idx_l = points.index(l)
+            idx_r = points.index(r)
+            adj_mat[idx_l, idx_r] = dists[idx_l, idx_r]
+        # shortest path
+        _, pr = shortest_path(adj_mat, directed=False, return_predecessors=True, indices=i)
+        k = j
+        line = [points[j]]
+        while pr[k] != -9999:
+            k = pr[k]
+            line.append(points[k])
+        # smooth line
+        line = np.array(line[::-1])
+        filter_len = min(len(line)//2*2-1, 11)
+        poly_order = min(filter_len-1, 3)
+        y = savgol_filter(line[:,0], filter_len, polyorder=poly_order)
+        x = savgol_filter(line[:,1], filter_len, polyorder=poly_order)
+        line = np.around(np.dstack((x, y)))[0]
+        line = approximate_polygon(line, 1)
+        lines.append(line.astype('uint').tolist())
     return lines
 
 
