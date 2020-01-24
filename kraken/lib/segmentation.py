@@ -38,7 +38,7 @@ from shapely.prepared import prep
 from skimage import draw, measure
 from skimage.filters import apply_hysteresis_threshold, sobel
 from skimage.measure import approximate_polygon, subdivide_polygon
-from skimage.morphology import skeletonize
+from skimage.morphology import medial_axis
 from skimage.transform import PiecewiseAffineTransform, SimilarityTransform, AffineTransform, warp
 
 from typing import List, Tuple, Union, Dict, Any, Sequence
@@ -238,7 +238,7 @@ def _cluster_lines(intensities):
     return clusters
 
 
-def _interpolate_lines(clusters):
+def _interpolate_lines(clusters, elongation_offset):
     """
     Interpolates the baseline clusters.
     """
@@ -272,6 +272,12 @@ def _interpolate_lines(clusters):
         x = savgol_filter(line[:,1], filter_len, polyorder=poly_order)
         line = np.around(np.dstack((x, y)))[0]
         line = approximate_polygon(line, 1)
+        lr_dir = line[0] - line[1]
+        lr_dir = (lr_dir.T  / np.sqrt(np.sum(lr_dir**2,axis=-1))) * elongation_offset
+        line[0] = line[0] + lr_dir
+        rr_dir = line[-1] - line[-2]
+        rr_dir = (rr_dir.T  / np.sqrt(np.sum(rr_dir**2,axis=-1))) * elongation_offset
+        line[-1] = line[-1] + rr_dir
         lines.append(line.astype('uint').tolist())
     return lines
 
@@ -294,14 +300,15 @@ def vectorize_lines(im: np.ndarray, threshold: float = 0.2, min_sp_dist: int = 1
     sep_map = im[2]
     # binarize
     bin = im > threshold
-    skel = skeletonize(bin[1])
+    skel, skel_dist_map = medial_axis(bin[1], return_distance=True)
+    elongation_offset = np.max(skel_dist_map)
     sp_can = _find_superpixels(skel, heatmap=bl_map, min_sp_dist=min_sp_dist)
     if not sp_can.size:
         logger.warning('No superpixel candidates found in network output. Likely empty page.')
         return []
     intensities = _compute_sp_states(sp_can, bl_map, sep_map)
     clusters = _cluster_lines(intensities)
-    lines = _interpolate_lines(clusters)
+    lines = _interpolate_lines(clusters, elongation_offset)
     return lines
 
 
