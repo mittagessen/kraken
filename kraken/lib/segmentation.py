@@ -668,6 +668,8 @@ def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image:
 
         for line in bounds['lines']:
             pl = np.array(line['boundary'])
+            if len(pl) > 50:
+                pl = approximate_polygon(pl, 2)
             full_polygon = subdivide_polygon(pl, preserve_ends=True)
             pl = geom.MultiPoint(full_polygon)
             baseline = np.array(line['baseline'])
