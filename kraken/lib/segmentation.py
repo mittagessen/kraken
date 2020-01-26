@@ -312,6 +312,41 @@ def vectorize_lines(im: np.ndarray, threshold: float = 0.2, min_sp_dist: int = 1
     return lines
 
 
+def _rotate(image, angle, center, scale, cval=0):
+    """
+    Rotate function taken mostly from scikit image. Main difference is that
+    this one allows dimensional scaling and records the final translation
+    to ensure no image content is lost. This is needed to rotate the seam
+    back into the original image.
+    """
+    rows, cols = image.shape[0], image.shape[1]
+    tform1 = SimilarityTransform(translation=center)
+    tform2 = SimilarityTransform(rotation=angle)
+    tform3 = SimilarityTransform(translation=-center)
+    tform4 = AffineTransform(scale=(1/scale, 1))
+    tform = tform4 + tform3 + tform2 + tform1
+    corners = np.array([
+        [0, 0],
+        [0, rows - 1],
+        [cols - 1, rows - 1],
+        [cols - 1, 0]
+    ])
+    corners = tform.inverse(corners)
+    minc = corners[:, 0].min()
+    minr = corners[:, 1].min()
+    maxc = corners[:, 0].max()
+    maxr = corners[:, 1].max()
+    out_rows = maxr - minr + 1
+    out_cols = maxc - minc + 1
+    output_shape = np.around((out_rows, out_cols))
+    # fit output image in new shape
+    translation = (minc, minr)
+    tform5 = SimilarityTransform(translation=translation)
+    tform = tform5 + tform
+    tform.params[2] = (0, 0, 1)
+    return tform, warp(image, tform, output_shape=output_shape, order=0, cval=cval, clip=False, preserve_range=True)
+
+
 def calculate_polygonal_environment(im: PIL.Image.Image = None, baselines: Sequence[Tuple[int, int]] = None, suppl_obj: Sequence[Tuple[int, int]] = None, im_feats: np.array = None):
     """
     Given a list of baselines and an input image, calculates a polygonal
@@ -363,41 +398,6 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None, baselines: Seque
 
         t = min(x for x in [tmin, tmax] if x >= 0)
         return ray + (direction * t)
-
-
-    def _rotate(image, angle, center, scale, cval=0):
-        """
-        Rotate function taken mostly from scikit image. Main difference is that
-        this one allows dimensional scaling and records the final translation
-        to ensure no image content is lost. This is needed to rotate the seam
-        back into the original image.
-        """
-        rows, cols = image.shape[0], image.shape[1]
-        tform1 = SimilarityTransform(translation=center)
-        tform2 = SimilarityTransform(rotation=angle)
-        tform3 = SimilarityTransform(translation=-center)
-        tform4 = AffineTransform(scale=(1/scale, 1))
-        tform = tform4 + tform3 + tform2 + tform1
-        corners = np.array([
-            [0, 0],
-            [0, rows - 1],
-            [cols - 1, rows - 1],
-            [cols - 1, 0]
-        ])
-        corners = tform.inverse(corners)
-        minc = corners[:, 0].min()
-        minr = corners[:, 1].min()
-        maxc = corners[:, 0].max()
-        maxr = corners[:, 1].max()
-        out_rows = maxr - minr + 1
-        out_cols = maxc - minc + 1
-        output_shape = np.around((out_rows, out_cols))
-        # fit output image in new shape
-        translation = (minc, minr)
-        tform5 = SimilarityTransform(translation=translation)
-        tform = tform5 + tform
-        tform.params[2] = (0, 0, 1)
-        return tform, warp(image, tform, output_shape=output_shape, order=0, cval=cval, clip=False, preserve_range=True)
 
     def _extract_patch(env_up, env_bottom, baseline, dir_vec):
         """
@@ -668,60 +668,87 @@ def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image:
 
         for line in bounds['lines']:
             pl = np.array(line['boundary'])
-            if len(pl) > 50:
-                pl = approximate_polygon(pl, 2)
-            full_polygon = subdivide_polygon(pl, preserve_ends=True)
-            pl = geom.MultiPoint(full_polygon)
             baseline = np.array(line['baseline'])
-            bl = zip(baseline[:-1:], baseline[1::])
-            bl = [geom.LineString(x) for x in bl]
-            cum_lens = np.cumsum([0] + [l.length for l in bl])
-            # distance of intercept from start point and number of line segment
-            control_pts = []
-            for point in pl.geoms:
-                npoint = np.array(point)
-                line_idx, dist, intercept = min(((idx, line.project(point), np.array(line.interpolate(line.project(point)))) for idx, line in enumerate(bl)), key=lambda x: np.linalg.norm(npoint-x[2]))
-                # absolute distance from start of line
-                line_dist = cum_lens[line_idx] + dist
-                intercept = np.array(intercept)
-                # side of line the point is at
-                side = np.linalg.det(np.array([[baseline[line_idx+1][0]-baseline[line_idx][0],
-                                                npoint[0]-baseline[line_idx][0]],
-                                               [baseline[line_idx+1][1]-baseline[line_idx][1],
-                                                npoint[1]-baseline[line_idx][1]]]))
-                side = np.sign(side)
-                # signed perpendicular distance from the rectified distance
-                per_dist = side * np.linalg.norm(npoint-intercept)
-                control_pts.append((line_dist, per_dist))
-            # calculate baseline destination points
-            bl_dst_pts = baseline[0] + np.dstack((cum_lens, np.zeros_like(cum_lens)))[0]
-            # calculate bounding polygon destination points
-            pol_dst_pts = np.array([baseline[0] + (line_dist, per_dist) for line_dist, per_dist in control_pts])
-            # extract bounding box patch
-            c_min, c_max = int(full_polygon[:,0].min()), int(full_polygon[:,0].max())
-            r_min, r_max = int(full_polygon[:,1].min()), int(full_polygon[:,1].max())
-            c_dst_min, c_dst_max = int(pol_dst_pts[:,0].min()), int(pol_dst_pts[:,0].max())
-            r_dst_min, r_dst_max = int(pol_dst_pts[:,1].min()), int(pol_dst_pts[:,1].max())
-            output_shape = np.around((r_dst_max - r_dst_min + 1, c_dst_max - c_dst_min + 1))
-            patch = im[r_min:r_max+1,c_min:c_max+1].copy()
-            # offset src points by patch shape
-            offset_polygon = full_polygon - (c_min, r_min)
-            offset_baseline = baseline - (c_min, r_min)
-            # offset dst point by dst polygon shape
-            offset_bl_dst_pts = bl_dst_pts - (c_dst_min, r_dst_min)
-            offset_pol_dst_pts = pol_dst_pts - (c_dst_min, r_dst_min)
-            # mask out points outside bounding polygon
-            mask = np.zeros(patch.shape[:2], dtype=np.bool)
-            r, c = draw.polygon(offset_polygon[:,1], offset_polygon[:,0])
-            mask[r, c] = True
-            patch[mask != True] = 0
-            # estimate piecewise transform
-            src_points = np.concatenate((offset_baseline, offset_polygon))
-            dst_points = np.concatenate((offset_bl_dst_pts, offset_pol_dst_pts))
-            tform = PiecewiseAffineTransform()
-            tform.estimate(src_points, dst_points)
-            o = warp(patch, tform.inverse, output_shape=output_shape, preserve_range=True, order=order)
-            i = Image.fromarray(o.astype('uint8'))
+            c_min, c_max = int(pl[:,0].min()), int(pl[:,0].max())
+            r_min, r_max = int(pl[:,1].min()), int(pl[:,1].max())
+
+            # fast path for straight baselines requiring only rotation
+            if len(baseline) == 2:
+                baseline = baseline.astype(np.float)
+                # calculate direction vector
+                with warnings.catch_warnings():
+                    warnings.simplefilter('ignore', RuntimeWarning)
+                    slope, _, _, _, _ = linregress(baseline[:, 0], baseline[:, 1])
+                if np.isnan(slope):
+                    p_dir = np.array([0., np.sign(np.diff(baseline[(0, -1),1])).item()*1.])
+                else:
+                    p_dir = np.array([1, np.sign(np.diff(baseline[(0, -1),0])).item()*slope])
+                    p_dir = (p_dir.T / np.sqrt(np.sum(p_dir**2,axis=-1)))
+                angle = np.arctan2(p_dir[1], p_dir[0])
+                patch = im[r_min:r_max+1, c_min:c_max+1].copy()
+                offset_polygon = pl - (c_min, r_min)
+                r, c = draw.polygon(offset_polygon[:,1], offset_polygon[:,0])
+                mask = np.zeros(patch.shape[:2], dtype=np.bool)
+                mask[r, c] = True
+                patch[mask != True] = 0
+                extrema = offset_polygon[(0,-1),:]
+                # scale line image to max 600 pixel width
+                tform, rotated_patch = _rotate(patch, angle, center=extrema[0], scale=1.0, cval=0)
+                i = Image.fromarray(rotated_patch.astype('uint8'))
+            # normal slow path with piecewise affine transformation
+            else:
+                if len(pl) > 50:
+                    pl = approximate_polygon(pl, 2)
+                full_polygon = subdivide_polygon(pl, preserve_ends=True)
+                pl = geom.MultiPoint(full_polygon)
+
+                bl = zip(baseline[:-1:], baseline[1::])
+                bl = [geom.LineString(x) for x in bl]
+                cum_lens = np.cumsum([0] + [l.length for l in bl])
+                # distance of intercept from start point and number of line segment
+                control_pts = []
+                for point in pl.geoms:
+                    npoint = np.array(point)
+                    line_idx, dist, intercept = min(((idx, line.project(point), np.array(line.interpolate(line.project(point)))) for idx, line in enumerate(bl)), key=lambda x: np.linalg.norm(npoint-x[2]))
+                    # absolute distance from start of line
+                    line_dist = cum_lens[line_idx] + dist
+                    intercept = np.array(intercept)
+                    # side of line the point is at
+                    side = np.linalg.det(np.array([[baseline[line_idx+1][0]-baseline[line_idx][0],
+                                                    npoint[0]-baseline[line_idx][0]],
+                                                   [baseline[line_idx+1][1]-baseline[line_idx][1],
+                                                    npoint[1]-baseline[line_idx][1]]]))
+                    side = np.sign(side)
+                    # signed perpendicular distance from the rectified distance
+                    per_dist = side * np.linalg.norm(npoint-intercept)
+                    control_pts.append((line_dist, per_dist))
+                # calculate baseline destination points
+                bl_dst_pts = baseline[0] + np.dstack((cum_lens, np.zeros_like(cum_lens)))[0]
+                # calculate bounding polygon destination points
+                pol_dst_pts = np.array([baseline[0] + (line_dist, per_dist) for line_dist, per_dist in control_pts])
+                # extract bounding box patch
+                c_dst_min, c_dst_max = int(pol_dst_pts[:,0].min()), int(pol_dst_pts[:,0].max())
+                r_dst_min, r_dst_max = int(pol_dst_pts[:,1].min()), int(pol_dst_pts[:,1].max())
+                output_shape = np.around((r_dst_max - r_dst_min + 1, c_dst_max - c_dst_min + 1))
+                patch = im[r_min:r_max+1,c_min:c_max+1].copy()
+                # offset src points by patch shape
+                offset_polygon = full_polygon - (c_min, r_min)
+                offset_baseline = baseline - (c_min, r_min)
+                # offset dst point by dst polygon shape
+                offset_bl_dst_pts = bl_dst_pts - (c_dst_min, r_dst_min)
+                offset_pol_dst_pts = pol_dst_pts - (c_dst_min, r_dst_min)
+                # mask out points outside bounding polygon
+                mask = np.zeros(patch.shape[:2], dtype=np.bool)
+                r, c = draw.polygon(offset_polygon[:,1], offset_polygon[:,0])
+                mask[r, c] = True
+                patch[mask != True] = 0
+                # estimate piecewise transform
+                src_points = np.concatenate((offset_baseline, offset_polygon))
+                dst_points = np.concatenate((offset_bl_dst_pts, offset_pol_dst_pts))
+                tform = PiecewiseAffineTransform()
+                tform.estimate(src_points, dst_points)
+                o = warp(patch, tform.inverse, output_shape=output_shape, preserve_range=True, order=order)
+                i = Image.fromarray(o.astype('uint8'))
             yield i.crop(i.getbbox()), line
     else:
         if bounds['text_direction'].startswith('vertical'):
