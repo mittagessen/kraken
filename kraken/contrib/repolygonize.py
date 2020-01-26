@@ -27,7 +27,7 @@ for fname in sys.argv[1:]:
         for line in lines:
             pol = line.find('./{*}Shape/{*}Polygon')
             if pol is not None:
-                pol.attrib['POINTS'] = ' '.join([coord for pt in o[idx] for coord in pt])
+                pol.attrib['POINTS'] = ' '.join([str(coord) for pt in o[idx] for coord in pt])
                 idx += 1
-    with open(splitext(fname)[0] + '_rewrite.xml', 'wb') as fp:
-        doc.write(fp)
+        with open(splitext(fname)[0] + '_rewrite.xml', 'wb') as fp:
+            doc.write(fp)
