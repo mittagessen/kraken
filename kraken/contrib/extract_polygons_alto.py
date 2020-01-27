@@ -12,9 +12,11 @@ from kraken.lib import dataset, segmentation
 
 xmls = sys.argv[1:]
 
-data = dataset.preparse_xml_data(xmls, 'alto')
-bounds = {'type': 'baselines', 'lines': [{'boundary': t['boundary'], 'baseline': t['baseline']} for t in data]}
-for line in data:
-    for idx, (im, box) in enumerate(segmentation.extract_polygons(Image.open(line['image']), bounds)):
+for doc in xmls:
+    data = dataset.preparse_xml_data([doc], 'alto')
+    bounds = {'type': 'baselines', 'lines': [{'boundary': t['boundary'], 'baseline': t['baseline'], 'text': t['text']} for t in data]}
+    for idx, (im, box) in enumerate(segmentation.extract_polygons(Image.open(data[0]['image']), bounds)):
         print('.', end='', flush=True)
-        im.save('{}.{}.jpg'.format(splitext(line['image'])[0], idx))
+        im.save('{}.{}.jpg'.format(splitext(data[0]['image'])[0], idx))
+        with open('{}.{}.gt.txt'.format(splitext(data[0]['image'])[0], idx), 'w') as fp:
+            fp.write(box['text'])
