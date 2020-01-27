@@ -238,12 +238,13 @@ def _cluster_lines(intensities):
     return clusters
 
 
-def _interpolate_lines(clusters, elongation_offset):
+def _interpolate_lines(clusters, elongation_offset, extent):
     """
     Interpolates the baseline clusters.
     """
     logger.debug('Reticulating splines')
     lines = []
+    extent = geom.LineString([(0, 0), (extent[1]-1, 0), (extent[1]-1, extent[0]-1), (0, extent[0]-1), (0, 0)])
     for cluster in clusters[1:]:
         # find start-end point
         points = [point for edge in cluster for point in edge]
@@ -275,9 +276,16 @@ def _interpolate_lines(clusters, elongation_offset):
         lr_dir = line[0] - line[1]
         lr_dir = (lr_dir.T  / np.sqrt(np.sum(lr_dir**2,axis=-1))) * elongation_offset
         line[0] = line[0] + lr_dir
+        # elongation might extend line beyond image bounds
+        l = geom.LineString(line[:2].astype('uint'))
+        if extent.intersects(l):
+            line[0] = extent.intersection(l).coords[0]
         rr_dir = line[-1] - line[-2]
         rr_dir = (rr_dir.T  / np.sqrt(np.sum(rr_dir**2,axis=-1))) * elongation_offset
         line[-1] = line[-1] + rr_dir
+        l = geom.LineString(line[-2:].astype('uint'))
+        if extent.intersects(l):
+            line[-1] = extent.intersection(l).coords[0]
         lines.append(line.astype('uint').tolist())
     return lines
 
@@ -308,7 +316,7 @@ def vectorize_lines(im: np.ndarray, threshold: float = 0.2, min_sp_dist: int = 1
         return []
     intensities = _compute_sp_states(sp_can, bl_map, sep_map)
     clusters = _cluster_lines(intensities)
-    lines = _interpolate_lines(clusters, elongation_offset)
+    lines = _interpolate_lines(clusters, elongation_offset, bl_map.shape)
     return lines
 
 
@@ -419,7 +427,7 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None, baselines: Seque
             r, c = draw.polygon(polygon[:,1], polygon[:,0])
             c_min, c_max = int(polygon[:,0].min()), int(polygon[:,0].max())
             r_min, r_max = int(polygon[:,1].min()), int(polygon[:,1].max())
-            patch = im_feats[r_min:r_max+1, c_min:c_max+1].copy()
+            patch = im_feats[r_min:r_max+2, c_min:c_max+2].copy()
             # bias feature matrix by distance from baseline
             mask = np.ones_like(patch)
             for l in zip(baseline[:-1] - (c_min, r_min), baseline[1:] - (c_min, r_min)):
