@@ -14,9 +14,10 @@ xmls = sys.argv[1:]
 
 for doc in xmls:
     data = dataset.preparse_xml_data([doc], 'alto')
-    bounds = {'type': 'baselines', 'lines': [{'boundary': t['boundary'], 'baseline': t['baseline'], 'text': t['text']} for t in data]}
-    for idx, (im, box) in enumerate(segmentation.extract_polygons(Image.open(data[0]['image']), bounds)):
-        print('.', end='', flush=True)
-        im.save('{}.{}.jpg'.format(splitext(data[0]['image'])[0], idx))
-        with open('{}.{}.gt.txt'.format(splitext(data[0]['image'])[0], idx), 'w') as fp:
-            fp.write(box['text'])
+    if len data > 0:
+        bounds = {'type': 'baselines', 'lines': [{'boundary': t['boundary'], 'baseline': t['baseline'], 'text': t['text']} for t in data]}
+        for idx, (im, box) in enumerate(segmentation.extract_polygons(Image.open(data[0]['image']), bounds)):
+            print('.', end='', flush=True)
+            im.save('{}.{}.jpg'.format(splitext(data[0]['image'])[0], idx))
+            with open('{}.{}.gt.txt'.format(splitext(data[0]['image'])[0], idx), 'w') as fp:
+                fp.write(box['text'])
