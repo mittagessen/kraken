@@ -33,7 +33,6 @@ from scipy.ndimage.filters import gaussian_filter, gaussian_filter1d
 from scipy.ndimage.morphology import distance_transform_cdt
 
 from shapely.ops import nearest_points, unary_union
-from shapely.prepared import prep
 
 from skimage import draw, measure
 from skimage.filters import apply_hysteresis_threshold, sobel
@@ -514,8 +513,8 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None, baselines: Seque
             upper_bounds_intersects.append(_ray_intersect_boundaries(point, (p_dir*(-1,1))[::-1], bounds+1).astype('int'))
             bottom_bounds_intersects.append(_ray_intersect_boundaries(point, (p_dir*(1,-1))[::-1], bounds+1).astype('int'))
         # build polygon between baseline and bbox intersects
-        upper_polygon = prep(geom.Polygon(ip_line.tolist() + upper_bounds_intersects))
-        bottom_polygon = prep(geom.Polygon(ip_line.tolist() + bottom_bounds_intersects))
+        upper_polygon = geom.Polygon(ip_line.tolist() + upper_bounds_intersects)
+        bottom_polygon = geom.Polygon(ip_line.tolist() + bottom_bounds_intersects)
 
         # select baselines at least partially in each polygon
         side_a = [geom.LineString(upper_bounds_intersects)]
