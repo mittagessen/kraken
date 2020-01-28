@@ -540,7 +540,7 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None, baselines: Seque
                 else:
                     return nearest_points(spt, t)[1]
             else:
-                raise Exception('No intersection with boundaries')
+                raise Exception('No intersection with boundaries. Shapely intersection object: {}'.format(intersects.wkt))
         # interpolate baseline
         env_up = []
         env_bottom = []
