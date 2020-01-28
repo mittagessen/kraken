@@ -534,6 +534,12 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None, baselines: Seque
                 return min([p for p in intersects], key=lambda x: spt.distance(x))
             elif intersects.type == 'Point':
                 return intersects
+            elif intersects.type == 'GeometryCollection' and len(intersects) > 0:
+                t = min([p for p in intersects], key=lambda x: spt.distance(x))
+                if t == 'Point':
+                    return t
+                else:
+                    return nearest_points(spt, t)[1]
             else:
                 raise Exception('No intersection with boundaries')
         # interpolate baseline
