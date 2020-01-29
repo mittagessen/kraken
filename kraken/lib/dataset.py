@@ -581,6 +581,7 @@ class BaselineSet(Dataset):
         super().__init__()
         self.mode = mode
         self.im_mode = '1'
+        self.aug = None
         if mode in ['alto', 'page']:
             if mode == 'alto':
                 fn = parse_alto
@@ -601,9 +602,28 @@ class BaselineSet(Dataset):
         else:
             raise Exception('invalid dataset mode')
         if augmentation:
-            import imgaug.augmenters as iaa
-            iaa = iaa.Sequential
+            from albumentations import (
+                Compose, ToFloat, FromFloat, RandomRotate90, Flip, OneOf, MotionBlur, MedianBlur, Blur,
+                ShiftScaleRotate, OpticalDistortion, GridDistortion, RandomBrightnessContrast,
+                HueSaturationValue,
+                )
 
+            self.aug = Compose([
+                                ToFloat(),
+                                RandomRotate90(),
+                                Flip(),
+                                OneOf([
+                                    MotionBlur(p=0.2),
+                                    MedianBlur(blur_limit=3, p=0.1),
+                                    Blur(blur_limit=3, p=0.1),
+                                ], p=0.2),
+                                ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.2, rotate_limit=45, p=0.2),
+                                OneOf([
+                                    OpticalDistortion(p=0.3),
+                                    GridDistortion(p=0.1),
+                                ], p=0.2),
+                                HueSaturationValue(hue_shift_limit=20, sat_shift_limit=0.1, val_shift_limit=0.1, p=0.3),
+                               ], p=0.5)
         self.imgs = imgs
         self.line_width = line_width
         self.im_transforms = im_transforms
@@ -674,11 +694,17 @@ class BaselineSet(Dataset):
         del separator_mask
         target = np.array(t)
         separator = np.array(s)
+        target[separator != 0] = 2
         target = tf.to_tensor(Image.fromarray(target)).long()
         separator = tf.to_tensor(Image.fromarray(separator)).long()
         target[separator != 0] = 2
         # squeeze away channel dimension for NLLLoss
         target = target.squeeze()
+        if self.aug:
+            image = image.permute((1, 2, 0)).numpy()
+            o = self.aug(image=image, mask=target.numpy())
+            image = torch.tensor(o['image'].transpose(2, 0, 1))
+            target = torch.tensor(o['mask']).long()
         return image, target
 
     def __len__(self):

@@ -118,11 +118,12 @@ def _expand_gt(ctx, param, value):
               'link to source images. In `path` mode arguments are image files'
               'sharing a prefix up to the last extension with JSON `.path` files'
               'containing the baseline information.')
+@click.option('--augment/--no-augment', show_default=False, default=False, help='Enable image augmentation')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
              lag, min_delta, device, optimizer, lrate, momentum, weight_decay,
              schedule, partition, training_files, evaluation_files, threads,
-             force_binarization, format_type, ground_truth):
+             force_binarization, format_type, augment, ground_truth):
     """
     Trains a baseline labeling model for layout analysis
     """
@@ -201,9 +202,9 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
         torch.multiprocessing.set_sharing_strategy('file_system')
 
     gt_set = BaselineSet(tr_im, line_width=line_width,
-                         im_transforms=transforms, mode=format_type)
+                         im_transforms=transforms, mode=format_type, augmentation=augment)
     val_set = BaselineSet(te_im, line_width=line_width,
-                          im_transforms=transforms, mode=format_type)
+                          im_transforms=transforms, mode=format_type, augmentation=augment)
 
     if len(gt_set.imgs) == 0:
         raise click.UsageError('No valid training data was provided to the train command. Please add valid XML or line data.')
