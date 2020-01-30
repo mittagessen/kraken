@@ -243,7 +243,7 @@ def _interpolate_lines(clusters, elongation_offset, extent):
     """
     logger.debug('Reticulating splines')
     lines = []
-    extent = geom.LineString([(0, 0), (extent[1]-1, 0), (extent[1]-1, extent[0]-1), (0, extent[0]-1), (0, 0)])
+    extent = geom.Polygon([(0, 0), (extent[1]-1, 0), (extent[1]-1, extent[0]-1), (0, extent[0]-1), (0, 0)])
     for cluster in clusters[1:]:
         # find start-end point
         points = [point for edge in cluster for point in edge]
@@ -275,17 +275,11 @@ def _interpolate_lines(clusters, elongation_offset, extent):
         lr_dir = line[0] - line[1]
         lr_dir = (lr_dir.T  / np.sqrt(np.sum(lr_dir**2,axis=-1))) * elongation_offset
         line[0] = line[0] + lr_dir
-        # elongation might extend line beyond image bounds
-        l = geom.LineString(line[:2].astype('uint'))
-        if extent.intersects(l):
-            line[0] = extent.intersection(l).coords[0]
         rr_dir = line[-1] - line[-2]
         rr_dir = (rr_dir.T  / np.sqrt(np.sum(rr_dir**2,axis=-1))) * elongation_offset
         line[-1] = line[-1] + rr_dir
-        l = geom.LineString(line[-2:].astype('uint'))
-        if extent.intersects(l):
-            line[-1] = extent.intersection(l).coords[0]
-        lines.append(line.astype('uint').tolist())
+        line = np.array(geom.LineString(line).intersection(extent), dtype='uint')
+        lines.append(line.tolist())
     return lines
 
 
