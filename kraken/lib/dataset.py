@@ -29,7 +29,7 @@ from os import path
 from PIL import Image, ImageDraw
 from collections import Counter
 from torchvision import transforms
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 from typing import Dict, List, Tuple, Sequence, Callable, Optional, Any, Union, cast
 
 from kraken.lib.xml import parse_alto, parse_page
@@ -109,6 +109,9 @@ def generate_input_transforms(batch: int, height: int, width: int, channels: int
 
     if force_binarization:
         out_transforms.append(transforms.Lambda(lambda x: nlbin(im)))
+    # dummy transforms to ensure we can determine color mode of input material
+    # from first two transforms. It's stupid but it works.
+    out_transforms.append(transforms.Lambda(lambda x: x))
     if scale != (0, 0):
         if center_norm:
             lnorm = CenterNormalizer(scale[0])
@@ -330,6 +333,27 @@ def _repolygonize(im: Image.Image, lines):
     return [{'boundary': polygon, 'baseline': orig['baseline'], 'text': orig['text']} for orig, polygon in zip(lines, polygons)]
 
 
+class InfiniteDataLoader(DataLoader):
+    """
+    Version of DataLoader that auto-reinitializes the iterator once it is
+    exhausted.
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.dataset_iter = super().__iter__()
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        try:
+            sample = next(self.dataset_iter)
+        except StopIteration:
+            self.dataset_iter = super().__iter__()
+            sample = next(self.dataset_iter)
+        return sample
+
+
 class PolygonGTDataset(Dataset):
     """
     Dataset for training a line recognition model from polygonal/baseline data.
@@ -344,8 +368,13 @@ class PolygonGTDataset(Dataset):
         self._gt = []  # type:  List[str]
         self.alphabet = Counter()  # type: Counter
         self.text_transforms = []  # type: List[Callable[[str], str]]
+        # split image transforms into two. one part giving the final PIL image
+        # before conversion to a tensor and the actual tensor conversion part.
+        self.head_transforms = transforms.Compose(im_transforms.transforms[:2])
+        self.tail_transforms = transforms.Compose(im_transforms.transforms[2:])
         self.transforms = im_transforms
         self.preload = preload
+        self.seg_type = 'baselines'
         # built text transformations
         if normalization:
             self.text_transforms.append(lambda x: unicodedata.normalize(cast(str, normalization), x))
@@ -354,7 +383,6 @@ class PolygonGTDataset(Dataset):
         if reorder:
             self.text_transforms.append(bd.get_display)
         self.im_mode = '1'
-
 
     def add(self, image: Union[str, Image.Image], text: str, baseline: List[Tuple[int, int]], boundary: List[Tuple[int, int]]):
         """
@@ -375,7 +403,10 @@ class PolygonGTDataset(Dataset):
                 im = Image.open(image)
             im, _ = next(extract_polygons(im, {'type': 'baselines', 'lines': [{'baseline': baseline, 'boundary': boundary}]}))
             try:
-                im = self.transforms(im)
+                im = self.head_transforms(im)
+                if not is_bitonal(im):
+                    self.im_mode = im.mode
+                im = self.tail_transforms(im)
             except ValueError:
                 raise KrakenInputException('Image transforms failed on {}'.format(image))
             self._images.append(im)
@@ -409,7 +440,11 @@ class PolygonGTDataset(Dataset):
                 if not isinstance(im, Image.Image):
                     im = Image.open(im)
                 im, _ = next(extract_polygons(im, {'type': 'baselines', 'lines': [{'baseline': item[0][1], 'boundary': item[0][2]}]}))
-                return (self.transforms(im), item[1])
+                im = self.head_transforms(im)
+                if not is_bitonal(im):
+                    self.im_mode = im.mode
+                im = self.tail_transforms(im)
+                return (im, item[1])
             except Exception:
                 idx = np.random.randint(0, len(self.training_set))
                 logger.debug('Failed. Replacing with sample {}'.format(idx))
@@ -462,8 +497,13 @@ class GroundTruthDataset(Dataset):
         self._gt = []  # type:  List[str]
         self.alphabet = Counter()  # type: Counter
         self.text_transforms = []  # type: List[Callable[[str], str]]
-        self.transforms = im_transforms
+        # split image transforms into two. one part giving the final PIL image
+        # before conversion to a tensor and the actual tensor conversion part.
+        self.head_transforms = transforms.Compose(im_transforms.transforms[:2])
+        self.tail_transforms = transforms.Compose(im_transforms.transforms[2:])
+
         self.preload = preload
+        self.seg_type = 'bbox'
         # built text transformations
         if normalization:
             self.text_transforms.append(lambda x: unicodedata.normalize(cast(str, normalization), x))
@@ -489,7 +529,10 @@ class GroundTruthDataset(Dataset):
         if self.preload:
             try:
                 im = Image.open(image)
-                im = self.transforms(im)
+                im = self.head_transforms(im)
+                if not is_bitonal(im):
+                    self.im_mode = im.mode
+                im = self.tail_transforms(im)
             except ValueError:
                 raise KrakenInputException('Image transforms failed on {}'.format(image))
             self._images.append(im)
@@ -508,7 +551,10 @@ class GroundTruthDataset(Dataset):
         """
         if self.preload:
             try:
-                im = self.transforms(image)
+                im = self.head_transforms(im)
+                if not is_bitonal(im):
+                    self.im_mode = im.mode
+                im = self.tail_transforms(im)
             except ValueError:
                 raise KrakenInputException('Image transforms failed on {}'.format(image))
             self._images.append(im)
@@ -543,7 +589,11 @@ class GroundTruthDataset(Dataset):
                 im = item[0]
                 if not isinstance(im, Image.Image):
                     im = Image.open(im)
-                return (self.transforms(im), item[1])
+                im = self.head_transforms(im)
+                if not is_bitonal(im):
+                    self.im_mode = im.mode
+                im = self.tail_transforms(im)
+                return im, item[1]
             except Exception:
                 idx = np.random.randint(0, len(self.training_set))
                 logger.debug('Failed. Replacing with sample {}'.format(idx))
@@ -626,7 +676,11 @@ class BaselineSet(Dataset):
                                ], p=0.5)
         self.imgs = imgs
         self.line_width = line_width
-        self.im_transforms = im_transforms
+        # split image transforms into two. one part giving the final PIL image
+        # before conversion to a tensor and the actual tensor conversion part.
+        self.head_transforms = transforms.Compose(im_transforms.transforms[:2])
+        self.tail_transforms = transforms.Compose(im_transforms.transforms[2:])
+        self.seg_type = None
 
     def add(self, image: Union[str, Image.Image], baselines: List[List[Tuple[int, int]]]):
         """
@@ -657,7 +711,8 @@ class BaselineSet(Dataset):
                 idx = np.random.randint(0, len(self.imgs))
                 logger.debug('Failed. Replacing with sample {}'.format(idx))
                 return self[np.random.randint(0, len(self.imgs))]
-        return self.transform(im, target)
+        im, target = self.transform(im, target)
+        return im, target
 
     @staticmethod
     def _get_ortho_line(lineseg, point, line_width, offset):
@@ -674,7 +729,10 @@ class BaselineSet(Dataset):
 
     def transform(self, image, target):
         orig_size = image.size
-        image = self.im_transforms(image)
+        image = self.head_transforms(image)
+        if not is_bitonal(image):
+            self.im_mode = image.mode
+        image = self.tail_transforms(image)
         scale = image.shape[2]/orig_size[0]
         t = Image.new('L', image.shape[:0:-1])
         line_mask = ImageDraw.Draw(t)

@@ -321,13 +321,15 @@ class KrakenTrainer(object):
         self.filename_prefix = filename_prefix
         self.event_frequency = event_frequency
         self.event_it = int(len(train_set) * event_frequency)
-        self.train_set = cycle(train_set)
+        self.train_set = train_set
         self.val_set = val_set
         self.stopper = stopper if stopper else NoStopping()
         self.iterations = 0
         self.lr_scheduler = None
         self.loss_fn = loss_fn
         self.evaluator = evaluator
+        # fill training metadata fields in model files
+        self.model.seg_type = train_set.dataset.seg_type
 
     def add_lr_scheduler(self, lr_scheduler: TrainScheduler):
         self.lr_scheduler = lr_scheduler
@@ -365,6 +367,9 @@ class KrakenTrainer(object):
             self.model.user_metadata['accuracy'].append((self.iterations, float(eval_res['val_metric'])))
             logger.info('Saving to {}_{}'.format(self.filename_prefix, self.stopper.epoch))
             event_callback(epoch=self.stopper.epoch, **eval_res)
+            # fill one_channel_mode after 1 iteration over training data set
+            print(self.train_set.dataset.im_mode)
+            #self.model.one_channel_mode = self.train_set.dataset.one_channel_mode
             try:
                 self.model.user_metadata['completed_epochs'] = self.stopper.epoch
                 self.model.save_model('{}_{}.mlmodel'.format(self.filename_prefix, self.stopper.epoch))

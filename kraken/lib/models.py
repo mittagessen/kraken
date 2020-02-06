@@ -49,6 +49,8 @@ class TorchSeqRecognizer(object):
         self.decoder = decoder
         self.train = train
         self.device = device
+        if nn.model_type not in [None, 'recognition']:
+            raise ValueError('Models of type {} are not supported by TorchSeqRecognizer'.format(nn.model_type))
         self.one_channel_mode = nn.one_channel_mode
         self.seg_type = nn.seg_type
         self.nn.to(device)

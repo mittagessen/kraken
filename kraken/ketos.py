@@ -136,7 +136,7 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
 
     from kraken.lib import vgsl, train
     from kraken.lib.train import EarlyStopping, EpochStopping, TrainScheduler, add_1cycle
-    from kraken.lib.dataset import BaselineSet, generate_input_transforms
+    from kraken.lib.dataset import BaselineSet, generate_input_transforms, InfiniteDataLoader
 
     logger.info('Building ground truth set from {} document images'.format(len(ground_truth) + len(training_files)))
 
@@ -214,9 +214,12 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
     else:
         loader_threads = threads
 
-    train_loader = DataLoader(gt_set, batch_size=1, shuffle=True, num_workers=loader_threads, pin_memory=True)
+    train_loader = InfiniteDataLoader(gt_set, batch_size=1, shuffle=True, num_workers=loader_threads, pin_memory=True)
     test_loader = DataLoader(val_set, batch_size=1, shuffle=True, num_workers=loader_threads, pin_memory=True)
     threads = max((threads - loader_threads, 1))
+
+    # set model type metadata field
+    nn.model_type = 'segmentation'
 
     # set mode to training
     nn.train()
@@ -371,7 +374,7 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
     from kraken.lib.util import make_printable
     from kraken.lib.train import EarlyStopping, EpochStopping, TrainStopper, TrainScheduler, add_1cycle
     from kraken.lib.codec import PytorchCodec
-    from kraken.lib.dataset import GroundTruthDataset, PolygonGTDataset, generate_input_transforms, preparse_xml_data
+    from kraken.lib.dataset import GroundTruthDataset, PolygonGTDataset, generate_input_transforms, preparse_xml_data, InfiniteDataLoader
 
     logger.info('Building ground truth set from {} line images'.format(len(ground_truth) + len(training_files)))
 
@@ -579,25 +582,24 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
     if nn.one_channel_mode and gt_set.im_mode != nn.one_channel_mode:
         logger.warning('Neural network has been trained on mode {} images, training set contains mode {} data. Consider setting `--force-binarization`'.format(nn.one_channel_mode, gt_set.im_mode))
 
-    #if format_type != 'path' and nn.nn.user_metadata['seg_type'] == 'bbox':
-    #    logger.warning('Neural network has been trained on bounding box image information but training set is polygonal.')
-
-    # set proper image mode on network
-    if gt_set.im_mode in ['1', 'L']:
-        nn.on_channel_mode = gt_set.im_mode
+    if format_type != 'path' and nn.seg_type == 'bbox':
+        logger.warning('Neural network has been trained on bounding box image information but training set is polygonal.')
 
     # half the number of data loading processes if device isn't cuda and we haven't enabled preloading
     if device == 'cpu' and not preload:
         loader_threads = threads // 2
     else:
         loader_threads = threads
-    train_loader = DataLoader(gt_set, batch_size=1, shuffle=True, num_workers=loader_threads, pin_memory=True)
+    train_loader = InfiniteDataLoader(gt_set, batch_size=1, shuffle=True, num_workers=loader_threads, pin_memory=True)
     threads = max(threads - loader_threads, 1)
 
     # don't encode validation set as the alphabets may not match causing encoding failures
     val_set.training_set = list(zip(val_set._images, val_set._gt))
 
     logger.debug('Constructing {} optimizer (lr: {}, momentum: {})'.format(optimizer, lrate, momentum))
+
+    # set model type metadata field
+    nn.model_type = 'recognition'
 
     # set mode to trainindg
     nn.train()

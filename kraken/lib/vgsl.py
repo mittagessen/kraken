@@ -109,7 +109,7 @@ class TorchVGSLModel(object):
         self.codec = None  # type: Optional[PytorchCodec]
         self.criterion = None  # type: Any
         self.nn = torch.nn.Sequential()
-        self.user_metadata = {'accuracy': [], 'seg_type': None, 'one_channel_mode': None}  # type: dict[str, str]
+        self.user_metadata = {'accuracy': [], 'seg_type': None, 'one_channel_mode': None, 'model_type': None}  # type: dict[str, str]
 
         self.idx = -1
         spec = spec.strip()
@@ -460,16 +460,28 @@ class TorchVGSLModel(object):
     def one_channel_mode(self):
         return self.user_metadata['one_channel_mode']
 
-    @one_channel_mode.setter(self, val: str):
+    @one_channel_mode.setter
+    def one_channel_mode(self, val: str):
         if val not in ['1', 'L', None]:
             raise ValueError('one_channel_mode {} is not one of [1, L, None]'.format(val))
-        self.user_metadata['one_channel_mode']
+        self.user_metadata['one_channel_mode'] = val
+
+    @property
+    def model_type(self):
+        return self.user_metadata['model_type']
+
+    @model_type.setter
+    def model_type(self, val: str):
+        if val not in ['recognition', 'segmentation']:
+            raise ValueError('model_type {} is not one of [recognition, segmentation]'.format(val))
+        self.user_metadata['model_type'] = val
 
     @property
     def seg_type(self):
         return self.user_metadata['seg_type']
 
-    @seg_type.setter(self, val: str):
+    @seg_type.setter
+    def seg_type(self, val: str):
         if val not in ['bbox', 'baselines', None]:
             raise ValueError('segmentation type {} is not one of [bbox, baselines, None]'.format(val))
         self.user_metadata['seg_type'] = val
