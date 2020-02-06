@@ -49,8 +49,8 @@ class TorchSeqRecognizer(object):
         self.decoder = decoder
         self.train = train
         self.device = device
-        self.one_channel_mode = self.nn.one_channel_mode
-        self.seg_type = self.nn.user_metadata['seg_type']
+        self.one_channel_mode = nn.one_channel_mode
+        self.seg_type = nn.seg_type
         self.nn.to(device)
 
     def to(self, device):

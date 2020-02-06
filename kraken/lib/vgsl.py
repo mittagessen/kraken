@@ -109,8 +109,7 @@ class TorchVGSLModel(object):
         self.codec = None  # type: Optional[PytorchCodec]
         self.criterion = None  # type: Any
         self.nn = torch.nn.Sequential()
-        self.user_metadata = {}  # type: dict[str, str]
-        self.one_channel_mode = None # type: Optional[str]
+        self.user_metadata = {'accuracy': [], 'seg_type': None, 'one_channel_mode': None}  # type: dict[str, str]
 
         self.idx = -1
         spec = spec.strip()
@@ -450,13 +449,30 @@ class TorchVGSLModel(object):
             nn.add_codec(PytorchCodec(json.loads(mlmodel.user_defined_metadata['codec'])))
         if 'kraken_meta' in mlmodel.user_defined_metadata:
             nn.user_metadata = json.loads(mlmodel.user_defined_metadata['kraken_meta'])
-        if 'one_channel_mode' in nn.user_metadata:
-            nn.one_channel_mode = nn.user_metadata['one_channel_mode']
-        else:
-            nn.one_channel_mode = '1'
+        # fill user metadata fields manually
+        if 'one_channel_mode' not in nn.user_metadata:
+            nn.user_metadata['one_channel_mode'] = '1'
         if 'seg_type' not in nn.user_metadata:
             nn.user_metadata['seg_type'] = 'bbox'
         return nn
+
+    @property
+    def one_channel_mode(self):
+        return self.user_metadata['one_channel_mode']
+
+    @one_channel_mode.setter(self, val: str):
+        if val not in ['1', 'L', None]:
+            raise ValueError('one_channel_mode {} is not one of [1, L, None]'.format(val))
+        self.user_metadata['one_channel_mode']
+
+    @property
+    def seg_type(self):
+        return self.user_metadata['seg_type']
+
+    @seg_type.setter(self, val: str):
+        if val not in ['bbox', 'baselines', None]:
+            raise ValueError('segmentation type {} is not one of [bbox, baselines, None]'.format(val))
+        self.user_metadata['seg_type'] = val
 
     def save_model(self, path: str):
         """
@@ -470,7 +486,6 @@ class TorchVGSLModel(object):
         net_builder = NeuralNetworkBuilder(inputs, outputs)
         input = 'input'
         prev_device = next(next(self.nn.children()).parameters()).device
-        self.user_metadata['on_channel_mode'] = self.one_channel_mode
         try:
             for name, layer in self.nn.to('cpu').named_children():
                 input = layer.serialize(name, input, net_builder)
