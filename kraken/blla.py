@@ -111,7 +111,7 @@ def segment(im,
     logger.debug('Vectorizing network output')
     baselines = vectorize_lines(o)
     logger.debug('Polygonizing lines')
-    lines = list(zip(baselines, calculate_polygonal_environment(scal_im, baselines)))
+    lines = list(filter(lambda x: x[1] is not None, zip(baselines, calculate_polygonal_environment(scal_im, baselines))))
     logger.debug('Scaling vectorized lines')
     scale = np.divide(im.size, o.shape[:0:-1])
     lines = scale_polygonal_lines(lines, scale)
