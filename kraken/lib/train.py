@@ -368,8 +368,9 @@ class KrakenTrainer(object):
             logger.info('Saving to {}_{}'.format(self.filename_prefix, self.stopper.epoch))
             event_callback(epoch=self.stopper.epoch, **eval_res)
             # fill one_channel_mode after 1 iteration over training data set
-            print(self.train_set.dataset.im_mode)
-            #self.model.one_channel_mode = self.train_set.dataset.one_channel_mode
+            im_mode = self.train_set.dataset.im_mode
+            if im_mode in ['1', 'L']:
+                self.model.one_channel_mode = im_mode
             try:
                 self.model.user_metadata['completed_epochs'] = self.stopper.epoch
                 self.model.save_model('{}_{}.mlmodel'.format(self.filename_prefix, self.stopper.epoch))
