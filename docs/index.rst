@@ -19,18 +19,16 @@ Features
 
 kraken's main features are:
 
-  - Script detection and multi-script recognition support
+  - Fully trainable layout analysis and character recognition
   - `Right-to-Left <https://en.wikipedia.org/wiki/Right-to-left>`_, `BiDi
     <https://en.wikipedia.org/wiki/Bi-directional_text>`_, and Top-to-Bottom
     script support
   - `ALTO <https://www.loc.gov/standards/alto/>`_, abbyXML, and hOCR output
   - Word bounding boxes and character cuts
-  - `Public repository <https://github.com/mittagessen/kraken-models>`_ of model files
+  - Multi-script recognition support
+  - `Public repository <https://zenodo.org/communities/ocr_models>`_ of model files
   - :ref:`Lightweight model files <models>`
   - :ref:`Variable recognition network architectures <vgsl>`
-
-All functionality not pertaining to OCR and prerequisite steps has been
-removed, i.e. no more error rate measuring, etc.
 
 Pull requests and code contributions are always welcome. 
 
@@ -60,11 +58,21 @@ or by running pip in the git repository:
 conda
 -----
 
-If you are running `Anaconda <https://www.anaconda.com/download/>`_/miniconda, use:
+Install the latest release through `conda <https://anaconda.org>`_:
 
-.. code-block:: console
+::
 
-  $ conda install -c mittagessen kraken
+  $ wget https://raw.githubusercontent.com/mittagessen/kraken/master/environment.yml
+  $ conda env create -f environment.yml
+
+or:
+
+::
+
+  $ wget https://raw.githubusercontent.com/mittagessen/kraken/master/environment_cuda.yml
+  $ conda env create -f environment_cuda.yml
+
+for CUDA acceleration with the appropriate hardware.
 
 Models
 ------

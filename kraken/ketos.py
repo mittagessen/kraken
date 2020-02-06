@@ -677,6 +677,12 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
               default=None, help='Ground truth normalization')
 @click.option('-n', '--normalize-whitespace/--no-normalize-whitespace',
               show_default=True, default=True, help='Normalizes unicode whitespace')
+@click.option('-f', '--format-type', type=click.Choice(['path', 'alto', 'page']), default='path',
+              help='Sets the training data format. In ALTO and PageXML mode all'
+              'data is extracted from xml files containing both baselines and a'
+              'link to source images. In `path` mode arguments are image files'
+              'sharing a prefix up to the last extension with JSON `.path` files'
+              'containing the baseline information.')
 @click.argument('test_set', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def test(ctx, model, evaluation_files, device, pad, threads, reorder, normalization, normalize_whitespace, test_set):
     """

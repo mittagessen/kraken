@@ -335,6 +335,7 @@ class KrakenTrainer(object):
     def run(self, event_callback=lambda *args, **kwargs: None, iteration_callback=lambda *args, **kwargs: None):
         logger.debug('Moving model to device {}'.format(self.device))
         self.model.to(self.device)
+        self.model.train()
 
         logger.debug('Starting up training...')
 
