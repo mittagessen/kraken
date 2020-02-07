@@ -1,25 +1,30 @@
 #!/usr/bin/env python
 """
-Reads in a bunch of ALTO documents and repolygonizes the lines contained with
+Reads in a bunch of PAGEXML documents and repolygonizes the lines contained with
 the kraken polygonizer.
 """
 import os
+import numpy as np
 import sys
 from lxml import etree
 from os.path import splitext
 
 from kraken.lib import xml
 from kraken import serialization, rpred
-
+from kraken.lib.dataset import _fixed_resize
 from PIL import Image
-from kraken.lib.segmentation import calculate_polygonal_environment
+from kraken.lib.segmentation import calculate_polygonal_environment, scale_polygonal_lines
 
 for fname in sys.argv[1:]:
     print(fname)
     seg = xml.parse_page(fname)
     im = Image.open(seg['image']).convert('L')
-    bls = [x['baseline'] for x in seg['lines']]
-    o = calculate_polygonal_environment(im, bls)
+    scal_im = _fixed_resize(im, (1200, 0))
+    scale = np.divide(im.size, scal_im.size)
+    scal_bls = scale_polygonal_lines([(x['baseline'], x['boundary']) for x in seg['lines']], 1/scale)
+    scal_bls = [x[0] for x in scal_bls]
+    o = calculate_polygonal_environment(scal_im, scal_bls)
+    o = [x[1] for x in scale_polygonal_lines([([0,1], x) for x in o], scale)]
     with open(fname, 'rb') as fp:
         doc = etree.parse(fp)
         lines = doc.findall('.//{*}TextLine')
