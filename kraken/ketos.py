@@ -82,7 +82,7 @@ def _expand_gt(ctx, param, value):
 @click.pass_context
 @click.option('-o', '--output', show_default=True, type=click.Path(), default='model', help='Output model file')
 @click.option('-s', '--spec', show_default=True,
-              default='[1,1200,0,3 Cr3,3,64,2,2 Gn32 Cr3,3,128,2,2 Gn32 Cr3,3,64 Gn32 Lbx32 Lby32 Cr1,1,32 Gn32 Lby32 Lbx32 O2l3]',
+              default='[1,1200,0,3 Cr3,3,64,2,2 Gn32 Cr3,3,128,2,2 Gn32 Cr3,3,64 Gn32 Lbx32 Lby32 Cr1,1,32 Gn32 Lby32 Lbx32]',
               help='VGSL spec of the baseline labeling network')
 @click.option('--line-width', show_default=True, default=8, help='The height of each baseline in the target after scaling')
 @click.option('-i', '--load', show_default=True, type=click.Path(exists=True, readable=True), help='Load existing file to continue training')
@@ -118,12 +118,15 @@ def _expand_gt(ctx, param, value):
               'link to source images. In `path` mode arguments are image files'
               'sharing a prefix up to the last extension with JSON `.path` files'
               'containing the baseline information.')
-@click.option('--augment/--no-augment', show_default=False, default=False, help='Enable image augmentation')
+@click.option('--filter-regions/--no-filter-regions', show_default=True, default=False, help='Do not train on regions extracted from XML input')
+@click.option('--filter-line-types/--no-filter-line-types', show_default=True, default=False, help='Treat all baselines as belonging to the default class')
+@click.option('--augment/--no-augment', show_default=True, default=False, help='Enable image augmentation')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
              lag, min_delta, device, optimizer, lrate, momentum, weight_decay,
              schedule, partition, training_files, evaluation_files, threads,
-             force_binarization, format_type, augment, ground_truth):
+             force_binarization, format_type, filter_regions,
+             filter_line_types, augment, ground_truth):
     """
     Trains a baseline labeling model for layout analysis
     """
@@ -146,14 +149,9 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
     nn = None
 
     if load:
-        logger.info('Loading existing model from {} '.format(load))
-        message('Loading existing model from {}'.format(load), nl=False)
+        logger.info(f'Loading existing model from {load} ')
+        message(f'Loading existing model from {load}', nl=False)
         nn = vgsl.TorchVGSLModel.load_model(load)
-        message('\u2713', fg='green')
-    else:
-        logger.info('Creating model {} '.format(spec))
-        message('Creating model {} '.format(spec), nl=False)
-        nn = vgsl.TorchVGSLModel(spec)
         message('\u2713', fg='green')
 
     # preparse input sizes from vgsl string to seed ground truth data set
@@ -161,11 +159,11 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
     if not nn:
         spec = spec.strip()
         if spec[0] != '[' or spec[-1] != ']':
-            raise click.BadOptionUsage('spec', 'VGSL spec {} not bracketed'.format(spec))
+            raise click.BadOptionUsage('spec', f'VGSL spec "{spec}" not bracketed')
         blocks = spec[1:-1].split(' ')
         m = re.match(r'(\d+),(\d+),(\d+),(\d+)', blocks[0])
         if not m:
-            raise click.BadOptionUsage('spec', 'Invalid input spec {}'.format(blocks[0]))
+            raise click.BadOptionUsage('spec', f'Invalid input spec {blocks[0]}')
         batch, height, width, channels = [int(x) for x in m.groups()]
     else:
         batch, channels, height, width = nn.input
@@ -190,11 +188,11 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
 
     tr_im = ground_truth[:int(len(ground_truth) * partition)]
     if evaluation_files:
-        logger.debug('Using {} images from explicit eval set'.format(len(evaluation_files)))
+        logger.debug(f'Using {len(evaluation_files)} images from explicit eval set')
         te_im = evaluation_files
     else:
         te_im = ground_truth[int(len(ground_truth) * partition):]
-        logger.debug('Taking {} images from training for evaluation'.format(len(te_im)))
+        logger.debug(f'Taking {len(te_im)} images from training for evaluation')
 
     # set multiprocessing tensor sharing strategy
     if 'file_system' in torch.multiprocessing.get_all_sharing_strategies():
@@ -205,6 +203,22 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
                          im_transforms=transforms, mode=format_type, augmentation=augment)
     val_set = BaselineSet(te_im, line_width=line_width,
                           im_transforms=transforms, mode=format_type, augmentation=augment)
+    # overwrite class mapping in validation set
+    val_set.num_classes = gt_set.num_classes
+    val_set.class_mapping = gt_set.class_mapping
+
+    if not load:
+        spec = f'[{spec[1:-1]} O2l{gt_set.num_classes}]'
+        message(f'Creating model {spec} with {gt_set.num_classes} outputs ', nl=False)
+        nn = vgsl.TorchVGSLModel(spec)
+        message('\u2713', fg='green')
+
+    message('Training line types:')
+    for k, v in gt_set.class_mapping['baselines'].items():
+        message(f'  {k}\t{v}')
+    message('Training region types:')
+    for k, v in gt_set.class_mapping['regions'].items():
+        message(f'  {k}\t{v}')
 
     if len(gt_set.imgs) == 0:
         raise click.UsageError('No valid training data was provided to the train command. Please add valid XML or line data.')
@@ -224,7 +238,7 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
     # set mode to training
     nn.train()
 
-    logger.debug('Set OpenMP threads to {}'.format(threads))
+    logger.debug(f'Set OpenMP threads to {threads}')
     nn.set_num_threads(threads)
 
     optim = getattr(torch.optim, optimizer)(nn.nn.parameters(), lr=0)
@@ -244,7 +258,7 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
     elif quit == 'dumb':
         st_it = EpochStopping(epochs - completed_epochs)
     else:
-        raise click.BadOptionUsage('quit', 'Invalid training interruption scheme {}'.format(quit))
+        raise click.BadOptionUsage('quit', f'Invalid training interruption scheme {quit}.')
 
     trainer = train.KrakenTrainer(model=nn,
                                   optimizer=optim,
@@ -517,7 +531,7 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
         char = make_printable(k)
         if char == k:
             char = '\t' + char
-        logger.info(u'{}\t{}'.format(char, v))
+        logger.info('{}\t{}'.format(char, v))
 
     logger.debug('Encoding training set')
 

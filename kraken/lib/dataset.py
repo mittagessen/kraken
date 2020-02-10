@@ -33,7 +33,7 @@ from torchvision import transforms
 from torch.utils.data import Dataset, DataLoader
 from typing import Dict, List, Tuple, Sequence, Callable, Optional, Any, Union, cast
 
-from skmage.draw import polygon
+from skimage.draw import polygon
 
 from kraken.lib.xml import parse_alto, parse_page
 from kraken.lib.util import is_bitonal
@@ -850,7 +850,7 @@ class BaselineSet(Dataset):
             self.im_mode = image.mode
         image = self.tail_transforms(image)
         scale = image.shape[2]/orig_size[0]
-        t = torch.zeros(image.shape[1:], dtype=torch.long)
+        t = torch.zeros((self.num_classes,) + image.shape[1:])
         start_sep_cls = self.class_mapping['aux']['_start_separator']
         end_sep_cls = self.class_mapping['aux']['_end_separator']
 
@@ -874,11 +874,12 @@ class BaselineSet(Dataset):
                 region = np.array(region)*scale
                 rr, cc = polygon(region[:,1], region[:,0], shape=image.shape[1:])
                 t[cls_idx, rr, cc] = 1
+        target = t
         if self.aug:
             image = image.permute((1, 2, 0)).numpy()
             o = self.aug(image=image, mask=target.numpy())
             image = torch.tensor(o['image'].transpose(2, 0, 1))
-            target = torch.tensor(o['mask']).long()
+            target = torch.tensor(o['mask'])
         return image, target
 
     def __len__(self):
