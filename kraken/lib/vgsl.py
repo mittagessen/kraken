@@ -724,15 +724,13 @@ class TorchVGSLModel(object):
         if nl == 'l' and int(m.group('out')) == 1:
             self.criterion = nn.BCELoss()
         elif nl == 'l' and int(m.group('out')) > 1:
-            self.criterion = nn.NLLLoss()
-        elif nl == 's' and int(m.group('out')) > 1:
-            self.criterion = nn.BCELoss
+            self.criterion = nn.BCELoss()
         elif nl == 'c':
             self.criterion = nn.CTCLoss(reduction='none')
         else:
             raise ValueError('unsupported output specification')
         # heatmap output
-        if dim == 2 and outdim == 1:
+        if dim == 2:
             act = 's' if nl == 'l' else 'm'
             fn = layers.ActConv2D(input[1], outdim, (1, 1), (1, 1), act)
             logger.debug('{}\t\tconv\tkernel 1 x 1 filters {} stride 1 activation {}'.format(self.idx+1, outdim, nl))
