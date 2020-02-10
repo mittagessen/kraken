@@ -384,7 +384,7 @@ class PolygonGTDataset(Dataset):
             self.text_transforms.append(bd.get_display)
         self.im_mode = '1'
 
-    def add(self, image: Union[str, Image.Image], text: str, baseline: List[Tuple[int, int]], boundary: List[Tuple[int, int]]):
+    def add(self, image: Union[str, Image.Image], text: str, baseline: List[Tuple[int, int]], boundary: List[Tuple[int, int]], *args, **kwargs):
         """
         Adds a line to the dataset.
 
@@ -513,7 +513,7 @@ class GroundTruthDataset(Dataset):
             self.text_transforms.append(bd.get_display)
         self.im_mode = '1'
 
-    def add(self, image: Union[str, Image.Image]) -> None:
+    def add(self, image: Union[str, Image.Image], *args, **kwargs) -> None:
         """
         Adds a line-image-text pair to the dataset.
 
@@ -640,9 +640,13 @@ class BaselineSet(Dataset):
             im_paths = []
             self.targets = []
             for img in imgs:
-                data = fn(img)
-                im_paths.append(data['image'])
-                self.targets.append([line['baseline'] for line in data['lines']])
+                try:
+                    data = fn(img)
+                    im_paths.append(data['image'])
+                    self.targets.append([line['baseline'] for line in data['lines']])
+                except KrakenInputException as e:
+                    logger.warning(e)
+                    continue
             imgs = im_paths
         elif mode == 'path':
             pass
@@ -682,7 +686,7 @@ class BaselineSet(Dataset):
         self.tail_transforms = transforms.Compose(im_transforms.transforms[2:])
         self.seg_type = None
 
-    def add(self, image: Union[str, Image.Image], baselines: List[List[Tuple[int, int]]]):
+    def add(self, image: Union[str, Image.Image], baselines: List[List[Tuple[int, int]]], *args, **kwargs):
         """
         Adds a line to the dataset.
 
