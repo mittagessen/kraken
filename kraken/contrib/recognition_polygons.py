@@ -27,10 +27,9 @@ for fname in sys.argv[2:]:
     im = im.convert('RGBA')
     tmp = Image.new('RGBA', im.size, (0, 0, 0, 0))
     draw = ImageDraw.Draw(tmp)
-    for line in res['lines']:
+    for idx, line in enumerate(res['lines']):
         c = next(cmap)
         draw.polygon([tuple(x) for x in line['boundary']], fill=c, outline=c[:3])
-    for idx, line in enumerate(res['lines']):
         draw.line([tuple(x) for x in line['baseline']], fill=bmap, width=2, joint='curve')
         draw.text(line['baseline'][0], str(idx), fill=(0, 0, 0, 255))
     im = Image.alpha_composite(im, tmp)

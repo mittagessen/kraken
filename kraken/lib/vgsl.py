@@ -725,6 +725,8 @@ class TorchVGSLModel(object):
             self.criterion = nn.BCELoss()
         elif nl == 'l' and int(m.group('out')) > 1:
             self.criterion = nn.NLLLoss()
+        elif nl == 's' and int(m.group('out')) > 1:
+            self.criterion = nn.BCELoss
         elif nl == 'c':
             self.criterion = nn.CTCLoss(reduction='none')
         else:

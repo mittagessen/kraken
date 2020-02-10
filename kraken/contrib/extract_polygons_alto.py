@@ -13,8 +13,9 @@ from kraken.lib import dataset, segmentation
 xmls = sys.argv[1:]
 
 for doc in xmls:
+    print(doc)
     data = dataset.preparse_xml_data([doc], 'alto')
-    if len data > 0:
+    if len(data) > 0:
         bounds = {'type': 'baselines', 'lines': [{'boundary': t['boundary'], 'baseline': t['baseline'], 'text': t['text']} for t in data]}
         for idx, (im, box) in enumerate(segmentation.extract_polygons(Image.open(data[0]['image']), bounds)):
             print('.', end='', flush=True)
