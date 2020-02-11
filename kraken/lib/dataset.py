@@ -860,13 +860,13 @@ class BaselineSet(Dataset):
             for line in lines:
                 # buffer out line to desired width
                 line = np.array(line)*scale
-                line_pol = np.array(geom.LineString(line).buffer(self.line_width/2, cap_style=2).boundary, dtype=np.uint)
+                line_pol = np.array(geom.LineString(line).buffer(self.line_width/2, cap_style=2).boundary, dtype=np.int)
                 rr, cc = polygon(line_pol[:,1], line_pol[:,0], shape=image.shape[1:])
                 t[cls_idx, rr, cc] = 1
-                start_sep = np.array(geom.LineString(self._get_ortho_line(line[:2], line[0], self.line_width, 'l')).buffer(self.line_width/2, cap_style=2).boundary, dtype=np.uint)
+                start_sep = np.array(geom.LineString(self._get_ortho_line(line[:2], line[0], self.line_width, 'l')).buffer(self.line_width/2, cap_style=2).boundary, dtype=np.int)
                 rr, cc = polygon(start_sep[:,1], start_sep[:,0], shape=image.shape[1:])
                 t[start_sep_cls, rr, cc] = 1
-                end_sep = np.array(geom.LineString(self._get_ortho_line(line[-2:], line[-1], self.line_width, 'r')).buffer(self.line_width/2, cap_style=2).boundary, dtype=np.uint)
+                end_sep = np.array(geom.LineString(self._get_ortho_line(line[-2:], line[-1], self.line_width, 'r')).buffer(self.line_width/2, cap_style=2).boundary, dtype=np.int)
                 rr, cc = polygon(end_sep[:,1], end_sep[:,0], shape=image.shape[1:])
                 t[end_sep_cls, rr, cc] = 1
         for key, regions in target['regions'].items():
