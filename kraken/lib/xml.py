@@ -102,6 +102,9 @@ def parse_page(filename):
             coords = region.find('{*}Coords')
             if coords is not None and not coords.get('points').isspace() and len(coords.get('points')):
                 coords = _parse_coords(coords.get('points'))
+            else:
+                logger.warning('Region {} without coordinates'.format(region.get('id')))
+                continue
             rtype = region.get('type')
             # parse transkribus-style custom field if possible
             custom_str = region.get('custom')
@@ -130,6 +133,7 @@ def parse_page(filename):
                 baseline = _parse_coords(base.get('points'))
             else:
                 logger.warning('TextLine {} without baseline'.format(line.get('id')))
+                continue
             text = ''
             manual_transcription = line.find('./{*}TextEquiv')
             if manual_transcription is not None:
