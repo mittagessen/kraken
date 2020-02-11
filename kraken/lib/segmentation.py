@@ -354,7 +354,11 @@ def _rotate(image, angle, center, scale, cval=0):
     return tform, warp(image, tform, output_shape=output_shape, order=0, cval=cval, clip=False, preserve_range=True)
 
 
-def calculate_polygonal_environment(im: PIL.Image.Image, baselines: Sequence[Tuple[int, int]] = None, suppl_obj: Sequence[Tuple[int, int]] = None, im_feats: np.array = None):
+def calculate_polygonal_environment(im: PIL.Image.Image,
+                                    baselines: Sequence[Tuple[int, int]] = None,
+                                    suppl_obj: Sequence[Tuple[int, int]] = None,
+                                    im_feats: np.array = None,
+                                    scale: Tuple[int, int] = None):
     """
     Given a list of baselines and an input image, calculates a polygonal
     environment around each baseline.
@@ -372,10 +376,23 @@ def calculate_polygonal_environment(im: PIL.Image.Image, baselines: Sequence[Tup
         im_feats (numpy.array): An optional precomputed seamcarve energy map.
                                 Overrides data in `im`. The default map is
                                 `gaussian_filter(sobel(im), 2)`.
+        scale (tuple): A 2-tuple (h, w) containing optional scale factors of
+                       the input. Values of 0 are used for aspect-preserving
+                       scaling. `None` skips input scaling.
     Returns:
         List of lists of coordinates. If no polygonization could be compute for
         a baseline `None` is returned instead.
     """
+    if scale is not None and (scale[0] > 0 or scale[1] > 0):
+        w, h = im.size
+        oh, ow = scale
+        if oh == 0:
+            oh = int(h * ow/w)
+        elif ow == 0:
+            ow = int(w * oh/h)
+        im = im.resize((ow, oh))
+        scale = np.array((ow/w, oh/h))
+
     bounds = np.array(im.size, dtype=np.float)
     im = np.array(im)
     if im_feats is None:
@@ -553,6 +570,9 @@ def calculate_polygonal_environment(im: PIL.Image.Image, baselines: Sequence[Tup
             polygons.append(_extract_patch(env_up, env_bottom, line.astype('int'), p_dir))
         except Exception as e:
             polygons.append(None)
+
+    if scale is not None:
+        polygons = [(np.array(pol)/scale).astype('uint').tolist() for pol in polygons if pol is not None]
     return polygons
 
 
