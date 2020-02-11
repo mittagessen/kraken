@@ -739,7 +739,7 @@ class BaselineSet(Dataset):
             self.num_classes += idx + 1
             for idx, reg_type in enumerate(region_types):
                 self.class_mapping['regions'][reg_type] = idx + self.num_classes
-            self.num_classes += idx
+            self.num_classes += idx + 1
         elif mode == 'path':
             pass
         elif mode is None:
@@ -824,6 +824,7 @@ class BaselineSet(Dataset):
                 im = Image.open(im)
                 return self.transform(im, target)
             except Exception:
+                raise
                 idx = np.random.randint(0, len(self.imgs))
                 logger.debug('Failed. Replacing with sample {}'.format(idx))
                 return self[np.random.randint(0, len(self.imgs))]
@@ -859,13 +860,13 @@ class BaselineSet(Dataset):
             for line in lines:
                 # buffer out line to desired width
                 line = np.array(line)*scale
-                line_pol = np.array(geom.LineString(line).buffer(line_width/2, cap_style=2).boundary, dtype=np.uint)
+                line_pol = np.array(geom.LineString(line).buffer(self.line_width/2, cap_style=2).boundary, dtype=np.uint)
                 rr, cc = polygon(line_pol[:,1], line_pol[:,0], shape=image.shape[1:])
                 t[cls_idx, rr, cc] = 1
-                start_sep = np.array(geom.LineString(self._get_ortho_line(line[:2], line[0], self.line_width, 'l')).buffer(line_width/2, cap_style=2).boundary, dtype=np.uint)
+                start_sep = np.array(geom.LineString(self._get_ortho_line(line[:2], line[0], self.line_width, 'l')).buffer(self.line_width/2, cap_style=2).boundary, dtype=np.uint)
                 rr, cc = polygon(start_sep[:,1], start_sep[:,0], shape=image.shape[1:])
                 t[start_sep_cls, rr, cc] = 1
-                end_sep = np.array(geom.LineString(self._get_ortho_line(line[-2:], line[-1], self.line_width, 'r')).buffer(line_width/2, cap_style=2).boundary, dtype=np.uint)
+                end_sep = np.array(geom.LineString(self._get_ortho_line(line[-2:], line[-1], self.line_width, 'r')).buffer(self.line_width/2, cap_style=2).boundary, dtype=np.uint)
                 rr, cc = polygon(end_sep[:,1], end_sep[:,0], shape=image.shape[1:])
                 t[end_sep_cls, rr, cc] = 1
         for key, regions in target['regions'].items():

@@ -255,7 +255,6 @@ def recognition_evaluator_fn(model, val_set, device):
 
 
 def baseline_label_evaluator_fn(model, val_set, device):
-
     true_positives = 0
     all_positives = 0
     actual_positives = 0
@@ -266,12 +265,11 @@ def baseline_label_evaluator_fn(model, val_set, device):
             x = x.to(device)
             y = y.to(device).unsqueeze(0)
             pred = model.nn(x.unsqueeze(0))
-            # scale output to target size
-            pred = F.interpolate(pred, size=(y.size(1), y.size(2)))
+            # scale target to output size
+            y = F.interpolate(y, size=(pred.size(2), pred.size(3)))
             pred = segmentation.denoising_hysteresis_thresh(pred.detach().squeeze().cpu().numpy(), 0.4, 0.5, 0)
-            # squash classes to indices
             pred = torch.from_numpy(pred.astype('f')).to(device)
-            pred = pred.argmax(dim=0).view(-1)
+            pred = pred.view(-1)
             y = y.view(-1)
             correct = torch.eq(y, pred)
             correct[y == 0] = 0
