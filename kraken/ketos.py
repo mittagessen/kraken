@@ -232,8 +232,9 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
     test_loader = DataLoader(val_set, batch_size=1, shuffle=True, num_workers=loader_threads, pin_memory=True)
     threads = max((threads - loader_threads, 1))
 
-    # set model type metadata field
+    # set model type metadata field and dump class_mapping
     nn.model_type = 'segmentation'
+    nn.user_metadata['class_mapping'] = val_set.class_mapping
 
     # set mode to training
     nn.train()
