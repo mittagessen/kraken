@@ -143,7 +143,8 @@ def _fixed_resize(img, size, interpolation=Image.LANCZOS):
         oh = int(h * ow/w)
     elif ow == 0:
         ow = int(w * oh/h)
-    return img.resize((ow, oh), interpolation)
+    img = img.resize((ow, oh), interpolation)
+    return img
 
 
 def _fast_levenshtein(seq1: Sequence[Any], seq2: Sequence[Any]) -> int:
