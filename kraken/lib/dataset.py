@@ -684,9 +684,9 @@ class BaselineSet(Dataset):
                  mode: str = 'path',
                  augmentation: bool = False,
                  valid_baselines: Sequence[str] = None,
-                 merge_baselines: Sequence[Sequence[str]] = None,
+                 merge_baselines: Dict[str, Sequence[str]] = None,
                  valid_regions: Sequence[str] = None,
-                 merge_regions: Sequence[Sequence[str]] = None):
+                 merge_regions: Dict[str, Sequence[str]] = None):
         """
         Reads a list of image-json pairs and creates a data set.
 
@@ -703,17 +703,14 @@ class BaselineSet(Dataset):
             augmentation (bool): Enable/disable augmentation.
             valid_baselines (list): Sequence of valid baseline identifiers. If
                                     `None` all are valid.
-            merge_baselines (list): Sequence of baseline identifiers to merge.
-                                    Resulting line type is the first type in
-                                    the entry.  Note that merging occurs after
-                                    entities not in valid_* have been
-                                    discarded.
+            merge_baselines (dict): Sequence of baseline identifiers to merge.
+                                    Note that merging occurs after entities not
+                                    in valid_* have been discarded.
             valid_regions (list): Sequence of valid region identifiers. If
                                   `None` all are valid.
-            merge_regions (list): Sequence of region identifiers to merge.
-                                  Resulting region is the first region in the
-                                  entry. Note that merging occurs after
-                                  entities not in valid_* have been discarded.
+            merge_regions (dict): Sequence of region identifiers to merge.
+                                  Note that merging occurs after entities not
+                                  in valid_* have been discarded.
         """
         super().__init__()
         self.mode = mode
@@ -723,15 +720,8 @@ class BaselineSet(Dataset):
         # n-th entry contains semantic of n-th class
         self.class_mapping = {'aux': {'_start_separator': 0, '_end_separator': 1}, 'baselines': {}, 'regions': {}}
         self.num_classes = 2
-        # build mapping for bl/region merging
-        mbl_dict = {}
-        for merge in merge_baselines:
-            for m in merge[1:]:
-                mbl_dict[m] = merge[0]
-        mreg_dict = {}
-        for merge in merge_regions:
-            for m in merge[1:]:
-                mreg_dict[m] = merge[0]
+        mbl_dict = merge_baselines if merge_baselines is not None else {}
+        mreg_dict = merge_regions if merge_regions is not None else {}
 
         if mode in ['alto', 'page']:
             if mode == 'alto':

@@ -26,6 +26,7 @@ from click import open_file
 from bidi.algorithm import get_display
 
 from typing import cast, Set, List, IO, Any
+from collections import defaultdict
 
 from kraken.lib import log
 from kraken.lib.exceptions import KrakenCairoSurfaceException
@@ -77,6 +78,18 @@ def _expand_gt(ctx, param, value):
         images.extend([x for x in glob.iglob(expression, recursive=True) if os.path.isfile(x)])
     return images
 
+def _validate_merging(ctx, param, value):
+    """
+    Maps baseline/region merging to a dict of merge structures.
+    """
+    merge_dict = defaultdict(list) # type: Dict[str, List[str]]
+    try:
+        for m in value:
+            k, v = m.split(':')
+            model_dict[k].append(v)  # type: ignore
+    except Exception:
+        raise click.BadParameter('Mappings must be in format target:src')
+    return merge_dict
 
 @cli.command('segtrain')
 @click.pass_context
@@ -118,15 +131,18 @@ def _expand_gt(ctx, param, value):
               'link to source images. In `path` mode arguments are image files'
               'sharing a prefix up to the last extension with JSON `.path` files'
               'containing the baseline information.')
-@click.option('--filter-regions/--no-filter-regions', show_default=True, default=False, help='Do not train on regions extracted from XML input')
-@click.option('--filter-line-types/--no-filter-line-types', show_default=True, default=False, help='Treat all baselines as belonging to the default class')
+@click.option('-vr', '--valid-regions', show_default=True, default=None, help='Valid region types in training data. May be used multiple times.')
+@click.option('-vb', '--valid-baselines', show_default=True, default=None, help='Valid baseline types in training data. May be used multiple times.')
+@click.option('-mr', '--merge-regions', show_default=True, default=None, help='Region merge mapping. One or more mappings of the form `$target:$src` where $src is merged into $target.', callback=_validate_merging)
+@click.option('-mb', '---merge-baselines', show_default=True, default=None, help='Baseline type merge mapping. Same syntax as `--merge-regions`', callback=_validate_merging)
+
 @click.option('--augment/--no-augment', show_default=True, default=False, help='Enable image augmentation')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
              lag, min_delta, device, optimizer, lrate, momentum, weight_decay,
              schedule, partition, training_files, evaluation_files, threads,
-             force_binarization, format_type, filter_regions,
-             filter_line_types, augment, ground_truth):
+             force_binarization, format_type, valid_regions, valid_baselines,
+             merge_regions, merge_baselines, augment, ground_truth):
     """
     Trains a baseline labeling model for layout analysis
     """
@@ -199,10 +215,25 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
         logger.debug('Setting multiprocessing tensor sharing strategy to file_system')
         torch.multiprocessing.set_sharing_strategy('file_system')
 
-    gt_set = BaselineSet(tr_im, line_width=line_width,
-                         im_transforms=transforms, mode=format_type, augmentation=augment)
-    val_set = BaselineSet(te_im, line_width=line_width,
-                          im_transforms=transforms, mode=format_type, augmentation=augment)
+    gt_set = BaselineSet(tr_im,
+                         line_width=line_width,
+                         im_transforms=transforms,
+                         mode=format_type,
+                         augmentation=augment,
+                         valid_baselines=valid_baselines,
+                         merge_baselines=merge_baselines,
+                         valid_regions=valid_regions,
+                         merge_regions=merge_regions)
+    val_set = BaselineSet(te_im,
+                          line_width=line_width,
+                          im_transforms=transforms,
+                          mode=format_type,
+                          augmentation=augment,
+                          valid_baselines=valid_baselines,
+                          merge_baselines=merge_baselines,
+                          valid_regions=valid_regions,
+                          merge_regions=merge_regions)
+
     # overwrite class mapping in validation set
     val_set.num_classes = gt_set.num_classes
     val_set.class_mapping = gt_set.class_mapping
