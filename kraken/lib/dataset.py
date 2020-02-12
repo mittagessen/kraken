@@ -682,7 +682,11 @@ class BaselineSet(Dataset):
                  line_width: int = 4,
                  im_transforms: Callable[[Any], torch.Tensor] = transforms.Compose([]),
                  mode: str = 'path',
-                 augmentation: bool = False):
+                 augmentation: bool = False,
+                 valid_baselines: Sequence[str] = None,
+                 merge_baselines: Sequence[Sequence[str]] = None,
+                 valid_regions: Sequence[str] = None,
+                 merge_regions: Sequence[Sequence[str]] = None):
         """
         Reads a list of image-json pairs and creates a data set.
 
@@ -697,6 +701,19 @@ class BaselineSet(Dataset):
                         ALTO/PageXML file. In `None` mode data is iteratively
                         added through the `add` method.
             augmentation (bool): Enable/disable augmentation.
+            valid_baselines (list): Sequence of valid baseline identifiers. If
+                                    `None` all are valid.
+            merge_baselines (list): Sequence of baseline identifiers to merge.
+                                    Resulting line type is the first type in
+                                    the entry.  Note that merging occurs after
+                                    entities not in valid_* have been
+                                    discarded.
+            valid_regions (list): Sequence of valid region identifiers. If
+                                  `None` all are valid.
+            merge_regions (list): Sequence of region identifiers to merge.
+                                  Resulting region is the first region in the
+                                  entry. Note that merging occurs after
+                                  entities not in valid_* have been discarded.
         """
         super().__init__()
         self.mode = mode
@@ -706,6 +723,16 @@ class BaselineSet(Dataset):
         # n-th entry contains semantic of n-th class
         self.class_mapping = {'aux': {'_start_separator': 0, '_end_separator': 1}, 'baselines': {}, 'regions': {}}
         self.num_classes = 2
+        # build mapping for bl/region merging
+        mbl_dict = {}
+        for merge in merge_baselines:
+            for m in merge[1:]:
+                mbl_dict[m] = merge[0]
+        mreg_dict = {}
+        for merge in merge_regions:
+            for m in merge[1:]:
+                mreg_dict[m] = merge[0]
+
         if mode in ['alto', 'page']:
             if mode == 'alto':
                 fn = parse_alto
@@ -719,12 +746,19 @@ class BaselineSet(Dataset):
                     im_paths.append(data['image'])
                     lines = defaultdict(list)
                     for line in data['lines']:
-                        lines[line['type']].append(line['baseline'])
+                        if valid_baselines is None or line['type'] in valid_baselines:
+                            lines[mbl_dict.get(line['type'], line['type'])].append(line['baseline'])
+                    if valid_regions is not None:
+                        regions = defaultdict(list)
+                        for k, v in data['regions']:
+                            if k in valid_regions:
+                                regions[mreg_dict.get(k, k)].extend(v)
+                        data['regions'] = regions
                     self.targets.append({'baselines': lines, 'regions': data['regions']})
                 except KrakenInputException as e:
                     logger.warning(e)
                     continue
-                # get line types
+            # get line types
             imgs = im_paths
             # calculate class mapping
             line_types = set()
