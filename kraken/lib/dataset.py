@@ -901,10 +901,11 @@ class BaselineSet(Dataset):
                 t[cls_idx, rr, cc] = 1
         target = t
         if self.aug:
-            image = image.permute((1, 2, 0)).numpy()
+            image = image.permute(1, 2, 0).numpy()
+            target = target.permute(1, 2, 0).numpy()
             o = self.aug(image=image, mask=target.numpy())
             image = torch.tensor(o['image'].transpose(2, 0, 1))
-            target = torch.tensor(o['mask'])
+            target = torch.tensor(o['mask']).transpose(2, 0, 1)
         return image, target
 
     def __len__(self):
