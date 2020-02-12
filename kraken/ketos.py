@@ -82,6 +82,8 @@ def _validate_merging(ctx, param, value):
     """
     Maps baseline/region merging to a dict of merge structures.
     """
+    if value is None:
+        return None
     merge_dict = defaultdict(list) # type: Dict[str, List[str]]
     try:
         for m in value:
@@ -131,18 +133,21 @@ def _validate_merging(ctx, param, value):
               'link to source images. In `path` mode arguments are image files'
               'sharing a prefix up to the last extension with JSON `.path` files'
               'containing the baseline information.')
+@click.option('--suppress-regions/--no-suppress-regions', show_default=True, default=False, help='Disables region segmentation training.')
+@click.option('--suppress-baselines/--no-suppress-baselines', show_default=True, default=False, help='Disables baseline segmentation training.')
 @click.option('-vr', '--valid-regions', show_default=True, default=None, help='Valid region types in training data. May be used multiple times.')
 @click.option('-vb', '--valid-baselines', show_default=True, default=None, help='Valid baseline types in training data. May be used multiple times.')
 @click.option('-mr', '--merge-regions', show_default=True, default=None, help='Region merge mapping. One or more mappings of the form `$target:$src` where $src is merged into $target.', callback=_validate_merging)
-@click.option('-mb', '---merge-baselines', show_default=True, default=None, help='Baseline type merge mapping. Same syntax as `--merge-regions`', callback=_validate_merging)
+@click.option('-mb', '--merge-baselines', show_default=True, default=None, help='Baseline type merge mapping. Same syntax as `--merge-regions`', callback=_validate_merging)
 
 @click.option('--augment/--no-augment', show_default=True, default=False, help='Enable image augmentation')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
              lag, min_delta, device, optimizer, lrate, momentum, weight_decay,
              schedule, partition, training_files, evaluation_files, threads,
-             force_binarization, format_type, valid_regions, valid_baselines,
-             merge_regions, merge_baselines, augment, ground_truth):
+             force_binarization, format_type, suppress_regions,
+             suppress_baselines, valid_regions, valid_baselines, merge_regions,
+             merge_baselines, augment, ground_truth):
     """
     Trains a baseline labeling model for layout analysis
     """
@@ -214,6 +219,13 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
     if 'file_system' in torch.multiprocessing.get_all_sharing_strategies():
         logger.debug('Setting multiprocessing tensor sharing strategy to file_system')
         torch.multiprocessing.set_sharing_strategy('file_system')
+
+    if suppress_regions:
+        valid_regions = []
+        merge_regions = None
+    if suppress_baselines:
+        valid_baselines = []
+        merge_baselines = None
 
     gt_set = BaselineSet(tr_im,
                          line_width=line_width,

@@ -722,7 +722,6 @@ class BaselineSet(Dataset):
         self.num_classes = 2
         mbl_dict = merge_baselines if merge_baselines is not None else {}
         mreg_dict = merge_regions if merge_regions is not None else {}
-
         if mode in ['alto', 'page']:
             if mode == 'alto':
                 fn = parse_alto
@@ -740,7 +739,7 @@ class BaselineSet(Dataset):
                             lines[mbl_dict.get(line['type'], line['type'])].append(line['baseline'])
                     if valid_regions is not None:
                         regions = defaultdict(list)
-                        for k, v in data['regions']:
+                        for k, v in data['regions'].items():
                             if k in valid_regions:
                                 regions[mreg_dict.get(k, k)].extend(v)
                         data['regions'] = regions
@@ -758,6 +757,7 @@ class BaselineSet(Dataset):
                     line_types.add(line_type)
                 for reg_type in page['regions'].keys():
                     region_types.add(reg_type)
+            idx = -1
             for idx, line_type in enumerate(line_types):
                 self.class_mapping['baselines'][line_type] = idx + self.num_classes
             self.num_classes += idx + 1
