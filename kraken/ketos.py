@@ -88,7 +88,7 @@ def _validate_merging(ctx, param, value):
     try:
         for m in value:
             k, v = m.split(':')
-            model_dict[k].append(v)  # type: ignore
+            merge_dict[k].append(v)  # type: ignore
     except Exception:
         raise click.BadParameter('Mappings must be in format target:src')
     return merge_dict
