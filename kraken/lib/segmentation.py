@@ -34,9 +34,9 @@ from scipy.ndimage.morphology import distance_transform_cdt
 
 from shapely.ops import nearest_points, unary_union, linemerge
 
-from skimage import draw, measure
+from skimage import draw
 from skimage.filters import apply_hysteresis_threshold, sobel
-from skimage.measure import approximate_polygon, subdivide_polygon
+from skimage.measure import approximate_polygon, subdivide_polygon, find_contours
 from skimage.morphology import medial_axis
 from skimage.transform import PiecewiseAffineTransform, SimilarityTransform, AffineTransform, warp
 
@@ -319,6 +319,29 @@ def vectorize_lines(im: np.ndarray, threshold: float = 0.2, min_sp_dist: int = 1
     return lines
 
 
+def vectorize_regions(im: np.ndarray, threshold: float = 0.2):
+    """
+    Vectorizes lines from a binarized array.
+
+    Args:
+        im (np.ndarray): Array of shape (H, W) with the first dimension
+                         being a probability distribution over the region.
+        threshold (float): Threshold for binarization
+
+    Returns:
+        [[x0, y0, ... xn, yn], [xm, ym, ..., xk, yk], ... ]
+        A list of lists containing the region polygons.
+    """
+    bin = im > threshold
+    contours = find_contours(bin, 0.5, fully_connected='high', positive_orientation='high')
+    if len(contours) == 0:
+        return contours
+    approx_contours = []
+    for contour in contours:
+        approx_contours.append(approximate_polygon(contour, 1))
+    return approx_contours
+
+
 def _rotate(image, angle, center, scale, cval=0):
     """
     Rotate function taken mostly from scikit image. Main difference is that
@@ -574,6 +597,7 @@ def calculate_polygonal_environment(im: PIL.Image.Image,
     if scale is not None:
         polygons = [(np.array(pol)/scale).astype('uint').tolist() for pol in polygons if pol is not None]
     return polygons
+
 
 
 def polygonal_reading_order(lines: Sequence[Tuple[List, List]], text_direction: str = 'lr') -> Sequence[Tuple[List, List]]:
