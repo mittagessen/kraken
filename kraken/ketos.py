@@ -135,11 +135,10 @@ def _validate_merging(ctx, param, value):
               'containing the baseline information.')
 @click.option('--suppress-regions/--no-suppress-regions', show_default=True, default=False, help='Disables region segmentation training.')
 @click.option('--suppress-baselines/--no-suppress-baselines', show_default=True, default=False, help='Disables baseline segmentation training.')
-@click.option('-vr', '--valid-regions', show_default=True, default=None, help='Valid region types in training data. May be used multiple times.')
-@click.option('-vb', '--valid-baselines', show_default=True, default=None, help='Valid baseline types in training data. May be used multiple times.')
-@click.option('-mr', '--merge-regions', show_default=True, default=None, help='Region merge mapping. One or more mappings of the form `$target:$src` where $src is merged into $target.', callback=_validate_merging)
-@click.option('-mb', '--merge-baselines', show_default=True, default=None, help='Baseline type merge mapping. Same syntax as `--merge-regions`', callback=_validate_merging)
-
+@click.option('-vr', '--valid-regions', show_default=True, default=None, multiple=True, help='Valid region types in training data. May be used multiple times.')
+@click.option('-vb', '--valid-baselines', show_default=True, default=None, multiple=True, help='Valid baseline types in training data. May be used multiple times.')
+@click.option('-mr', '--merge-regions', show_default=True, default=None, help='Region merge mapping. One or more mappings of the form `$target:$src` where $src is merged into $target.', multiple=True, callback=_validate_merging)
+@click.option('-mb', '--merge-baselines', show_default=True, default=None, help='Baseline type merge mapping. Same syntax as `--merge-regions`', multiple=True, callback=_validate_merging)
 @click.option('--augment/--no-augment', show_default=True, default=False, help='Enable image augmentation')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
