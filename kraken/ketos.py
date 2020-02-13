@@ -82,13 +82,13 @@ def _validate_merging(ctx, param, value):
     """
     Maps baseline/region merging to a dict of merge structures.
     """
-    if value is None:
+    if not value:
         return None
-    merge_dict = defaultdict(list) # type: Dict[str, List[str]]
+    merge_dict = {} # type: Dict[str, str]
     try:
         for m in value:
             k, v = m.split(':')
-            merge_dict[k].append(v)  # type: ignore
+            merge_dict[v] = k  # type: ignore
     except Exception:
         raise click.BadParameter('Mappings must be in format target:src')
     return merge_dict
@@ -218,6 +218,11 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
     if 'file_system' in torch.multiprocessing.get_all_sharing_strategies():
         logger.debug('Setting multiprocessing tensor sharing strategy to file_system')
         torch.multiprocessing.set_sharing_strategy('file_system')
+
+    if len(valid_regions) == 0:
+        valid_regions = None
+    if len(valid_baselines) == 0:
+        valid_baselines = None
 
     if suppress_regions:
         valid_regions = []

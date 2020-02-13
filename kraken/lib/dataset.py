@@ -737,12 +737,14 @@ class BaselineSet(Dataset):
                     for line in data['lines']:
                         if valid_baselines is None or line['type'] in valid_baselines:
                             lines[mbl_dict.get(line['type'], line['type'])].append(line['baseline'])
-                    if valid_regions is not None:
-                        regions = defaultdict(list)
-                        for k, v in data['regions'].items():
+                    regions = defaultdict(list)
+                    for k, v in data['regions'].items():
+                        if valid_regions is not None:
                             if k in valid_regions:
                                 regions[mreg_dict.get(k, k)].extend(v)
-                        data['regions'] = regions
+                        else:
+                            regions[mreg_dict.get(k, k)].extend(v)
+                    data['regions'] = regions
                     self.targets.append({'baselines': lines, 'regions': data['regions']})
                 except KrakenInputException as e:
                     logger.warning(e)
