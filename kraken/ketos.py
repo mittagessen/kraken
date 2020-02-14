@@ -679,6 +679,19 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
               default=None, help='Ground truth normalization')
 @click.option('-n', '--normalize-whitespace/--no-normalize-whitespace',
               show_default=True, default=True, help='Normalizes unicode whitespace')
+@click.option('--repolygonize/--no-repolygonize', show_default=True,
+              default=False, help='Repolygonizes line data in ALTO/PageXML'
+              'files. This ensures that the trained model is compatible with the'
+              'segmenter in kraken even if the original image files either do'
+              'not contain anything but transcriptions and baseline information'
+              'or the polygon data was created using a different method. Will'
+              'be ignored in `path` mode. Note, that this option will be slow'
+              'and will not scale input images to the same size as the segmenter'
+              'does.')
+@click.option('--force-binarization/--no-binarization', show_default=True,
+              default=False, help='Forces input images to be binary, otherwise'
+              'the appropriate color format will be auto-determined through the'
+              'network specification. Will be ignored in `path` mode.')
 @click.option('-f', '--format-type', type=click.Choice(['path', 'alto', 'page']), default='path',
               help='Sets the training data format. In ALTO and PageXML mode all'
               'data is extracted from xml files containing both baselines and a'
@@ -686,7 +699,9 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
               'sharing a prefix up to the last extension with JSON `.path` files'
               'containing the baseline information.')
 @click.argument('test_set', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
-def test(ctx, model, evaluation_files, device, pad, threads, reorder, normalization, normalize_whitespace, format_type, test_set):
+def test(ctx, model, evaluation_files, device, pad, threads, reorder,
+         normalization, normalize_whitespace, repolygonize, force_binarization,
+         format_type, test_set):
     """
     Evaluate on a test set.
     """
@@ -700,7 +715,7 @@ def test(ctx, model, evaluation_files, device, pad, threads, reorder, normalizat
 
     from kraken.serialization import render_report
     from kraken.lib import models
-    from kraken.lib.dataset import global_align, compute_confusions, generate_input_transforms
+    from kraken.lib.dataset import global_align, compute_confusions, generate_input_transforms, preparse_xml_data, PolygonGTDataset, GroundTruthDataset
 
     logger.info('Building test set from {} line images'.format(len(test_set) + len(evaluation_files)))
 
@@ -716,7 +731,6 @@ def test(ctx, model, evaluation_files, device, pad, threads, reorder, normalizat
     logger.debug('Set OpenMP threads to {}'.format(threads))
     next(iter(nn.values())).nn.set_num_threads(threads)
 
-    # merge training_files into ground_truth list
     if evaluation_files:
         test_set.extend(evaluation_files)
 
@@ -732,12 +746,22 @@ def test(ctx, model, evaluation_files, device, pad, threads, reorder, normalizat
     if reorder:
         text_transforms.append(get_display)
 
-    def _get_text(im):
-        with open(os.path.splitext(im)[0] + '.gt.txt', 'r') as fp:
-            text = fp.read()
-            for func in text_transforms:
-                text = func(text)
-            return text
+    if format_type != 'path':
+        if repolygonize:
+            message('Repolygonizing data')
+        test_set = preparse_xml_data(test_set, format_type, repolygonize)
+        valid_norm = False
+        DatasetClass = PolygonGTDataset
+    else:
+        DatasetClass = GroundTruthDataset
+        t = []
+        if force_binarization:
+            logger.warning('Forced binarization enabled in `path` mode. Will be ignored.')
+            force_binarization = False
+        if repolygonize:
+            logger.warning('Repolygonization enabled in `path` mode. Will be ignored.')
+        test_set = [{'image': img} for img in test_set]
+        valid_norm = True
 
     acc_list = []
     for p, net in nn.items():
@@ -748,13 +772,21 @@ def test(ctx, model, evaluation_files, device, pad, threads, reorder, normalizat
         message('Evaluating {}'.format(p))
         logger.info('Evaluating {}'.format(p))
         batch, channels, height, width = net.nn.input
-        ts = generate_input_transforms(batch, height, width, channels, pad)
-        with log.progressbar(test_set, label='Evaluating') as bar:
-            for im_path in bar:
+        ts = generate_input_transforms(batch, height, width, channels, pad, valid_norm, force_binarization)
+        ds = DatasetClass(normalization=normalization,
+                          whitespace_normalization=normalize_whitespace,
+                          reorder=reorder,
+                          im_transforms=ts,
+                          preload=False)
+        for line in test_set:
+            ds.add(**line)
+        # don't encode validation set as the alphabets may not match causing encoding failures
+        ds.training_set = list(zip(ds._images, ds._gt))
+
+        with log.progressbar(ds, label='Evaluating') as bar:
+            for im, text in list(bar):
                 try:
-                    i = ts(Image.open(im_path))
-                    text = _get_text(im_path)
-                    pred = net.predict_string(i)
+                    pred = net.predict_string(im)
                     chars += len(text)
                     c, algn1, algn2 = global_align(text, pred)
                     algn_gt.extend(algn1)
