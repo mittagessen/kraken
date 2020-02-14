@@ -686,7 +686,7 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
               'sharing a prefix up to the last extension with JSON `.path` files'
               'containing the baseline information.')
 @click.argument('test_set', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
-def test(ctx, model, evaluation_files, device, pad, threads, reorder, normalization, normalize_whitespace, test_set):
+def test(ctx, model, evaluation_files, device, pad, threads, reorder, normalization, normalize_whitespace, format_type, test_set):
     """
     Evaluate on a test set.
     """
