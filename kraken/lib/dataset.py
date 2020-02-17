@@ -389,7 +389,7 @@ class PolygonGTDataset(Dataset):
         if augmentation:
             from albumentations import (
                 Compose, ToFloat, FromFloat, Flip, OneOf, MotionBlur, MedianBlur, Blur,
-                ShiftScaleRotate, OpticalDistortion, ElasticDistortion, RandomBrightnessContrast,
+                ShiftScaleRotate, OpticalDistortion, ElasticTransform, RandomBrightnessContrast,
                 )
 
             self.aug = Compose([
@@ -402,7 +402,7 @@ class PolygonGTDataset(Dataset):
                                 ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.2, rotate_limit=45, p=0.2),
                                 OneOf([
                                     OpticalDistortion(p=0.3),
-                                    ElasticDistortion(p=0.1),
+                                    ElasticTransform(p=0.1),
                                 ], p=0.2),
                                ], p=0.5)
 
@@ -550,7 +550,7 @@ class GroundTruthDataset(Dataset):
         if augmentation:
             from albumentations import (
                 Compose, ToFloat, FromFloat, Flip, OneOf, MotionBlur, MedianBlur, Blur,
-                ShiftScaleRotate, OpticalDistortion, ElasticDistortion, RandomBrightnessContrast,
+                ShiftScaleRotate, OpticalDistortion, ElasticTransform, RandomBrightnessContrast,
                 )
 
             self.aug = Compose([
@@ -563,7 +563,7 @@ class GroundTruthDataset(Dataset):
                                 ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.2, rotate_limit=45, p=0.2),
                                 OneOf([
                                     OpticalDistortion(p=0.3),
-                                    ElasticDistortion(p=0.1),
+                                    ElasticTransform(p=0.1),
                                 ], p=0.2),
                                ], p=0.5)
 
@@ -724,7 +724,7 @@ class BaselineSet(Dataset):
         if augmentation:
             from albumentations import (
                 Compose, ToFloat, FromFloat, RandomRotate90, Flip, OneOf, MotionBlur, MedianBlur, Blur,
-                ShiftScaleRotate, OpticalDistortion, ElasticDistortion, RandomBrightnessContrast,
+                ShiftScaleRotate, OpticalDistortion, ElasticTransform, RandomBrightnessContrast,
                 HueSaturationValue,
                 )
 
@@ -740,7 +740,7 @@ class BaselineSet(Dataset):
                                 ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.2, rotate_limit=45, p=0.2),
                                 OneOf([
                                     OpticalDistortion(p=0.3),
-                                    ElasticDistortion(p=0.1),
+                                    ElasticTransform(p=0.1),
                                 ], p=0.2),
                                 HueSaturationValue(hue_shift_limit=20, sat_shift_limit=0.1, val_shift_limit=0.1, p=0.3),
                                ], p=0.5)
