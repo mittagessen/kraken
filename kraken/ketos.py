@@ -348,12 +348,13 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
               'link to source images. In `path` mode arguments are image files'
               'sharing a prefix up to the last extension with text `.gt.txt` files'
               'containing the transcription.')
+@click.option('--augment/--no-augment', show_default=False, default=False, help='Enable image augmentation')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
           lag, min_delta, device, optimizer, lrate, momentum, weight_decay,
           schedule, partition, normalization, normalize_whitespace, codec,
           resize, reorder, training_files, evaluation_files, preload, threads,
-          repolygonize, force_binarization, format_type, ground_truth):
+          repolygonize, force_binarization, format_type, augment, ground_truth):
     """
     Trains a model from image-text pairs.
     """
@@ -474,7 +475,8 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
                           whitespace_normalization=normalize_whitespace,
                           reorder=reorder,
                           im_transforms=transforms,
-                          preload=preload)
+                          preload=preload,
+                          augmentation=augment)
     with log.progressbar(tr_im, label='Building training set') as bar:
         for im in bar:
             logger.debug('Adding line {} to training set'.format(im))

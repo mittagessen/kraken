@@ -238,7 +238,7 @@ def compute_line_seeds(binary, bottom, top, colseps, scale, threshold=0.2):
     Base on gradient maps, computes candidates for baselines and xheights.
     Then, it marks the regions between the two as a line seed.
     """
-    logger.debug(u'Finding line seeds')
+    logger.debug('Finding line seeds')
     vrange = int(scale)
     bmarked = maximum_filter(bottom == maximum_filter(bottom, (vrange, 0)),
                              (2, 2))
@@ -292,7 +292,7 @@ def rotate_lines(lines, angle, offset):
     """
     Rotates line bounding boxes around the origin and adding and offset.
     """
-    logger.debug(u'Rotate line coordinates by {} with offset {}'.format(angle, offset))
+    logger.debug('Rotate line coordinates by {} with offset {}'.format(angle, offset))
     angle = np.radians(angle)
     r = np.array([[np.cos(angle), -np.sin(angle)], [np.sin(angle), np.cos(angle)]])
     p = np.array(lines).reshape((-1, 2))

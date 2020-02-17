@@ -364,7 +364,8 @@ class PolygonGTDataset(Dataset):
                  whitespace_normalization: bool = True,
                  reorder: bool = True,
                  im_transforms: Callable[[Any], torch.Tensor] = transforms.Compose([]),
-                 preload: bool = True) -> None:
+                 preload: bool = True,
+                 augmentation: bool = False) -> None:
         self._images = []  # type:  Union[List[Image], List[torch.Tensor]]
         self._gt = []  # type:  List[str]
         self.alphabet = Counter()  # type: Counter
@@ -375,6 +376,7 @@ class PolygonGTDataset(Dataset):
         self.tail_transforms = transforms.Compose(im_transforms.transforms[2:])
         self.transforms = im_transforms
         self.preload = preload
+
         self.seg_type = 'baselines'
         # built text transformations
         if normalization:
@@ -383,6 +385,30 @@ class PolygonGTDataset(Dataset):
             self.text_transforms.append(lambda x: regex.sub('\s', ' ', x).strip())
         if reorder:
             self.text_transforms.append(bd.get_display)
+        if augmentation:
+            from albumentations import (
+                Compose, ToFloat, FromFloat, RandomRotate90, Flip, OneOf, MotionBlur, MedianBlur, Blur,
+                ShiftScaleRotate, OpticalDistortion, GridDistortion, RandomBrightnessContrast,
+                HueSaturationValue,
+                )
+
+            self.aug = Compose([
+                                ToFloat(),
+                                RandomRotate90(),
+                                Flip(),
+                                OneOf([
+                                    MotionBlur(p=0.2),
+                                    MedianBlur(blur_limit=3, p=0.1),
+                                    Blur(blur_limit=3, p=0.1),
+                                ], p=0.2),
+                                ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.2, rotate_limit=45, p=0.2),
+                                OneOf([
+                                    OpticalDistortion(p=0.3),
+                                    GridDistortion(p=0.1),
+                                ], p=0.2),
+                                HueSaturationValue(hue_shift_limit=20, sat_shift_limit=0.1, val_shift_limit=0.1, p=0.3),
+                               ], p=0.5)
+
         self.im_mode = '1'
 
     def add(self, image: Union[str, Image.Image], text: str, baseline: List[Tuple[int, int]], boundary: List[Tuple[int, int]], *args, **kwargs):
@@ -432,7 +458,10 @@ class PolygonGTDataset(Dataset):
 
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor]:
         if self.preload:
-            return self.training_set[index]
+           x, y = self.training_set[index]
+           if self.aug:
+               return self.aug(x), y
+           return x, y
         else:
             item = self.training_set[index]
             try:
@@ -445,6 +474,8 @@ class PolygonGTDataset(Dataset):
                 if not is_bitonal(im):
                     self.im_mode = im.mode
                 im = self.tail_transforms(im)
+                if self.aug:
+                    im = self.aug(im)
                 return (im, item[1])
             except Exception:
                 idx = np.random.randint(0, len(self.training_set))
