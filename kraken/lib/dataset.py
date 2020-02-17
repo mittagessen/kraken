@@ -376,6 +376,7 @@ class PolygonGTDataset(Dataset):
         self.tail_transforms = transforms.Compose(im_transforms.transforms[2:])
         self.transforms = im_transforms
         self.preload = preload
+        self.aug = None
 
         self.seg_type = 'baselines'
         # built text transformations
