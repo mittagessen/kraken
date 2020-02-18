@@ -695,6 +695,7 @@ def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image:
         # select proper interpolation scheme depending on shape
         if im.mode == '1':
             order = 0
+            im = im.convert('L')
         else:
             order = 1
         im = np.array(im)
