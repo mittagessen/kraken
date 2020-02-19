@@ -146,5 +146,5 @@ def segment(im,
     lines = reading_order_fn(lines, text_direction[-2:])
     return {'text_direction': text_direction,
             'type': 'baselines',
-            'lines': [{'type': bl_type, 'baseline': bl, 'boundary': pl} for bl_type, bl, pl in lines],
+            'lines': [{'script': bl_type, 'baseline': bl, 'boundary': pl} for bl_type, bl, pl in lines],
             'regions': regions}
