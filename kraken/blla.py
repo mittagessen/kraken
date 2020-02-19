@@ -30,7 +30,11 @@ import torchvision.transforms as tf
 from kraken.lib import vgsl, dataset
 from kraken.lib.util import pil2array, is_bitonal, get_im_str
 from kraken.lib.exceptions import KrakenInputException
-from kraken.lib.segmentation import polygonal_reading_order, vectorize_lines, scale_polygonal_lines, calculate_polygonal_environment
+from kraken.lib.segmentation import (polygonal_reading_order,
+                                     vectorize_lines, vectorize_regions,
+                                     scale_polygonal_lines,
+                                     calculate_polygonal_environment,
+                                     scale_regions)
 
 __all__ = ['segment']
 
@@ -68,6 +72,10 @@ def segment(im,
          'lines': [
             {'baseline': [[x0, y0], [x1, y1], ..., [x_n, y_n]], 'boundary': [[x0, y0, x1, y1], ... [x_m, y_m]]},
             {'baseline': [[x0, ...]], 'boundary': [[x0, ...]]}
+          ]
+          'regions': [
+            {'region': [[x0, y0], [x1, y1], ..., [x_n, y_n]], 'type': 'image'},
+            {'region': [[x0, ...]], 'type': 'text'}
           ]
         }: A dictionary containing the text direction and under the key 'lines'
         a list of reading order sorted baselines (polylines) and their
@@ -108,15 +116,35 @@ def segment(im,
     logger.debug('Upsampling network output')
     o = F.interpolate(o, size=scal_im.size[::-1])
     o = o.squeeze().numpy()
-    logger.debug('Vectorizing network output')
-    baselines = vectorize_lines(o)
-    logger.debug('Polygonizing lines')
-    lines = list(filter(lambda x: x[1] is not None, zip(baselines, calculate_polygonal_environment(scal_im, baselines))))
-    logger.debug('Scaling vectorized lines')
     scale = np.divide(im.size, o.shape[:0:-1])
-    lines = scale_polygonal_lines(lines, scale)
+    # postprocessing
+    cls_map = model.user_metadata['class_mapping']
+    st_sep = cls_map['aux']['_start_separator']
+    end_sep = cls_map['aux']['_end_separator']
+
+    logger.info('Vectorizing baselines')
+    baselines = []
+    regions = {}
+    for bl_type, idx in cls_map['baselines'].items():
+        logger.debug(f'Vectorizing lines of type {bl_type}')
+        baselines.extend([(bl_type,x) for x in vectorize_lines(o[(st_sep, end_sep, idx), :, :])])
+    logger.info('Vectorizing regions')
+    for region_type, idx in cls_map['regions'].items():
+        logger.debug(f'Vectorizing lines of type {bl_type}')
+        regions[region_type] = vectorize_regions(o[idx])
+    logger.debug('Polygonizing lines')
+    lines = list(filter(lambda x: x[2] is not None, zip([x[0] for x in baselines],
+                                                        [x[1] for x in baselines],
+                                                        calculate_polygonal_environment(scal_im, [x[1] for x in baselines]))))
+    logger.debug('Scaling vectorized lines')
+    sc = scale_polygonal_lines([x[1:] for x in lines], scale)
+    lines = list(zip([x[0] for x in lines], [x[0] for x in sc], [x[1] for x in sc]))
+    logger.debug('Scaling vectorized regions')
+    for reg_id, regs in regions.items():
+        regions[reg_id] = scale_regions(regs, scale)
     logger.debug('Reordering baselines')
     lines = reading_order_fn(lines, text_direction[-2:])
     return {'text_direction': text_direction,
             'type': 'baselines',
-            'lines': [{'script': 'default', 'baseline': bl, 'boundary': pl} for bl, pl in lines]}
+            'lines': [{'type': bl_type, 'baseline': bl, 'boundary': pl} for bl_type, bl, pl in lines],
+            'regions': regions}

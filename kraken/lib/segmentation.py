@@ -50,6 +50,7 @@ __all__ = ['reading_order',
            'calculate_polygonal_environment',
            'polygonal_reading_order',
            'scale_polygonal_lines',
+           'scale_regions',
            'compute_polygon_section',
            'extract_polygons']
 
@@ -295,19 +296,21 @@ def vectorize_lines(im: np.ndarray, threshold: float = 0.2, min_sp_dist: int = 1
 
     Args:
         im (np.ndarray): Array of shape (3, H, W) with the first dimension
-                         being a probability distribution over (background,
-                         baseline, separators).
+                         being probabilities for (start_separators,
+                         end_separators, baseline).
 
     Returns:
         [[x0, y0, ... xn, yn], [xm, ym, ..., xk, yk], ... ]
         A list of lists containing the points of all baseline polylines.
     """
     # split into baseline and separator map
-    bl_map = im[1]
-    sep_map = im[2]
+    st_map = im[0]
+    end_map = im[1]
+    sep_map = st_map + end_map
+    bl_map = im[2]
     # binarize
     bin = im > threshold
-    skel, skel_dist_map = medial_axis(bin[1], return_distance=True)
+    skel, skel_dist_map = medial_axis(bin[2], return_distance=True)
     elongation_offset = np.max(skel_dist_map)
     sp_can = _find_superpixels(skel, heatmap=bl_map, min_sp_dist=min_sp_dist)
     if not sp_can.size:
@@ -319,7 +322,7 @@ def vectorize_lines(im: np.ndarray, threshold: float = 0.2, min_sp_dist: int = 1
     return lines
 
 
-def vectorize_regions(im: np.ndarray, threshold: float = 0.2):
+def vectorize_regions(im: np.ndarray, threshold: float = 0.5):
     """
     Vectorizes lines from a binarized array.
 
@@ -338,7 +341,7 @@ def vectorize_regions(im: np.ndarray, threshold: float = 0.2):
         return contours
     approx_contours = []
     for contour in contours:
-        approx_contours.append(approximate_polygon(contour, 1))
+        approx_contours.append(approximate_polygon(contour, 1).astype('uint').tolist())
     return approx_contours
 
 
@@ -616,11 +619,28 @@ def polygonal_reading_order(lines: Sequence[Tuple[List, List]], text_direction: 
     """
     bounds = []
     for line in lines:
-        l = geom.LineString(line[0]).bounds
+        l = geom.LineString(line[1]).bounds
         bounds.append((slice(l[1], l[0]), slice(l[3], l[2])))
     order = reading_order(bounds, text_direction)
     lsort = topsort(order)
     return [lines[i] for i in lsort]
+
+
+def scale_regions(regions: Sequence[Tuple[List, List]], scale: Union[float, Tuple[float, float]]) -> Sequence[Tuple[List, List]]:
+    """
+    Scales baselines/polygon coordinates by a certain factor.
+
+    Args:
+        lines (Sequence): List of tuples containing the baseline and it's
+                          polygonization.
+        scale (float or tuple of floats): Scaling factor
+    """
+    if isinstance(scale, float):
+        scale = (scale, scale)
+    scaled_regions = []
+    for region in regions:
+        scaled_regions.append((np.array(region) * scale).astype('int').tolist())
+    return scaled_regions
 
 
 def scale_polygonal_lines(lines: Sequence[Tuple[List, List]], scale: Union[float, Tuple[float, float]]) -> Sequence[Tuple[List, List]]:
