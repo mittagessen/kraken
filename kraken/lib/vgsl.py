@@ -218,7 +218,7 @@ class TorchVGSLModel(object):
             return getattr(sys.modules[mname], cname)
 
         of = io.open
-        if path.endswith(u'.gz'):
+        if path.endswith('.gz'):
             of = gzip.open
         with io.BufferedReader(of(path, 'rb')) as fp:
             unpickler = cPickle.Unpickler(fp)
@@ -364,7 +364,7 @@ class TorchVGSLModel(object):
             mode = 'clstm_compat'
 
         # extract codec
-        codec = PytorchCodec([u''] + [chr(x) for x in net.codec[1:]])
+        codec = PytorchCodec([''] + [chr(x) for x in net.codec[1:]])
 
         # separate layers
         nets = {}
