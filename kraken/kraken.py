@@ -292,7 +292,7 @@ def segment(ctx, model, boxes, text_direction, script_detect, allowed_scripts,
     """
     if model and boxes:
         logger.warning('Baseline model ({}) given but legacy segmenter selected. Forcing to -bl.'.format(model))
-        boxes = True
+        boxes = False
 
     if boxes == False:
         from kraken.lib.vgsl import TorchVGSLModel
