@@ -40,7 +40,7 @@ from skimage.measure import approximate_polygon, subdivide_polygon, find_contour
 from skimage.morphology import medial_axis
 from skimage.transform import PiecewiseAffineTransform, SimilarityTransform, AffineTransform, warp
 
-from typing import List, Tuple, Union, Dict, Any, Sequence
+from typing import List, Tuple, Union, Dict, Any, Sequence, Optional
 
 logger = logging.getLogger('kraken')
 
@@ -603,14 +603,17 @@ def calculate_polygonal_environment(im: PIL.Image.Image,
 
 
 
-def polygonal_reading_order(lines: Sequence[Tuple[List, List]], text_direction: str = 'lr') -> Sequence[Tuple[List, List]]:
+def polygonal_reading_order(lines: Sequence[Tuple[List, List]],
+                            text_direction: str = 'lr',
+                            regions: Optional[Sequence[List[Tuple[int, int]]]] = None) -> Sequence[Tuple[List, List]]:
     """
-    Given a list of baselines, calculates the correct reading order and applies
-    it to the input.
+    Given a list of baselines and regions, calculates the correct reading order
+    and applies it to the input.
 
     Args:
         lines (Sequence): List of tuples containing the baseline and its
                           polygonization.
+        regions (Sequence): List of region polygons.
         text_direction (str): Set principal text direction for column ordering.
                               Can be 'lr' or 'rl'
 
@@ -618,15 +621,49 @@ def polygonal_reading_order(lines: Sequence[Tuple[List, List]], text_direction: 
         A reordered input.
     """
     bounds = []
-    for line in lines:
-        l = geom.LineString(line[1]).bounds
-        bounds.append((slice(l[1], l[0]), slice(l[3], l[2])))
+    r = []
+    for regs in regions.values():
+        r.extend(regs)
+    r = [geom.Polygon(reg) for reg in r]
+    region_lines = [[] for _ in range(len(r))]
+    indizes = {}
+    for line_idx, line in enumerate(lines):
+        l = geom.LineString(line[1])
+        is_in_region = False
+        for idx, reg in enumerate(r):
+            if reg.contains(l):
+                region_lines[idx].append((line_idx, (slice(l.bounds[1], l.bounds[0]), slice(l.bounds[3], l.bounds[2]))))
+                is_in_region = True
+                break
+        if not is_in_region:
+            bounds.append((slice(l.bounds[1], l.bounds[0]), slice(l.bounds[3], l.bounds[2])))
+            indizes[line_idx] = ('line', line)
+    # order everything in regions
+    intra_region_order = [[] for _ in range(len(r))]
+    for idx, reg in enumerate(r):
+        if len(region_lines[idx]) > 0:
+            order = reading_order([x[1] for x in region_lines[idx]], text_direction)
+            lsort = topsort(order)
+            intra_region_order[idx] = [region_lines[idx][i][0] for i in lsort]
+            reg = reg.bounds
+            bounds.append((slice(reg[1], reg[0]), slice(reg[3], reg[2])))
+            indizes[line_idx+idx] = ('region', idx)
+    # order unassigned lines and regions
     order = reading_order(bounds, text_direction)
     lsort = topsort(order)
-    return [lines[i] for i in lsort]
+    sidz = sorted(indizes.keys())
+    lsort = [sidz[i] for i in lsort]
+    ordered_lines = []
+    for i in lsort:
+        if indizes[i][0] == 'line':
+            ordered_lines.append(indizes[i][1])
+        else:
+            ordered_lines.extend(lines[x] for x in intra_region_order[indizes[i][1]])
+    return ordered_lines
 
 
-def scale_regions(regions: Sequence[Tuple[List, List]], scale: Union[float, Tuple[float, float]]) -> Sequence[Tuple[List, List]]:
+def scale_regions(regions: Sequence[Tuple[List, List]],
+                  scale: Union[float, Tuple[float, float]]) -> Sequence[Tuple[List, List]]:
     """
     Scales baselines/polygon coordinates by a certain factor.
 
