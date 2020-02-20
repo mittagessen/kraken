@@ -258,7 +258,7 @@ def binarize(threshold, zoom, escale, border, perc, range, low, high):
 @cli.command('segment')
 @click.pass_context
 @click.option('-i', '--model',
-              default=pkg_resources.resource_filename(__name__, 'blla.mlmodel'),
+              default=None,
               show_default=True, type=click.Path(exists=True),
               help='Baseline detection model to use')
 @click.option('-x/-bl', '--boxes/--baseline', default=True, show_default=True,
