@@ -45,6 +45,7 @@ class ocr_record(object):
         self.prediction = prediction
         self.cuts = cuts
         self.confidences = confidences
+        self.script = None if 'script' not in line else line['script']
         self.type = 'baselines' if 'baseline' in line else 'box'
         if self.type == 'baselines':
             self.line = line['boundary']
@@ -124,7 +125,9 @@ def bidi_record(record: ocr_record) -> ocr_record:
         line = {'boundary': record.line, 'baseline': record.baseline}
     else:
         line = record.line
-    return ocr_record(prediction, cuts, confidences, line)
+    rec = ocr_record(prediction, cuts, confidences, line)
+    rec.script = record.script
+    return rec
 
 
 class mm_rpred(object):
