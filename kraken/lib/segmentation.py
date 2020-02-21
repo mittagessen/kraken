@@ -602,7 +602,6 @@ def calculate_polygonal_environment(im: PIL.Image.Image,
     return polygons
 
 
-
 def polygonal_reading_order(lines: Sequence[Tuple[List, List]],
                             text_direction: str = 'lr',
                             regions: Optional[Sequence[List[Tuple[int, int]]]] = None) -> Sequence[Tuple[List, List]]:
@@ -621,10 +620,10 @@ def polygonal_reading_order(lines: Sequence[Tuple[List, List]],
         A reordered input.
     """
     bounds = []
-    r = []
-    for regs in regions.values():
-        r.extend(regs)
-    r = [geom.Polygon(reg) for reg in r]
+    if regions is not None:
+        r = [geom.Polygon(reg) for reg in regions]
+    else:
+        r = []
     region_lines = [[] for _ in range(len(r))]
     indizes = {}
     for line_idx, line in enumerate(lines):

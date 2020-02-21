@@ -143,7 +143,11 @@ def segment(im,
     for reg_id, regs in regions.items():
         regions[reg_id] = scale_regions(regs, scale)
     logger.debug('Reordering baselines')
-    lines = reading_order_fn(lines, text_direction[-2:])
+    order_regs = []
+    for regs in regions.values():
+        order_regs.extend(regs)
+    lines = reading_order_fn(lines=lines, regions=order_regs, text_direction=text_direction[-2:])
+    logger.debug('Assigning regions to lines')
     return {'text_direction': text_direction,
             'type': 'baselines',
             'lines': [{'script': bl_type, 'baseline': bl, 'boundary': pl} for bl_type, bl, pl in lines],
