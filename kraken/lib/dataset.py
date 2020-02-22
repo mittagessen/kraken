@@ -399,7 +399,7 @@ class PolygonGTDataset(Dataset):
                                     MedianBlur(blur_limit=3, p=0.1),
                                     Blur(blur_limit=3, p=0.1),
                                 ], p=0.2),
-                                ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.2, rotate_limit=45, p=0.2),
+                                ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.2, rotate_limit=3, p=0.2),
                                 OneOf([
                                     OpticalDistortion(p=0.3),
                                     ElasticTransform(p=0.1),
@@ -457,7 +457,7 @@ class PolygonGTDataset(Dataset):
         if self.preload:
             x, y = self.training_set[index]
             if self.aug:
-                im = im.permute((1, 2, 0)).numpy()
+                im = x.permute((1, 2, 0)).numpy()
                 o = self.aug(image=im)
                 im = torch.tensor(o['image'].transpose(2, 0, 1))
                 return im, y
