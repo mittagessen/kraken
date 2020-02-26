@@ -85,7 +85,7 @@
 							   HEIGHT="{{ entity.bbox[3] - entity.bbox[1] }}"
 							   TYPE="{{ entity.region_type }}">
 						{% if entity.lines|length > 0 %}
-						<TextBlock ID="textblock_0">
+						<TextBlock ID="textblock_{{ loop.index }}">
 						{% for line in entity.lines %}
 						{{ render_line(line) }}
 						{% endfor %}
@@ -94,7 +94,7 @@
 					</ComposedBlockType>
 				{% else %}
 				{% if not loop.previtem or loop.previtem.type != 'line' %}
-				<TextBlock ID="textblock_no_region">
+				<TextBlock ID="textblock_{{ loop.index }}">
 				{% endif %}
 				{{ render_line(entity) }}
 				{% if loop.last %}
