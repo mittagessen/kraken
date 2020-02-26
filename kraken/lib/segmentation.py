@@ -675,7 +675,7 @@ def scale_regions(regions: Sequence[Tuple[List, List]],
         scale = (scale, scale)
     scaled_regions = []
     for region in regions:
-        scaled_regions.append((np.array(region) * scale).astype('int').tolist())
+        scaled_regions.append((np.array(region) * scale).astype('uint').tolist())
     return scaled_regions
 
 

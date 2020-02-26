@@ -172,8 +172,8 @@ class mm_rpred(object):
         """
         seg_types = set(recognizer.seg_type for recognizer in nets.values())
         if ('type' in bounds and bounds['type'] not in seg_types) or len(seg_types) > 1:
-            logger.warning('Recognizers with segmentation types {} will be'
-                           'applied to segmentation of type {}. This will likely result'
+            logger.warning('Recognizers with segmentation types {} will be '
+                           'applied to segmentation of type {}. This will likely result '
                            'in severely degraded performace'.format(seg_types,
                             bounds['type'] if 'type' in bounds else None))
         one_channel_modes = set(recognizer.nn.one_channel_mode for recognizer in nets.values())

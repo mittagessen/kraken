@@ -181,6 +181,7 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, script_ignore, base
                                              Image.open(base_image).size,
                                              ctx.meta['text_direction'],
                                              scripts,
+                                             bounds['regions'] if 'regions' in bounds else None,
                                              ctx.meta['mode']))
         else:
             fp.write('\n'.join(s.prediction for s in preds))
