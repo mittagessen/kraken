@@ -350,6 +350,7 @@ def _validate_mm(ctx, param, value):
               'ALTO, and plain text output', flag_value='hocr')
 @click.option('-a', '--alto', 'serializer', flag_value='alto')
 @click.option('-y', '--abbyy', 'serializer', flag_value='abbyyxml')
+@click.option('-x', '--pagexml', 'serializer', flag_value='pagexml')
 @click.option('-t', '--text', 'serializer', flag_value='text', default=True,
               show_default=True)
 @click.option('-d', '--text-direction', default='horizontal-tb',
