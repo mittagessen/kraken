@@ -270,7 +270,7 @@ def baseline_label_evaluator_fn(model, val_set, device):
             y = y.to(device).unsqueeze(0)
             pred = model.nn(x.unsqueeze(0))
             # scale target to output size
-            y = F.interpolate(y, size=(pred.size(2), pred.size(3)))
+            y = F.interpolate(y, size=(pred.size(2), pred.size(3))).squeeze(0)
             pred = segmentation.denoising_hysteresis_thresh(pred.detach().squeeze().cpu().numpy(), 0.4, 0.5, 0)
             pred = torch.from_numpy(pred.astype('f')).to(device)
             pred = pred.view(pred.size(0), -1)
@@ -283,13 +283,13 @@ def baseline_label_evaluator_fn(model, val_set, device):
             if correct.sum() == 0:
                 tp = torch.zeros_like(all_p)
             else:
-                tp = correct.sum(dim=0)
+                tp = correct.sum(dim=1)
             tp = tp.type(torch.DoubleTensor)
             true_positives += tp
             all_positives += all_p
             actual_positives += actual_p
             false_negatives += (actual_positives - true_positives)
-            all_n += y.shape
+            all_n += y.size(1)
     model.train()
     # all_positives = tp + fp
     # actual_positives = tp + fn
@@ -299,8 +299,9 @@ def baseline_label_evaluator_fn(model, val_set, device):
     f1 = precision * recall * 2/(precision + recall + smooth)
     pixel_accuracy = true_positives.sum()/all_n.sum()
     mean_accuracy = torch.mean(true_positives/all_n)
-    mean_iu = torch.mean(true_positives/(all_positives + true_negatives))
-    freq_iu = torch.sum(actual_positives/all_n * (true_positives/(all_positives + true_negatives)))
+    iu = true_positives/(all_positives + false_negatives)
+    mean_iu = torch.mean(iu)
+    freq_iu = torch.sum(actual_positives/all_n * iu)
     return {'val_metric': mean_iu, 'precision': precision, 'recall': recall, 'f1': f1, 'accuracy': pixel_accuracy, 'mean_acc': mean_accuracy, 'mean_iu': mean_iu, 'freq_iu': freq_iu}
 
 
