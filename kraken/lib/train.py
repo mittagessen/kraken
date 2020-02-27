@@ -254,11 +254,15 @@ def recognition_evaluator_fn(model, val_set, device):
     return {'val_metric': accuracy, 'accuracy': accuracy, 'chars': chars, 'error': error}
 
 
+
 def baseline_label_evaluator_fn(model, val_set, device):
-    true_positives = 0
-    all_positives = 0
-    actual_positives = 0
-    all_n = 0
+    smooth = np.finfo(np.float).eps
+    _, s = val_set[0]
+    true_positives = torch.zeros(s.size(0), dtype=torch.double)
+    all_positives = torch.zeros(s.size(0), dtype=torch.double)
+    actual_positives = torch.zeros(s.size(0), dtype=torch.double)
+    false_negatives = torch.zeros(s.size(0), dtype=torch.double)
+    all_n = torch.zeros(s.size(0), dtype=torch.double)
     model.eval()
     with torch.no_grad():
         for x, y in val_set:
@@ -269,13 +273,13 @@ def baseline_label_evaluator_fn(model, val_set, device):
             y = F.interpolate(y, size=(pred.size(2), pred.size(3)))
             pred = segmentation.denoising_hysteresis_thresh(pred.detach().squeeze().cpu().numpy(), 0.4, 0.5, 0)
             pred = torch.from_numpy(pred.astype('f')).to(device)
-            pred = pred.view(-1)
-            y = y.view(-1)
+            pred = pred.view(pred.size(0), -1)
+            y = y.view(y.size(0), -1)
             correct = torch.eq(y, pred)
             correct[y == 0] = 0
             correct[pred == 0] = 0
-            all_p = (pred != 0).sum(dim=0).type(torch.DoubleTensor)
-            actual_p = (y != 0).sum(dim=0).type(torch.DoubleTensor)
+            all_p = (pred != 0).sum(dim=1).type(torch.DoubleTensor)
+            actual_p = (y != 0).sum(dim=1).type(torch.DoubleTensor)
             if correct.sum() == 0:
                 tp = torch.zeros_like(all_p)
             else:
@@ -284,18 +288,20 @@ def baseline_label_evaluator_fn(model, val_set, device):
             true_positives += tp
             all_positives += all_p
             actual_positives += actual_p
-            all_n += len(y)
+            false_negatives += (actual_positives - true_positives)
+            all_n += y.shape
     model.train()
     # all_positives = tp + fp
     # actual_positives = tp + fn
     # true_positivies = tp
-    precision = true_positives/(all_positives + 1e-20)
-    recall = true_positives/(actual_positives + 1e-20)
-    f1 = precision * recall * 2/(precision + recall + 1e-20)
-    s = actual_positives/all_n
-    p = all_positives/all_n
-    mcc = ((true_positives/all_n) - s*p)/(torch.sqrt(p*s*(1-s)*(1-p)) + 1e-20)
-    return {'precision': precision, 'recall': recall, 'f1': f1, 'mcc': mcc, 'val_metric': mcc}
+    precision = true_positives.sum()/(all_positives.sum() + smooth)
+    recall = true_positives.sum()/(actual_positives.sum() + smooth)
+    f1 = precision * recall * 2/(precision + recall + smooth)
+    pixel_accuracy = true_positives.sum()/all_n.sum()
+    mean_accuracy = torch.mean(true_positives/all_n)
+    mean_iu = torch.mean(true_positives/(all_positives + true_negatives))
+    freq_iu = torch.sum(actual_positives/all_n * (true_positives/(all_positives + true_negatives)))
+    return {'val_metric': mean_iu, 'precision': precision, 'recall': recall, 'f1': f1, 'accuracy': pixel_accuracy, 'mean_acc': mean_accuracy, 'mean_iu': mean_iu, 'freq_iu': freq_iu}
 
 
 class KrakenTrainer(object):
