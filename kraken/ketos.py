@@ -327,7 +327,7 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
         def _draw_progressbar():
             bar.update(1)
 
-        def _print_eval(epoch, prevision, recall, f1, accuracy, mean_acc, mean_iu, freq_iu, **kwargs):
+        def _print_eval(epoch, precision, recall, f1, accuracy, mean_acc, mean_iu, freq_iu, **kwargs):
             message('Accuracy report ({}) mean_iu: {:0.4f} freq_iu: {:0.4f} mean_acc: {:0.4f} accuracy: {:0.4f}'.format(epoch, mean_iu, freq_iu, mean_acc, accuracy))
             # reset progress bar
             bar.label = 'stage {}/{}'.format(epoch+1, trainer.stopper.epochs if trainer.stopper.epochs > 0 else '∞')
