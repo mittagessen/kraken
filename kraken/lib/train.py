@@ -302,7 +302,7 @@ def baseline_label_evaluator_fn(model, val_set, device):
     iu = true_positives/(all_positives + false_negatives)
     mean_iu = torch.mean(iu)
     freq_iu = torch.sum(actual_positives/all_n * iu)
-    return {'val_metric': mean_iu, 'precision': precision, 'recall': recall, 'f1': f1, 'accuracy': pixel_accuracy, 'mean_acc': mean_accuracy, 'mean_iu': mean_iu, 'freq_iu': freq_iu}
+    return {'precision': precision, 'recall': recall, 'f1': f1, 'accuracy': pixel_accuracy, 'mean_acc': mean_accuracy, 'mean_iu': mean_iu, 'freq_iu': freq_iu, 'val_metric': mean_iu}
 
 
 class KrakenTrainer(object):
