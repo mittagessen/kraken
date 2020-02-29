@@ -277,7 +277,7 @@ def baseline_label_evaluator_fn(model, val_set, device):
             pred = pred.view(pred.size(0), -1)
             y = y.view(y.size(0), -1)
             m = y + pred
-            intersections += (m == 2)
+            intersections += (m == 2).sum(dim=1)
             unions += m.type(torch.bool).sum(dim=1, dtype=torch.double)
             corrects += torch.eq(y, pred).sum(dim=1, dtype=torch.double)
             cls_cnt += y.sum(dim=1)
