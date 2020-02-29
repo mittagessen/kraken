@@ -258,11 +258,11 @@ def recognition_evaluator_fn(model, val_set, device):
 def baseline_label_evaluator_fn(model, val_set, device):
     smooth = np.finfo(np.float).eps
     _, s = val_set[0]
-    corrects = torch.zeros(s.size(0), dtype=torch.double)
-    all_n = torch.zeros(s.size(0), dtype=torch.double)
-    intersections = torch.zeros(s.size(0), dtype=torch.double)
-    unions = torch.zeros(s.size(0), dtype=torch.double)
-    cls_cnt = torch.zeros(s.size(0), dtype=torch.double)
+    corrects = torch.zeros(s.size(0), dtype=torch.double).to(device)
+    all_n = torch.zeros(s.size(0), dtype=torch.double).to(device)
+    intersections = torch.zeros(s.size(0), dtype=torch.double).to(device)
+    unions = torch.zeros(s.size(0), dtype=torch.double).to(device)
+    cls_cnt = torch.zeros(s.size(0), dtype=torch.double).to(device)
     model.eval()
 
     with torch.no_grad():
