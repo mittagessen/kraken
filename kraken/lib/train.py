@@ -280,7 +280,7 @@ def baseline_label_evaluator_fn(model, val_set, device):
             intersections += (m == 2).sum(dim=1, dtype=torch.double)
             unions += m.type(torch.bool).sum(dim=1, dtype=torch.double)
             corrects += torch.eq(y, pred).sum(dim=1, dtype=torch.double)
-            cls_cnt += y.sum(dim=1)
+            cls_cnt += y.sum(dim=1, dtype=torch.double)
             all_n += y.size(1)
     model.train()
     # all_positives = tp + fp
