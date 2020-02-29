@@ -17,8 +17,10 @@ from jinja2 import Environment, PackageLoader
 
 import regex
 import logging
+import datetime
 import shapely.geometry as geom
 
+from shapely.ops import unary_union
 from collections import Counter
 
 from scipy.spatial import ConvexHull
@@ -103,7 +105,12 @@ def serialize(records: Sequence[ocr_record],
             (str) rendered template.
     """
     logger.info(f'Serialize {len(records)} records from {image_name} with template {template}.')
-    page = {'entities': [], 'size': image_size, 'name': image_name, 'writing_mode': writing_mode, 'scripts': scripts}  # type: dict
+    page = {'entities': [],
+            'size': image_size,
+            'name': image_name,
+            'writing_mode': writing_mode,
+            'scripts': scripts,
+            'date': datetime.datetime.now().isoformat()}  # type: dict
     seg_idx = 0
     char_idx = 0
     region_map = {}
@@ -175,9 +182,10 @@ def serialize(records: Sequence[ocr_record],
                                               range(char_idx, char_idx + len(segment)))],
                           'index': seg_idx}
             # compute complex hull of all characters in segment
-            if record.type == 'baseline':
-                hull = ConvexHull(record.cuts[line_offset:line_offset + len(segment)])
-                seg_struct['boundary'] = hull.points.tolist()
+            if record.type == 'baselines':
+                coords = list(unary_union([geom.Polygon(x) for x in record.cuts[line_offset:line_offset + len(segment)]]).exterior.coords)
+                print(coords)
+                seg_struct['boundary'] = coords
             line['recognition'].append(seg_struct)
             char_idx += len(segment)
             seg_idx += 1
