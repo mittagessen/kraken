@@ -258,12 +258,13 @@ def recognition_evaluator_fn(model, val_set, device):
 def baseline_label_evaluator_fn(model, val_set, device):
     smooth = np.finfo(np.float).eps
     _, s = val_set[0]
-    true_positives = torch.zeros(s.size(0), dtype=torch.double)
-    all_positives = torch.zeros(s.size(0), dtype=torch.double)
-    actual_positives = torch.zeros(s.size(0), dtype=torch.double)
-    false_negatives = torch.zeros(s.size(0), dtype=torch.double)
+    corrects = torch.zeros(s.size(0), dtype=torch.double)
     all_n = torch.zeros(s.size(0), dtype=torch.double)
+    intersections = torch.zeros(s.size(0), dtype=torch.double)
+    unions = torch.zeros(s.size(0), dtype=torch.double)
+    cls_cnt = torch.zeros(s.size(0), dtype=torch.double)
     model.eval()
+
     with torch.no_grad():
         for x, y in val_set:
             x = x.to(device)
@@ -275,33 +276,22 @@ def baseline_label_evaluator_fn(model, val_set, device):
             pred = torch.from_numpy(pred.astype('f')).to(device)
             pred = pred.view(pred.size(0), -1)
             y = y.view(y.size(0), -1)
-            correct = torch.eq(y, pred)
-            correct[y == 0] = 0
-            correct[pred == 0] = 0
-            all_p = (pred != 0).sum(dim=1).type(torch.DoubleTensor)
-            actual_p = (y != 0).sum(dim=1).type(torch.DoubleTensor)
-            if correct.sum() == 0:
-                tp = torch.zeros_like(all_p)
-            else:
-                tp = correct.sum(dim=1)
-            tp = tp.type(torch.DoubleTensor)
-            true_positives += tp
-            all_positives += all_p
-            actual_positives += actual_p
-            false_negatives += (actual_positives - true_positives)
+            m = y + pred
+            intersections += (m == 2)
+            unions += m.type(torch.bool).sum(dim=1, dtype=torch.double)
+            corrects += torch.eq(y, pred).sum(dim=1, dtype=torch.double)
+            cls_cnt += y.sum(dim=1)
             all_n += y.size(1)
     model.train()
     # all_positives = tp + fp
     # actual_positives = tp + fn
     # true_positivies = tp
-    precision = true_positives.sum()/(all_positives.sum() + smooth)
-    recall = true_positives.sum()/(actual_positives.sum() + smooth)
-    f1 = precision * recall * 2/(precision + recall + smooth)
-    pixel_accuracy = true_positives.sum()/all_n.sum()
-    mean_accuracy = torch.mean(true_positives/all_n)
-    iu = true_positives/(all_positives + false_negatives)
+    pixel_accuracy = corrects.sum()/all_n.sum()
+    mean_accuracy = torch.mean(corrects/all_n)
+    iu = intersections/(unions+smooth)
+    # true positive / (true positive + false positive + false negative) 
     mean_iu = torch.mean(iu)
-    freq_iu = torch.sum(actual_positives/all_n * iu)
+    freq_iu = torch.sum(cls_cnt/cls_cnt.sum() * iu)
     return {'precision': precision, 'recall': recall, 'f1': f1, 'accuracy': pixel_accuracy, 'mean_acc': mean_accuracy, 'mean_iu': mean_iu, 'freq_iu': freq_iu, 'val_metric': mean_iu}
 
 
