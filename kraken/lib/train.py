@@ -257,12 +257,11 @@ def recognition_evaluator_fn(model, val_set, device):
 
 def baseline_label_evaluator_fn(model, val_set, device):
     smooth = np.finfo(np.float).eps
-    _, s = val_set[0]
-    corrects = torch.zeros(s.size(0), dtype=torch.double).to(device)
-    all_n = torch.zeros(s.size(0), dtype=torch.double).to(device)
-    intersections = torch.zeros(s.size(0), dtype=torch.double).to(device)
-    unions = torch.zeros(s.size(0), dtype=torch.double).to(device)
-    cls_cnt = torch.zeros(s.size(0), dtype=torch.double).to(device)
+    corrects = torch.zeros(val_set.num_classes, dtype=torch.double).to(device)
+    all_n = torch.zeros(val_set.num_classes, dtype=torch.double).to(device)
+    intersections = torch.zeros(val_set.num_classes, dtype=torch.double).to(device)
+    unions = torch.zeros(val_set.num_classes, dtype=torch.double).to(device)
+    cls_cnt = torch.zeros(val_set.num_classes, dtype=torch.double).to(device)
     model.eval()
 
     with torch.no_grad():
@@ -271,14 +270,13 @@ def baseline_label_evaluator_fn(model, val_set, device):
             y = y.to(device).unsqueeze(0)
             pred = model.nn(x.unsqueeze(0))
             # scale target to output size
-            y = F.interpolate(y, size=(pred.size(2), pred.size(3))).squeeze(0)
-            pred = segmentation.denoising_hysteresis_thresh(pred.detach().squeeze().cpu().numpy(), 0.4, 0.5, 0)
-            pred = torch.from_numpy(pred.astype('f')).to(device)
+            y = F.interpolate(y, size=(pred.size(2), pred.size(3))).squeeze(0).bool()
+            pred = segmentation.denoising_hysteresis_thresh(pred.detach().squeeze().cpu().numpy(), 0.2, 0.3, 0)
+            pred = torch.from_numpy(pred.astype('bool')).to(device)
             pred = pred.view(pred.size(0), -1)
             y = y.view(y.size(0), -1)
-            m = y + pred
-            intersections += (m == 2).sum(dim=1, dtype=torch.double)
-            unions += m.type(torch.bool).sum(dim=1, dtype=torch.double)
+            intersections += (y & pred).sum(dim=1, dtype=torch.double)
+            unions += (y | pred).sum(dim=1, dtype=torch.double)
             corrects += torch.eq(y, pred).sum(dim=1, dtype=torch.double)
             cls_cnt += y.sum(dim=1, dtype=torch.double)
             all_n += y.size(1)
@@ -288,8 +286,7 @@ def baseline_label_evaluator_fn(model, val_set, device):
     # true_positivies = tp
     pixel_accuracy = corrects.sum()/all_n.sum()
     mean_accuracy = torch.mean(corrects/all_n)
-    iu = intersections/(unions+smooth)
-    # true positive / (true positive + false positive + false negative) 
+    iu = (intersections+smooth)/(unions+smooth)
     mean_iu = torch.mean(iu)
     freq_iu = torch.sum(cls_cnt/cls_cnt.sum() * iu)
     return {'accuracy': pixel_accuracy, 'mean_acc': mean_accuracy, 'mean_iu': mean_iu, 'freq_iu': freq_iu, 'val_metric': mean_iu}
