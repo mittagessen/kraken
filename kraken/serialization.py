@@ -189,7 +189,7 @@ def serialize(records: Sequence[ocr_record],
                     try:
                         pols.append(geom.Polygon(x))
                     except ValueError:
-                        pols.append(geom.LineString(x).buffer(0.5))
+                        pols.append(geom.LineString(x).buffer(0.5, cap_style=2))
                 coords = np.array(unary_union(pols).exterior.coords, dtype=np.uint).tolist()
                 seg_struct['boundary'] = coords
             line['recognition'].append(seg_struct)
