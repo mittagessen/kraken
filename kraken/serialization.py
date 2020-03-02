@@ -18,6 +18,7 @@ from jinja2 import Environment, PackageLoader
 import regex
 import logging
 import datetime
+import numpy as np
 import shapely.geometry as geom
 
 from shapely.ops import unary_union
@@ -183,8 +184,13 @@ def serialize(records: Sequence[ocr_record],
                           'index': seg_idx}
             # compute complex hull of all characters in segment
             if record.type == 'baselines':
-                coords = list(unary_union([geom.Polygon(x) for x in record.cuts[line_offset:line_offset + len(segment)]]).exterior.coords)
-                print(coords)
+                pols = []
+                for x in record.cuts[line_offset:line_offset + len(segment)]:
+                    try:
+                        pols.append(geom.Polygon(x))
+                    except ValueError:
+                        pols.append(geom.LineString(x).buffer(0.5))
+                coords = np.array(unary_union(pols).exterior.coords, dtype=np.uint).tolist()
                 seg_struct['boundary'] = coords
             line['recognition'].append(seg_struct)
             char_idx += len(segment)
