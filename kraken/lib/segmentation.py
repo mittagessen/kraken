@@ -733,6 +733,10 @@ def compute_polygon_section(baseline, boundary, dist1, dist2):
         A sequence of polygon points.
     """
     # find baseline segments the points are in
+    if dist1 == 0:
+        dist1 = np.finfo(np.float).eps
+    if dist2 == 0:
+        dist2 = np.finfo(np.float).eps
     bl = np.array(baseline)
     dists = np.cumsum(np.diag(np.roll(squareform(pdist(bl)), 1)))
     segs_idx = np.searchsorted(dists, [dist1, dist2])
