@@ -155,7 +155,7 @@ class TestLayers(unittest.TestCase):
         """
         Test convolutional layer without activation.
         """
-        conv = layers.ActConv2D(5, 12, (3, 3), 'l')
+        conv = layers.ActConv2D(5, 12, (3, 3), (1, 1), 'l')
         o = conv(torch.randn(1, 5, 24, 12))
         self.assertEqual(o.shape, (1, 12, 24, 12))
 
@@ -163,7 +163,7 @@ class TestLayers(unittest.TestCase):
         """
         Test convolutional layer with sigmoid activation.
         """
-        conv = layers.ActConv2D(5, 12, (3, 3), 's')
+        conv = layers.ActConv2D(5, 12, (3, 3), (1, 1), 's')
         o = conv(torch.randn(1, 5, 24, 12))
         self.assertTrue(0 <= o.min() <= 1)
         self.assertTrue(0 <= o.max() <= 1)
@@ -172,7 +172,7 @@ class TestLayers(unittest.TestCase):
         """
         Test convolutional layer with tanh activation.
         """
-        conv = layers.ActConv2D(5, 12, (3, 3), 't')
+        conv = layers.ActConv2D(5, 12, (3, 3), (1, 1), 't')
         o = conv(torch.randn(1, 5, 24, 12))
         self.assertTrue(-1 <= o.min() <= 1)
         self.assertTrue(-1 <= o.max() <= 1)
@@ -181,7 +181,7 @@ class TestLayers(unittest.TestCase):
         """
         Test convolutional layer with softmax activation.
         """
-        conv = layers.ActConv2D(5, 12, (3, 3), 'm')
+        conv = layers.ActConv2D(5, 12, (3, 3), (1, 1), 'm')
         o = conv(torch.randn(1, 5, 24, 12))
         self.assertTrue(0 <= o.min() <= 1)
         self.assertTrue(0 <= o.max() <= 1)
@@ -190,7 +190,7 @@ class TestLayers(unittest.TestCase):
         """
         Test convolutional layer with relu activation.
         """
-        conv = layers.ActConv2D(5, 12, (3, 3), 'r')
+        conv = layers.ActConv2D(5, 12, (3, 3), (1, 1), 'r')
         o = conv(torch.randn(1, 5, 24, 12))
         self.assertLessEqual(0, o.min())
         self.assertLessEqual(0, o.max())
