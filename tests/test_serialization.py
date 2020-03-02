@@ -57,7 +57,7 @@ class TestSerializations(unittest.TestCase):
 
         fp.write(serialization.serialize(self.records, image_name='foo.png', template='alto'))
         doc = etree.fromstring(fp.getvalue().encode('utf-8'))
-        with open(os.path.join(resources, 'alto-4-0.xsd')) as schema_fp:
+        with open(os.path.join(resources, 'alto-4-1.xsd')) as schema_fp:
             alto_schema = etree.XMLSchema(etree.parse(schema_fp))
             alto_schema.assertValid(doc)
 
@@ -70,5 +70,17 @@ class TestSerializations(unittest.TestCase):
         fp.write(serialization.serialize(self.records, image_name='foo.png', template='abbyyxml'))
         doc = etree.fromstring(fp.getvalue().encode('utf-8'))
         with open(os.path.join(resources, 'FineReader10-schema-v1.xml')) as schema_fp:
+            abbyy_schema = etree.XMLSchema(etree.parse(schema_fp))
+            abbyy_schema.assertValid(doc)
+
+    def test_pagexml_serialization_validation(self):
+        """
+        Validates output against abbyyXML schema
+        """
+        fp = StringIO()
+
+        fp.write(serialization.serialize(self.records, image_name='foo.png', template='pagexml'))
+        doc = etree.fromstring(fp.getvalue().encode('utf-8'))
+        with open(os.path.join(resources, 'pagecontent.xml')) as schema_fp:
             abbyy_schema = etree.XMLSchema(etree.parse(schema_fp))
             abbyy_schema.assertValid(doc)
