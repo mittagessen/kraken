@@ -42,6 +42,8 @@ from skimage.transform import PiecewiseAffineTransform, SimilarityTransform, Aff
 
 from typing import List, Tuple, Union, Dict, Any, Sequence, Optional
 
+from kraken.lib.exceptions import KrakenInputException
+
 logger = logging.getLogger('kraken')
 
 __all__ = ['reading_order',
