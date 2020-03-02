@@ -181,9 +181,9 @@ def parse_alto(filename):
             pol = line.find('./{*}Shape/{*}Polygon')
             boundary = None
             if pol is not None:
-                points = [int(x) for x in pol.get('POINTS').split(' ')]
+                points = [int(float(x)) for x in pol.get('POINTS').split(' ')]
                 boundary = list(zip(points[::2], points[1::2]))
-            points = [int(x) for x in line.get('BASELINE').split(' ')]
+            points = [int(float(x)) for x in line.get('BASELINE').split(' ')]
             baseline = list(zip(points[::2], points[1::2]))
             text = ''
             for el in line.xpath(".//*[local-name() = 'String'] | .//*[local-name() = 'SP']"):
