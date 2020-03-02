@@ -151,7 +151,7 @@ def serialize(records: Sequence[ocr_record],
         # skip empty records
         if not record.prediction:
             logger.debug('Empty record. Skipping')
-            #continue
+            continue
         line = {'index': idx,
                 'bbox': max_bbox([record.line]),
                 'cuts': record.cuts,
