@@ -10,6 +10,8 @@
 				<Word id="segment_{{ segment.index }}">
 					{% if segment.boundary -%}
 					<Coords points="{% for point in segment.boundary %}{{ point|join(',') }}{% if not loop.last %} {% endif %}{% endfor %}"/>
+					{% else -%}
+					<Coords points="{{ segment.bbox[0] }},{{ segment.bbox[1] }} {{ segment.bbox[0] }},{{ segment.bbox[3] }} {{ segment.bbox[2] }},{{ segment.bbox[3] }} {{ segment.bbox[2] }},{{ segment.bbox[1] }}"/>
 					{% endif -%}
 				{% for char in segment.recognition -%}
 					<Glyph id="char_{{ char.index }}">
