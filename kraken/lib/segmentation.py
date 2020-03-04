@@ -504,15 +504,10 @@ def calculate_polygonal_environment(im: PIL.Image.Image,
         try:
             # find intercepts with image bounds on each side of baseline
             line = np.array(line, dtype=np.float)
-            # calculate direction vector
-            with warnings.catch_warnings():
-                warnings.simplefilter('ignore', RuntimeWarning)
-                slope, _, _, _, _ = linregress(line[:, 0], line[:, 1])
-            if np.isnan(slope):
-                p_dir = np.array([0., np.sign(np.diff(line[(0, -1),1])).item()*1.])
-            else:
-                p_dir = np.array([1, np.sign(np.diff(line[(0, -1),0])).item()*slope])
-                p_dir = (p_dir.T / np.sqrt(np.sum(p_dir**2,axis=-1)))
+            # calculate magnitude-weighted average direction vector
+            lengths = np.linalg.norm(np.diff(line.T), axis=0)
+            p_dir = np.mean(np.diff(line.T) * lengths/lengths.sum(), axis=1)
+            p_dir = (p_dir.T / np.sqrt(np.sum(p_dir**2,axis=-1)))
             # interpolate baseline
             ls = geom.LineString(line)
             ip_line = [line[0]]
