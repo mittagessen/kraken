@@ -19,10 +19,14 @@ for fname in sys.argv[1:]:
     print(fname)
     seg = xml.parse_alto(fname)
     im = Image.open(seg['image']).convert('L')
-    im = Image.open(seg['image']).convert('L')
     scal_im = _fixed_resize(im, (1200, 0))
     scale = np.divide(im.size, scal_im.size)
-    scal_bls = scale_polygonal_lines([(x['baseline'], x['boundary']) for x in seg['lines']], 1/scale)
+    l = []
+    for x in seg['lines']:
+        bl = x['baseline'] if x['baseline'] is not None else [0, 0]
+        pl = x['boundary'] if x['boundary'] is not None else [0, 0]
+        l.append((bl, pl))
+    scal_bls = scale_polygonal_lines(l, 1/scale)
     scal_bls = [x[0] for x in scal_bls]
     o = calculate_polygonal_environment(scal_im, scal_bls)
     o = [x[1] for x in scale_polygonal_lines([([0,1], x) for x in o], scale)]
@@ -36,4 +40,4 @@ for fname in sys.argv[1:]:
                 pol.attrib['POINTS'] = ' '.join([str(coord) for pt in o[idx] for coord in pt])
                 idx += 1
         with open(splitext(fname)[0] + '_rewrite.xml', 'wb') as fp:
-            doc.write(fp)
+            doc.write(fp, encoding='UTF-8', xml_declaration=True)
