@@ -111,7 +111,7 @@ def segment(im,
         o = model.nn(transforms(im).unsqueeze(0).to(device))
     logger.debug('Upsampling network output')
     o = F.interpolate(o, size=scal_im.size[::-1])
-    o = o.squeeze().numpy()
+    o = o.squeeze().cpu().numpy()
     logger.debug('Vectorizing network output')
     baselines = vectorize_lines(o)
     logger.debug('Polygonizing lines')
