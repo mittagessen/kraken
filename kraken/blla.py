@@ -40,7 +40,8 @@ def segment(im,
             text_direction='horizontal-lr',
             mask=None,
             reading_order_fn=polygonal_reading_order,
-            model=None):
+            model=None,
+            device='cpu'):
     """
     Segments a page into text lines using the baseline segmenter.
 
@@ -61,6 +62,8 @@ def segment(im,
         model (vgsl.TorchVGSLModel): A TorchVGSLModel containing a segmentation
                                      model. If none is given a default model
                                      will be loaded.
+        device (str or torch.Device): The target device to run the neural
+                                      network on.
 
     Returns:
         {'text_direction': '$dir',
@@ -85,6 +88,7 @@ def segment(im,
         logger.info('No segmentation model given. Loading default model.')
         model = vgsl.TorchVGSLModel.load_model(pkg_resources.resource_filename(__name__, 'blla.mlmodel'))
     model.eval()
+    model.to(device)
 
     if mask:
         if mask.mode != '1' and not is_bitonal(mask):
@@ -104,7 +108,7 @@ def segment(im,
 
     with torch.no_grad():
         logger.debug('Running network forward pass')
-        o = model.nn(transforms(im).unsqueeze(0))
+        o = model.nn(transforms(im).unsqueeze(0).to(device))
     logger.debug('Upsampling network output')
     o = F.interpolate(o, size=scal_im.size[::-1])
     o = o.squeeze().numpy()

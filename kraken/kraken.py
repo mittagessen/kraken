@@ -96,7 +96,7 @@ def segmenter(legacy, model, text_direction, script_detect, allowed_scripts,
         if legacy:
             res = pageseg.segment(im, text_direction, scale, maxcolseps, black_colseps, no_hlines=remove_hlines, pad=pad, mask=mask)
         else:
-            res = blla.segment(im, text_direction, mask=mask, model=model)
+            res = blla.segment(im, text_direction, mask=mask, model=model, device=ctx.meta['device'])
         if script_detect:
             res = pageseg.detect_scripts(im, res, valid_scripts=allowed_scripts)
     except Exception:
