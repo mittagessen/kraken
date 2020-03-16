@@ -720,8 +720,10 @@ class BaselineSet(Dataset):
         # n-th entry contains semantic of n-th class
         self.class_mapping = {'aux': {'_start_separator': 0, '_end_separator': 1}, 'baselines': {}, 'regions': {}}
         self.num_classes = 2
-        mbl_dict = merge_baselines if merge_baselines is not None else {}
-        mreg_dict = merge_regions if merge_regions is not None else {}
+        self.mbl_dict = merge_baselines if merge_baselines is not None else {}
+        self.mreg_dict = merge_regions if merge_regions is not None else {}
+        self.valid_baselines = valid_baselines
+        self.valid_regions = valid_regions
         if mode in ['alto', 'page']:
             if mode == 'alto':
                 fn = parse_alto
@@ -736,14 +738,11 @@ class BaselineSet(Dataset):
                     lines = defaultdict(list)
                     for line in data['lines']:
                         if valid_baselines is None or line['type'] in valid_baselines:
-                            lines[mbl_dict.get(line['type'], line['type'])].append(line['baseline'])
+                            lines[self.mbl_dict.get(line['type'], line['type'])].append(line['baseline'])
                     regions = defaultdict(list)
                     for k, v in data['regions'].items():
-                        if valid_regions is not None:
-                            if k in valid_regions:
-                                regions[mreg_dict.get(k, k)].extend(v)
-                        else:
-                            regions[mreg_dict.get(k, k)].extend(v)
+                        if valid_regions is None or k in valid_regions:
+                            regions[self.mreg_dict.get(k, k)].extend(v)
                     data['regions'] = regions
                     self.targets.append({'baselines': lines, 'regions': data['regions']})
                 except KrakenInputException as e:
@@ -763,6 +762,7 @@ class BaselineSet(Dataset):
             for idx, line_type in enumerate(line_types):
                 self.class_mapping['baselines'][line_type] = idx + self.num_classes
             self.num_classes += idx + 1
+            idx = -1
             for idx, reg_type in enumerate(region_types):
                 self.class_mapping['regions'][reg_type] = idx + self.num_classes
             self.num_classes += idx + 1
@@ -819,23 +819,26 @@ class BaselineSet(Dataset):
         """
         if self.mode:
             raise Exception('The `add` method is incompatible with dataset mode {}'.format(self.mode))
-        self.imgs.append(image)
-        self.targets.append({'baselines': baselines, 'regions': regions})
-        line_types = set()
-        region_types = set()
-        for line_type in baselines.keys():
-            line_types.add(line_type)
-        for reg_type in regions.keys():
-                region_types.add(reg_type)
-        idx = 0
-        for line_type in line_types:
-            if line_type not in self.class_mapping['baselines']:
-                self.class_mapping['baselines'][line_type] = idx + self.num_classes
 
-        self.num_classes += idx + 1
-        for idx, reg_type in enumerate(region_types):
-            self.class_mapping['regions'][reg_type] = idx + self.num_classes
-        self.num_classes = idx + offset
+        data = fn(img)
+        lines = defaultdict(list)
+        for line in data['lines']:
+            line_type = self.mbl_dict.get(line['type'], line['type'])
+            if self.valid_baselines is None or line['type'] in self.valid_baselines:
+                lines[line_type].append(line['baseline'])
+                if line_type not in self.class_mapping['baselines']:
+                    self.num_classes += 1
+                    self.class_mapping['baselines'][line_type] = self.num_classes
+        regions = defaultdict(list)
+        for k, v in data['regions'].items():
+            if self.valid_regions is None or k in self.valid_regions:
+                reg_type = self.mreg_dict.get(k, k)
+                regions[reg_type].extend(v)
+                if reg_type not in self.class_mapping['regions']:
+                    self.num_classes += 1
+                    self.class_mapping['baselines'][line_type] = self.num_classes
+        self.targets.append({'baselines': lines, 'regions': regions})
+        self.imgs.append(data['image'])
 
     def __getitem__(self, idx):
         im = self.imgs[idx]
