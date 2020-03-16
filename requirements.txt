@@ -12,4 +12,6 @@ jinja2
 python-bidi
 torchvision
 torch>=1.0.0
-coremltools
+coremltools>=3.3
+scikit-image
+shapely
