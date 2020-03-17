@@ -28,6 +28,7 @@ import torchvision.transforms.functional as tf
 
 from os import path
 from PIL import Image, ImageDraw
+from itertools import groupby
 from collections import Counter, defaultdict
 from torchvision import transforms
 from torch.utils.data import Dataset, DataLoader
@@ -888,6 +889,7 @@ class BaselineSet(Dataset):
             cls_idx = self.class_mapping['baselines'][key]
             for line in lines:
                 # buffer out line to desired width
+                line = [k for k, g in groupby(line)]
                 line = np.array(line)*scale
                 line_pol = np.array(geom.LineString(line).buffer(self.line_width/2, cap_style=2).boundary, dtype=np.int)
                 rr, cc = polygon(line_pol[:,1], line_pol[:,0], shape=image.shape[1:])
