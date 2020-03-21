@@ -23,6 +23,7 @@ import logging
 import bidi.algorithm as bd
 
 from PIL import Image
+from collections import defaultdict
 from typing import List, Tuple, Optional, Generator, Union, Dict
 
 from kraken.lib.util import get_im_str, is_bitonal
@@ -202,13 +203,14 @@ class mm_rpred(object):
         logger.info('Running {} multi-script recognizers on {} with {} lines'.format(len(nets), im_str, self.len))
 
         miss = [script for script in scripts if not nets.get(script)]
-        if miss:
-            raise KrakenInputException('Missing models for scripts {}'.format(miss))
+        if miss and not isinstance(nets, defaultdict):
+            raise KrakenInputException('Missing models for scripts {}'.format(set(miss)))
 
         # build dictionary for line preprocessing
         self.ts = {}
-        for script, network in nets.items():
+        for script in scripts:
             logger.debug('Loading line transforms for {}'.format(script))
+            network = nets[script]
             batch, channels, height, width = network.nn.input
             self.ts[script] = generate_input_transforms(batch, height, width, channels, pad, valid_norm)
 

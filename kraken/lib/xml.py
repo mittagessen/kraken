@@ -120,6 +120,7 @@ def parse_page(filename):
         data['regions'] = region_data
 
         # parse line information
+        scripts = set()
         for line in lines:
             pol = line.find('./{*}Coords')
             boundary = None
@@ -148,7 +149,12 @@ def parse_page(filename):
                 cs = _parse_page_custom(custom_str)
                 if 'structure' in cs and 'type' in cs['structure']:
                     l_type = cs['structure']['type']
+            scripts.add(l_type)
             data['lines'].append({'baseline': baseline, 'boundary': boundary, 'text': text, 'script': l_type})
+        if len(scripts) > 1:
+            data['script_detection'] = True
+        else:
+            data['script_detection'] = False
         return data
 
 
@@ -189,4 +195,5 @@ def parse_alto(filename):
             for el in line.xpath(".//*[local-name() = 'String'] | .//*[local-name() = 'SP']"):
                 text += el.get('CONTENT') if el.get('CONTENT') else ' '
             data['lines'].append({'baseline': baseline, 'boundary': boundary, 'text': text, 'script': 'default'})
+        data['script_detection'] = False
         return data

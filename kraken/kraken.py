@@ -24,7 +24,7 @@ import warnings
 import logging
 import pkg_resources
 
-from typing import Dict, Union, List, cast, Any, IO
+from typing import Dict, Union, List, cast, Any, IO, Callable
 from functools import partial
 from PIL import Image
 
@@ -48,10 +48,28 @@ def message(msg: str, **styles) -> None:
         click.secho(msg, **styles)
 
 
-# chainable functions of functional components (binarization/segmentation/recognition
+def get_input_parser(type_str: str) -> Callable[[str], Dict[str, Any]]:
+    if type_str == 'alto':
+        from kraken.lib.xml import parse_alto
+        return parse_alto
+    elif type_str == 'page':
+        from kraken.lib.xml import parse_page
+        return parse_page
+    elif type_str == 'image':
+        return Image.open
 
-def binarizer(threshold, zoom, escale, border, perc, range, low, high, base_image, input, output) -> None:
+# chainable functions of functional components (binarization/segmentation/recognition)
+
+def binarizer(threshold, zoom, escale, border, perc, range, low, high, input, output) -> None:
     from kraken import binarization
+
+    ctx = click.get_current_context()
+    if ctx.meta['first_process']:
+        if ctx.meta['input_format_type'] != 'image':
+            input = get_input_parser(ctx.meta['input_format_type'])(input)['image']
+        ctx.meta['first_process'] = False
+    else:
+        raise click.UsageError('Binarization has to be the initial process.')
 
     try:
         im = Image.open(input)
@@ -68,6 +86,7 @@ def binarizer(threshold, zoom, escale, border, perc, range, low, high, base_imag
             if ext:
                 logger.warning('jpeg does not support 1bpp images. Forcing to png.')
         res.save(output, format=form)
+        ctx.meta['base_image'] = output
     except Exception:
         message('\u2717', fg='red')
         raise
@@ -76,11 +95,21 @@ def binarizer(threshold, zoom, escale, border, perc, range, low, high, base_imag
 
 def segmenter(legacy, model, text_direction, script_detect, allowed_scripts,
               scale, maxcolseps, black_colseps, remove_hlines, pad, mask,
-              base_image, input, output) -> None:
+              input, output) -> None:
     import json
 
     from kraken import pageseg
     from kraken import blla
+
+    ctx = click.get_current_context()
+
+    if ctx.meta['first_process']:
+        if ctx.meta['input_format_type'] != 'image':
+            input = get_input_parser(ctx.meta['input_format_type'])(input)['image']
+        ctx.meta['first_process'] = False
+
+    if 'base_image' not in ctx.meta:
+        ctx.meta['base_image'] = input
 
     try:
         im = Image.open(input)
@@ -108,61 +137,58 @@ def segmenter(legacy, model, text_direction, script_detect, allowed_scripts,
     message('\u2713', fg='green')
 
 
-def recognizer(model, pad, no_segmentation, bidi_reordering, script_ignore, base_image, input, output, lines) -> None:
+def recognizer(model, pad, no_segmentation, bidi_reordering, script_ignore, input, output) -> None:
 
     import json
     import tempfile
 
     from kraken import rpred
 
+    ctx = click.get_current_context()
+
+    bounds = None
+    if 'base_image' not in ctx.meta:
+        ctx.meta['base_image'] = input
+
+    if ctx.meta['first_process']:
+        if ctx.meta['input_format_type'] != 'image':
+            doc = get_input_parser(ctx.meta['input_format_type'])(input)
+            ctx.meta['base_image'] = doc['image']
+            doc['text_direction'] = 'horizontal-lr'
+            bounds = doc
+
     try:
-        im = Image.open(base_image)
+        im = Image.open(ctx.meta['base_image'])
     except IOError as e:
         raise click.BadParameter(str(e))
 
-    ctx = click.get_current_context()
-
-    # input may either be output from the segmenter then it is a JSON file or
-    # be an image file when running the OCR subcommand alone. might still come
-    # from some other subcommand though.
-    scripts = set()
-    if not lines and base_image != input:
-        lines = input
-    if not lines:
+    if not bounds and ctx.meta['base_image'] != input:
+        with open_file(input, 'r') as fp:
+            try:
+                fp = cast(IO[Any], fp)
+                bounds = json.load(fp)
+            except ValueError as e:
+                raise click.UsageError(f'{input} invalid segmentation: {str(e)}')
+    elif not bounds:
         if no_segmentation:
-            lines = tempfile.NamedTemporaryFile(mode='w', delete=False)
-            logger.info('Running in no_segmentation mode. Creating temporary segmentation {}.'.format(lines.name))
-            json.dump({'script_detection': False,
-                       'text_direction': 'horizontal-lr',
-                       'boxes': [(0, 0) + im.size]}, lines)
-            lines.close()
-            lines = lines.name
+            print('loading no_seg')
+            bounds = {'script_detection': False,
+                      'text_direction': 'horizontal-lr',
+                      'boxes': [(0, 0) + im.size]}
         else:
-            raise click.UsageError('No line segmentation given. Add one with `-l` or run `segment` first.')
+            raise click.UsageError('No line segmentation given. Add one with the input, `-l`, or run `segment` first.')
     elif no_segmentation:
         logger.warning('no_segmentation mode enabled but segmentation defined. Ignoring --no-segmentation option.')
 
-    with open_file(lines, 'r') as fp:
-        try:
-            fp = cast(IO[Any], fp)
-            bounds = json.load(fp)
-        except ValueError as e:
-            raise click.UsageError('{} invalid segmentation: {}'.format(lines, str(e)))
-        # script detection
-        if 'script_detection' in bounds and bounds['script_detection']:
-            for l in bounds['boxes']:
-                for t in l:
-                    scripts.add(t[0])
-            it = rpred.mm_rpred(model, im, bounds, pad,
-                                bidi_reordering=bidi_reordering,
-                                script_ignore=script_ignore)
-        else:
-            it = rpred.rpred(model['default'], im, bounds, pad,
-                             bidi_reordering=bidi_reordering)
-
-    if not lines and no_segmentation:
-        logger.debug('Removing temporary segmentation file.')
-        os.unlink(lines.name)
+    scripts = set()
+    # script detection
+    if 'script_detection' in bounds and bounds['script_detection']:
+        it = rpred.mm_rpred(model, im, bounds, pad,
+                            bidi_reordering=bidi_reordering,
+                            script_ignore=script_ignore)
+    else:
+        it = rpred.rpred(model['default'], im, bounds, pad,
+                         bidi_reordering=bidi_reordering)
 
     preds = []
 
@@ -173,7 +199,7 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, script_ignore, base
     ctx = click.get_current_context()
     with open_file(output, 'w', encoding='utf-8') as fp:
         fp = cast(IO[Any], fp)
-        message('Writing recognition results for {}\t'.format(base_image), nl=False)
+        message(f'Writing recognition results for {ctx.meta["orig_file"]}\t', nl=False)
         logger.info('Serializing as {} into {}'.format(ctx.meta['mode'], output))
         if ctx.meta['mode'] != 'text':
             from kraken import serialization
@@ -199,8 +225,10 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, script_ignore, base
 @click.option('-I', '--batch-input', multiple=True, help='Glob expression to add multiple files at once.')
 @click.option('-o', '--suffix', help='Suffix for output files from batch inputs.')
 @click.option('-v', '--verbose', default=0, count=True, show_default=True)
+@click.option('-f', '--format-type', type=click.Choice(['image', 'alto', 'page']), default='image',
+              help='Sets the default input type. In image mode inputs are ')
 @click.option('-d', '--device', default='cpu', show_default=True, help='Select device to use (cpu, cuda:0, cuda:1, ...)')
-def cli(input, batch_input, suffix, verbose, device):
+def cli(input, batch_input, suffix, verbose, format_type, device):
     """
     Base command for recognition functionality.
 
@@ -210,6 +238,7 @@ def cli(input, batch_input, suffix, verbose, device):
     """
     ctx = click.get_current_context()
     ctx.meta['device'] = device
+    ctx.meta['input_format_type'] = format_type
     log.set_logger(logger, level=30-min(10*verbose, 20))
 
 
@@ -228,13 +257,17 @@ def process_pipeline(subcommands, input, batch_input, suffix, **args):
             for in_file in glob.glob(batch_expr, recursive=True):
                 input.append((in_file, '{}{}'.format(os.path.splitext(in_file)[0], suffix)))
 
+    ctx = click.get_current_context()
+
     for io_pair in input:
+        ctx.meta['first_process'] = True
+        ctx.meta['orig_file'] = io_pair[0]
+        if 'base_image' in ctx.meta:
+            del ctx.meta['base_image']
         try:
-            base_image = io_pair[0]
             fc = [io_pair[0]] + [tempfile.mkstemp()[1] for cmd in subcommands[1:]] + [io_pair[1]]
             for task, input, output in zip(subcommands, fc, fc[1:]):
-                task(base_image=base_image, input=input, output=output)
-                base_image = input
+                task(input=input, output=output)
         finally:
             for f in fc[1:-1]:
                 os.unlink(f)
@@ -292,12 +325,12 @@ def segment(ctx, model, boxes, text_direction, script_detect, allowed_scripts,
     Segments page images into text lines.
     """
     if model and boxes:
-        logger.warning('Baseline model ({}) given but legacy segmenter selected. Forcing to -bl.'.format(model))
+        logger.warning(f'Baseline model ({model}) given but legacy segmenter selected. Forcing to -bl.')
         boxes = False
 
     if boxes == False:
         from kraken.lib.vgsl import TorchVGSLModel
-        message('Loading ANN {}\t'.format(model), nl=False)
+        message(f'Loading ANN {model}\t', nl=False)
         try:
             model = TorchVGSLModel.load_model(model)
             model.to(ctx.meta['device'])
@@ -357,15 +390,16 @@ def _validate_mm(ctx, param, value):
               show_default=True,
               type=click.Choice(['horizontal-tb', 'vertical-lr', 'vertical-rl']),
               help='Sets principal text direction in serialization output')
-@click.option('-l', '--lines', type=click.Path(exists=True), show_default=True,
-              help='JSON file containing line coordinates')
 @click.option('--threads', default=1, show_default=True, type=click.IntRange(1),
               help='Number of threads to use for OpenMP parallelization.')
-def ocr(ctx, model, pad, reorder, no_segmentation, serializer, text_direction, lines, threads):
+def ocr(ctx, model, pad, reorder, no_segmentation, serializer, text_direction, threads):
     """
     Recognizes text in line images.
     """
     from kraken.lib import models
+
+    if ctx.meta['input_format_type'] != 'image' and no_segmentation:
+        raise click.BadParameter('no_segmentation mode is incompatible with page/alto inputs')
 
     # first we try to find the model in the absolue path, then ~/.kraken, then
     # LEGACY_MODEL_DIR
@@ -381,8 +415,8 @@ def ocr(ctx, model, pad, reorder, no_segmentation, serializer, text_direction, l
                 location = loc
                 break
         if not location:
-            raise click.BadParameter('No model for {} found'.format(k))
-        message('Loading ANN {}\t'.format(k), nl=False)
+            raise click.BadParameter(f'No model for {k} found')
+        message(f'Loading ANN {k}\t', nl=False)
         try:
             rnn = models.load_any(location, device=ctx.meta['device'])
             nm[k] = rnn
@@ -398,7 +432,7 @@ def ocr(ctx, model, pad, reorder, no_segmentation, serializer, text_direction, l
         nn.update(nm)
         nm = nn
     # thread count is global so setting it once is sufficient
-    nn[k].nn.set_num_threads(threads)
+    nm[k].nn.set_num_threads(threads)
 
     # set output mode
     ctx.meta['mode'] = serializer
@@ -408,8 +442,7 @@ def ocr(ctx, model, pad, reorder, no_segmentation, serializer, text_direction, l
                    pad=pad,
                    no_segmentation=no_segmentation,
                    bidi_reordering=reorder,
-                   script_ignore=ign_scripts,
-                   lines=lines)
+                   script_ignore=ign_scripts)
 
 
 @cli.command('show')
@@ -480,7 +513,7 @@ def get(ctx, model_id):
                               partial(message, '.', nl=False))
     message('\b\u2713', fg='green', nl=False)
     message('\033[?25h')
-    message('Model name: {}'.format(filename))
+    message(f'Model name: {filename}')
     ctx.exit(0)
 
 

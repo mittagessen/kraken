@@ -147,7 +147,14 @@ def segment(im,
     for regs in regions.values():
         order_regs.extend(regs)
     lines = reading_order_fn(lines=lines, regions=order_regs, text_direction=text_direction[-2:])
+
+    if 'class_mapping' in nn.user_metadata and len(nn.user_metadata['class_mapping']['baselines']) > 1:
+        script_detection = True
+    else:
+        script_detection = False
+
     return {'text_direction': text_direction,
             'type': 'baselines',
             'lines': [{'script': bl_type, 'baseline': bl, 'boundary': pl} for bl_type, bl, pl in lines],
-            'regions': regions}
+            'regions': regions,
+            'script_detection': script_detection}
