@@ -148,7 +148,7 @@ def parse_page(filename):
                 cs = _parse_page_custom(custom_str)
                 if 'structure' in cs and 'type' in cs['structure']:
                     l_type = cs['structure']['type']
-            data['lines'].append({'baseline': baseline, 'boundary': boundary, 'text': text, 'type': l_type})
+            data['lines'].append({'baseline': baseline, 'boundary': boundary, 'text': text, 'script': l_type})
         return data
 
 
@@ -188,5 +188,5 @@ def parse_alto(filename):
             text = ''
             for el in line.xpath(".//*[local-name() = 'String'] | .//*[local-name() = 'SP']"):
                 text += el.get('CONTENT') if el.get('CONTENT') else ' '
-            data['lines'].append({'baseline': baseline, 'boundary': boundary, 'text': text, 'type': 'default'})
+            data['lines'].append({'baseline': baseline, 'boundary': boundary, 'text': text, 'script': 'default'})
         return data

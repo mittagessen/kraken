@@ -87,7 +87,7 @@ def segment(im,
         direction is invalid.
     """
     im_str = get_im_str(im)
-    logger.info('Segmenting {}'.format(im_str))
+    logger.info(f'Segmenting {im_str}')
 
     if model is None:
         logger.info('No segmentation model given. Loading default model.')
@@ -100,8 +100,8 @@ def segment(im,
             raise KrakenInputException('Mask is not bitonal')
         mask = mask.convert('1')
         if mask.size != im.size:
-            logger.error('Mask size {} doesn\'t match image size {}'.format(mask.size, im.size))
-            raise KrakenInputException('Mask size {} doesn\'t match image size {}'.format(mask.size, im.size))
+            logger.error('Mask size {mask.size} doesn\'t match image size {im.size}')
+            raise KrakenInputException('Mask size {mask.size} doesn\'t match image size {im.size}')
         logger.info('Masking enabled in segmenter.')
         mask = pil2array(mask)
 

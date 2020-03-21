@@ -292,7 +292,7 @@ def rotate_lines(lines, angle, offset):
     """
     Rotates line bounding boxes around the origin and adding and offset.
     """
-    logger.debug('Rotate line coordinates by {} with offset {}'.format(angle, offset))
+    logger.debug('Rotate line coordinates by {angle} with offset {offset}')
     angle = np.radians(angle)
     r = np.array([[np.cos(angle), -np.sin(angle)], [np.sin(angle), np.cos(angle)]])
     p = np.array(lines).reshape((-1, 2))
@@ -341,11 +341,11 @@ def segment(im, text_direction='horizontal-lr', scale=None, maxcolseps=2,
         direction is invalid.
     """
     im_str = get_im_str(im)
-    logger.info('Segmenting {}'.format(im_str))
+    logger.info(f'Segmenting {im_str}')
 
     if im.mode != '1' and not is_bitonal(im):
-        logger.error('Image {} is not bi-level'.format(im_str))
-        raise KrakenInputException('Image {} is not bi-level'.format(im_str))
+        logger.error(f'Image {im_str} is not bi-level')
+        raise KrakenInputException(f'Image {im_str} is not bi-level')
 
     # rotate input image for vertical lines
     if text_direction.startswith('horizontal'):
@@ -358,10 +358,10 @@ def segment(im, text_direction='horizontal-lr', scale=None, maxcolseps=2,
         angle = 90
         offset = (im.size[0], 0)
     else:
-        logger.error('Invalid text direction \'{}\''.format(text_direction))
-        raise KrakenInputException('Invalid text direction {}'.format(text_direction))
+        logger.error(f'Invalid text direction \'{text_direction}\'')
+        raise KrakenInputException(f'Invalid text direction {text_direction}')
 
-    logger.debug('Rotating input image by {} degrees'.format(angle))
+    logger.debug(f'Rotating input image by {angle} degrees')
     im = im.rotate(angle, expand=True)
 
     a = pil2array(im)
@@ -382,8 +382,8 @@ def segment(im, text_direction='horizontal-lr', scale=None, maxcolseps=2,
                 raise KrakenInputException('Mask is not bitonal')
             mask = mask.convert('1')
             if mask.size != im.size:
-                logger.error('Mask size {} doesn\'t match image size {}'.format(mask.size, im.size))
-                raise KrakenInputException('Mask size {} doesn\'t match image size {}'.format(mask.size, im.size))
+                logger.error(f'Mask size {mask.size} doesn\'t match image size {im.size}')
+                raise KrakenInputException(f'Mask size {mask.size} doesn\'t match image size {im.size}')
             logger.info('Masking enabled in segmenter. Disabling column detection.')
             mask = mask.rotate(angle, expand=True)
             colseps = pil2array(mask)
@@ -392,7 +392,7 @@ def segment(im, text_direction='horizontal-lr', scale=None, maxcolseps=2,
         else:
             colseps = compute_white_colseps(binary, scale, maxcolseps)
     except ValueError:
-        logger.warning('Exception in column finder (probably empty image) for {}.'.format(im_str))
+        logger.warning(f'Exception in column finder (probably empty image) for {im_str}')
         return {'text_direction': text_direction, 'boxes':  []}
 
     bottom, top, boxmap = compute_gradmaps(binary, scale)
@@ -442,8 +442,8 @@ def detect_scripts(im, bounds, model=pkg_resources.resource_filename(__name__, '
     """
     raise NotImplementedError('Temporarily unavailable. Please open a github ticket if you want this fixed sooner.')
     im_str = get_im_str(im)
-    logger.info('Detecting scripts with {} in {} lines on {}'.format(model, len(bounds['boxes']), im_str))
-    logger.debug('Loading detection model {}'.format(model))
+    logger.info(f'Detecting scripts with {model} in {len(bounds["boxes"])} lines on {im_str}')
+    logger.debug(f'Loading detection model {model}')
     rnn = models.load_any(model)
     # load numerical to 4 char identifier map
     logger.debug('Loading label to identifier map')
@@ -452,7 +452,7 @@ def detect_scripts(im, bounds, model=pkg_resources.resource_filename(__name__, '
     # convert allowed scripts to labels
     val_scripts = []
     if valid_scripts:
-        logger.debug('Converting allowed scripts list {}'.format(valid_scripts))
+        logger.debug(f'Converting allowed scripts list {valid_scripts}')
         for k, v in n2s.items():
             if v in valid_scripts:
                 val_scripts.append(chr(int(k) + 0xF0000))
