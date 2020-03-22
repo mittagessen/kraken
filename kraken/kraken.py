@@ -26,6 +26,7 @@ import pkg_resources
 
 from typing import Dict, Union, List, cast, Any, IO, Callable
 from functools import partial
+from itertools import cycle
 from PIL import Image
 
 import click
@@ -57,6 +58,7 @@ def get_input_parser(type_str: str) -> Callable[[str], Dict[str, Any]]:
         return parse_page
     elif type_str == 'image':
         return Image.open
+
 
 # chainable functions of functional components (binarization/segmentation/recognition)
 
@@ -270,30 +272,43 @@ def process_pipeline(subcommands, input, batch_input, suffix, verbose, format_ty
 
     # parse pdfs
     if format_type == 'pdf':
+        import pyvips
+
+        if not batch_input:
+            logger.warning('PDF inputs not added with batch option. Manual output filename will be ignored and `-o` utilized.')
         new_input = []
-        import wand.image as wimage
-        import wand.color as wcolor
-        message('Extracting images from PDFs')
+        num_pages = 0
         for (fpath, _) in input:
-            with wimage.Image(filename=fpath, resolution=300) as doc:
-                if doc.format != 'PDF':
-                    logger.warning(f'{fpath} is not a PDF file. Skipping.')
-                    continue
-                dest_dict = {'idx': -1, 'src': fpath, 'uuid': None}
-                for page in doc.sequence:
-                    dest_dict['idx'] += 1
-                    dest_dict['uuid'] = str(uuid.uuid4())
-                    with wimage.Image(page) as im:
-                        im.format = 'png'
-                        im.background_color = wcolor.Color('white')
-                        im.alpha_channel = 'remove'
-                        fd, filename = tempfile.mkstemp()
+            doc = pyvips.Image.new_from_file(fpath, dpi=300, n=-1, access="sequential")
+            if 'n-pages' in doc.get_fields():
+                num_pages += doc.get('n-pages')
+
+        with log.progressbar(length=num_pages, label='Extracting PDF pages') as bar:
+            for (fpath, _) in input:
+                try:
+                    doc = pyvips.Image.new_from_file(fpath, dpi=300, n=-1, access="sequential")
+                    if 'n-pages' not in doc.get_fields():
+                        logger.warning('{fpath} does not contain pages. Skipping.')
+                        continue
+                    doc.flatten(background=255)
+                    n_pages = doc.get('n-pages')
+                    page_width = doc.width
+                    page_height = doc.height / n_pages
+
+                    dest_dict = {'idx': -1, 'src': fpath, 'uuid': None}
+                    for i in range(0, n_pages):
+                        dest_dict['idx'] += 1
+                        dest_dict['uuid'] = str(uuid.uuid4())
+                        fd, filename = tempfile.mkstemp(suffix='.png')
                         os.close(fd)
+                        page = doc.crop(0, i * page_height, page_width, page_height)
                         logger.info(f'Saving temporary image {fpath}:{dest_dict["idx"]} to {filename}')
-                        im.save(filename=filename)
+                        page.write_to_file(filename)
                         new_input.append((filename, pdf_format.format(**dest_dict) + suffix))
-#            except WandRuntimeError:
-#                logger.warning(f'{fpath} is not a PDF file. Skipping.')
+                        bar.update(1)
+                except pyvips.error.Error:
+                    logger.warning(f'{fpath} is not a PDF file. Skipping.')
+        input = new_input
 
     ctx = click.get_current_context()
 
@@ -309,6 +324,8 @@ def process_pipeline(subcommands, input, batch_input, suffix, verbose, format_ty
             fc = [io_pair[0]] + [tmp[1] for tmp in tmps] + [io_pair[1]]
             for task, input, output in zip(subcommands, fc, fc[1:]):
                 task(input=input, output=output)
+        except Exception as e:
+            logger.error(f'Failed processing {io_pair[0]}: {str(e)}')
         finally:
             for f in fc[1:-1]:
                 os.unlink(f)
