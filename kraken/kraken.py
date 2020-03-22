@@ -220,7 +220,10 @@ def process_pipeline(subcommands, input, batch_input, suffix, **args):
     for io_pair in input:
         try:
             base_image = io_pair[0]
-            fc = [io_pair[0]] + [tempfile.mkstemp()[1] for cmd in subcommands[1:]] + [io_pair[1]]
+            tmps = [tempfile.mkstemp() for cmd in subcommands[1:]]
+            for tmp in tmps:
+                os.close(tmp[0])
+            fc = [io_pair[0]] + [tmp[1] for tmp in tmps] + [io_pair[1]]
             for task, input, output in zip(subcommands, fc, fc[1:]):
                 task(base_image=base_image, input=input, output=output)
                 base_image = input
