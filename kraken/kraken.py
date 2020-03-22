@@ -140,7 +140,6 @@ def segmenter(legacy, model, text_direction, script_detect, allowed_scripts,
 def recognizer(model, pad, no_segmentation, bidi_reordering, script_ignore, input, output) -> None:
 
     import json
-    import tempfile
 
     from kraken import rpred
 
@@ -223,12 +222,21 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, script_ignore, inpu
               help='Input-output file pairs. Each input file (first argument) is mapped to one '
                    'output file (second argument), e.g. `-i input.png output.txt`')
 @click.option('-I', '--batch-input', multiple=True, help='Glob expression to add multiple files at once.')
-@click.option('-o', '--suffix', help='Suffix for output files from batch inputs.')
+@click.option('-o', '--suffix', help='Suffix for output files from batch and PDF inputs.')
 @click.option('-v', '--verbose', default=0, count=True, show_default=True)
-@click.option('-f', '--format-type', type=click.Choice(['image', 'alto', 'page']), default='image',
-              help='Sets the default input type. In image mode inputs are ')
-@click.option('-d', '--device', default='cpu', show_default=True, help='Select device to use (cpu, cuda:0, cuda:1, ...)')
-def cli(input, batch_input, suffix, verbose, format_type, device):
+@click.option('-f', '--format-type', type=click.Choice(['image', 'alto', 'page', 'pdf']), default='image',
+              help='Sets the default input type. In image mode inputs are image '
+                   'files, alto/page expects XML files in the respective format, pdf '
+                   'expects PDF files with numbered suffixes added to output file '
+                   'names as needed.')
+@click.option('-p', '--pdf-format', default='{src}_{idx:06d}',
+              show_default=True,
+              help='Format for output of PDF files. valid fields '
+                   'are `src` (source file), `idx` (page number), and `uuid` (v4 uuid). '
+                   '`-o` suffixes are appended to this format string.')
+@click.option('-d', '--device', default='cpu', show_default=True,
+              help='Select device to use (cpu, cuda:0, cuda:1, ...)')
+def cli(input, batch_input, suffix, verbose, format_type, pdf_format, device):
     """
     Base command for recognition functionality.
 
@@ -238,26 +246,53 @@ def cli(input, batch_input, suffix, verbose, format_type, device):
     """
     ctx = click.get_current_context()
     ctx.meta['device'] = device
-    ctx.meta['input_format_type'] = format_type
+    ctx.meta['input_format_type'] = format_type if format_type != 'pdf' else 'image'
     log.set_logger(logger, level=30-min(10*verbose, 20))
 
 
 @cli.resultcallback()
-def process_pipeline(subcommands, input, batch_input, suffix, **args):
+def process_pipeline(subcommands, input, batch_input, suffix, verbose, format_type, pdf_format, **args):
     """
     Helper function calling the partials returned by each subcommand and
     placing their respective outputs in temporary files.
     """
     import glob
+    import uuid
     import tempfile
 
     input = list(input)
+    # expand batch inputs
     if batch_input and suffix:
         for batch_expr in batch_input:
             for in_file in glob.glob(batch_expr, recursive=True):
                 input.append((in_file, '{}{}'.format(os.path.splitext(in_file)[0], suffix)))
 
-    ctx = click.get_current_context()
+    # parse pdfs
+    if format_type == 'pdf':
+        new_input = []
+        import wand.image as wimage
+        import wand.color as wcolor
+        message('Extracting images from PDFs')
+        for (fpath, _) in input:
+            with wimage.Image(filename=fpath, resolution=300) as doc:
+                if doc.format != 'PDF':
+                    logger.warning(f'{fpath} is not a PDF file. Skipping.')
+                    continue
+                dest_dict = {'idx': -1, 'src': fpath, 'uuid': None}
+                for page in doc.sequence:
+                    dest_dict['idx'] += 1
+                    dest_dict['uuid'] = str(uuid.uuid4())
+                    with wimage.Image(page) as im:
+                        im.format = 'png'
+                        im.background_color = wcolor.Color('white')
+                        im.alpha_channel = 'remove'
+                        fd, filename = tempfile.mkstemp()
+                        fd.close()
+                        logger.info(f'Saving temporary image {fpath}:{dest_dict["idx"]} to {filename}')
+                        im.save(filename=filename)
+                        new_input.append((filename, pdf_format.format(**dest_dict) + suffix))
+#            except WandRuntimeError:
+#                logger.warning(f'{fpath} is not a PDF file. Skipping.')
 
     for io_pair in input:
         ctx.meta['first_process'] = True
@@ -271,6 +306,10 @@ def process_pipeline(subcommands, input, batch_input, suffix, **args):
         finally:
             for f in fc[1:-1]:
                 os.unlink(f)
+            # clean up temporary PDF image files
+            if format_type == 'pdf':
+                logger.debug(f'unlinking {fc[0]}')
+                os.unlink(fc[0])
 
 
 @cli.command('binarize')

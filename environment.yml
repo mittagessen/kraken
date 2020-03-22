@@ -23,6 +23,7 @@ dependencies:
   - scikit-image
   - shapely
   - pip
+  - wand
   - pip:
     - coremltools>=3.3
     - git+https://github.com/mittagessen/kraken.git@master
