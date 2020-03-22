@@ -40,7 +40,7 @@ installed using:
 
 .. code-block:: console
 
-        # apt install libpangocairo-1.0 libxml2 libblas3 liblapack3 python3-dev python3-pip
+        # apt install libpangocairo-1.0 libxml2 libblas3 liblapack3 python3-dev python3-pip libvips
 
 pip
 ---
