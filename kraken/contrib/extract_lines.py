@@ -37,15 +37,14 @@ def cli(format_type, model, repolygonize, files):
     if model is None:
         for doc in files:
             click.echo(f'Processing {doc} ', nl=False)
-            if format_type != 'image':
-                data = dataset.preparse_xml_data([doc], format_type, repolygonize=repolygonize)
-                if len(data) > 0:
-                    bounds = {'type': 'baselines', 'lines': [{'boundary': t['boundary'], 'baseline': t['baseline'], 'text': t['text']} for t in data]}
-                    for idx, (im, box) in enumerate(segmentation.extract_polygons(Image.open(data[0]['image']), bounds)):
-                        click.echo('.', nl=False)
-                        im.save('{}.{}.jpg'.format(splitext(data[0]['image'])[0], idx))
-                        with open('{}.{}.gt.txt'.format(splitext(data[0]['image'])[0], idx), 'w') as fp:
-                            fp.write(box['text'])
+            data = dataset.preparse_xml_data([doc], format_type, repolygonize=repolygonize)
+            if len(data) > 0:
+                bounds = {'type': 'baselines', 'lines': [{'boundary': t['boundary'], 'baseline': t['baseline'], 'text': t['text']} for t in data]}
+                for idx, (im, box) in enumerate(segmentation.extract_polygons(Image.open(data[0]['image']), bounds)):
+                    click.echo('.', nl=False)
+                    im.save('{}.{}.jpg'.format(splitext(data[0]['image'])[0], idx))
+                    with open('{}.{}.gt.txt'.format(splitext(data[0]['image'])[0], idx), 'w') as fp:
+                        fp.write(box['text'])
     else:
         net = vgsl.TorchVGSLModel.load_model(model)
         for doc in files:
