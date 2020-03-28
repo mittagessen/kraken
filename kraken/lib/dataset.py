@@ -462,10 +462,10 @@ class PolygonGTDataset(Dataset):
         if self.preload:
             x, y = self.training_set[index]
             if self.aug:
-                im = im.permute((1, 2, 0)).numpy()
-                o = self.aug(image=im)
-                im = torch.tensor(o['image'].transpose(2, 0, 1))
-                return im, y
+                x = x.permute((1, 2, 0)).numpy()
+                o = self.aug(image=x)
+                x = torch.tensor(o['image'].transpose(2, 0, 1))
+                return x, y
             return x, y
         else:
             item = self.training_set[index]
