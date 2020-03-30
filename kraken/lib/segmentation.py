@@ -595,7 +595,7 @@ def calculate_polygonal_environment(im: PIL.Image.Image,
             polygons.append(None)
 
     if scale is not None:
-        polygons = [(np.array(pol)/scale).astype('uint').tolist() for pol in polygons if pol is not None else None]
+        polygons = [(np.array(pol)/scale).astype('uint').tolist() if pol is not None else None for pol in polygons]
     return polygons
 
 
