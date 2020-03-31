@@ -25,7 +25,6 @@ import shapely.geometry as geom
 from PIL import Image, ImageDraw
 
 from scipy.stats import linregress
-from scipy.signal import savgol_filter
 from scipy.spatial import distance_matrix, Delaunay
 from scipy.sparse.csgraph import shortest_path
 from scipy.spatial.distance import cdist, pdist, squareform
@@ -266,12 +265,7 @@ def _interpolate_lines(clusters, elongation_offset, extent):
             line.append(points[k])
         # smooth line
         line = np.array(line[::-1])
-        filter_len = min(len(line)//2*2-1, 11)
-        poly_order = min(filter_len-1, 3)
-        y = savgol_filter(line[:,0], filter_len, polyorder=poly_order)
-        x = savgol_filter(line[:,1], filter_len, polyorder=poly_order)
-        line = np.around(np.dstack((x, y)))[0]
-        line = approximate_polygon(line, 1)
+        line = approximate_polygon(line[:,[1,0]], 1)
         lr_dir = line[0] - line[1]
         lr_dir = (lr_dir.T  / np.sqrt(np.sum(lr_dir**2,axis=-1))) * elongation_offset
         line[0] = line[0] + lr_dir
