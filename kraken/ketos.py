@@ -592,7 +592,7 @@ def extract(ctx, binarize, normalization, normalize_whitespace, reorder,
               help='Font style to use')
 @click.option('-p', '--prefill', default=None,
               help='Use given model for prefill mode.')
-@click.option('-p', '--pad', show_default=True, type=(int, int), default=(0, 0),
+@click.option('--pad', show_default=True, type=(int, int), default=(0, 0),
               help='Left and right padding around lines')
 @click.option('-l', '--lines', type=click.Path(exists=True), show_default=True,
               help='JSON file containing line coordinates')
