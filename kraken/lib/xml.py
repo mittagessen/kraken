@@ -102,6 +102,9 @@ def parse_page(filename):
             coords = region.find('{*}Coords')
             if coords is not None and not coords.get('points').isspace() and len(coords.get('points')):
                 coords = _parse_coords(coords.get('points'))
+            else:
+                logger.warning('Region {} without coordinates'.format(region.get('id')))
+                continue
             rtype = region.get('type')
             # parse transkribus-style custom field if possible
             custom_str = region.get('custom')
@@ -117,6 +120,7 @@ def parse_page(filename):
         data['regions'] = region_data
 
         # parse line information
+        scripts = set()
         for line in lines:
             pol = line.find('./{*}Coords')
             boundary = None
@@ -130,6 +134,7 @@ def parse_page(filename):
                 baseline = _parse_coords(base.get('points'))
             else:
                 logger.warning('TextLine {} without baseline'.format(line.get('id')))
+                continue
             text = ''
             manual_transcription = line.find('./{*}TextEquiv')
             if manual_transcription is not None:
@@ -144,7 +149,12 @@ def parse_page(filename):
                 cs = _parse_page_custom(custom_str)
                 if 'structure' in cs and 'type' in cs['structure']:
                     l_type = cs['structure']['type']
-            data['lines'].append({'baseline': baseline, 'boundary': boundary, 'text': text, 'type': l_type})
+            scripts.add(l_type)
+            data['lines'].append({'baseline': baseline, 'boundary': boundary, 'text': text, 'script': l_type})
+        if len(scripts) > 1:
+            data['script_detection'] = True
+        else:
+            data['script_detection'] = False
         return data
 
 
@@ -177,12 +187,13 @@ def parse_alto(filename):
             pol = line.find('./{*}Shape/{*}Polygon')
             boundary = None
             if pol is not None:
-                points = [int(x) for x in pol.get('POINTS').split(' ')]
+                points = [int(float(x)) for x in pol.get('POINTS').split(' ')]
                 boundary = list(zip(points[::2], points[1::2]))
-            points = [int(x) for x in line.get('BASELINE').split(' ')]
+            points = [int(float(x)) for x in line.get('BASELINE').split(' ')]
             baseline = list(zip(points[::2], points[1::2]))
             text = ''
             for el in line.xpath(".//*[local-name() = 'String'] | .//*[local-name() = 'SP']"):
                 text += el.get('CONTENT') if el.get('CONTENT') else ' '
-            data['lines'].append({'baseline': baseline, 'boundary': boundary, 'text': text, 'type': 'default'})
+            data['lines'].append({'baseline': baseline, 'boundary': boundary, 'text': text, 'script': 'default'})
+        data['script_detection'] = False
         return data

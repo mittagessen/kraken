@@ -26,6 +26,7 @@ from click import open_file
 from bidi.algorithm import get_display
 
 from typing import cast, Set, List, IO, Any
+from collections import defaultdict
 
 from kraken.lib import log
 from kraken.lib.exceptions import KrakenCairoSurfaceException
@@ -77,12 +78,26 @@ def _expand_gt(ctx, param, value):
         images.extend([x for x in glob.iglob(expression, recursive=True) if os.path.isfile(x)])
     return images
 
+def _validate_merging(ctx, param, value):
+    """
+    Maps baseline/region merging to a dict of merge structures.
+    """
+    if not value:
+        return None
+    merge_dict = {} # type: Dict[str, str]
+    try:
+        for m in value:
+            k, v = m.split(':')
+            merge_dict[v] = k  # type: ignore
+    except Exception:
+        raise click.BadParameter('Mappings must be in format target:src')
+    return merge_dict
 
 @cli.command('segtrain')
 @click.pass_context
 @click.option('-o', '--output', show_default=True, type=click.Path(), default='model', help='Output model file')
 @click.option('-s', '--spec', show_default=True,
-              default='[1,1200,0,3 Cr3,3,64,2,2 Gn32 Cr3,3,128,2,2 Gn32 Cr3,3,64 Gn32 Lbx32 Lby32 Cr1,1,32 Gn32 Lby32 Lbx32 O2l3]',
+              default='[1,1200,0,3 Cr3,3,64,2,2 Gn32 Cr3,3,128,2,2 Gn32 Cr3,3,64 Gn32 Lbx32 Lby32 Cr1,1,32 Gn32 Lby32 Lbx32]',
               help='VGSL spec of the baseline labeling network')
 @click.option('--line-width', show_default=True, default=8, help='The height of each baseline in the target after scaling')
 @click.option('-i', '--load', show_default=True, type=click.Path(exists=True, readable=True), help='Load existing file to continue training')
@@ -118,12 +133,20 @@ def _expand_gt(ctx, param, value):
               'link to source images. In `path` mode arguments are image files'
               'sharing a prefix up to the last extension with JSON `.path` files'
               'containing the baseline information.')
-@click.option('--augment/--no-augment', show_default=False, default=False, help='Enable image augmentation')
+@click.option('--suppress-regions/--no-suppress-regions', show_default=True, default=False, help='Disables region segmentation training.')
+@click.option('--suppress-baselines/--no-suppress-baselines', show_default=True, default=False, help='Disables baseline segmentation training.')
+@click.option('-vr', '--valid-regions', show_default=True, default=None, multiple=True, help='Valid region types in training data. May be used multiple times.')
+@click.option('-vb', '--valid-baselines', show_default=True, default=None, multiple=True, help='Valid baseline types in training data. May be used multiple times.')
+@click.option('-mr', '--merge-regions', show_default=True, default=None, help='Region merge mapping. One or more mappings of the form `$target:$src` where $src is merged into $target.', multiple=True, callback=_validate_merging)
+@click.option('-mb', '--merge-baselines', show_default=True, default=None, help='Baseline type merge mapping. Same syntax as `--merge-regions`', multiple=True, callback=_validate_merging)
+@click.option('--augment/--no-augment', show_default=True, default=False, help='Enable image augmentation')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
              lag, min_delta, device, optimizer, lrate, momentum, weight_decay,
              schedule, partition, training_files, evaluation_files, threads,
-             force_binarization, format_type, augment, ground_truth):
+             force_binarization, format_type, suppress_regions,
+             suppress_baselines, valid_regions, valid_baselines, merge_regions,
+             merge_baselines, augment, ground_truth):
     """
     Trains a baseline labeling model for layout analysis
     """
@@ -146,14 +169,9 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
     nn = None
 
     if load:
-        logger.info('Loading existing model from {} '.format(load))
-        message('Loading existing model from {}'.format(load), nl=False)
+        logger.info(f'Loading existing model from {load} ')
+        message(f'Loading existing model from {load}', nl=False)
         nn = vgsl.TorchVGSLModel.load_model(load)
-        message('\u2713', fg='green')
-    else:
-        logger.info('Creating model {} '.format(spec))
-        message('Creating model {} '.format(spec), nl=False)
-        nn = vgsl.TorchVGSLModel(spec)
         message('\u2713', fg='green')
 
     # preparse input sizes from vgsl string to seed ground truth data set
@@ -161,11 +179,11 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
     if not nn:
         spec = spec.strip()
         if spec[0] != '[' or spec[-1] != ']':
-            raise click.BadOptionUsage('spec', 'VGSL spec {} not bracketed'.format(spec))
+            raise click.BadOptionUsage('spec', f'VGSL spec "{spec}" not bracketed')
         blocks = spec[1:-1].split(' ')
         m = re.match(r'(\d+),(\d+),(\d+),(\d+)', blocks[0])
         if not m:
-            raise click.BadOptionUsage('spec', 'Invalid input spec {}'.format(blocks[0]))
+            raise click.BadOptionUsage('spec', f'Invalid input spec {blocks[0]}')
         batch, height, width, channels = [int(x) for x in m.groups()]
     else:
         batch, channels, height, width = nn.input
@@ -190,21 +208,64 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
 
     tr_im = ground_truth[:int(len(ground_truth) * partition)]
     if evaluation_files:
-        logger.debug('Using {} images from explicit eval set'.format(len(evaluation_files)))
+        logger.debug(f'Using {len(evaluation_files)} images from explicit eval set')
         te_im = evaluation_files
     else:
         te_im = ground_truth[int(len(ground_truth) * partition):]
-        logger.debug('Taking {} images from training for evaluation'.format(len(te_im)))
+        logger.debug(f'Taking {len(te_im)} images from training for evaluation')
 
     # set multiprocessing tensor sharing strategy
     if 'file_system' in torch.multiprocessing.get_all_sharing_strategies():
         logger.debug('Setting multiprocessing tensor sharing strategy to file_system')
         torch.multiprocessing.set_sharing_strategy('file_system')
 
-    gt_set = BaselineSet(tr_im, line_width=line_width,
-                         im_transforms=transforms, mode=format_type, augmentation=augment)
-    val_set = BaselineSet(te_im, line_width=line_width,
-                          im_transforms=transforms, mode=format_type, augmentation=augment)
+    if len(valid_regions) == 0:
+        valid_regions = None
+    if len(valid_baselines) == 0:
+        valid_baselines = None
+
+    if suppress_regions:
+        valid_regions = []
+        merge_regions = None
+    if suppress_baselines:
+        valid_baselines = []
+        merge_baselines = None
+
+    gt_set = BaselineSet(tr_im,
+                         line_width=line_width,
+                         im_transforms=transforms,
+                         mode=format_type,
+                         augmentation=augment,
+                         valid_baselines=valid_baselines,
+                         merge_baselines=merge_baselines,
+                         valid_regions=valid_regions,
+                         merge_regions=merge_regions)
+    val_set = BaselineSet(te_im,
+                          line_width=line_width,
+                          im_transforms=transforms,
+                          mode=format_type,
+                          augmentation=augment,
+                          valid_baselines=valid_baselines,
+                          merge_baselines=merge_baselines,
+                          valid_regions=valid_regions,
+                          merge_regions=merge_regions)
+
+    # overwrite class mapping in validation set
+    val_set.num_classes = gt_set.num_classes
+    val_set.class_mapping = gt_set.class_mapping
+
+    if not load:
+        spec = f'[{spec[1:-1]} O2l{gt_set.num_classes}]'
+        message(f'Creating model {spec} with {gt_set.num_classes} outputs ', nl=False)
+        nn = vgsl.TorchVGSLModel(spec)
+        message('\u2713', fg='green')
+
+    message('Training line types:')
+    for k, v in gt_set.class_mapping['baselines'].items():
+        message(f'  {k}\t{v}')
+    message('Training region types:')
+    for k, v in gt_set.class_mapping['regions'].items():
+        message(f'  {k}\t{v}')
 
     if len(gt_set.imgs) == 0:
         raise click.UsageError('No valid training data was provided to the train command. Please add valid XML or line data.')
@@ -218,13 +279,14 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
     test_loader = DataLoader(val_set, batch_size=1, shuffle=True, num_workers=loader_threads, pin_memory=True)
     threads = max((threads - loader_threads, 1))
 
-    # set model type metadata field
+    # set model type metadata field and dump class_mapping
     nn.model_type = 'segmentation'
+    nn.user_metadata['class_mapping'] = val_set.class_mapping
 
     # set mode to training
     nn.train()
 
-    logger.debug('Set OpenMP threads to {}'.format(threads))
+    logger.debug(f'Set OpenMP threads to {threads}')
     nn.set_num_threads(threads)
 
     optim = getattr(torch.optim, optimizer)(nn.nn.parameters(), lr=0)
@@ -244,7 +306,7 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
     elif quit == 'dumb':
         st_it = EpochStopping(epochs - completed_epochs)
     else:
-        raise click.BadOptionUsage('quit', 'Invalid training interruption scheme {}'.format(quit))
+        raise click.BadOptionUsage('quit', f'Invalid training interruption scheme {quit}.')
 
     trainer = train.KrakenTrainer(model=nn,
                                   optimizer=optim,
@@ -265,8 +327,8 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
         def _draw_progressbar():
             bar.update(1)
 
-        def _print_eval(epoch, mcc, f1, recall, precision, **kwargs):
-            message('Accuracy report ({}) mcc: {:0.4f} f1: {:0.4f} recall: {:0.4f} precision: {:0.4f}'.format(epoch, mcc, f1, recall, precision))
+        def _print_eval(epoch, accuracy, mean_acc, mean_iu, freq_iu, **kwargs):
+            message('Accuracy report ({}) mean_iu: {:0.4f} freq_iu: {:0.4f} mean_acc: {:0.4f} accuracy: {:0.4f}'.format(epoch, mean_iu, freq_iu, mean_acc, accuracy))
             # reset progress bar
             bar.label = 'stage {}/{}'.format(epoch+1, trainer.stopper.epochs if trainer.stopper.epochs > 0 else '∞')
             bar.pos = 0
@@ -517,7 +579,7 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
         char = make_printable(k)
         if char == k:
             char = '\t' + char
-        logger.info(u'{}\t{}'.format(char, v))
+        logger.info('{}\t{}'.format(char, v))
 
     logger.debug('Encoding training set')
 

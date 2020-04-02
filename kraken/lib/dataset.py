@@ -23,14 +23,18 @@ import unicodedata
 import numpy as np
 import pkg_resources
 import bidi.algorithm as bd
+import shapely.geometry as geom
 import torchvision.transforms.functional as tf
 
 from os import path
 from PIL import Image, ImageDraw
-from collections import Counter
+from itertools import groupby
+from collections import Counter, defaultdict
 from torchvision import transforms
 from torch.utils.data import Dataset, DataLoader
 from typing import Dict, List, Tuple, Sequence, Callable, Optional, Any, Union, cast
+
+from skimage.draw import polygon
 
 from kraken.lib.xml import parse_alto, parse_page
 from kraken.lib.util import is_bitonal
@@ -279,7 +283,8 @@ def preparse_xml_data(filenames, format_type='page', repolygonize=False):
     """
     Loads training data from a set of xml files.
 
-    Extracts line information from Page/ALTO xml files for training purposes.
+    Extracts line information from Page/ALTO xml files for training of
+    recognition models.
 
     Args:
         filenames (list): List of XML files.
@@ -457,10 +462,9 @@ class PolygonGTDataset(Dataset):
         if self.preload:
             x, y = self.training_set[index]
             if self.aug:
-                im = x.permute((1, 2, 0)).numpy()
-                o = self.aug(image=im)
-                im = torch.tensor(o['image'].transpose(2, 0, 1))
-                return im, y
+                x = x.permute((1, 2, 0)).numpy()
+                o = self.aug(image=x)
+                x = torch.tensor(o['image'].transpose(2, 0, 1))
             return x, y
         else:
             item = self.training_set[index]
@@ -671,14 +675,18 @@ class GroundTruthDataset(Dataset):
 
 class BaselineSet(Dataset):
     """
-    Dataset for training a baseline recognition model.
+    Dataset for training a baseline/region segmentation model.
     """
     def __init__(self, imgs: Sequence[str] = None,
                  suffix: str = '.path',
                  line_width: int = 4,
                  im_transforms: Callable[[Any], torch.Tensor] = transforms.Compose([]),
                  mode: str = 'path',
-                 augmentation: bool = False):
+                 augmentation: bool = False,
+                 valid_baselines: Sequence[str] = None,
+                 merge_baselines: Dict[str, Sequence[str]] = None,
+                 valid_regions: Sequence[str] = None,
+                 merge_regions: Dict[str, Sequence[str]] = None):
         """
         Reads a list of image-json pairs and creates a data set.
 
@@ -693,11 +701,29 @@ class BaselineSet(Dataset):
                         ALTO/PageXML file. In `None` mode data is iteratively
                         added through the `add` method.
             augmentation (bool): Enable/disable augmentation.
+            valid_baselines (list): Sequence of valid baseline identifiers. If
+                                    `None` all are valid.
+            merge_baselines (dict): Sequence of baseline identifiers to merge.
+                                    Note that merging occurs after entities not
+                                    in valid_* have been discarded.
+            valid_regions (list): Sequence of valid region identifiers. If
+                                  `None` all are valid.
+            merge_regions (dict): Sequence of region identifiers to merge.
+                                  Note that merging occurs after entities not
+                                  in valid_* have been discarded.
         """
         super().__init__()
         self.mode = mode
         self.im_mode = '1'
         self.aug = None
+        self.targets = []
+        # n-th entry contains semantic of n-th class
+        self.class_mapping = {'aux': {'_start_separator': 0, '_end_separator': 1}, 'baselines': {}, 'regions': {}}
+        self.num_classes = 2
+        self.mbl_dict = merge_baselines if merge_baselines is not None else {}
+        self.mreg_dict = merge_regions if merge_regions is not None else {}
+        self.valid_baselines = valid_baselines
+        self.valid_regions = valid_regions
         if mode in ['alto', 'page']:
             if mode == 'alto':
                 fn = parse_alto
@@ -709,16 +735,41 @@ class BaselineSet(Dataset):
                 try:
                     data = fn(img)
                     im_paths.append(data['image'])
-                    self.targets.append([line['baseline'] for line in data['lines']])
+                    lines = defaultdict(list)
+                    for line in data['lines']:
+                        if valid_baselines is None or line['type'] in valid_baselines:
+                            lines[self.mbl_dict.get(line['type'], line['type'])].append(line['baseline'])
+                    regions = defaultdict(list)
+                    for k, v in data['regions'].items():
+                        if valid_regions is None or k in valid_regions:
+                            regions[self.mreg_dict.get(k, k)].extend(v)
+                    data['regions'] = regions
+                    self.targets.append({'baselines': lines, 'regions': data['regions']})
                 except KrakenInputException as e:
                     logger.warning(e)
                     continue
+            # get line types
             imgs = im_paths
+            # calculate class mapping
+            line_types = set()
+            region_types = set()
+            for page in self.targets:
+                for line_type in page['baselines'].keys():
+                    line_types.add(line_type)
+                for reg_type in page['regions'].keys():
+                    region_types.add(reg_type)
+            idx = -1
+            for idx, line_type in enumerate(line_types):
+                self.class_mapping['baselines'][line_type] = idx + self.num_classes
+            self.num_classes += idx + 1
+            idx = -1
+            for idx, reg_type in enumerate(region_types):
+                self.class_mapping['regions'][reg_type] = idx + self.num_classes
+            self.num_classes += idx + 1
         elif mode == 'path':
             pass
         elif mode is None:
             imgs = []
-            self.targets = []
         else:
             raise Exception('invalid dataset mode')
         if augmentation:
@@ -752,18 +803,42 @@ class BaselineSet(Dataset):
         self.tail_transforms = transforms.Compose(im_transforms.transforms[2:])
         self.seg_type = None
 
-    def add(self, image: Union[str, Image.Image], baselines: List[List[Tuple[int, int]]], *args, **kwargs):
+    def add(self,
+            image: Union[str, Image.Image],
+            baselines: Dict[str, List[List[Tuple[int, int]]]],
+            regions: Dict[str, List[List[Tuple[int, int]]]] = None,
+            *args,
+            **kwargs):
         """
-        Adds a line to the dataset.
+        Adds a page to the dataset.
 
         Args:
             im (path): Path to the whole page image
-            baseline (list): A list of lists of coordinates [[x0, y0], ..., [xn, yn]]].
+            baseline (dict): A dict containing list of lists of coordinates {'line_type_0': [[x0, y0], ..., [xn, yn]]], 'line_type_1': ...}.
+            regions (dict): A dict containing list of lists of coordinates {'region_type_0': [[x0, y0], ..., [xn, yn]]], 'region_type_1': ...}.
         """
         if self.mode:
             raise Exception('The `add` method is incompatible with dataset mode {}'.format(self.mode))
-        self.imgs.append(image)
-        self.targets.append(baselines)
+
+        data = fn(img)
+        lines = defaultdict(list)
+        for line in data['lines']:
+            line_type = self.mbl_dict.get(line['type'], line['type'])
+            if self.valid_baselines is None or line['type'] in self.valid_baselines:
+                lines[line_type].append(line['baseline'])
+                if line_type not in self.class_mapping['baselines']:
+                    self.num_classes += 1
+                    self.class_mapping['baselines'][line_type] = self.num_classes
+        regions = defaultdict(list)
+        for k, v in data['regions'].items():
+            if self.valid_regions is None or k in self.valid_regions:
+                reg_type = self.mreg_dict.get(k, k)
+                regions[reg_type].extend(v)
+                if reg_type not in self.class_mapping['regions']:
+                    self.num_classes += 1
+                    self.class_mapping['baselines'][line_type] = self.num_classes
+        self.targets.append({'baselines': lines, 'regions': regions})
+        self.imgs.append(data['image'])
 
     def __getitem__(self, idx):
         im = self.imgs[idx]
@@ -778,6 +853,7 @@ class BaselineSet(Dataset):
                 im = Image.open(im)
                 return self.transform(im, target)
             except Exception:
+                raise
                 idx = np.random.randint(0, len(self.imgs))
                 logger.debug('Failed. Replacing with sample {}'.format(idx))
                 return self[np.random.randint(0, len(self.imgs))]
@@ -804,35 +880,38 @@ class BaselineSet(Dataset):
             self.im_mode = image.mode
         image = self.tail_transforms(image)
         scale = image.shape[2]/orig_size[0]
-        t = Image.new('L', image.shape[:0:-1])
-        line_mask = ImageDraw.Draw(t)
-        s = Image.new('L', image.shape[:0:-1])
-        separator_mask = ImageDraw.Draw(s)
-        lines = []
-        for line in target:
-            l = []
-            for point in line:
-                l.append((int(point[0]*scale), int(point[1]*scale)))
-            line_mask.line(l, fill=255, width=self.line_width)
-            sep_1 = [tuple(x) for x in self._get_ortho_line(l[:2], l[0], self.line_width, 'l')]
-            separator_mask.line(sep_1, fill=255, width=self.line_width)
-            sep_2 = [tuple(x) for x in self._get_ortho_line(l[-2:], l[-1], self.line_width, 'r')]
-            separator_mask.line(sep_2, fill=255, width=self.line_width)
-        del line_mask
-        del separator_mask
-        target = np.array(t)
-        separator = np.array(s)
-        target[separator != 0] = 2
-        target = tf.to_tensor(Image.fromarray(target)).long()
-        separator = tf.to_tensor(Image.fromarray(separator)).long()
-        target[separator != 0] = 2
-        # squeeze away channel dimension for NLLLoss
-        target = target.squeeze()
+        t = torch.zeros((self.num_classes,) + image.shape[1:])
+        start_sep_cls = self.class_mapping['aux']['_start_separator']
+        end_sep_cls = self.class_mapping['aux']['_end_separator']
+
+        for key, lines in target['baselines'].items():
+            cls_idx = self.class_mapping['baselines'][key]
+            for line in lines:
+                # buffer out line to desired width
+                line = [k for k, g in groupby(line)]
+                line = np.array(line)*scale
+                line_pol = np.array(geom.LineString(line).buffer(self.line_width/2, cap_style=2).boundary, dtype=np.int)
+                rr, cc = polygon(line_pol[:,1], line_pol[:,0], shape=image.shape[1:])
+                t[cls_idx, rr, cc] = 1
+                start_sep = np.array(geom.LineString(self._get_ortho_line(line[:2], line[0], self.line_width, 'l')).buffer(self.line_width/2, cap_style=2).boundary, dtype=np.int)
+                rr, cc = polygon(start_sep[:,1], start_sep[:,0], shape=image.shape[1:])
+                t[start_sep_cls, rr, cc] = 1
+                end_sep = np.array(geom.LineString(self._get_ortho_line(line[-2:], line[-1], self.line_width, 'r')).buffer(self.line_width/2, cap_style=2).boundary, dtype=np.int)
+                rr, cc = polygon(end_sep[:,1], end_sep[:,0], shape=image.shape[1:])
+                t[end_sep_cls, rr, cc] = 1
+        for key, regions in target['regions'].items():
+            cls_idx = self.class_mapping['regions'][key]
+            for region in regions:
+                region = np.array(region)*scale
+                rr, cc = polygon(region[:,1], region[:,0], shape=image.shape[1:])
+                t[cls_idx, rr, cc] = 1
+        target = t
         if self.aug:
-            image = image.permute((1, 2, 0)).numpy()
-            o = self.aug(image=image, mask=target.numpy())
-            image = torch.tensor(o['image'].transpose(2, 0, 1))
-            target = torch.tensor(o['mask']).long()
+            image = image.permute(1, 2, 0).numpy()
+            target = target.permute(1, 2, 0).numpy()
+            o = self.aug(image=image, mask=target)
+            image = torch.tensor(o['image']).permute(2, 0, 1)
+            target = torch.tensor(o['mask']).permute(2, 0, 1)
         return image, target
 
     def __len__(self):

@@ -241,7 +241,7 @@ def recognition_loss_fn(criterion, output, target):
 
 
 def baseline_label_loss_fn(criterion, output, target):
-    output = F.interpolate(output, size=(target.size(1), target.size(2)))
+    output = F.interpolate(output, size=(target.size(2), target.size(3)))
     loss = criterion(output, target)
     return loss
 
@@ -254,50 +254,42 @@ def recognition_evaluator_fn(model, val_set, device):
     return {'val_metric': accuracy, 'accuracy': accuracy, 'chars': chars, 'error': error}
 
 
-def baseline_label_evaluator_fn(model, val_set, device):
 
-    true_positives = 0
-    all_positives = 0
-    actual_positives = 0
-    all_n = 0
+def baseline_label_evaluator_fn(model, val_set, device):
+    smooth = np.finfo(np.float).eps
+    corrects = torch.zeros(val_set.num_classes, dtype=torch.double).to(device)
+    all_n = torch.zeros(val_set.num_classes, dtype=torch.double).to(device)
+    intersections = torch.zeros(val_set.num_classes, dtype=torch.double).to(device)
+    unions = torch.zeros(val_set.num_classes, dtype=torch.double).to(device)
+    cls_cnt = torch.zeros(val_set.num_classes, dtype=torch.double).to(device)
     model.eval()
+
     with torch.no_grad():
         for x, y in val_set:
             x = x.to(device)
             y = y.to(device).unsqueeze(0)
             pred = model.nn(x.unsqueeze(0))
-            # scale output to target size
-            pred = F.interpolate(pred, size=(y.size(1), y.size(2)))
-            pred = segmentation.denoising_hysteresis_thresh(pred.detach().squeeze().cpu().numpy(), 0.4, 0.5, 0)
-            # squash classes to indices
-            pred = torch.from_numpy(pred.astype('f')).to(device)
-            pred = pred.argmax(dim=0).view(-1)
-            y = y.view(-1)
-            correct = torch.eq(y, pred)
-            correct[y == 0] = 0
-            correct[pred == 0] = 0
-            all_p = (pred != 0).sum(dim=0).type(torch.DoubleTensor)
-            actual_p = (y != 0).sum(dim=0).type(torch.DoubleTensor)
-            if correct.sum() == 0:
-                tp = torch.zeros_like(all_p)
-            else:
-                tp = correct.sum(dim=0)
-            tp = tp.type(torch.DoubleTensor)
-            true_positives += tp
-            all_positives += all_p
-            actual_positives += actual_p
-            all_n += len(y)
+            # scale target to output size
+            y = F.interpolate(y, size=(pred.size(2), pred.size(3))).squeeze(0).bool()
+            pred = segmentation.denoising_hysteresis_thresh(pred.detach().squeeze().cpu().numpy(), 0.2, 0.3, 0)
+            pred = torch.from_numpy(pred.astype('bool')).to(device)
+            pred = pred.view(pred.size(0), -1)
+            y = y.view(y.size(0), -1)
+            intersections += (y & pred).sum(dim=1, dtype=torch.double)
+            unions += (y | pred).sum(dim=1, dtype=torch.double)
+            corrects += torch.eq(y, pred).sum(dim=1, dtype=torch.double)
+            cls_cnt += y.sum(dim=1, dtype=torch.double)
+            all_n += y.size(1)
     model.train()
     # all_positives = tp + fp
     # actual_positives = tp + fn
     # true_positivies = tp
-    precision = true_positives/(all_positives + 1e-20)
-    recall = true_positives/(actual_positives + 1e-20)
-    f1 = precision * recall * 2/(precision + recall + 1e-20)
-    s = actual_positives/all_n
-    p = all_positives/all_n
-    mcc = ((true_positives/all_n) - s*p)/(torch.sqrt(p*s*(1-s)*(1-p)) + 1e-20)
-    return {'precision': precision, 'recall': recall, 'f1': f1, 'mcc': mcc, 'val_metric': mcc}
+    pixel_accuracy = corrects.sum()/all_n.sum()
+    mean_accuracy = torch.mean(corrects/all_n)
+    iu = (intersections+smooth)/(unions+smooth)
+    mean_iu = torch.mean(iu)
+    freq_iu = torch.sum(cls_cnt/cls_cnt.sum() * iu)
+    return {'accuracy': pixel_accuracy, 'mean_acc': mean_accuracy, 'mean_iu': mean_iu, 'freq_iu': freq_iu, 'val_metric': mean_iu}
 
 
 class KrakenTrainer(object):

@@ -23,6 +23,7 @@ import logging
 import bidi.algorithm as bd
 
 from PIL import Image
+from collections import defaultdict
 from typing import List, Tuple, Optional, Generator, Union, Dict
 
 from kraken.lib.util import get_im_str, is_bitonal
@@ -45,6 +46,7 @@ class ocr_record(object):
         self.prediction = prediction
         self.cuts = cuts
         self.confidences = confidences
+        self.script = None if 'script' not in line else line['script']
         self.type = 'baselines' if 'baseline' in line else 'box'
         if self.type == 'baselines':
             self.line = line['boundary']
@@ -124,7 +126,9 @@ def bidi_record(record: ocr_record) -> ocr_record:
         line = {'boundary': record.line, 'baseline': record.baseline}
     else:
         line = record.line
-    return ocr_record(prediction, cuts, confidences, line)
+    rec = ocr_record(prediction, cuts, confidences, line)
+    rec.script = record.script
+    return rec
 
 
 class mm_rpred(object):
@@ -169,8 +173,8 @@ class mm_rpred(object):
         """
         seg_types = set(recognizer.seg_type for recognizer in nets.values())
         if ('type' in bounds and bounds['type'] not in seg_types) or len(seg_types) > 1:
-            logger.warning('Recognizers with segmentation types {} will be'
-                           'applied to segmentation of type {}. This will likely result'
+            logger.warning('Recognizers with segmentation types {} will be '
+                           'applied to segmentation of type {}. This will likely result '
                            'in severely degraded performace'.format(seg_types,
                             bounds['type'] if 'type' in bounds else None))
         one_channel_modes = set(recognizer.nn.one_channel_mode for recognizer in nets.values())
@@ -199,13 +203,14 @@ class mm_rpred(object):
         logger.info('Running {} multi-script recognizers on {} with {} lines'.format(len(nets), im_str, self.len))
 
         miss = [script for script in scripts if not nets.get(script)]
-        if miss:
-            raise KrakenInputException('Missing models for scripts {}'.format(miss))
+        if miss and not isinstance(nets, defaultdict):
+            raise KrakenInputException('Missing models for scripts {}'.format(set(miss)))
 
         # build dictionary for line preprocessing
         self.ts = {}
-        for script, network in nets.items():
+        for script in scripts:
             logger.debug('Loading line transforms for {}'.format(script))
+            network = nets[script]
             batch, channels, height, width = network.nn.input
             self.ts[script] = generate_input_transforms(batch, height, width, channels, pad, valid_norm)
 

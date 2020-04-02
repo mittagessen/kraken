@@ -65,12 +65,12 @@ def nlbin(im: Image.Image,
         KrakenInputException when trying to binarize an empty image.
     """
     im_str = get_im_str(im)
-    logger.info('Binarizing {}'.format(im_str))
+    logger.info(f'Binarizing {im_str}')
     if is_bitonal(im):
-        logger.info('Skipping binarization because {} is bitonal.'.format(im_str))
+        logger.info(f'Skipping binarization because {im_str} is bitonal.')
         return im
     # convert to grayscale first
-    logger.debug('Converting {} to grayscale'.format(im_str))
+    logger.debug(f'Converting {im_str} to grayscale')
     im = im.convert('L')
     raw = pil2array(im)
     logger.debug('Scaling and normalizing')
@@ -78,7 +78,7 @@ def nlbin(im: Image.Image,
     raw = raw/np.float(np.iinfo(raw.dtype).max)
     # perform image normalization
     if np.amax(raw) == np.amin(raw):
-        logger.warning('Trying to binarize empty image {}'.format(im_str))
+        logger.warning(f'Trying to binarize empty image {im_str}')
         raise KrakenInputException('Image is empty')
     image = raw-np.amin(raw)
     image /= np.amax(image)
@@ -116,6 +116,6 @@ def nlbin(im: Image.Image,
     flat -= lo
     flat /= (hi-lo)
     flat = np.clip(flat, 0, 1)
-    logger.debug('Thresholding at {}'.format(threshold))
+    logger.debug(f'Thresholding at {threshold}')
     bin = np.array(255*(flat > threshold), 'B')
     return array2pil(bin)

@@ -218,7 +218,7 @@ class TorchVGSLModel(object):
             return getattr(sys.modules[mname], cname)
 
         of = io.open
-        if path.endswith(u'.gz'):
+        if path.endswith('.gz'):
             of = gzip.open
         with io.BufferedReader(of(path, 'rb')) as fp:
             unpickler = cPickle.Unpickler(fp)
@@ -364,7 +364,7 @@ class TorchVGSLModel(object):
             mode = 'clstm_compat'
 
         # extract codec
-        codec = PytorchCodec([u''] + [chr(x) for x in net.codec[1:]])
+        codec = PytorchCodec([''] + [chr(x) for x in net.codec[1:]])
 
         # separate layers
         nets = {}
@@ -721,16 +721,14 @@ class TorchVGSLModel(object):
             raise ValueError('categorical output not supported, yet.')
         if nl == 'c' and dim == 2:
             raise ValueError('CTC not supported for heatmap output')
-        if nl == 'l' and int(m.group('out')) == 1:
+        if nl in ['l', 's'] and int(m.group('out')) >= 1:
             self.criterion = nn.BCELoss()
-        elif nl == 'l' and int(m.group('out')) > 1:
-            self.criterion = nn.NLLLoss()
         elif nl == 'c':
             self.criterion = nn.CTCLoss(reduction='none')
         else:
             raise ValueError('unsupported output specification')
         # heatmap output
-        if dim == 2 and outdim == 1:
+        if dim == 2:
             act = 's' if nl == 'l' else 'm'
             fn = layers.ActConv2D(input[1], outdim, (1, 1), (1, 1), act)
             logger.debug('{}\t\tconv\tkernel 1 x 1 filters {} stride 1 activation {}'.format(self.idx+1, outdim, nl))

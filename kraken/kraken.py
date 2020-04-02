@@ -24,8 +24,9 @@ import warnings
 import logging
 import pkg_resources
 
-from typing import Dict, Union, List, cast, Any, IO
+from typing import Dict, Union, List, cast, Any, IO, Callable
 from functools import partial
+from itertools import cycle
 from PIL import Image
 
 import click
@@ -48,10 +49,29 @@ def message(msg: str, **styles) -> None:
         click.secho(msg, **styles)
 
 
-# chainable functions of functional components (binarization/segmentation/recognition
+def get_input_parser(type_str: str) -> Callable[[str], Dict[str, Any]]:
+    if type_str == 'alto':
+        from kraken.lib.xml import parse_alto
+        return parse_alto
+    elif type_str == 'page':
+        from kraken.lib.xml import parse_page
+        return parse_page
+    elif type_str == 'image':
+        return Image.open
 
-def binarizer(threshold, zoom, escale, border, perc, range, low, high, base_image, input, output) -> None:
+
+# chainable functions of functional components (binarization/segmentation/recognition)
+
+def binarizer(threshold, zoom, escale, border, perc, range, low, high, input, output) -> None:
     from kraken import binarization
+
+    ctx = click.get_current_context()
+    if ctx.meta['first_process']:
+        if ctx.meta['input_format_type'] != 'image':
+            input = get_input_parser(ctx.meta['input_format_type'])(input)['image']
+        ctx.meta['first_process'] = False
+    else:
+        raise click.UsageError('Binarization has to be the initial process.')
 
     try:
         im = Image.open(input)
@@ -68,6 +88,7 @@ def binarizer(threshold, zoom, escale, border, perc, range, low, high, base_imag
             if ext:
                 logger.warning('jpeg does not support 1bpp images. Forcing to png.')
         res.save(output, format=form)
+        ctx.meta['base_image'] = output
     except Exception:
         message('\u2717', fg='red')
         raise
@@ -76,11 +97,21 @@ def binarizer(threshold, zoom, escale, border, perc, range, low, high, base_imag
 
 def segmenter(legacy, model, text_direction, script_detect, allowed_scripts,
               scale, maxcolseps, black_colseps, remove_hlines, pad, mask,
-              device, base_image, input, output) -> None:
+              device, input, output) -> None:
     import json
 
     from kraken import pageseg
     from kraken import blla
+
+    ctx = click.get_current_context()
+
+    if ctx.meta['first_process']:
+        if ctx.meta['input_format_type'] != 'image':
+            input = get_input_parser(ctx.meta['input_format_type'])(input)['image']
+        ctx.meta['first_process'] = False
+
+    if 'base_image' not in ctx.meta:
+        ctx.meta['base_image'] = input
 
     try:
         im = Image.open(input)
@@ -108,61 +139,57 @@ def segmenter(legacy, model, text_direction, script_detect, allowed_scripts,
     message('\u2713', fg='green')
 
 
-def recognizer(model, pad, no_segmentation, bidi_reordering, script_ignore, base_image, input, output, lines) -> None:
+def recognizer(model, pad, no_segmentation, bidi_reordering, script_ignore, input, output) -> None:
 
     import json
-    import tempfile
 
     from kraken import rpred
 
+    ctx = click.get_current_context()
+
+    bounds = None
+    if 'base_image' not in ctx.meta:
+        ctx.meta['base_image'] = input
+
+    if ctx.meta['first_process']:
+        if ctx.meta['input_format_type'] != 'image':
+            doc = get_input_parser(ctx.meta['input_format_type'])(input)
+            ctx.meta['base_image'] = doc['image']
+            doc['text_direction'] = 'horizontal-lr'
+            bounds = doc
+
     try:
-        im = Image.open(base_image)
+        im = Image.open(ctx.meta['base_image'])
     except IOError as e:
         raise click.BadParameter(str(e))
 
-    ctx = click.get_current_context()
-
-    # input may either be output from the segmenter then it is a JSON file or
-    # be an image file when running the OCR subcommand alone. might still come
-    # from some other subcommand though.
-    scripts = set()
-    if not lines and base_image != input:
-        lines = input
-    if not lines:
+    if not bounds and ctx.meta['base_image'] != input:
+        with open_file(input, 'r') as fp:
+            try:
+                fp = cast(IO[Any], fp)
+                bounds = json.load(fp)
+            except ValueError as e:
+                raise click.UsageError(f'{input} invalid segmentation: {str(e)}')
+    elif not bounds:
         if no_segmentation:
-            lines = tempfile.NamedTemporaryFile(mode='w', delete=False)
-            logger.info('Running in no_segmentation mode. Creating temporary segmentation {}.'.format(lines.name))
-            json.dump({'script_detection': False,
-                       'text_direction': 'horizontal-lr',
-                       'boxes': [(0, 0) + im.size]}, lines)
-            lines.close()
-            lines = lines.name
+            print('loading no_seg')
+            bounds = {'script_detection': False,
+                      'text_direction': 'horizontal-lr',
+                      'boxes': [(0, 0) + im.size]}
         else:
-            raise click.UsageError('No line segmentation given. Add one with `-l` or run `segment` first.')
+            raise click.UsageError('No line segmentation given. Add one with the input, `-l`, or run `segment` first.')
     elif no_segmentation:
         logger.warning('no_segmentation mode enabled but segmentation defined. Ignoring --no-segmentation option.')
 
-    with open_file(lines, 'r') as fp:
-        try:
-            fp = cast(IO[Any], fp)
-            bounds = json.load(fp)
-        except ValueError as e:
-            raise click.UsageError('{} invalid segmentation: {}'.format(lines, str(e)))
-        # script detection
-        if 'script_detection' in bounds and bounds['script_detection']:
-            for l in bounds['boxes']:
-                for t in l:
-                    scripts.add(t[0])
-            it = rpred.mm_rpred(model, im, bounds, pad,
-                                bidi_reordering=bidi_reordering,
-                                script_ignore=script_ignore)
-        else:
-            it = rpred.rpred(model['default'], im, bounds, pad,
-                             bidi_reordering=bidi_reordering)
-
-    if not lines and no_segmentation:
-        logger.debug('Removing temporary segmentation file.')
-        os.unlink(lines.name)
+    scripts = set()
+    # script detection
+    if 'script_detection' in bounds and bounds['script_detection']:
+        it = rpred.mm_rpred(model, im, bounds, pad,
+                            bidi_reordering=bidi_reordering,
+                            script_ignore=script_ignore)
+    else:
+        it = rpred.rpred(model['default'], im, bounds, pad,
+                         bidi_reordering=bidi_reordering)
 
     preds = []
 
@@ -173,14 +200,15 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, script_ignore, base
     ctx = click.get_current_context()
     with open_file(output, 'w', encoding='utf-8') as fp:
         fp = cast(IO[Any], fp)
-        message('Writing recognition results for {}\t'.format(base_image), nl=False)
+        message(f'Writing recognition results for {ctx.meta["orig_file"]}\t', nl=False)
         logger.info('Serializing as {} into {}'.format(ctx.meta['mode'], output))
         if ctx.meta['mode'] != 'text':
             from kraken import serialization
-            fp.write(serialization.serialize(preds, base_image,
-                                             Image.open(base_image).size,
+            fp.write(serialization.serialize(preds, ctx.meta['base_image'],
+                                             Image.open(ctx.meta['base_image']).size,
                                              ctx.meta['text_direction'],
                                              scripts,
+                                             bounds['regions'] if 'regions' in bounds else None,
                                              ctx.meta['mode']))
         else:
             fp.write('\n'.join(s.prediction for s in preds))
@@ -196,10 +224,22 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, script_ignore, base
               help='Input-output file pairs. Each input file (first argument) is mapped to one '
                    'output file (second argument), e.g. `-i input.png output.txt`')
 @click.option('-I', '--batch-input', multiple=True, help='Glob expression to add multiple files at once.')
-@click.option('-o', '--suffix', help='Suffix for output files from batch inputs.')
+@click.option('-o', '--suffix', default='', show_default=True,
+              help='Suffix for output files from batch and PDF inputs.')
 @click.option('-v', '--verbose', default=0, count=True, show_default=True)
-@click.option('-d', '--device', default='cpu', show_default=True, help='Select device to use (cpu, cuda:0, cuda:1, ...)')
-def cli(input, batch_input, suffix, verbose, device):
+@click.option('-f', '--format-type', type=click.Choice(['image', 'alto', 'page', 'pdf']), default='image',
+              help='Sets the default input type. In image mode inputs are image '
+                   'files, alto/page expects XML files in the respective format, pdf '
+                   'expects PDF files with numbered suffixes added to output file '
+                   'names as needed.')
+@click.option('-p', '--pdf-format', default='{src}_{idx:06d}',
+              show_default=True,
+              help='Format for output of PDF files. valid fields '
+                   'are `src` (source file), `idx` (page number), and `uuid` (v4 uuid). '
+                   '`-o` suffixes are appended to this format string.')
+@click.option('-d', '--device', default='cpu', show_default=True,
+              help='Select device to use (cpu, cuda:0, cuda:1, ...)')
+def cli(input, batch_input, suffix, verbose, format_type, pdf_format, device):
     """
     Base command for recognition functionality.
 
@@ -209,34 +249,90 @@ def cli(input, batch_input, suffix, verbose, device):
     """
     ctx = click.get_current_context()
     ctx.meta['device'] = device
+    ctx.meta['input_format_type'] = format_type if format_type != 'pdf' else 'image'
     log.set_logger(logger, level=30-min(10*verbose, 20))
 
 
 @cli.resultcallback()
-def process_pipeline(subcommands, input, batch_input, suffix, **args):
+def process_pipeline(subcommands, input, batch_input, suffix, verbose, format_type, pdf_format, **args):
     """
     Helper function calling the partials returned by each subcommand and
     placing their respective outputs in temporary files.
     """
     import glob
+    import uuid
     import tempfile
 
     input = list(input)
+    # expand batch inputs
     if batch_input and suffix:
         for batch_expr in batch_input:
             for in_file in glob.glob(batch_expr, recursive=True):
                 input.append((in_file, '{}{}'.format(os.path.splitext(in_file)[0], suffix)))
 
+    # parse pdfs
+    if format_type == 'pdf':
+        import pyvips
+
+        if not batch_input:
+            logger.warning('PDF inputs not added with batch option. Manual output filename will be ignored and `-o` utilized.')
+        new_input = []
+        num_pages = 0
+        for (fpath, _) in input:
+            doc = pyvips.Image.new_from_file(fpath, dpi=300, n=-1, access="sequential")
+            if 'n-pages' in doc.get_fields():
+                num_pages += doc.get('n-pages')
+
+        with log.progressbar(length=num_pages, label='Extracting PDF pages') as bar:
+            for (fpath, _) in input:
+                try:
+                    doc = pyvips.Image.new_from_file(fpath, dpi=300, n=-1, access="sequential")
+                    if 'n-pages' not in doc.get_fields():
+                        logger.warning('{fpath} does not contain pages. Skipping.')
+                        continue
+                    doc.flatten(background=255)
+                    n_pages = doc.get('n-pages')
+                    page_width = doc.width
+                    page_height = doc.height / n_pages
+
+                    dest_dict = {'idx': -1, 'src': fpath, 'uuid': None}
+                    for i in range(0, n_pages):
+                        dest_dict['idx'] += 1
+                        dest_dict['uuid'] = str(uuid.uuid4())
+                        fd, filename = tempfile.mkstemp(suffix='.png')
+                        os.close(fd)
+                        page = doc.crop(0, i * page_height, page_width, page_height)
+                        logger.info(f'Saving temporary image {fpath}:{dest_dict["idx"]} to {filename}')
+                        page.write_to_file(filename)
+                        new_input.append((filename, pdf_format.format(**dest_dict) + suffix))
+                        bar.update(1)
+                except pyvips.error.Error:
+                    logger.warning(f'{fpath} is not a PDF file. Skipping.')
+        input = new_input
+
+    ctx = click.get_current_context()
+
     for io_pair in input:
+        ctx.meta['first_process'] = True
+        ctx.meta['orig_file'] = io_pair[0]
+        if 'base_image' in ctx.meta:
+            del ctx.meta['base_image']
         try:
-            base_image = io_pair[0]
-            fc = [io_pair[0]] + [tempfile.mkstemp()[1] for cmd in subcommands[1:]] + [io_pair[1]]
+            tmps = [tempfile.mkstemp() for cmd in subcommands[1:]]
+            for tmp in tmps:
+                os.close(tmp[0])
+            fc = [io_pair[0]] + [tmp[1] for tmp in tmps] + [io_pair[1]]
             for task, input, output in zip(subcommands, fc, fc[1:]):
-                task(base_image=base_image, input=input, output=output)
-                base_image = input
+                task(input=input, output=output)
+        except Exception as e:
+            logger.error(f'Failed processing {io_pair[0]}: {str(e)}')
         finally:
             for f in fc[1:-1]:
                 os.unlink(f)
+            # clean up temporary PDF image files
+            if format_type == 'pdf':
+                logger.debug(f'unlinking {fc[0]}')
+                os.unlink(fc[0])
 
 
 @cli.command('binarize')
@@ -258,7 +354,7 @@ def binarize(threshold, zoom, escale, border, perc, range, low, high):
 @cli.command('segment')
 @click.pass_context
 @click.option('-i', '--model',
-              default=pkg_resources.resource_filename(__name__, 'blla.mlmodel'),
+              default=None,
               show_default=True, type=click.Path(exists=True),
               help='Baseline detection model to use')
 @click.option('-x/-bl', '--boxes/--baseline', default=True, show_default=True,
@@ -291,12 +387,12 @@ def segment(ctx, model, boxes, text_direction, script_detect, allowed_scripts,
     Segments page images into text lines.
     """
     if model and boxes:
-        logger.warning('Baseline model ({}) given but legacy segmenter selected. Forcing to -bl.'.format(model))
-        boxes = True
+        logger.warning(f'Baseline model ({model}) given but legacy segmenter selected. Forcing to -bl.')
+        boxes = False
 
     if boxes == False:
         from kraken.lib.vgsl import TorchVGSLModel
-        message('Loading ANN {}\t'.format(model), nl=False)
+        message(f'Loading ANN {model}\t', nl=False)
         try:
             model = TorchVGSLModel.load_model(model)
             model.to(ctx.meta['device'])
@@ -349,21 +445,23 @@ def _validate_mm(ctx, param, value):
               'ALTO, and plain text output', flag_value='hocr')
 @click.option('-a', '--alto', 'serializer', flag_value='alto')
 @click.option('-y', '--abbyy', 'serializer', flag_value='abbyyxml')
+@click.option('-x', '--pagexml', 'serializer', flag_value='pagexml')
 @click.option('-t', '--text', 'serializer', flag_value='text', default=True,
               show_default=True)
 @click.option('-d', '--text-direction', default='horizontal-tb',
               show_default=True,
               type=click.Choice(['horizontal-tb', 'vertical-lr', 'vertical-rl']),
               help='Sets principal text direction in serialization output')
-@click.option('-l', '--lines', type=click.Path(exists=True), show_default=True,
-              help='JSON file containing line coordinates')
 @click.option('--threads', default=1, show_default=True, type=click.IntRange(1),
               help='Number of threads to use for OpenMP parallelization.')
-def ocr(ctx, model, pad, reorder, no_segmentation, serializer, text_direction, lines, threads):
+def ocr(ctx, model, pad, reorder, no_segmentation, serializer, text_direction, threads):
     """
     Recognizes text in line images.
     """
     from kraken.lib import models
+
+    if ctx.meta['input_format_type'] != 'image' and no_segmentation:
+        raise click.BadParameter('no_segmentation mode is incompatible with page/alto inputs')
 
     # first we try to find the model in the absolue path, then ~/.kraken, then
     # LEGACY_MODEL_DIR
@@ -379,8 +477,8 @@ def ocr(ctx, model, pad, reorder, no_segmentation, serializer, text_direction, l
                 location = loc
                 break
         if not location:
-            raise click.BadParameter('No model for {} found'.format(k))
-        message('Loading ANN {}\t'.format(k), nl=False)
+            raise click.BadParameter(f'No model for {k} found')
+        message(f'Loading ANN {k}\t', nl=False)
         try:
             rnn = models.load_any(location, device=ctx.meta['device'])
             nm[k] = rnn
@@ -396,7 +494,7 @@ def ocr(ctx, model, pad, reorder, no_segmentation, serializer, text_direction, l
         nn.update(nm)
         nm = nn
     # thread count is global so setting it once is sufficient
-    nn[k].nn.set_num_threads(threads)
+    nm[k].nn.set_num_threads(threads)
 
     # set output mode
     ctx.meta['mode'] = serializer
@@ -406,8 +504,7 @@ def ocr(ctx, model, pad, reorder, no_segmentation, serializer, text_direction, l
                    pad=pad,
                    no_segmentation=no_segmentation,
                    bidi_reordering=reorder,
-                   script_ignore=ign_scripts,
-                   lines=lines)
+                   script_ignore=ign_scripts)
 
 
 @cli.command('show')
@@ -478,7 +575,7 @@ def get(ctx, model_id):
                               partial(message, '.', nl=False))
     message('\b\u2713', fg='green', nl=False)
     message('\033[?25h')
-    message('Model name: {}'.format(filename))
+    message(f'Model name: {filename}')
     ctx.exit(0)
 
 

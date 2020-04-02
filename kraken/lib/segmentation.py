@@ -28,18 +28,21 @@ from scipy.stats import linregress
 from scipy.spatial import distance_matrix, Delaunay
 from scipy.sparse.csgraph import shortest_path
 from scipy.spatial.distance import cdist, pdist, squareform
+from scipy.ndimage import maximum_filter
 from scipy.ndimage.filters import gaussian_filter, gaussian_filter1d
 from scipy.ndimage.morphology import distance_transform_cdt
 
 from shapely.ops import nearest_points, unary_union, linemerge
 
-from skimage import draw, measure
+from skimage import draw
 from skimage.filters import apply_hysteresis_threshold, sobel
-from skimage.measure import approximate_polygon, subdivide_polygon
+from skimage.measure import approximate_polygon, subdivide_polygon, find_contours
 from skimage.morphology import medial_axis
 from skimage.transform import PiecewiseAffineTransform, SimilarityTransform, AffineTransform, warp
 
-from typing import List, Tuple, Union, Dict, Any, Sequence
+from typing import List, Tuple, Union, Dict, Any, Sequence, Optional
+
+from kraken.lib.exceptions import KrakenInputException
 
 logger = logging.getLogger('kraken')
 
@@ -49,6 +52,7 @@ __all__ = ['reading_order',
            'calculate_polygonal_environment',
            'polygonal_reading_order',
            'scale_polygonal_lines',
+           'scale_regions',
            'compute_polygon_section',
            'extract_polygons']
 
@@ -146,10 +150,11 @@ def _find_superpixels(skeleton, heatmap, min_sp_dist):
     return np.array(sp_can)
 
 
-def _compute_sp_states(sp_can, bl_map, sep_map):
+def _compute_sp_states(sp_can, bl_map, st_map, end_map):
     """
     Estimates the superpixel state information.
     """
+    sep_map = st_map + end_map
     logger.debug('Triangulating superpixels')
     # some pages might not contain
     if len(sp_can) < 2:
@@ -236,20 +241,20 @@ def _cluster_lines(intensities):
     return clusters
 
 
-def _interpolate_lines(clusters, elongation_offset, extent):
+def _interpolate_lines(clusters, elongation_offset, extent, st_map, end_map):
     """
-    Interpolates the baseline clusters.
+    Interpolates the baseline clusters and sets the correct line direction.
     """
     logger.debug('Reticulating splines')
     lines = []
     extent = geom.Polygon([(0, 0), (extent[1]-1, 0), (extent[1]-1, extent[0]-1), (0, extent[0]-1), (0, 0)])
+    f_st_map = maximum_filter(st_map, size=20)
+    f_end_map = maximum_filter(end_map, size=20)
     for cluster in clusters[1:]:
         # find start-end point
         points = [point for edge in cluster for point in edge]
         dists = squareform(pdist(points))
         i, j = np.unravel_index(dists.argmax(), dists.shape)
-        if points[i][1] > points[j][1]:
-            i, j = j, i
         # build adjacency matrix for shortest path algo
         adj_mat = np.full_like(dists, np.inf)
         for l, r in cluster:
@@ -267,10 +272,10 @@ def _interpolate_lines(clusters, elongation_offset, extent):
         line = np.array(line[::-1])
         line = approximate_polygon(line[:,[1,0]], 1)
         lr_dir = line[0] - line[1]
-        lr_dir = (lr_dir.T  / np.sqrt(np.sum(lr_dir**2,axis=-1))) * elongation_offset
+        lr_dir = (lr_dir.T  / np.sqrt(np.sum(lr_dir**2,axis=-1))) * elongation_offset/2
         line[0] = line[0] + lr_dir
         rr_dir = line[-1] - line[-2]
-        rr_dir = (rr_dir.T  / np.sqrt(np.sum(rr_dir**2,axis=-1))) * elongation_offset
+        rr_dir = (rr_dir.T  / np.sqrt(np.sum(rr_dir**2,axis=-1))) * elongation_offset/2
         line[-1] = line[-1] + rr_dir
         ins = geom.LineString(line).intersection(extent)
         if ins.type == 'MultiLineString':
@@ -279,6 +284,16 @@ def _interpolate_lines(clusters, elongation_offset, extent):
             if ins.type != 'LineString':
                 continue
         line = np.array(ins, dtype='uint')
+        l_end = tuple(line[0])[::-1]
+        r_end = tuple(line[-1])[::-1]
+        if f_st_map[l_end] - f_end_map[l_end] > 0.2 and f_end_map[r_end] - f_st_map[r_end] > -0.2:
+            pass
+        elif f_st_map[l_end] - f_end_map[l_end] < -0.2 and f_end_map[r_end] - f_st_map[r_end] > 0.2:
+            line = line[::-1]
+        else:
+            logger.debug('Insufficient marker confidences in output. Defaulting to upright line.')
+            if line[0][0] > line[-1][0]:
+                line = line[::-1]
         lines.append(line.tolist())
     return lines
 
@@ -289,28 +304,53 @@ def vectorize_lines(im: np.ndarray, threshold: float = 0.2, min_sp_dist: int = 1
 
     Args:
         im (np.ndarray): Array of shape (3, H, W) with the first dimension
-                         being a probability distribution over (background,
-                         baseline, separators).
+                         being probabilities for (start_separators,
+                         end_separators, baseline).
 
     Returns:
         [[x0, y0, ... xn, yn], [xm, ym, ..., xk, yk], ... ]
         A list of lists containing the points of all baseline polylines.
     """
     # split into baseline and separator map
-    bl_map = im[1]
-    sep_map = im[2]
+    st_map = im[0]
+    end_map = im[1]
+    sep_map = st_map + end_map
+    bl_map = im[2]
     # binarize
     bin = im > threshold
-    skel, skel_dist_map = medial_axis(bin[1], return_distance=True)
+    skel, skel_dist_map = medial_axis(bin[2], return_distance=True)
     elongation_offset = np.max(skel_dist_map)
     sp_can = _find_superpixels(skel, heatmap=bl_map, min_sp_dist=min_sp_dist)
     if not sp_can.size:
         logger.warning('No superpixel candidates found in network output. Likely empty page.')
         return []
-    intensities = _compute_sp_states(sp_can, bl_map, sep_map)
+    intensities = _compute_sp_states(sp_can, bl_map, st_map, end_map)
     clusters = _cluster_lines(intensities)
-    lines = _interpolate_lines(clusters, elongation_offset, bl_map.shape)
+    lines = _interpolate_lines(clusters, elongation_offset, bl_map.shape, st_map, end_map)
     return lines
+
+
+def vectorize_regions(im: np.ndarray, threshold: float = 0.5):
+    """
+    Vectorizes lines from a binarized array.
+
+    Args:
+        im (np.ndarray): Array of shape (H, W) with the first dimension
+                         being a probability distribution over the region.
+        threshold (float): Threshold for binarization
+
+    Returns:
+        [[x0, y0, ... xn, yn], [xm, ym, ..., xk, yk], ... ]
+        A list of lists containing the region polygons.
+    """
+    bin = im > threshold
+    contours = find_contours(bin, 0.5, fully_connected='high', positive_orientation='high')
+    if len(contours) == 0:
+        return contours
+    approx_contours = []
+    for contour in contours:
+        approx_contours.append(approximate_polygon(contour[:,[1,0]], 1).astype('uint').tolist())
+    return approx_contours
 
 
 def _rotate(image, angle, center, scale, cval=0):
@@ -563,18 +603,21 @@ def calculate_polygonal_environment(im: PIL.Image.Image,
             polygons.append(None)
 
     if scale is not None:
-        polygons = [(np.array(pol)/scale).astype('int').tolist() for pol in polygons if pol is not None]
+        polygons = [(np.array(pol)/scale).astype('uint').tolist() if pol is not None else None for pol in polygons]
     return polygons
 
 
-def polygonal_reading_order(lines: Sequence[Tuple[List, List]], text_direction: str = 'lr') -> Sequence[Tuple[List, List]]:
+def polygonal_reading_order(lines: Sequence[Tuple[List, List]],
+                            text_direction: str = 'lr',
+                            regions: Optional[Sequence[List[Tuple[int, int]]]] = None) -> Sequence[Tuple[List, List]]:
     """
-    Given a list of baselines, calculates the correct reading order and applies
-    it to the input.
+    Given a list of baselines and regions, calculates the correct reading order
+    and applies it to the input.
 
     Args:
         lines (Sequence): List of tuples containing the baseline and its
                           polygonization.
+        regions (Sequence): List of region polygons.
         text_direction (str): Set principal text direction for column ordering.
                               Can be 'lr' or 'rl'
 
@@ -582,12 +625,63 @@ def polygonal_reading_order(lines: Sequence[Tuple[List, List]], text_direction: 
         A reordered input.
     """
     bounds = []
-    for line in lines:
-        l = geom.LineString(line[0]).bounds
-        bounds.append((slice(l[1], l[0]), slice(l[3], l[2])))
+    if regions is not None:
+        r = [geom.Polygon(reg) for reg in regions]
+    else:
+        r = []
+    region_lines = [[] for _ in range(len(r))]
+    indizes = {}
+    for line_idx, line in enumerate(lines):
+        l = geom.LineString(line[1])
+        is_in_region = False
+        for idx, reg in enumerate(r):
+            if reg.contains(l):
+                region_lines[idx].append((line_idx, (slice(l.bounds[1], l.bounds[0]), slice(l.bounds[3], l.bounds[2]))))
+                is_in_region = True
+                break
+        if not is_in_region:
+            bounds.append((slice(l.bounds[1], l.bounds[0]), slice(l.bounds[3], l.bounds[2])))
+            indizes[line_idx] = ('line', line)
+    # order everything in regions
+    intra_region_order = [[] for _ in range(len(r))]
+    for idx, reg in enumerate(r):
+        if len(region_lines[idx]) > 0:
+            order = reading_order([x[1] for x in region_lines[idx]], text_direction)
+            lsort = topsort(order)
+            intra_region_order[idx] = [region_lines[idx][i][0] for i in lsort]
+            reg = reg.bounds
+            bounds.append((slice(reg[1], reg[0]), slice(reg[3], reg[2])))
+            indizes[line_idx+idx] = ('region', idx)
+    # order unassigned lines and regions
     order = reading_order(bounds, text_direction)
     lsort = topsort(order)
-    return [lines[i] for i in lsort]
+    sidz = sorted(indizes.keys())
+    lsort = [sidz[i] for i in lsort]
+    ordered_lines = []
+    for i in lsort:
+        if indizes[i][0] == 'line':
+            ordered_lines.append(indizes[i][1])
+        else:
+            ordered_lines.extend(lines[x] for x in intra_region_order[indizes[i][1]])
+    return ordered_lines
+
+
+def scale_regions(regions: Sequence[Tuple[List, List]],
+                  scale: Union[float, Tuple[float, float]]) -> Sequence[Tuple[List, List]]:
+    """
+    Scales baselines/polygon coordinates by a certain factor.
+
+    Args:
+        lines (Sequence): List of tuples containing the baseline and it's
+                          polygonization.
+        scale (float or tuple of floats): Scaling factor
+    """
+    if isinstance(scale, float):
+        scale = (scale, scale)
+    scaled_regions = []
+    for region in regions:
+        scaled_regions.append((np.array(region) * scale).astype('uint').tolist())
+    return scaled_regions
 
 
 def scale_polygonal_lines(lines: Sequence[Tuple[List, List]], scale: Union[float, Tuple[float, float]]) -> Sequence[Tuple[List, List]]:
@@ -644,6 +738,10 @@ def compute_polygon_section(baseline, boundary, dist1, dist2):
         A sequence of polygon points.
     """
     # find baseline segments the points are in
+    if dist1 == 0:
+        dist1 = np.finfo(np.float).eps
+    if dist2 == 0:
+        dist2 = np.finfo(np.float).eps
     bl = np.array(baseline)
     dists = np.cumsum(np.diag(np.roll(squareform(pdist(bl)), 1)))
     segs_idx = np.searchsorted(dists, [dist1, dist2])
@@ -661,7 +759,7 @@ def compute_polygon_section(baseline, boundary, dist1, dist2):
         points = [_test_intersect(point, uv[::-1], bounds).round() for point, uv in zip(seg_points, unit_vec)]
     except ValueError:
         logger.warning('No intercepts with polygon (possibly misshaped polygon)')
-        return seg_points.astype('int')
+        return seg_points.astype('int').tolist()
     o = np.int_(points[0]).reshape(-1, 2).tolist()
     o.extend(np.int_(np.roll(points[1], 2)).reshape(-1, 2).tolist())
     return o

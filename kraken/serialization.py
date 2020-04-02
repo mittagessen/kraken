@@ -17,7 +17,11 @@ from jinja2 import Environment, PackageLoader
 
 import regex
 import logging
+import datetime
+import numpy as np
+import shapely.geometry as geom
 
+from shapely.ops import unary_union
 from collections import Counter
 
 from scipy.spatial import ConvexHull
@@ -25,7 +29,7 @@ from scipy.spatial import ConvexHull
 from kraken.rpred import ocr_record
 from kraken.lib.util import make_printable
 
-from typing import List, Tuple, Iterable, Optional, Sequence
+from typing import List, Tuple, Iterable, Optional, Sequence, Dict
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +77,7 @@ def serialize(records: Sequence[ocr_record],
               image_size: Tuple[int, int] = (0, 0),
               writing_mode: str = 'horizontal-tb',
               scripts: Optional[Iterable[str]] = None,
+              regions: Optional[Dict[str, List[List[Tuple[int, int]]]]] = None,
               template: str = 'hocr') -> str:
     """
     Serializes a list of ocr_records into an output document.
@@ -92,17 +97,53 @@ def serialize(records: Sequence[ocr_record],
                             are horizontal-tb, vertical-rl, and
                             vertical-lr.
         scripts (list): List of scripts contained in the OCR records
+        regions (list): Dictionary mapping region types to a list of region
+                        polygons.
         template (str): Selector for the serialization format. May be
                         'hocr' or 'alto'.
 
     Returns:
             (str) rendered template.
     """
-    logger.info('Serialize {} records from {} with template {}.'.format(len(records), image_name, template))
-    page = {'lines': [], 'size': image_size, 'name': image_name, 'writing_mode': writing_mode, 'scripts': scripts}  # type: dict
+    logger.info(f'Serialize {len(records)} records from {image_name} with template {template}.')
+    page = {'entities': [],
+            'size': image_size,
+            'name': image_name,
+            'writing_mode': writing_mode,
+            'scripts': scripts,
+            'date': datetime.datetime.now().isoformat()}  # type: dict
     seg_idx = 0
     char_idx = 0
+    region_map = {}
+    idx = 0
+    if regions is not None:
+        for id, regs in regions.items():
+            for reg in regs:
+                region_map[idx] = (id, geom.Polygon(reg), reg)
+                idx += 1
+
+    is_in_region = -1
     for idx, record in enumerate(records):
+        if record.type == 'baselines':
+            l_obj = geom.LineString(record.baseline)
+        else:
+            l_obj = geom.LineString(record.line)
+        reg = list(filter(lambda x: x[1][1].contains(l_obj), region_map.items()))
+        if len(reg) == 0:
+            cur_ent = page['entities']
+        elif reg[0][0] != is_in_region:
+            reg = reg[0]
+            is_in_region = reg[0]
+            region = {'index': reg[0],
+                      'bbox': [int(x) for x in reg[1][1].bounds],
+                      'boundary': reg[1][2],
+                      'region_type': reg[1][0],
+                      'lines': [],
+                      'type': 'region'
+                     }
+            page['entities'].append(region)
+            cur_ent = region['lines']
+
         # set field to indicate the availability of baseline segmentation in
         # addition to bounding boxes
         if record.type == 'baselines':
@@ -116,13 +157,16 @@ def serialize(records: Sequence[ocr_record],
                 'cuts': record.cuts,
                 'confidences': record.confidences,
                 'recognition': [],
-                'boundary': record.line
+                'boundary': record.line,
+                'type': 'line'
                 }
+        if record.script is not None:
+            line['script'] = record.script
         if record.type == 'baselines':
             line['baseline'] = record.baseline
         splits = regex.split(r'(\s+)', record.prediction)
         line_offset = 0
-        logger.debug('Record contains {} segments'.format(len(splits)))
+        logger.debug(f'Record contains {len(splits)} segments')
         for segment in splits:
             if len(segment) == 0:
                 continue
@@ -139,14 +183,20 @@ def serialize(records: Sequence[ocr_record],
                                               range(char_idx, char_idx + len(segment)))],
                           'index': seg_idx}
             # compute complex hull of all characters in segment
-            if record.type == 'baseline':
-                hull = ConvexHull(record.cuts[line_offset:line_offset + len(segment)])
-                seg_struct['boundary'] = hull.points.tolist()
+            if record.type == 'baselines':
+                pols = []
+                for x in record.cuts[line_offset:line_offset + len(segment)]:
+                    try:
+                        pols.append(geom.Polygon(x))
+                    except ValueError:
+                        pols.append(geom.LineString(x).buffer(0.5, cap_style=2))
+                coords = np.array(unary_union(pols).exterior.coords, dtype=np.uint).tolist()
+                seg_struct['boundary'] = coords
             line['recognition'].append(seg_struct)
             char_idx += len(segment)
             seg_idx += 1
             line_offset += len(segment)
-        page['lines'].append(line)
+        cur_ent.append(line)
     logger.debug('Initializing jinja environment.')
     env = Environment(loader=PackageLoader('kraken', 'templates'),
                       trim_blocks=True,
@@ -186,7 +236,7 @@ def render_report(model: str,
     Returns:
         A string containing the rendered report.
     """
-    logger.info('Serializing report for {}'.format(model))
+    logger.info(f'Serializing report for {model}.')
 
     report = {'model': model,
               'chars': chars,

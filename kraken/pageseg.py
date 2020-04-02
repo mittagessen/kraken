@@ -126,7 +126,7 @@ def compute_lines(segmentation, scale):
 
 def compute_separators_morph(binary: np.array, scale: float, sepwiden: int = 10, maxcolseps: int = 2) -> np.array:
     """Finds vertical black lines corresponding to column separators."""
-    logger.debug(u'Finding vertical black column lines')
+    logger.debug('Finding vertical black column lines')
     d0 = int(max(5, scale/4))
     d1 = int(max(5, scale)) + sepwiden
     thick = morph.r_dilation(binary, (d0, d1))
@@ -279,7 +279,7 @@ def remove_hlines(binary, scale, maxsize=10):
             numpy.array containing the filtered image.
 
     """
-    logger.debug(u'Filtering horizontal lines')
+    logger.debug('Filtering horizontal lines')
     labels, _ = morph.label(binary)
     objects = morph.find_objects(labels)
     for i, b in enumerate(objects):
@@ -292,7 +292,7 @@ def rotate_lines(lines, angle, offset):
     """
     Rotates line bounding boxes around the origin and adding and offset.
     """
-    logger.debug('Rotate line coordinates by {} with offset {}'.format(angle, offset))
+    logger.debug('Rotate line coordinates by {angle} with offset {offset}')
     angle = np.radians(angle)
     r = np.array([[np.cos(angle), -np.sin(angle)], [np.sin(angle), np.cos(angle)]])
     p = np.array(lines).reshape((-1, 2))
@@ -341,11 +341,11 @@ def segment(im, text_direction='horizontal-lr', scale=None, maxcolseps=2,
         direction is invalid.
     """
     im_str = get_im_str(im)
-    logger.info('Segmenting {}'.format(im_str))
+    logger.info(f'Segmenting {im_str}')
 
     if im.mode != '1' and not is_bitonal(im):
-        logger.error('Image {} is not bi-level'.format(im_str))
-        raise KrakenInputException('Image {} is not bi-level'.format(im_str))
+        logger.error(f'Image {im_str} is not bi-level')
+        raise KrakenInputException(f'Image {im_str} is not bi-level')
 
     # rotate input image for vertical lines
     if text_direction.startswith('horizontal'):
@@ -358,10 +358,10 @@ def segment(im, text_direction='horizontal-lr', scale=None, maxcolseps=2,
         angle = 90
         offset = (im.size[0], 0)
     else:
-        logger.error('Invalid text direction \'{}\''.format(text_direction))
-        raise KrakenInputException('Invalid text direction {}'.format(text_direction))
+        logger.error(f'Invalid text direction \'{text_direction}\'')
+        raise KrakenInputException(f'Invalid text direction {text_direction}')
 
-    logger.debug('Rotating input image by {} degrees'.format(angle))
+    logger.debug(f'Rotating input image by {angle} degrees')
     im = im.rotate(angle, expand=True)
 
     a = pil2array(im)
@@ -382,8 +382,8 @@ def segment(im, text_direction='horizontal-lr', scale=None, maxcolseps=2,
                 raise KrakenInputException('Mask is not bitonal')
             mask = mask.convert('1')
             if mask.size != im.size:
-                logger.error('Mask size {} doesn\'t match image size {}'.format(mask.size, im.size))
-                raise KrakenInputException('Mask size {} doesn\'t match image size {}'.format(mask.size, im.size))
+                logger.error(f'Mask size {mask.size} doesn\'t match image size {im.size}')
+                raise KrakenInputException(f'Mask size {mask.size} doesn\'t match image size {im.size}')
             logger.info('Masking enabled in segmenter. Disabling column detection.')
             mask = mask.rotate(angle, expand=True)
             colseps = pil2array(mask)
@@ -392,7 +392,7 @@ def segment(im, text_direction='horizontal-lr', scale=None, maxcolseps=2,
         else:
             colseps = compute_white_colseps(binary, scale, maxcolseps)
     except ValueError:
-        logger.warning('Exception in column finder (probably empty image) for {}.'.format(im_str))
+        logger.warning(f'Exception in column finder (probably empty image) for {im_str}')
         return {'text_direction': text_direction, 'boxes':  []}
 
     bottom, top, boxmap = compute_gradmaps(binary, scale)
@@ -442,17 +442,17 @@ def detect_scripts(im, bounds, model=pkg_resources.resource_filename(__name__, '
     """
     raise NotImplementedError('Temporarily unavailable. Please open a github ticket if you want this fixed sooner.')
     im_str = get_im_str(im)
-    logger.info(u'Detecting scripts with {} in {} lines on {}'.format(model, len(bounds['boxes']), im_str))
-    logger.debug(u'Loading detection model {}'.format(model))
+    logger.info(f'Detecting scripts with {model} in {len(bounds["boxes"])} lines on {im_str}')
+    logger.debug(f'Loading detection model {model}')
     rnn = models.load_any(model)
     # load numerical to 4 char identifier map
-    logger.debug(u'Loading label to identifier map')
+    logger.debug('Loading label to identifier map')
     with pkg_resources.resource_stream(__name__, 'iso15924.json') as fp:
         n2s = json.load(fp)
     # convert allowed scripts to labels
     val_scripts = []
     if valid_scripts:
-        logger.debug(u'Converting allowed scripts list {}'.format(valid_scripts))
+        logger.debug(f'Converting allowed scripts list {valid_scripts}')
         for k, v in n2s.items():
             if v in valid_scripts:
                 val_scripts.append(chr(int(k) + 0xF0000))
@@ -460,11 +460,11 @@ def detect_scripts(im, bounds, model=pkg_resources.resource_filename(__name__, '
         valid_scripts = []
     it = rpred(rnn, im, bounds, bidi_reordering=False)
     preds = []
-    logger.debug(u'Running detection')
+    logger.debug('Running detection')
     for pred, bbox in zip(it, bounds['boxes']):
         # substitute inherited scripts with neighboring runs
         def _subs(m, s, r=False):
-            p = u''
+            p = ''
             for c in s:
                 if c in m and p and not r:
                     p += p[-1]
@@ -474,23 +474,23 @@ def detect_scripts(im, bounds, model=pkg_resources.resource_filename(__name__, '
                     p += c
             return p
 
-        logger.debug(u'Substituting scripts')
-        p = _subs([u'\U000f03e2', u'\U000f03e6'], pred.prediction)
+        logger.debug('Substituting scripts')
+        p = _subs(['\U000f03e2', '\U000f03e6'], pred.prediction)
         # do a reverse run to fix leading inherited scripts
-        pred.prediction = ''.join(reversed(_subs([u'\U000f03e2', u'\U000f03e6'], reversed(p))))
+        pred.prediction = ''.join(reversed(_subs(['\U000f03e2', '\U000f03e6'], reversed(p))))
         # group by valid scripts. two steps: 1. substitute common confusions
         # (Latin->Fraktur and Syriac->Arabic) if given in script list.
         if 'Arab' in valid_scripts and 'Syrc' not in valid_scripts:
-            pred.prediction = pred.prediction.replace(u'\U000f0087', u'\U000f00a0')
+            pred.prediction = pred.prediction.replace('\U000f0087', '\U000f00a0')
         if 'Latn' in valid_scripts and 'Latf' not in valid_scripts:
-            pred.prediction = pred.prediction.replace(u'\U000f00d9', u'\U000f00d7')
+            pred.prediction = pred.prediction.replace('\U000f00d9', '\U000f00d7')
         # next merge adjacent scripts
         if val_scripts:
             pred.prediction = _subs(val_scripts, pred.prediction, r=True)
 
         # group by grapheme
         t = []
-        logger.debug(u'Merging detections')
+        logger.debug('Merging detections')
         # if line contains only a single script return whole line bounding box
         if len(set(pred.prediction)) == 1:
             logger.debug('Only one script on line. Emitting whole line bbox')

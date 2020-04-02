@@ -46,7 +46,7 @@ def publish_model(model_file: BinaryIO = None, metadata: dict = None, access_tok
         callback (func): Function called for every 1024 octet chunk uploaded.
     """
     headers = {"Content-Type": "application/json"}
-    r = requests.post('{}deposit/depositions'.format(MODEL_REPO),
+    r = requests.post(f'{MODEL_REPO}deposit/depositions',
                       params={'access_token': access_token}, json={},
                       headers=headers)
     r.raise_for_status()
@@ -54,14 +54,14 @@ def publish_model(model_file: BinaryIO = None, metadata: dict = None, access_tok
     deposition_id = r.json()['id']
     data = {'filename': 'metadata.json'}
     files = {'file': ('metadata.json', json.dumps(metadata))}
-    r = requests.post('{}deposit/depositions/{}/files'.format(MODEL_REPO, deposition_id),
+    r = requests.post(f'{MODEL_REPO}deposit/depositions/{deposition_id}/files',
                       params={'access_token': access_token}, data=data,
                       files=files)
     r.raise_for_status()
     callback()
     data = {'filename': metadata['name']}
     files = {'file': open(model_file, 'rb')}
-    r = requests.post('{}deposit/depositions/{}/files'.format(MODEL_REPO, deposition_id),
+    r = requests.post(f'{MODEL_REPO}deposit/depositions/{deposition_id}/files',
                       params={'access_token': access_token}, data=data,
                       files=files)
     r.raise_for_status()
@@ -82,13 +82,13 @@ def publish_model(model_file: BinaryIO = None, metadata: dict = None, access_tok
     # add link to training data to metadata
     if 'source' in metadata:
         data['metadata']['related_identifiers'] = [{'relation': 'isSupplementTo', 'identifier': metadata['source']}]
-    r = requests.put('{}deposit/depositions/{}'.format(MODEL_REPO, deposition_id),
+    r = requests.put(f'{MODEL_REPO}deposit/depositions/{deposition_id}',
                      params={'access_token': access_token},
                      data=json.dumps(data),
                      headers=headers)
     r.raise_for_status()
     callback()
-    r = requests.post('{}deposit/depositions/{}/actions/publish'.format(MODEL_REPO, deposition_id),
+    r = requests.post(f'{MODEL_REPO}deposit/depositions/{deposition_id}/actions/publish',
                       params={'access_token': access_token})
     r.raise_for_status()
     callback()
@@ -108,21 +108,21 @@ def get_model(model_id: str, path: str, callback: Callable[..., Any] = lambda: N
         The identifier the model can be called through on the command line.
         Will usually be the file name of the model.
     """
-    logger.info('Saving model {} to {}'.format(model_id, path))
-    r = requests.get('{}{}'.format(MODEL_REPO, 'records'), params={'q': 'doi:"{}"'.format(model_id)})
+    logger.info(f'Saving model {model_id} to {path}')
+    r = requests.get(f'{MODEL_REPO}records', params={'q': f'doi:"{model_id}"'})
     r.raise_for_status()
     callback()
     resp = r.json()
     if resp['hits']['total'] != 1:
-        logger.error('Found {} models when querying for id \'{}\''.format(resp['hits']['total'], model_id))
-        raise KrakenRepoException('Found {} models when querying for id \'{}\''.format(resp['hits']['total'], model_id))
+        logger.error(f'Found {resp["hits"]["total"]} models when querying for id \'{model_id}\'')
+        raise KrakenRepoException(f'Found {resp["hits"]["total"]} models when querying for id \'{model_id}\'')
 
     metadata = resp['hits']['hits'][0]
     model_url = [x['links']['self'] for x in metadata['files'] if x['type'] == 'mlmodel'][0]
     # callable model identifier
     nat_id = os.path.basename(urllib.parse.urlparse(model_url).path)
     spath = os.path.join(path, nat_id)
-    logger.debug('downloading model file {} to {}'.format(model_url, spath))
+    logger.debug(f'downloading model file {model_url} to {spath}')
     with closing(requests.get(model_url, stream=True)) as r:
         with open(spath, 'wb') as f:
             for chunk in r.iter_content(chunk_size=1024):
@@ -142,8 +142,8 @@ def get_description(model_id: str, callback: Callable[..., Any] = lambda: None) 
     Returns:
         Dict
     """
-    logger.info('Retrieving metadata for {}'.format(model_id))
-    r = requests.get('{}{}'.format(MODEL_REPO, 'records'), params={'q': 'doi:"{}"'.format(model_id)})
+    logger.info(f'Retrieving metadata for {model_id}')
+    r = requests.get(f'{MODEL_REPO}records', params={'q': f'doi:"{model_id}"'})
     r.raise_for_status()
     callback()
     resp = r.json()
