@@ -29,6 +29,7 @@ from scipy.signal import savgol_filter
 from scipy.spatial import distance_matrix, Delaunay
 from scipy.sparse.csgraph import shortest_path
 from scipy.spatial.distance import cdist, pdist, squareform
+from scipy.ndimage import maximum_filter
 from scipy.ndimage.filters import gaussian_filter, gaussian_filter1d
 from scipy.ndimage.morphology import distance_transform_cdt
 
@@ -150,10 +151,11 @@ def _find_superpixels(skeleton, heatmap, min_sp_dist):
     return np.array(sp_can)
 
 
-def _compute_sp_states(sp_can, bl_map, sep_map):
+def _compute_sp_states(sp_can, bl_map, st_map, end_map):
     """
     Estimates the superpixel state information.
     """
+    sep_map = st_map + end_map
     logger.debug('Triangulating superpixels')
     # some pages might not contain
     if len(sp_can) < 2:
@@ -240,20 +242,20 @@ def _cluster_lines(intensities):
     return clusters
 
 
-def _interpolate_lines(clusters, elongation_offset, extent):
+def _interpolate_lines(clusters, elongation_offset, extent, st_map, end_map):
     """
-    Interpolates the baseline clusters.
+    Interpolates the baseline clusters and sets the correct line direction.
     """
     logger.debug('Reticulating splines')
     lines = []
     extent = geom.Polygon([(0, 0), (extent[1]-1, 0), (extent[1]-1, extent[0]-1), (0, extent[0]-1), (0, 0)])
+    f_st_map = maximum_filter(st_map, size=20)
+    f_end_map = maximum_filter(end_map, size=20)
     for cluster in clusters[1:]:
         # find start-end point
         points = [point for edge in cluster for point in edge]
         dists = squareform(pdist(points))
         i, j = np.unravel_index(dists.argmax(), dists.shape)
-        if points[i][1] > points[j][1]:
-            i, j = j, i
         # build adjacency matrix for shortest path algo
         adj_mat = np.full_like(dists, np.inf)
         for l, r in cluster:
@@ -276,10 +278,10 @@ def _interpolate_lines(clusters, elongation_offset, extent):
         line = np.around(np.dstack((x, y)))[0]
         line = approximate_polygon(line, 1)
         lr_dir = line[0] - line[1]
-        lr_dir = (lr_dir.T  / np.sqrt(np.sum(lr_dir**2,axis=-1))) * elongation_offset
+        lr_dir = (lr_dir.T  / np.sqrt(np.sum(lr_dir**2,axis=-1))) * elongation_offset/2
         line[0] = line[0] + lr_dir
         rr_dir = line[-1] - line[-2]
-        rr_dir = (rr_dir.T  / np.sqrt(np.sum(rr_dir**2,axis=-1))) * elongation_offset
+        rr_dir = (rr_dir.T  / np.sqrt(np.sum(rr_dir**2,axis=-1))) * elongation_offset/2
         line[-1] = line[-1] + rr_dir
         ins = geom.LineString(line).intersection(extent)
         if ins.type == 'MultiLineString':
@@ -288,6 +290,16 @@ def _interpolate_lines(clusters, elongation_offset, extent):
             if ins.type != 'LineString':
                 continue
         line = np.array(ins, dtype='uint')
+        l_end = tuple(line[0])[::-1]
+        r_end = tuple(line[-1])[::-1]
+        if f_st_map[l_end] - f_end_map[l_end] > 0.2 and f_end_map[r_end] - f_st_map[r_end] > -0.2:
+            pass
+        elif f_st_map[l_end] - f_end_map[l_end] < -0.2 and f_end_map[r_end] - f_st_map[r_end] > 0.2:
+            line = line[::-1]
+        else:
+            logger.debug('Insufficient marker confidences in output. Defaulting to upright line.')
+            if line[0][0] > line[-1][0]:
+                line = line[::-1]
         lines.append(line.tolist())
     return lines
 
@@ -318,9 +330,9 @@ def vectorize_lines(im: np.ndarray, threshold: float = 0.2, min_sp_dist: int = 1
     if not sp_can.size:
         logger.warning('No superpixel candidates found in network output. Likely empty page.')
         return []
-    intensities = _compute_sp_states(sp_can, bl_map, sep_map)
+    intensities = _compute_sp_states(sp_can, bl_map, st_map, end_map)
     clusters = _cluster_lines(intensities)
-    lines = _interpolate_lines(clusters, elongation_offset, bl_map.shape)
+    lines = _interpolate_lines(clusters, elongation_offset, bl_map.shape, st_map, end_map)
     return lines
 
 
@@ -343,7 +355,7 @@ def vectorize_regions(im: np.ndarray, threshold: float = 0.5):
         return contours
     approx_contours = []
     for contour in contours:
-        approx_contours.append(approximate_polygon(contour, 1).astype('uint').tolist())
+        approx_contours.append(approximate_polygon(contour[:,[1,0]], 1).astype('uint').tolist())
     return approx_contours
 
 
