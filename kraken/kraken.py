@@ -95,9 +95,8 @@ def binarizer(threshold, zoom, escale, border, perc, range, low, high, input, ou
     message('\u2713', fg='green')
 
 
-def segmenter(legacy, model, text_direction, script_detect, allowed_scripts,
-              scale, maxcolseps, black_colseps, remove_hlines, pad, mask,
-              device, input, output) -> None:
+def segmenter(legacy, model, text_direction, scale, maxcolseps, black_colseps,
+              remove_hlines, pad, mask, device, input, output) -> None:
     import json
 
     from kraken import pageseg
@@ -128,8 +127,6 @@ def segmenter(legacy, model, text_direction, script_detect, allowed_scripts,
             res = pageseg.segment(im, text_direction, scale, maxcolseps, black_colseps, no_hlines=remove_hlines, pad=pad, mask=mask)
         else:
             res = blla.segment(im, text_direction, mask=mask, model=model, device=device)
-        if script_detect:
-            res = pageseg.detect_scripts(im, res, valid_scripts=allowed_scripts)
     except Exception:
         message('\u2717', fg='red')
         raise
@@ -364,12 +361,6 @@ def binarize(threshold, zoom, escale, border, perc, range, low, high):
               type=click.Choice(['horizontal-lr', 'horizontal-rl',
                                  'vertical-lr', 'vertical-rl']),
               help='Sets principal text direction')
-@click.option('-s/-n', '--script-detect/--no-script-detect', default=False,
-              show_default=True,
-              help='Enable script detection on segmenter output')
-@click.option('-a', '--allowed-scripts', default=None, multiple=True,
-              show_default=True,
-              help='List of allowed scripts in script detection output. Ignored if disabled.')
 @click.option('--scale', show_default=True, default=None, type=click.FLOAT)
 @click.option('-m', '--maxcolseps', show_default=True, default=2, type=click.INT)
 @click.option('-b/-w', '--black-colseps/--white_colseps', show_default=True, default=False)
@@ -381,7 +372,7 @@ def binarize(threshold, zoom, escale, border, perc, range, low, high):
               'suppressing page areas for line detection. 0-valued image '
               'regions are ignored for segmentation purposes. Disables column '
               'detection.')
-def segment(ctx, model, boxes, text_direction, script_detect, allowed_scripts,
+def segment(ctx, model, boxes, text_direction, allowed_scripts,
             scale, maxcolseps, black_colseps, remove_hlines, pad, mask):
     """
     Segments page images into text lines.
@@ -401,9 +392,9 @@ def segment(ctx, model, boxes, text_direction, script_detect, allowed_scripts,
             ctx.exit(1)
         message('\u2713', fg='green')
 
-    return partial(segmenter, boxes, model, text_direction, script_detect,
-                   allowed_scripts, scale, maxcolseps, black_colseps,
-                   remove_hlines, pad, mask, ctx.meta['device'])
+    return partial(segmenter, boxes, model, text_direction, allowed_scripts,
+                   scale, maxcolseps, black_colseps, remove_hlines, pad, mask,
+                   ctx.meta['device'])
 
 
 def _validate_mm(ctx, param, value):

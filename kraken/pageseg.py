@@ -40,7 +40,7 @@ from kraken.lib.segmentation import reading_order, topsort
 from kraken.rpred import rpred
 from kraken.serialization import max_bbox
 
-__all__ = ['segment', 'detect_scripts']
+__all__ = ['segment']
 
 logger = logging.getLogger(__name__)
 
@@ -413,94 +413,3 @@ def segment(im, text_direction='horizontal-lr', scale=None, maxcolseps=2,
     lines = [(max(x[0]-pad[0], 0), x[1], min(x[2]+pad[1], im.size[0]), x[3]) for x in lines]
 
     return {'text_direction': text_direction, 'boxes':  rotate_lines(lines, 360-angle, offset).tolist(), 'script_detection': False}
-
-
-def detect_scripts(im, bounds, model=pkg_resources.resource_filename(__name__, 'script.mlmodel'), valid_scripts=None):
-    """
-    Detects scripts in a segmented page.
-
-    Classifies lines returned by the page segmenter into runs of scripts/writing systems.
-
-    Args:
-        im (PIL.Image): A bi-level page of mode '1' or 'L'
-        bounds (dict): A dictionary containing a 'boxes' entry with a list of
-                       coordinates (x0, y0, x1, y1) of a text line in the image
-                       and an entry 'text_direction' containing
-                       'horizontal-lr/rl/vertical-lr/rl'.
-        model (str): Location of the script classification model or None for default.
-        valid_scripts (list): List of valid scripts.
-
-    Returns:
-        {'script_detection': True, 'text_direction': '$dir', 'boxes':
-        [[(script, (x1, y1, x2, y2)),...]]}: A dictionary containing the text
-        direction and a list of lists of reading order sorted bounding boxes
-        under the key 'boxes' with each list containing the script segmentation
-        of a single line. Script is a ISO15924 4 character identifier.
-
-    Raises:
-        KrakenInvalidModelException if no clstm module is available.
-    """
-    raise NotImplementedError('Temporarily unavailable. Please open a github ticket if you want this fixed sooner.')
-    im_str = get_im_str(im)
-    logger.info(f'Detecting scripts with {model} in {len(bounds["boxes"])} lines on {im_str}')
-    logger.debug(f'Loading detection model {model}')
-    rnn = models.load_any(model)
-    # load numerical to 4 char identifier map
-    logger.debug('Loading label to identifier map')
-    with pkg_resources.resource_stream(__name__, 'iso15924.json') as fp:
-        n2s = json.load(fp)
-    # convert allowed scripts to labels
-    val_scripts = []
-    if valid_scripts:
-        logger.debug(f'Converting allowed scripts list {valid_scripts}')
-        for k, v in n2s.items():
-            if v in valid_scripts:
-                val_scripts.append(chr(int(k) + 0xF0000))
-    else:
-        valid_scripts = []
-    it = rpred(rnn, im, bounds, bidi_reordering=False)
-    preds = []
-    logger.debug('Running detection')
-    for pred, bbox in zip(it, bounds['boxes']):
-        # substitute inherited scripts with neighboring runs
-        def _subs(m, s, r=False):
-            p = ''
-            for c in s:
-                if c in m and p and not r:
-                    p += p[-1]
-                elif c not in m and p and r:
-                    p += p[-1]
-                else:
-                    p += c
-            return p
-
-        logger.debug('Substituting scripts')
-        p = _subs(['\U000f03e2', '\U000f03e6'], pred.prediction)
-        # do a reverse run to fix leading inherited scripts
-        pred.prediction = ''.join(reversed(_subs(['\U000f03e2', '\U000f03e6'], reversed(p))))
-        # group by valid scripts. two steps: 1. substitute common confusions
-        # (Latin->Fraktur and Syriac->Arabic) if given in script list.
-        if 'Arab' in valid_scripts and 'Syrc' not in valid_scripts:
-            pred.prediction = pred.prediction.replace('\U000f0087', '\U000f00a0')
-        if 'Latn' in valid_scripts and 'Latf' not in valid_scripts:
-            pred.prediction = pred.prediction.replace('\U000f00d9', '\U000f00d7')
-        # next merge adjacent scripts
-        if val_scripts:
-            pred.prediction = _subs(val_scripts, pred.prediction, r=True)
-
-        # group by grapheme
-        t = []
-        logger.debug('Merging detections')
-        # if line contains only a single script return whole line bounding box
-        if len(set(pred.prediction)) == 1:
-            logger.debug('Only one script on line. Emitting whole line bbox')
-            k = ord(pred.prediction[0]) - 0xF0000
-            t.append((n2s[str(k)], bbox))
-        else:
-            for k, g in groupby(pred, key=lambda x: x[0]):
-                # convert to ISO15924 numerical identifier
-                k = ord(k) - 0xF0000
-                b = max_bbox(x[1] for x in g)
-                t.append((n2s[str(k)], b))
-        preds.append(t)
-    return {'boxes': preds, 'text_direction': bounds['text_direction'], 'script_detection': True}
