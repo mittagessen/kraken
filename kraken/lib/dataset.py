@@ -737,8 +737,8 @@ class BaselineSet(Dataset):
                     im_paths.append(data['image'])
                     lines = defaultdict(list)
                     for line in data['lines']:
-                        if valid_baselines is None or line['type'] in valid_baselines:
-                            lines[self.mbl_dict.get(line['type'], line['type'])].append(line['baseline'])
+                        if valid_baselines is None or line['script'] in valid_baselines:
+                            lines[self.mbl_dict.get(line['script'], line['script'])].append(line['baseline'])
                     regions = defaultdict(list)
                     for k, v in data['regions'].items():
                         if valid_regions is None or k in valid_regions:
@@ -823,8 +823,8 @@ class BaselineSet(Dataset):
         data = fn(img)
         lines = defaultdict(list)
         for line in data['lines']:
-            line_type = self.mbl_dict.get(line['type'], line['type'])
-            if self.valid_baselines is None or line['type'] in self.valid_baselines:
+            line_type = self.mbl_dict.get(line['script'], line['script'])
+            if self.valid_baselines is None or line['script'] in self.valid_baselines:
                 lines[line_type].append(line['baseline'])
                 if line_type not in self.class_mapping['baselines']:
                     self.num_classes += 1
