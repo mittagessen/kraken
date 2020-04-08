@@ -372,8 +372,8 @@ def binarize(threshold, zoom, escale, border, perc, range, low, high):
               'suppressing page areas for line detection. 0-valued image '
               'regions are ignored for segmentation purposes. Disables column '
               'detection.')
-def segment(ctx, model, boxes, text_direction, allowed_scripts,
-            scale, maxcolseps, black_colseps, remove_hlines, pad, mask):
+def segment(ctx, model, boxes, text_direction, scale, maxcolseps,
+            black_colseps, remove_hlines, pad, mask):
     """
     Segments page images into text lines.
     """
@@ -392,8 +392,8 @@ def segment(ctx, model, boxes, text_direction, allowed_scripts,
             ctx.exit(1)
         message('\u2713', fg='green')
 
-    return partial(segmenter, boxes, model, text_direction, allowed_scripts,
-                   scale, maxcolseps, black_colseps, remove_hlines, pad, mask,
+    return partial(segmenter, boxes, model, text_direction, scale, maxcolseps,
+                   black_colseps, remove_hlines, pad, mask,
                    ctx.meta['device'])
 
 
