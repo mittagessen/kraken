@@ -157,13 +157,13 @@ def serialize(records: Sequence[ocr_record],
                 'cuts': record.cuts,
                 'confidences': record.confidences,
                 'recognition': [],
-                'boundary': record.line,
+                'boundary': [list(x) for x in record.line],
                 'type': 'line'
                 }
         if record.script is not None:
             line['script'] = record.script
         if record.type == 'baselines':
-            line['baseline'] = record.baseline
+            line['baseline'] = [list(x) for x in record.baseline]
         splits = regex.split(r'(\s+)', record.prediction)
         line_offset = 0
         logger.debug(f'Record contains {len(splits)} segments')
@@ -190,7 +190,7 @@ def serialize(records: Sequence[ocr_record],
                         pols.append(geom.Polygon(x))
                     except ValueError:
                         pols.append(geom.LineString(x).buffer(0.5, cap_style=2))
-                coords = np.array(unary_union(pols).exterior.coords, dtype=np.uint).tolist()
+                coords = np.array(unary_union(pols).convex_hull.exterior.coords, dtype=np.uint).tolist()
                 seg_struct['boundary'] = coords
             line['recognition'].append(seg_struct)
             char_idx += len(segment)
@@ -200,7 +200,7 @@ def serialize(records: Sequence[ocr_record],
     logger.debug('Initializing jinja environment.')
     env = Environment(loader=PackageLoader('kraken', 'templates'),
                       trim_blocks=True,
-                      lstrip_blocks=True,
+                      lstrip_blocks=False,
                       autoescape=True)
     env.tests['whitespace'] = str.isspace
     env.filters['rescale'] = _rescale

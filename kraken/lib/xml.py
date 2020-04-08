@@ -91,7 +91,7 @@ def parse_page(filename):
         if image is None or image.get('imageFilename') is None:
             raise KrakenInputException('No valid image filename found in PageXML file {}'.format(filename))
         lines = doc.findall('.//{*}TextLine')
-        data = {'image': os.path.join(base_dir, image.get('imageFilename')), 'lines': [], 'type': 'baselines', 'regions': []}
+        data = {'image': os.path.join(base_dir, image.get('imageFilename')), 'lines': [], 'type': 'baselines', 'regions': {}}
         # find all image regions
         regions = []
         for x in page_regions.keys():
@@ -180,7 +180,7 @@ def parse_alto(filename):
         if image is None or not image.text:
             raise KrakenInputException('No valid filename found in ALTO file')
         lines = doc.findall('.//{*}TextLine')
-        data = {'image': os.path.join(base_dir, image.text), 'lines': [], 'type': 'baselines', 'regions': []}
+        data = {'image': os.path.join(base_dir, image.text), 'lines': [], 'type': 'baselines', 'regions': {}}
         for line in lines:
             if line.get('BASELINE') is None:
                 raise KrakenInputException('ALTO file {} contains no baseline information'.format(filename))

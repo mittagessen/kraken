@@ -286,9 +286,9 @@ def _interpolate_lines(clusters, elongation_offset, extent, st_map, end_map):
         line = np.array(ins, dtype='uint')
         l_end = tuple(line[0])[::-1]
         r_end = tuple(line[-1])[::-1]
-        if f_st_map[l_end] - f_end_map[l_end] > 0.2 and f_end_map[r_end] - f_st_map[r_end] > -0.2:
+        if f_st_map[l_end] - f_end_map[l_end] > 0.2 and f_st_map[r_end] - f_end_map[r_end] < -0.2:
             pass
-        elif f_st_map[l_end] - f_end_map[l_end] < -0.2 and f_end_map[r_end] - f_st_map[r_end] > 0.2:
+        elif f_st_map[l_end] - f_end_map[l_end] < -0.2 and f_st_map[r_end] - f_end_map[r_end] > 0.2:
             line = line[::-1]
         else:
             logger.debug('Insufficient marker confidences in output. Defaulting to upright line.')
