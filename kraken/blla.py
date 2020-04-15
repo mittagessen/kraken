@@ -95,6 +95,12 @@ def segment(im,
     if model is None:
         logger.info('No segmentation model given. Loading default model.')
         model = vgsl.TorchVGSLModel.load_model(pkg_resources.resource_filename(__name__, 'blla.mlmodel'))
+
+    if model.one_channel_mode == '1' and not is_bitonal(im)
+        logger.warning('Running binary model on non-binary input image '
+                       '(mode {}). This will result in severely degraded '
+                       'performance'.format(im.mode))
+
     model.eval()
     model.to(device)
 
