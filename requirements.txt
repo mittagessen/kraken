@@ -4,14 +4,14 @@ future
 requests
 click>=7.0
 numpy
-Pillow==6.1
+Pillow
 regex
 scipy
 protobuf>=3.0.0
 jinja2
 python-bidi
 torchvision
-torch>=1.0.0
+torch==1.4.0
 coremltools>=3.3
 scikit-image
 shapely
