@@ -63,8 +63,10 @@ def cli(format_type, model, repolygonize, files):
                 draw = ImageDraw.Draw(tmp)
                 for idx, line in enumerate(ls):
                     c = next(cmap)
-                    draw.polygon([tuple(x) for x in line['boundary']], fill=c, outline=c[:3])
-                    draw.line([tuple(x) for x in line['baseline']], fill=bmap, width=2, joint='curve')
+                    if line['boundary']:
+                        draw.polygon([tuple(x) for x in line['boundary']], fill=c, outline=c[:3])
+                    if line['baseline']:
+                        draw.line([tuple(x) for x in line['baseline']], fill=bmap, width=2, joint='curve')
                     draw.text(line['baseline'][0], str(idx), fill=(0, 0, 0, 255))
                 base_image = Image.alpha_composite(im, tmp)
                 base_image.save(f'high_{os.path.basename(doc)}_lines_{t}.png')
