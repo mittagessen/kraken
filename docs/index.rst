@@ -7,30 +7,29 @@ kraken
 
    advanced
    Training <ketos>
-   API <api>
+   API tutorial <api>
+   API reference <api_docs>
    Models <models>
 
-kraken is a turn-key OCR system forked from `ocropus
-<https://github.com/tmbdev/ocropy>`_. It is intended to rectify a number of
-issues while preserving (mostly) functional equivalence. 
+kraken is a turn-key OCR system optimized for historical and non-Latin script
+material.
 
 Features
 ========
 
 kraken's main features are:
 
-  - Script detection and multi-script recognition support
+  - Fully trainable layout analysis and character recognition
   - `Right-to-Left <https://en.wikipedia.org/wiki/Right-to-left>`_, `BiDi
     <https://en.wikipedia.org/wiki/Bi-directional_text>`_, and Top-to-Bottom
     script support
-  - `ALTO <https://www.loc.gov/standards/alto/>`_, abbyXML, and hOCR output
+  - `ALTO <https://www.loc.gov/standards/alto/>`_, PageXML, abbyXML, and hOCR
+    output
   - Word bounding boxes and character cuts
+  - Multi-script recognition support
   - `Public repository <https://zenodo.org/communities/ocr_models>`_ of model files
   - :ref:`Lightweight model files <models>`
   - :ref:`Variable recognition network architectures <vgsl>`
-
-All functionality not pertaining to OCR and prerequisite steps has been
-removed, i.e. no more error rate measuring, etc.
 
 Pull requests and code contributions are always welcome. 
 
@@ -42,7 +41,7 @@ installed using:
 
 .. code-block:: console
 
-        # apt install libpangocairo-1.0 libxml2 libblas3 liblapack3 python3-dev python3-pip
+        # apt install libpangocairo-1.0 libxml2 libblas3 liblapack3 python3-dev python3-pip libvips
 
 pip
 ---
@@ -60,11 +59,21 @@ or by running pip in the git repository:
 conda
 -----
 
-If you are running `Anaconda <https://www.anaconda.com/download/>`_/miniconda, use:
+Install the latest release through `conda <https://anaconda.org>`_:
 
-.. code-block:: console
+::
 
-  $ conda install -c mittagessen kraken
+  $ wget https://raw.githubusercontent.com/mittagessen/kraken/master/environment.yml
+  $ conda env create -f environment.yml
+
+or:
+
+::
+
+  $ wget https://raw.githubusercontent.com/mittagessen/kraken/master/environment_cuda.yml
+  $ conda env create -f environment_cuda.yml
+
+for CUDA acceleration with the appropriate hardware.
 
 Models
 ------
@@ -88,22 +97,18 @@ Model metadata can be extracted using:
 
 .. code-block:: console
 
-  $ kraken show arabic-alam-al-kutub
-  name: arabic-alam-al-kutub.clstm
+  $ kraken show 10.5281/zenodo.2577813
+  name: 10.5281/zenodo.2577813
 
-  An experimental model for Classical Arabic texts.
-
-  Network trained on 889 lines of [0] as a test case for a general Classical
-  Arabic model. Ground truth was prepared by Sarah Savant
-  <sarah.savant@aku.edu> and Maxim Romanov <maxim.romanov@uni-leipzig.de>.
-
-  Vocalization was omitted in the ground truth. Training was stopped at ~35000
-  iterations with an accuracy of 97%.
-
-  [0] Ibn al-Faqīh (d. 365 AH). Kitāb al-buldān. Edited by Yūsuf al-Hādī, 1st
-  edition. Bayrūt: ʿĀlam al-kutub, 1416 AH/1996 CE.
-  alphabet:  !()-.0123456789:[] «»،؟ءابةتثجحخدذرزسشصضطظعغفقكلمنهوىي ARABIC
-  MADDAH ABOVE, ARABIC HAMZA ABOVE, ARABIC HAMZA BELOW
+  A generalized model for English printed text
+  
+  This model has been trained on a large corpus of modern printed English text\naugmented with ~10000 lines of historical p
+  scripts: Latn
+  alphabet: !"#$%&'()+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]`abcdefghijklmnopqrstuvwxyz{} SPACE
+  accuracy: 99.95%
+  license: Apache-2.0
+  author(s): Kiessling, Benjamin
+  date: 2019-02-26
 
 Quickstart
 ==========
@@ -113,24 +118,24 @@ prerequisite steps of binarization and page segmentation:
 
 .. code-block:: console
 
-  $ kraken -i image.tif image.txt binarize segment ocr
+  $ kraken -i image.tif image.txt segment -bl ocr
   Loading RNN     ✓
   Processing      ⣻
 
-To binarize a single image using the nlbin algorithm:
+To binarize a single image using the nlbin algorithm (usually not required with the baseline segmenter):
 
 .. code-block:: console
 
   $ kraken -i image.tif bw.tif binarize
 
-To segment a binarized image into reading-order sorted lines:
+To segment a binarized image into reading-order sorted baselines and regions:
 
 .. code-block:: console
 
-  $ kraken -i bw.tif lines.json segment
+  $ kraken -i bw.tif lines.json segment -bl
 
-To OCR a binarized image using the default RNN and the previously generated
-page segmentation:
+To OCR an image using the default RNN and the previously generated page
+segmentation:jjjj
 
 .. code-block:: console
 
@@ -150,5 +155,4 @@ License
 =======
 
 ``Kraken`` is provided under the terms and conditions of the `Apache 2.0
-License <https://github.com/mittagessen/kraken/blob/master/LICENSE>`_ retained
-from the original ``ocropus`` distribution.
+License <https://github.com/mittagessen/kraken/blob/master/LICENSE>`_.

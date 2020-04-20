@@ -14,6 +14,7 @@
 # or implied. See the License for the specific language governing
 # permissions and limitations under the License.
 import os
+import time
 import json
 import glob
 import uuid
@@ -25,6 +26,7 @@ from click import open_file
 from bidi.algorithm import get_display
 
 from typing import cast, Set, List, IO, Any
+from collections import defaultdict
 
 from kraken.lib import log
 from kraken.lib.exceptions import KrakenCairoSurfaceException
@@ -33,6 +35,7 @@ from kraken.lib.exceptions import KrakenInputException
 
 APP_NAME = 'kraken'
 
+logging.captureWarnings(True)
 logger = logging.getLogger('kraken')
 
 
@@ -75,6 +78,270 @@ def _expand_gt(ctx, param, value):
         images.extend([x for x in glob.iglob(expression, recursive=True) if os.path.isfile(x)])
     return images
 
+def _validate_merging(ctx, param, value):
+    """
+    Maps baseline/region merging to a dict of merge structures.
+    """
+    if not value:
+        return None
+    merge_dict = {} # type: Dict[str, str]
+    try:
+        for m in value:
+            k, v = m.split(':')
+            merge_dict[v] = k  # type: ignore
+    except Exception:
+        raise click.BadParameter('Mappings must be in format target:src')
+    return merge_dict
+
+@cli.command('segtrain')
+@click.pass_context
+@click.option('-o', '--output', show_default=True, type=click.Path(), default='model', help='Output model file')
+@click.option('-s', '--spec', show_default=True,
+              default='[1,1200,0,3 Cr7,7,64,2,2 Gn32 Cr3,3,128,2,2 Gn32 Cr3,3,128 Gn32 Cr3,3,256 Gn32 Cr3,3,256 Gn32 Lbx32 Lby32 Cr1,1,32 Gn32 Lby32 Lbx32 Gn32 Cr3,3,64 Gn32 Cr3,3,128 Gn32 Cr3,3,64]',
+              help='VGSL spec of the baseline labeling network')
+@click.option('--line-width', show_default=True, default=8, help='The height of each baseline in the target after scaling')
+@click.option('-i', '--load', show_default=True, type=click.Path(exists=True, readable=True), help='Load existing file to continue training')
+@click.option('-F', '--freq', show_default=True, default=1.0, type=click.FLOAT,
+              help='Model saving and report generation frequency in epochs during training')
+@click.option('-q', '--quit', show_default=True, default='early', type=click.Choice(['early', 'dumb']),
+              help='Stop condition for training. Set to `early` for early stooping or `dumb` for fixed number of epochs')
+@click.option('-N', '--epochs', show_default=True, default=-1, help='Number of epochs to train for')
+@click.option('--lag', show_default=True, default=10, help='Number of evaluations (--report frequence) to wait before stopping training without improvement')
+@click.option('--min-delta', show_default=True, default=None, type=click.FLOAT, help='Minimum improvement between epochs to reset early stopping. Default is scales the delta by the best loss')
+@click.option('-d', '--device', show_default=True, default='cpu', help='Select device to use (cpu, cuda:0, cuda:1, ...)')
+@click.option('--optimizer', show_default=True, default='Adam', type=click.Choice(['Adam', 'SGD', 'RMSprop']), help='Select optimizer')
+@click.option('-r', '--lrate', show_default=True, default=2e-4, help='Learning rate')
+@click.option('-m', '--momentum', show_default=True, default=0.9, help='Momentum')
+@click.option('-w', '--weight-decay', show_default=True, default=1e-5, help='Weight decay')
+@click.option('--schedule', show_default=True, type=click.Choice(['constant', '1cycle']), default='constant',
+              help='Set learning rate scheduler. For 1cycle, cycle length is determined by the `--epoch` option.')
+@click.option('-p', '--partition', show_default=True, default=0.9, help='Ground truth data partition ratio between train/validation set')
+@click.option('-t', '--training-files', show_default=True, default=None, multiple=True,
+              callback=_validate_manifests, type=click.File(mode='r', lazy=True),
+              help='File(s) with additional paths to training data')
+@click.option('-e', '--evaluation-files', show_default=True, default=None, multiple=True,
+              callback=_validate_manifests, type=click.File(mode='r', lazy=True),
+              help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
+@click.option('--threads', show_default=True, default=1, help='Number of OpenMP threads and workers when running on CPU.')
+@click.option('--force-binarization/--no-binarization', show_default=True,
+              default=False, help='Forces input images to be binary, otherwise'
+              'the appropriate color format will be auto-determined through the'
+              'network specification. Will be ignored in `path` mode.')
+@click.option('-f', '--format-type', type=click.Choice(['path', 'alto', 'page']), default='path',
+              help='Sets the training data format. In ALTO and PageXML mode all'
+              'data is extracted from xml files containing both baselines and a'
+              'link to source images. In `path` mode arguments are image files'
+              'sharing a prefix up to the last extension with JSON `.path` files'
+              'containing the baseline information.')
+@click.option('--suppress-regions/--no-suppress-regions', show_default=True, default=False, help='Disables region segmentation training.')
+@click.option('--suppress-baselines/--no-suppress-baselines', show_default=True, default=False, help='Disables baseline segmentation training.')
+@click.option('-vr', '--valid-regions', show_default=True, default=None, multiple=True, help='Valid region types in training data. May be used multiple times.')
+@click.option('-vb', '--valid-baselines', show_default=True, default=None, multiple=True, help='Valid baseline types in training data. May be used multiple times.')
+@click.option('-mr', '--merge-regions', show_default=True, default=None, help='Region merge mapping. One or more mappings of the form `$target:$src` where $src is merged into $target.', multiple=True, callback=_validate_merging)
+@click.option('-mb', '--merge-baselines', show_default=True, default=None, help='Baseline type merge mapping. Same syntax as `--merge-regions`', multiple=True, callback=_validate_merging)
+@click.option('--augment/--no-augment', show_default=True, default=False, help='Enable image augmentation')
+@click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
+def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
+             lag, min_delta, device, optimizer, lrate, momentum, weight_decay,
+             schedule, partition, training_files, evaluation_files, threads,
+             force_binarization, format_type, suppress_regions,
+             suppress_baselines, valid_regions, valid_baselines, merge_regions,
+             merge_baselines, augment, ground_truth):
+    """
+    Trains a baseline labeling model for layout analysis
+    """
+    import re
+    import torch
+    import shutil
+    import numpy as np
+
+    from torch.utils.data import DataLoader
+
+    from kraken.lib import vgsl, train
+    from kraken.lib.train import EarlyStopping, EpochStopping, TrainScheduler, add_1cycle
+    from kraken.lib.dataset import BaselineSet, generate_input_transforms, InfiniteDataLoader
+
+    logger.info('Building ground truth set from {} document images'.format(len(ground_truth) + len(training_files)))
+
+    completed_epochs = 0
+    # load model if given. if a new model has to be created we need to do that
+    # after data set initialization, otherwise to output size is still unknown.
+    nn = None
+
+    if load:
+        logger.info(f'Loading existing model from {load} ')
+        message(f'Loading existing model from {load}', nl=False)
+        nn = vgsl.TorchVGSLModel.load_model(load)
+        message('\u2713', fg='green')
+
+    # preparse input sizes from vgsl string to seed ground truth data set
+    # sizes and dimension ordering.
+    if not nn:
+        spec = spec.strip()
+        if spec[0] != '[' or spec[-1] != ']':
+            raise click.BadOptionUsage('spec', f'VGSL spec "{spec}" not bracketed')
+        blocks = spec[1:-1].split(' ')
+        m = re.match(r'(\d+),(\d+),(\d+),(\d+)', blocks[0])
+        if not m:
+            raise click.BadOptionUsage('spec', f'Invalid input spec {blocks[0]}')
+        batch, height, width, channels = [int(x) for x in m.groups()]
+    else:
+        batch, channels, height, width = nn.input
+    try:
+        transforms = generate_input_transforms(batch, height, width, channels, 0, valid_norm=False)
+    except KrakenInputException as e:
+        raise click.BadOptionUsage('spec', str(e))
+
+    # disable automatic partition when given evaluation set explicitly
+    if evaluation_files:
+        partition = 1
+    ground_truth = list(ground_truth)
+
+    # merge training_files into ground_truth list
+    if training_files:
+        ground_truth.extend(training_files)
+
+    if len(ground_truth) == 0:
+        raise click.UsageError('No training data was provided to the train command. Use `-t` or the `ground_truth` argument.')
+
+    np.random.shuffle(ground_truth)
+
+    tr_im = ground_truth[:int(len(ground_truth) * partition)]
+    if evaluation_files:
+        logger.debug(f'Using {len(evaluation_files)} images from explicit eval set')
+        te_im = evaluation_files
+    else:
+        te_im = ground_truth[int(len(ground_truth) * partition):]
+        logger.debug(f'Taking {len(te_im)} images from training for evaluation')
+
+    # set multiprocessing tensor sharing strategy
+    if 'file_system' in torch.multiprocessing.get_all_sharing_strategies():
+        logger.debug('Setting multiprocessing tensor sharing strategy to file_system')
+        torch.multiprocessing.set_sharing_strategy('file_system')
+
+    if len(valid_regions) == 0:
+        valid_regions = None
+    if len(valid_baselines) == 0:
+        valid_baselines = None
+
+    if suppress_regions:
+        valid_regions = []
+        merge_regions = None
+    if suppress_baselines:
+        valid_baselines = []
+        merge_baselines = None
+
+    gt_set = BaselineSet(tr_im,
+                         line_width=line_width,
+                         im_transforms=transforms,
+                         mode=format_type,
+                         augmentation=augment,
+                         valid_baselines=valid_baselines,
+                         merge_baselines=merge_baselines,
+                         valid_regions=valid_regions,
+                         merge_regions=merge_regions)
+    val_set = BaselineSet(te_im,
+                          line_width=line_width,
+                          im_transforms=transforms,
+                          mode=format_type,
+                          augmentation=augment,
+                          valid_baselines=valid_baselines,
+                          merge_baselines=merge_baselines,
+                          valid_regions=valid_regions,
+                          merge_regions=merge_regions)
+
+    # overwrite class mapping in validation set
+    val_set.num_classes = gt_set.num_classes
+    val_set.class_mapping = gt_set.class_mapping
+
+    if not load:
+        spec = f'[{spec[1:-1]} O2l{gt_set.num_classes}]'
+        message(f'Creating model {spec} with {gt_set.num_classes} outputs ', nl=False)
+        nn = vgsl.TorchVGSLModel(spec)
+        message('\u2713', fg='green')
+
+    message('Training line types:')
+    for k, v in gt_set.class_mapping['baselines'].items():
+        message(f'  {k}\t{v}')
+    message('Training region types:')
+    for k, v in gt_set.class_mapping['regions'].items():
+        message(f'  {k}\t{v}')
+
+    if len(gt_set.imgs) == 0:
+        raise click.UsageError('No valid training data was provided to the train command. Please add valid XML or line data.')
+
+    if device == 'cpu':
+        loader_threads = threads // 2
+    else:
+        loader_threads = threads
+
+    train_loader = InfiniteDataLoader(gt_set, batch_size=1, shuffle=True, num_workers=loader_threads, pin_memory=True)
+    test_loader = DataLoader(val_set, batch_size=1, shuffle=True, num_workers=loader_threads, pin_memory=True)
+    threads = max((threads - loader_threads, 1))
+
+    # set model type metadata field and dump class_mapping
+    nn.model_type = 'segmentation'
+    nn.user_metadata['class_mapping'] = val_set.class_mapping
+
+    # set mode to training
+    nn.train()
+
+    logger.debug(f'Set OpenMP threads to {threads}')
+    nn.set_num_threads(threads)
+
+    optim = getattr(torch.optim, optimizer)(nn.nn.parameters(), lr=0)
+
+    if 'accuracy' not in nn.user_metadata:
+        nn.user_metadata['accuracy'] = []
+
+    tr_it = TrainScheduler(optim)
+    if schedule == '1cycle':
+        add_1cycle(tr_it, int(len(gt_set) * epochs), lrate, momentum, momentum - 0.10, weight_decay)
+    else:
+        # constant learning rate scheduler
+        tr_it.add_phase(1, (lrate, lrate), (momentum, momentum), weight_decay, train.annealing_const)
+
+    if quit == 'early':
+        st_it = EarlyStopping(min_delta, lag)
+    elif quit == 'dumb':
+        st_it = EpochStopping(epochs - completed_epochs)
+    else:
+        raise click.BadOptionUsage('quit', f'Invalid training interruption scheme {quit}.')
+
+    trainer = train.KrakenTrainer(model=nn,
+                                  optimizer=optim,
+                                  device=device,
+                                  filename_prefix=output,
+                                  event_frequency=freq,
+                                  train_set=train_loader,
+                                  val_set=val_set,
+                                  stopper=st_it,
+                                  loss_fn=train.baseline_label_loss_fn,
+                                  evaluator=train.baseline_label_evaluator_fn)
+
+    trainer.add_lr_scheduler(tr_it)
+
+    with log.progressbar(label='stage {}/{}'.format(1, trainer.stopper.epochs if trainer.stopper.epochs > 0 else '∞'),
+                         length=trainer.event_it, show_pos=True) as bar:
+
+        def _draw_progressbar():
+            bar.update(1)
+
+        def _print_eval(epoch, accuracy, mean_acc, mean_iu, freq_iu, **kwargs):
+            message('Accuracy report ({}) mean_iu: {:0.4f} freq_iu: {:0.4f} mean_acc: {:0.4f} accuracy: {:0.4f}'.format(epoch, mean_iu, freq_iu, mean_acc, accuracy))
+            # reset progress bar
+            bar.label = 'stage {}/{}'.format(epoch+1, trainer.stopper.epochs if trainer.stopper.epochs > 0 else '∞')
+            bar.pos = 0
+            bar.finished = False
+            bar.start = bar.last_eta = time.time()
+
+        trainer.run(_print_eval, _draw_progressbar)
+
+    if quit == 'early':
+        message('Moving best model {0}_{1}.mlmodel ({2}) to {0}_best.mlmodel'.format(output, trainer.stopper.best_epoch, trainer.stopper.best_loss))
+        logger.info('Moving best model {0}_{1}.mlmodel ({2}) to {0}_best.mlmodel'.format(output, trainer.stopper.best_epoch, trainer.stopper.best_loss))
+        shutil.copy('{}_{}.mlmodel'.format(output, trainer.stopper.best_epoch), '{}_best.mlmodel'.format(output))
+
 
 @cli.command('train')
 @click.pass_context
@@ -82,7 +349,7 @@ def _expand_gt(ctx, param, value):
               'padding around lines')
 @click.option('-o', '--output', show_default=True, type=click.Path(), default='model', help='Output model file')
 @click.option('-s', '--spec', show_default=True,
-              default='[1,48,0,1 Cr3,3,32 Do0.1,2 Mp2,2 Cr3,3,64 Do0.1,2 Mp2,2 S1(1x12)1,3 Lbx100 Do]',
+              default='[1,48,0,1 Cr3,3,32 Do0.1,2 Mp2,2 Cr3,3,64 Do0.1,2 Mp2,2 S1(1x0)1,3 Lbx100 Do]',
               help='VGSL spec of the network to train. CTC layer will be added automatically.')
 @click.option('-a', '--append', show_default=True, default=None, type=click.INT,
               help='Removes layers before argument and then appends spec. Only works when loading an existing model')
@@ -124,12 +391,32 @@ def _expand_gt(ctx, param, value):
 @click.option('--threads', show_default=True, default=1, help='Number of OpenMP threads and workers when running on CPU.')
 #@click.option('--load-hyper-parameters/--no-load-hyper-parameters', show_default=True, default=False,
 #              help='When loading an existing model, retrieve hyperparameters from the model')
+@click.option('--repolygonize/--no-repolygonize', show_default=True,
+              default=False, help='Repolygonizes line data in ALTO/PageXML'
+              'files. This ensures that the trained model is compatible with the'
+              'segmenter in kraken even if the original image files either do'
+              'not contain anything but transcriptions and baseline information'
+              'or the polygon data was created using a different method. Will'
+              'be ignored in `path` mode. Note, that this option will be slow'
+              'and will not scale input images to the same size as the segmenter'
+              'does.')
+@click.option('--force-binarization/--no-binarization', show_default=True,
+              default=False, help='Forces input images to be binary, otherwise'
+              'the appropriate color format will be auto-determined through the'
+              'network specification. Will be ignored in `path` mode.')
+@click.option('-f', '--format-type', type=click.Choice(['path', 'alto', 'page']), default='path',
+              help='Sets the training data format. In ALTO and PageXML mode all'
+              'data is extracted from xml files containing both line definitions and a'
+              'link to source images. In `path` mode arguments are image files'
+              'sharing a prefix up to the last extension with text `.gt.txt` files'
+              'containing the transcription.')
+@click.option('--augment/--no-augment', show_default=False, default=False, help='Enable image augmentation')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
           lag, min_delta, device, optimizer, lrate, momentum, weight_decay,
           schedule, partition, normalization, normalize_whitespace, codec,
           resize, reorder, training_files, evaluation_files, preload, threads,
-          ground_truth):
+          repolygonize, force_binarization, format_type, augment, ground_truth):
     """
     Trains a model from image-text pairs.
     """
@@ -150,7 +437,7 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
     from kraken.lib.util import make_printable
     from kraken.lib.train import EarlyStopping, EpochStopping, TrainStopper, TrainScheduler, add_1cycle
     from kraken.lib.codec import PytorchCodec
-    from kraken.lib.dataset import GroundTruthDataset, generate_input_transforms
+    from kraken.lib.dataset import GroundTruthDataset, PolygonGTDataset, generate_input_transforms, preparse_xml_data, InfiniteDataLoader
 
     logger.info('Building ground truth set from {} line images'.format(len(ground_truth) + len(training_files)))
 
@@ -172,23 +459,6 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
         #            locals()[param] = nn.user_metadata[param]
         message('\u2713', fg='green', nl=False)
 
-    # preparse input sizes from vgsl string to seed ground truth data set
-    # sizes and dimension ordering.
-    if not nn:
-        spec = spec.strip()
-        if spec[0] != '[' or spec[-1] != ']':
-            raise click.BadOptionUsage('spec', 'VGSL spec {} not bracketed'.format(spec))
-        blocks = spec[1:-1].split(' ')
-        m = re.match(r'(\d+),(\d+),(\d+),(\d+)', blocks[0])
-        if not m:
-            raise click.BadOptionUsage('spec', 'Invalid input spec {}'.format(blocks[0]))
-        batch, height, width, channels = [int(x) for x in m.groups()]
-    else:
-        batch, channels, height, width = nn.input
-    try:
-        transforms = generate_input_transforms(batch, height, width, channels, pad)
-    except KrakenInputException as e:
-        raise click.BadOptionUsage('spec', str(e))
 
     # disable automatic partition when given evaluation set explicitly
     if evaluation_files:
@@ -203,6 +473,45 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
         raise click.UsageError('No training data was provided to the train command. Use `-t` or the `ground_truth` argument.')
 
     np.random.shuffle(ground_truth)
+
+    DatasetClass = GroundTruthDataset
+    if format_type != 'path':
+        logger.info('Parsing {} XML files for training data'.format(len(ground_truth)))
+        if repolygonize:
+            message('Repolygonizing data')
+        ground_truth = preparse_xml_data(ground_truth, format_type, repolygonize)
+        if evaluation_files:
+            evaluation_files = preparse_xml_data(evaluation_files, format_type, repolygonize)
+        DatasetClass = PolygonGTDataset
+        valid_norm = False
+    else:
+        if force_binarization:
+            logger.warning('Forced binarization enabled in `path` mode. Will be ignored.')
+            force_binarization = False
+        if repolygonize:
+            logger.warning('Repolygonization enabled in `path` mode. Will be ignored.')
+        ground_truth = [{'image': im} for im in ground_truth]
+        if evaluation_files:
+            evaluation_files = [{'image': im} for im in evaluation_files]
+        valid_norm = True
+
+    # preparse input sizes from vgsl string to seed ground truth data set
+    # sizes and dimension ordering.
+    if not nn:
+        spec = spec.strip()
+        if spec[0] != '[' or spec[-1] != ']':
+            raise click.BadOptionUsage('spec', 'VGSL spec {} not bracketed'.format(spec))
+        blocks = spec[1:-1].split(' ')
+        m = re.match(r'(\d+),(\d+),(\d+),(\d+)', blocks[0])
+        if not m:
+            raise click.BadOptionUsage('spec', 'Invalid input spec {}'.format(blocks[0]))
+        batch, height, width, channels = [int(x) for x in m.groups()]
+    else:
+        batch, channels, height, width = nn.input
+    try:
+        transforms = generate_input_transforms(batch, height, width, channels, pad, valid_norm, force_binarization)
+    except KrakenInputException as e:
+        raise click.BadOptionUsage('spec', str(e))
 
     if len(ground_truth) > 2500 and not preload:
         logger.info('Disabling preloading for large (>2500) training data set. Enable by setting --preload parameter')
@@ -224,35 +533,39 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
         logger.debug('Setting multiprocessing tensor sharing strategy to file_system')
         torch.multiprocessing.set_sharing_strategy('file_system')
 
-    gt_set = GroundTruthDataset(normalization=normalization,
-                                whitespace_normalization=normalize_whitespace,
-                                reorder=reorder,
-                                im_transforms=transforms,
-                                preload=preload)
+    gt_set = DatasetClass(normalization=normalization,
+                          whitespace_normalization=normalize_whitespace,
+                          reorder=reorder,
+                          im_transforms=transforms,
+                          preload=preload,
+                          augmentation=augment)
     with log.progressbar(tr_im, label='Building training set') as bar:
         for im in bar:
             logger.debug('Adding line {} to training set'.format(im))
             try:
-                gt_set.add(im)
+                gt_set.add(**im)
             except FileNotFoundError as e:
                 logger.warning('{}: {}. Skipping.'.format(e.strerror, e.filename))
             except KrakenInputException as e:
                 logger.warning(str(e))
 
-    val_set = GroundTruthDataset(normalization=normalization,
-                                 whitespace_normalization=normalize_whitespace,
-                                 reorder=reorder,
-                                 im_transforms=transforms,
-                                 preload=preload)
+    val_set = DatasetClass(normalization=normalization,
+                           whitespace_normalization=normalize_whitespace,
+                           reorder=reorder,
+                           im_transforms=transforms,
+                           preload=preload)
     with log.progressbar(te_im, label='Building validation set') as bar:
         for im in bar:
             logger.debug('Adding line {} to validation set'.format(im))
             try:
-                val_set.add(im)
+                val_set.add(**im)
             except FileNotFoundError as e:
                 logger.warning('{}: {}. Skipping.'.format(e.strerror, e.filename))
             except KrakenInputException as e:
                 logger.warning(str(e))
+
+    if len(gt_set._images) == 0:
+        raise click.UsageError('No valid training data was provided to the train command. Please add valid XML or line data.')
 
     logger.info('Training set {} lines, validation set {} lines, alphabet {} symbols'.format(len(gt_set._images), len(val_set._images), len(gt_set.alphabet)))
     alpha_diff_only_train = set(gt_set.alphabet).difference(set(val_set.alphabet))
@@ -260,13 +573,13 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
     if alpha_diff_only_train:
         logger.warning('alphabet mismatch: chars in training set only: {} (not included in accuracy test during training)'.format(alpha_diff_only_train))
     if alpha_diff_only_val:
-        logger.warning('alphabet mismatch: chars in validation set only: {} (not trained)'.format(alpha_diff_only_val))        
+        logger.warning('alphabet mismatch: chars in validation set only: {} (not trained)'.format(alpha_diff_only_val))
     logger.info('grapheme\tcount')
     for k, v in sorted(gt_set.alphabet.items(), key=lambda x: x[1], reverse=True):
         char = make_printable(k)
         if char == k:
             char = '\t' + char
-        logger.info(u'{}\t{}'.format(char, v))
+        logger.info('{}\t{}'.format(char, v))
 
     logger.debug('Encoding training set')
 
@@ -292,7 +605,7 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
 
         try:
             gt_set.encode(codec)
-        except KrakenEncodeException as e:
+        except KrakenEncodeException:
             message('Network codec not compatible with training set')
             alpha_diff = set(gt_set.alphabet).difference(set(codec.c2l.keys()))
             if resize == 'fail':
@@ -330,18 +643,27 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
         # initialize codec
         message('\u2713', fg='green')
 
+    if nn.one_channel_mode and gt_set.im_mode != nn.one_channel_mode:
+        logger.warning('Neural network has been trained on mode {} images, training set contains mode {} data. Consider setting `--force-binarization`'.format(nn.one_channel_mode, gt_set.im_mode))
+
+    if format_type != 'path' and nn.seg_type == 'bbox':
+        logger.warning('Neural network has been trained on bounding box image information but training set is polygonal.')
+
     # half the number of data loading processes if device isn't cuda and we haven't enabled preloading
     if device == 'cpu' and not preload:
         loader_threads = threads // 2
     else:
         loader_threads = threads
-    train_loader = DataLoader(gt_set, batch_size=1, shuffle=True, num_workers=loader_threads, pin_memory=True)
-    threads = max(threads-loader_threads, 1)
+    train_loader = InfiniteDataLoader(gt_set, batch_size=1, shuffle=True, num_workers=loader_threads, pin_memory=True)
+    threads = max(threads - loader_threads, 1)
 
     # don't encode validation set as the alphabets may not match causing encoding failures
     val_set.training_set = list(zip(val_set._images, val_set._gt))
 
     logger.debug('Constructing {} optimizer (lr: {}, momentum: {})'.format(optimizer, lrate, momentum))
+
+    # set model type metadata field
+    nn.model_type = 'recognition'
 
     # set mode to trainindg
     nn.train()
@@ -350,11 +672,13 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
     logger.debug('Set OpenMP threads to {}'.format(threads))
     nn.set_num_threads(threads)
 
-    logger.debug('Moving model to device {}'.format(device))
     optim = getattr(torch.optim, optimizer)(nn.nn.parameters(), lr=0)
 
-    if 'accuracy' not in  nn.user_metadata:
+    if 'accuracy' not in nn.user_metadata:
         nn.user_metadata['accuracy'] = []
+
+    if 'seg_type' not in nn.user_metadata:
+        nn.user_metadata['seg_type'] = 'baselines' if format_type != 'path' else 'bbox'
 
     tr_it = TrainScheduler(optim)
     if schedule == '1cycle':
@@ -369,10 +693,6 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
         st_it = EpochStopping(epochs - completed_epochs)
     else:
         raise click.BadOptionUsage('quit', 'Invalid training interruption scheme {}'.format(quit))
-
-    #for param in hyper_fields:
-    #    logger.debug('Setting \'{}\' to \'{}\' in model metadata'.format(param, locals()[param]))
-    #    nn.user_metadata[param] = locals()[param]
 
     trainer = train.KrakenTrainer(model=nn,
                                   optimizer=optim,
@@ -391,12 +711,13 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
         def _draw_progressbar():
             bar.update(1)
 
-        def _print_eval(epoch, accuracy, chars, error):
+        def _print_eval(epoch, accuracy, chars, error, **kwargs):
             message('Accuracy report ({}) {:0.4f} {} {}'.format(epoch, accuracy, chars, error))
             # reset progress bar
             bar.label = 'stage {}/{}'.format(epoch+1, trainer.stopper.epochs if trainer.stopper.epochs > 0 else '∞')
             bar.pos = 0
             bar.finished = False
+            bar.start = bar.last_eta = time.time()
 
         trainer.run(_print_eval, _draw_progressbar)
 
@@ -417,20 +738,48 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
 @click.option('-p', '--pad', show_default=True, type=click.INT, default=16, help='Left and right '
               'padding around lines')
 @click.option('--threads', show_default=True, default=1, help='Number of OpenMP threads when running on CPU.')
+@click.option('--reorder/--no-reorder', show_default=True, default=True, help='Reordering of code points to display order')
+@click.option('-u', '--normalization', show_default=True, type=click.Choice(['NFD', 'NFKD', 'NFC', 'NFKC']),
+              default=None, help='Ground truth normalization')
+@click.option('-n', '--normalize-whitespace/--no-normalize-whitespace',
+              show_default=True, default=True, help='Normalizes unicode whitespace')
+@click.option('--repolygonize/--no-repolygonize', show_default=True,
+              default=False, help='Repolygonizes line data in ALTO/PageXML'
+              'files. This ensures that the trained model is compatible with the'
+              'segmenter in kraken even if the original image files either do'
+              'not contain anything but transcriptions and baseline information'
+              'or the polygon data was created using a different method. Will'
+              'be ignored in `path` mode. Note, that this option will be slow'
+              'and will not scale input images to the same size as the segmenter'
+              'does.')
+@click.option('--force-binarization/--no-binarization', show_default=True,
+              default=False, help='Forces input images to be binary, otherwise'
+              'the appropriate color format will be auto-determined through the'
+              'network specification. Will be ignored in `path` mode.')
+@click.option('-f', '--format-type', type=click.Choice(['path', 'alto', 'page']), default='path',
+              help='Sets the training data format. In ALTO and PageXML mode all'
+              'data is extracted from xml files containing both baselines and a'
+              'link to source images. In `path` mode arguments are image files'
+              'sharing a prefix up to the last extension with JSON `.path` files'
+              'containing the baseline information.')
 @click.argument('test_set', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
-def test(ctx, model, evaluation_files, device, pad, threads, test_set):
+def test(ctx, model, evaluation_files, device, pad, threads, reorder,
+         normalization, normalize_whitespace, repolygonize, force_binarization,
+         format_type, test_set):
     """
     Evaluate on a test set.
     """
     if not model:
         raise click.UsageError('No model to evaluate given.')
 
+    import regex
+    import unicodedata
     import numpy as np
     from PIL import Image
 
     from kraken.serialization import render_report
     from kraken.lib import models
-    from kraken.lib.dataset import global_align, compute_confusions, generate_input_transforms
+    from kraken.lib.dataset import global_align, compute_confusions, generate_input_transforms, preparse_xml_data, PolygonGTDataset, GroundTruthDataset
 
     logger.info('Building test set from {} line images'.format(len(test_set) + len(evaluation_files)))
 
@@ -446,16 +795,37 @@ def test(ctx, model, evaluation_files, device, pad, threads, test_set):
     logger.debug('Set OpenMP threads to {}'.format(threads))
     next(iter(nn.values())).nn.set_num_threads(threads)
 
-    # merge training_files into ground_truth list
     if evaluation_files:
         test_set.extend(evaluation_files)
 
     if len(test_set) == 0:
         raise click.UsageError('No evaluation data was provided to the test command. Use `-e` or the `test_set` argument.')
 
-    def _get_text(im):
-        with open(os.path.splitext(im)[0] + '.gt.txt', 'r') as fp:
-            return get_display(fp.read())
+    text_transforms = []
+    if normalization:
+        text_transforms.append(lambda x: unicodedata.normalize(normalization, x))
+    if normalize_whitespace:
+        text_transforms.append(lambda x: regex.sub(r'\s', ' ', x))
+        text_transforms.append(lambda x: x.strip())
+    if reorder:
+        text_transforms.append(get_display)
+
+    if format_type != 'path':
+        if repolygonize:
+            message('Repolygonizing data')
+        test_set = preparse_xml_data(test_set, format_type, repolygonize)
+        valid_norm = False
+        DatasetClass = PolygonGTDataset
+    else:
+        DatasetClass = GroundTruthDataset
+        t = []
+        if force_binarization:
+            logger.warning('Forced binarization enabled in `path` mode. Will be ignored.')
+            force_binarization = False
+        if repolygonize:
+            logger.warning('Repolygonization enabled in `path` mode. Will be ignored.')
+        test_set = [{'image': img} for img in test_set]
+        valid_norm = True
 
     acc_list = []
     for p, net in nn.items():
@@ -466,17 +836,30 @@ def test(ctx, model, evaluation_files, device, pad, threads, test_set):
         message('Evaluating {}'.format(p))
         logger.info('Evaluating {}'.format(p))
         batch, channels, height, width = net.nn.input
-        ts = generate_input_transforms(batch, height, width, channels, pad)
-        with log.progressbar(test_set, label='Evaluating') as bar:
-            for im_path in bar:
-                i = ts(Image.open(im_path))
-                text = _get_text(im_path)
-                pred = net.predict_string(i)
-                chars += len(text)
-                c, algn1, algn2 = global_align(text, pred)
-                algn_gt.extend(algn1)
-                algn_pred.extend(algn2)
-                error += c
+        ts = generate_input_transforms(batch, height, width, channels, pad, valid_norm, force_binarization)
+        ds = DatasetClass(normalization=normalization,
+                          whitespace_normalization=normalize_whitespace,
+                          reorder=reorder,
+                          im_transforms=ts,
+                          preload=False)
+        for line in test_set:
+            ds.add(**line)
+        # don't encode validation set as the alphabets may not match causing encoding failures
+        ds.training_set = list(zip(ds._images, ds._gt))
+
+        with log.progressbar(ds, label='Evaluating') as bar:
+            for im, text in list(bar):
+                try:
+                    pred = net.predict_string(im)
+                    chars += len(text)
+                    c, algn1, algn2 = global_align(text, pred)
+                    algn_gt.extend(algn1)
+                    algn_pred.extend(algn2)
+                    error += c
+                except FileNotFoundError as e:
+                    logger.warning('{} {}. Skipping.'.format(e.strerror, e.filename))
+                except KrakenInputException as e:
+                    logger.warning(str(e))
         acc_list.append((chars-error)/chars)
         confusions, scripts, ins, dels, subs = compute_confusions(algn_gt, algn_pred)
         rep = render_report(p, chars, error, confusions, scripts, ins, dels, subs)
@@ -527,7 +910,7 @@ def extract(ctx, binarize, normalization, normalize_whitespace, reorder,
     if normalization:
         text_transforms.append(lambda x: unicodedata.normalize(normalization, x))
     if normalize_whitespace:
-        text_transforms.append(lambda x: regex.sub('\s', ' ', x))
+        text_transforms.append(lambda x: regex.sub(r'\s', ' ', x))
     if reorder:
         text_transforms.append(get_display)
 
@@ -613,7 +996,6 @@ def transcription(ctx, text_direction, scale, bw, maxcolseps,
     from kraken import binarization
 
     from kraken.lib import models
-    from kraken.lib.util import is_bitonal
 
     ti = transcribe.TranscriptionInterface(font, font_style)
 
@@ -622,7 +1004,7 @@ def transcription(ctx, text_direction, scale, bw, maxcolseps,
 
     if prefill:
         logger.info('Loading model {}'.format(prefill))
-        message('Loading RNN', nl=False)
+        message('Loading ANN', nl=False)
         prefill = models.load_any(prefill)
         message('\u2713', fg='green')
 
@@ -820,7 +1202,7 @@ def publish(ctx, metadata, access_token, model):
         accuracy_default = None
         # take last accuracy measurement in model metadata
         if 'accuracy' in nn.nn.user_metadata and nn.nn.user_metadata['accuracy']:
-           accuracy_default = nn.nn.user_metadata['accuracy'][-1][1] * 100
+            accuracy_default = nn.nn.user_metadata['accuracy'][-1][1] * 100
         accuracy = click.prompt('accuracy on test set', type=float, default=accuracy_default)
         script = [click.prompt('script', type=click.Choice(sorted(schema['properties']['script']['items']['enum'])), show_choices=True)]
         license = click.prompt('license', type=click.Choice(sorted(schema['properties']['license']['enum'])), show_choices=True)
@@ -848,7 +1230,8 @@ def publish(ctx, metadata, access_token, model):
         validate(metadata, schema)
     metadata['graphemes'] = [char for char in ''.join(nn.codec.c2l.keys())]
     oid = repo.publish_model(model, metadata, access_token, partial(message, '.', nl=False))
-    print('\nmodel PID: {}'.format(oid))
+    message('\nmodel PID: {}'.format(oid))
+
 
 if __name__ == '__main__':
     cli()

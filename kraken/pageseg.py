@@ -27,7 +27,7 @@ import logging
 import numpy as np
 import pkg_resources
 
-from typing import Tuple, Sequence, List, Optional, Dict, Any
+from typing import Tuple, List, Callable, Optional
 from scipy.ndimage.filters import (gaussian_filter, uniform_filter,
                                    maximum_filter)
 
@@ -35,11 +35,12 @@ from kraken.lib import models
 from kraken.lib import morph, sl
 from kraken.lib.util import pil2array, is_bitonal, get_im_str
 from kraken.lib.exceptions import KrakenInputException
+from kraken.lib.segmentation import reading_order, topsort
 
 from kraken.rpred import rpred
 from kraken.serialization import max_bbox
 
-__all__ = ['segment', 'detect_scripts']
+__all__ = ['segment']
 
 logger = logging.getLogger(__name__)
 
@@ -125,77 +126,7 @@ def compute_lines(segmentation, scale):
     return lines
 
 
-def reading_order(lines: Sequence, text_direction: str = 'lr') -> List:
-    """Given the list of lines (a list of 2D slices), computes
-    the partial reading order.  The output is a binary 2D array
-    such that order[i,j] is true if line i comes before line j
-    in reading order."""
-
-    logger.info('Compute reading order on {} lines in {} direction'.format(len(lines), text_direction))
-
-    order = np.zeros((len(lines), len(lines)), 'B')
-
-    def _x_overlaps(u, v):
-        return u[1].start < v[1].stop and u[1].stop > v[1].start
-
-    def _above(u, v):
-        return u[0].start < v[0].start
-
-    def _left_of(u, v):
-        return u[1].stop < v[1].start
-
-    def _separates(w, u, v):
-        if w[0].stop < min(u[0].start, v[0].start):
-            return 0
-        if w[0].start > max(u[0].stop, v[0].stop):
-            return 0
-        if w[1].start < u[1].stop and w[1].stop > v[1].start:
-            return 1
-        return 0
-
-    if text_direction == 'rl':
-        def horizontal_order(u, v):
-            return not _left_of(u, v)
-    else:
-        horizontal_order = _left_of
-
-    for i, u in enumerate(lines):
-        for j, v in enumerate(lines):
-            if _x_overlaps(u, v):
-                if _above(u, v):
-                    order[i, j] = 1
-            else:
-                if [w for w in lines if _separates(w, u, v)] == []:
-                    if horizontal_order(u, v):
-                        order[i, j] = 1
-    return order
-
-
-def topsort(order: np.array) -> np.array:
-    """Given a binary array defining a partial order (o[i,j]==True means i<j),
-    compute a topological sort.  This is a quick and dirty implementation
-    that works for up to a few thousand elements."""
-    logger.info('Perform topological sort on partially ordered lines')
-    n = len(order)
-    visited = np.zeros(n)
-    L = []
-
-    def _visit(k):
-        if visited[k]:
-            return
-        visited[k] = 1
-        a, = np.nonzero(np.ravel(order[:, k]))
-        for l in a:
-            _visit(l)
-        L.append(k)
-
-    for k in range(n):
-        _visit(k)
-    return L
-
-
-def compute_separators_morph(binary: np.array, scale: float,
-                             sepwiden: int = 10, maxcolseps: int = 2) -> np.array:
+def compute_separators_morph(binary: np.array, scale: float, sepwiden: int = 10, maxcolseps: int = 2) -> np.array:
     """Finds vertical black lines corresponding to column separators."""
     logger.debug('Finding vertical black column lines')
     d0 = int(max(5, scale/4))
@@ -365,7 +296,7 @@ def rotate_lines(lines: np.array, angle: float, offset: int) -> np.array:
     """
     Rotates line bounding boxes around the origin and adding and offset.
     """
-    logger.debug('Rotate line coordinates by {} with offset {}'.format(angle, offset))
+    logger.debug(f'Rotate line coordinates by {angle} with offset {offset}')
     angle = np.radians(angle)
     r = np.array([[np.cos(angle), -np.sin(angle)], [np.sin(angle), np.cos(angle)]])
     p = np.array(lines).reshape((-1, 2))
@@ -383,7 +314,7 @@ def segment(im, text_direction: str = 'horizontal-lr',
             no_hlines: bool = True,
             pad: int = 0,
             mask: Optional[np.array] = None,
-            skip_order: bool = False) -> Dict[str, Any]:
+            eading_order_fn: Callable = reading_order) -> Dict[str, Any]:
     """
     Segments a page into text lines.
 
@@ -405,7 +336,9 @@ def segment(im, text_direction: str = 'horizontal-lr',
         mask (PIL.Image): A bi-level mask image of the same size as `im` where
                           0-valued regions are ignored for segmentation
                           purposes. Disables column detection.
-        skip_order (bool): Skips reading order determination of lines.
+        reading_order_fn (Callable): Function to call to order line output.
+                                     Callable accepting a list of slices (y, x)
+                                     and a text direction in (`rl`, `lr`).
 
     Returns:
         {'text_direction': '$dir', 'boxes': [(x1, y1, x2, y2),...]}: A
@@ -417,11 +350,11 @@ def segment(im, text_direction: str = 'horizontal-lr',
         direction is invalid.
     """
     im_str = get_im_str(im)
-    logger.info('Segmenting {}'.format(im_str))
+    logger.info(f'Segmenting {im_str}')
 
     if im.mode != '1' and not is_bitonal(im):
-        logger.error('Image {} is not bi-level'.format(im_str))
-        raise KrakenInputException('Image {} is not bi-level'.format(im_str))
+        logger.error(f'Image {im_str} is not bi-level')
+        raise KrakenInputException(f'Image {im_str} is not bi-level')
 
     # rotate input image for vertical lines
     if text_direction.startswith('horizontal'):
@@ -434,10 +367,10 @@ def segment(im, text_direction: str = 'horizontal-lr',
         angle = 90
         offset = (im.size[0], 0)
     else:
-        logger.error('Invalid text direction \'{}\''.format(text_direction))
-        raise KrakenInputException('Invalid text direction {}'.format(text_direction))
+        logger.error(f'Invalid text direction \'{text_direction}\'')
+        raise KrakenInputException(f'Invalid text direction {text_direction}')
 
-    logger.debug('Rotating input image by {} degrees'.format(angle))
+    logger.debug(f'Rotating input image by {angle} degrees')
     im = im.rotate(angle, expand=True)
 
     a = pil2array(im)
@@ -458,8 +391,8 @@ def segment(im, text_direction: str = 'horizontal-lr',
                 raise KrakenInputException('Mask is not bitonal')
             mask = mask.convert('1')
             if mask.size != im.size:
-                logger.error('Mask size {} doesn\'t match image size {}'.format(mask.size, im.size))
-                raise KrakenInputException('Mask size {} doesn\'t match image size {}'.format(mask.size, im.size))
+                logger.error(f'Mask size {mask.size} doesn\'t match image size {im.size}')
+                raise KrakenInputException(f'Mask size {mask.size} doesn\'t match image size {im.size}')
             logger.info('Masking enabled in segmenter. Disabling column detection.')
             mask = mask.rotate(angle, expand=True)
             colseps = pil2array(mask)
@@ -468,7 +401,7 @@ def segment(im, text_direction: str = 'horizontal-lr',
         else:
             colseps = compute_white_colseps(binary, scale, maxcolseps)
     except ValueError:
-        logger.warning('Exception in column finder (probably empty image) for {}.'.format(im_str))
+        logger.warning(f'Exception in column finder (probably empty image) for {im_str}')
         return {'text_direction': text_direction, 'boxes':  []}
 
     bottom, top, boxmap = compute_gradmaps(binary, scale)
@@ -479,12 +412,9 @@ def segment(im, text_direction: str = 'horizontal-lr',
     segmentation = llabels*binary
 
     lines = compute_lines(segmentation, scale)
-    if not skip_order:
-        order = reading_order([l.bounds for l in lines], text_direction[-2:])
-        lsort = topsort(order)
-        lines = [lines[i].bounds for i in lsort]
-    else:
-        lines = [l.bounds for l in lines]
+    order = reading_order_fn([l.bounds for l in lines], text_direction[-2:])
+    lsort = topsort(order)
+    lines = [lines[i].bounds for i in lsort]
     lines = [(s2.start, s1.start, s2.stop, s1.stop) for s1, s2 in lines]
 
     if isinstance(pad, int):
@@ -492,94 +422,3 @@ def segment(im, text_direction: str = 'horizontal-lr',
     lines = [(max(x[0]-pad[0], 0), x[1], min(x[2]+pad[1], im.size[0]), x[3]) for x in lines]
 
     return {'text_direction': text_direction, 'boxes':  rotate_lines(lines, 360-angle, offset).tolist(), 'script_detection': False}
-
-
-def detect_scripts(im, bounds, model=pkg_resources.resource_filename(__name__, 'script.mlmodel'), valid_scripts=None):
-    """
-    Detects scripts in a segmented page.
-
-    Classifies lines returned by the page segmenter into runs of scripts/writing systems.
-
-    Args:
-        im (PIL.Image): A bi-level page of mode '1' or 'L'
-        bounds (dict): A dictionary containing a 'boxes' entry with a list of
-                       coordinates (x0, y0, x1, y1) of a text line in the image
-                       and an entry 'text_direction' containing
-                       'horizontal-lr/rl/vertical-lr/rl'.
-        model (str): Location of the script classification model or None for default.
-        valid_scripts (list): List of valid scripts.
-
-    Returns:
-        {'script_detection': True, 'text_direction': '$dir', 'boxes':
-        [[(script, (x1, y1, x2, y2)),...]]}: A dictionary containing the text
-        direction and a list of lists of reading order sorted bounding boxes
-        under the key 'boxes' with each list containing the script segmentation
-        of a single line. Script is a ISO15924 4 character identifier.
-
-    Raises:
-        KrakenInvalidModelException if no clstm module is available.
-    """
-    raise NotImplementedError('Temporarily unavailable. Please open a github ticket if you want this fixed sooner.')
-    im_str = get_im_str(im)
-    logger.info(u'Detecting scripts with {} in {} lines on {}'.format(model, len(bounds['boxes']), im_str))
-    logger.debug(u'Loading detection model {}'.format(model))
-    rnn = models.load_any(model)
-    # load numerical to 4 char identifier map
-    logger.debug(u'Loading label to identifier map')
-    with pkg_resources.resource_stream(__name__, 'iso15924.json') as fp:
-        n2s = json.load(fp)
-    # convert allowed scripts to labels
-    val_scripts = []
-    if valid_scripts:
-        logger.debug(u'Converting allowed scripts list {}'.format(valid_scripts))
-        for k, v in n2s.items():
-            if v in valid_scripts:
-                val_scripts.append(chr(int(k) + 0xF0000))
-    else:
-        valid_scripts = []
-    it = rpred(rnn, im, bounds, bidi_reordering=False)
-    preds = []
-    logger.debug(u'Running detection')
-    for pred, bbox in zip(it, bounds['boxes']):
-        # substitute inherited scripts with neighboring runs
-        def _subs(m, s, r=False):
-            p = u''
-            for c in s:
-                if c in m and p and not r:
-                    p += p[-1]
-                elif c not in m and p and r:
-                    p += p[-1]
-                else:
-                    p += c
-            return p
-
-        logger.debug(u'Substituting scripts')
-        p = _subs([u'\U000f03e2', u'\U000f03e6'], pred.prediction)
-        # do a reverse run to fix leading inherited scripts
-        pred.prediction = ''.join(reversed(_subs([u'\U000f03e2', u'\U000f03e6'], reversed(p))))
-        # group by valid scripts. two steps: 1. substitute common confusions
-        # (Latin->Fraktur and Syriac->Arabic) if given in script list.
-        if 'Arab' in valid_scripts and 'Syrc' not in valid_scripts:
-            pred.prediction = pred.prediction.replace(u'\U000f0087', u'\U000f00a0')
-        if 'Latn' in valid_scripts and 'Latf' not in valid_scripts:
-            pred.prediction = pred.prediction.replace(u'\U000f00d9', u'\U000f00d7')
-        # next merge adjacent scripts
-        if val_scripts:
-            pred.prediction = _subs(val_scripts, pred.prediction, r=True)
-
-        # group by grapheme
-        t = []
-        logger.debug(u'Merging detections')
-        # if line contains only a single script return whole line bounding box
-        if len(set(pred.prediction)) == 1:
-            logger.debug('Only one script on line. Emitting whole line bbox')
-            k = ord(pred.prediction[0]) - 0xF0000
-            t.append((n2s[str(k)], bbox))
-        else:
-            for k, g in groupby(pred, key=lambda x: x[0]):
-                # convert to ISO15924 numerical identifier
-                k = ord(k) - 0xF0000
-                b = max_bbox(x[1] for x in g)
-                t.append((n2s[str(k)], b))
-        preds.append(t)
-    return {'boxes': preds, 'text_direction': bounds['text_direction'], 'script_detection': True}

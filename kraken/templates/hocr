@@ -1,24 +1,34 @@
+{% macro render_line(line) -%}
+		<span class="ocr_line" id="line_{{ line.index }}" title="bbox {{ line.bbox|join(' ') }}; x_bboxes {{ line.cuts|sum(start=[])|map('join', ' ')|join(' ') }}{% if line.boundary -%}; poly {{ line.boundary|sum(start=[])|join(' ') }}{% endif %}">
+		{% for segment in line.recognition %}
+			<span class="ocrx_word" id="segment_{{ segment.index }}" title="bbox {{ segment.bbox|join(' ') }}; x_confs {{ segment.confidences|join(' ') }}{% if segment.boundary -%}; poly {{ segment.boundary|sum(start=[])|join(' ') }}{% endif %}">{{ segment.text }}</span>
+		{% endfor -%}
+		</span>
+		<br/>
+{%- endmacro -%}
 <!DOCTYPE html>
 <html>
 	<head>
 		<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
 		<meta name="ocr-system" content="kraken"/>
-		<meta name="ocr-capabilities" content="ocr_page ocr_line ocrx_word"/>
+		<meta name="ocr-capabilities" content="ocr_page ocrx_block ocr_line ocrx_word ocrp_poly"/>
 		{% if page.scripts %}
 		<meta name="ocr-scripts" content="{{ page.scripts|join(' ') }}"/>
 		{% endif %}
 	</head>
 	<body>
 		<div class="ocr_page" title="bbox 0 0 {{ page.size|join(' ') }}; image {{ page.name }}" style="writing-mode: {{ page.writing_mode }};">
-			{% for line in page.lines %}
-			<span class="ocr_line" id="line_{{ line.index }}" title="bbox {{ line.bbox|join(' ') }}; x_bboxes {{ line.cuts|map('join', ' ')|join(' ') }}">
-			{% for segment in line.recognition %}
-				<span class="ocrx_word" id="segment_{{ segment.index }}" title="bbox {{ segment.bbox|join(' ') }}; x_confs {{ segment.confidences|join(' ') }}">{{ segment.text }}</span>
-			{% endfor %}
-			</span>
-			<br/>
-			{% endfor %}
-
+			{% for entity in page.entities -%}
+			{% if entity.type == "region" -%}
+			<div class="ocrx_block" id="region_{{ entity.index }}" data-region-type="{{ entity.region_type }}" title="bbox {{ entity.bbox|join(' ') }}; poly {{ entity.boundary|sum(start=[])|join(' ') }}">
+				{% for line in entity.lines -%}
+				{{ render_line(line) }}
+				{% endfor %}
+			</div>
+			{% else -%}
+			{{ render_line(entity) }}
+			{% endif -%}
+			{% endfor -%}
 		</div>
 	</body>
 </html>

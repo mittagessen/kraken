@@ -1,7 +1,7 @@
 .. _training:
 
-Training a kraken model
-=======================
+Training kraken
+===============
 
 kraken is an optical character recognition package that can be trained fairly
 easily for a large number of scripts. In contrast to other system requiring
@@ -9,11 +9,14 @@ segmentation down to glyph level before classification, it is uniquely suited
 for the recognition of connected scripts, because the neural network is trained
 to assign correct character to unsegmented training data.
 
-Training a new model for kraken requires a variable amount of training data
-manually generated from page images which have to be typographically similar to
-the target prints that are to be recognized. As the system works on unsegmented
-inputs for both training and recognition and its base unit is a text line,
-training data are just transcriptions aligned to line images. 
+Both segmentation, the process finding lines and regions on a page image, and
+recognition, the conversion of line images into text, can be trained in kraken.
+To train models for either we require training data, i.e. examples of page
+segmentations and transcriptions that are similar to what we want to be able to
+recognize. For segmentation the examples are  the location of baselines, i.e.
+the imaginary lines the text is written on, and polygons of regions. For
+recognition these are the text contained in a line. There are multiple ways to
+supply training data but the easiest is through PageXML or ALTO files.
 
 Installing kraken
 -----------------
@@ -47,108 +50,48 @@ example, only slightly compressed JPEG scans are generally suitable for
 training and recognition.
 
 Depending on the source of the scans some preprocessing such as splitting scans
-into pages, correcting skew and warp, and removing speckles is usually
-required. For complex layouts such as newspapers it is advisable to split the
-page manually into columns as the line extraction algorithm run to create
-transcription environments does not deal well with non-codex page layouts. A
-fairly user-friendly software for semi-automatic batch processing of image
-scans is `Scantailor <http://scantailor.org>`_ albeit most work can be done
-using a standard image editor.
+into pages, correcting skew and warp, and removing speckles can be advisable
+although it isn't strictly necessary as the segmenter can be trained to treat
+noisy material with a high accuracy. A fairly user-friendly software for
+semi-automatic batch processing of image scans is `Scantailor
+<http://scantailor.org>`_ albeit most work can be done using a standard image
+editor.
 
-The total number of scans required depends on the nature of the script to be
-recognized. Only features that are found on the page images and training data
-derived from it can later be recognized, so it is important that the coverage
-of typographic features is exhaustive. Training a single script model for a
-fairly small script such as Arabic or Hebrew requires at least 800 lines, while
-multi-script models, e.g. combined polytonic Greek and Latin, will require
-significantly more transcriptions. 
+The total number of scans required depends on the kind of model to train
+(segmentation or recognition), the complexity of the layout or the nature of
+the script to recognize. Only features that are found in the training data can
+later be recognized, so it is important that the coverage of typographic
+features is exhaustive. Training a small segmentation model for a particular
+kind of material might require less than a few hundred samples while a general
+model can well go into the thousands of pages. Likewise a specific recognition
+model for printed script with a small grapheme inventory such as Arabic or
+Hebrew requires around 800 lines, with manuscripts, complex scripts (such as
+polytonic Greek), and general models for multiple typefaces and hands needing
+more training data for the same accuracy.
 
 There is no hard rule for the amount of training data and it may be required to
 retrain a model after the initial training data proves insufficient. Most
 ``western`` texts contain between 25 and 40 lines per page, therefore upward of
 30 pages have to be preprocessed and later transcribed.
 
-Transcription
--------------
+Annotation and transcription
+----------------------------
 
-Transcription is done through local browser based HTML transcription
-environments. These are created by the ``ketos transcribe`` command line util
-that is part of kraken. Its basic input is just a number of image files and an
-output path to write the HTML file to:
-
-.. code-block:: console
-        
-        $ ketos transcribe -o output.html image_1.png image_2.png ...
-
-While it is possible to put multiple images into a single transcription
-environment splitting into one-image-per-HTML will ease parallel transcription
-by multiple people.
-
-The above command reads in the image files, converts them to black and white if
-necessary, tries to split them into line images, and puts an editable text
-field next to the image in the HTML.
-
-Transcription has to be diplomatic, i.e. contain the exact character sequence
-in the line image, including original orthography. Some deviations, such as
-consistently omitting vocalization in Arabic texts, is possible as long as they
-are systematic and relatively minor.
-
-.. note::
-
-        The page segmentation algorithm extracting lines from images is
-        optimized for ``western`` page layouts and may recognize lines
-        erroneously, lumping multiple lines together or cutting them in half.
-        The most efficient way to deal with these errors is just skipping the
-        affected lines by leaving the text box empty.
-
-.. tip::
-
-        Copy-paste transcription can significantly speed up the whole process.
-        Either transcribe scans of a work where a digital edition already
-        exists (but does not for typographically similar prints) or find a
-        sufficiently similar edition as a base.
-
-After transcribing a number of lines the results have to be saved, either using
-the ``Download`` button on the lower left or through the regular ``Save Page
-As`` (CTRL+S) function of the browser. All the work done is contained directly
-in the saved files and it is possible to save partially transcribed files and
-continue work later.
-
-Next the contents of the filled transcription environments have to be
-extracted through the ``ketos extract`` command:
-
-.. code-block:: console 
-
-        $ ketos extract --output output_directory --normalization NFD *.html
-
-with
-
---output
-        The output directory where all line image-text pairs (training data)
-        are written, defaulting to ``training/``
---normalization
-        Unicode has code points to encode most glyphs encountered in the wild.
-        A lesser known feature is that there usually are multiple ways to
-        encode a glyph.  `Unicode normalization
-        <http://www.unicode.org/reports/tr15/>`_ ensures that equal glyphs are
-        encoded in the same way, i.e. that the encoded representation across
-        the training data set is consistent and there is only one way the
-        network can recognize a particular feature on the page. Usually it is
-        sufficient to set the normalization to Normalization Form
-        Decomposed (NFD), as it reduces the the size of the overall script to
-        be recognized slightly.
-
-The result will be a directory filled with line image text pairs ``NNNNNN.png``
-and ``NNNNNN.gt.txt`` and a ``manifest.txt`` containing a list of all extracted
-lines.
-
-.. note::
-
-        At this point it is recommended to review the content of the training
-        data directory before proceeding. 
+kraken does not provide internal tools for the annotation and transcription of
+baselines, regions, and text. There are a number of tools available that can
+create ALTO and PageXML files containing the requisite information for either
+segmentation or recognition training: `escriptorium
+<https://escripta.hypotheses.org>`_ integrates kraken tightly including
+training and inference, `Aletheia
+<https://www.primaresearch.org/tools/Aletheia>`_ is a powerful desktop
+application that can create fine grained annotations.
 
 Training
 --------
+
+The training data, e.g. a collection of PAGE XML documents, obtained through
+annotation and transcription may now be used to train segmentation and/or
+transcription models.
 
 The training data in ``output_dir`` may now be used to train a new model by
 invoking the ``ketos train`` command. Just hand a list of images to the command

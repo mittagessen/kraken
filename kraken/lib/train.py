@@ -21,16 +21,14 @@ import math
 import torch
 import logging
 import numpy as np
+import torch.nn.functional as F
 
-from itertools import cycle, count
-from torch.utils import data
-from functools import partial
-from typing import Tuple, Union, Optional, Callable, List, Dict, Any
-from collections.abc import Iterable
+from itertools import cycle
+from typing import Tuple, Callable, List, Dict, Any
 
-from kraken.lib import models, vgsl
+from kraken.lib import models, vgsl, segmentation
 from kraken.lib.dataset import compute_error
-from kraken.lib.exceptions import KrakenStopTrainingException, KrakenInputException
+from kraken.lib.exceptions import KrakenInputException
 
 logger = logging.getLogger(__name__)
 
@@ -58,11 +56,14 @@ class TrainStopper(object):
         """
         pass
 
+
 def annealing_const(start: float, end: float, pct: float) -> float:
     return start
 
+
 def annealing_linear(start: float, end: float, pct: float) -> float:
     return start + pct * (end-start)
+
 
 def annealing_cos(start: float, end: float, pct: float) -> float:
     co = np.cos(np.pi * pct) + 1
@@ -121,7 +122,9 @@ def add_1cycle(sched: TrainScheduler, iterations: int,
     """
     Adds 1cycle policy [0] phases to a learning rate scheduler.
 
-    [0] Smith, Leslie N. "A disciplined approach to neural network hyper-parameters: Part 1--learning rate, batch size, momentum, and weight decay." arXiv preprint arXiv:1803.09820 (2018).
+    [0] Smith, Leslie N. "A disciplined approach to neural network
+    hyper-parameters: Part 1--learning rate, batch size, momentum, and weight
+    decay." arXiv preprint arXiv:1803.09820 (2018).
 
     Args:
         sched (kraken.lib.train.Trainscheduler): TrainScheduler instance
@@ -211,7 +214,7 @@ class NoStopping(TrainStopper):
     def __init__(self) -> None:
         super().__init__()
 
-    def update(self, val_los: float) -> None:
+    def update(self, val_loss: float) -> None:
         """
         Only update internal best iteration
         """
@@ -224,9 +227,74 @@ class NoStopping(TrainStopper):
         return True
 
 
+def recognition_loss_fn(criterion, output, target):
+    # height should be 1 by now
+    if output.size(2) != 1:
+        raise KrakenInputException('Expected dimension 3 to be 1, actual {}'.format(output.size(2)))
+    output = output.squeeze(2)
+    # NCW -> WNC
+    loss = criterion(output.permute(2, 0, 1),  # type: ignore
+                     target,
+                     (output.size(2),),
+                     (target.size(1),))
+    return loss
+
+
+def baseline_label_loss_fn(criterion, output, target):
+    output = F.interpolate(output, size=(target.size(2), target.size(3)))
+    loss = criterion(output, target)
+    return loss
+
+
+def recognition_evaluator_fn(model, val_set, device):
+    rec = models.TorchSeqRecognizer(model, device=device)
+    chars, error = compute_error(rec, list(val_set))
+    model.train()
+    accuracy = (chars-error)/chars
+    return {'val_metric': accuracy, 'accuracy': accuracy, 'chars': chars, 'error': error}
+
+
+
+def baseline_label_evaluator_fn(model, val_set, device):
+    smooth = np.finfo(np.float).eps
+    corrects = torch.zeros(val_set.num_classes, dtype=torch.double).to(device)
+    all_n = torch.zeros(val_set.num_classes, dtype=torch.double).to(device)
+    intersections = torch.zeros(val_set.num_classes, dtype=torch.double).to(device)
+    unions = torch.zeros(val_set.num_classes, dtype=torch.double).to(device)
+    cls_cnt = torch.zeros(val_set.num_classes, dtype=torch.double).to(device)
+    model.eval()
+
+    with torch.no_grad():
+        for x, y in val_set:
+            x = x.to(device)
+            y = y.to(device).unsqueeze(0)
+            pred = model.nn(x.unsqueeze(0))
+            # scale target to output size
+            y = F.interpolate(y, size=(pred.size(2), pred.size(3))).squeeze(0).bool()
+            pred = segmentation.denoising_hysteresis_thresh(pred.detach().squeeze().cpu().numpy(), 0.2, 0.3, 0)
+            pred = torch.from_numpy(pred.astype('bool')).to(device)
+            pred = pred.view(pred.size(0), -1)
+            y = y.view(y.size(0), -1)
+            intersections += (y & pred).sum(dim=1, dtype=torch.double)
+            unions += (y | pred).sum(dim=1, dtype=torch.double)
+            corrects += torch.eq(y, pred).sum(dim=1, dtype=torch.double)
+            cls_cnt += y.sum(dim=1, dtype=torch.double)
+            all_n += y.size(1)
+    model.train()
+    # all_positives = tp + fp
+    # actual_positives = tp + fn
+    # true_positivies = tp
+    pixel_accuracy = corrects.sum()/all_n.sum()
+    mean_accuracy = torch.mean(corrects/all_n)
+    iu = (intersections+smooth)/(unions+smooth)
+    mean_iu = torch.mean(iu)
+    freq_iu = torch.sum(cls_cnt/cls_cnt.sum() * iu)
+    return {'accuracy': pixel_accuracy, 'mean_acc': mean_accuracy, 'mean_iu': mean_iu, 'freq_iu': freq_iu, 'val_metric': mean_iu}
+
+
 class KrakenTrainer(object):
     """
-    Class encapsulating the training process.
+    Class encapsulating the recognition model training process.
     """
     def __init__(self,
                  model: vgsl.TorchVGSLModel,
@@ -235,25 +303,34 @@ class KrakenTrainer(object):
                  filename_prefix: str = 'model',
                  event_frequency: float = 1.0,
                  train_set: torch.utils.data.DataLoader = None,
-                 val_set = None,
-                 stopper = None):
+                 val_set=None,
+                 stopper=None,
+                 loss_fn=recognition_loss_fn,
+                 evaluator=recognition_evaluator_fn):
         self.model = model
-        self.rec = models.TorchSeqRecognizer(model, train=True, device=device)
         self.optimizer = optimizer
         self.device = device
         self.filename_prefix = filename_prefix
         self.event_frequency = event_frequency
         self.event_it = int(len(train_set) * event_frequency)
-        self.train_set = cycle(train_set)
+        self.train_set = train_set
         self.val_set = val_set
         self.stopper = stopper if stopper else NoStopping()
         self.iterations = 0
         self.lr_scheduler = None
+        self.loss_fn = loss_fn
+        self.evaluator = evaluator
+        # fill training metadata fields in model files
+        self.model.seg_type = train_set.dataset.seg_type
 
     def add_lr_scheduler(self, lr_scheduler: TrainScheduler):
         self.lr_scheduler = lr_scheduler
 
-    def run(self, event_callback = lambda *args, **kwargs: None, iteration_callback = lambda *args, **kwargs: None):
+    def run(self, event_callback=lambda *args, **kwargs: None, iteration_callback=lambda *args, **kwargs: None):
+        logger.debug('Moving model to device {}'.format(self.device))
+        self.model.to(self.device)
+        self.model.train()
+
         logger.debug('Starting up training...')
 
         if 'accuracy' not in self.model.user_metadata:
@@ -267,16 +344,8 @@ class KrakenTrainer(object):
                 target = target.to(self.device, non_blocking=True)
                 input = input.requires_grad_()
                 o = self.model.nn(input)
-                # height should be 1 by now
-                if o.size(2) != 1:
-                    raise KrakenInputException('Expected dimension 3 to be 1, actual {}'.format(o.size(2)))
-                o = o.squeeze(2)
                 self.optimizer.zero_grad()
-                # NCW -> WNC
-                loss = self.model.criterion(o.permute(2, 0, 1),  # type: ignore
-                                            target,
-                                            (o.size(2),),
-                                            (target.size(1),))
+                loss = self.loss_fn(self.model.criterion, o, target)
                 if not torch.isinf(loss):
                     loss.backward()
                     self.optimizer.step()
@@ -285,15 +354,15 @@ class KrakenTrainer(object):
                 iteration_callback()
             self.iterations += self.event_it
             logger.debug('Starting evaluation run')
-            self.model.eval()
-            chars, error = compute_error(self.rec, list(self.val_set))
-            self.model.train()
-            accuracy = (chars-error)/chars
-            logger.info('Accuracy report ({}) {:0.4f} {} {}'.format(self.stopper.epoch, accuracy, chars, error))
-            self.stopper.update(accuracy)
-            self.model.user_metadata['accuracy'].append((self.iterations, accuracy))
+            eval_res = self.evaluator(self.model, self.val_set, self.device)
+            self.stopper.update(eval_res['val_metric'])
+            self.model.user_metadata['accuracy'].append((self.iterations, float(eval_res['val_metric'])))
             logger.info('Saving to {}_{}'.format(self.filename_prefix, self.stopper.epoch))
-            event_callback(epoch=self.stopper.epoch, accuracy=accuracy, chars=chars, error=error)
+            event_callback(epoch=self.stopper.epoch, **eval_res)
+            # fill one_channel_mode after 1 iteration over training data set
+            im_mode = self.train_set.dataset.im_mode
+            if im_mode in ['1', 'L']:
+                self.model.one_channel_mode = im_mode
             try:
                 self.model.user_metadata['completed_epochs'] = self.stopper.epoch
                 self.model.save_model('{}_{}.mlmodel'.format(self.filename_prefix, self.stopper.epoch))

@@ -8,7 +8,7 @@ For the full text see https://creativecommons.org/licenses/by-sa/4.0/legalcode. 
 <!-- Originally created during the EU-funded Project METAe, the Metadata Engine Project (2001 - 2003), by Alexander Egger (1), Birgit Stehno (2) and Gregor Retti (2), (1) University of Graz and (2) University of Innsbruck, Austria with contributions of Ralph Tiede, CCS GmbH, Germany -->
 <!-- Prepared for the Library of Congress by Ralph Tiede, CCS GmbH, with the assistance of Justin Littman (Library of Congress). -->
 
-<!-- Version 4.0 DRAFT -->
+<!-- Version 4.1 -->
 
 <!-- Change History -->
 <!-- June 22, 2004: Version finalized for docWORKS/METAe -->
@@ -85,7 +85,7 @@ For the full text see https://creativecommons.org/licenses/by-sa/4.0/legalcode. 
 	2. Added support for using different shapes for the elements String, TextLine, all PageSpaceType elements and on all BlockType elements.
 	3. The description of the attribute ROTATION is changed to the rotation of the contents of a block and not the block itself. The attribute is inherited by all sub elements.
 -->
-<!-- January 2018, version 4.0 (draft)
+<!-- January 2018, version 4.0
 	1. Changed schema version to 4.0
 	2. Changed namespace and targetNamespace to http://www.loc.gov/standards/alto/ns-v4#
 	3. Clarification and definition of the licensing to common standard "CC BY-SA 4.0" for this ALTO standard (with agreement of the authors)
@@ -96,8 +96,12 @@ For the full text see https://creativecommons.org/licenses/by-sa/4.0/legalcode. 
 	8. Add common vocabulary for "processingStep" comprising the "ContentGeneration", "ContentModification", "PreOperation", "PostOperation", "Other"
 	9. Fix for the element Shape. The Shape element can now only be used once within a PageSpace or a TextLine as it was intended.
 -->
+<!-- May 2019, version 4.1
+	1. Fix for Processing including  processingStepType.
+	2. Add missing PROCESSINGREFS to PageType, PageSpaceType, BlockType, TextLine, StringType for referencing Processing history. 
+-->
 
-<xsd:schema xmlns="http://www.loc.gov/standards/alto/ns-v4#" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xlink="http://www.w3.org/1999/xlink" targetNamespace="http://www.loc.gov/standards/alto/ns-v4#" elementFormDefault="qualified" attributeFormDefault="unqualified" version="4.0">
+<xsd:schema xmlns="http://www.loc.gov/standards/alto/ns-v4#" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xlink="http://www.w3.org/1999/xlink" targetNamespace="http://www.loc.gov/standards/alto/ns-v4#" elementFormDefault="qualified" attributeFormDefault="unqualified" version="4.1">
 	<xsd:import namespace="http://www.w3.org/1999/xlink" schemaLocation="http://www.loc.gov/standards/xlink/xlink.xsd"/>
 	<xsd:element name="alto" type="altoType">
 		<xsd:annotation>
@@ -274,6 +278,7 @@ For the full text see https://creativecommons.org/licenses/by-sa/4.0/legalcode. 
 			</xsd:annotation>
 		</xsd:attribute>
 		<xsd:attribute name="STYLEREFS" type="xsd:IDREFS" use="optional"/>
+		<xsd:attribute name="PROCESSINGREFS" type="xsd:IDREFS" use="optional"/>
 		<xsd:attribute name="HEIGHT" type="xsd:float" use="optional"/>
 		<xsd:attribute name="WIDTH" type="xsd:float" use="optional"/>
 		<xsd:attribute name="PHYSICAL_IMG_NR" type="xsd:float" use="required">
@@ -411,6 +416,7 @@ For the full text see https://creativecommons.org/licenses/by-sa/4.0/legalcode. 
 		<xsd:attribute name="ID" type="BlockTypeID" use="required"/>
 		<xsd:attribute name="STYLEREFS" type="xsd:IDREFS"/>
 		<xsd:attribute name="TAGREFS" type="xsd:IDREFS" use="optional"/>
+		<xsd:attribute name="PROCESSINGREFS" type="xsd:IDREFS" use="optional"/>		
 		<xsd:attribute name="HEIGHT" type="xsd:float" use="optional"/>
 		<xsd:attribute name="WIDTH" type="xsd:float" use="optional"/>
 		<xsd:attribute name="HPOS" type="xsd:float" use="optional"/>
@@ -498,6 +504,7 @@ For the full text see https://creativecommons.org/licenses/by-sa/4.0/legalcode. 
 		<xsd:attribute name="ID" type="StringTypeID" use="optional"/>
 		<xsd:attribute name="STYLEREFS" type="xsd:IDREFS" use="optional"/>
 		<xsd:attribute name="TAGREFS" type="xsd:IDREFS" use="optional"/>
+		<xsd:attribute name="PROCESSINGREFS" type="xsd:IDREFS" use="optional"/>
 		<xsd:attribute name="HEIGHT" type="xsd:float" use="optional"/>
 		<xsd:attribute name="WIDTH" type="xsd:float" use="optional"/>
 		<xsd:attribute name="HPOS" type="xsd:float" use="optional"/>
@@ -539,6 +546,7 @@ For the full text see https://creativecommons.org/licenses/by-sa/4.0/legalcode. 
 		</xsd:sequence>
 		<xsd:attribute name="ID" type="PageSpaceTypeID" use="optional"/>
 		<xsd:attribute name="STYLEREFS" type="xsd:IDREFS" use="optional"/>
+		<xsd:attribute name="PROCESSINGREFS" type="xsd:IDREFS" use="optional"/>
 		<xsd:attribute name="HEIGHT" type="xsd:float" use="optional"/>
 		<xsd:attribute name="WIDTH" type="xsd:float" use="optional"/>
 		<xsd:attribute name="HPOS" type="xsd:float" use="optional"/>
@@ -722,23 +730,16 @@ For the full text see https://creativecommons.org/licenses/by-sa/4.0/legalcode. 
 			<xsd:element name="postProcessingStep" type="processingStepType" minOccurs="0" maxOccurs="unbounded"/>
 		</xsd:sequence>
 	</xsd:complexType>
-	<xsd:complexType name="processingType">
-		<xsd:annotation>
-			<xsd:documentation>Information on how the text was created, including generation, modification, preprocessing, postprocessing or any other steps. May include references to a list of space-separated IDs of elements processed.</xsd:documentation>
-		</xsd:annotation>
-		<xsd:sequence>
-			<xsd:element name="contentGeneration" type="processingType" minOccurs="0" maxOccurs="unbounded"/>
-			<xsd:element name="contentModification" type="processingType" minOccurs="0" maxOccurs="unbounded"/>
-			<xsd:element name="preOperation" type="processingType" minOccurs="0" maxOccurs="unbounded"/>
-			<xsd:element name="postOperation" type="processingType" minOccurs="0" maxOccurs="unbounded"/>
-			<xsd:element name="other" type="processingType" minOccurs="0" maxOccurs="unbounded"/>
-		</xsd:sequence>
-	</xsd:complexType>
 	<xsd:complexType name="processingStepType">
 		<xsd:annotation>
-			<xsd:documentation>A processing step.</xsd:documentation>
+			<xsd:documentation>Description of the processing step.</xsd:documentation>
 		</xsd:annotation>
 		<xsd:sequence>
+			<xsd:element name="processingCategory" type="processingCategoryType" minOccurs="0" maxOccurs="1">
+				<xsd:annotation>
+					<xsd:documentation>Classification of the category of operation, how the file was created, including generation, modification, preprocessing, postprocessing or any other steps.</xsd:documentation>
+				</xsd:annotation>
+			</xsd:element>
 			<xsd:element name="processingDateTime" type="dateTimeType" minOccurs="0">
 				<xsd:annotation>
 					<xsd:documentation>Date or DateTime the image was processed.</xsd:documentation>
@@ -762,6 +763,19 @@ For the full text see https://creativecommons.org/licenses/by-sa/4.0/legalcode. 
 			<xsd:element name="processingSoftware" type="processingSoftwareType" minOccurs="0"/>
 		</xsd:sequence>
 	</xsd:complexType>
+	<xsd:simpleType name="processingCategoryType">
+		<xsd:list>
+			<xsd:simpleType>
+				<xsd:restriction base="xsd:string">
+					<xsd:enumeration value="contentGeneration"/>
+					<xsd:enumeration value="contentModification"/>
+					<xsd:enumeration value="preOperation"/>
+					<xsd:enumeration value="postOperation"/>
+					<xsd:enumeration value="other"/>
+				</xsd:restriction>
+			</xsd:simpleType>
+		</xsd:list>
+	</xsd:simpleType>
 	<xsd:complexType name="processingSoftwareType">
 		<xsd:annotation>
 			<xsd:documentation>Information about a software application. Where applicable, the preferred method for determining this information is by selecting Help -- About.</xsd:documentation>
@@ -899,6 +913,7 @@ For the full text see https://creativecommons.org/licenses/by-sa/4.0/legalcode. 
 							<xsd:attribute name="ID" type="TextLineID"/>
 							<xsd:attribute name="STYLEREFS" type="xsd:IDREFS" use="optional"/>
 							<xsd:attribute name="TAGREFS" type="xsd:IDREFS" use="optional"/>
+							<xsd:attribute name="PROCESSINGREFS" type="xsd:IDREFS" use="optional"/>
 							<xsd:attribute name="HEIGHT" type="xsd:float" use="optional"/>
 							<xsd:attribute name="WIDTH" type="xsd:float" use="optional"/>
 							<xsd:attribute name="HPOS" type="xsd:float" use="optional"/>

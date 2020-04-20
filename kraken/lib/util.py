@@ -7,7 +7,7 @@ import numpy as np
 
 from PIL import Image
 
-__all__ = ['pil2array', 'array2pil']
+__all__ = ['pil2array', 'array2pil', 'is_bitonal', 'make_printable', 'get_im_str']
 
 
 def pil2array(im: Image.Image, alpha: int = 0) -> np.array:
@@ -60,10 +60,10 @@ def is_printable(char: str) -> bool:
     Returns:
         True if printable, False otherwise.
     """
-    letters     = ('LC', 'Ll', 'Lm', 'Lo', 'Lt', 'Lu')
-    numbers     = ('Nd', 'Nl', 'No')
+    letters = ('LC', 'Ll', 'Lm', 'Lo', 'Lt', 'Lu')
+    numbers = ('Nd', 'Nl', 'No')
     punctuation = ('Pc', 'Pd', 'Pe', 'Pf', 'Pi', 'Po', 'Ps')
-    symbol      = ('Sc', 'Sk', 'Sm', 'So')
+    symbol = ('Sc', 'Sk', 'Sm', 'So')
     printable = letters + numbers + punctuation + symbol
 
     return unicodedata.category(char) in printable

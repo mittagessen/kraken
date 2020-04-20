@@ -4,18 +4,22 @@ Description
 .. image:: https://travis-ci.org/mittagessen/kraken.svg?branch=master
     :target: https://travis-ci.org/mittagessen/kraken
 
-kraken is a fork of ocropus intended to rectify a number of issues while
-preserving (mostly) functional equivalence. Its main features are:
+kraken is a turn-key OCR system optimized for historical and non-Latin script
+material.
 
-  - Script detection and multiscript recognition support
+kraken's main features are:
+
+  - Fully trainable layout analysis and character recognition
   - `Right-to-Left <https://en.wikipedia.org/wiki/Right-to-left>`_, `BiDi
     <https://en.wikipedia.org/wiki/Bi-directional_text>`_, and Top-to-Bottom
     script support
-  - `ALTO <https://www.loc.gov/standards/alto/>`_, abbyXML, and hOCR output
+  - `ALTO <https://www.loc.gov/standards/alto/>`_, PageXML, abbyXML, and hOCR
+    output
   - Word bounding boxes and character cuts
+  - Multi-script recognition support
   - `Public repository <https://zenodo.org/communities/ocr_models>`_ of model files
-  - Dynamic recognition model architectures and GPU acceleration
-  - Clean public API 
+  - Lightweight model files
+  - Variable recognition network architectures
 
 Installation
 ============

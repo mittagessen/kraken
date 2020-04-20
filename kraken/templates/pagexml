@@ -1,0 +1,58 @@
+{% macro render_line(line) %}
+			<TextLine id="line_{{ line.index }}">
+				{% if line.boundary %}
+				<Coords points="{% for point in line.boundary %}{{ point|join(',') }}{% if not loop.last %} {% endif %}{% endfor %}"/>
+				{% endif %}
+				{% if line.baseline %}
+				<Baseline points="{% for point in line.baseline %}{{ point|join(',') }}{% if not loop.last %} {% endif %}{% endfor %}"/>
+				{% endif %}
+				{% for segment in line.recognition %}
+				<Word id="segment_{{ segment.index }}">
+					{% if segment.boundary %}
+					<Coords points="{% for point in segment.boundary %}{{ point|join(',') }}{% if not loop.last %} {% endif %}{% endfor %}"/>
+					{% else %}
+					<Coords points="{{ segment.bbox[0] }},{{ segment.bbox[1] }} {{ segment.bbox[0] }},{{ segment.bbox[3] }} {{ segment.bbox[2] }},{{ segment.bbox[3] }} {{ segment.bbox[2] }},{{ segment.bbox[1] }}"/>
+					{% endif %}
+				{% for char in segment.recognition %}
+					<Glyph id="char_{{ char.index }}">
+						<Coords points="{% for point in char.boundary %}{{ point|join(',') }}{% if not loop.last %} {% endif %}{% endfor %}"/>
+						<TextEquiv conf="{{ char.confidence|round(4) }}"><Unicode>{{ char.text|e }}</Unicode></TextEquiv>
+					</Glyph>
+				{% endfor %}
+				</Word>
+				{% endfor %}
+			</TextLine>
+{% endmacro %}
+<?xml version="1.0" encoding="UTF-8"?>
+<PcGts xmlns="http://schema.primaresearch.org/PAGE/gts/pagecontent/2019-07-15" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://schema.primaresearch.org/PAGE/gts/pagecontent/2019-07-15 http://schema.primaresearch.org/PAGE/gts/pagecontent/2019-07-15/pagecontent.xsd">
+	<Metadata>
+		<Creator>kraken</Creator>
+		<Created>{{ page.date }}</Created>
+		<LastChange>{{ page.date }}</LastChange>
+	</Metadata>
+	<Page imageFilename="{{ page.name }}" imageWidth="{{ page.size[0] }}" imageHeight="{{ page.size[1] }}">
+	{% for entity in page.entities %}
+                {% if entity.type == "region" %}
+                        {% if loop.previtem and loop.previtem.type == 'line' %}
+                        </TextRegion>
+                        {% endif %}
+			<TextRegion id="block_{{ entity.index }}"
+				    custom="structure {type:{{ entity.region_type }};}">
+				<Coords points="{% for point in entity.boundary %}{{ point|join(',') }}{% if not loop.last %} {% endif %}{% endfor %}"/>
+                                {% for line in entity.lines %}
+                                {{ render_line(line) }}
+                                {% endfor %}
+                        </TextRegion>
+                {% else %}
+                {% if not loop.previtem or loop.previtem.type != 'line' %}
+                <TextRegion id="textblock_{{ loop.index }}">
+			<Coords points="0,0 0,{{ page.size[1] }} {{ page.size[0] }},{{ page.size[1] }} {{ page.size[0] }},0"/>
+                {% endif %}
+                {{ render_line(entity) }}
+                {% if loop.last %}
+                </TextRegion>
+                {% endif %}
+		{% endif %}
+	{% endfor %}
+	</Page>
+</PcGts>

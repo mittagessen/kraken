@@ -26,6 +26,7 @@ from coremltools.models import MLModel
 from coremltools.models import datatypes
 from coremltools.models.neural_network import NeuralNetworkBuilder
 
+from google.protobuf.message import DecodeError
 
 # all tensors are ordered NCHW, the "feature" dimension is C, so the output of
 # an LSTM will be put into C same as the filters of a CNN.
@@ -56,7 +57,10 @@ class TorchVGSLModel(object):
         user_metdata (dict): dict with user defined metadata. Is flushed into
                              model file during saving/overwritten by loading
                              operations.
-
+        one_channel_mode (str): Field indicating the image type used during
+                                training of one-channel images. Is '1' for
+                                models trained on binarized images, 'L' for
+                                grayscale, and None otherwise.
     """
     def __init__(self, spec: str) -> None:
         """
@@ -65,8 +69,9 @@ class TorchVGSLModel(object):
         Args:
             spec (str): Model definition similar to tesseract as follows:
                         ============ FUNCTIONAL OPS ============
-                        C(s|t|r|l|m)[{name}]<y>,<x>,<d> Convolves using a y,x window, with no
-                          shrinkage, SAME infill, d outputs, with s|t|r|l|m non-linear layer.
+                        C(s|t|r|l|m)[{name}]<y>,<x>,<d>[,<y_stride>,<x_stride>]
+                          Convolves using a y,x window, with no shrinkage, SAME
+                          infill, d outputs, with s|t|r|l|m non-linear layer.
                           (s|t|r|l|m) specifies the type of non-linearity:
                           s = sigmoid
                           t = tanh
@@ -104,7 +109,7 @@ class TorchVGSLModel(object):
         self.codec = None  # type: Optional[PytorchCodec]
         self.criterion = None  # type: Any
         self.nn = torch.nn.Sequential()
-        self.user_metadata = {} # type: dict[str, str]
+        self.user_metadata = {'accuracy': [], 'seg_type': None, 'one_channel_mode': None, 'model_type': None}  # type: dict[str, str]
 
         self.idx = -1
         spec = spec.strip()
@@ -213,7 +218,7 @@ class TorchVGSLModel(object):
             return getattr(sys.modules[mname], cname)
 
         of = io.open
-        if path.endswith(u'.gz'):
+        if path.endswith('.gz'):
             of = gzip.open
         with io.BufferedReader(of(path, 'rb')) as fp:
             unpickler = cPickle.Unpickler(fp)
@@ -359,7 +364,7 @@ class TorchVGSLModel(object):
             mode = 'clstm_compat'
 
         # extract codec
-        codec = PytorchCodec([u''] + [chr(x) for x in net.codec[1:]])
+        codec = PytorchCodec([''] + [chr(x) for x in net.codec[1:]])
 
         # separate layers
         nets = {}
@@ -418,10 +423,23 @@ class TorchVGSLModel(object):
 
         Args:
             path (str): CoreML file
+
+        Returns:
+            A TorchVGSLModel instance.
+
+        Raises:
+            KrakenInvalidModelException if the model data is invalid (not a
+            string, protobuf file, or without appropriate metadata).
+            FileNotFoundError if the path doesn't point to a file.
         """
-        mlmodel = MLModel(path)
+        try:
+            mlmodel = MLModel(path)
+        except TypeError as e:
+            raise KrakenInvalidModelException(str(e))
+        except DecodeError as e:
+            raise KrakenInvalidModelException('Failure parsing model protobuf: {}'.format(str(e)))
         if 'vgsl' not in mlmodel.user_defined_metadata:
-            raise ValueError('No VGSL spec in model metadata')
+            raise KrakenInvalidModelException('No VGSL spec in model metadata')
         vgsl_spec = mlmodel.user_defined_metadata['vgsl']
         nn = cls(vgsl_spec)
         for name, layer in nn.nn.named_children():
@@ -429,9 +447,41 @@ class TorchVGSLModel(object):
 
         if 'codec' in mlmodel.user_defined_metadata:
             nn.add_codec(PytorchCodec(json.loads(mlmodel.user_defined_metadata['codec'])))
+
+        nn.user_metadata = {'accuracy': [], 'seg_type': 'bbox', 'one_channel_mode': '1', 'model_type': None}  # type: dict[str, str]
         if 'kraken_meta' in mlmodel.user_defined_metadata:
-            nn.user_metadata = json.loads(mlmodel.user_defined_metadata['kraken_meta'])
+            nn.user_metadata.update(json.loads(mlmodel.user_defined_metadata['kraken_meta']))
         return nn
+
+    @property
+    def one_channel_mode(self):
+        return self.user_metadata['one_channel_mode']
+
+    @one_channel_mode.setter
+    def one_channel_mode(self, val: str):
+        if val not in ['1', 'L', None]:
+            raise ValueError('one_channel_mode {} is not one of [1, L, None]'.format(val))
+        self.user_metadata['one_channel_mode'] = val
+
+    @property
+    def model_type(self):
+        return self.user_metadata['model_type']
+
+    @model_type.setter
+    def model_type(self, val: str):
+        if val not in ['recognition', 'segmentation']:
+            raise ValueError('model_type {} is not one of [recognition, segmentation]'.format(val))
+        self.user_metadata['model_type'] = val
+
+    @property
+    def seg_type(self):
+        return self.user_metadata['seg_type']
+
+    @seg_type.setter
+    def seg_type(self, val: str):
+        if val not in ['bbox', 'baselines', None]:
+            raise ValueError('segmentation type {} is not one of [bbox, baselines, None]'.format(val))
+        self.user_metadata['seg_type'] = val
 
     def save_model(self, path: str):
         """
@@ -596,15 +646,16 @@ class TorchVGSLModel(object):
         """
         Builds a 2D convolution layer.
         """
-        pattern = re.compile(r'(?P<type>C)(?P<nl>s|t|r|l|m)(?P<name>{\w+})?(\d+),(\d+),(?P<out>\d+)')
+        pattern = re.compile(r'(?P<type>C)(?P<nl>s|t|r|l|m)(?P<name>{\w+})?(\d+),(\d+),(?P<out>\d+)(,(?P<stride_y>\d+),(?P<stride_x>\d+))?')
         m = pattern.match(block)
         if not m:
             return None, None, None
         kernel_size = (int(m.group(4)), int(m.group(5)))
         filters = int(m.group('out'))
+        stride = (int(m.group('stride_y')), int(m.group('stride_x'))) if m.group('stride_x') else (1, 1)
         nl = m.group('nl')
-        fn = layers.ActConv2D(input[1], filters, kernel_size, nl)
-        logger.debug('{}\t\tconv\tkernel {} x {} filters {} activation {}'.format(self.idx+1, kernel_size[0], kernel_size[1], filters, nl))
+        fn = layers.ActConv2D(input[1], filters, kernel_size, stride, nl)
+        logger.debug('{}\t\tconv\tkernel {} x {} filters {} stride {} activation {}'.format(self.idx+1, kernel_size[0], kernel_size[1], filters, stride, nl))
         return fn.get_shape(input), self.get_layer_name(m.group('type'), m.group('name')), fn
 
     def build_maxpool(self, input: Tuple[int, int, int, int], block: str) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
@@ -663,14 +714,27 @@ class TorchVGSLModel(object):
         m = pattern.match(block)
         if not m:
             return None, None, None
-        if int(m.group('dim')) != 1:
-            raise ValueError('non-2d output not supported, yet')
+        dim = int(m.group('dim'))
         nl = m.group('type')
-        if nl not in ['s', 'c']:
-            raise ValueError('only softmax and ctc supported in output')
-        if nl == 'c':
+        outdim = int(m.group('out'))
+        if dim == 0:
+            raise ValueError('categorical output not supported, yet.')
+        if nl == 'c' and dim == 2:
+            raise ValueError('CTC not supported for heatmap output')
+        if nl in ['l', 's'] and int(m.group('out')) >= 1:
+            self.criterion = nn.BCELoss()
+        elif nl == 'c':
             self.criterion = nn.CTCLoss(reduction='none')
-        aug = True if m.group('aug') else False
-        lin = layers.LinSoftmax(input[1], int(m.group('out')), aug)
-        logger.debug('{}\t\tlinear\taugmented {} out {}'.format(self.idx+1, aug, m.group('out')))
-        return lin.get_shape(input), self.get_layer_name(m.group(1), m.group('name')), lin
+        else:
+            raise ValueError('unsupported output specification')
+        # heatmap output
+        if dim == 2:
+            act = 's' if nl == 'l' else 'm'
+            fn = layers.ActConv2D(input[1], outdim, (1, 1), (1, 1), act)
+            logger.debug('{}\t\tconv\tkernel 1 x 1 filters {} stride 1 activation {}'.format(self.idx+1, outdim, nl))
+            return fn.get_shape(input), self.get_layer_name(m.group('type'), m.group('name')), fn
+        else:
+            aug = True if m.group('aug') else False
+            lin = layers.LinSoftmax(input[1], int(m.group('out')), aug)
+            logger.debug('{}\t\tlinear\taugmented {} out {}'.format(self.idx+1, aug, m.group('out')))
+            return lin.get_shape(input), self.get_layer_name(m.group(1), m.group('name')), lin

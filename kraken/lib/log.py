@@ -50,7 +50,7 @@ class LogFormatter(logging.Formatter):
                 style = self.colors[level]
             else:
                 style = {}
-            msg = click.style(u'[{:2.4f}] {} '.format(time.time() - self.st_time, str(msg)), **style)
+            msg = click.style('[{:2.4f}] {} '.format(time.time() - self.st_time, str(msg)), **style)
             return msg
         return logging.Formatter.format(self, record)
 

@@ -110,7 +110,7 @@ Convolutional Layers
 
 .. code-block:: console
 
-        C[{name}](s|t|r|l|m)[{name}]<y>,<x>,<d>
+        C[{name}](s|t|r|l|m)[{name}]<y>,<x>,<d>[,<stride_y>,<stride_x>]
         s = sigmoid
         t = tanh
         r = relu
@@ -118,7 +118,8 @@ Convolutional Layers
         m = softmax
 
 Adds a 2D convolution with kernel size `(y, x)` and `d` output channels, applying
-the selected nonlinearity.
+the selected nonlinearity. The stride can be adjusted with the optional last
+two parameters.
 
 Recurrent Layers
 ----------------
@@ -177,9 +178,22 @@ height before a recurrent layer.
 Regularization Layers
 ---------------------
 
+Dropout
+^^^^^^^
+
 .. code-block:: console
 
         Do[{name}][<prob>],[<dim>] Insert a 1D or 2D dropout layer
 
 Adds an 1D or 2D dropout layer with a given probability. Defaults to `0.5` drop
 probability and 1D dropout. Set to `dim` to `2` after convolutional layers.
+
+Group Normalization
+^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: console
+
+        Gn<groups> Inserts a group normalization layer
+
+Adds a group normalization layer separating the input into `<groups>` groups,
+normalizing each separately.

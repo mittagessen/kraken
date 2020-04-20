@@ -1,4 +1,8 @@
 #!/usr/bin/env python
+"""
+Draws transparent character bounding boxes over images giving a legacy
+segmenter model.
+"""
 
 import os
 import sys

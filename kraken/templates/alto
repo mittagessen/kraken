@@ -1,3 +1,58 @@
+{% macro render_line(line) -%}
+<TextLine ID="line_{{ line.index }}"
+	  HPOS="{{ line.bbox[0] }}"
+	  VPOS="{{ line.bbox[1] }}" 
+	  WIDTH="{{ line.bbox[2] - line.bbox[0] }}" 
+	  HEIGHT="{{ line.bbox[3] - line.bbox[1] }}"
+	  {% if line.baseline %}
+	  BASELINE="{{ line.baseline|sum(start=[])|join(' ') }}"
+	  {% endif %}>
+	{% if line.boundary %}
+		<Shape>
+			<Polygon POINTS="{{ line.boundary|sum(start=[])|join(' ') }}"/>
+		</Shape>
+	{% endif %}
+	{% for segment in line.recognition %}
+		{# ALTO forbids encoding whitespace before any String/Shape tags #}
+		{% if segment.text is whitespace and loop.index > 1 %}
+		<SP ID="segment_{{ segment.index }}"
+		    HPOS="{{ segment.bbox[0]}}" 
+		    VPOS="{{ segment.bbox[1] }}"
+		    WIDTH="{{ segment.bbox[2] - segment.bbox[0] }}" 
+		    HEIGHT="{{ segment.bbox[3] - segment.bbox[1] }}"/>
+		{% else %}
+		<String ID="segment_{{ segment.index }}"
+			CONTENT="{{ segment.text|e }}" 
+			HPOS="{{ segment.bbox[0] }}" 
+			VPOS="{{ segment.bbox[1] }}"
+			WIDTH="{{ segment.bbox[2] - segment.bbox[0] }}" 
+			HEIGHT="{{ segment.bbox[3] - segment.bbox[1] }}" 
+			WC="{{ (segment.confidences|sum / segment.confidences|length)|round(4) }}">
+			{% if segment.boundary %}
+			<Shape>
+				<Polygon POINTS="{{ segment.boundary|sum(start=[])|join(' ') }}"/>
+			</Shape>
+			{% endif %}
+			{% for char in segment.recognition %}
+			<Glyph ID="char_{{ char.index }}" 
+			       CONTENT="{{ char.text|e }}"
+			       HPOS="{{ char.bbox[0] }}"
+			       VPOS="{{ char.bbox[1] }}"
+			       WIDTH="{{ char.bbox[2] - char.bbox[0] }}"
+			       HEIGHT="{{ char.bbox[3] - char.bbox[1] }}"
+			       GC="{{ char.confidence|round(4) }}">
+			{% if char.boundary %}
+			<Shape>
+				<Polygon POINTS="{{ char.boundary|sum(start=[])|join(' ') }}"/>
+			</Shape>
+			{% endif %}
+			</Glyph>
+			{% endfor %}
+		</String>
+		{% endif %}
+	{% endfor %}
+</TextLine>
+{%- endmacro %}
 <?xml version="1.0" encoding="UTF-8"?>
 <alto xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xmlns="http://www.loc.gov/standards/alto/ns-v4#"
@@ -15,49 +70,38 @@
 			</ocrProcessingStep>
 		</OCRProcessing>
 	</Description>
-
 	<Layout>
 		<Page WIDTH="{{ page.size[0] }}" HEIGHT="{{ page.size[1] }}" PHYSICAL_IMG_NR="0" ID="page_0">
 			<PrintSpace HPOS="0" VPOS="0" WIDTH="{{ page.size[0] }}" HEIGHT="{{ page.size[1] }}">
-				<TextBlock HPOS="0" VPOS="0" ID="textblock_0" WIDTH="{{ page.size[0] }}" HEIGHT="{{ page.size[1] }}">
-					{% for line in page.lines %}
-					<TextLine ID="line_{{ line.index }}"
-						  HPOS="{{ line.bbox[0] }}"
-						  VPOS="{{ line.bbox[1] }}" 
-						  WIDTH="{{ line.bbox[2] - line.bbox[0] }}" 
-						  HEIGHT="{{ line.bbox[3] - line.bbox[1] }}">
-						{% for segment in line.recognition %}
-							{# ALTO forbids encoding whitespace before any String/Shape tags #}
-							{% if segment.text is whitespace and loop.index > 1 %}
-							<SP ID="segment_{{ segment.index }}"
-							    HPOS="{{ segment.bbox[0]}}" 
-							    VPOS="{{ segment.bbox[1] }}"
-							    WIDTH="{{ segment.bbox[2] - segment.bbox[0] }}" 
-							    HEIGHT="{{ segment.bbox[3] - segment.bbox[1] }}"/>
-							{% else %}
-							<String ID="segment_{{ segment.index }}"
-								CONTENT="{{ segment.text|e }}" 
-								HPOS="{{ segment.bbox[0] }}" 
-								VPOS="{{ segment.bbox[1] }}"
-								WIDTH="{{ segment.bbox[2] - segment.bbox[0] }}" 
-								HEIGHT="{{ segment.bbox[3] - segment.bbox[1] }}" 
-								WC="{{ (segment.confidences|sum / segment.confidences|length)|round(4) }}">
-								{% for char in segment.recognition %}
-								<Glyph ID="char_{{ char.index }}" 
-								       CONTENT="{{ char.text|e }}"
-								       HPOS="{{ char.bbox[0] }}"
-								       VPOS="{{ char.bbox[1] }}"
-								       WIDTH="{{ char.bbox[2] - char.bbox[0] }}"
-								       HEIGHT="{{ char.bbox[3] - char.bbox[1] }}"
-								       GC="{{ char.confidence|round(4) }}">
-								</Glyph>
-								{% endfor %}
-							</String>
-							{% endif %}
+			{% for entity in page.entities %}
+				{% if entity.type == "region" %}
+					{% if loop.previtem and loop.previtem.type == 'line' %}
+					</TextBlock>
+					{% endif %}
+					<ComposedBlockType ID="block_{{ entity.index }}"
+						  	   HPOS="{{ entity.bbox[0] }}"
+						  	   VPOS="{{ entity.bbox[1] }}" 
+						     	   WIDTH="{{ entity.bbox[2] - entity.bbox[0] }}" 
+							   HEIGHT="{{ entity.bbox[3] - entity.bbox[1] }}"
+							   TYPE="{{ entity.region_type }}">
+						{% if entity.lines|length > 0 %}
+						<TextBlock ID="textblock_{{ loop.index }}">
+						{% for line in entity.lines %}
+						{{ render_line(line) }}
 						{% endfor %}
-					</TextLine>
-					{% endfor %}
+						</TextBlock>
+						{% endif %}
+					</ComposedBlockType>
+				{% else %}
+				{% if not loop.previtem or loop.previtem.type != 'line' %}
+				<TextBlock ID="textblock_{{ loop.index }}">
+				{% endif %}
+				{{ render_line(entity) }}
+				{% if loop.last %}
 				</TextBlock>
+				{% endif %}
+			{% endif %}
+			{% endfor %}
 			</PrintSpace>
 		</Page>
 	</Layout>
