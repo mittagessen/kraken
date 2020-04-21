@@ -643,7 +643,7 @@ class GroundTruthDataset(Dataset):
         if self.preload:
             x, y = self.training_set[index]
             if self.aug:
-                im = im.permute((1, 2, 0)).numpy()
+                im = x.permute((1, 2, 0)).numpy()
                 o = self.aug(image=im)
                 im = torch.tensor(o['image'].transpose(2, 0, 1))
                 return im, y
