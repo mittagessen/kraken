@@ -169,7 +169,6 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, script_ignore, inpu
                 raise click.UsageError(f'{input} invalid segmentation: {str(e)}')
     elif not bounds:
         if no_segmentation:
-            print('loading no_seg')
             bounds = {'script_detection': False,
                       'text_direction': 'horizontal-lr',
                       'boxes': [(0, 0) + im.size]}
