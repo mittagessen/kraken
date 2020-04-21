@@ -27,7 +27,7 @@ import logging
 import numpy as np
 import pkg_resources
 
-from typing import Tuple, List, Callable, Optional, Dict
+from typing import Tuple, List, Callable, Optional, Dict, Any
 from scipy.ndimage.filters import (gaussian_filter, uniform_filter,
                                    maximum_filter)
 
