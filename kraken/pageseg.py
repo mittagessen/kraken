@@ -314,7 +314,7 @@ def segment(im, text_direction: str = 'horizontal-lr',
             no_hlines: bool = True,
             pad: int = 0,
             mask: Optional[np.array] = None,
-            eading_order_fn: Callable = reading_order) -> Dict[str, Any]:
+            reading_order_fn: Callable = reading_order) -> Dict[str, Any]:
     """
     Segments a page into text lines.
 
