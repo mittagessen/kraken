@@ -12,7 +12,7 @@ dependencies:
   - requests
   - click>=7.0
   - numpy
-  - pillow==6.1
+  - pillow>=6.2.2
   - scipy
   - protobuf>=3.0
   - jinja2

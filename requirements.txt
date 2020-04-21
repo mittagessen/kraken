@@ -4,7 +4,7 @@ future
 requests
 click>=7.0
 numpy
-Pillow==6.1
+Pillow>=6.2.2
 regex
 scipy
 protobuf>=3.0.0
