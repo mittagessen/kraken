@@ -27,6 +27,8 @@ import pkg_resources
 import torch.nn.functional as F
 import torchvision.transforms as tf
 
+from typing import Optional, Dict, Callable
+
 from kraken.lib import vgsl, dataset
 from kraken.lib.util import pil2array, is_bitonal, get_im_str
 from kraken.lib.exceptions import KrakenInputException
@@ -41,11 +43,11 @@ __all__ = ['segment']
 logger = logging.getLogger(__name__)
 
 def segment(im,
-            text_direction='horizontal-lr',
-            mask=None,
-            reading_order_fn=polygonal_reading_order,
+            text_direction: str = 'horizontal-lr',
+            mask: Optional[np.array] = None,
+            reading_order_fn: Callable = polygonal_reading_order,
             model=None,
-            device='cpu'):
+            device: str = 'cpu'):
     """
     Segments a page into text lines using the baseline segmenter.
 
