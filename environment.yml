@@ -1,4 +1,4 @@
-name: kraken_test
+name: kraken
 channels:
   - defaults
   - conda-forge
