@@ -11,6 +11,45 @@ Both segmentation and recognition are trainable in kraken. The segmentation
 model finds baselines and regions on a page image. Recognition models convert
 text image lines found by the segmenter into digital text.
 
+Training data formats
+---------------------
+
+The training tools accept a variety of training data formats, usually some kind
+of custom low level format, and the XML-based formats that are commony used for
+archival of annotation and transcription data. It is recommended to use the XML
+formats as they are interchangeable with other tools, do not incur
+transformation losses, and allow training all components of kraken from the
+same datasets easily.
+
+ALTO
+~~~~
+
+Kraken parses and produces files according to the upcoming version of the ALTO
+standard: 4.2. It validates against version 4.1 with the exception of the
+`redefinition <https://github.com/altoxml/schema/issues/32>`_ of the `BASELINE`
+attribute to accomodate polygonal chain baselines. An example showing the
+attributes necessary for segmentation and recognition training follows:
+
+.. literalinclude:: alto.xml
+   :language: xml
+   :force:
+
+Importantly, the parser only works with measurements in the pixel domain, i.e.
+an unset `MeasurementUnit` or one with an element value of `pixel`. In
+addition, as the minimal version required for ingestion is quite new it is
+likely that most existing ALTO documents will not contain sufficient
+information to be used with kraken out of the box.
+
+PAGE XML
+~~~~~~~~
+
+PAGE XML is parsed and produced according to the 2019-07-15 version of the
+schema, although the parser is not strict and works with non-conformant output
+of a variety of tools.
+
+.. literalinclude:: pagexml.xml
+   :language: xml
+   :force:
 
 Recognition training
 --------------------

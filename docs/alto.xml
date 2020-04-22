@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<alto xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns="http://www.loc.gov/standards/alto/ns-v4#"
+	xsi:schemaLocation="http://www.loc.gov/standards/alto/ns-v4# http://www.loc.gov/standards/alto/v4/alto-4-0.xsd">
+	<Description>
+		<sourceImageInformation>
+			<fileName>filename.jpg</fileName><!-- relative path in relation to XML location of the image file-->
+		</sourceImageInformation>
+		....
+	</Description>
+	<Layout>
+		<Page...>
+			<PrintSpace...>
+				<ComposedBlockType ID="block_I"
+						   HPOS="125"
+						   VPOS="523" 
+						   WIDTH="5234" 
+						   HEIGHT="4000"
+						   TYPE="region_type"><!-- for textlines part of a semantic region -->
+					<TextBlock ID="textblock_N">
+						<TextLine ID="line_0"
+							  HPOS="..."
+							  VPOS="..." 
+							  WIDTH="..." 
+							  HEIGHT="..."
+							  BASELINE="10 20 15 20 400 20"><!-- necessary for segmentation training -->
+							<String ID="segment_K" 
+								CONTENT="word_text"><!-- necessary for recognition training. Text is retrieved from <String> and <SP> tags. Lower level glyphs are ignored. -->
+								...
+							</String>
+							<SP.../>
+						</TextLine>
+					</TextBlock>
+				</ComposedBlockType>
+				<TextBlock ID="textblock_M"><!-- for textlines not part of a region -->
+				...
+				</TextBlock>
+			</PrintSpace>
+		</Page>
+	</Layout>
+</alto>
