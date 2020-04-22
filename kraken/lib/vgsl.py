@@ -109,7 +109,7 @@ class TorchVGSLModel(object):
         self.codec = None  # type: Optional[PytorchCodec]
         self.criterion = None  # type: Any
         self.nn = torch.nn.Sequential()
-        self.user_metadata = {'accuracy': [], 'seg_type': None, 'one_channel_mode': None, 'model_type': None}  # type: dict[str, str]
+        self.user_metadata = {'accuracy': [], 'seg_type': None, 'one_channel_mode': None, 'model_type': None, 'hyper_params': {}}  # type: dict[str, str]
 
         self.idx = -1
         spec = spec.strip()
@@ -448,7 +448,7 @@ class TorchVGSLModel(object):
         if 'codec' in mlmodel.user_defined_metadata:
             nn.add_codec(PytorchCodec(json.loads(mlmodel.user_defined_metadata['codec'])))
 
-        nn.user_metadata = {'accuracy': [], 'seg_type': 'bbox', 'one_channel_mode': '1', 'model_type': None}  # type: dict[str, str]
+        nn.user_metadata = {'accuracy': [], 'seg_type': 'bbox', 'one_channel_mode': '1', 'model_type': None, 'hyper_params': {}}  # type: dict[str, str]
         if 'kraken_meta' in mlmodel.user_defined_metadata:
             nn.user_metadata.update(json.loads(mlmodel.user_defined_metadata['kraken_meta']))
         return nn
@@ -482,6 +482,14 @@ class TorchVGSLModel(object):
         if val not in ['bbox', 'baselines', None]:
             raise ValueError('segmentation type {} is not one of [bbox, baselines, None]'.format(val))
         self.user_metadata['seg_type'] = val
+
+    @property
+    def hyper_params(self, **kwargs):
+        return self.user_metadata['hyper_parameters']
+
+    @hyper_params.setter
+    def hyper_params(self, val: Dict[str, Any]):
+        self.user_metadata['hyper_parameters'].update(val)
 
     def save_model(self, path: str):
         """
