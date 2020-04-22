@@ -1,8 +1,8 @@
 name: kraken
 channels:
   - defaults
-  - pytorch
   - conda-forge
+  - pytorch
 dependencies:
   - python>=3.6
   - python-bidi
@@ -17,7 +17,9 @@ dependencies:
   - protobuf>=3.0
   - jinja2
   - torchvision
-  - pytorch==1.4.0
+  - pytorch>=1.5.0
+  - cudatoolkit<=9.2
+  - cuda92
   - jsonschema
   - scikit-image
   - shapely
