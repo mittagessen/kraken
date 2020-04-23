@@ -33,8 +33,7 @@ RECOGNITION_HYPER_PARAMS = {'pad': 16,
                             'schedule': 'constant',
                             'normalization': None,
                             'normalize_whitespace': True,
-                            'reorder': True,
-                            'completed_epochs': -1,
+                            'completed_epochs': 0,
                             'augment': False
                            }
 
