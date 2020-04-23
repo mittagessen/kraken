@@ -167,16 +167,36 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
 
     logger.info('Building ground truth set from {} document images'.format(len(ground_truth) + len(training_files)))
 
-    completed_epochs = 0
     # load model if given. if a new model has to be created we need to do that
     # after data set initialization, otherwise to output size is still unknown.
     nn = None
 
+    # populate hyperparameters from command line args
+    hyper_params = SEGMENTATION_HYPER_PARAMS.copy()
+    hyper_params.update({'line_width': line_width,
+                         'freq': freq,
+                         'quit': quit,
+                         'epochs': epochs,
+                         'lag': lag,
+                         'min_delta': min_delta,
+                         'optimizer': optimizer,
+                         'lrate': lrate,
+                         'momentum': momentum,
+                         'weight_decay': weight_decay,
+                         'schedule': schedule,
+                         'augment': augment
+                        })
+
     if load:
         logger.info(f'Loading existing model from {load} ')
-        message(f'Loading existing model from {load}', nl=False)
+        message(f'Loading existing model from {load} ', nl=False)
         nn = vgsl.TorchVGSLModel.load_model(load)
-        message('\u2713', fg='green')
+        if load_hyper_parameters:
+            hyper_params.update(nn.hyper_params)
+            nn.hyper_params = hyper_params
+            logger.info('Setting \'{}\' to \'{}\''.format(param, nn.user_metadata[param]))
+            message('Setting \'{}\' to \'{}\''.format(param, nn.user_metadata[param]))
+        message('\u2713', fg='green', nl=False)
 
     # preparse input sizes from vgsl string to seed ground truth data set
     # sizes and dimension ordering.
@@ -236,19 +256,19 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
         merge_baselines = None
 
     gt_set = BaselineSet(tr_im,
-                         line_width=line_width,
+                         line_width=hyper_params['line_width'],
                          im_transforms=transforms,
                          mode=format_type,
-                         augmentation=augment,
+                         augmentation=hyper_params['augment'],
                          valid_baselines=valid_baselines,
                          merge_baselines=merge_baselines,
                          valid_regions=valid_regions,
                          merge_regions=merge_regions)
     val_set = BaselineSet(te_im,
-                          line_width=line_width,
+                          line_width=hyper_params['line_width'],
                           im_transforms=transforms,
                           mode=format_type,
-                          augmentation=augment,
+                          augmentation=hyper_params['augment'],
                           valid_baselines=valid_baselines,
                           merge_baselines=merge_baselines,
                           valid_regions=valid_regions,
@@ -293,22 +313,28 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
     logger.debug(f'Set OpenMP threads to {threads}')
     nn.set_num_threads(threads)
 
-    optim = getattr(torch.optim, optimizer)(nn.nn.parameters(), lr=0)
-
-    if 'accuracy' not in nn.user_metadata:
-        nn.user_metadata['accuracy'] = []
+    optim = getattr(torch.optim, hyper_params['optimizer'])(nn.nn.parameters(), lr=0)
 
     tr_it = TrainScheduler(optim)
     if schedule == '1cycle':
-        add_1cycle(tr_it, int(len(gt_set) * epochs), lrate, momentum, momentum - 0.10, weight_decay)
+        add_1cycle(tr_it,
+                   int(len(gt_set) * hyper_params['epochs']),
+                   hyper_params['lrate'],
+                   hyper_params['momentum'],
+                   hyper_params['momentum'] - 0.10,
+                   hyper_params['weight_decay'])
     else:
         # constant learning rate scheduler
-        tr_it.add_phase(1, (lrate, lrate), (momentum, momentum), weight_decay, train.annealing_const)
+        tr_it.add_phase(1,
+                        2*(hyper_params['lrate'],),
+                        2*(hyper_params['momentum'],),
+                        hyper_params['weight_decay'],
+                        train.annealing_const)
 
     if quit == 'early':
-        st_it = EarlyStopping(min_delta, lag)
+        st_it = EarlyStopping(hyper_params['min_delta'], hyper_params['lag'])
     elif quit == 'dumb':
-        st_it = EpochStopping(epochs - completed_epochs)
+        st_it = EpochStopping(hyper_params['epochs'] - hyper_params['completed_epochs'])
     else:
         raise click.BadOptionUsage('quit', f'Invalid training interruption scheme {quit}.')
 
@@ -316,7 +342,7 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
                                   optimizer=optim,
                                   device=device,
                                   filename_prefix=output,
-                                  event_frequency=freq,
+                                  event_frequency=hyper_params['freq'],
                                   train_set=train_loader,
                                   val_set=val_set,
                                   stopper=st_it,
@@ -344,7 +370,7 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
     if quit == 'early':
         message('Moving best model {0}_{1}.mlmodel ({2}) to {0}_best.mlmodel'.format(output, trainer.stopper.best_epoch, trainer.stopper.best_loss))
         logger.info('Moving best model {0}_{1}.mlmodel ({2}) to {0}_best.mlmodel'.format(output, trainer.stopper.best_epoch, trainer.stopper.best_loss))
-        shutil.copy('{}_{}.mlmodel'.format(output, trainer.stopper.best_epoch), '{}_best.mlmodel'.format(output))
+        shutil.copy(f'{output}_{trainer.stopper.best_epoch}.mlmodel', f'{output}_best.mlmodel')
 
 
 @cli.command('train')
@@ -708,8 +734,8 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
     else:
         # constant learning rate scheduler
         tr_it.add_phase(1,
-                        (hyper_params['lrate'], hyper_params['lrate']),
-                        (hyper_params['momentum'], hyper_params['momentum']),
+                        2*(hyper_params['lrate'],),
+                        2*(hyper_params['momentum'],),
                         hyper_params['weight_decay'],
                         train.annealing_const)
 

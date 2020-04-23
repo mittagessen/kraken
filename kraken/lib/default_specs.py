@@ -48,6 +48,6 @@ SEGMENTATION_HYPER_PARAMS = {'line_width': 8,
                              'momentum': 0.9,
                              'weight_decay': 1e-5,
                              'schedule': 'constant',
-                             'completed_epochs': -1,
+                             'completed_epochs': 0,
                              'augment': False
                            }
