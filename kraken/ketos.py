@@ -127,6 +127,8 @@ def _validate_merging(ctx, param, value):
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
 @click.option('--threads', show_default=True, default=1, help='Number of OpenMP threads and workers when running on CPU.')
+@click.option('--load-hyper-parameters/--no-load-hyper-parameters', show_default=True, default=False,
+              help='When loading an existing model, retrieve hyperparameters from the model')
 @click.option('--force-binarization/--no-binarization', show_default=True,
               default=False, help='Forces input images to be binary, otherwise'
               'the appropriate color format will be auto-determined through the'
@@ -148,7 +150,7 @@ def _validate_merging(ctx, param, value):
 def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
              lag, min_delta, device, optimizer, lrate, momentum, weight_decay,
              schedule, partition, training_files, evaluation_files, threads,
-             force_binarization, format_type, suppress_regions,
+             load_hyper_parameters, force_binarization, format_type, suppress_regions,
              suppress_baselines, valid_regions, valid_baselines, merge_regions,
              merge_baselines, augment, ground_truth):
     """
