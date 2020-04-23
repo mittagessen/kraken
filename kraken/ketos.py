@@ -28,10 +28,14 @@ from bidi.algorithm import get_display
 from typing import cast, Set, List, IO, Any
 from collections import defaultdict
 
-from kraken.lib import log, default_specs
+from kraken.lib import log
 from kraken.lib.exceptions import KrakenCairoSurfaceException
 from kraken.lib.exceptions import KrakenEncodeException
 from kraken.lib.exceptions import KrakenInputException
+from kraken.lib.default_specs import (SEGMENTATION_HYPER_PARAMS,
+                                      RECOGNITION_HYPER_PARAMS,
+                                      SEGMENTATION_SPEC,
+                                      RECOGNITION_SPEC)
 
 APP_NAME = 'kraken'
 
@@ -97,23 +101,23 @@ def _validate_merging(ctx, param, value):
 @click.pass_context
 @click.option('-o', '--output', show_default=True, type=click.Path(), default='model', help='Output model file')
 @click.option('-s', '--spec', show_default=True,
-              default=default_specs.SEGMENTATION_SPEC,
+              default=SEGMENTATION_SPEC,
               help='VGSL spec of the baseline labeling network')
-@click.option('--line-width', show_default=True, default=8, help='The height of each baseline in the target after scaling')
+@click.option('--line-width', show_default=True, default=SEGMENTATION_HYPER_PARAMS['line_width'], help='The height of each baseline in the target after scaling')
 @click.option('-i', '--load', show_default=True, type=click.Path(exists=True, readable=True), help='Load existing file to continue training')
-@click.option('-F', '--freq', show_default=True, default=1.0, type=click.FLOAT,
+@click.option('-F', '--freq', show_default=True, default=SEGMENTATION_HYPER_PARAMS['freq'], type=click.FLOAT,
               help='Model saving and report generation frequency in epochs during training')
-@click.option('-q', '--quit', show_default=True, default='early', type=click.Choice(['early', 'dumb']),
+@click.option('-q', '--quit', show_default=True, default=SEGMENTATION_HYPER_PARAMS['quit'], type=click.Choice(['early', 'dumb']),
               help='Stop condition for training. Set to `early` for early stooping or `dumb` for fixed number of epochs')
-@click.option('-N', '--epochs', show_default=True, default=-1, help='Number of epochs to train for')
-@click.option('--lag', show_default=True, default=10, help='Number of evaluations (--report frequence) to wait before stopping training without improvement')
-@click.option('--min-delta', show_default=True, default=None, type=click.FLOAT, help='Minimum improvement between epochs to reset early stopping. Default is scales the delta by the best loss')
+@click.option('-N', '--epochs', show_default=True, default=SEGMENTATION_HYPER_PARAMS['epochs'], help='Number of epochs to train for')
+@click.option('--lag', show_default=True, default=SEGMENTATION_HYPER_PARAMS['lag'], help='Number of evaluations (--report frequence) to wait before stopping training without improvement')
+@click.option('--min-delta', show_default=True, default=SEGMENTATION_HYPER_PARAMS['min_delta'], type=click.FLOAT, help='Minimum improvement between epochs to reset early stopping. Default is scales the delta by the best loss')
 @click.option('-d', '--device', show_default=True, default='cpu', help='Select device to use (cpu, cuda:0, cuda:1, ...)')
-@click.option('--optimizer', show_default=True, default='Adam', type=click.Choice(['Adam', 'SGD', 'RMSprop']), help='Select optimizer')
-@click.option('-r', '--lrate', show_default=True, default=2e-4, help='Learning rate')
-@click.option('-m', '--momentum', show_default=True, default=0.9, help='Momentum')
-@click.option('-w', '--weight-decay', show_default=True, default=1e-5, help='Weight decay')
-@click.option('--schedule', show_default=True, type=click.Choice(['constant', '1cycle']), default='constant',
+@click.option('--optimizer', show_default=True, default=SEGMENTATION_HYPER_PARAMS['optimizer'], type=click.Choice(['Adam', 'SGD', 'RMSprop']), help='Select optimizer')
+@click.option('-r', '--lrate', show_default=True, default=SEGMENTATION_HYPER_PARAMS['lrate'], help='Learning rate')
+@click.option('-m', '--momentum', show_default=True, default=SEGMENTATION_HYPER_PARAMS['momentum'], help='Momentum')
+@click.option('-w', '--weight-decay', show_default=True, default=SEGMENTATION_HYPER_PARAMS['weight_decay'], help='Weight decay')
+@click.option('--schedule', show_default=True, type=click.Choice(['constant', '1cycle']), default=SEGMENTATION_HYPER_PARAMS['schedule'],
               help='Set learning rate scheduler. For 1cycle, cycle length is determined by the `--epoch` option.')
 @click.option('-p', '--partition', show_default=True, default=0.9, help='Ground truth data partition ratio between train/validation set')
 @click.option('-t', '--training-files', show_default=True, default=None, multiple=True,
@@ -139,7 +143,7 @@ def _validate_merging(ctx, param, value):
 @click.option('-vb', '--valid-baselines', show_default=True, default=None, multiple=True, help='Valid baseline types in training data. May be used multiple times.')
 @click.option('-mr', '--merge-regions', show_default=True, default=None, help='Region merge mapping. One or more mappings of the form `$target:$src` where $src is merged into $target.', multiple=True, callback=_validate_merging)
 @click.option('-mb', '--merge-baselines', show_default=True, default=None, help='Baseline type merge mapping. Same syntax as `--merge-regions`', multiple=True, callback=_validate_merging)
-@click.option('--augment/--no-augment', show_default=True, default=False, help='Enable image augmentation')
+@click.option('--augment/--no-augment', show_default=True, default=SEGMENTATION_HYPER_PARAMS['augment'], help='Enable image augmentation')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
              lag, min_delta, device, optimizer, lrate, momentum, weight_decay,
@@ -348,32 +352,31 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
 @click.option('-p', '--pad', show_default=True, type=click.INT, default=16, help='Left and right '
               'padding around lines')
 @click.option('-o', '--output', show_default=True, type=click.Path(), default='model', help='Output model file')
-@click.option('-s', '--spec', show_default=True,
-              default=default_specs.RECOGNITION_SPEC,
+@click.option('-s', '--spec', show_default=True, default=RECOGNITION_SPEC,
               help='VGSL spec of the network to train. CTC layer will be added automatically.')
 @click.option('-a', '--append', show_default=True, default=None, type=click.INT,
               help='Removes layers before argument and then appends spec. Only works when loading an existing model')
 @click.option('-i', '--load', show_default=True, type=click.Path(exists=True, readable=True), help='Load existing file to continue training')
-@click.option('-F', '--freq', show_default=True, default=1.0, type=click.FLOAT,
+@click.option('-F', '--freq', show_default=True, default=RECOGNITION_HYPER_PARAMS['freq'], type=click.FLOAT,
               help='Model saving and report generation frequency in epochs during training')
-@click.option('-q', '--quit', show_default=True, default='early', type=click.Choice(['early', 'dumb']),
+@click.option('-q', '--quit', show_default=True, default=RECOGNITION_HYPER_PARAMS['quit'], type=click.Choice(['early', 'dumb']),
               help='Stop condition for training. Set to `early` for early stooping or `dumb` for fixed number of epochs')
-@click.option('-N', '--epochs', show_default=True, default=-1, help='Number of epochs to train for')
-@click.option('--lag', show_default=True, default=5, help='Number of evaluations (--report frequence) to wait before stopping training without improvement')
-@click.option('--min-delta', show_default=True, default=None, type=click.FLOAT, help='Minimum improvement between epochs to reset early stopping. Default is scales the delta by the best loss')
+@click.option('-N', '--epochs', show_default=True, default=RECOGNITION_HYPER_PARAMS['epochs'], help='Number of epochs to train for')
+@click.option('--lag', show_default=True, default=RECOGNITION_HYPER_PARAMS['lag'], help='Number of evaluations (--report frequence) to wait before stopping training without improvement')
+@click.option('--min-delta', show_default=True, default=RECOGNITION_HYPER_PARAMS['min_delta'], type=click.FLOAT, help='Minimum improvement between epochs to reset early stopping. Default is scales the delta by the best loss')
 @click.option('-d', '--device', show_default=True, default='cpu', help='Select device to use (cpu, cuda:0, cuda:1, ...)')
-@click.option('--optimizer', show_default=True, default='Adam', type=click.Choice(['Adam', 'SGD', 'RMSprop']), help='Select optimizer')
-@click.option('-r', '--lrate', show_default=True, default=2e-3, help='Learning rate')
-@click.option('-m', '--momentum', show_default=True, default=0.9, help='Momentum')
-@click.option('-w', '--weight-decay', show_default=True, default=0.0, help='Weight decay')
-@click.option('--schedule', show_default=True, type=click.Choice(['constant', '1cycle']), default='constant',
+@click.option('--optimizer', show_default=True, default=RECOGNITION_HYPER_PARAMS['optimizer'], type=click.Choice(['Adam', 'SGD', 'RMSprop']), help='Select optimizer')
+@click.option('-r', '--lrate', show_default=True, default=RECOGNITION_HYPER_PARAMS['lrate'], help='Learning rate')
+@click.option('-m', '--momentum', show_default=True, default=RECOGNITION_HYPER_PARAMS['momentum'], help='Momentum')
+@click.option('-w', '--weight-decay', show_default=True, default=RECOGNITION_HYPER_PARAMS['weight_decay'], help='Weight decay')
+@click.option('--schedule', show_default=True, type=click.Choice(['constant', '1cycle']), default=RECOGNITION_HYPER_PARAMS['schedule'],
               help='Set learning rate scheduler. For 1cycle, cycle length is determined by the `--epoch` option.')
 @click.option('-p', '--partition', show_default=True, default=0.9, help='Ground truth data partition ratio between train/validation set')
 @click.option('-u', '--normalization', show_default=True, type=click.Choice(['NFD', 'NFKD', 'NFC', 'NFKC']),
-              default=None, help='Ground truth normalization')
+              default=RECOGNITION_HYPER_PARAMS['normalization'], help='Ground truth normalization')
 @click.option('-n', '--normalize-whitespace/--no-normalize-whitespace',
               show_default=True, default=True, help='Normalizes unicode whitespace')
-@click.option('-c', '--codec', show_default=True, default=None, type=click.File(mode='r', lazy=True),
+@click.option('-c', '--codec', show_default=True, default=RECOGNITION_HYPER_PARAMS['normalize_whitespace'], type=click.File(mode='r', lazy=True),
               help='Load a codec JSON definition (invalid if loading existing model)')
 @click.option('--resize', show_default=True, default='fail', type=click.Choice(['add', 'both', 'fail']),
               help='Codec/output layer resizing option. If set to `add` code '
@@ -410,7 +413,7 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
               'link to source images. In `path` mode arguments are image files'
               'sharing a prefix up to the last extension with text `.gt.txt` files'
               'containing the transcription.')
-@click.option('--augment/--no-augment', show_default=False, default=False, help='Enable image augmentation')
+@click.option('--augment/--no-augment', show_default=True, default=RECOGNITION_HYPER_PARAMS['augment'], help='Enable image augmentation')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
           lag, min_delta, device, optimizer, lrate, momentum, weight_decay,
@@ -445,7 +448,25 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
     # load model if given. if a new model has to be created we need to do that
     # after data set initialization, otherwise to output size is still unknown.
     nn = None
-    #hyper_fields = ['freq', 'quit', 'epochs', 'lag', 'min_delta', 'optimizer', 'lrate', 'momentum', 'weight_decay', 'schedule', 'partition', 'normalization', 'normalize_whitespace', 'reorder', 'preload', 'completed_epochs', 'output']
+    # populate hyperparameters from command line args
+    #hyper_params = {'freq':,
+    #                'pad':,
+    #                'quit':,
+    #                'epochs':,
+    #                'lag':,
+    #                'min_delta':,
+    #                'optimizer':,
+    #                'lrate':,
+    #                'momentum':,
+    #                'weight_decay':,
+    #                'schedule':,
+    #                'normalization':,
+    #                'normalize_whitespace':,
+    #                'reorder':,
+    #                'preload':,
+    #                'completed_epochs':,
+    #                'output':
+    #               }
 
     if load:
         logger.info('Loading existing model from {} '.format(load))
