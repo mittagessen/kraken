@@ -3,7 +3,7 @@
 import click
 
 @click.command()
-@click.option('-f', '--format-type', type=click.Choice(['alto', 'page']), default='page',
+@click.option('-f', '--format-type', type=click.Choice(['xml', 'alto', 'page']), default='xml',
               help='Sets the input document format. In ALTO and PageXML mode all'
               'data is extracted from xml files containing both baselines, polygons, and a'
               'link to source images.')

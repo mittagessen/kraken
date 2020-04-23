@@ -133,7 +133,7 @@ def _validate_merging(ctx, param, value):
               default=False, help='Forces input images to be binary, otherwise'
               'the appropriate color format will be auto-determined through the'
               'network specification. Will be ignored in `path` mode.')
-@click.option('-f', '--format-type', type=click.Choice(['path', 'alto', 'page']), default='path',
+@click.option('-f', '--format-type', type=click.Choice(['path', 'xml', 'alto', 'page']), default='xml',
               help='Sets the training data format. In ALTO and PageXML mode all'
               'data is extracted from xml files containing both baselines and a'
               'link to source images. In `path` mode arguments are image files'
@@ -435,7 +435,7 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
               default=False, help='Forces input images to be binary, otherwise'
               'the appropriate color format will be auto-determined through the'
               'network specification. Will be ignored in `path` mode.')
-@click.option('-f', '--format-type', type=click.Choice(['path', 'alto', 'page']), default='path',
+@click.option('-f', '--format-type', type=click.Choice(['path', 'xml', 'alto', 'page']), default='path',
               help='Sets the training data format. In ALTO and PageXML mode all'
               'data is extracted from xml files containing both line definitions and a'
               'link to source images. In `path` mode arguments are image files'
@@ -810,7 +810,7 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
               default=False, help='Forces input images to be binary, otherwise'
               'the appropriate color format will be auto-determined through the'
               'network specification. Will be ignored in `path` mode.')
-@click.option('-f', '--format-type', type=click.Choice(['path', 'alto', 'page']), default='path',
+@click.option('-f', '--format-type', type=click.Choice(['path', 'xml', 'alto', 'page']), default='path',
               help='Sets the training data format. In ALTO and PageXML mode all'
               'data is extracted from xml files containing both baselines and a'
               'link to source images. In `path` mode arguments are image files'

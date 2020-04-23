@@ -28,7 +28,7 @@ from kraken.lib.exceptions import KrakenInputException
 
 logger = logging.getLogger(__name__)
 
-__all__ = ['parse_page', 'parse_alto']
+__all__ = ['parse_xml', 'parse_page', 'parse_alto']
 
 # fallback mapping between PAGE region types and tags
 page_regions = {'TextRegion': 'text',
@@ -48,6 +48,33 @@ page_regions = {'TextRegion': 'text',
                 'CustomRegion': 'custom'
                }
 
+def parse_xml(filename):
+    """
+    Parses either a PageXML or ALTO file with autodetermination of the file
+    format.
+
+    Args:
+        filename (str): path to an XML file.
+
+    Returns:
+        A dict {'image': impath, lines: [{'boundary': [[x0, y0], ...],
+        'baseline': [[x0, y0], ...]}, {...], 'text': 'apdjfqpf', 'script':
+        'script_type'}, regions: {'region_type_0': [[[x0, y0], ...], ...],
+        ...}}
+    """
+    with open(filename, 'rb') as fp:
+        try:
+            doc = etree.parse(fp)
+        except etree.XMLSyntaxError as e:
+            raise KrakenInputException(f'Parsing {filename} failed: {e}')
+    if doc.getroot().tag.endswith('alto'):
+        return parse_alto(filename)
+    elif doc.getroot().tag.endswith('PcGts'):
+        return parse_page(filename)
+    else:
+        raise KrakenInputException(f'Unknown XML format in {filename}')
+
+
 def parse_page(filename):
     """
     Parses a PageXML file, returns the baselines defined in it, and loads the
@@ -57,8 +84,10 @@ def parse_page(filename):
         filename (str): path to a PageXML file.
 
     Returns:
-        A dict {'image': impath, lines: [{'boundary': [[x0, y0], ...], 'baseline':
-        [[x0, y0], ...]}, {...], 'text': 'apdjfqpf'}
+        A dict {'image': impath, lines: [{'boundary': [[x0, y0], ...],
+        'baseline': [[x0, y0], ...]}, {...], 'text': 'apdjfqpf', 'script':
+        'script_type'}, regions: {'region_type_0': [[[x0, y0], ...], ...],
+        ...}}
     """
     def _parse_page_custom(s):
         o = {}
@@ -167,8 +196,10 @@ def parse_alto(filename):
         filename (str): path to an ALTO file.
 
     Returns:
-        A dict {'image': impath, lines: [{'boundary': [[x0, y0], ...], 'baseline':
-        [[x0, y0], ...]}, {...], 'text': 'apdjfqpf'}
+        A dict {'image': impath, lines: [{'boundary': [[x0, y0], ...],
+        'baseline': [[x0, y0], ...]}, {...], 'text': 'apdjfqpf', 'script':
+        'script_type'}, regions: {'region_type_0': [[[x0, y0], ...], ...],
+        ...}}
     """
     with open(filename, 'rb') as fp:
         base_dir = dirname(filename)

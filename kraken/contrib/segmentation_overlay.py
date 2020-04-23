@@ -14,7 +14,7 @@ cmap = cycle([(230, 25, 75, 127),
 bmap = (0, 130, 200, 255)
 
 @click.command()
-@click.option('-f', '--format-type', type=click.Choice(['alto', 'page']), default='page',
+@click.option('-f', '--format-type', type=click.Choice(['xml', 'alto', 'page']), default='xml',
               help='Sets the input document format. In ALTO and PageXML mode all'
               'data is extracted from xml files containing both baselines, polygons, and a'
               'link to source images.')
@@ -46,7 +46,9 @@ def cli(format_type, model, repolygonize, files):
     from kraken import blla
 
     if model is None:
-        if format_type == 'alto':
+        if format_type == 'xml':
+            fn = xml.parse_xml
+        elif format_type == 'alto':
             fn = xml.parse_palto
         else:
             fn = xml.parse_page

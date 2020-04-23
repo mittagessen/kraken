@@ -36,7 +36,7 @@ from typing import Dict, List, Tuple, Sequence, Callable, Optional, Any, Union, 
 
 from skimage.draw import polygon
 
-from kraken.lib.xml import parse_alto, parse_page
+from kraken.lib.xml import parse_alto, parse_page, parse_xml
 from kraken.lib.util import is_bitonal
 from kraken.lib.codec import PytorchCodec
 from kraken.lib.models import TorchSeqRecognizer
@@ -279,7 +279,7 @@ def compute_error(model: TorchSeqRecognizer, validation_set: Sequence[Tuple[str,
     return total_chars, error
 
 
-def preparse_xml_data(filenames, format_type='page', repolygonize=False):
+def preparse_xml_data(filenames, format_type='xml', repolygonize=False):
     """
     Loads training data from a set of xml files.
 
@@ -288,7 +288,8 @@ def preparse_xml_data(filenames, format_type='page', repolygonize=False):
 
     Args:
         filenames (list): List of XML files.
-        format_type (str): Either `page` or `alto`
+        format_type (str): Either `page`, `alto` or `xml` for
+                           autodetermination.
         repolygonize (bool): (Re-)calculates polygon information using the
                              kraken algorithm.
 
@@ -297,12 +298,14 @@ def preparse_xml_data(filenames, format_type='page', repolygonize=False):
         [[x0, y0], ...], 'image': PIL.Image}.
     """
     training_pairs = []
-    if format_type == 'alto':
+    if format_type == 'xml':
+        parse_fn = parse_xml
+    elif format_type == 'alto':
         parse_fn = parse_alto
     elif format_type == 'page':
         parse_fn = parse_page
     else:
-        raise Exception('invalid format {} for preparse_xml_data'.format(format_type))
+        raise Exception(f'invalid format {format_type} for preparse_xml_data')
     for fn in filenames:
         try:
             data = parse_fn(fn)
@@ -312,7 +315,7 @@ def preparse_xml_data(filenames, format_type='page', repolygonize=False):
         try:
             Image.open(data['image'])
         except FileNotFoundError as e:
-            logger.warning('Could not open file {} in {}'.format(e.filename, fn))
+            logger.warning(f'Could not open file {e.filename} in {fn}')
             continue
         if repolygonize:
             logger.info('repolygonizing {} lines in {}'.format(len(data['lines']), data['image']))
@@ -696,10 +699,10 @@ class BaselineSet(Dataset):
                           files from.
             line_width (int): Height of the baseline in the scaled input.
             target_size (tuple): Target size of the image as a (height, width) tuple.
-            mode (str): Either path, alto, page, or None. In alto and page mode
-                        the baseline paths and image data is retrieved from an
-                        ALTO/PageXML file. In `None` mode data is iteratively
-                        added through the `add` method.
+            mode (str): Either path, alto, page, xml, or None. In alto, page,
+                        and xml mode the baseline paths and image data is
+                        retrieved from an ALTO/PageXML file. In `None` mode
+                        data is iteratively added through the `add` method.
             augmentation (bool): Enable/disable augmentation.
             valid_baselines (list): Sequence of valid baseline identifiers. If
                                     `None` all are valid.
@@ -724,11 +727,13 @@ class BaselineSet(Dataset):
         self.mreg_dict = merge_regions if merge_regions is not None else {}
         self.valid_baselines = valid_baselines
         self.valid_regions = valid_regions
-        if mode in ['alto', 'page']:
+        if mode in ['alto', 'page', 'xml']:
             if mode == 'alto':
                 fn = parse_alto
-            else:
+            elif mode == 'page':
                 fn = parse_page
+            elif mode == 'xml':
+                fn = parse_xml
             im_paths = []
             self.targets = []
             for img in imgs:

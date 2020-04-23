@@ -7,7 +7,7 @@ the kraken polygonizer.
 import click
 
 @click.command()
-@click.option('-f', '--format-type', type=click.Choice(['alto', 'page']), default='page',
+@click.option('-f', '--format-type', type=click.Choice(['alto', 'page', 'xml']), default='xml',
               help='Sets the input document format. In ALTO and PageXML mode all'
               'data is extracted from xml files containing both baselines, polygons, and a'
               'link to source images.')
@@ -59,7 +59,9 @@ def cli(format_type, files):
             with open(splitext(fname)[0] + '_rewrite.xml', 'wb') as fp:
                 doc.write(fp, encoding='UTF-8', xml_declaration=True)
 
-    if format_type == 'page':
+    if format_type == 'xml':
+        parse_fn = xml.parse_xml
+    elif format_type == 'page':
         parse_fn = xml.parse_page
     else:
         parse_fn = xml.parse_alto
