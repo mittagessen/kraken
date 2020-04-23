@@ -485,11 +485,11 @@ class TorchVGSLModel(object):
 
     @property
     def hyper_params(self, **kwargs):
-        return self.user_metadata['hyper_parameters']
+        return self.user_metadata['hyper_params']
 
     @hyper_params.setter
     def hyper_params(self, val: Dict[str, Any]):
-        self.user_metadata['hyper_parameters'].update(val)
+        self.user_metadata['hyper_params'].update(val)
 
     def save_model(self, path: str):
         """

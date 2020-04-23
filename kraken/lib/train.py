@@ -364,7 +364,7 @@ class KrakenTrainer(object):
             if im_mode in ['1', 'L']:
                 self.model.one_channel_mode = im_mode
             try:
-                self.model.user_metadata['completed_epochs'] = self.stopper.epoch
+                self.model.hyper_params['completed_epochs'] = self.stopper.epoch
                 self.model.save_model('{}_{}.mlmodel'.format(self.filename_prefix, self.stopper.epoch))
             except Exception as e:
                 logger.error('Saving model failed: {}'.format(str(e)))
