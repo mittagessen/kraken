@@ -612,7 +612,7 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
     if len(gt_set._images) == 0:
         raise click.UsageError('No valid training data was provided to the train command. Please add valid XML or line data.')
 
-    logger.info(f'Training set {len(gt_set._images)} lines, validation set {len(val_set._images)} lines, alphabet {len(gt_set._alphabet)} symbols')
+    logger.info(f'Training set {len(gt_set._images)} lines, validation set {len(val_set._images)} lines, alphabet {len(gt_set.alphabet)} symbols')
     alpha_diff_only_train = set(gt_set.alphabet).difference(set(val_set.alphabet))
     alpha_diff_only_val = set(val_set.alphabet).difference(set(gt_set.alphabet))
     if alpha_diff_only_train:
