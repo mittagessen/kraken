@@ -403,8 +403,8 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
 @click.option('-u', '--normalization', show_default=True, type=click.Choice(['NFD', 'NFKD', 'NFC', 'NFKC']),
               default=RECOGNITION_HYPER_PARAMS['normalization'], help='Ground truth normalization')
 @click.option('-n', '--normalize-whitespace/--no-normalize-whitespace',
-              show_default=True, default=True, help='Normalizes unicode whitespace')
-@click.option('-c', '--codec', show_default=True, default=RECOGNITION_HYPER_PARAMS['normalize_whitespace'], type=click.File(mode='r', lazy=True),
+              show_default=True, default=RECOGNITION_HYPER_PARAMS['normalize_whitespace'], help='Normalizes unicode whitespace')
+@click.option('-c', '--codec', show_default=True, default=None, type=click.File(mode='r', lazy=True),
               help='Load a codec JSON definition (invalid if loading existing model)')
 @click.option('--resize', show_default=True, default='fail', type=click.Choice(['add', 'both', 'fail']),
               help='Codec/output layer resizing option. If set to `add` code '
