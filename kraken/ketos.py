@@ -460,7 +460,7 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
 
     import shutil
     import numpy as np
-    from kraken.lib.train import recognition_train_gen
+    from kraken.lib.train import KrakenTrainer
 
     hyper_params = RECOGNITION_HYPER_PARAMS.copy()
     hyper_params.update({'freq': freq,
@@ -499,24 +499,24 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
         evaluation_files = ground_truth[int(len(ground_truth) * partition):]
         logger.debug(f'Taking {len(evaluation_files)} lines/files from training set for evaluation')
 
-    trainer = recognition_train_gen(hyper_params,
-                                    message=message,
-                                    output=output,
-                                    spec=spec,
-                                    append=append,
-                                    load=load,
-                                    device=device,
-                                    reorder=reorder,
-                                    training_data=training_files,
-                                    evaluation_data=evaluation_files,
-                                    preload=preload,
-                                    threads=threads,
-                                    load_hyper_parameters=load_hyper_parameters,
-                                    repolygonize=repolygonize,
-                                    force_binarization=force_binarization,
-                                    format_type=format_type,
-                                    codec=codec,
-                                    augment=augment)
+    trainer = KrakenTrainer.recognition_train_gen(hyper_params,
+                                                  message=message,
+                                                  output=output,
+                                                  spec=spec,
+                                                  append=append,
+                                                  load=load,
+                                                  device=device,
+                                                  reorder=reorder,
+                                                  training_data=training_files,
+                                                  evaluation_data=evaluation_files,
+                                                  preload=preload,
+                                                  threads=threads,
+                                                  load_hyper_parameters=load_hyper_parameters,
+                                                  repolygonize=repolygonize,
+                                                  force_binarization=force_binarization,
+                                                  format_type=format_type,
+                                                  codec=codec,
+                                                  augment=augment)
 
     with  log.progressbar(label='stage {}/{}'.format(1, trainer.stopper.epochs if trainer.stopper.epochs > 0 else '∞'),
                           length=trainer.event_it, show_pos=True) as bar:
