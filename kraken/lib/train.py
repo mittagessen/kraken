@@ -31,7 +31,7 @@ from typing import Tuple, Callable, List, Dict, Any
 from kraken.lib import models, vgsl, segmentation, default_specs
 from kraken.lib.util import make_printable
 from kraken.lib.codec import PytorchCodec
-from kraken.lib.dataset import GroundTruthDataset, PolygonGTDataset, generate_input_transforms, preparse_xml_data, InfiniteDataLoader, compute_error
+from kraken.lib.dataset import BaselineSet, GroundTruthDataset, PolygonGTDataset, generate_input_transforms, preparse_xml_data, InfiniteDataLoader, compute_error
 from kraken.lib.exceptions import KrakenInputException
 
 from torch.utils.data import DataLoader
@@ -297,11 +297,6 @@ def baseline_label_evaluator_fn(model, val_set, device):
     mean_iu = torch.mean(iu)
     freq_iu = torch.sum(cls_cnt/cls_cnt.sum() * iu)
     return {'accuracy': pixel_accuracy, 'mean_acc': mean_accuracy, 'mean_iu': mean_iu, 'freq_iu': freq_iu, 'val_metric': mean_iu}
-
-
-
-
-
 
 def segmentation_train_gen():
     pass
@@ -674,6 +669,207 @@ class KrakenTrainer(object):
                       train_set=train_loader,
                       val_set=val_set,
                       stopper=st_it)
+
+        trainer.add_lr_scheduler(tr_it)
+
+        return trainer
+
+    @classmethod
+    def segmentation_train_gen(cls,
+                               hyper_params=default_specs.SEGMENTATION_HYPER_PARAMS,
+                               progress_callback: Callable = lambda string, length: lambda: None,
+                               message = lambda x: None,
+                               **kwargs):
+        """
+        This is an ugly constructor that takes all the arguments from the command
+        line driver, finagles the datasets, models, and hyperparameters correctly
+        and returns a KrakenTrainer object.
+
+        Setup parameters (load, training_data, evaluation_data, ....) are named,
+        model hyperparameters (everything in
+        kraken.lib.default_specs.SEGMENTATION_HYPER_PARAMS) are in in the
+        `hyper_params` argument.
+
+        Args:
+            hyper_params (dict): Hyperparameter dictionary containing all fields
+                                 from
+                                 kraken.lib.default_specs.SEGMENTATION_HYPER_PARAMS
+            progress_callback (Callable): Callback for progress reports on various
+                                          computationally expensive processes. A
+                                          human readable string and the process
+                                          length is supplied. The callback has to
+                                          return another function which will be
+                                          executed after each step.
+            message (Callable): Messaging printing method for above log but below
+                                warning level output, i.e. infos that should
+                                generally be shown to users.
+            **kwargs: Setup parameters, i.e. CLI parameters of the train() command.
+
+        Returns:
+            A KrakenTrainer object.
+        """
+        # load model if given. if a new model has to be created we need to do that
+        # after data set initialization, otherwise to output size is still unknown.
+        nn = None
+
+        load = kwargs['load']
+        if load:
+            logger.info(f'Loading existing model from {load} ')
+            message(f'Loading existing model from {load} ', nl=False)
+            nn = vgsl.TorchVGSLModel.load_model(load)
+            if kwargs['load_hyper_parameters']:
+                hyper_params.update(nn.hyper_params)
+                nn.hyper_params = hyper_params
+            message('\u2713', fg='green', nl=False)
+
+        training_data = kwargs['training_data']
+        evaluation_data = kwargs['evaluation_data']
+
+        # preparse input sizes from vgsl string to seed ground truth data set
+        # sizes and dimension ordering.
+        if not nn:
+            spec = kwargs['spec'].strip()
+            if spec[0] != '[' or spec[-1] != ']':
+                logger.error(f'VGSL spec "{spec}" not bracketed')
+                return None
+            blocks = spec[1:-1].split(' ')
+            m = re.match(r'(\d+),(\d+),(\d+),(\d+)', blocks[0])
+            if not m:
+                logger.error(f'Invalid input spec {blocks[0]}')
+                return None
+            batch, height, width, channels = [int(x) for x in m.groups()]
+        else:
+            batch, channels, height, width = nn.input
+        try:
+            transforms = generate_input_transforms(batch, height, width, channels, 0, valid_norm=False)
+        except KrakenInputException as e:
+            logger.error(f'Spec error: {e}')
+            return None
+
+        # set multiprocessing tensor sharing strategy
+        if 'file_system' in torch.multiprocessing.get_all_sharing_strategies():
+            logger.debug('Setting multiprocessing tensor sharing strategy to file_system')
+            torch.multiprocessing.set_sharing_strategy('file_system')
+
+        valid_regions = kwargs['valid_regions']
+        valid_baselines = kwargs['valid_baselines']
+
+        if len(valid_regions) == 0:
+            valid_regions = None
+        if len(valid_baselines) == 0:
+            valid_baselines = None
+
+        suppress_regions = kwargs['suppress_regions']
+        suppress_baselines = kwargs['suppress_baselines']
+
+        merge_regions = kwargs['merge_regions']
+        merge_baselines = kwargs['merge_baselines']
+
+        if suppress_regions:
+            valid_regions = []
+            merge_regions = None
+        if suppress_baselines:
+            valid_baselines = []
+            merge_baselines = None
+
+        gt_set = BaselineSet(training_data,
+                             line_width=hyper_params['line_width'],
+                             im_transforms=transforms,
+                             mode=kwargs['format_type'],
+                             augmentation=hyper_params['augment'],
+                             valid_baselines=valid_baselines,
+                             merge_baselines=merge_baselines,
+                             valid_regions=valid_regions,
+                             merge_regions=merge_regions)
+        val_set = BaselineSet(evaluation_data,
+                              line_width=hyper_params['line_width'],
+                              im_transforms=transforms,
+                              mode=kwargs['format_type'],
+                              augmentation=hyper_params['augment'],
+                              valid_baselines=valid_baselines,
+                              merge_baselines=merge_baselines,
+                              valid_regions=valid_regions,
+                              merge_regions=merge_regions)
+
+        # overwrite class mapping in validation set
+        val_set.num_classes = gt_set.num_classes
+        val_set.class_mapping = gt_set.class_mapping
+
+        if not load:
+            spec = f'[{spec[1:-1]} O2l{gt_set.num_classes}]'
+            message(f'Creating model {spec} with {gt_set.num_classes} outputs ', nl=False)
+            nn = vgsl.TorchVGSLModel(spec)
+            message('\u2713', fg='green')
+
+        message('Training line types:')
+        for k, v in gt_set.class_mapping['baselines'].items():
+            message(f'  {k}\t{v}')
+        message('Training region types:')
+        for k, v in gt_set.class_mapping['regions'].items():
+            message(f'  {k}\t{v}')
+
+        if len(gt_set.imgs) == 0:
+            logger.error('No valid training data was provided to the train command. Please add valid XML data.')
+            return None
+
+        device = kwargs['device']
+        threads = kwargs['threads']
+
+        if device == 'cpu':
+            loader_threads = threads // 2
+        else:
+            loader_threads = threads
+
+        train_loader = InfiniteDataLoader(gt_set, batch_size=1, shuffle=True, num_workers=loader_threads, pin_memory=True)
+        test_loader = DataLoader(val_set, batch_size=1, shuffle=True, num_workers=loader_threads, pin_memory=True)
+        threads = max((threads - loader_threads, 1))
+
+        # set model type metadata field and dump class_mapping
+        nn.model_type = 'segmentation'
+        nn.user_metadata['class_mapping'] = val_set.class_mapping
+
+        # set mode to training
+        nn.train()
+
+        logger.debug(f'Set OpenMP threads to {threads}')
+        nn.set_num_threads(threads)
+
+        optim = getattr(torch.optim, hyper_params['optimizer'])(nn.nn.parameters(), lr=0)
+
+        tr_it = TrainScheduler(optim)
+        if hyper_params['schedule'] == '1cycle':
+            add_1cycle(tr_it,
+                       int(len(gt_set) * hyper_params['epochs']),
+                       hyper_params['lrate'],
+                       hyper_params['momentum'],
+                       hyper_params['momentum'] - 0.10,
+                       hyper_params['weight_decay'])
+        else:
+            # constant learning rate scheduler
+            tr_it.add_phase(1,
+                            2*(hyper_params['lrate'],),
+                            2*(hyper_params['momentum'],),
+                            hyper_params['weight_decay'],
+                            annealing_const)
+
+        if hyper_params['quit'] == 'early':
+            st_it = EarlyStopping(hyper_params['min_delta'], hyper_params['lag'])
+        elif hyper_params['quit'] == 'dumb':
+            st_it = EpochStopping(hyper_params['epochs'] - hyper_params['completed_epochs'])
+        else:
+            logger.error(f'Invalid training interruption scheme {quit}')
+            return None
+
+        trainer = cls(model=nn,
+                      optimizer=optim,
+                      device=device,
+                      filename_prefix=kwargs['output'],
+                      event_frequency=hyper_params['freq'],
+                      train_set=train_loader,
+                      val_set=val_set,
+                      stopper=st_it,
+                      loss_fn=baseline_label_loss_fn,
+                      evaluator=baseline_label_evaluator_fn)
 
         trainer.add_lr_scheduler(tr_it)
 

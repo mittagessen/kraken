@@ -161,11 +161,7 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
     import shutil
     import numpy as np
 
-    from torch.utils.data import DataLoader
-
-    from kraken.lib import vgsl, train
-    from kraken.lib.train import EarlyStopping, EpochStopping, TrainScheduler, add_1cycle
-    from kraken.lib.dataset import BaselineSet, generate_input_transforms, InfiniteDataLoader
+    from kraken.lib.train import KrakenTrainer
 
     logger.info('Building ground truth set from {} document images'.format(len(ground_truth) + len(training_files)))
 
@@ -189,35 +185,6 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
                          'augment': augment
                         })
 
-    if load:
-        logger.info(f'Loading existing model from {load} ')
-        message(f'Loading existing model from {load} ', nl=False)
-        nn = vgsl.TorchVGSLModel.load_model(load)
-        if load_hyper_parameters:
-            hyper_params.update(nn.hyper_params)
-            nn.hyper_params = hyper_params
-            logger.info('Setting \'{}\' to \'{}\''.format(param, nn.user_metadata[param]))
-            message('Setting \'{}\' to \'{}\''.format(param, nn.user_metadata[param]))
-        message('\u2713', fg='green', nl=False)
-
-    # preparse input sizes from vgsl string to seed ground truth data set
-    # sizes and dimension ordering.
-    if not nn:
-        spec = spec.strip()
-        if spec[0] != '[' or spec[-1] != ']':
-            raise click.BadOptionUsage('spec', f'VGSL spec "{spec}" not bracketed')
-        blocks = spec[1:-1].split(' ')
-        m = re.match(r'(\d+),(\d+),(\d+),(\d+)', blocks[0])
-        if not m:
-            raise click.BadOptionUsage('spec', f'Invalid input spec {blocks[0]}')
-        batch, height, width, channels = [int(x) for x in m.groups()]
-    else:
-        batch, channels, height, width = nn.input
-    try:
-        transforms = generate_input_transforms(batch, height, width, channels, 0, valid_norm=False)
-    except KrakenInputException as e:
-        raise click.BadOptionUsage('spec', str(e))
-
     # disable automatic partition when given evaluation set explicitly
     if evaluation_files:
         partition = 1
@@ -232,126 +199,34 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
 
     np.random.shuffle(ground_truth)
 
-    tr_im = ground_truth[:int(len(ground_truth) * partition)]
+    training_files = ground_truth[:int(len(ground_truth) * partition)]
     if evaluation_files:
-        logger.debug(f'Using {len(evaluation_files)} images from explicit eval set')
-        te_im = evaluation_files
+        logger.debug(f'Using {len(evaluation_files)} lines/files from explicit eval set')
     else:
-        te_im = ground_truth[int(len(ground_truth) * partition):]
-        logger.debug(f'Taking {len(te_im)} images from training for evaluation')
+        evaluation_files = ground_truth[int(len(ground_truth) * partition):]
+        logger.debug(f'Taking {len(evaluation_files)} lines/files from training set for evaluation')
 
-    # set multiprocessing tensor sharing strategy
-    if 'file_system' in torch.multiprocessing.get_all_sharing_strategies():
-        logger.debug('Setting multiprocessing tensor sharing strategy to file_system')
-        torch.multiprocessing.set_sharing_strategy('file_system')
+    trainer = KrakenTrainer.segmentation_train_gen(hyper_params,
+                                                   message=message,
+                                                   output=output,
+                                                   spec=spec,
+                                                   load=load,
+                                                   device=device,
+                                                   training_data=training_files,
+                                                   evaluation_data=evaluation_files,
+                                                   threads=threads,
+                                                   load_hyper_parameters=load_hyper_parameters,
+                                                   force_binarization=force_binarization,
+                                                   format_type=format_type,
+                                                   suppress_regions=suppress_regions,
+                                                   suppress_baselines=suppress_baselines,
+                                                   valid_regions=valid_regions,
+                                                   valid_baselines=valid_baselines,
+                                                   merge_regions=merge_regions,
+                                                   merge_baselines=merge_baselines,
+                                                   augment=augment)
 
-    if len(valid_regions) == 0:
-        valid_regions = None
-    if len(valid_baselines) == 0:
-        valid_baselines = None
 
-    if suppress_regions:
-        valid_regions = []
-        merge_regions = None
-    if suppress_baselines:
-        valid_baselines = []
-        merge_baselines = None
-
-    gt_set = BaselineSet(tr_im,
-                         line_width=hyper_params['line_width'],
-                         im_transforms=transforms,
-                         mode=format_type,
-                         augmentation=hyper_params['augment'],
-                         valid_baselines=valid_baselines,
-                         merge_baselines=merge_baselines,
-                         valid_regions=valid_regions,
-                         merge_regions=merge_regions)
-    val_set = BaselineSet(te_im,
-                          line_width=hyper_params['line_width'],
-                          im_transforms=transforms,
-                          mode=format_type,
-                          augmentation=hyper_params['augment'],
-                          valid_baselines=valid_baselines,
-                          merge_baselines=merge_baselines,
-                          valid_regions=valid_regions,
-                          merge_regions=merge_regions)
-
-    # overwrite class mapping in validation set
-    val_set.num_classes = gt_set.num_classes
-    val_set.class_mapping = gt_set.class_mapping
-
-    if not load:
-        spec = f'[{spec[1:-1]} O2l{gt_set.num_classes}]'
-        message(f'Creating model {spec} with {gt_set.num_classes} outputs ', nl=False)
-        nn = vgsl.TorchVGSLModel(spec)
-        message('\u2713', fg='green')
-
-    message('Training line types:')
-    for k, v in gt_set.class_mapping['baselines'].items():
-        message(f'  {k}\t{v}')
-    message('Training region types:')
-    for k, v in gt_set.class_mapping['regions'].items():
-        message(f'  {k}\t{v}')
-
-    if len(gt_set.imgs) == 0:
-        raise click.UsageError('No valid training data was provided to the train command. Please add valid XML or line data.')
-
-    if device == 'cpu':
-        loader_threads = threads // 2
-    else:
-        loader_threads = threads
-
-    train_loader = InfiniteDataLoader(gt_set, batch_size=1, shuffle=True, num_workers=loader_threads, pin_memory=True)
-    test_loader = DataLoader(val_set, batch_size=1, shuffle=True, num_workers=loader_threads, pin_memory=True)
-    threads = max((threads - loader_threads, 1))
-
-    # set model type metadata field and dump class_mapping
-    nn.model_type = 'segmentation'
-    nn.user_metadata['class_mapping'] = val_set.class_mapping
-
-    # set mode to training
-    nn.train()
-
-    logger.debug(f'Set OpenMP threads to {threads}')
-    nn.set_num_threads(threads)
-
-    optim = getattr(torch.optim, hyper_params['optimizer'])(nn.nn.parameters(), lr=0)
-
-    tr_it = TrainScheduler(optim)
-    if schedule == '1cycle':
-        add_1cycle(tr_it,
-                   int(len(gt_set) * hyper_params['epochs']),
-                   hyper_params['lrate'],
-                   hyper_params['momentum'],
-                   hyper_params['momentum'] - 0.10,
-                   hyper_params['weight_decay'])
-    else:
-        # constant learning rate scheduler
-        tr_it.add_phase(1,
-                        2*(hyper_params['lrate'],),
-                        2*(hyper_params['momentum'],),
-                        hyper_params['weight_decay'],
-                        train.annealing_const)
-
-    if quit == 'early':
-        st_it = EarlyStopping(hyper_params['min_delta'], hyper_params['lag'])
-    elif quit == 'dumb':
-        st_it = EpochStopping(hyper_params['epochs'] - hyper_params['completed_epochs'])
-    else:
-        raise click.BadOptionUsage('quit', f'Invalid training interruption scheme {quit}.')
-
-    trainer = train.KrakenTrainer(model=nn,
-                                  optimizer=optim,
-                                  device=device,
-                                  filename_prefix=output,
-                                  event_frequency=hyper_params['freq'],
-                                  train_set=train_loader,
-                                  val_set=val_set,
-                                  stopper=st_it,
-                                  loss_fn=train.baseline_label_loss_fn,
-                                  evaluator=train.baseline_label_evaluator_fn)
-
-    trainer.add_lr_scheduler(tr_it)
 
     with log.progressbar(label='stage {}/{}'.format(1, trainer.stopper.epochs if trainer.stopper.epochs > 0 else '∞'),
                          length=trainer.event_it, show_pos=True) as bar:
