@@ -530,7 +530,7 @@ def recognition_train_gen(hyper_params=default_specs.RECOGNITION_HYPER_PARAMS,
 
     # half the number of data loading processes if device isn't cuda and we haven't enabled preloading
     device = kwargs['device']
-    loader_threads = kwargs['loader_threads']
+    threads = kwargs['threads']
 
     if device == 'cpu' and not preload:
         loader_threads = threads // 2
@@ -573,7 +573,7 @@ def recognition_train_gen(hyper_params=default_specs.RECOGNITION_HYPER_PARAMS,
                         2*(hyper_params['lrate'],),
                         2*(hyper_params['momentum'],),
                         hyper_params['weight_decay'],
-                        train.annealing_const)
+                        annealing_const)
 
     if hyper_params['quit'] == 'early':
         st_it = EarlyStopping(hyper_params['min_delta'], hyper_params['lag'])
@@ -583,14 +583,14 @@ def recognition_train_gen(hyper_params=default_specs.RECOGNITION_HYPER_PARAMS,
         logger.error(f'Invalid training interruption scheme {quit}')
         return None
 
-    trainer = train.KrakenTrainer(model=nn,
-                                  optimizer=optim,
-                                  device=device,
-                                  filename_prefix=kwargs['output'],
-                                  event_frequency=hyper_params['freq'],
-                                  train_set=train_loader,
-                                  val_set=val_set,
-                                  stopper=st_it)
+    trainer = KrakenTrainer(model=nn,
+                            optimizer=optim,
+                            device=device,
+                            filename_prefix=kwargs['output'],
+                            event_frequency=hyper_params['freq'],
+                            train_set=train_loader,
+                            val_set=val_set,
+                            stopper=st_it)
 
     trainer.add_lr_scheduler(tr_it)
 

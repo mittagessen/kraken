@@ -458,25 +458,10 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
     if resize != 'fail' and not load:
         raise click.BadOptionUsage('resize', 'resize option requires loading an existing model')
 
-    import re
-    import torch
     import shutil
     import numpy as np
+    from kraken.lib.train import recognition_train_gen
 
-    from torch.utils.data import DataLoader
-
-    from kraken.lib import models, vgsl, train
-    from kraken.lib.util import make_printable
-    from kraken.lib.train import EarlyStopping, EpochStopping, TrainStopper, TrainScheduler, add_1cycle
-    from kraken.lib.codec import PytorchCodec
-    from kraken.lib.dataset import GroundTruthDataset, PolygonGTDataset, generate_input_transforms, preparse_xml_data, InfiniteDataLoader
-
-    logger.info('Building ground truth set from {} line images'.format(len(ground_truth) + len(training_files)))
-
-    # load model if given. if a new model has to be created we need to do that
-    # after data set initialization, otherwise to output size is still unknown.
-    nn = None
-    # populate hyperparameters from command line args
     hyper_params = RECOGNITION_HYPER_PARAMS.copy()
     hyper_params.update({'freq': freq,
                          'pad': pad,
@@ -494,17 +479,6 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
                          'augment': augment
                         })
 
-    if load:
-        logger.info(f'Loading existing model from {load} ')
-        message(f'Loading existing model from {load} ', nl=False)
-        nn = vgsl.TorchVGSLModel.load_model(load)
-        if load_hyper_parameters:
-            hyper_params.update(nn.hyper_params)
-            nn.hyper_params = hyper_params
-            logger.info('Setting \'{}\' to \'{}\''.format(param, nn.user_metadata[param]))
-            message('Setting \'{}\' to \'{}\''.format(param, nn.user_metadata[param]))
-        message('\u2713', fg='green', nl=False)
-
     # disable automatic partition when given evaluation set explicitly
     if evaluation_files:
         partition = 1
@@ -518,246 +492,31 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
         raise click.UsageError('No training data was provided to the train command. Use `-t` or the `ground_truth` argument.')
 
     np.random.shuffle(ground_truth)
-
-    DatasetClass = GroundTruthDataset
-    if format_type != 'path':
-        logger.info(f'Parsing {len(ground_truth)} XML files for training data')
-        if repolygonize:
-            message('Repolygonizing data')
-        ground_truth = preparse_xml_data(ground_truth, format_type, repolygonize)
-        if evaluation_files:
-            evaluation_files = preparse_xml_data(evaluation_files, format_type, repolygonize)
-        DatasetClass = PolygonGTDataset
-        valid_norm = False
-    else:
-        if force_binarization:
-            logger.warning('Forced binarization enabled in `path` mode. Will be ignored.')
-            force_binarization = False
-        if repolygonize:
-            logger.warning('Repolygonization enabled in `path` mode. Will be ignored.')
-        ground_truth = [{'image': im} for im in ground_truth]
-        if evaluation_files:
-            evaluation_files = [{'image': im} for im in evaluation_files]
-        valid_norm = True
-
-    # preparse input sizes from vgsl string to seed ground truth data set
-    # sizes and dimension ordering.
-    if not nn:
-        spec = spec.strip()
-        if spec[0] != '[' or spec[-1] != ']':
-            raise click.BadOptionUsage('spec', 'VGSL spec {} not bracketed'.format(spec))
-        blocks = spec[1:-1].split(' ')
-        m = re.match(r'(\d+),(\d+),(\d+),(\d+)', blocks[0])
-        if not m:
-            raise click.BadOptionUsage('spec', f'Invalid input spec {blocks[0]}')
-        batch, height, width, channels = [int(x) for x in m.groups()]
-    else:
-        batch, channels, height, width = nn.input
-    try:
-        transforms = generate_input_transforms(batch, height, width, channels, hyper_params['pad'], valid_norm, force_binarization)
-    except KrakenInputException as e:
-        raise click.BadOptionUsage('spec', str(e))
-
-    if len(ground_truth) > 2500 and not preload:
-        logger.info('Disabling preloading for large (>2500) training data set. Enable by setting --preload parameter')
-        preload = False
-    # implicit preloading enabled for small data sets
-    if preload is None:
-        preload = True
-
-    tr_im = ground_truth[:int(len(ground_truth) * partition)]
+    training_files = ground_truth[:int(len(ground_truth) * partition)]
     if evaluation_files:
-        logger.debug(f'Using {len(evaluation_files)} lines from explicit eval set')
-        te_im = evaluation_files
+        logger.debug(f'Using {len(evaluation_files)} lines/files from explicit eval set')
     else:
-        te_im = ground_truth[int(len(ground_truth) * partition):]
-        logger.debug(f'Taking {len(te_im)} lines from training for evaluation')
+        evaluation_files = ground_truth[int(len(ground_truth) * partition):]
+        logger.debug(f'Taking {len(evaluation_files)} lines/files from training set for evaluation')
 
-    # set multiprocessing tensor sharing strategy
-    if 'file_system' in torch.multiprocessing.get_all_sharing_strategies():
-        logger.debug('Setting multiprocessing tensor sharing strategy to file_system')
-        torch.multiprocessing.set_sharing_strategy('file_system')
-
-    gt_set = DatasetClass(normalization=hyper_params['normalization'],
-                          whitespace_normalization=hyper_params['normalize_whitespace'],
-                          reorder=reorder,
-                          im_transforms=transforms,
-                          preload=preload,
-                          augmentation=hyper_params['augment'])
-    with log.progressbar(tr_im, label='Building training set') as bar:
-        for im in bar:
-            logger.debug(f'Adding line {im} to training set')
-            try:
-                gt_set.add(**im)
-            except FileNotFoundError as e:
-                logger.warning(f'{e.strerror}: {e.filename}. Skipping.')
-            except KrakenInputException as e:
-                logger.warning(str(e))
-
-    val_set = DatasetClass(normalization=hyper_params['normalization'],
-                           whitespace_normalization=hyper_params['normalize_whitespace'],
-                           reorder=reorder,
-                           im_transforms=transforms,
-                           preload=preload)
-    with log.progressbar(te_im, label='Building validation set') as bar:
-        for im in bar:
-            logger.debug(f'Adding line {im} to validation set')
-            try:
-                val_set.add(**im)
-            except FileNotFoundError as e:
-                logger.warning(f'{e.strerror}: {e.filename}. Skipping.')
-            except KrakenInputException as e:
-                logger.warning(str(e))
-
-    if len(gt_set._images) == 0:
-        raise click.UsageError('No valid training data was provided to the train command. Please add valid XML or line data.')
-
-    logger.info(f'Training set {len(gt_set._images)} lines, validation set {len(val_set._images)} lines, alphabet {len(gt_set.alphabet)} symbols')
-    alpha_diff_only_train = set(gt_set.alphabet).difference(set(val_set.alphabet))
-    alpha_diff_only_val = set(val_set.alphabet).difference(set(gt_set.alphabet))
-    if alpha_diff_only_train:
-        logger.warning(f'alphabet mismatch: chars in training set only: {alpha_diff_only_train} (not included in accuracy test during training)')
-    if alpha_diff_only_val:
-        logger.warning(f'alphabet mismatch: chars in validation set only: {alpha_diff_only_val} (not trained)')
-    logger.info('grapheme\tcount')
-    for k, v in sorted(gt_set.alphabet.items(), key=lambda x: x[1], reverse=True):
-        char = make_printable(k)
-        if char == k:
-            char = '\t' + char
-        logger.info(f'{char}\t{v}')
-
-    logger.debug('Encoding training set')
-
-    # use model codec when given
-    if append:
-        # is already loaded
-        nn = cast(vgsl.TorchVGSLModel, nn)
-        gt_set.encode(codec)
-        message('Slicing and dicing model ', nl=False)
-        # now we can create a new model
-        spec = '[{} O1c{}]'.format(spec[1:-1], gt_set.codec.max_label()+1)
-        logger.info(f'Appending {spec} to existing model {nn.spec} after {append}')
-        nn.append(append, spec)
-        nn.add_codec(gt_set.codec)
-        message('\u2713', fg='green')
-        logger.info(f'Assembled model spec: {nn.spec}')
-    elif load:
-        # is already loaded
-        nn = cast(vgsl.TorchVGSLModel, nn)
-
-        # prefer explicitly given codec over network codec if mode is 'both'
-        codec = codec if (codec and resize == 'both') else nn.codec
-
-        try:
-            gt_set.encode(codec)
-        except KrakenEncodeException:
-            message('Network codec not compatible with training set')
-            alpha_diff = set(gt_set.alphabet).difference(set(codec.c2l.keys()))
-            if resize == 'fail':
-                logger.error(f'Training data and model codec alphabets mismatch: {alpha_diff}')
-                ctx.exit(code=1)
-            elif resize == 'add':
-                message('Adding missing labels to network ', nl=False)
-                logger.info(f'Resizing codec to include {len(alpha_diff)} new code points')
-                codec.c2l.update({k: [v] for v, k in enumerate(alpha_diff, start=codec.max_label()+1)})
-                nn.add_codec(PytorchCodec(codec.c2l))
-                logger.info(f'Resizing last layer in network to {codex.max_label()+1} outputs')
-                nn.resize_output(codec.max_label()+1)
-                gt_set.encode(nn.codec)
-                message('\u2713', fg='green')
-            elif resize == 'both':
-                message('Fitting network exactly to training set ', nl=False)
-                logger.info(f'Resizing network or given codec to {gt_set.alphabet} code sequences')
-                gt_set.encode(None)
-                ncodec, del_labels = codec.merge(gt_set.codec)
-                logger.info(f'Deleting {len(del_labels)} output classes from network ({len(codec)-len(del_labels)} retained)')
-                gt_set.encode(ncodec)
-                nn.resize_output(ncodec.max_label()+1, del_labels)
-                message('\u2713', fg='green')
-            else:
-                raise click.BadOptionUsage('resize', f'Invalid resize value {resize}')
-    else:
-        gt_set.encode(codec)
-        logger.info(f'Creating new model {spec} with {gt_set.codec.max_label()+1} outputs')
-        spec = '[{} O1c{}]'.format(spec[1:-1], gt_set.codec.max_label()+1)
-        nn = vgsl.TorchVGSLModel(spec)
-        # initialize weights
-        message('Initializing model ', nl=False)
-        nn.init_weights()
-        nn.add_codec(gt_set.codec)
-        # initialize codec
-        message('\u2713', fg='green')
-
-    if nn.one_channel_mode and gt_set.im_mode != nn.one_channel_mode:
-        logger.warning(f'Neural network has been trained on mode {nn.one_channel_mode} images, training set contains mode {gt_set.im_mode} data. Consider setting `--force-binarization`')
-
-    if format_type != 'path' and nn.seg_type == 'bbox':
-        logger.warning('Neural network has been trained on bounding box image information but training set is polygonal.')
-
-    # half the number of data loading processes if device isn't cuda and we haven't enabled preloading
-    if device == 'cpu' and not preload:
-        loader_threads = threads // 2
-    else:
-        loader_threads = threads
-    train_loader = InfiniteDataLoader(gt_set, batch_size=1, shuffle=True, num_workers=loader_threads, pin_memory=True)
-    threads = max(threads - loader_threads, 1)
-
-    # don't encode validation set as the alphabets may not match causing encoding failures
-    val_set.training_set = list(zip(val_set._images, val_set._gt))
-
-    logger.debug('Constructing {} optimizer (lr: {}, momentum: {})'.format(hyper_params['optimizer'], hyper_params['lrate'], hyper_params['momentum']))
-
-    # set model type metadata field
-    nn.model_type = 'recognition'
-
-    # set mode to trainindg
-    nn.train()
-
-    # set number of OpenMP threads
-    logger.debug(f'Set OpenMP threads to {threads}')
-    nn.set_num_threads(threads)
-
-    optim = getattr(torch.optim, hyper_params['optimizer'])(nn.nn.parameters(), lr=0)
-
-    if 'accuracy' not in nn.user_metadata:
-        nn.user_metadata['accuracy'] = []
-
-    if 'seg_type' not in nn.user_metadata:
-        nn.user_metadata['seg_type'] = 'baselines' if format_type != 'path' else 'bbox'
-
-    tr_it = TrainScheduler(optim)
-    if hyper_params['schedule'] == '1cycle':
-        add_1cycle(tr_it,
-                   int(len(gt_set) * hyper_params['epochs']),
-                   hyper_params['lrate'],
-                   hyper_params['momentum'],
-                   hyper_params['momentum'] - 0.10,
-                   hyper_params['weight_decay'])
-    else:
-        # constant learning rate scheduler
-        tr_it.add_phase(1,
-                        2*(hyper_params['lrate'],),
-                        2*(hyper_params['momentum'],),
-                        hyper_params['weight_decay'],
-                        train.annealing_const)
-
-    if hyper_params['quit'] == 'early':
-        st_it = EarlyStopping(hyper_params['min_delta'], hyper_params['lag'])
-    elif hype_params['quit'] == 'dumb':
-        st_it = EpochStopping(hyper_params['epochs'] - hyper_params['completed_epochs'])
-    else:
-        raise click.BadOptionUsage('quit', f'Invalid training interruption scheme {quit}')
-
-    trainer = train.KrakenTrainer(model=nn,
-                                  optimizer=optim,
-                                  device=device,
-                                  filename_prefix=output,
-                                  event_frequency=hyper_params['freq'],
-                                  train_set=train_loader,
-                                  val_set=val_set,
-                                  stopper=st_it)
-
-    trainer.add_lr_scheduler(tr_it)
+    trainer = recognition_train_gen(hyper_params,
+                                    message=message,
+                                    output=output,
+                                    spec=spec,
+                                    append=append,
+                                    load=load,
+                                    device=device,
+                                    reorder=reorder,
+                                    training_data=training_files,
+                                    evaluation_data=evaluation_files,
+                                    preload=preload,
+                                    threads=threads,
+                                    load_hyper_parameters=load_hyper_parameters,
+                                    repolygonize=repolygonize,
+                                    force_binarization=force_binarization,
+                                    format_type=format_type,
+                                    codec=codec,
+                                    augment=augment)
 
     with  log.progressbar(label='stage {}/{}'.format(1, trainer.stopper.epochs if trainer.stopper.epochs > 0 else '∞'),
                           length=trainer.event_it, show_pos=True) as bar:
