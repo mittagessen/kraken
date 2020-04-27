@@ -226,8 +226,6 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
                                                    merge_baselines=merge_baselines,
                                                    augment=augment)
 
-
-
     with log.progressbar(label='stage {}/{}'.format(1, trainer.stopper.epochs if trainer.stopper.epochs > 0 else '∞'),
                          length=trainer.event_it, show_pos=True) as bar:
 
