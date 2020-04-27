@@ -26,7 +26,7 @@ import numpy as np
 import torch.nn.functional as F
 
 from itertools import cycle
-from typing import Tuple, Callable, List, Dict, Any
+from typing import Tuple, Callable, List, Dict, Any, Optional, Sequence
 
 from kraken.lib import models, vgsl, segmentation, default_specs
 from kraken.lib.util import make_printable
@@ -380,10 +380,25 @@ class KrakenTrainer(object):
 
     @classmethod
     def recognition_train_gen(cls,
-                              hyper_params=default_specs.RECOGNITION_HYPER_PARAMS,
-                              progress_callback: Callable = lambda string, length: lambda: None,
-                              message = lambda x: None,
-                              **kwargs):
+                              hyper_params: Dict = default_specs.RECOGNITION_HYPER_PARAMS,
+                              progress_callback: Callable[[str, int], Callable[[None], None]] = lambda string, length: lambda: None,
+                              message: Callable[[str], None] = lambda x: None,
+                              output: str = 'model',
+                              spec: str = default_specs.RECOGNITION_SPEC,
+                              append: Optional[int] = None,
+                              load: Optional[str] = None,
+                              device: str = 'cpu',
+                              reorder: bool = True,
+                              training_data: Sequence[Dict] = None,
+                              evaluation_data: Sequence[Dict] = None,
+                              preload: Optional[bool] = None,
+                              threads: int = 1,
+                              load_hyper_parameters: bool = False,
+                              repolygonize: bool = False,
+                              force_binarization: bool = False,
+                              format_type: str = 'path',
+                              codec: Optional[Dict] = None,
+                              augment: bool = False):
         """
         This is an ugly constructor that takes all the arguments from the command
         line driver, finagles the datasets, models, and hyperparameters correctly
@@ -416,25 +431,22 @@ class KrakenTrainer(object):
         # after data set initialization, otherwise to output size is still unknown.
         nn = None
 
-        if 'load' in kwargs and kwargs['load']:
+        if load:
             logger.info(f'Loading existing model from {load} ')
             message(f'Loading existing model from {load} ', nl=False)
             nn = vgsl.TorchVGSLModel.load_model(load)
-            if 'load_hyper_params' in kwargs and kwargs['load_hyper_parameters']:
+            if load_hyper_parameters:
                 hyper_params.update(nn.hyper_params)
                 nn.hyper_params = hyper_params
             message('\u2713', fg='green', nl=False)
 
-        training_data = kwargs['training_data']
-        evaluation_data = kwargs['evaluation_data']
-
         DatasetClass = GroundTruthDataset
-        force_binarization = kwargs['force_binarization']
-        repolygonize = kwargs['repolygonize']
-        format_type = kwargs['format_type']
+        force_binarization = force_binarization
+        repolygonize = repolygonize
+        format_type = format_type
         if format_type != 'path':
             logger.info(f'Parsing {len(training_data)} XML files for training data')
-            if kwargs['repolygonize']:
+            if repolygonize:
                 message('Repolygonizing data')
             training_data = preparse_xml_data(training_data, format_type, repolygonize)
             evaluation_data = preparse_xml_data(evaluation_data, format_type, repolygonize)
@@ -454,7 +466,7 @@ class KrakenTrainer(object):
         # preparse input sizes from vgsl string to seed ground truth data set
         # sizes and dimension ordering.
         if not nn:
-            spec = kwargs['spec'].strip()
+            spec = spec.strip()
             if spec[0] != '[' or spec[-1] != ']':
                 raise click.BadOptionUsage('spec', 'VGSL spec {} not bracketed'.format(spec))
             blocks = spec[1:-1].split(' ')
@@ -469,7 +481,6 @@ class KrakenTrainer(object):
         except KrakenInputException as e:
             raise click.BadOptionUsage('spec', str(e))
 
-        preload = kwargs['preload']
         if len(training_data) > 2500 and not preload:
             logger.info('Disabling preloading for large (>2500) training data set. Enable by setting --preload parameter')
             preload = False
@@ -484,7 +495,7 @@ class KrakenTrainer(object):
 
         gt_set = DatasetClass(normalization=hyper_params['normalization'],
                               whitespace_normalization=hyper_params['normalize_whitespace'],
-                              reorder=kwargs['reorder'],
+                              reorder=reorder,
                               im_transforms=transforms,
                               preload=preload,
                               augmentation=hyper_params['augment'])
@@ -501,7 +512,7 @@ class KrakenTrainer(object):
 
         val_set = DatasetClass(normalization=hyper_params['normalization'],
                                whitespace_normalization=hyper_params['normalize_whitespace'],
-                               reorder=kwargs['reorder'],
+                               reorder=reorder,
                                im_transforms=transforms,
                                preload=preload)
         bar = progress_callback('Building validation set', len(evaluation_data))
@@ -535,26 +546,24 @@ class KrakenTrainer(object):
 
         logger.debug('Encoding training set')
 
-        codec = kwargs['codec']
 
         # use model codec when given
-        if kwargs['append']:
+        if append:
             # is already loaded
             nn = cast(vgsl.TorchVGSLModel, nn)
             gt_set.encode(codec)
             message('Slicing and dicing model ', nl=False)
             # now we can create a new model
             spec = '[{} O1c{}]'.format(spec[1:-1], gt_set.codec.max_label()+1)
-            logger.info(f'Appending {spec} to existing model {nn.spec} after {kwargs["append"]}')
-            nn.append(kwargs['append'], spec)
+            logger.info(f'Appending {spec} to existing model {nn.spec} after {append}')
+            nn.append(append, spec)
             nn.add_codec(gt_set.codec)
             message('\u2713', fg='green')
             logger.info(f'Assembled model spec: {nn.spec}')
-        elif kwargs['load']:
+        elif load:
             # is already loaded
             nn = cast(vgsl.TorchVGSLModel, nn)
 
-            resize = kwargs['resize']
 
             # prefer explicitly given codec over network codec if mode is 'both'
             codec = codec if (codec and resize == 'both') else nn.codec
@@ -607,8 +616,6 @@ class KrakenTrainer(object):
             logger.warning('Neural network has been trained on bounding box image information but training set is polygonal.')
 
         # half the number of data loading processes if device isn't cuda and we haven't enabled preloading
-        device = kwargs['device']
-        threads = kwargs['threads']
 
         if device == 'cpu' and not preload:
             loader_threads = threads // 2
@@ -664,7 +671,7 @@ class KrakenTrainer(object):
         trainer = cls(model=nn,
                       optimizer=optim,
                       device=device,
-                      filename_prefix=kwargs['output'],
+                      filename_prefix=output,
                       event_frequency=hyper_params['freq'],
                       train_set=train_loader,
                       val_set=val_set,
@@ -676,10 +683,26 @@ class KrakenTrainer(object):
 
     @classmethod
     def segmentation_train_gen(cls,
-                               hyper_params=default_specs.SEGMENTATION_HYPER_PARAMS,
-                               progress_callback: Callable = lambda string, length: lambda: None,
-                               message = lambda x: None,
-                               **kwargs):
+                               hyper_params: Dict = default_specs.SEGMENTATION_HYPER_PARAMS,
+                               progress_callback: Callable[[str, int], Callable[[None], None]] = lambda string, length: lambda: None,
+                               message: Callable[[str], None] = lambda x: None,
+                               output: str = 'model',
+                               spec: str = default_specs.SEGMENTATION_SPEC,
+                               load: Optional[str] = None,
+                               device: str = 'cpu',
+                               training_data: Sequence[Dict] = None,
+                               evaluation_data: Sequence[Dict] = None,
+                               threads: int = 1,
+                               load_hyper_parameters: bool = False,
+                               force_binarization: bool = False,
+                               format_type: str = 'path',
+                               suppress_regions: bool = False,
+                               suppress_baselines: bool = False,
+                               valid_regions: Optional[Sequence[str]] = None,
+                               valid_baselines: Optional[Sequence[str]] = None,
+                               merge_regions: Optional[Dict[str, str]] = None,
+                               merge_baselines: Optional[Dict[str, str]] = None,
+                               augment: bool = False):
         """
         This is an ugly constructor that takes all the arguments from the command
         line driver, finagles the datasets, models, and hyperparameters correctly
@@ -712,23 +735,19 @@ class KrakenTrainer(object):
         # after data set initialization, otherwise to output size is still unknown.
         nn = None
 
-        load = kwargs['load']
         if load:
             logger.info(f'Loading existing model from {load} ')
             message(f'Loading existing model from {load} ', nl=False)
             nn = vgsl.TorchVGSLModel.load_model(load)
-            if kwargs['load_hyper_parameters']:
+            if load_hyper_parameters:
                 hyper_params.update(nn.hyper_params)
                 nn.hyper_params = hyper_params
             message('\u2713', fg='green', nl=False)
 
-        training_data = kwargs['training_data']
-        evaluation_data = kwargs['evaluation_data']
-
         # preparse input sizes from vgsl string to seed ground truth data set
         # sizes and dimension ordering.
         if not nn:
-            spec = kwargs['spec'].strip()
+            spec = spec.strip()
             if spec[0] != '[' or spec[-1] != ']':
                 logger.error(f'VGSL spec "{spec}" not bracketed')
                 return None
@@ -751,19 +770,10 @@ class KrakenTrainer(object):
             logger.debug('Setting multiprocessing tensor sharing strategy to file_system')
             torch.multiprocessing.set_sharing_strategy('file_system')
 
-        valid_regions = kwargs['valid_regions']
-        valid_baselines = kwargs['valid_baselines']
-
         if len(valid_regions) == 0:
             valid_regions = None
         if len(valid_baselines) == 0:
             valid_baselines = None
-
-        suppress_regions = kwargs['suppress_regions']
-        suppress_baselines = kwargs['suppress_baselines']
-
-        merge_regions = kwargs['merge_regions']
-        merge_baselines = kwargs['merge_baselines']
 
         if suppress_regions:
             valid_regions = []
@@ -775,7 +785,7 @@ class KrakenTrainer(object):
         gt_set = BaselineSet(training_data,
                              line_width=hyper_params['line_width'],
                              im_transforms=transforms,
-                             mode=kwargs['format_type'],
+                             mode=format_type,
                              augmentation=hyper_params['augment'],
                              valid_baselines=valid_baselines,
                              merge_baselines=merge_baselines,
@@ -784,7 +794,7 @@ class KrakenTrainer(object):
         val_set = BaselineSet(evaluation_data,
                               line_width=hyper_params['line_width'],
                               im_transforms=transforms,
-                              mode=kwargs['format_type'],
+                              mode=format_type,
                               augmentation=hyper_params['augment'],
                               valid_baselines=valid_baselines,
                               merge_baselines=merge_baselines,
@@ -811,9 +821,6 @@ class KrakenTrainer(object):
         if len(gt_set.imgs) == 0:
             logger.error('No valid training data was provided to the train command. Please add valid XML data.')
             return None
-
-        device = kwargs['device']
-        threads = kwargs['threads']
 
         if device == 'cpu':
             loader_threads = threads // 2
@@ -863,7 +870,7 @@ class KrakenTrainer(object):
         trainer = cls(model=nn,
                       optimizer=optim,
                       device=device,
-                      filename_prefix=kwargs['output'],
+                      filename_prefix=output,
                       event_frequency=hyper_params['freq'],
                       train_set=train_loader,
                       val_set=val_set,
