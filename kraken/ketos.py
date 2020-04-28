@@ -42,7 +42,6 @@ APP_NAME = 'kraken'
 logging.captureWarnings(True)
 logger = logging.getLogger('kraken')
 
-
 def message(msg, **styles):
     if logger.getEffectiveLevel() >= 30:
         click.secho(msg, **styles)
@@ -206,8 +205,16 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
         evaluation_files = ground_truth[int(len(ground_truth) * partition):]
         logger.debug(f'Taking {len(evaluation_files)} lines/files from training set for evaluation')
 
+    def _init_progressbar(label, length):
+        if 'bar' in ctx.meta:
+            ctx.meta['bar'].__exit__(None, None, None)
+        ctx.meta['bar'] = log.progressbar(label=label, length=length, show_pos=True)
+        ctx.meta['bar'].__enter__()
+        return lambda: ctx.meta['bar'].update(1)
+
     trainer = KrakenTrainer.segmentation_train_gen(hyper_params,
                                                    message=message,
+                                                   progress_callback=_init_progressbar,
                                                    output=output,
                                                    spec=spec,
                                                    load=load,
@@ -372,8 +379,16 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
         evaluation_files = ground_truth[int(len(ground_truth) * partition):]
         logger.debug(f'Taking {len(evaluation_files)} lines/files from training set for evaluation')
 
+    def _init_progressbar(label, length):
+        if 'bar' in ctx.meta:
+            ctx.meta['bar'].__exit__(None, None, None)
+        ctx.meta['bar'] = log.progressbar(label=label, length=length, show_pos=True)
+        ctx.meta['bar'].__enter__()
+        return lambda: ctx.meta['bar'].update(1)
+
     trainer = KrakenTrainer.recognition_train_gen(hyper_params,
                                                   message=message,
+                                                  progress_callback=_init_progressbar,
                                                   output=output,
                                                   spec=spec,
                                                   append=append,
