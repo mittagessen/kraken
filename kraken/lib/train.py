@@ -261,7 +261,6 @@ def recognition_evaluator_fn(model, val_set, device):
     return {'val_metric': accuracy, 'accuracy': accuracy, 'chars': chars, 'error': error}
 
 
-
 def baseline_label_evaluator_fn(model, val_set, device):
     smooth = np.finfo(np.float).eps
     corrects = torch.zeros(val_set.num_classes, dtype=torch.double).to(device)
@@ -382,7 +381,7 @@ class KrakenTrainer(object):
     def recognition_train_gen(cls,
                               hyper_params: Dict = default_specs.RECOGNITION_HYPER_PARAMS,
                               progress_callback: Callable[[str, int], Callable[[None], None]] = lambda string, length: lambda: None,
-                              message: Callable[[str], None] = lambda x: None,
+                              message: Callable[[str], None] = lambda *args, **kwargs: None,
                               output: str = 'model',
                               spec: str = default_specs.RECOGNITION_SPEC,
                               append: Optional[int] = None,
@@ -685,7 +684,7 @@ class KrakenTrainer(object):
     def segmentation_train_gen(cls,
                                hyper_params: Dict = default_specs.SEGMENTATION_HYPER_PARAMS,
                                progress_callback: Callable[[str, int], Callable[[None], None]] = lambda string, length: lambda: None,
-                               message: Callable[[str], None] = lambda x: None,
+                               message: Callable[[str], None] = lambda *args, **kwargs: None,
                                output: str = 'model',
                                spec: str = default_specs.SEGMENTATION_SPEC,
                                load: Optional[str] = None,
@@ -770,9 +769,9 @@ class KrakenTrainer(object):
             logger.debug('Setting multiprocessing tensor sharing strategy to file_system')
             torch.multiprocessing.set_sharing_strategy('file_system')
 
-        if len(valid_regions) == 0:
+        if not valid_regions:
             valid_regions = None
-        if len(valid_baselines) == 0:
+        if not valid_baselines:
             valid_baselines = None
 
         if suppress_regions:

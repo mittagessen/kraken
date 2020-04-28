@@ -282,3 +282,98 @@ the :func:`kraken.serialization.serialize` function.
                 fp.write(alto)
 
 
+Training
+--------
+
+There are catch-all constructors for quickly setting up
+:cls:`kraken.lib.train.KrakenTrainer` instances for all training needs. They
+largely map the comand line utils `ketos train` and `ketos segtrain` to a
+programmatic interface. The arguments are identical, apart from a
+differentiation between general arguments (data sources and setup, file names,
+devices, ...) and hyperparameters (optimizers, learning rate schedules,
+augmentation.
+
+Training a recognition model from a number of xml files in ALTO or PAGE XML:
+
+.. code-block:: python
+
+        >>> from kraken.lib.train import KrakenTrainer
+        >>> ground_truth = glob.glob('training/*.xml')
+        >>> training_files = ground_truth[:250] # training data is shuffled internally
+        >>> evaluation_files = ground_truth[250:]
+        >>> trainer = KrakenTrainer.recognition_train_gen(training_data=training_files, evaluation_data=evaluation_files, format_type='xml', augment=True)
+        >>> trainer.run()
+
+Likewise for a baseline and region segmentation model:
+
+.. code-block:: python
+
+        >>> from kraken.lib.train import KrakenTrainer
+        >>> ground_truth = glob.glob('training/*.xml')
+        >>> training_files = ground_truth[:250] # training data is shuffled internally
+        >>> evaluation_files = ground_truth[250:]
+        >>> trainer = KrakenTrainer.segmentation_train_gen(training_data=training_files, evaluation_data=evaluation_files, format_type='xml', augment=True)
+        >>> trainer.run()
+
+Both constructing the trainer object and the training itself can take quite a
+bit of time. The constructor provides a callback for each iterative process
+during object initialization that is intended to set up a progress bar:
+
+.. code-block:: python
+
+        >>> from kraken.lib.train import KrakenTrainer
+
+        >>> def progress_callback(string, length):
+                print(f'starting process "{string}" of length {length}')
+                return lambda: print('.', end='')
+        >>> ground_truth = glob.glob('training/*.xml')
+        >>> training_files = ground_truth[:25] # training data is shuffled internally
+        >>> evaluation_files = ground_truth[25:95]
+        >>> trainer = KrakenTrainer.segmentation_train_gen(training_data=training_files, evaluation_data=evaluation_files, format_type='xml', progress_callback=progress_callback, augment=True)
+        starting process "Building training set" of length 25
+        .........................
+        starting process "Building validation set" of length 70
+        ......................................................................      
+        >>> trainer.run()
+
+Executing the trainer object has two callbacks as arguments, one called after
+each iteration and one returning the evaluation metrics after the end of each
+epoch:
+
+.. code-block:: python
+
+        >>> from kraken.lib.train import KrakenTrainer
+        >>> ground_truth = glob.glob('training/*.xml')
+        >>> training_files = ground_truth[:250] # training data is shuffled internally
+        >>> evaluation_files = ground_truth[250:]
+        >>> trainer = KrakenTrainer.segmentation_train_gen(training_data=training_files, evaluation_data=evaluation_files, format_type='xml', augment=True)
+        >>> def _update_progress():
+                print('.', end='')
+        >>> def _print_eval(epoch, accuracy, **kwargs):
+                print(accuracy)
+        >>> trainer.run(_print_eval, _update_progress)
+        .........................0.0
+        .........................0.0
+        .........................0.0
+        .........................0.0
+        .........................0.0
+        ...
+
+The metrics differ for recognition
+(:func:`kraken.lib.train.recognition_evaluator_fn`) and segmentation
+(:func:`kraken.lib.train.baseline_label_evaluator_fn`).
+
+Depending on the stopping method chosen the last model file might not be the
+one with the best accuracy. Per default early stopping is used which aborts
+training after a certain number of epochs without improvement. In that case the
+best model and evaluation loss can be determined through:
+
+.. code-block:: python
+
+        >>> trainer.stopper.best_epoch
+        >>> trainer.stopper.best_loss
+        >>> best_model_path = f'{trainer.filename_prefix}_{trainer.stopper.best_epoch}.mlmodel'
+
+This is only a small subset of the training functionality. It is suggested to
+have a closer look at the command line parameters for features as transfer
+learning, region and baseline filtering, training continuation, and so on.
