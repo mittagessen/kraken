@@ -661,7 +661,7 @@ class KrakenTrainer(object):
 
         if hyper_params['quit'] == 'early':
             st_it = EarlyStopping(hyper_params['min_delta'], hyper_params['lag'])
-        elif hype_params['quit'] == 'dumb':
+        elif hyper_params['quit'] == 'dumb':
             st_it = EpochStopping(hyper_params['epochs'] - hyper_params['completed_epochs'])
         else:
             logger.error(f'Invalid training interruption scheme {quit}')
