@@ -404,6 +404,7 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
                                                   force_binarization=force_binarization,
                                                   format_type=format_type,
                                                   codec=codec,
+                                                  resize=resize,
                                                   augment=augment)
 
     with  log.progressbar(label='stage {}/{}'.format(1, trainer.stopper.epochs if trainer.stopper.epochs > 0 else '∞'),

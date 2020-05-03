@@ -397,6 +397,7 @@ class KrakenTrainer(object):
                               force_binarization: bool = False,
                               format_type: str = 'path',
                               codec: Optional[Dict] = None,
+                              resize: str = 'fail',
                               augment: bool = False):
         """
         This is an ugly constructor that takes all the arguments from the command
@@ -440,10 +441,7 @@ class KrakenTrainer(object):
             message('\u2713', fg='green', nl=False)
 
         DatasetClass = GroundTruthDataset
-        force_binarization = force_binarization
-        repolygonize = repolygonize
-        format_type = format_type
-        if format_type != 'path':
+        if format_type and format_type != 'path':
             logger.info(f'Parsing {len(training_data)} XML files for training data')
             if repolygonize:
                 message('Repolygonizing data')
@@ -451,7 +449,7 @@ class KrakenTrainer(object):
             evaluation_data = preparse_xml_data(evaluation_data, format_type, repolygonize)
             DatasetClass = PolygonGTDataset
             valid_norm = False
-        else:
+        elif format_type == 'path':
             if force_binarization:
                 logger.warning('Forced binarization enabled in `path` mode. Will be ignored.')
                 force_binarization = False
@@ -461,6 +459,10 @@ class KrakenTrainer(object):
             if evaluation_data:
                 evaluation_data = [{'image': im} for im in evaluation_data]
             valid_norm = True
+        # format_type is None. Determine training type from length of training data entry
+        else:
+            if len(training_data[0]) >= 4):
+                DatasetClass = PolygonGTDataset
 
         # preparse input sizes from vgsl string to seed ground truth data set
         # sizes and dimension ordering.
@@ -574,7 +576,7 @@ class KrakenTrainer(object):
                 alpha_diff = set(gt_set.alphabet).difference(set(codec.c2l.keys()))
                 if resize == 'fail':
                     logger.error(f'Training data and model codec alphabets mismatch: {alpha_diff}')
-                    ctx.exit(code=1)
+                    return None
                 elif resize == 'add':
                     message('Adding missing labels to network ', nl=False)
                     logger.info(f'Resizing codec to include {len(alpha_diff)} new code points')
@@ -799,6 +801,12 @@ class KrakenTrainer(object):
                               merge_baselines=merge_baselines,
                               valid_regions=valid_regions,
                               merge_regions=merge_regions)
+
+        if format_type == None:
+            for page in training_data:
+                gt_set.add(**page)
+            for page in evaluation_data:
+                val_set.add(**page)
 
         # overwrite class mapping in validation set
         val_set.num_classes = gt_set.num_classes
