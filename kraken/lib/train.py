@@ -26,7 +26,7 @@ import numpy as np
 import torch.nn.functional as F
 
 from itertools import cycle
-from typing import Tuple, Callable, List, Dict, Any, Optional, Sequence
+from typing import cast, Tuple, Callable, List, Dict, Any, Optional, Sequence
 
 from kraken.lib import models, vgsl, segmentation, default_specs
 from kraken.lib.util import make_printable
@@ -441,6 +441,7 @@ class KrakenTrainer(object):
             message('\u2713', fg='green', nl=False)
 
         DatasetClass = GroundTruthDataset
+        valid_norm = True
         if format_type and format_type != 'path':
             logger.info(f'Parsing {len(training_data)} XML files for training data')
             if repolygonize:
@@ -461,8 +462,16 @@ class KrakenTrainer(object):
             valid_norm = True
         # format_type is None. Determine training type from length of training data entry
         else:
-            if len(training_data[0]) >= 4):
+            if len(training_data[0]) >= 4:
                 DatasetClass = PolygonGTDataset
+                valid_norm = False
+            else:
+                if force_binarization:
+                    logger.warning('Forced binarization enabled with box lines. Will be ignored.')
+                    force_binarization = False
+                if repolygonize:
+                    logger.warning('Repolygonization enabled with box lines. Will be ignored.')
+
 
         # preparse input sizes from vgsl string to seed ground truth data set
         # sizes and dimension ordering.

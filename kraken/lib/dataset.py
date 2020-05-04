@@ -810,7 +810,7 @@ class BaselineSet(Dataset):
 
     def add(self,
             image: Union[str, Image.Image],
-            baselines: Dict[str, List[List[Tuple[int, int]]]],
+            baselines: List[List[List[Tuple[int, int]]]] = None,
             regions: Dict[str, List[List[Tuple[int, int]]]] = None,
             *args,
             **kwargs):
@@ -819,31 +819,32 @@ class BaselineSet(Dataset):
 
         Args:
             im (path): Path to the whole page image
-            baseline (dict): A dict containing list of lists of coordinates {'line_type_0': [[x0, y0], ..., [xn, yn]]], 'line_type_1': ...}.
+            baseline (dict): A list containing dicts with a list of coordinates
+                             and script types [{'baseline': [[x0, y0], ...,
+                             [xn, yn]], 'script': 'script_type'}, ...]
             regions (dict): A dict containing list of lists of coordinates {'region_type_0': [[x0, y0], ..., [xn, yn]]], 'region_type_1': ...}.
         """
         if self.mode:
             raise Exception('The `add` method is incompatible with dataset mode {}'.format(self.mode))
 
-        data = fn(img)
         lines = defaultdict(list)
-        for line in data['lines']:
+        for line in baselines:
             line_type = self.mbl_dict.get(line['script'], line['script'])
             if self.valid_baselines is None or line['script'] in self.valid_baselines:
                 lines[line_type].append(line['baseline'])
                 if line_type not in self.class_mapping['baselines']:
                     self.num_classes += 1
-                    self.class_mapping['baselines'][line_type] = self.num_classes
+                    self.class_mapping['baselines'][line_type] = self.num_classes - 1
         regions = defaultdict(list)
-        for k, v in data['regions'].items():
+        for k, v in regions.items():
             if self.valid_regions is None or k in self.valid_regions:
                 reg_type = self.mreg_dict.get(k, k)
                 regions[reg_type].extend(v)
                 if reg_type not in self.class_mapping['regions']:
                     self.num_classes += 1
-                    self.class_mapping['baselines'][line_type] = self.num_classes
+                    self.class_mapping['baselines'][line_type] = self.num_classes - 1
         self.targets.append({'baselines': lines, 'regions': regions})
-        self.imgs.append(data['image'])
+        self.imgs.append(image)
 
     def __getitem__(self, idx):
         im = self.imgs[idx]
