@@ -18,8 +18,8 @@ dependencies:
   - scipy
   - protobuf>=3.0
   - jinja2
-  - torchvision
-  - pytorch=1.4.0='cuda92*'
+  - torchvision=0.4.0
+  - pytorch=1.2.0='cuda92*'
   - cudatoolkit<=9.2
   - jsonschema
   - scikit-image

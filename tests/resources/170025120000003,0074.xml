@@ -1,0 +1,390 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<PcGts xmlns="http://schema.primaresearch.org/PAGE/gts/pagecontent/2013-07-15" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://schema.primaresearch.org/PAGE/gts/pagecontent/2013-07-15 http://schema.primaresearch.org/PAGE/gts/pagecontent/2013-07-15/pagecontent.xsd">
+    <Metadata>
+        <Creator>TRP</Creator>
+        <Created>2016-06-16T16:57:15.027+02:00</Created>
+        <LastChange>2018-07-04T17:25:44.389+02:00</LastChange>
+    </Metadata>
+    <Page imageFilename="170025120000003,0074.jpg" imageWidth="2743" imageHeight="3965">
+        <ReadingOrder>
+            <OrderedGroup id="ro_1530717944451" caption="Regions reading order">
+                <RegionRefIndexed index="0" regionRef="region_1469098609000_462"/>
+                <RegionRefIndexed index="1" regionRef="region_1469098557906_461"/>
+                <RegionRefIndexed index="2" regionRef="TextRegion_1520586482298_194"/>
+                <RegionRefIndexed index="3" regionRef="TextRegion_1520586482298_193"/>
+            </OrderedGroup>
+        </ReadingOrder>
+        <TextRegion id="region_1469098609000_462" custom="readingOrder {index:0;} structure {type:$pag;}">
+            <Coords points="2324,171 2437,171 2436,258 2326,237"/>
+            <TextLine id="line_1469098625593_463" custom="readingOrder {index:0;} structure {type:$pag;}">
+                <Coords points="2344,182 2428,195 2420,244 2336,231"/>
+                <Baseline points="2337,226 2421,239"/>
+                <TextEquiv>
+                    <Unicode>$pag:39</Unicode>
+                </TextEquiv>
+            </TextLine>
+            <TextEquiv>
+                <Unicode>$pag:39</Unicode>
+            </TextEquiv>
+        </TextRegion>
+        <TextRegion id="region_1469098557906_461" custom="readingOrder {index:1;} structure {type:$pac;}">
+            <Coords points="738,203 2339,245 2398,294 2446,345 2574,469 2539,1873 2523,2053 2477,2182 738,2243"/>
+            <TextLine id="line_1469098649515_464" custom="readingOrder {index:0;} structure {type:$pac;}">
+                <Coords points="790,224 2398,259 2397,309 789,274"/>
+                <Baseline points="789,269 2397,304"/>
+                <TextEquiv>
+                    <Unicode>$-nor su hijo, De todos sus bienes, con los pactos</Unicode>
+                </TextEquiv>
+            </TextLine>
+            <TextLine id="line_1469098653078_465" custom="readingOrder {index:1;} structure {type:$pac;}">
+                <Coords points="786,313 2432,322 2432,372 786,363"/>
+                <Baseline points="786,358 2432,367"/>
+                <TextEquiv>
+                    <Unicode>y salvedades alli expressadas; Y fue acetada;</Unicode>
+                </TextEquiv>
+            </TextLine>
+            <TextLine id="line_1469098657875_466" custom="readingOrder {index:2;} structure {type:$pac;}">
+                <Coords points="767,399 2461,392 2461,442 767,449"/>
+                <Baseline points="767,444 2461,437"/>
+                <TextEquiv>
+                    <Unicode>y assi mismo el dho$.dicho $ofi:Patron $ant:Miguel $ant:Carreras,</Unicode>
+                </TextEquiv>
+            </TextLine>
+            <TextLine id="line_1469098662671_467" custom="readingOrder {index:3;} structure {type:$pac;}">
+                <Coords points="776,481 2487,478 2487,528 776,531"/>
+                <Baseline points="776,526 2487,523"/>
+                <TextEquiv>
+                    <Unicode>y el $ofi:Rndo$.Reverendo $ant:Miguel $ant:Carreras $ofi:pbro$.presbítero residente en la</Unicode>
+                </TextEquiv>
+            </TextLine>
+            <TextLine id="line_1469098667484_468" custom="readingOrder {index:4;} structure {type:$pac;}">
+                <Coords points="773,545 2563,555 2563,605 773,595"/>
+                <Baseline points="773,590 2563,600"/>
+                <TextEquiv>
+                    <Unicode>Parq.$^l$.Parroquial Igla$.Iglesia de dha$.dicha villa de $top:Canet Padre é, hijo  </Unicode>
+                </TextEquiv>
+            </TextLine>
+            <TextLine id="line_1469098672453_469" custom="readingOrder {index:5;} structure {type:$pac;}">
+                <Coords points="770,624 2537,612 2537,662 770,674"/>
+                <Baseline points="770,669 2537,657"/>
+                <TextEquiv>
+                    <Unicode>hizieron donacion a la dha$.dicha $ant:Anna $ant:Maria su</Unicode>
+                </TextEquiv>
+            </TextLine>
+            <TextLine id="line_1469098676796_470" custom="readingOrder {index:6;} structure {type:$pac;}">
+                <Coords points="767,704 2493,698 2493,748 767,754"/>
+                <Baseline points="767,749 2493,743"/>
+                <TextEquiv>
+                    <Unicode>hija y hermana resp.$^e$.respectivamente por todos sus drôs$.derechos de le:$-</Unicode>
+                </TextEquiv>
+            </TextLine>
+            <TextLine id="line_1469098689109_471" custom="readingOrder {index:7;} structure {type:$pac;}">
+                <Coords points="763,787 2566,780 2566,830 763,837"/>
+                <Baseline points="763,832 2566,825"/>
+                <TextEquiv>
+                    <Unicode>$-gitima Paterna, Materna y otros de ducientas$.doscientas</Unicode>
+                </TextEquiv>
+            </TextLine>
+            <TextLine id="line_1469098694312_472" custom="readingOrder {index:8;} structure {type:$pac;}">
+                <Coords points="776,863 2487,844 2487,894 776,913"/>
+                <Baseline points="776,908 2487,889"/>
+                <TextEquiv>
+                    <Unicode>libras de moneda Bar$.barcelonesa; arca y vestidos corres:$-</Unicode>
+                </TextEquiv>
+            </TextLine>
+            <TextLine id="line_1469098699078_473" custom="readingOrder {index:9;} structure {type:$pac;}">
+                <Coords points="785,958 2463,920 2464,970 786,1008"/>
+                <Baseline points="786,1003 2464,965"/>
+                <TextEquiv>
+                    <Unicode>$-pondientes, con promesa de pagar en esta</Unicode>
+                </TextEquiv>
+            </TextLine>
+            <TextLine id="line_1469098705093_474" custom="readingOrder {index:10;} structure {type:$pac;}">
+                <Coords points="775,1031 2435,996 2436,1046 776,1081"/>
+                <Baseline points="776,1076 2436,1041"/>
+                <TextEquiv>
+                    <Unicode>forma, ésto es arcas, ropas y joyas el dia de las</Unicode>
+                </TextEquiv>
+            </TextLine>
+            <TextLine id="line_1469098709203_475" custom="readingOrder {index:11;} structure {type:$pac;}">
+                <Coords points="756,1111 2463,1070 2464,1120 757,1161"/>
+                <Baseline points="757,1156 2464,1115"/>
+                <TextEquiv>
+                    <Unicode>Bodas; cien libras del dia de la fecha, á, medio</Unicode>
+                </TextEquiv>
+            </TextLine>
+            <TextLine id="line_1469098713953_476" custom="readingOrder {index:12;} structure {type:$pac;}">
+                <Coords points="762,1209 2498,1165 2499,1215 763,1259"/>
+                <Baseline points="763,1254 2499,1210"/>
+                <TextEquiv>
+                    <Unicode>año y las restantes cien libras del dho$.dicho dia de la</Unicode>
+                </TextEquiv>
+            </TextLine>
+            <TextLine id="line_1469098719250_477" custom="readingOrder {index:13;} structure {type:$pac;}">
+                <Coords points="759,1283 2451,1241 2452,1291 760,1333"/>
+                <Baseline points="760,1328 2452,1286"/>
+                <TextEquiv>
+                    <Unicode>fecha á tres años prox.$^s$.proximos venturos bajo obli:$-</Unicode>
+                </TextEquiv>
+            </TextLine>
+            <TextLine id="line_1469098723328_478" custom="readingOrder {index:14;} structure {type:$pac;}">
+                <Coords points="753,1372 2451,1317 2452,1367 754,1422"/>
+                <Baseline points="754,1417 2452,1362"/>
+                <TextEquiv>
+                    <Unicode>$-gacion de todos sus bienes; cuya dha$.dicha donacion</Unicode>
+                </TextEquiv>
+            </TextLine>
+            <TextLine id="line_1469098728109_479" custom="readingOrder {index:15;} structure {type:$pac;}">
+                <Coords points="756,1451 2438,1419 2439,1469 757,1501"/>
+                <Baseline points="757,1496 2439,1464"/>
+                <TextEquiv>
+                    <Unicode>fue echa con el pacto revercional acos:$-</Unicode>
+                </TextEquiv>
+            </TextLine>
+            <TextLine id="line_1469098734250_480" custom="readingOrder {index:16;} structure {type:$pac;}">
+                <Coords points="769,1521 2486,1499 2487,1549 770,1571"/>
+                <Baseline points="770,1566 2487,1544"/>
+                <TextEquiv>
+                    <Unicode>$-tumbrado; Y fue azetada por la dha$.dicha $ant:Anna</Unicode>
+                </TextEquiv>
+            </TextLine>
+            <TextLine id="line_1469098738500_481" custom="readingOrder {index:17;} structure {type:$pac;}">
+                <Coords points="778,1613 2457,1569 2458,1619 779,1663"/>
+                <Baseline points="779,1658 2458,1614"/>
+                <TextEquiv>
+                    <Unicode>$ant:Maria por quien fue echa la diffinición cor:$-</Unicode>
+                </TextEquiv>
+            </TextLine>
+            <TextLine id="line_1469098742531_482" custom="readingOrder {index:18;} structure {type:$pac;}">
+                <Coords points="759,1699 2409,1648 2410,1698 760,1749"/>
+                <Baseline points="760,1744 2410,1693"/>
+                <TextEquiv>
+                    <Unicode>$-respondiente de dhos$.dichos sus dros$.derechos a favor del dho$.dicho</Unicode>
+                </TextEquiv>
+            </TextLine>
+            <TextLine id="line_1469098746359_483" custom="readingOrder {index:19;} structure {type:$pac;}">
+                <Coords points="759,1769 2400,1724 2401,1774 760,1819"/>
+                <Baseline points="760,1814 2401,1769"/>
+                <TextEquiv>
+                    <Unicode>su Padre y hermano resp.$^e$.respectivamente y salvose el de</Unicode>
+                </TextEquiv>
+            </TextLine>
+            <TextLine id="line_1469098753765_484" custom="readingOrder {index:20;} structure {type:$pac;}">
+                <Coords points="762,1851 2540,1801 2541,1851 763,1901"/>
+                <Baseline points="763,1896 2541,1846"/>
+                <TextEquiv>
+                    <Unicode>futura sucession: Y en su consequencia hizo</Unicode>
+                </TextEquiv>
+            </TextLine>
+            <TextLine id="line_1469098757921_485" custom="readingOrder {index:21;} structure {type:$pac;}">
+                <Coords points="769,1940 2508,1883 2509,1933 770,1990"/>
+                <Baseline points="770,1985 2509,1928"/>
+                <TextEquiv>
+                    <Unicode>la correspondiente constitucion dotal al</Unicode>
+                </TextEquiv>
+            </TextLine>
+            <TextLine id="line_1469098763250_486" custom="readingOrder {index:22;} structure {type:$pac;}">
+                <Coords points="762,2007 2466,1963 2467,2013 763,2057"/>
+                <Baseline points="763,2052 2467,2008"/>
+                <TextEquiv>
+                    <Unicode>dho$.dicho $ant:Joseph $ant:Vancells su venidero esposo; y este</Unicode>
+                </TextEquiv>
+            </TextLine>
+            <TextLine id="line_1469098767531_487" custom="readingOrder {index:23;} structure {type:$pac;}">
+                <Coords points="753,2084 2451,2042 2452,2092 754,2134"/>
+                <Baseline points="754,2129 2452,2087"/>
+                <TextEquiv>
+                    <Unicode>acetandola prometió en su caso restituir</Unicode>
+                </TextEquiv>
+            </TextLine>
+            <TextLine id="line_1469098772171_488" custom="readingOrder {index:24;} structure {type:$pac;}">
+                <Coords points="768,2173 1906,2118 1908,2168 770,2223"/>
+                <Baseline points="770,2218 1908,2163"/>
+                <TextEquiv>
+                    <Unicode>bajo obligacion de todos sus bienes.</Unicode>
+                </TextEquiv>
+            </TextLine>
+            <TextEquiv>
+                <Unicode>$-nor su hijo, De todos sus bienes, con los pactos
+y salvedades alli expressadas; Y fue acetada;
+y assi mismo el dho$.dicho $ofi:Patron $ant:Miguel $ant:Carreras,
+y el $ofi:Rndo$.Reverendo $ant:Miguel $ant:Carreras $ofi:pbro$.presbítero residente en la
+Parq.$^l$.Parroquial Igla$.Iglesia de dha$.dicha villa de $top:Canet Padre é, hijo
+hizieron donacion a la dha$.dicha $ant:Anna $ant:Maria su
+hija y hermana resp.$^e$.respectivamente por todos sus drôs$.derechos de le:$-
+$-gitima Paterna, Materna y otros de ducientas$.doscientas
+libras de moneda Bar$.barcelonesa; arca y vestidos corres:$-
+$-pondientes, con promesa de pagar en esta
+forma, ésto es arcas, ropas y joyas el dia de las
+Bodas; cien libras del dia de la fecha, á, medio
+año y las restantes cien libras del dho$.dicho dia de la
+fecha á tres años prox.$^s$.proximos venturos bajo obli:$-
+$-gacion de todos sus bienes; cuya dha$.dicha donacion
+fue echa con el pacto revercional acos:$-
+$-tumbrado; Y fue azetada por la dha$.dicha $ant:Anna
+$ant:Maria por quien fue echa la diffinición cor:$-
+$-respondiente de dhos$.dichos sus dros$.derechos a favor del dho$.dicho
+su Padre y hermano resp.$^e$.respectivamente y salvose el de
+futura sucession: Y en su consequencia hizo
+la correspondiente constitucion dotal al
+dho$.dicho $ant:Joseph $ant:Vancells su venidero esposo; y este
+acetandola prometió en su caso restituir
+bajo obligacion de todos sus bienes.</Unicode>
+            </TextEquiv>
+        </TextRegion>
+        <TextRegion id="TextRegion_1520586482298_194" custom="readingOrder {index:2;} structure {type:$tip;}">
+            <Coords points="687,2428 688,2422 107,2420 106,2264 789,2256 758,2404"/>
+            <TextLine id="line_1469099154500_490" custom="readingOrder {index:0;} structure {type:$tip;}">
+                <Coords points="115,2335 743,2318 744,2368 116,2385"/>
+                <Baseline points="116,2380 744,2363"/>
+                <TextEquiv>
+                    <Unicode>$tip:Clausula $tip:hered.$^ria$.hereditaria</Unicode>
+                </TextEquiv>
+            </TextLine>
+            <TextEquiv>
+                <Unicode>$tip:Clausula $tip:hered.$^ria$.hereditaria</Unicode>
+            </TextEquiv>
+        </TextRegion>
+        <TextRegion id="TextRegion_1520586482298_193" custom="readingOrder {index:3;} structure {type:$par;}">
+            <Coords points="675,3772 687,2428 758,2404 789,2256 2542,2236 2581,3748"/>
+            <TextLine id="line_1469099163031_491" custom="readingOrder {index:0;} structure {type:$par;}">
+                <Coords points="805,2330 2397,2286 2398,2336 806,2380"/>
+                <Baseline points="806,2375 2398,2331"/>
+                <TextEquiv>
+                    <Unicode>En seis Julio mil Sett.$^s$.Setecientos y Sesenta y</Unicode>
+                </TextEquiv>
+            </TextLine>
+            <TextLine id="line_1469099167203_492" custom="readingOrder {index:1;} structure {type:$par;}">
+                <Coords points="756,2413 2369,2357 2371,2407 758,2463"/>
+                <Baseline points="758,2458 2371,2402"/>
+                <TextEquiv>
+                    <Unicode>nueve se ha presentado en el Of.$^o$.Oficio de Hip.$^s$.Hipotecas de esta</Unicode>
+                </TextEquiv>
+            </TextLine>
+            <TextLine id="line_1469099171046_493" custom="readingOrder {index:2;} structure {type:$par;}">
+                <Coords points="753,2490 2470,2431 2472,2481 755,2540"/>
+                <Baseline points="755,2535 2472,2476"/>
+                <TextEquiv>
+                    <Unicode>ciud$.ciudad de $top:Gerona una clausula hereditaria sa:$-</Unicode>
+                </TextEquiv>
+            </TextLine>
+            <TextLine id="line_1469099175546_494" custom="readingOrder {index:3;} structure {type:$par;}">
+                <Coords points="751,2567 2415,2520 2416,2570 752,2617"/>
+                <Baseline points="752,2612 2416,2565"/>
+                <TextEquiv>
+                    <Unicode>$-cada de un testam.$^to$.testamento echo por $ant:Fran.$^co$.Francisco $ant:Van:$-</Unicode>
+                </TextEquiv>
+            </TextLine>
+            <TextLine id="line_1469099180078_495" custom="readingOrder {index:4;} structure {type:$par;}">
+                <Coords points="742,2644 2465,2611 2466,2661 743,2694"/>
+                <Baseline points="743,2689 2466,2656"/>
+                <TextEquiv>
+                    <Unicode>$-cell $ofi:sappatero de la villa de $top:Canet, en autos</Unicode>
+                </TextEquiv>
+            </TextLine>
+            <TextLine id="line_1469099185296_496" custom="readingOrder {index:5;} structure {type:$par;}">
+                <Coords points="754,2730 2423,2682 2424,2732 755,2780"/>
+                <Baseline points="755,2775 2424,2727"/>
+                <TextEquiv>
+                    <Unicode>de $ant:Bernardo $ant:Nualart $ofi:nott$.notario de dha$.dicha villa</Unicode>
+                </TextEquiv>
+            </TextLine>
+            <TextLine id="line_1469099189250_497" custom="readingOrder {index:6;} structure {type:$par;}">
+                <Coords points="734,2819 2444,2774 2445,2824 735,2869"/>
+                <Baseline points="735,2864 2445,2819"/>
+                <TextEquiv>
+                    <Unicode>en onze Agosto mil Sett.$^s$.Setecientos y diez y seis, con</Unicode>
+                </TextEquiv>
+            </TextLine>
+            <TextLine id="line_1469099193718_498" custom="readingOrder {index:7;} structure {type:$par;}">
+                <Coords points="737,2904 2515,2860 2516,2910 738,2954"/>
+                <Baseline points="738,2949 2516,2905"/>
+                <TextEquiv>
+                    <Unicode>la qual Instituyó por su heredero universal</Unicode>
+                </TextEquiv>
+            </TextLine>
+            <TextLine id="line_1469099197125_499" custom="readingOrder {index:8;} structure {type:$par;}">
+                <Coords points="737,2993 2409,2946 2410,2996 738,3043"/>
+                <Baseline points="738,3038 2410,2991"/>
+                <TextEquiv>
+                    <Unicode>al dho$.dicho $ant:Joseph su hijo, y el premuerto, á sus</Unicode>
+                </TextEquiv>
+            </TextLine>
+            <TextLine id="line_1469099203375_500" custom="readingOrder {index:9;} structure {type:$par;}">
+                <Coords points="725,3064 2400,3037 2401,3087 726,3114"/>
+                <Baseline points="726,3109 2401,3082"/>
+                <TextEquiv>
+                    <Unicode>hijos, nietos y demas decendientes suÿos de</Unicode>
+                </TextEquiv>
+            </TextLine>
+            <TextLine id="line_1469099207453_501" custom="readingOrder {index:10;} structure {type:$par;}">
+                <Coords points="707,3155 2409,3114 2410,3164 708,3205"/>
+                <Baseline points="708,3200 2410,3159"/>
+                <TextEquiv>
+                    <Unicode>grado en grado, y ellos premuertos substi:$-</Unicode>
+                </TextEquiv>
+            </TextLine>
+            <TextLine id="line_1469099230031_503" custom="readingOrder {index:11;} structure {type:$par;}">
+                <Coords points="723,3233 2426,3195 2427,3245 724,3283"/>
+                <Baseline points="724,3278 2427,3240"/>
+                <TextEquiv>
+                    <Unicode>$-tuyó al dho$.dicho $ant:Pablo su hijo, y el premuerto, á</Unicode>
+                </TextEquiv>
+            </TextLine>
+            <TextLine id="line_1469099235718_504" custom="readingOrder {index:12;} structure {type:$par;}">
+                <Coords points="730,3327 2423,3275 2424,3325 731,3377"/>
+                <Baseline points="731,3372 2424,3320"/>
+                <TextEquiv>
+                    <Unicode>sus hijos, como del dho$.dicho $ant:Joseph primero insti:$-</Unicode>
+                </TextEquiv>
+            </TextLine>
+            <TextLine id="line_1469099240828_505" custom="readingOrder {index:13;} structure {type:$par;}">
+                <Coords points="713,3410 2412,3362 2413,3412 714,3460"/>
+                <Baseline points="714,3455 2413,3407"/>
+                <TextEquiv>
+                    <Unicode>$-tuido está dho$.dicho, y despues substituyo, á, $ant:Fran.$^co$.Francisco</Unicode>
+                </TextEquiv>
+            </TextLine>
+            <TextLine id="line_1469099246062_506" custom="readingOrder {index:14;} structure {type:$par;}">
+                <Coords points="717,3494 2378,3462 2379,3512 718,3544"/>
+                <Baseline points="718,3539 2379,3507"/>
+                <TextEquiv>
+                    <Unicode>tambien su hijo, y el premuerto, á, sus hijos</Unicode>
+                </TextEquiv>
+            </TextLine>
+            <TextLine id="line_1469099251343_507" custom="readingOrder {index:15;} structure {type:$par;}">
+                <Coords points="731,3574 2486,3563 2486,3613 731,3624"/>
+                <Baseline points="731,3619 2486,3608"/>
+                <TextEquiv>
+                    <Unicode>nietos y demas decendientes, como del prim.$^o$.primero</Unicode>
+                </TextEquiv>
+            </TextLine>
+            <TextLine id="line_1469099255968_508" custom="readingOrder {index:16;} structure {type:$par;}">
+                <Coords points="714,3660 2399,3653 2399,3703 714,3710"/>
+                <Baseline points="714,3705 2399,3698"/>
+                <TextEquiv>
+                    <Unicode>esta dicho; Y despues substituyó a la dicha</Unicode>
+                </TextEquiv>
+            </TextLine>
+            <TextEquiv>
+                <Unicode>En seis Julio mil Sett.$^s$.Setecientos y Sesenta y
+nueve se ha presentado en el Of.$^o$.Oficio de Hip.$^s$.Hipotecas de esta
+ciud$.ciudad de $top:Gerona una clausula hereditaria sa:$-
+$-cada de un testam.$^to$.testamento echo por $ant:Fran.$^co$.Francisco $ant:Van:$-
+$-cell $ofi:sappatero de la villa de $top:Canet, en autos
+de $ant:Bernardo $ant:Nualart $ofi:nott$.notario de dha$.dicha villa
+en onze Agosto mil Sett.$^s$.Setecientos y diez y seis, con
+la qual Instituyó por su heredero universal
+al dho$.dicho $ant:Joseph su hijo, y el premuerto, á sus
+hijos, nietos y demas decendientes suÿos de
+grado en grado, y ellos premuertos substi:$-
+$-tuyó al dho$.dicho $ant:Pablo su hijo, y el premuerto, á
+sus hijos, como del dho$.dicho $ant:Joseph primero insti:$-
+$-tuido está dho$.dicho, y despues substituyo, á, $ant:Fran.$^co$.Francisco
+tambien su hijo, y el premuerto, á, sus hijos
+nietos y demas decendientes, como del prim.$^o$.primero
+esta dicho; Y despues substituyó a la dicha</Unicode>
+            </TextEquiv>
+        </TextRegion>
+    </Page>
+</PcGts>
