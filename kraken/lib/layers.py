@@ -5,7 +5,7 @@ import torch
 import numpy as np
 
 from typing import List, Tuple, Optional, Iterable
-from torch.nn import Module
+from torch.nn import Module, Sequential
 from torch.nn import functional as F
 from coremltools.proto import NeuralNetwork_pb2
 
@@ -14,6 +14,18 @@ from coremltools.proto import NeuralNetwork_pb2
 
 __all__ = ['MaxPool', 'Reshape', 'Dropout', 'TransposedSummarizingRNN', 'LinSoftmax', 'ActConv2D']
 
+
+class MultiParamSequential(Sequential):
+    """
+    Sequential variant accepting multiple arguments.
+    """
+    def forward(self, *inputs):
+        for module in self._modules.values():
+            if type(inputs) == tuple:
+                inputs = module(*inputs)
+            else:
+                inputs = module(inputs)
+        return inputs
 
 def PeepholeLSTMCell(input: torch.Tensor,
                      hidden: Tuple[torch.Tensor, torch.Tensor],
@@ -173,8 +185,8 @@ class Reshape(Module):
             perm[x], perm[x + step] = perm[x + step], perm[x]
         input = input.permute(perm)
         o = input.reshape(input.shape[:dest] + (input.shape[dest] * input.shape[dest + 1],) + input.shape[dest + 2:])
-        if seq_len:
-            seq_len = (seq_len * initial_len/o.shape[3]).int()
+        if seq_len is not None:
+            seq_len = (seq_len * float(initial_len)/o.shape[3]).int()
         return o, seq_len
 
     def get_shape(self, input: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
@@ -221,8 +233,8 @@ class MaxPool(Module):
 
     def forward(self, inputs: torch.Tensor, seq_len: torch.Tensor = None) -> Tuple[torch.Tensor, torch.Tensor]:
         o = self.layer(inputs)
-        if seq_len:
-            seq_len = torch.floor((seq_len-(self.kernel_size[1]-1)-1)/self.stride[1]+1).int()
+        if seq_len is not None:
+            seq_len = np.floor((seq_len-(self.kernel_size[1]-1)-1).float()/self.stride[1]+1).int()
         return o, seq_len
 
     def get_shape(self, input: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
@@ -364,7 +376,7 @@ class TransposedSummarizingRNN(Module):
         if self.transpose:
             o = o.transpose(0, 2)
         # HNWO -> NOHW
-        if seq_len and seq_len.max() > o.shape[2]:
+        if seq_len is not None and seq_len.max() > o.shape[2]:
             raise Exception('Do not use summarizing layer in x-axis with batching/sequences')
         return o.permute(1, 3, 0, 2), seq_len
 
@@ -634,8 +646,8 @@ class ActConv2D(Module):
         o = self.co(inputs)
         if self.nl:
             o = self.nl(o)
-        if seq_len:
-            seq_len = max(np.floor((seq_len+2*self.padding[1]-(self.kernel_size[1]-1)-1)/self.stride[1]+1), 1).int()
+        if seq_len is not None:
+            seq_len = torch.clamp(np.floor((seq_len+2*self.padding[1]-(self.kernel_size[1]-1)-1).float()/self.stride[1]+1), min=1).int()
         return o, seq_len
 
     def get_shape(self, input: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
