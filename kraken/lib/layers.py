@@ -235,7 +235,7 @@ class MaxPool(Module):
     def forward(self, inputs: torch.Tensor, seq_len: torch.Tensor = None) -> Tuple[torch.Tensor, torch.Tensor]:
         o = self.layer(inputs)
         if seq_len is not None:
-            seq_len = np.floor((seq_len-(self.kernel_size[1]-1)-1).float()/self.stride[1]+1).int()
+            seq_len = torch.floor((seq_len-(self.kernel_size[1]-1)-1).float()/self.stride[1]+1).int()
         return o, seq_len
 
     def get_shape(self, input: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
@@ -654,7 +654,7 @@ class ActConv2D(Module):
         if self.nl:
             o = self.nl(o)
         if seq_len is not None:
-            seq_len = torch.clamp(np.floor((seq_len+2*self.padding[1]-(self.kernel_size[1]-1)-1).float()/self.stride[1]+1), min=1).int()
+            seq_len = torch.clamp(torch.floor((seq_len+2*self.padding[1]-(self.kernel_size[1]-1)-1).float()/self.stride[1]+1), min=1).int()
         return o, seq_len
 
     def get_shape(self, input: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
