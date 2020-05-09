@@ -31,7 +31,7 @@ from typing import cast, Tuple, Callable, List, Dict, Any, Optional, Sequence
 from kraken.lib import models, vgsl, segmentation, default_specs
 from kraken.lib.util import make_printable
 from kraken.lib.codec import PytorchCodec
-from kraken.lib.dataset import BaselineSet, GroundTruthDataset, PolygonGTDataset, generate_input_transforms, preparse_xml_data, InfiniteDataLoader, compute_error
+from kraken.lib.dataset import BaselineSet, GroundTruthDataset, PolygonGTDataset, generate_input_transforms, preparse_xml_data, InfiniteDataLoader, compute_error, collate_sequences
 from kraken.lib.exceptions import KrakenInputException
 
 from torch.utils.data import DataLoader
@@ -235,6 +235,14 @@ class NoStopping(TrainStopper):
 
 
 def recognition_loss_fn(criterion, output, target):
+    if isinstance(output, tuple):
+        seq_lens = output[1]
+        output = output[0]
+        target_lens = target[1]
+        target = target[0]
+    else:
+        seq_lens = (output.size(2),)
+        target_lens = (target.size(1),)
     # height should be 1 by now
     if output.size(2) != 1:
         raise KrakenInputException('Expected dimension 3 to be 1, actual {}'.format(output.size(2)))
@@ -242,8 +250,8 @@ def recognition_loss_fn(criterion, output, target):
     # NCW -> WNC
     loss = criterion(output.permute(2, 0, 1),  # type: ignore
                      target,
-                     (output.size(2),),
-                     (target.size(1),))
+                     seq_lens,
+                     target_lens)
     return loss
 
 
@@ -345,13 +353,22 @@ class KrakenTrainer(object):
             self.model.user_metadata['accuracy'] = []
 
         while self.stopper.trigger():
-            for _, (input, target) in zip(range(self.event_it), self.train_set):
+            for _, batch in zip(range(self.event_it), self.train_set):
                 if self.lr_scheduler:
                     self.lr_scheduler.step()
+                input, target, *lens = batch
                 input = input.to(self.device, non_blocking=True)
                 target = target.to(self.device, non_blocking=True)
                 input = input.requires_grad_()
-                o = self.model.nn(input)
+                # sequence batch
+                if lens:
+                    seq_lens, label_lens = lens
+                    seq_lens = seq_lens.to(self.device, non_blocking=True)
+                    label_lens = label_lens.to(self.device, non_blocking=True)
+                    target = (target, label_lens)
+                    o = self.model.nn(input, seq_lens)
+                else:
+                    o = self.model.nn(input)
                 self.optimizer.zero_grad()
                 loss = self.loss_fn(self.model.criterion, o, target)
                 if not torch.isinf(loss):
@@ -631,7 +648,11 @@ class KrakenTrainer(object):
             loader_threads = threads // 2
         else:
             loader_threads = threads
-        train_loader = InfiniteDataLoader(gt_set, batch_size=1, shuffle=True, num_workers=loader_threads, pin_memory=True)
+        train_loader = InfiniteDataLoader(gt_set, batch_size=hyper_params['batch_size'],
+                                          shuffle=True,
+                                          num_workers=loader_threads,
+                                          pin_memory=True,
+                                          collate_fn=collate_sequences)
         threads = max(threads - loader_threads, 1)
 
         # don't encode validation set as the alphabets may not match causing encoding failures

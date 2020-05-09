@@ -22,6 +22,7 @@ RECOGNITION_SPEC = '[1,48,0,1 Cr4,2,32,4,2 Gn32 Cr4,2,64,1,1 Gn32 Mp4,2,4,2 Cr3,
 
 RECOGNITION_HYPER_PARAMS = {'pad': 16,
                             'freq': 1.0,
+                            'batch_size': 8,
                             'quit': 'early',
                             'epochs': -1,
                             'lag': 5,

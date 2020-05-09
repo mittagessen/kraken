@@ -348,12 +348,11 @@ def collate_sequences(batch):
     """
     Sorts and pads sequences.
     """
-
     sorted_batch = sorted(batch, key=lambda x: x[0].shape[2], reverse=True)
     seqs = [x[0] for x in sorted_batch]
     seq_lens = torch.LongTensor([seq.shape[2] for seq in seqs])
     max_len = seqs[0].shape[2]
-    seqs = [F.pad(seq, pad=(0, max_len-seq.shape[2])) for seq in seqs]
+    seqs = torch.stack([F.pad(seq, pad=(0, max_len-seq.shape[2])) for seq in seqs])
     labels = torch.cat([x[1] for x in sorted_batch]).long()
     label_lens = torch.LongTensor([len(x[1]) for x in sorted_batch])
     return seqs, labels, seq_lens, label_lens

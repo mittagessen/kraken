@@ -732,7 +732,7 @@ class TorchVGSLModel(object):
         if nl in ['l', 's'] and int(m.group('out')) >= 1:
             self.criterion = nn.BCELoss()
         elif nl == 'c':
-            self.criterion = nn.CTCLoss(reduction='none')
+            self.criterion = nn.CTCLoss(reduction='sum', zero_infinity=True)
         else:
             raise ValueError('unsupported output specification')
         # heatmap output
