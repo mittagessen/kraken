@@ -24,6 +24,7 @@ import numpy as np
 import pkg_resources
 import bidi.algorithm as bd
 import shapely.geometry as geom
+import torch.nn.functional as F
 import torchvision.transforms.functional as tf
 
 from os import path
@@ -32,6 +33,7 @@ from itertools import groupby
 from collections import Counter, defaultdict
 from torchvision import transforms
 from torch.utils.data import Dataset, DataLoader
+from torch.nn.utils.rnn import pad_sequence
 from typing import Dict, List, Tuple, Sequence, Callable, Optional, Any, Union, cast
 
 from skimage.draw import polygon
@@ -340,6 +342,21 @@ def _repolygonize(im: Image.Image, lines):
     im = Image.open(im).convert('L')
     polygons = calculate_polygonal_environment(im, [x['baseline'] for x in lines])
     return [{'boundary': polygon, 'baseline': orig['baseline'], 'text': orig['text']} for orig, polygon in zip(lines, polygons)]
+
+
+def collate_sequences(batch):
+    """
+    Sorts and pads sequences.
+    """
+
+    sorted_batch = sorted(batch, key=lambda x: x[0].shape[2], reverse=True)
+    seqs = [x[0] for x in sorted_batch]
+    seq_lens = torch.LongTensor([seq.shape[2] for seq in seqs])
+    max_len = seqs[0].shape[2]
+    seqs = [F.pad(seq, pad=(0, max_len-seq.shape[2])) for seq in seqs]
+    labels = torch.cat([x[1] for x in sorted_batch]).long()
+    label_lens = torch.LongTensor([len(x[1]) for x in sorted_batch])
+    return seqs, labels, seq_lens, label_lens
 
 
 class InfiniteDataLoader(DataLoader):
@@ -859,7 +876,6 @@ class BaselineSet(Dataset):
                 im = Image.open(im)
                 return self.transform(im, target)
             except Exception:
-                raise
                 idx = np.random.randint(0, len(self.imgs))
                 logger.debug('Failed. Replacing with sample {}'.format(idx))
                 return self[np.random.randint(0, len(self.imgs))]
