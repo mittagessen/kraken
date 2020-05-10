@@ -32,7 +32,7 @@ from kraken.lib import models, vgsl, segmentation, default_specs
 from kraken.lib.util import make_printable
 from kraken.lib.codec import PytorchCodec
 from kraken.lib.dataset import BaselineSet, GroundTruthDataset, PolygonGTDataset, generate_input_transforms, preparse_xml_data, InfiniteDataLoader, compute_error
-from kraken.lib.exceptions import KrakenInputException
+from kraken.lib.exceptions import KrakenInputException, KrakenEncodeException
 
 from torch.utils.data import DataLoader
 
