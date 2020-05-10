@@ -356,13 +356,13 @@ class KrakenTrainer(object):
             for _, batch in zip(range(self.event_it), self.train_set):
                 if self.lr_scheduler:
                     self.lr_scheduler.step()
-                input, target, *lens = batch
+                input, target = batch['image'], batch['target']
                 input = input.to(self.device, non_blocking=True)
                 target = target.to(self.device, non_blocking=True)
                 input = input.requires_grad_()
                 # sequence batch
-                if lens:
-                    seq_lens, label_lens = lens
+                if 'seq_lens' in batch:
+                    seq_lens, label_lens = batch['seq_lens'], batch['target_lens']
                     seq_lens = seq_lens.to(self.device, non_blocking=True)
                     label_lens = label_lens.to(self.device, non_blocking=True)
                     target = (target, label_lens)

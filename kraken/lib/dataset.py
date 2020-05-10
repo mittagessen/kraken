@@ -348,14 +348,14 @@ def collate_sequences(batch):
     """
     Sorts and pads sequences.
     """
-    sorted_batch = sorted(batch, key=lambda x: x[0].shape[2], reverse=True)
-    seqs = [x[0] for x in sorted_batch]
+    sorted_batch = sorted(batch, key=lambda x: x['image'].shape[2], reverse=True)
+    seqs = [x['image'] for x in sorted_batch]
     seq_lens = torch.LongTensor([seq.shape[2] for seq in seqs])
     max_len = seqs[0].shape[2]
     seqs = torch.stack([F.pad(seq, pad=(0, max_len-seq.shape[2])) for seq in seqs])
-    labels = torch.cat([x[1] for x in sorted_batch]).long()
-    label_lens = torch.LongTensor([len(x[1]) for x in sorted_batch])
-    return seqs, labels, seq_lens, label_lens
+    labels = torch.cat([x['target'] for x in sorted_batch]).long()
+    label_lens = torch.LongTensor([len(x['target']) for x in sorted_batch])
+    return {'image': seqs, 'target': labels, 'seq_lens': seq_lens, 'target_lens': label_lens}
 
 
 class InfiniteDataLoader(DataLoader):
@@ -484,7 +484,7 @@ class PolygonGTDataset(Dataset):
                 x = x.permute((1, 2, 0)).numpy()
                 o = self.aug(image=x)
                 x = torch.tensor(o['image'].transpose(2, 0, 1))
-            return x, y
+            return {'image': x, 'target': y}
         else:
             item = self.training_set[index]
             try:
@@ -501,7 +501,7 @@ class PolygonGTDataset(Dataset):
                     im = im.permute((1, 2, 0)).numpy()
                     o = self.aug(image=im)
                     im = torch.tensor(o['image'].transpose(2, 0, 1))
-                return (im, item[1])
+                return {'image': im, 'target': item[1]}
             except Exception:
                 idx = np.random.randint(0, len(self.training_set))
                 logger.debug('Failed. Replacing with sample {}'.format(idx))
@@ -665,8 +665,8 @@ class GroundTruthDataset(Dataset):
                 im = x.permute((1, 2, 0)).numpy()
                 o = self.aug(image=im)
                 im = torch.tensor(o['image'].transpose(2, 0, 1))
-                return im, y
-            return x, y
+                return {'image': im, 'target': y}
+            return {'image': x, 'target': y}
         else:
             item = self.training_set[index]
             try:
@@ -682,7 +682,7 @@ class GroundTruthDataset(Dataset):
                     im = im.permute((1, 2, 0)).numpy()
                     o = self.aug(image=im)
                     im = torch.tensor(o['image'].transpose(2, 0, 1))
-                return im, item[1]
+                return {'image': im, 'target': item[1]}
             except Exception:
                 idx = np.random.randint(0, len(self.training_set))
                 logger.debug('Failed. Replacing with sample {}'.format(idx))
@@ -873,13 +873,14 @@ class BaselineSet(Dataset):
             try:
                 logger.debug('Attempting to load {}'.format(im))
                 im = Image.open(im)
-                return self.transform(im, target)
+                im, target = self.transform(im, target)
+                return {'image': im, 'target': target}
             except Exception:
                 idx = np.random.randint(0, len(self.imgs))
                 logger.debug('Failed. Replacing with sample {}'.format(idx))
                 return self[np.random.randint(0, len(self.imgs))]
         im, target = self.transform(im, target)
-        return im, target
+        return {'image': im, 'target': target}
 
     @staticmethod
     def _get_ortho_line(lineseg, point, line_width, offset):
@@ -933,7 +934,7 @@ class BaselineSet(Dataset):
             o = self.aug(image=image, mask=target)
             image = torch.tensor(o['image']).permute(2, 0, 1)
             target = torch.tensor(o['mask']).permute(2, 0, 1)
-        return image, target
+        return {'image': image, 'target': target}
 
     def __len__(self):
         return len(self.imgs)
