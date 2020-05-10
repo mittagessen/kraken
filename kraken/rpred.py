@@ -251,7 +251,7 @@ class mm_rpred(object):
                 continue
 
             logger.debug('Forward pass with model {}'.format(script))
-            preds = self.nets[script].predict(line)
+            preds = self.nets[script].predict(line.unsqueeze(0))[0]
 
             # calculate recognized LSTM locations of characters
             logger.debug('Convert to absolute coordinates')
@@ -304,7 +304,7 @@ class mm_rpred(object):
         if line.max() == line.min():
             return ocr_record('', [], [], coords)
 
-        preds = self.nets[script].predict(line)
+        preds = self.nets[script].predict(line.unsqueeze(0))[0]
         # calculate recognized LSTM locations of characters
         # scale between network output and network input
         net_scale = line.shape[2]/self.nets[script].outputs.shape[1]
