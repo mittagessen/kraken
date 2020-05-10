@@ -79,7 +79,7 @@ class TorchSeqRecognizer(object):
         o, olens = self.nn.nn(line, lens)
         if o.size(2) != 1:
             raise KrakenInputException('Expected dimension 3 to be 1, actual {}'.format(o.size()))
-        self.outputs = o.detach().squeeze().cpu().numpy()
+        self.outputs = o.detach().squeeze(2).cpu().numpy()
         if olens is not None:
             olens = olens.cpu().numpy()
         return self.outputs, olens
@@ -99,8 +99,12 @@ class TorchSeqRecognizer(object):
         """
         o, olens = self.forward(line, lens)
         dec_seqs = []
-        for seq, seq_len in zip(o, olens):
-            locs = self.decoder(seq[:seq_len])
+        if olens is not None:
+            for seq, seq_len in zip(o, olens):
+                locs = self.decoder(seq[:, :seq_len])
+                dec_seqs.append(self.codec.decode(locs))
+        else:
+            locs = self.decoder(o[0])
             dec_seqs.append(self.codec.decode(locs))
         return dec_seqs
 
@@ -111,8 +115,12 @@ class TorchSeqRecognizer(object):
         """
         o, olens = self.forward(line, lens)
         dec_strs = []
-        for seq, seq_len in zip(o, olens):
-            locs = self.decoder(seq[:seq_len])
+        if olens is not None:
+            for seq, seq_len in zip(o, olens):
+                locs = self.decoder(seq[:, :seq_len])
+                dec_strs.append(''.join(x[0] for x in self.codec.decode(locs)))
+        else:
+            locs = self.decoder(o[0])
             dec_strs.append(''.join(x[0] for x in self.codec.decode(locs)))
         return dec_strs
 
@@ -124,8 +132,11 @@ class TorchSeqRecognizer(object):
         """
         o, olens = self.forward(line, lens)
         oseqs = []
-        for seq, seq_len in zip(o, olens):
-            oseqs.append(self.decoder(seq[:seq_len]))
+        if olens is not None:
+            for seq, seq_len in zip(o, olens):
+                oseqs.append(self.decoder(seq[:, :seq_len]))
+        else:
+            oseqs.append(self.decoder(o[0]))
         return oseqs
 
 
