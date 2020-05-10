@@ -80,7 +80,8 @@ class TorchSeqRecognizer(object):
         if o.size(2) != 1:
             raise KrakenInputException('Expected dimension 3 to be 1, actual {}'.format(o.size()))
         self.outputs = o.detach().squeeze().cpu().numpy()
-        olens = olens.cpu().numpy()
+        if olens is not None:
+            olens = olens.cpu().numpy()
         return self.outputs, olens
 
     def predict(self, line: torch.Tensor, lens: torch.Tensor = None) -> List[List[Tuple[str, int, int, float]]]:
@@ -112,7 +113,7 @@ class TorchSeqRecognizer(object):
         dec_strs = []
         for seq, seq_len in zip(o, olens):
             locs = self.decoder(seq[:seq_len])
-            dec_strs.append(x[0] for x in self.codec.decode(locs))
+            dec_strs.append(''.join(x[0] for x in self.codec.decode(locs)))
         return dec_strs
 
     def predict_labels(self, line: torch.tensor, lens: torch.Tensor = None) -> List[List[Tuple[int, int, int, float]]]:

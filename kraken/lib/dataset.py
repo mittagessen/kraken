@@ -34,7 +34,7 @@ from collections import Counter, defaultdict
 from torchvision import transforms
 from torch.utils.data import Dataset, DataLoader
 from torch.nn.utils.rnn import pad_sequence
-from typing import Dict, List, Tuple, Sequence, Callable, Optional, Any, Union, cast
+from typing import Dict, List, Tuple, Iterable, Sequence, Callable, Optional, Any, Union, cast
 
 from skimage.draw import polygon
 
@@ -260,7 +260,7 @@ def compute_confusions(algn1: Sequence[str], algn2: Sequence[str]):
                 subs[script] += v
     return counts, scripts, ins, dels, subs
 
-def compute_error(model: TorchSeqRecognizer, validation_set: Sequence[Tuple[str, str]]) -> Tuple[int, int]:
+def compute_error(model: TorchSeqRecognizer, validation_set: Iterable[Dict[str, torch.Tensor]]) -> Tuple[int, int]:
     """
     Computes error report from a model and a list of line image-text pairs.
 
@@ -274,10 +274,11 @@ def compute_error(model: TorchSeqRecognizer, validation_set: Sequence[Tuple[str,
     """
     total_chars = 0
     error = 0
-    for im, text in validation_set:
-        pred = model.predict_string(im)
-        total_chars += len(text)
-        error += _fast_levenshtein(pred, text)
+    for batch in validation_set:
+        preds = model.predict_string(batch['image'], batch['seq_lens'])
+        total_chars += batch['target_lens'].sum()
+        for pred, text in zip(preds, batch['target']):
+            error += _fast_levenshtein(pred, text)
     return total_chars, error
 
 
@@ -353,7 +354,10 @@ def collate_sequences(batch):
     seq_lens = torch.LongTensor([seq.shape[2] for seq in seqs])
     max_len = seqs[0].shape[2]
     seqs = torch.stack([F.pad(seq, pad=(0, max_len-seq.shape[2])) for seq in seqs])
-    labels = torch.cat([x['target'] for x in sorted_batch]).long()
+    if isinstance(sorted_batch[0]['target'], str):
+        labels = [x['target'] for x in sorted_batch]
+    else:
+        labels = torch.cat([x['target'] for x in sorted_batch]).long()
     label_lens = torch.LongTensor([len(x['target']) for x in sorted_batch])
     return {'image': seqs, 'target': labels, 'seq_lens': seq_lens, 'target_lens': label_lens}
 
