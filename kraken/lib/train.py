@@ -261,7 +261,7 @@ def baseline_label_loss_fn(criterion, output, target):
     return loss
 
 
-def recognition_evaluator_fn(model, val_set, device):
+def recognition_evaluator_fn(model, val_loader, device):
     rec = models.TorchSeqRecognizer(model, device=device)
     chars, error = compute_error(rec, list(val_set))
     model.train()
@@ -269,7 +269,7 @@ def recognition_evaluator_fn(model, val_set, device):
     return {'val_metric': accuracy, 'accuracy': accuracy, 'chars': chars, 'error': error}
 
 
-def baseline_label_evaluator_fn(model, val_set, device):
+def baseline_label_evaluator_fn(model, val_loader, device):
     smooth = np.finfo(np.float).eps
     corrects = torch.zeros(val_set.num_classes, dtype=torch.double).to(device)
     all_n = torch.zeros(val_set.num_classes, dtype=torch.double).to(device)
@@ -656,7 +656,12 @@ class KrakenTrainer(object):
         threads = max(threads - loader_threads, 1)
 
         # don't encode validation set as the alphabets may not match causing encoding failures
-        val_set.training_set = list(zip(val_set._images, val_set._gt))
+        val_set.no_encode()
+        val_loader = DataLoader(val_set,
+                                batch_size=hyper_params['batch_size'],
+                                num_workers=loader_threads,
+                                pin_memory=True,
+                                collate_fn=collate_sequences)
 
         logger.debug('Constructing {} optimizer (lr: {}, momentum: {})'.format(hyper_params['optimizer'], hyper_params['lrate'], hyper_params['momentum']))
 
@@ -705,7 +710,7 @@ class KrakenTrainer(object):
                       filename_prefix=output,
                       event_frequency=hyper_params['freq'],
                       train_set=train_loader,
-                      val_set=val_set,
+                      val_set=val_loader,
                       stopper=st_it)
 
         trainer.add_lr_scheduler(tr_it)
@@ -865,7 +870,7 @@ class KrakenTrainer(object):
             loader_threads = threads
 
         train_loader = InfiniteDataLoader(gt_set, batch_size=1, shuffle=True, num_workers=loader_threads, pin_memory=True)
-        test_loader = DataLoader(val_set, batch_size=1, shuffle=True, num_workers=loader_threads, pin_memory=True)
+        val_loader = DataLoader(val_set, batch_size=1, shuffle=True, num_workers=loader_threads, pin_memory=True)
         threads = max((threads - loader_threads, 1))
 
         # set model type metadata field and dump class_mapping
@@ -910,7 +915,7 @@ class KrakenTrainer(object):
                       filename_prefix=output,
                       event_frequency=hyper_params['freq'],
                       train_set=train_loader,
-                      val_set=val_set,
+                      val_set=val_loader,
                       stopper=st_it,
                       loss_fn=baseline_label_loss_fn,
                       evaluator=baseline_label_evaluator_fn)

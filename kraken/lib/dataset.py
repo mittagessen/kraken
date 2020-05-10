@@ -477,6 +477,14 @@ class PolygonGTDataset(Dataset):
         for im, gt in zip(self._images, self._gt):
             self.training_set.append((im, self.codec.encode(gt)))
 
+    def no_encode(self) -> None:
+        """
+        Creates an unencoded dataset.
+        """
+        self.training_set = []  # type: List[Tuple[Union[Image, torch.Tensor], str]]
+        for im, gt in zip(self._images, self._gt):
+            self.training_set.append((im, gt))
+
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor]:
         if self.preload:
             x, y = self.training_set[index]
@@ -657,6 +665,14 @@ class GroundTruthDataset(Dataset):
         self.training_set = []  # type: List[Tuple[Union[Image, torch.Tensor], torch.Tensor]]
         for im, gt in zip(self._images, self._gt):
             self.training_set.append((im, self.codec.encode(gt)))
+
+    def no_encode(self) -> None:
+        """
+        Creates an unencoded dataset.
+        """
+        self.training_set = []  # type: List[Tuple[Union[Image, torch.Tensor], str]]
+        for im, gt in zip(self._images, self._gt):
+            self.training_set.append((im, gt))
 
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor]:
         if self.preload:
