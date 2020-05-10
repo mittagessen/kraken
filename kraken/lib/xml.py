@@ -167,8 +167,10 @@ def parse_page(filename):
             text = ''
             manual_transcription = line.find('./{*}TextEquiv')
             if manual_transcription is not None:
-                line = manual_transcription
-            for el in line.findall('.//{*}Unicode'):
+                transcription = manual_transcription
+            else:
+                transcription = line
+            for el in transcription.findall('.//{*}Unicode'):
                 if el.text:
                     text += el.text
             # retrieve line tag if custom string is set and contains
