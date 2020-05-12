@@ -73,8 +73,7 @@ def cli(format_type, files):
         l = []
         for x in seg['lines']:
             bl = x['baseline'] if x['baseline'] is not None else [0, 0]
-            pl = x['boundary'] if x['boundary'] is not None else [0, 0]
-            l.append((bl, pl))
+            l.append(bl)
         o = calculate_polygonal_environment(im, l, scale=(1200, 0))
         print(o)
 
