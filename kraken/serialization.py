@@ -182,17 +182,18 @@ def serialize(records: Sequence[ocr_record],
                                               segment,
                                               range(char_idx, char_idx + len(segment)))],
                           'index': seg_idx}
-            # compute complex hull of all characters in segment
+            # compute convex hull of all characters in segment
             if record.type == 'baselines':
                 pols = []
                 for x in record.cuts[line_offset:line_offset + len(segment)]:
                     try:
-                        pols.append(geom.Polygon(x))
+                        pol = geom.Polygon(x)
                     except ValueError:
-                        pols.append(geom.LineString(x).buffer(0.5, cap_style=2))
+                        pol = geom.LineString(x).buffer(0.5, cap_style=2)
+                    if pol.area == 0.0:
+                        pol = pol.buffer(0.5)
+                    pols.append(pol)
                 pols = unary_union(pols)
-                if pols.convex_hull.type == 'LineString':
-                    pols = pols.buffer(0.5, cap_style=2)
                 coords = np.array(pols.convex_hull.exterior.coords, dtype=np.uint).tolist()
                 seg_struct['boundary'] = coords
             line['recognition'].append(seg_struct)
