@@ -281,7 +281,8 @@ def baseline_label_evaluator_fn(model, val_loader, device):
     model.eval()
 
     with torch.no_grad():
-        for x, y in val_loader:
+        for batch in val_loader:
+            x,y = batch['image'], batch['target']
             x = x.to(device)
             y = y.to(device).unsqueeze(0)
             pred = model.nn(x.unsqueeze(0))
