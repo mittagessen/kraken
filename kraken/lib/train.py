@@ -284,8 +284,8 @@ def baseline_label_evaluator_fn(model, val_loader, device):
         for batch in val_loader:
             x,y = batch['image'], batch['target']
             x = x.to(device)
-            y = y.to(device).unsqueeze(0)
-            pred = model.nn(x.unsqueeze(0))
+            y = y.to(device)
+            pred = model.nn(x)
             # scale target to output size
             y = F.interpolate(y, size=(pred.size(2), pred.size(3))).squeeze(0).bool()
             pred = segmentation.denoising_hysteresis_thresh(pred.detach().squeeze().cpu().numpy(), 0.2, 0.3, 0)
