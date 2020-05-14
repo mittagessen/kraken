@@ -257,6 +257,8 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
 
 @cli.command('train')
 @click.pass_context
+@click.option('-B', '--batch-size', show_default=True, type=click.INT,
+              default=RECOGNITION_HYPER_PARAMS['batch_size'], help='batch sample size')
 @click.option('-p', '--pad', show_default=True, type=click.INT, default=16, help='Left and right '
               'padding around lines')
 @click.option('-o', '--output', show_default=True, type=click.Path(), default='model', help='Output model file')
@@ -323,7 +325,7 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
               'containing the transcription.')
 @click.option('--augment/--no-augment', show_default=True, default=RECOGNITION_HYPER_PARAMS['augment'], help='Enable image augmentation')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
-def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
+def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
           lag, min_delta, device, optimizer, lrate, momentum, weight_decay,
           schedule, partition, normalization, normalize_whitespace, codec,
           resize, reorder, training_files, evaluation_files, preload, threads,
@@ -345,6 +347,7 @@ def train(ctx, pad, output, spec, append, load, freq, quit, epochs,
     hyper_params = RECOGNITION_HYPER_PARAMS.copy()
     hyper_params.update({'freq': freq,
                          'pad': pad,
+                         'batch_size': batch_size,
                          'quit': quit,
                          'epochs': epochs,
                          'lag': lag,
@@ -481,7 +484,7 @@ def test(ctx, model, evaluation_files, device, pad, threads, reorder,
 
     from kraken.serialization import render_report
     from kraken.lib import models
-    from kraken.lib.dataset import global_align, compute_confusions, generate_input_transforms, preparse_xml_data, PolygonGTDataset, GroundTruthDataset
+    from kraken.lib.dataset import global_align, compute_confusions, preparse_xml_data, PolygonGTDataset, GroundTruthDataset
 
     logger.info('Building test set from {} line images'.format(len(test_set) + len(evaluation_files)))
 

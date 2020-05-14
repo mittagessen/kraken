@@ -24,6 +24,7 @@ import numpy as np
 import pkg_resources
 import bidi.algorithm as bd
 import shapely.geometry as geom
+import torch.nn.functional as F
 import torchvision.transforms.functional as tf
 
 from os import path
@@ -32,7 +33,8 @@ from itertools import groupby
 from collections import Counter, defaultdict
 from torchvision import transforms
 from torch.utils.data import Dataset, DataLoader
-from typing import Dict, List, Tuple, Sequence, Callable, Optional, Any, Union, cast
+from torch.nn.utils.rnn import pad_sequence
+from typing import Dict, List, Tuple, Iterable, Sequence, Callable, Optional, Any, Union, cast
 
 from skimage.draw import polygon
 
@@ -258,7 +260,7 @@ def compute_confusions(algn1: Sequence[str], algn2: Sequence[str]):
                 subs[script] += v
     return counts, scripts, ins, dels, subs
 
-def compute_error(model: TorchSeqRecognizer, validation_set: Sequence[Tuple[str, str]]) -> Tuple[int, int]:
+def compute_error(model: TorchSeqRecognizer, validation_set: Iterable[Dict[str, torch.Tensor]]) -> Tuple[int, int]:
     """
     Computes error report from a model and a list of line image-text pairs.
 
@@ -272,10 +274,11 @@ def compute_error(model: TorchSeqRecognizer, validation_set: Sequence[Tuple[str,
     """
     total_chars = 0
     error = 0
-    for im, text in validation_set:
-        pred = model.predict_string(im)
-        total_chars += len(text)
-        error += _fast_levenshtein(pred, text)
+    for batch in validation_set:
+        preds = model.predict_string(batch['image'], batch['seq_lens'])
+        total_chars += batch['target_lens'].sum()
+        for pred, text in zip(preds, batch['target']):
+            error += _fast_levenshtein(pred, text)
     return total_chars, error
 
 
@@ -340,6 +343,23 @@ def _repolygonize(im: Image.Image, lines):
     im = Image.open(im).convert('L')
     polygons = calculate_polygonal_environment(im, [x['baseline'] for x in lines])
     return [{'boundary': polygon, 'baseline': orig['baseline'], 'text': orig['text']} for orig, polygon in zip(lines, polygons)]
+
+
+def collate_sequences(batch):
+    """
+    Sorts and pads sequences.
+    """
+    sorted_batch = sorted(batch, key=lambda x: x['image'].shape[2], reverse=True)
+    seqs = [x['image'] for x in sorted_batch]
+    seq_lens = torch.LongTensor([seq.shape[2] for seq in seqs])
+    max_len = seqs[0].shape[2]
+    seqs = torch.stack([F.pad(seq, pad=(0, max_len-seq.shape[2])) for seq in seqs])
+    if isinstance(sorted_batch[0]['target'], str):
+        labels = [x['target'] for x in sorted_batch]
+    else:
+        labels = torch.cat([x['target'] for x in sorted_batch]).long()
+    label_lens = torch.LongTensor([len(x['target']) for x in sorted_batch])
+    return {'image': seqs, 'target': labels, 'seq_lens': seq_lens, 'target_lens': label_lens}
 
 
 class InfiniteDataLoader(DataLoader):
@@ -461,6 +481,14 @@ class PolygonGTDataset(Dataset):
         for im, gt in zip(self._images, self._gt):
             self.training_set.append((im, self.codec.encode(gt)))
 
+    def no_encode(self) -> None:
+        """
+        Creates an unencoded dataset.
+        """
+        self.training_set = []  # type: List[Tuple[Union[Image, torch.Tensor], str]]
+        for im, gt in zip(self._images, self._gt):
+            self.training_set.append((im, gt))
+
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor]:
         if self.preload:
             x, y = self.training_set[index]
@@ -468,7 +496,7 @@ class PolygonGTDataset(Dataset):
                 x = x.permute((1, 2, 0)).numpy()
                 o = self.aug(image=x)
                 x = torch.tensor(o['image'].transpose(2, 0, 1))
-            return x, y
+            return {'image': x, 'target': y}
         else:
             item = self.training_set[index]
             try:
@@ -485,7 +513,7 @@ class PolygonGTDataset(Dataset):
                     im = im.permute((1, 2, 0)).numpy()
                     o = self.aug(image=im)
                     im = torch.tensor(o['image'].transpose(2, 0, 1))
-                return (im, item[1])
+                return {'image': im, 'target': item[1]}
             except Exception:
                 idx = np.random.randint(0, len(self.training_set))
                 logger.debug('Failed. Replacing with sample {}'.format(idx))
@@ -642,6 +670,14 @@ class GroundTruthDataset(Dataset):
         for im, gt in zip(self._images, self._gt):
             self.training_set.append((im, self.codec.encode(gt)))
 
+    def no_encode(self) -> None:
+        """
+        Creates an unencoded dataset.
+        """
+        self.training_set = []  # type: List[Tuple[Union[Image, torch.Tensor], str]]
+        for im, gt in zip(self._images, self._gt):
+            self.training_set.append((im, gt))
+
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor]:
         if self.preload:
             x, y = self.training_set[index]
@@ -649,8 +685,8 @@ class GroundTruthDataset(Dataset):
                 im = x.permute((1, 2, 0)).numpy()
                 o = self.aug(image=im)
                 im = torch.tensor(o['image'].transpose(2, 0, 1))
-                return im, y
-            return x, y
+                return {'image': im, 'target': y}
+            return {'image': x, 'target': y}
         else:
             item = self.training_set[index]
             try:
@@ -666,7 +702,7 @@ class GroundTruthDataset(Dataset):
                     im = im.permute((1, 2, 0)).numpy()
                     o = self.aug(image=im)
                     im = torch.tensor(o['image'].transpose(2, 0, 1))
-                return im, item[1]
+                return {'image': im, 'target': item[1]}
             except Exception:
                 idx = np.random.randint(0, len(self.training_set))
                 logger.debug('Failed. Replacing with sample {}'.format(idx))
@@ -857,14 +893,14 @@ class BaselineSet(Dataset):
             try:
                 logger.debug('Attempting to load {}'.format(im))
                 im = Image.open(im)
-                return self.transform(im, target)
+                im, target = self.transform(im, target)
+                return {'image': im, 'target': target}
             except Exception:
-                raise
                 idx = np.random.randint(0, len(self.imgs))
                 logger.debug('Failed. Replacing with sample {}'.format(idx))
                 return self[np.random.randint(0, len(self.imgs))]
         im, target = self.transform(im, target)
-        return im, target
+        return {'image': im, 'target': target}
 
     @staticmethod
     def _get_ortho_line(lineseg, point, line_width, offset):

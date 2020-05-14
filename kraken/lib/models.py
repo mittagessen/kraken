@@ -62,48 +62,82 @@ class TorchSeqRecognizer(object):
         self.device = device
         self.nn.to(device)
 
-    def forward(self, line: torch.Tensor) -> np.array:
+    def forward(self, line: torch.Tensor, lens: torch.Tensor = None) -> np.array:
         """
-        Performs a forward pass on a torch tensor of a line with shape (C, H, W)
-        and returns a numpy array (W, C).
+        Performs a forward pass on a torch tensor of one or more lines with
+        shape (N, C, H, W) and returns a numpy array (N, W, C).
+
+        Args:
+            line (torch.Tensor): NCHW line tensor
+            lens (torch.Tensor): Optional tensor containing sequence lengths if N > 1
+
+        Returns:
+            Tuple with (N, W, C) shaped numpy array and final output sequence
+            lengths.
         """
-        # make CHW -> 1CHW
         line = line.to(self.device)
-        line = line.unsqueeze(0)
-        o = self.nn.nn(line)
+        o, olens = self.nn.nn(line, lens)
         if o.size(2) != 1:
             raise KrakenInputException('Expected dimension 3 to be 1, actual {}'.format(o.size()))
-        self.outputs = o.detach().squeeze().cpu().numpy()
-        return self.outputs
+        self.outputs = o.detach().squeeze(2).cpu().numpy()
+        if olens is not None:
+            olens = olens.cpu().numpy()
+        return self.outputs, olens
 
-    def predict(self, line: torch.Tensor) -> List[Tuple[str, int, int, float]]:
+    def predict(self, line: torch.Tensor, lens: torch.Tensor = None) -> List[List[Tuple[str, int, int, float]]]:
         """
-        Performs a forward pass on a torch tensor of a line with shape (C, H, W)
+        Performs a forward pass on a torch tensor of a line with shape (N, C, H, W)
         and returns the decoding as a list of tuples (string, start, end,
         confidence).
-        """
-        o = self.forward(line)
-        locs = self.decoder(o)
-        return self.codec.decode(locs)
 
-    def predict_string(self, line: torch.Tensor) -> str:
+        Args:
+            line (torch.Tensor): NCHW line tensor
+            lens (torch.Tensor): Optional tensor containing sequence lengths if N > 1
+
+        Returns:
+            List of decoded sequences.
+        """
+        o, olens = self.forward(line, lens)
+        dec_seqs = []
+        if olens is not None:
+            for seq, seq_len in zip(o, olens):
+                locs = self.decoder(seq[:, :seq_len])
+                dec_seqs.append(self.codec.decode(locs))
+        else:
+            locs = self.decoder(o[0])
+            dec_seqs.append(self.codec.decode(locs))
+        return dec_seqs
+
+    def predict_string(self, line: torch.Tensor, lens: torch.Tensor = None) -> List[str]:
         """
         Performs a forward pass on a torch tensor of a line with shape (C, H, W)
         and returns a string of the results.
         """
-        o = self.forward(line)
-        locs = self.decoder(o)
-        decoding = self.codec.decode(locs)
-        return ''.join(x[0] for x in decoding)
+        o, olens = self.forward(line, lens)
+        dec_strs = []
+        if olens is not None:
+            for seq, seq_len in zip(o, olens):
+                locs = self.decoder(seq[:, :seq_len])
+                dec_strs.append(''.join(x[0] for x in self.codec.decode(locs)))
+        else:
+            locs = self.decoder(o[0])
+            dec_strs.append(''.join(x[0] for x in self.codec.decode(locs)))
+        return dec_strs
 
-    def predict_labels(self, line: torch.tensor) -> List[Tuple[int, int, int, float]]:
+    def predict_labels(self, line: torch.tensor, lens: torch.Tensor = None) -> List[List[Tuple[int, int, int, float]]]:
         """
-        Performs a forward pass on a torch tensor of a line with shape (C, H, W)
+        Performs a forward pass on a torch tensor of a line with shape (N, C, H, W)
         and returns a list of tuples (class, start, end, max). Max is the
         maximum value of the softmax layer in the region.
         """
-        o = self.forward(line)
-        return self.decoder(o)
+        o, olens = self.forward(line, lens)
+        oseqs = []
+        if olens is not None:
+            for seq, seq_len in zip(o, olens):
+                oseqs.append(self.decoder(seq[:, :seq_len]))
+        else:
+            oseqs.append(self.decoder(o[0]))
+        return oseqs
 
 
 def load_any(fname: str, train: bool = False, device: str = 'cpu') -> TorchSeqRecognizer:

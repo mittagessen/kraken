@@ -130,7 +130,11 @@ def parse_page(filename):
         for region in regions:
             coords = region.find('{*}Coords')
             if coords is not None and not coords.get('points').isspace() and len(coords.get('points')):
-                coords = _parse_coords(coords.get('points'))
+                try:
+                    coords = _parse_coords(coords.get('points'))
+                except:
+                    logger.warning('Region {} without coordinates'.format(region.get('id')))
+                    continue
             else:
                 logger.warning('Region {} without coordinates'.format(region.get('id')))
                 continue
@@ -154,13 +158,21 @@ def parse_page(filename):
             pol = line.find('./{*}Coords')
             boundary = None
             if pol is not None and not pol.get('points').isspace() and len(pol.get('points')):
-                boundary = _parse_coords(pol.get('points'))
+                try:
+                    boundary = _parse_coords(pol.get('points'))
+                except:
+                    logger.info('TextLine {} without polygon'.format(line.get('id')))
+                    pass
             else:
                 logger.info('TextLine {} without polygon'.format(line.get('id')))
             base = line.find('./{*}Baseline')
             baseline = None
             if base is not None and not base.get('points').isspace() and len(base.get('points')):
-                baseline = _parse_coords(base.get('points'))
+                try:
+                    baseline = _parse_coords(pol.get('points'))
+                except:
+                    logger.info('TextLine {} without baseline'.format(line.get('id')))
+                    continue
             else:
                 logger.warning('TextLine {} without baseline'.format(line.get('id')))
                 continue

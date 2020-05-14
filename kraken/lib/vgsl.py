@@ -108,7 +108,7 @@ class TorchVGSLModel(object):
         self.ops = [self.build_rnn, self.build_dropout, self.build_maxpool, self.build_conv, self.build_output, self.build_reshape, self.build_groupnorm]
         self.codec = None  # type: Optional[PytorchCodec]
         self.criterion = None  # type: Any
-        self.nn = torch.nn.Sequential()
+        self.nn = layers.MultiParamSequential()
         self.user_metadata = {'accuracy': [], 'seg_type': None, 'one_channel_mode': None, 'model_type': None, 'hyper_params': {}}  # type: dict[str, str]
 
         self.idx = -1
@@ -732,7 +732,7 @@ class TorchVGSLModel(object):
         if nl in ['l', 's'] and int(m.group('out')) >= 1:
             self.criterion = nn.BCELoss()
         elif nl == 'c':
-            self.criterion = nn.CTCLoss(reduction='none')
+            self.criterion = nn.CTCLoss(reduction='sum', zero_infinity=True)
         else:
             raise ValueError('unsupported output specification')
         # heatmap output
