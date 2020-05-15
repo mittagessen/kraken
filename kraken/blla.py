@@ -124,7 +124,7 @@ def segment(im,
 
     with torch.no_grad():
         logger.debug('Running network forward pass')
-        o = model.nn(transforms(im).unsqueeze(0).to(device))
+        o, _ = model.nn(transforms(im).unsqueeze(0).to(device))
     logger.debug('Upsampling network output')
     o = F.interpolate(o, size=scal_im.size[::-1])
     o = o.squeeze().cpu().numpy()
