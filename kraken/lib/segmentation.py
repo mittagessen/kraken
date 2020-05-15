@@ -761,7 +761,7 @@ def compute_polygon_section(baseline, boundary, dist1, dist2):
     try:
         points = [_test_intersect(point, uv[::-1], bounds).round() for point, uv in zip(seg_points, unit_vec)]
     except ValueError:
-        logger.warning('No intercepts with polygon (possibly misshaped polygon)')
+        logger.info('No intercepts with polygon (possibly misshaped polygon)')
         return seg_points.astype('int').tolist()
     o = np.int_(points[0]).reshape(-1, 2).tolist()
     o.extend(np.int_(np.roll(points[1], 2)).reshape(-1, 2).tolist())
