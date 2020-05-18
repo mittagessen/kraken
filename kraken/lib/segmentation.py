@@ -654,7 +654,7 @@ def polygonal_reading_order(lines: Sequence[Tuple[List, List]],
             intra_region_order[idx] = [region_lines[idx][i][0] for i in lsort]
             reg = reg.bounds
             bounds.append((slice(reg[1], reg[0]), slice(reg[3], reg[2])))
-            indizes[line_idx+idx] = ('region', idx)
+            indizes[line_idx+idx+1] = ('region', idx)
     # order unassigned lines and regions
     order = reading_order(bounds, text_direction)
     lsort = topsort(order)
