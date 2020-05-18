@@ -36,6 +36,7 @@ from kraken.lib.default_specs import (SEGMENTATION_HYPER_PARAMS,
                                       RECOGNITION_HYPER_PARAMS,
                                       SEGMENTATION_SPEC,
                                       RECOGNITION_SPEC)
+from kraken.lib.dataset import generate_input_transforms                                      
 
 APP_NAME = 'kraken'
 
