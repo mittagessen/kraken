@@ -434,6 +434,8 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
 
 @cli.command('test')
 @click.pass_context
+@click.option('-B', '--batch-size', show_default=True, type=click.INT,
+              default=RECOGNITION_HYPER_PARAMS['batch_size'], help='batch sample size')
 @click.option('-m', '--model', show_default=True, type=click.Path(exists=True, readable=True),
               multiple=True, help='Model(s) to evaluate')
 @click.option('-e', '--evaluation-files', show_default=True, default=None, multiple=True,
@@ -468,9 +470,9 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
               'sharing a prefix up to the last extension with JSON `.path` files'
               'containing the baseline information.')
 @click.argument('test_set', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
-def test(ctx, model, evaluation_files, device, pad, threads, reorder,
-         normalization, normalize_whitespace, repolygonize, force_binarization,
-         format_type, test_set):
+def test(ctx, batch_size, model, evaluation_files, device, pad, threads,
+         reorder, normalization, normalize_whitespace, repolygonize,
+         force_binarization, format_type, test_set):
     """
     Evaluate on a test set.
     """
@@ -481,10 +483,11 @@ def test(ctx, model, evaluation_files, device, pad, threads, reorder,
     import unicodedata
     import numpy as np
     from PIL import Image
+    from torch.utils.data import DataLoader
 
     from kraken.serialization import render_report
     from kraken.lib import models
-    from kraken.lib.dataset import global_align, compute_confusions, preparse_xml_data, PolygonGTDataset, GroundTruthDataset, generate_input_transforms
+    from kraken.lib.dataset import global_align, compute_confusions, preparse_xml_data, PolygonGTDataset, GroundTruthDataset, generate_input_transforms, collate_sequences
 
     logger.info('Building test set from {} line images'.format(len(test_set) + len(evaluation_files)))
 
@@ -497,8 +500,7 @@ def test(ctx, model, evaluation_files, device, pad, threads, reorder,
     test_set = list(test_set)
 
     # set number of OpenMP threads
-    logger.debug('Set OpenMP threads to {}'.format(threads))
-    next(iter(nn.values())).nn.set_num_threads(threads)
+    next(iter(nn.values())).nn.set_num_threads(1)
 
     if evaluation_files:
         test_set.extend(evaluation_files)
@@ -550,17 +552,26 @@ def test(ctx, model, evaluation_files, device, pad, threads, reorder,
         for line in test_set:
             ds.add(**line)
         # don't encode validation set as the alphabets may not match causing encoding failures
-        ds.training_set = list(zip(ds._images, ds._gt))
+        ds.no_encode()
+        ds_loader = DataLoader(ds,
+                               batch_size=batch_size,
+                               num_workers=threads,
+                               pin_memory=True,
+                               collate_fn=collate_sequences)
 
-        with log.progressbar(ds, label='Evaluating') as bar:
-            for im, text in list(bar):
+        with log.progressbar(ds_loader, label='Evaluating') as bar:
+            for batch in bar:
+                im = batch['image']
+                text = batch['target']
+                lens = batch['seq_lens']
                 try:
-                    pred = net.predict_string(im)
-                    chars += len(text)
-                    c, algn1, algn2 = global_align(text, pred)
-                    algn_gt.extend(algn1)
-                    algn_pred.extend(algn2)
-                    error += c
+                    pred = net.predict_string(im, lens)
+                    for x, y in zip(pred, text):
+                        chars += len(y)
+                        c, algn1, algn2 = global_align(y, x)
+                        algn_gt.extend(algn1)
+                        algn_pred.extend(algn2)
+                        error += c
                 except FileNotFoundError as e:
                     logger.warning('{} {}. Skipping.'.format(e.strerror, e.filename))
                 except KrakenInputException as e:

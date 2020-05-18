@@ -110,7 +110,7 @@ class TorchSeqRecognizer(object):
 
     def predict_string(self, line: torch.Tensor, lens: torch.Tensor = None) -> List[str]:
         """
-        Performs a forward pass on a torch tensor of a line with shape (C, H, W)
+        Performs a forward pass on a torch tensor of a line with shape (N, C, H, W)
         and returns a string of the results.
         """
         o, olens = self.forward(line, lens)
