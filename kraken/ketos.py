@@ -107,10 +107,10 @@ def _validate_merging(ctx, param, value):
 @click.option('-F', '--freq', show_default=True, default=SEGMENTATION_HYPER_PARAMS['freq'], type=click.FLOAT,
               help='Model saving and report generation frequency in epochs during training')
 @click.option('-q', '--quit', show_default=True, default=SEGMENTATION_HYPER_PARAMS['quit'], type=click.Choice(['early', 'dumb']),
-              help='Stop condition for training. Set to `early` for early stooping or `dumb` for fixed number of epochs')
+              help='Stop condition for training. Set to `early` for early stopping or `dumb` for fixed number of epochs')
 @click.option('-N', '--epochs', show_default=True, default=SEGMENTATION_HYPER_PARAMS['epochs'], help='Number of epochs to train for')
 @click.option('--lag', show_default=True, default=SEGMENTATION_HYPER_PARAMS['lag'], help='Number of evaluations (--report frequence) to wait before stopping training without improvement')
-@click.option('--min-delta', show_default=True, default=SEGMENTATION_HYPER_PARAMS['min_delta'], type=click.FLOAT, help='Minimum improvement between epochs to reset early stopping. Default is scales the delta by the best loss')
+@click.option('--min-delta', show_default=True, default=SEGMENTATION_HYPER_PARAMS['min_delta'], type=click.FLOAT, help='Minimum improvement between epochs to reset early stopping. By default it scales the delta by the best loss')
 @click.option('-d', '--device', show_default=True, default='cpu', help='Select device to use (cpu, cuda:0, cuda:1, ...)')
 @click.option('--optimizer', show_default=True, default=SEGMENTATION_HYPER_PARAMS['optimizer'], type=click.Choice(['Adam', 'SGD', 'RMSprop']), help='Select optimizer')
 @click.option('-r', '--lrate', show_default=True, default=SEGMENTATION_HYPER_PARAMS['lrate'], help='Learning rate')
@@ -127,7 +127,7 @@ def _validate_merging(ctx, param, value):
               help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
 @click.option('--threads', show_default=True, default=1, help='Number of OpenMP threads and workers when running on CPU.')
 @click.option('--load-hyper-parameters/--no-load-hyper-parameters', show_default=True, default=False,
-              help='When loading an existing model, retrieve hyperparameters from the model')
+              help='When loading an existing model, retrieve hyper-parameters from the model')
 @click.option('--force-binarization/--no-binarization', show_default=True,
               default=False, help='Forces input images to be binary, otherwise'
               'the appropriate color format will be auto-determined through the'
@@ -305,23 +305,23 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
 @click.option('--load-hyper-parameters/--no-load-hyper-parameters', show_default=True, default=False,
               help='When loading an existing model, retrieve hyperparameters from the model')
 @click.option('--repolygonize/--no-repolygonize', show_default=True,
-              default=False, help='Repolygonizes line data in ALTO/PageXML'
-              'files. This ensures that the trained model is compatible with the'
-              'segmenter in kraken even if the original image files either do'
-              'not contain anything but transcriptions and baseline information'
-              'or the polygon data was created using a different method. Will'
-              'be ignored in `path` mode. Note, that this option will be slow'
-              'and will not scale input images to the same size as the segmenter'
+              default=False, help='Repolygonizes line data in ALTO/PageXML '
+              'files. This ensures that the trained model is compatible with the '
+              'segmenter in kraken even if the original image files either do '
+              'not contain anything but transcriptions and baseline information '
+              'or the polygon data was created using a different method. Will '
+              'be ignored in `path` mode. Note that this option will be slow '
+              'and will not scale input images to the same size as the segmenter '
               'does.')
 @click.option('--force-binarization/--no-binarization', show_default=True,
-              default=False, help='Forces input images to be binary, otherwise'
-              'the appropriate color format will be auto-determined through the'
+              default=False, help='Forces input images to be binary, otherwise '
+              'the appropriate color format will be auto-determined through the '
               'network specification. Will be ignored in `path` mode.')
 @click.option('-f', '--format-type', type=click.Choice(['path', 'xml', 'alto', 'page']), default='path',
-              help='Sets the training data format. In ALTO and PageXML mode all'
-              'data is extracted from xml files containing both line definitions and a'
-              'link to source images. In `path` mode arguments are image files'
-              'sharing a prefix up to the last extension with text `.gt.txt` files'
+              help='Sets the training data format. In ALTO and PageXML mode all '
+              'data is extracted from xml files containing both line definitions and a '
+              'link to source images. In `path` mode arguments are image files '
+              'sharing a prefix up to the last extension with `.gt.txt` text files '
               'containing the transcription.')
 @click.option('--augment/--no-augment', show_default=True, default=RECOGNITION_HYPER_PARAMS['augment'], help='Enable image augmentation')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
@@ -435,7 +435,7 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
 @cli.command('test')
 @click.pass_context
 @click.option('-B', '--batch-size', show_default=True, type=click.INT,
-              default=RECOGNITION_HYPER_PARAMS['batch_size'], help='batch sample size')
+              default=RECOGNITION_HYPER_PARAMS['batch_size'], help='Batch sample size')
 @click.option('-m', '--model', show_default=True, type=click.Path(exists=True, readable=True),
               multiple=True, help='Model(s) to evaluate')
 @click.option('-e', '--evaluation-files', show_default=True, default=None, multiple=True,
