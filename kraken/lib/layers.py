@@ -187,7 +187,7 @@ class Reshape(Module):
         input = input.permute(perm)
         o = input.reshape(input.shape[:dest] + (input.shape[dest] * input.shape[dest + 1],) + input.shape[dest + 2:])
         if seq_len is not None:
-            seq_len = (seq_len * float(initial_len)/o.shape[3]).int()
+            seq_len = (seq_len * (float(initial_len)/o.shape[3])).int()
         return o, seq_len
 
     def get_shape(self, input: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
