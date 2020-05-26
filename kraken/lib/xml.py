@@ -20,6 +20,7 @@ ALTO/Page data loaders for segmentation training
 import os.path
 import logging
 
+from itertools import groupby
 from lxml import etree
 from os.path import dirname
 
@@ -107,7 +108,8 @@ def parse_page(filename):
     def _parse_coords(coords):
         points = [x for x in coords.split(' ')]
         points = [int(c) for point in points for c in point.split(',')]
-        return list(zip(points[::2], points[1::2]))
+        pts = zip(points[::2], points[1::2])
+        return [k for k, g in groupby(pts)]
 
 
     with open(filename, 'rb') as fp:
@@ -233,9 +235,12 @@ def parse_alto(filename):
             boundary = None
             if pol is not None:
                 points = [int(float(x)) for x in pol.get('POINTS').split(' ')]
-                boundary = list(zip(points[::2], points[1::2]))
+                boundary = zip(points[::2], points[1::2])
+                boundary = [k for k, g in groupby(boundary)]
             points = [int(float(x)) for x in line.get('BASELINE').split(' ')]
             baseline = list(zip(points[::2], points[1::2]))
+            baseline =  [k for k, g in groupby(baseline)]
+
             text = ''
             for el in line.xpath(".//*[local-name() = 'String'] | .//*[local-name() = 'SP']"):
                 text += el.get('CONTENT') if el.get('CONTENT') else ' '
