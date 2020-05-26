@@ -380,6 +380,8 @@ class KrakenTrainer(object):
                 else:
                     logger.debug('infinite loss in trial')
                 iteration_callback()
+                # prevent memory leak
+                del loss, o
             self.iterations += self.event_it
             logger.debug('Starting evaluation run')
             eval_res = self.evaluator(self.model, self.val_set, self.device)
