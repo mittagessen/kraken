@@ -171,7 +171,7 @@ def parse_page(filename):
             baseline = None
             if base is not None and not base.get('points').isspace() and len(base.get('points')):
                 try:
-                    baseline = _parse_coords(pol.get('points'))
+                    baseline = _parse_coords(base.get('points'))
                 except:
                     logger.info('TextLine {} without baseline'.format(line.get('id')))
                     continue
