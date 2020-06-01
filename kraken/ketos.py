@@ -116,8 +116,8 @@ def _validate_merging(ctx, param, value):
 @click.option('-r', '--lrate', show_default=True, default=SEGMENTATION_HYPER_PARAMS['lrate'], help='Learning rate')
 @click.option('-m', '--momentum', show_default=True, default=SEGMENTATION_HYPER_PARAMS['momentum'], help='Momentum')
 @click.option('-w', '--weight-decay', show_default=True, default=SEGMENTATION_HYPER_PARAMS['weight_decay'], help='Weight decay')
-@click.option('--schedule', show_default=True, type=click.Choice(['constant', '1cycle']), default=SEGMENTATION_HYPER_PARAMS['schedule'],
-              help='Set learning rate scheduler. For 1cycle, cycle length is determined by the `--epoch` option.')
+@click.option('--schedule', show_default=True, type=click.Choice(['constant', '1cycle', 'exponential']), default=SEGMENTATION_HYPER_PARAMS['schedule'],
+              help='Set learning rate scheduler. For 1cycle/exponential, cycle length is determined by the `--epoch` option.')
 @click.option('-p', '--partition', show_default=True, default=0.9, help='Ground truth data partition ratio between train/validation set')
 @click.option('-t', '--training-files', show_default=True, default=None, multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
@@ -279,8 +279,8 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
 @click.option('-r', '--lrate', show_default=True, default=RECOGNITION_HYPER_PARAMS['lrate'], help='Learning rate')
 @click.option('-m', '--momentum', show_default=True, default=RECOGNITION_HYPER_PARAMS['momentum'], help='Momentum')
 @click.option('-w', '--weight-decay', show_default=True, default=RECOGNITION_HYPER_PARAMS['weight_decay'], help='Weight decay')
-@click.option('--schedule', show_default=True, type=click.Choice(['constant', '1cycle']), default=RECOGNITION_HYPER_PARAMS['schedule'],
-              help='Set learning rate scheduler. For 1cycle, cycle length is determined by the `--epoch` option.')
+@click.option('--schedule', show_default=True, type=click.Choice(['constant', '1cycle', 'exponential']), default=RECOGNITION_HYPER_PARAMS['schedule'],
+              help='Set learning rate scheduler. For 1cycle/exponential, cycle length is determined by the `--epoch` option.')
 @click.option('-p', '--partition', show_default=True, default=0.9, help='Ground truth data partition ratio between train/validation set')
 @click.option('-u', '--normalization', show_default=True, type=click.Choice(['NFD', 'NFKD', 'NFC', 'NFKC']),
               default=RECOGNITION_HYPER_PARAMS['normalization'], help='Ground truth normalization')

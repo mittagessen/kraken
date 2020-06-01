@@ -77,6 +77,17 @@ def annealing_cos(start: float, end: float, pct: float) -> float:
     return end + (start-end)/2 * co
 
 
+class annealing_exponential(object):
+    def __init__(self, decay: float = 0.96, decay_steps: int = 10):
+        self.decay = decay
+        self.decay_steps = 10
+        self.steps_pct = 0.0
+
+    def __call__(self, start, end, pct):
+        self.steps_pct += pct
+        return start * (self.decay ** self.steps_pct/self.decay_steps)
+
+
 class TrainScheduler(object):
     """
     Implements learning rate scheduling.
@@ -91,7 +102,9 @@ class TrainScheduler(object):
                   lrate: Tuple[float, float] = (1e-4, 1e-4),
                   momentum: Tuple[float, float] = (0.9, 0.9),
                   wd: float = 0.0,
-                  annealing_fn: Callable[[float, float, float], float] = annealing_const) -> None:
+                  lr_annealing_fn: Callable[[float, float, float], float] = annealing_const,
+                  mom_annealing_fn: Callable[[float, float, float], float] = annealing_const) -> None:
+
         """
         Adds a new phase to the scheduler.
 
@@ -103,13 +116,14 @@ class TrainScheduler(object):
             max_mon (float): Maximum momentum
             min_mon (float): Minimum momentum
             wd (float): Weight decay
-            annealing_fn (Callable[[int, int, int], float]): LR change
+            lr_annealing_fn (Callable[[int, int, int], float]): LR change
             function. Can be one of `annealing_const` (keeping start value),
             `annealing_linear` (linear change), and `annealing_cos` (cosine
                     change).
+            mom_annealing_fn (Callable[[int, int, int], float]): momentum change fn
         """
-        self.steps.extend([{'lr': annealing_fn(*lrate, pct=x/iterations),
-                            'momentum': annealing_fn(*momentum, pct=x/iterations),
+        self.steps.extend([{'lr': lr_annealing_fn(*lrate, pct=x/iterations),
+                            'momentum': mom_annealing_fn(*momentum, pct=x/iterations),
                             'weight_decay': wd} for x in range(iterations)])
 
     def step(self) -> None:
@@ -121,6 +135,31 @@ class TrainScheduler(object):
         kwargs = next(self.cycle)
         for param_group in self.optimizer.param_groups:
             param_group.update(kwargs)
+
+
+def add_exponential_decay(sched: TrainScheduler, iterations: int,
+                          epoch_len: int = 1000,
+                          lr: float = 0.001, decay: float = 0.96,
+                          momentum: float = 0.95, wd: float = 0.0):
+    """
+    Adds 1cycle policy [0] phases to a learning rate scheduler.
+
+    [0] Smith, Leslie N. "A disciplined approach to neural network
+    hyper-parameters: Part 1--learning rate, batch size, momentum, and weight
+    decay." arXiv preprint arXiv:1803.09820 (2018).
+
+    Args:
+        sched (kraken.lib.train.Trainscheduler): TrainScheduler instance
+        iterations (int): Number of iterations per cycle
+        max_lr (float): Peak learning rate
+        div (float): divisor to determine minimum learning rate (min_lr = max_lr / div)
+        max_mon (float): Maximum momentum
+        min_mon (float): Minimum momentum
+        wd (float): Weight decay
+    """
+    annealing_fn = annealing_exponential(0.8, iterations/epoch_len)
+    for _ in range(1, 1000):
+        sched.add_phase(iterations, (lr, lr), (momentum, momentum), wd, annealing_fn, annealing_const)
 
 
 def add_1cycle(sched: TrainScheduler, iterations: int,
@@ -142,8 +181,8 @@ def add_1cycle(sched: TrainScheduler, iterations: int,
         min_mon (float): Minimum momentum
         wd (float): Weight decay
     """
-    sched.add_phase(iterations//2, (max_lr/div, max_lr), (max_mom, min_mom), wd, annealing_linear)
-    sched.add_phase(iterations//2, (max_lr, max_lr/div), (min_mom, max_mom), wd, annealing_cos)
+    sched.add_phase(iterations//2, (max_lr/div, max_lr), (max_mom, min_mom), wd, annealing_linear, annealing_linear)
+    sched.add_phase(iterations//2, (max_lr, max_lr/div), (min_mom, max_mom), wd, annealing_cos, annealing_cos)
 
 
 class EarlyStopping(TrainStopper):
@@ -691,6 +730,14 @@ class KrakenTrainer(object):
                        hyper_params['momentum'],
                        hyper_params['momentum'] - 0.10,
                        hyper_params['weight_decay'])
+        elif hyper_params['schedule'] == 'exponential':
+            add_exponential_decay(tr_it,
+                                  int(len(gt_set) * hyper_params['epochs']),
+                                  len(gt_set),
+                                  hyper_params['lrate'],
+                                  0.95,
+                                  hyper_params['momentum'],
+                                  hyper_params['weight_decay'])
         else:
             # constant learning rate scheduler
             tr_it.add_phase(1,
@@ -896,6 +943,14 @@ class KrakenTrainer(object):
                        hyper_params['momentum'],
                        hyper_params['momentum'] - 0.10,
                        hyper_params['weight_decay'])
+        elif hyper_params['schedule'] == 'exponential':
+            add_exponential_decay(tr_it,
+                                  int(len(gt_set) * hyper_params['epochs']),
+                                  len(gt_set),
+                                  hyper_params['lrate'],
+                                  0.95,
+                                  hyper_params['momentum'],
+                                  hyper_params['weight_decay'])
         else:
             # constant learning rate scheduler
             tr_it.add_phase(1,
