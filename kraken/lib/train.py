@@ -650,7 +650,7 @@ class KrakenTrainer(object):
                     logger.info(f'Resizing codec to include {len(alpha_diff)} new code points')
                     codec.c2l.update({k: [v] for v, k in enumerate(alpha_diff, start=codec.max_label()+1)})
                     nn.add_codec(PytorchCodec(codec.c2l))
-                    logger.info(f'Resizing last layer in network to {codex.max_label()+1} outputs')
+                    logger.info(f'Resizing last layer in network to {codec.max_label()+1} outputs')
                     nn.resize_output(codec.max_label()+1)
                     gt_set.encode(nn.codec)
                     message('\u2713', fg='green')
