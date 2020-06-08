@@ -862,24 +862,24 @@ class BaselineSet(Dataset):
         """
         if self.mode:
             raise Exception('The `add` method is incompatible with dataset mode {}'.format(self.mode))
-
-        lines = defaultdict(list)
+        baselines_ = defaultdict(list)
         for line in baselines:
             line_type = self.mbl_dict.get(line['script'], line['script'])
             if self.valid_baselines is None or line['script'] in self.valid_baselines:
-                lines[line_type].append(line['baseline'])
+                baselines_[line_type].append(line['baseline'])
                 if line_type not in self.class_mapping['baselines']:
                     self.num_classes += 1
                     self.class_mapping['baselines'][line_type] = self.num_classes - 1
-        regions = defaultdict(list)
+        regions_ = defaultdict(list)
         for k, v in regions.items():
-            if self.valid_regions is None or k in self.valid_regions:
-                reg_type = self.mreg_dict.get(k, k)
-                regions[reg_type].extend(v)
+            reg_type = self.mreg_dict.get(k, k)
+            if self.valid_regions is None or reg_type in self.valid_regions:
+                regions_[reg_type].extend(v)
                 if reg_type not in self.class_mapping['regions']:
                     self.num_classes += 1
-                    self.class_mapping['baselines'][line_type] = self.num_classes - 1
-        self.targets.append({'baselines': lines, 'regions': regions})
+                    self.class_mapping['regions'][reg_type] = self.num_classes - 1
+        self.targets.append({'baselines': baselines_, 'regions': regions_})
+
         self.imgs.append(image)
 
     def __getitem__(self, idx):
@@ -958,4 +958,3 @@ class BaselineSet(Dataset):
 
     def __len__(self):
         return len(self.imgs)
-
