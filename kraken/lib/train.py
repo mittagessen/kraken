@@ -304,8 +304,9 @@ def baseline_label_loss_fn(criterion, output, target):
 def recognition_evaluator_fn(model, val_loader, device):
     rec = models.TorchSeqRecognizer(model, device=device)
     chars, error = compute_error(rec, val_loader)
+    chars = chars.item()
     model.train()
-    accuracy = ((chars-error).float()/chars).item()
+    accuracy = ((chars-error)/chars)
     return {'val_metric': accuracy, 'accuracy': accuracy, 'chars': chars, 'error': error}
 
 
