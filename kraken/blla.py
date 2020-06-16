@@ -142,7 +142,7 @@ def segment(im,
         baselines.extend([(bl_type,x) for x in vectorize_lines(o[(st_sep, end_sep, idx), :, :])])
     logger.info('Vectorizing regions')
     for region_type, idx in cls_map['regions'].items():
-        logger.debug(f'Vectorizing lines of type {bl_type}')
+        logger.debug(f'Vectorizing regions of type {region_type}')
         regions[region_type] = vectorize_regions(o[idx])
     logger.debug('Polygonizing lines')
     lines = list(filter(lambda x: x[2] is not None, zip([x[0] for x in baselines],
