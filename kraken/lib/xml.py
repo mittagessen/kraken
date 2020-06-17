@@ -258,7 +258,7 @@ def parse_alto(filename):
                 points = [int(float(x)) for x in coords.get('POINTS').split(' ')]
                 boundary = zip(points[::2], points[1::2])
                 boundary = [k for k, g in groupby(boundary)]
-            else:
+            elif region.get('HPOS') is not None and region.get('VPOS') is not None and region.get('WIDTH') is not None and region.get('HEIGHT') is not None:
                 # use rectangular definition
                 x_min = int(float(region.get('HPOS')))
                 y_min = int(float(region.get('VPOS')))
@@ -268,6 +268,8 @@ def parse_alto(filename):
                             (x_min, y_min + height),
                             (x_min + width, y_min + height),
                             (x_min + width, y_min)]
+            else:
+                continue
             rtype = region.get('TYPE')
             # fall back to default region type if nothing is given
             if not rtype:
