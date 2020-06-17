@@ -49,6 +49,12 @@ page_regions = {'TextRegion': 'text',
                 'CustomRegion': 'custom'
                }
 
+# same for ALTO
+alto_regions = {'TextBlock': 'text',
+                'IllustrationType': 'illustration',
+                'GraphicalElementType': 'graphic',
+                'ComposedBlock': 'composed'}
+
 def parse_xml(filename):
     """
     Parses either a PageXML or ALTO file with autodetermination of the file
@@ -228,6 +234,50 @@ def parse_alto(filename):
             raise KrakenInputException('No valid filename found in ALTO file')
         lines = doc.findall('.//{*}TextLine')
         data = {'image': os.path.join(base_dir, image.text), 'lines': [], 'type': 'baselines', 'regions': {}}
+        # find all image regions
+        regions = []
+        for x in alto_regions.keys():
+            regions.extend(doc.findall('./{{*}}Layout/{{*}}Page/{{*}}PrintSpace/{{*}}{}'.format(x)))
+        # find overall dimensions to filter out dummy TextBlocks
+        ps = doc.find('./{*}Layout/{*}Page/{*}PrintSpace')
+        x_min = int(float(ps.get('HPOS')))
+        y_min = int(float(ps.get('VPOS')))
+        width = int(float(ps.get('WIDTH')))
+        height = int(float(ps.get('HEIGHT')))
+        page_boundary = [(x_min, y_min),
+                         (x_min, y_min + height),
+                         (x_min + width, y_min + height),
+                         (x_min + width, y_min)]
+
+        # parse region type and coords
+        region_data = defaultdict(list)
+        for region in regions:
+            # try to find shape object
+            coords = region.find('./{*}Shape/{*}Polygon')
+            if coords is not None:
+                points = [int(float(x)) for x in coords.get('POINTS').split(' ')]
+                boundary = zip(points[::2], points[1::2])
+                boundary = [k for k, g in groupby(boundary)]
+            else:
+                # use rectangular definition
+                x_min = int(float(region.get('HPOS')))
+                y_min = int(float(region.get('VPOS')))
+                width = int(float(region.get('WIDTH')))
+                height = int(float(region.get('HEIGHT')))
+                boundary = [(x_min, y_min),
+                            (x_min, y_min + height),
+                            (x_min + width, y_min + height),
+                            (x_min + width, y_min)]
+            rtype = region.get('TYPE')
+            # fall back to default region type if nothing is given
+            if not rtype:
+                rtype = alto_regions[region.tag.split('}')[-1]]
+            if boundary == page_boundary and rtype == 'text':
+                    logger.info('Skipping TextBlock with same size as page image.')
+                    continue
+            region_data[rtype].append(boundary)
+        data['regions'] = region_data
+
         for line in lines:
             if line.get('BASELINE') is None:
                 raise KrakenInputException('ALTO file {} contains no baseline information'.format(filename))
