@@ -84,6 +84,10 @@
 						     	   WIDTH="{{ entity.bbox[2] - entity.bbox[0] }}" 
 							   HEIGHT="{{ entity.bbox[3] - entity.bbox[1] }}"
 							   TYPE="{{ entity.region_type }}">
+					<Shape>
+						<Polygon POINTS="{{ entity.boundary|sum(start=[])|join(' ') }}"/>
+					</Shape>
+
 						{% if entity.lines|length > 0 %}
 						<TextBlock ID="textblock_{{ loop.index }}">
 						{% for line in entity.lines %}
