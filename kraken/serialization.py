@@ -122,6 +122,9 @@ def serialize(records: Sequence[ocr_record],
                 region_map[idx] = (id, geom.Polygon(reg), reg)
                 idx += 1
 
+    # build region and line type dict
+    page['types'] = list(regions.keys()) + list(set(line.script for line in records if line.script is not None))
+
     is_in_region = -1
     for idx, record in enumerate(records):
         if record.type == 'baselines':

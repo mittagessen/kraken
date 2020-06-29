@@ -1,12 +1,19 @@
-{% macro render_line(line) -%}
+{% macro render_line(page, line) -%}
 <TextLine ID="line_{{ line.index }}"
 	  HPOS="{{ line.bbox[0] }}"
 	  VPOS="{{ line.bbox[1] }}" 
 	  WIDTH="{{ line.bbox[2] - line.bbox[0] }}" 
 	  HEIGHT="{{ line.bbox[3] - line.bbox[1] }}"
-	  {% if line.baseline %}
+	  {%- if line.baseline %}
 	  BASELINE="{{ line.baseline|sum(start=[])|join(' ') }}"
-	  {% endif %}>
+	  {% endif %}
+          {% if line.script and line.script in page.types %}
+          {% for type in page.types %}
+          {% if type == line.script %}
+          TAGREFS="TYPE_{{ loop.index }}"
+          {%- endif -%}
+          {%- endfor -%}
+	  {%- endif -%}>
 	{% if line.boundary %}
 		<Shape>
 			<Polygon POINTS="{{ line.boundary|sum(start=[])|join(' ') }}"/>
@@ -70,6 +77,11 @@
 			</ocrProcessingStep>
 		</OCRProcessing>
 	</Description>
+	<Tags>
+	{% for reg_type in page.types %}
+	<OtherTag ID="TYPE_{{ loop.index }}" LABEL="{{ reg_type }}"/>
+	{% endfor %}
+	</Tags>
 	<Layout>
 		<Page WIDTH="{{ page.size[0] }}" HEIGHT="{{ page.size[1] }}" PHYSICAL_IMG_NR="0" ID="page_0">
 			<PrintSpace HPOS="0" VPOS="0" WIDTH="{{ page.size[0] }}" HEIGHT="{{ page.size[1] }}">
@@ -78,29 +90,28 @@
 					{% if loop.previtem and loop.previtem.type == 'line' %}
 					</TextBlock>
 					{% endif %}
-					<ComposedBlockType ID="block_{{ entity.index }}"
-						  	   HPOS="{{ entity.bbox[0] }}"
-						  	   VPOS="{{ entity.bbox[1] }}" 
-						     	   WIDTH="{{ entity.bbox[2] - entity.bbox[0] }}" 
-							   HEIGHT="{{ entity.bbox[3] - entity.bbox[1] }}"
-							   TYPE="{{ entity.region_type }}">
+					<TextBlock ID="block_{{ entity.index }}"
+						   HPOS="{{ entity.bbox[0] }}"
+						   VPOS="{{ entity.bbox[1] }}" 
+						   WIDTH="{{ entity.bbox[2] - entity.bbox[0] }}" 
+						   HEIGHT="{{ entity.bbox[3] - entity.bbox[1] }}"
+ 					           {% for type in page.types %}
+ 					           {% if type == entity.region_type %}
+ 					           TAGREFS="TYPE_{{ loop.index }}"
+ 					           {%- endif -%}
+ 					           {%- endfor -%}>
 					<Shape>
 						<Polygon POINTS="{{ entity.boundary|sum(start=[])|join(' ') }}"/>
 					</Shape>
-
-						{% if entity.lines|length > 0 %}
-						<TextBlock ID="textblock_{{ loop.index }}">
-						{% for line in entity.lines %}
-						{{ render_line(line) }}
-						{% endfor %}
-						</TextBlock>
-						{% endif %}
-					</ComposedBlockType>
+					{% for line in entity.lines %}
+					{{ render_line(page, line) }}
+					{% endfor %}
+					</TextBlock>
 				{% else %}
 				{% if not loop.previtem or loop.previtem.type != 'line' %}
 				<TextBlock ID="textblock_{{ loop.index }}">
 				{% endif %}
-				{{ render_line(entity) }}
+				{{ render_line(page, entity) }}
 				{% if loop.last %}
 				</TextBlock>
 				{% endif %}
