@@ -249,6 +249,13 @@ def parse_alto(filename):
                          (x_min + width, y_min + height),
                          (x_min + width, y_min)]
 
+        # parse tagrefs
+        cls_map = {}
+        tags = doc.find('.//{*}Tags')
+        if tags is not None:
+            for x in ['StructureTag', 'LayoutTag', 'OtherTag']:
+                for tag in tags.findall('./{{*}}{}'.format(x)):
+                    cls_map[tag.get('ID')] = tag.get('LABEL')
         # parse region type and coords
         region_data = defaultdict(list)
         for region in regions:
@@ -272,7 +279,14 @@ def parse_alto(filename):
                 continue
             rtype = region.get('TYPE')
             # fall back to default region type if nothing is given
-            if not rtype:
+            tagrefs = region.get('TAGREFS')
+            print(tagrefs)
+            if tagrefs is not None and rtype is None:
+                for tagref in tagrefs.split():
+                    rtype = cls_map.get(tagref, None)
+                    if rtype is not None:
+                        break
+            if rtype is None:
                 rtype = alto_regions[region.tag.split('}')[-1]]
             if boundary == page_boundary and rtype == 'text':
                     logger.info('Skipping TextBlock with same size as page image.')
@@ -296,6 +310,14 @@ def parse_alto(filename):
             text = ''
             for el in line.xpath(".//*[local-name() = 'String'] | .//*[local-name() = 'SP']"):
                 text += el.get('CONTENT') if el.get('CONTENT') else ' '
-            data['lines'].append({'baseline': baseline, 'boundary': boundary, 'text': text, 'script': 'default'})
+            # find line type
+            ltype = None
+            tagrefs = line.get('TAGREFS')
+            if tagrefs is not None:
+                for tagref in tagrefs.split():
+                    ltype = cls_map.get(tagref, None)
+                    if ltype is not None:
+                        break
+            data['lines'].append({'baseline': baseline, 'boundary': boundary, 'text': text, 'script': ltype if ltype is not None else 'default'})
         data['script_detection'] = False
         return data
