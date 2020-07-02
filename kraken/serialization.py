@@ -123,7 +123,9 @@ def serialize(records: Sequence[ocr_record],
                 idx += 1
 
     # build region and line type dict
-    page['types'] = list(regions.keys()) + list(set(line.script for line in records if line.script is not None))
+    page['types'] = list(set(line.script for line in records if line.script is not None))
+    if regions is not None:
+        page['types'].extend(list(regions.keys()))
 
     is_in_region = -1
     for idx, record in enumerate(records):
