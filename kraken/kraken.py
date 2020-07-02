@@ -154,7 +154,6 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, script_ignore, inpu
             ctx.meta['base_image'] = doc['image']
             doc['text_direction'] = 'horizontal-lr'
             bounds = doc
-
     try:
         im = Image.open(ctx.meta['base_image'])
     except IOError as e:
@@ -173,7 +172,7 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, script_ignore, inpu
                       'text_direction': 'horizontal-lr',
                       'boxes': [(0, 0) + im.size]}
         else:
-            raise click.UsageError('No line segmentation given. Add one with the input, `-l`, or run `segment` first.')
+            raise click.UsageError('No line segmentation given. Add one with the input or run `segment` first.')
     elif no_segmentation:
         logger.warning('no_segmentation mode enabled but segmentation defined. Ignoring --no-segmentation option.')
 
@@ -321,6 +320,7 @@ def process_pipeline(subcommands, input, batch_input, suffix, verbose, format_ty
             for task, input, output in zip(subcommands, fc, fc[1:]):
                 task(input=input, output=output)
         except Exception as e:
+            raise
             logger.error(f'Failed processing {io_pair[0]}: {str(e)}')
         finally:
             for f in fc[1:-1]:
