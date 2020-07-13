@@ -745,7 +745,7 @@ def transcription(ctx, text_direction, scale, bw, maxcolseps,
                     except ValueError as e:
                         raise click.UsageError('{} invalid segmentation: {}'.format(lines, str(e)))
             if prefill:
-                it = rpred.rpred(prefill, im_bin, res)
+                it = rpred.rpred(prefill, im_bin, res.copy())
                 preds = []
                 logger.info('Recognizing')
                 for pred in it:
