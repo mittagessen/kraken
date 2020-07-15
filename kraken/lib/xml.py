@@ -280,7 +280,6 @@ def parse_alto(filename):
             rtype = region.get('TYPE')
             # fall back to default region type if nothing is given
             tagrefs = region.get('TAGREFS')
-            print(tagrefs)
             if tagrefs is not None and rtype is None:
                 for tagref in tagrefs.split():
                     rtype = cls_map.get(tagref, None)
