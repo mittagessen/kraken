@@ -908,11 +908,10 @@ class KrakenTrainer(object):
                     logger.error(f'Training data and model class mapping differ (bl: {bl_diff}, regions: {regions_diff}')
                     raise KrakenInputException(f'Training data and model class mapping differ (bl: {bl_diff}, regions: {regions_diff}')
                 elif resize == 'add':
-                    message('Adding missing labels to network ', nl=False)
-                    logger.info(f'Resizing codec to include {len(alpha_diff)} new code points')
-                    codec.c2l.update({k: [v] for v, k in enumerate(alpha_diff, start=codec.max_label()+1)})
-                    nn.add_codec(PytorchCodec(codec.c2l))
-                    logger.info(f'Resizing last layer in network to {codec.max_label()+1} outputs')
+                    new_bls = gt_set.class_mapping['baselines'].keys() - nn.user_metadata.class_mapping['baselines'].keys()
+                    new_regions = gt_set.class_mapping['regions'].keys() - nn.user_metadata.class_mapping['regions'].keys()
+
+                    message('Adding missing types to network output layer ', nl=False)
                     nn.resize_output(codec.max_label()+1)
                     gt_set.encode(nn.codec)
                     message('\u2713', fg='green')
@@ -928,11 +927,10 @@ class KrakenTrainer(object):
                 else:
                     logger.error(f'invalid resize parameter value {resize}')
                     raise KrakenInputException(f'invalid resize parameter value {resize}')
-            else:
-                # backfill gt_set/val_set mapping if key-equal as the actual
-                # numbering in the gt_set might be different
-                gt_set.class_mapping = nn.user_metadata['class_mapping']
-                val_set.class_mapping = nn.user_metadata['class_mapping']
+            # backfill gt_set/val_set mapping if key-equal as the actual
+            # numbering in the gt_set might be different
+            gt_set.class_mapping = nn.user_metadata['class_mapping']
+            val_set.class_mapping = nn.user_metadata['class_mapping']
 
         message('Training line types:')
         for k, v in gt_set.class_mapping['baselines'].items():
