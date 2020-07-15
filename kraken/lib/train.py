@@ -791,6 +791,7 @@ class KrakenTrainer(object):
                                valid_baselines: Optional[Sequence[str]] = None,
                                merge_regions: Optional[Dict[str, str]] = None,
                                merge_baselines: Optional[Dict[str, str]] = None,
+                               resize: str = 'fail',
                                augment: bool = False):
         """
         This is an ugly constructor that takes all the arguments from the command
@@ -905,6 +906,38 @@ class KrakenTrainer(object):
             message(f'Creating model {spec} with {gt_set.num_classes} outputs ', nl=False)
             nn = vgsl.TorchVGSLModel(spec)
             message('\u2713', fg='green')
+        else:
+            if gt_set.class_mapping['baselines'].keys() != nn.user_metadata.class_mapping['baselines'].keys() or \
+                gt_set.class_mapping['regions'].keys() != nn.user_metadata.class_mapping['regions'].keys():
+                if resize == 'fail':
+                    logger.error(f'Training data and model class mapping differ')
+                    return None
+                elif resize == 'add':
+                    message('Adding missing labels to network ', nl=False)
+                    logger.info(f'Resizing codec to include {len(alpha_diff)} new code points')
+                    codec.c2l.update({k: [v] for v, k in enumerate(alpha_diff, start=codec.max_label()+1)})
+                    nn.add_codec(PytorchCodec(codec.c2l))
+                    logger.info(f'Resizing last layer in network to {codec.max_label()+1} outputs')
+                    nn.resize_output(codec.max_label()+1)
+                    gt_set.encode(nn.codec)
+                    message('\u2713', fg='green')
+                elif resize == 'both':
+                    message('Fitting network exactly to training set ', nl=False)
+                    logger.info(f'Resizing network or given codec to {gt_set.alphabet} code sequences')
+                    gt_set.encode(None)
+                    ncodec, del_labels = codec.merge(gt_set.codec)
+                    logger.info(f'Deleting {len(del_labels)} output classes from network ({len(codec)-len(del_labels)} retained)')
+                    gt_set.encode(ncodec)
+                    nn.resize_output(ncodec.max_label()+1, del_labels)
+                    message('\u2713', fg='green')
+                else:
+                    logger.error(f'invalid resize parameter value {resize}')
+                    return None
+            else:
+                # backfill gt_set/val_set mapping if key-equal as the actual
+                # numbering in the gt_set might be different
+                gt_set.class_mapping = nn.user_metadata['class_mapping']
+                val_set.class_mapping = nn.user_metadata['class_mapping']
 
         message('Training line types:')
         for k, v in gt_set.class_mapping['baselines'].items():
