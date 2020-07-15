@@ -700,6 +700,32 @@ class ActConv2D(Module):
             builder.add_softmax(act_name, conv_name, name)
         return name
 
+    def resize(self, output_size: int, del_indices: Optional[Iterable[int]] = None) -> None:
+        """
+        Resizes the convolutional filters of the layer
+
+        First removes the filters at output positions in del_indices, then
+        resizes both tensors to a new output size.
+
+        Args:
+            output_size (int): Desired output dimensionality after resizing
+            del_indices (list): List of connection to outputs to remove.
+        """
+        if not del_indices:
+            del_indices = []
+        old_shape = self.co.weight.size(1)
+        self.out_channels = output_size
+        idx = torch.tensor([x for x in range(old_shape) if x not in del_indices])
+        weight = self.co.weight.index_select(1, idx)
+        rweight = torch.zeros((weight.size(0), output_size - weight.size(1), weight.size(2), weight.size(3)))
+        torch.nn.init.xavier_uniform_(rweight)
+        weight = torch.cat([weight, rweight], dim=1)
+        bias = self.co.bias
+        self.co = torch.nn.Conv2d(self.in_channels, self.out_channels, self.kernel_size,
+                                  stride=self.stride, padding=self.padding)
+        self.co.weight = torch.nn.Parameter(weight)
+        self.co.bias = torch.nn.Parameter(bias)
+
 
 class GroupNorm(Module):
     """
