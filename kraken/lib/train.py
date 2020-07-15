@@ -348,8 +348,6 @@ def baseline_label_evaluator_fn(model, val_loader, device):
     freq_iu = torch.sum(cls_cnt/cls_cnt.sum() * iu)
     return {'accuracy': pixel_accuracy, 'mean_acc': mean_accuracy, 'mean_iu': mean_iu, 'freq_iu': freq_iu, 'val_metric': mean_iu}
 
-def segmentation_train_gen():
-    pass
 
 class KrakenTrainer(object):
     """
@@ -540,18 +538,15 @@ class KrakenTrainer(object):
         if not nn:
             spec = spec.strip()
             if spec[0] != '[' or spec[-1] != ']':
-                raise click.BadOptionUsage('spec', 'VGSL spec {} not bracketed'.format(spec))
+                raise KrakenInputException('VGSL spec {} not bracketed'.format(spec))
             blocks = spec[1:-1].split(' ')
             m = re.match(r'(\d+),(\d+),(\d+),(\d+)', blocks[0])
             if not m:
-                raise click.BadOptionUsage('spec', f'Invalid input spec {blocks[0]}')
+                raise KrakenInputException(f'Invalid input spec {blocks[0]}')
             batch, height, width, channels = [int(x) for x in m.groups()]
         else:
             batch, channels, height, width = nn.input
-        try:
-            transforms = generate_input_transforms(batch, height, width, channels, hyper_params['pad'], valid_norm, force_binarization)
-        except KrakenInputException as e:
-            raise click.BadOptionUsage('spec', str(e))
+        transforms = generate_input_transforms(batch, height, width, channels, hyper_params['pad'], valid_norm, force_binarization)
 
         if len(training_data) > 2500 and not preload:
             logger.info('Disabling preloading for large (>2500) training data set. Enable by setting --preload parameter')
@@ -635,7 +630,6 @@ class KrakenTrainer(object):
         elif load:
             # is already loaded
             nn = cast(vgsl.TorchVGSLModel, nn)
-
 
             # prefer explicitly given codec over network codec if mode is 'both'
             codec = codec if (codec and resize == 'both') else nn.codec
@@ -849,11 +843,8 @@ class KrakenTrainer(object):
             batch, height, width, channels = [int(x) for x in m.groups()]
         else:
             batch, channels, height, width = nn.input
-        try:
-            transforms = generate_input_transforms(batch, height, width, channels, 0, valid_norm=False)
-        except KrakenInputException as e:
-            logger.error(f'Spec error: {e}')
-            return None
+
+        transforms = generate_input_transforms(batch, height, width, channels, 0, valid_norm=False)
 
         # set multiprocessing tensor sharing strategy
         if 'file_system' in torch.multiprocessing.get_all_sharing_strategies():
@@ -908,10 +899,14 @@ class KrakenTrainer(object):
             message('\u2713', fg='green')
         else:
             if gt_set.class_mapping['baselines'].keys() != nn.user_metadata.class_mapping['baselines'].keys() or \
-                gt_set.class_mapping['regions'].keys() != nn.user_metadata.class_mapping['regions'].keys():
+               gt_set.class_mapping['regions'].keys() != nn.user_metadata.class_mapping['regions'].keys():
+
+                bl_diff = set(gt_set.class_mapping['baselines'].keys()).symmetric_difference(set(nn.user_metadata.class_mapping['baselines'].keys()))
+                regions_diff = set(gt_set.class_mapping['regions'].keys()).symmetric_difference(set(nn.user_metadata.class_mapping['regions'].keys()))
+
                 if resize == 'fail':
-                    logger.error(f'Training data and model class mapping differ')
-                    return None
+                    logger.error(f'Training data and model class mapping differ (bl: {bl_diff}, regions: {regions_diff}')
+                    raise KrakenInputException(f'Training data and model class mapping differ (bl: {bl_diff}, regions: {regions_diff}')
                 elif resize == 'add':
                     message('Adding missing labels to network ', nl=False)
                     logger.info(f'Resizing codec to include {len(alpha_diff)} new code points')
@@ -932,7 +927,7 @@ class KrakenTrainer(object):
                     message('\u2713', fg='green')
                 else:
                     logger.error(f'invalid resize parameter value {resize}')
-                    return None
+                    raise KrakenInputException(f'invalid resize parameter value {resize}')
             else:
                 # backfill gt_set/val_set mapping if key-equal as the actual
                 # numbering in the gt_set might be different
