@@ -145,13 +145,18 @@ def _validate_merging(ctx, param, value):
 @click.option('-mr', '--merge-regions', show_default=True, default=None, help='Region merge mapping. One or more mappings of the form `$target:$src` where $src is merged into $target.', multiple=True, callback=_validate_merging)
 @click.option('-mb', '--merge-baselines', show_default=True, default=None, help='Baseline type merge mapping. Same syntax as `--merge-regions`', multiple=True, callback=_validate_merging)
 @click.option('--augment/--no-augment', show_default=True, default=SEGMENTATION_HYPER_PARAMS['augment'], help='Enable image augmentation')
+@click.option('--resize', show_default=True, default='fail', type=click.Choice(['add', 'both', 'fail']),
+              help='Output layer resizing option. If set to `add` new classes will be '
+                   'added, `both` will set the layer to match exactly '
+                   'the training data classes, `fail` will abort if training data and model '
+                   'classes do not match.')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
              lag, min_delta, device, optimizer, lrate, momentum, weight_decay,
              schedule, partition, training_files, evaluation_files, threads,
              load_hyper_parameters, force_binarization, format_type, suppress_regions,
              suppress_baselines, valid_regions, valid_baselines, merge_regions,
-             merge_baselines, augment, ground_truth):
+             merge_baselines, augment, resize, ground_truth):
     """
     Trains a baseline labeling model for layout analysis
     """
@@ -162,7 +167,11 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
 
     from kraken.lib.train import KrakenTrainer
 
+    if resize != 'fail' and not load:
+        raise click.BadOptionUsage('resize', 'resize option requires loading an existing model')
+
     logger.info('Building ground truth set from {} document images'.format(len(ground_truth) + len(training_files)))
+
 
     # load model if given. if a new model has to be created we need to do that
     # after data set initialization, otherwise to output size is still unknown.
@@ -231,7 +240,8 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
                                                    valid_baselines=valid_baselines,
                                                    merge_regions=merge_regions,
                                                    merge_baselines=merge_baselines,
-                                                   augment=augment)
+                                                   augment=augment,
+                                                   resize=resize)
 
     with log.progressbar(label='stage {}/{}'.format(1, trainer.stopper.epochs if trainer.stopper.epochs > 0 else '∞'),
                          length=trainer.event_it, show_pos=True) as bar:
