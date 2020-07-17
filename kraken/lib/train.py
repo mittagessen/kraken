@@ -924,11 +924,25 @@ class KrakenTrainer(object):
                 elif resize == 'both':
                     message('Fitting network exactly to training set ', nl=False)
                     logger.info(f'Resizing network or given codec to {gt_set.alphabet} code sequences')
-                    gt_set.encode(None)
-                    ncodec, del_labels = codec.merge(gt_set.codec)
-                    logger.info(f'Deleting {len(del_labels)} output classes from network ({len(codec)-len(del_labels)} retained)')
-                    gt_set.encode(ncodec)
-                    nn.resize_output(ncodec.max_label()+1, del_labels)
+                    new_bls = gt_set.class_mapping['baselines'].keys() - nn.user_metadata['class_mapping']['baselines'].keys()
+                    new_regions = gt_set.class_mapping['regions'].keys() - nn.user_metadata['class_mapping']['regions'].keys()
+                    del_bls = nn.user_metadata['class_mapping']['baselines'].keys() - gt_set.class_mapping['baselines'].keys()
+                    del_regions = nn.user_metadata['class_mapping']['regions'].keys() - gt_set.class_mapping['regions'].keys()
+
+                    message(f'Adding {len(new_bls) + len(new_regions)} missing '
+                             'types and removing {len(del_bls) + '
+                             'len(del_regions)} to network output layer ',
+                            nl=False)
+                    cls_idx = max(max(nn.user_metadata['class_mapping']['baselines'].values()),
+                                  max(nn.user_metadata['class_mapping']['regions'].values()))
+
+                    nn.resize_output(cls_idx + len(new_bls) + len(new_regions) - len(del_bls) - len(del_regions))
+                    for cls in new_bls:
+                        cls_idx += 1
+                        nn.user_metadata['class_mapping']['baselines'][cls] = cls_idx
+                    for cls in new_regions:
+                        cls_idx += 1
+                        nn.user_metadata['class_mapping']['regions'][cls] = cls_idx
                     message('\u2713', fg='green')
                 else:
                     logger.error(f'invalid resize parameter value {resize}')
