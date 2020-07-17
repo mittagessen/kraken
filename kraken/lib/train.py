@@ -908,12 +908,18 @@ class KrakenTrainer(object):
                     logger.error(f'Training data and model class mapping differ (bl: {bl_diff}, regions: {regions_diff}')
                     raise KrakenInputException(f'Training data and model class mapping differ (bl: {bl_diff}, regions: {regions_diff}')
                 elif resize == 'add':
-                    new_bls = gt_set.class_mapping['baselines'].keys() - nn.user_metadata.class_mapping['baselines'].keys()
-                    new_regions = gt_set.class_mapping['regions'].keys() - nn.user_metadata.class_mapping['regions'].keys()
-
-                    message('Adding missing types to network output layer ', nl=False)
-                    nn.resize_output(codec.max_label()+1)
-                    gt_set.encode(nn.codec)
+                    new_bls = gt_set.class_mapping['baselines'].keys() - nn.user_metadata['class_mapping']['baselines'].keys()
+                    new_regions = gt_set.class_mapping['regions'].keys() - nn.user_metadata['class_mapping']['regions'].keys()
+                    cls_idx = max(max(nn.user_metadata['class_mapping']['baselines'].values()),
+                                  max(nn.user_metadata['class_mapping']['regions'].values()))
+                    message(f'Adding {len(new_bls) + len(new_regions)} missing types to network output layer ', nl=False)
+                    nn.resize_output(cls_idx + len(new_bls) + len(new_regions))
+                    for cls in new_bls:
+                        cls_idx += 1
+                        nn.user_metadata['class_mapping']['baselines'][cls] = cls_idx
+                    for cls in new_regions:
+                        cls_idx += 1
+                        nn.user_metadata['class_mapping']['regions'][cls] = cls_idx
                     message('\u2713', fg='green')
                 elif resize == 'both':
                     message('Fitting network exactly to training set ', nl=False)
