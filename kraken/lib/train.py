@@ -913,7 +913,7 @@ class KrakenTrainer(object):
                     cls_idx = max(max(nn.user_metadata['class_mapping']['baselines'].values()) if nn.user_metadata['class_mapping']['baselines'] else -1,
                                   max(nn.user_metadata['class_mapping']['regions'].values()) if nn.user_metadata['class_mapping']['regions'] else -1)
                     message(f'Adding {len(new_bls) + len(new_regions)} missing types to network output layer ', nl=False)
-                    nn.resize_output(cls_idx + len(new_bls) + len(new_regions))
+                    nn.resize_output(cls_idx + len(new_bls) + len(new_regions) + 1)
                     for c in new_bls:
                         cls_idx += 1
                         nn.user_metadata['class_mapping']['baselines'][c] = cls_idx
@@ -938,7 +938,7 @@ class KrakenTrainer(object):
 
                     del_indices = [nn.user_metadata['class_mapping']['baselines'][x] or x in del_bls]
                     del_indices.extend(nn.user_metadata['class_mapping']['regions'][x] or x in del_regions)
-                    nn.resize_output(cls_idx + len(new_bls) + len(new_regions) - len(del_bls) - len(del_regions), del_indices)
+                    nn.resize_output(cls_idx + len(new_bls) + len(new_regions) - len(del_bls) - len(del_regions) + 1, del_indices)
                     # delete old baseline/region types
                     cls_idx = min(min(nn.user_metadata['class_mapping']['baselines'].values()),
                                   min(nn.user_metadata['class_mapping']['regions'].values()))
