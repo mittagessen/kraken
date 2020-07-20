@@ -589,15 +589,15 @@ class TorchVGSLModel(object):
 
     def resize_output(self, output_size: int, del_indices: Optional[Iterable] = None) -> None:
         """
-        Resizes an output linear projection layer.
+        Resizes an output layer.
 
         Args:
-            output_size (int): New size of the linear layer
+            output_size (int): New size/output channels of last layer
             del_indices (list): list of outputs to delete from layer
         """
-        if not isinstance(self.nn[-1], layers.LinSoftmax):
-            raise ValueError('last layer is not linear projection')
-        logger.debug('Resizing output LinSoftmax layer to {}'.format(output_size))
+        if type(self.nn[-1]) not in [layers.ActConv2D, layers.LinSoftmax]:
+            raise ValueError('last layer is neither linear nor convolutional layer')
+        logger.debug('Resizing output layer to {}'.format(output_size))
         self.nn[-1].resize(output_size, del_indices)
         pattern = re.compile(r'(O)(?P<name>{\w+})?(?P<dim>2|1|0)(?P<type>l|s|c)(?P<aug>a)?(?P<out>\d+)')
         m = pattern.match(self.named_spec[-1])

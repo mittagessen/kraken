@@ -348,8 +348,6 @@ def baseline_label_evaluator_fn(model, val_loader, device):
     freq_iu = torch.sum(cls_cnt/cls_cnt.sum() * iu)
     return {'accuracy': pixel_accuracy, 'mean_acc': mean_accuracy, 'mean_iu': mean_iu, 'freq_iu': freq_iu, 'val_metric': mean_iu}
 
-def segmentation_train_gen():
-    pass
 
 class KrakenTrainer(object):
     """
@@ -540,18 +538,15 @@ class KrakenTrainer(object):
         if not nn:
             spec = spec.strip()
             if spec[0] != '[' or spec[-1] != ']':
-                raise click.BadOptionUsage('spec', 'VGSL spec {} not bracketed'.format(spec))
+                raise KrakenInputException('VGSL spec {} not bracketed'.format(spec))
             blocks = spec[1:-1].split(' ')
             m = re.match(r'(\d+),(\d+),(\d+),(\d+)', blocks[0])
             if not m:
-                raise click.BadOptionUsage('spec', f'Invalid input spec {blocks[0]}')
+                raise KrakenInputException(f'Invalid input spec {blocks[0]}')
             batch, height, width, channels = [int(x) for x in m.groups()]
         else:
             batch, channels, height, width = nn.input
-        try:
-            transforms = generate_input_transforms(batch, height, width, channels, hyper_params['pad'], valid_norm, force_binarization)
-        except KrakenInputException as e:
-            raise click.BadOptionUsage('spec', str(e))
+        transforms = generate_input_transforms(batch, height, width, channels, hyper_params['pad'], valid_norm, force_binarization)
 
         if len(training_data) > 2500 and not preload:
             logger.info('Disabling preloading for large (>2500) training data set. Enable by setting --preload parameter')
@@ -635,7 +630,6 @@ class KrakenTrainer(object):
         elif load:
             # is already loaded
             nn = cast(vgsl.TorchVGSLModel, nn)
-
 
             # prefer explicitly given codec over network codec if mode is 'both'
             codec = codec if (codec and resize == 'both') else nn.codec
@@ -791,6 +785,7 @@ class KrakenTrainer(object):
                                valid_baselines: Optional[Sequence[str]] = None,
                                merge_regions: Optional[Dict[str, str]] = None,
                                merge_baselines: Optional[Dict[str, str]] = None,
+                               resize: str = 'fail',
                                augment: bool = False):
         """
         This is an ugly constructor that takes all the arguments from the command
@@ -848,11 +843,8 @@ class KrakenTrainer(object):
             batch, height, width, channels = [int(x) for x in m.groups()]
         else:
             batch, channels, height, width = nn.input
-        try:
-            transforms = generate_input_transforms(batch, height, width, channels, 0, valid_norm=False)
-        except KrakenInputException as e:
-            logger.error(f'Spec error: {e}')
-            return None
+
+        transforms = generate_input_transforms(batch, height, width, channels, 0, valid_norm=False)
 
         # set multiprocessing tensor sharing strategy
         if 'file_system' in torch.multiprocessing.get_all_sharing_strategies():
@@ -905,6 +897,83 @@ class KrakenTrainer(object):
             message(f'Creating model {spec} with {gt_set.num_classes} outputs ', nl=False)
             nn = vgsl.TorchVGSLModel(spec)
             message('\u2713', fg='green')
+        else:
+            if gt_set.class_mapping['baselines'].keys() != nn.user_metadata['class_mapping']['baselines'].keys() or \
+               gt_set.class_mapping['regions'].keys() != nn.user_metadata['class_mapping']['regions'].keys():
+
+                bl_diff = set(gt_set.class_mapping['baselines'].keys()).symmetric_difference(set(nn.user_metadata['class_mapping']['baselines'].keys()))
+                regions_diff = set(gt_set.class_mapping['regions'].keys()).symmetric_difference(set(nn.user_metadata['class_mapping']['regions'].keys()))
+
+                if resize == 'fail':
+                    logger.error(f'Training data and model class mapping differ (bl: {bl_diff}, regions: {regions_diff}')
+                    raise KrakenInputException(f'Training data and model class mapping differ (bl: {bl_diff}, regions: {regions_diff}')
+                elif resize == 'add':
+                    new_bls = gt_set.class_mapping['baselines'].keys() - nn.user_metadata['class_mapping']['baselines'].keys()
+                    new_regions = gt_set.class_mapping['regions'].keys() - nn.user_metadata['class_mapping']['regions'].keys()
+                    cls_idx = max(max(nn.user_metadata['class_mapping']['baselines'].values()) if nn.user_metadata['class_mapping']['baselines'] else -1,
+                                  max(nn.user_metadata['class_mapping']['regions'].values()) if nn.user_metadata['class_mapping']['regions'] else -1)
+                    message(f'Adding {len(new_bls) + len(new_regions)} missing types to network output layer ', nl=False)
+                    nn.resize_output(cls_idx + len(new_bls) + len(new_regions) + 1)
+                    for c in new_bls:
+                        cls_idx += 1
+                        nn.user_metadata['class_mapping']['baselines'][c] = cls_idx
+                    for c in new_regions:
+                        cls_idx += 1
+                        nn.user_metadata['class_mapping']['regions'][c] = cls_idx
+                    message('\u2713', fg='green')
+                elif resize == 'both':
+                    message('Fitting network exactly to training set ', nl=False)
+                    new_bls = gt_set.class_mapping['baselines'].keys() - nn.user_metadata['class_mapping']['baselines'].keys()
+                    new_regions = gt_set.class_mapping['regions'].keys() - nn.user_metadata['class_mapping']['regions'].keys()
+                    del_bls = nn.user_metadata['class_mapping']['baselines'].keys() - gt_set.class_mapping['baselines'].keys()
+                    del_regions = nn.user_metadata['class_mapping']['regions'].keys() - gt_set.class_mapping['regions'].keys()
+
+                    message(f'Adding {len(new_bls) + len(new_regions)} missing '
+                             'types and removing {len(del_bls) + '
+                             'len(del_regions)} to network output layer ',
+                            nl=False)
+                    cls_idx = max(max(nn.user_metadata['class_mapping']['baselines'].values()) if nn.user_metadata['class_mapping']['baselines'] else -1,
+                                  max(nn.user_metadata['class_mapping']['regions'].values()) if nn.user_metadata['class_mapping']['regions'] else -1)
+
+                    del_indices = [nn.user_metadata['class_mapping']['baselines'][x] for x in del_bls]
+                    del_indices.extend(nn.user_metadata['class_mapping']['regions'][x] for x in del_regions)
+                    nn.resize_output(cls_idx + len(new_bls) + len(new_regions) - len(del_bls) - len(del_regions) + 1, del_indices)
+
+                    # delete old baseline/region types
+                    cls_idx = min(min(nn.user_metadata['class_mapping']['baselines'].values()) if nn.user_metadata['class_mapping']['baselines'] else np.inf,
+                                  min(nn.user_metadata['class_mapping']['regions'].values()) if nn.user_metadata['class_mapping']['regions'] else np.inf)
+
+                    bls = {}
+                    for k,v in sorted(nn.user_metadata['class_mapping']['baselines'].items(), key=lambda item: item[1]):
+                        if k not in del_bls:
+                            bls[k] = cls_idx
+                            cls_idx += 1
+
+                    regions = {}
+                    for k,v in sorted(nn.user_metadata['class_mapping']['regions'].items(), key=lambda item: item[1]):
+                        if k not in del_regions:
+                            regions[k] = cls_idx
+                            cls_idx += 1
+
+                    nn.user_metadata['class_mapping']['baselines'] = bls
+                    nn.user_metadata['class_mapping']['regions'] = regions
+
+                    # add new baseline/region types
+                    cls_idx -= 1
+                    for c in new_bls:
+                        cls_idx += 1
+                        nn.user_metadata['class_mapping']['baselines'][c] = cls_idx
+                    for c in new_regions:
+                        cls_idx += 1
+                        nn.user_metadata['class_mapping']['regions'][c] = cls_idx
+                    message('\u2713', fg='green')
+                else:
+                    logger.error(f'invalid resize parameter value {resize}')
+                    raise KrakenInputException(f'invalid resize parameter value {resize}')
+            # backfill gt_set/val_set mapping if key-equal as the actual
+            # numbering in the gt_set might be different
+            gt_set.class_mapping = nn.user_metadata['class_mapping']
+            val_set.class_mapping = nn.user_metadata['class_mapping']
 
         message('Training line types:')
         for k, v in gt_set.class_mapping['baselines'].items():
