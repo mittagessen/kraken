@@ -713,14 +713,15 @@ class ActConv2D(Module):
         """
         if not del_indices:
             del_indices = []
-        old_shape = self.co.weight.size(1)
+        old_shape = self.co.weight.size(0)
         self.out_channels = output_size
         idx = torch.tensor([x for x in range(old_shape) if x not in del_indices])
-        weight = self.co.weight.index_select(1, idx)
-        rweight = torch.zeros((weight.size(0), output_size - weight.size(1), weight.size(2), weight.size(3)))
+        weight = self.co.weight.index_select(0, idx)
+        rweight = torch.zeros((output_size - weight.size(0), weight.size(1), weight.size(2), weight.size(3)))
         torch.nn.init.xavier_uniform_(rweight)
-        weight = torch.cat([weight, rweight], dim=1)
-        bias = self.co.bias
+        weight = torch.cat([weight, rweight], dim=0)
+        bias = self.co.bias.index_select(0, idx)
+        bias = torch.cat([bias, torch.zeros(output_size - bias.size(0))])
         self.co = torch.nn.Conv2d(self.in_channels, self.out_channels, self.kernel_size,
                                   stride=self.stride, padding=self.padding)
         self.co.weight = torch.nn.Parameter(weight)

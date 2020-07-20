@@ -595,7 +595,7 @@ class TorchVGSLModel(object):
             output_size (int): New size/output channels of last layer
             del_indices (list): list of outputs to delete from layer
         """
-        if type(self.nn[-1]) not in [layers.ActConv2D, layers.Linsoftmax]:
+        if type(self.nn[-1]) not in [layers.ActConv2D, layers.LinSoftmax]:
             raise ValueError('last layer is neither linear nor convolutional layer')
         logger.debug('Resizing output layer to {}'.format(output_size))
         self.nn[-1].resize(output_size, del_indices)
