@@ -923,7 +923,6 @@ class KrakenTrainer(object):
                     message('\u2713', fg='green')
                 elif resize == 'both':
                     message('Fitting network exactly to training set ', nl=False)
-                    logger.info(f'Resizing network or given codec to {gt_set.alphabet} code sequences')
                     new_bls = gt_set.class_mapping['baselines'].keys() - nn.user_metadata['class_mapping']['baselines'].keys()
                     new_regions = gt_set.class_mapping['regions'].keys() - nn.user_metadata['class_mapping']['regions'].keys()
                     del_bls = nn.user_metadata['class_mapping']['baselines'].keys() - gt_set.class_mapping['baselines'].keys()
@@ -936,12 +935,13 @@ class KrakenTrainer(object):
                     cls_idx = max(max(nn.user_metadata['class_mapping']['baselines'].values()) if nn.user_metadata['class_mapping']['baselines'] else -1,
                                   max(nn.user_metadata['class_mapping']['regions'].values()) if nn.user_metadata['class_mapping']['regions'] else -1)
 
-                    del_indices = [nn.user_metadata['class_mapping']['baselines'][x] or x in del_bls]
-                    del_indices.extend(nn.user_metadata['class_mapping']['regions'][x] or x in del_regions)
+                    del_indices = [nn.user_metadata['class_mapping']['baselines'][x] for x in del_bls]
+                    del_indices.extend(nn.user_metadata['class_mapping']['regions'][x] for x in del_regions)
                     nn.resize_output(cls_idx + len(new_bls) + len(new_regions) - len(del_bls) - len(del_regions) + 1, del_indices)
+
                     # delete old baseline/region types
-                    cls_idx = min(min(nn.user_metadata['class_mapping']['baselines'].values()),
-                                  min(nn.user_metadata['class_mapping']['regions'].values()))
+                    cls_idx = min(min(nn.user_metadata['class_mapping']['baselines'].values()) if nn.user_metadata['class_mapping']['baselines'] else np.inf,
+                                  min(nn.user_metadata['class_mapping']['regions'].values()) if nn.user_metadata['class_mapping']['regions'] else np.inf)
 
                     bls = {}
                     for k,v in sorted(nn.user_metadata['class_mapping']['baselines'].items(), key=lambda item: item[1]):
@@ -958,6 +958,7 @@ class KrakenTrainer(object):
                     nn.user_metadata['class_mapping']['baselines'] = bls
                     nn.user_metadata['class_mapping']['regions'] = regions
 
+                    # add new baseline/region types
                     cls_idx -= 1
                     for c in new_bls:
                         cls_idx += 1
