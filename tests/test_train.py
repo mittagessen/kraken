@@ -95,8 +95,8 @@ class TestKrakenTrainer(unittest.TestCase):
                                                       evaluation_data=evaluation_data)
         self.assertEqual(trainer.model.seg_type, 'baselines')
         self.assertIsInstance(trainer.train_set.dataset, kraken.lib.dataset.PolygonGTDataset)
-        self.assertEqual(len(trainer.train_set), 44)
-        self.assertEqual(len(trainer.val_set), 44)
+        self.assertEqual(len(trainer.train_set.dataset), 44)
+        self.assertEqual(len(trainer.val_set.dataset), 44)
 
     def test_krakentrainer_rec_bl_dict(self):
         """

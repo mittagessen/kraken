@@ -62,13 +62,5 @@ class TestCLI(unittest.TestCase):
         Tests segmentation of b/w images without script detection
         """
         with tempfile.NamedTemporaryFile() as fp:
-            result = self.runner.invoke(cli, ['-i', self.color_img, fp.name, 'segment', '--no-script-detect'])
-            self.assertEqual(result.exit_code, 1)
-
-    def test_segment_bw_script(self):
-        """
-        Tests segmentation of b/w images with script detection
-        """
-        with tempfile.NamedTemporaryFile() as fp:
-            result = self.runner.invoke(cli, ['-i', self.color_img, fp.name, 'segment', '--script-detect'])
+            result = self.runner.invoke(cli, ['-i', self.color_img, fp.name, 'segment'])
             self.assertEqual(result.exit_code, 1)
