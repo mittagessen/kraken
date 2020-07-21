@@ -316,7 +316,8 @@ def preparse_xml_data(filenames, format_type='xml', repolygonize=False):
             logger.warning(e)
             continue
         try:
-            Image.open(data['image'])
+            with open(data['image'], 'rb') as fp:
+                Image.open(fp)
         except FileNotFoundError as e:
             logger.warning(f'Could not open file {e.filename} in {fn}')
             continue
