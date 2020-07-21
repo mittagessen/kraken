@@ -81,6 +81,6 @@ class TestSerializations(unittest.TestCase):
 
         fp.write(serialization.serialize(self.records, image_name='foo.png', template='pagexml'))
         doc = etree.fromstring(fp.getvalue().encode('utf-8'))
-        with open(os.path.join(resources, 'pagecontent.xml')) as schema_fp:
+        with open(os.path.join(resources, 'pagecontent.xsd')) as schema_fp:
             abbyy_schema = etree.XMLSchema(etree.parse(schema_fp))
             abbyy_schema.assertValid(doc)
