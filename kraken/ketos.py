@@ -144,6 +144,7 @@ def _validate_merging(ctx, param, value):
 @click.option('-vb', '--valid-baselines', show_default=True, default=None, multiple=True, help='Valid baseline types in training data. May be used multiple times.')
 @click.option('-mr', '--merge-regions', show_default=True, default=None, help='Region merge mapping. One or more mappings of the form `$target:$src` where $src is merged into $target.', multiple=True, callback=_validate_merging)
 @click.option('-mb', '--merge-baselines', show_default=True, default=None, help='Baseline type merge mapping. Same syntax as `--merge-regions`', multiple=True, callback=_validate_merging)
+@click.option('-br', '--bounding-regions', show_default=True, default=None, multiple=True, help='Regions treated as boundaries for polygonization purposes. May be used multiple times.')
 @click.option('--augment/--no-augment', show_default=True, default=SEGMENTATION_HYPER_PARAMS['augment'], help='Enable image augmentation')
 @click.option('--resize', show_default=True, default='fail', type=click.Choice(['add', 'both', 'fail']),
               help='Output layer resizing option. If set to `add` new classes will be '
@@ -156,7 +157,7 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
              schedule, partition, training_files, evaluation_files, threads,
              load_hyper_parameters, force_binarization, format_type, suppress_regions,
              suppress_baselines, valid_regions, valid_baselines, merge_regions,
-             merge_baselines, augment, resize, ground_truth):
+             merge_baselines, bounding_regions, augment, resize, ground_truth):
     """
     Trains a baseline labeling model for layout analysis
     """
@@ -240,6 +241,7 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
                                                    valid_baselines=valid_baselines,
                                                    merge_regions=merge_regions,
                                                    merge_baselines=merge_baselines,
+                                                   bounding_regions=bounding_regions,
                                                    augment=augment,
                                                    resize=resize)
 

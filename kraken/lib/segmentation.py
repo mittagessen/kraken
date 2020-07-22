@@ -389,8 +389,8 @@ def _rotate(image, angle, center, scale, cval=0):
 
 
 def calculate_polygonal_environment(im: PIL.Image.Image,
-                                    baselines: Sequence[Tuple[int, int]] = None,
-                                    suppl_obj: Sequence[Tuple[int, int]] = None,
+                                    baselines: Sequence[Sequence[Tuple[int, int]]] = None,
+                                    suppl_obj: Sequence[Sequence[Tuple[int, int]]] = None,
                                     im_feats: np.array = None,
                                     scale: Tuple[int, int] = None):
     """

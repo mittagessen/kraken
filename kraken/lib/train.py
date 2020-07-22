@@ -785,6 +785,7 @@ class KrakenTrainer(object):
                                valid_baselines: Optional[Sequence[str]] = None,
                                merge_regions: Optional[Dict[str, str]] = None,
                                merge_baselines: Optional[Dict[str, str]] = None,
+                               bounding_regions: Optional[Sequence[str]] = None,
                                resize: str = 'fail',
                                augment: bool = False):
         """
@@ -897,6 +898,8 @@ class KrakenTrainer(object):
             message(f'Creating model {spec} with {gt_set.num_classes} outputs ', nl=False)
             nn = vgsl.TorchVGSLModel(spec)
             message('\u2713', fg='green')
+            if bounding_regions is not None:
+                nn.user_metadata['bounding_regions'] = bounding_regions
         else:
             if gt_set.class_mapping['baselines'].keys() != nn.user_metadata['class_mapping']['baselines'].keys() or \
                gt_set.class_mapping['regions'].keys() != nn.user_metadata['class_mapping']['regions'].keys():
