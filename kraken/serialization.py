@@ -141,7 +141,7 @@ def serialize(records: Sequence[ocr_record],
             is_in_region = reg[0]
             region = {'index': reg[0],
                       'bbox': [int(x) for x in reg[1][1].bounds],
-                      'boundary': reg[1][2],
+                      'boundary': [list(x) for x in reg[1][2]],
                       'region_type': reg[1][0],
                       'lines': [],
                       'type': 'region'
