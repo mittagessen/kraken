@@ -29,6 +29,9 @@ import torchvision.transforms as tf
 
 from typing import Optional, Dict, Callable
 
+from scipy.ndimage.filters import gaussian_filter
+from skimage.filters import sobel
+
 from kraken.lib import vgsl, dataset
 from kraken.lib.util import pil2array, is_bitonal, get_im_str
 from kraken.lib.exceptions import KrakenInputException
@@ -87,7 +90,12 @@ def compute_segmentation_map(im,
     o = F.interpolate(o, size=scal_im.size[::-1])
     o = o.squeeze().cpu().numpy()
     scale = np.divide(im.size, o.shape[:0:-1])
-    return {'heatmap': o, 'cls_map': model.user_metadata['class_mapping'], 'scale': scale, 'scal_im': scal_im}
+    bounding_regions = model.user_metadata['bounding_regions'] if 'bounding_regions' in model.user_metadata else None
+    return {'heatmap': o,
+            'cls_map': model.user_metadata['class_mapping'],
+            'bounding_regions': bounding_regions,
+            'scale': scale,
+            'scal_im': scal_im}
 
 
 def vec_regions(heatmap: torch.Tensor, cls_map: Dict, scale: float, **kwargs):
@@ -112,6 +120,7 @@ def vec_lines(heatmap: torch.Tensor,
               reading_order_fn: Callable = polygonal_reading_order,
               regions: Dict = None,
               scal_im = None,
+              suppl_obj = None,
               **kwargs):
     """
     Computes lines from a stack of heatmaps, a class mapping, and scaling
@@ -126,9 +135,10 @@ def vec_lines(heatmap: torch.Tensor,
         logger.debug(f'Vectorizing lines of type {bl_type}')
         baselines.extend([(bl_type,x) for x in vectorize_lines(heatmap[(st_sep, end_sep, idx), :, :])])
     logger.debug('Polygonizing lines')
+    im_feats = gaussian_filter(sobel(scal_im), 2)
     lines = list(filter(lambda x: x[2] is not None, zip([x[0] for x in baselines],
                                                         [x[1] for x in baselines],
-                                                        calculate_polygonal_environment(scal_im, [x[1] for x in baselines]))))
+                                                        calculate_polygonal_environment([x[1] for x in baselines], im_feats=im_feats, suppl_obj=suppl_obj))))
     logger.debug('Scaling vectorized lines')
     sc = scale_polygonal_lines([x[1:] for x in lines], scale)
     lines = list(zip([x[0] for x in lines], [x[0] for x in sc], [x[1] for x in sc]))
@@ -191,10 +201,13 @@ def segment(im,
 
     rets = compute_segmentation_map(im, mask, model, device)
     regions = vec_regions(**rets)
-    # flatten regions for line ordering
+    # flatten regions for line ordering/fetch bounding regions
     line_regs = []
-    for regs in regions.values():
+    suppl_obj = []
+    for cls, regs in regions.items():
         line_regs.extend(regs)
+        if rets['bounding_regions'] is not None and cls in rets['bounding_regions']:
+            suppl_obj.extend(regs)
     lines = vec_lines(**rets,
                       regions=line_regs,
                       reading_order_fn=reading_order_fn,
