@@ -718,7 +718,8 @@ class ActConv2D(Module):
         idx = torch.tensor([x for x in range(old_shape) if x not in del_indices])
         weight = self.co.weight.index_select(0, idx)
         rweight = torch.zeros((output_size - weight.size(0), weight.size(1), weight.size(2), weight.size(3)))
-        torch.nn.init.xavier_uniform_(rweight)
+        if rweight.shape[0] > 0:
+            torch.nn.init.xavier_uniform_(rweight)
         weight = torch.cat([weight, rweight], dim=0)
         bias = self.co.bias.index_select(0, idx)
         bias = torch.cat([bias, torch.zeros(output_size - bias.size(0))])
