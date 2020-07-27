@@ -932,8 +932,8 @@ class KrakenTrainer(object):
                     del_regions = nn.user_metadata['class_mapping']['regions'].keys() - gt_set.class_mapping['regions'].keys()
 
                     message(f'Adding {len(new_bls) + len(new_regions)} missing '
-                             'types and removing {len(del_bls) + '
-                             'len(del_regions)} to network output layer ',
+                            f'types and removing {len(del_bls) + '
+                            f'len(del_regions)} to network output layer ',
                             nl=False)
                     cls_idx = max(max(nn.user_metadata['class_mapping']['baselines'].values()) if nn.user_metadata['class_mapping']['baselines'] else -1,
                                   max(nn.user_metadata['class_mapping']['regions'].values()) if nn.user_metadata['class_mapping']['regions'] else -1)
