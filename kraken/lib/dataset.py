@@ -759,6 +759,7 @@ class BaselineSet(Dataset):
         self.targets = []
         # n-th entry contains semantic of n-th class
         self.class_mapping = {'aux': {'_start_separator': 0, '_end_separator': 1}, 'baselines': {}, 'regions': {}}
+        self.class_stats = {'baselines': defaultdict(int), 'regions': defaultdict(int)}
         self.num_classes = 2
         self.mbl_dict = merge_baselines if merge_baselines is not None else {}
         self.mreg_dict = merge_regions if merge_regions is not None else {}
@@ -781,10 +782,12 @@ class BaselineSet(Dataset):
                     for line in data['lines']:
                         if valid_baselines is None or line['script'] in valid_baselines:
                             lines[self.mbl_dict.get(line['script'], line['script'])].append(line['baseline'])
+                            self.class_stats['baselines'][self.mbl_dict.get(line['script'], line['script'])] += 1
                     regions = defaultdict(list)
                     for k, v in data['regions'].items():
                         if valid_regions is None or k in valid_regions:
                             regions[self.mreg_dict.get(k, k)].extend(v)
+                            self.class_stats['regions'][self.mreg_dict.get(k, k)] += 1
                     data['regions'] = regions
                     self.targets.append({'baselines': lines, 'regions': data['regions']})
                 except KrakenInputException as e:
@@ -868,19 +871,21 @@ class BaselineSet(Dataset):
             line_type = self.mbl_dict.get(line['script'], line['script'])
             if self.valid_baselines is None or line['script'] in self.valid_baselines:
                 baselines_[line_type].append(line['baseline'])
+                self.class_stats['baselines'][line_type] += 1
                 if line_type not in self.class_mapping['baselines']:
                     self.num_classes += 1
                     self.class_mapping['baselines'][line_type] = self.num_classes - 1
+
         regions_ = defaultdict(list)
         for k, v in regions.items():
             reg_type = self.mreg_dict.get(k, k)
             if self.valid_regions is None or reg_type in self.valid_regions:
                 regions_[reg_type].extend(v)
+                self.class_stats['baselines'][reg_type] += 1
                 if reg_type not in self.class_mapping['regions']:
                     self.num_classes += 1
                     self.class_mapping['regions'][reg_type] = self.num_classes - 1
         self.targets.append({'baselines': baselines_, 'regions': regions_})
-
         self.imgs.append(image)
 
     def __getitem__(self, idx):

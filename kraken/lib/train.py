@@ -932,8 +932,7 @@ class KrakenTrainer(object):
                     del_regions = nn.user_metadata['class_mapping']['regions'].keys() - gt_set.class_mapping['regions'].keys()
 
                     message(f'Adding {len(new_bls) + len(new_regions)} missing '
-                            f'types and removing {len(del_bls) + '
-                            f'len(del_regions)} to network output layer ',
+                            f'types and removing {len(del_bls) + len(del_regions)} to network output layer ',
                             nl=False)
                     cls_idx = max(max(nn.user_metadata['class_mapping']['baselines'].values()) if nn.user_metadata['class_mapping']['baselines'] else -1,
                                   max(nn.user_metadata['class_mapping']['regions'].values()) if nn.user_metadata['class_mapping']['regions'] else -1)
@@ -980,10 +979,10 @@ class KrakenTrainer(object):
 
         message('Training line types:')
         for k, v in gt_set.class_mapping['baselines'].items():
-            message(f'  {k}\t{v}')
+            message(f'  {k}\t{v}\t{gt_set.class_stats["baselines"][k]}')
         message('Training region types:')
         for k, v in gt_set.class_mapping['regions'].items():
-            message(f'  {k}\t{v}')
+            message(f'  {k}\t{v}\t{gt_set.class_stats["regions"][k]}')
 
         if len(gt_set.imgs) == 0:
             logger.error('No valid training data was provided to the train command. Please add valid XML data.')
