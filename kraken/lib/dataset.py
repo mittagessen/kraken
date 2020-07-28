@@ -787,7 +787,7 @@ class BaselineSet(Dataset):
                     for k, v in data['regions'].items():
                         if valid_regions is None or k in valid_regions:
                             regions[self.mreg_dict.get(k, k)].extend(v)
-                            self.class_stats['regions'][self.mreg_dict.get(k, k)] += 1
+                            self.class_stats['regions'][self.mreg_dict.get(k, k)] += len(v)
                     data['regions'] = regions
                     self.targets.append({'baselines': lines, 'regions': data['regions']})
                 except KrakenInputException as e:
@@ -881,7 +881,7 @@ class BaselineSet(Dataset):
             reg_type = self.mreg_dict.get(k, k)
             if self.valid_regions is None or reg_type in self.valid_regions:
                 regions_[reg_type].extend(v)
-                self.class_stats['baselines'][reg_type] += 1
+                self.class_stats['baselines'][reg_type] += len(v)
                 if reg_type not in self.class_mapping['regions']:
                     self.num_classes += 1
                     self.class_mapping['regions'][reg_type] = self.num_classes - 1
