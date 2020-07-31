@@ -16,9 +16,9 @@ dependencies:
   - scipy
   - protobuf>=3.0
   - jinja2
-  - torchvision>=0.5.0
+  - pytorch::torchvision>=0.5.0
   - cpuonly
-  - pytorch==1.5.0
+  - pytorch::pytorch==1.5.0
   - jsonschema
   - scikit-image
   - shapely
