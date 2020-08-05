@@ -388,7 +388,7 @@ def _rotate(image, angle, center, scale, cval=0):
     return tform, warp(image, tform, output_shape=output_shape, order=0, cval=cval, clip=False, preserve_range=True)
 
 
-def calculate_polygonal_environment(im: PIL.Image.Image,
+def calculate_polygonal_environment(im: PIL.Image.Image = None,
                                     baselines: Sequence[Sequence[Tuple[int, int]]] = None,
                                     suppl_obj: Sequence[Sequence[Tuple[int, int]]] = None,
                                     im_feats: np.array = None,
@@ -432,11 +432,13 @@ def calculate_polygonal_environment(im: PIL.Image.Image,
         if suppl_obj is not None:
             suppl_obj = [(np.array(bl) * scale).astype('int').tolist() for bl in suppl_obj]
 
-    bounds = np.array(im.size, dtype=np.float)
-    im = np.array(im)
     if im_feats is None:
+        bounds = np.array(im.size, dtype=np.float)
+        im = np.array(im)
          # compute image gradient
         im_feats = gaussian_filter(sobel(im), 2)
+    else:
+        bounds = im_feats.shape[::-1]
 
     def _ray_intersect_boundaries(ray, direction, aabb):
         """
