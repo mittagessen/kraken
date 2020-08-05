@@ -138,7 +138,7 @@ def vec_lines(heatmap: torch.Tensor,
     im_feats = gaussian_filter(sobel(scal_im), 2)
     lines = list(filter(lambda x: x[2] is not None, zip([x[0] for x in baselines],
                                                         [x[1] for x in baselines],
-                                                        calculate_polygonal_environment([x[1] for x in baselines], im_feats=im_feats, suppl_obj=suppl_obj))))
+                                                        calculate_polygonal_environment(baselines=[x[1] for x in baselines], im_feats=im_feats, suppl_obj=suppl_obj))))
     logger.debug('Scaling vectorized lines')
     sc = scale_polygonal_lines([x[1:] for x in lines], scale)
     lines = list(zip([x[0] for x in lines], [x[0] for x in sc], [x[1] for x in sc]))
