@@ -117,7 +117,7 @@ def _validate_merging(ctx, param, value):
 @click.option('-m', '--momentum', show_default=True, default=SEGMENTATION_HYPER_PARAMS['momentum'], help='Momentum')
 @click.option('-w', '--weight-decay', show_default=True, default=SEGMENTATION_HYPER_PARAMS['weight_decay'], help='Weight decay')
 @click.option('--schedule', show_default=True, type=click.Choice(['constant', '1cycle', 'exponential']), default=SEGMENTATION_HYPER_PARAMS['schedule'],
-              help='Set learning rate scheduler. For 1cycle/exponential, cycle length is determined by the `--epoch` option.')
+              help='Set learning rate scheduler. For 1cycle/exponential, cycle/halving length is determined by the `--epoch` option.')
 @click.option('-p', '--partition', show_default=True, default=0.9, help='Ground truth data partition ratio between train/validation set')
 @click.option('-t', '--training-files', show_default=True, default=None, multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
@@ -519,15 +519,6 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, threads,
 
     if len(test_set) == 0:
         raise click.UsageError('No evaluation data was provided to the test command. Use `-e` or the `test_set` argument.')
-
-    text_transforms = []
-    if normalization:
-        text_transforms.append(lambda x: unicodedata.normalize(normalization, x))
-    if normalize_whitespace:
-        text_transforms.append(lambda x: regex.sub(r'\s', ' ', x))
-        text_transforms.append(lambda x: x.strip())
-    if reorder:
-        text_transforms.append(get_display)
 
     if format_type != 'path':
         if repolygonize:
