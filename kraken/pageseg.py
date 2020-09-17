@@ -152,7 +152,7 @@ def compute_colseps_conv(binary: np.array, scale: float = 1.0,
     Returns:
         Separators
     """
-    logger.debug('Finding column separators')
+    logger.debug(f'Finding max {maxcolseps} column separators')
     # find vertical whitespace by thresholding
     smoothed = gaussian_filter(1.0*binary, (scale, scale*0.5))
     smoothed = uniform_filter(smoothed, (5.0*scale, 1))
@@ -183,7 +183,7 @@ def compute_black_colseps(binary: np.array, scale: float, maxcolseps: int) -> Tu
     """
     logger.debug('Extract vertical black column separators from lines')
     seps = compute_separators_morph(binary, scale, maxcolseps)
-    colseps = np.maximum(compute_colseps_conv(binary, scale, maxcolseps), seps)
+    colseps = np.maximum(compute_colseps_conv(binary, scale, maxcolseps=maxcolseps), seps)
     binary = np.minimum(binary, 1-seps)
     return colseps, binary
 
@@ -199,7 +199,7 @@ def compute_white_colseps(binary: np.array, scale: float, maxcolseps: int) -> Tu
     Returns:
         colseps:
     """
-    return compute_colseps_conv(binary, scale, maxcolseps)
+    return compute_colseps_conv(binary, scale, maxcolseps=maxcolseps)
 
 
 def norm_max(v: np.array) -> np.array:
