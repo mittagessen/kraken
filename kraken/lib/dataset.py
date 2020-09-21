@@ -46,7 +46,7 @@ from kraken.lib.segmentation import extract_polygons, calculate_polygonal_enviro
 from kraken.lib.exceptions import KrakenInputException
 from kraken.lib.lineest import CenterNormalizer, dewarp
 
-__all__ = ['BaselineSet', 'GroundTruthDataset', 'compute_error', 'generate_input_transforms', 'preparse_xml_data']
+__all__ = ['BaselineSet', 'PolygonGTDataset', 'GroundTruthDataset', 'compute_error', 'generate_input_transforms', 'preparse_xml_data']
 
 import logging
 
