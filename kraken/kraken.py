@@ -234,7 +234,9 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, script_ignore, inpu
                    '`-o` suffixes are appended to this format string.')
 @click.option('-d', '--device', default='cpu', show_default=True,
               help='Select device to use (cpu, cuda:0, cuda:1, ...)')
-def cli(input, batch_input, suffix, verbose, format_type, pdf_format, device):
+@click.option('-r', '--raise-on-error/--no-raise-on-error', default=False, show_default=True,
+              help='Raises the exception that caused processing to fail in the case of an error')
+def cli(input, batch_input, suffix, verbose, format_type, pdf_format, device, raise_on_error):
     """
     Base command for recognition functionality.
 
@@ -245,6 +247,7 @@ def cli(input, batch_input, suffix, verbose, format_type, pdf_format, device):
     ctx = click.get_current_context()
     ctx.meta['device'] = device
     ctx.meta['input_format_type'] = format_type if format_type != 'pdf' else 'image'
+    ctx.meta['raise_failed'] = raise_on_error
     log.set_logger(logger, level=30-min(10*verbose, 20))
 
 
@@ -320,8 +323,9 @@ def process_pipeline(subcommands, input, batch_input, suffix, verbose, format_ty
             for task, input, output in zip(subcommands, fc, fc[1:]):
                 task(input=input, output=output)
         except Exception as e:
-            raise
             logger.error(f'Failed processing {io_pair[0]}: {str(e)}')
+            if ctx.meta['raise_failed'] is True:
+                raise
         finally:
             for f in fc[1:-1]:
                 os.unlink(f)
