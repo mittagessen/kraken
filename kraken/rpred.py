@@ -289,7 +289,12 @@ class mm_rpred(object):
             return rec
 
     def _recognize_baseline_line(self, line):
-        box, coords = next(extract_polygons(self.im, line))
+        try:
+            box, coords = next(extract_polygons(self.im, line))
+        except KrakenInputException as e:
+            logger.warning(f'Extracting line failed: {e}')
+            return ocr_record('', [], [], line['lines'][0])
+
         script = coords['script']
         # check if boxes are non-zero in any dimension
         if 0 in box.size:

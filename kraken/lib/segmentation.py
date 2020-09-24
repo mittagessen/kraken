@@ -763,7 +763,7 @@ def compute_polygon_section(baseline, boundary, dist1, dist2):
     try:
         points = [_test_intersect(point, uv[::-1], bounds).round() for point, uv in zip(seg_points, unit_vec)]
     except ValueError:
-        logger.info('No intercepts with polygon (possibly misshaped polygon)')
+        logger.debug('No intercepts with polygon (possibly misshaped polygon)')
         return seg_points.astype('int').tolist()
     o = np.int_(points[0]).reshape(-1, 2).tolist()
     o.extend(np.int_(np.roll(points[1], 2)).reshape(-1, 2).tolist())
@@ -799,6 +799,11 @@ def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image:
             baseline = np.array(line['baseline'])
             c_min, c_max = int(pl[:,0].min()), int(pl[:,0].max())
             r_min, r_max = int(pl[:,1].min()), int(pl[:,1].max())
+
+            if (pl < 0).any() or (pl.max(axis=0)[::-1] >= im.shape[:2]).any():
+                raise KrakenInputException(f'Line polygon outside of image bounds')
+            if (baseline < 0).any() or (baseline.max(axis=0)[::-1] >= im.shape[:2]).any():
+                raise KrakenInputException('Baseline outside of image bounds')
 
             # fast path for straight baselines requiring only rotation
             if len(baseline) == 2:
@@ -886,8 +891,8 @@ def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image:
         for box in bounds['boxes']:
             if isinstance(box, tuple):
                 box = list(box)
-            if (box < [0, 0, 0, 0] or box[::2] > [im.size[0], im.size[0]] or
-                    box[1::2] > [im.size[1], im.size[1]]):
+            if (box < [0, 0, 0, 0] or box[::2] >= [im.size[0], im.size[0]] or
+                    box[1::2] >= [im.size[1], im.size[1]]):
                 logger.error('bbox {} is outside of image bounds {}'.format(box, im.size))
                 raise KrakenInputException('Line outside of image bounds')
             yield im.crop(box).rotate(angle, expand=True), box
