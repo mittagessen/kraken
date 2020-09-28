@@ -537,6 +537,9 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, threads,
         test_set = [{'image': img} for img in test_set]
         valid_norm = True
 
+    if len(test_set) == 0:
+        raise click.UsageError('No evaluation data was provided to the test command. Use `-e` or the `test_set` argument.')
+
     acc_list = []
     for p, net in nn.items():
         algn_gt: List[str] = []
@@ -553,7 +556,10 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, threads,
                           im_transforms=ts,
                           preload=False)
         for line in test_set:
-            ds.add(**line)
+            try:
+                ds.add(**line)
+            except KrakenInputException as e:
+                logger.info(e)
         # don't encode validation set as the alphabets may not match causing encoding failures
         ds.no_encode()
         ds_loader = DataLoader(ds,
