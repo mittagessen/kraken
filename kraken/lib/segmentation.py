@@ -732,6 +732,10 @@ def compute_polygon_section(baseline, boundary, dist1, dist2):
     the rectangle formed by the orthogonal cuts on that baseline segment. The
     resulting polygon is not garantueed to have a non-zero area.
 
+    The distance can be larger than the actual length of the baseline if the
+    baseline endpoints are inside the bounding polygon. In that case the
+    baseline will be extrapolated to the polygon edge.
+
     Args:
         baseline (list): A polyline ((x1, y1), ..., (xn, yn))
         boundary (list): A bounding polygon around the baseline (same format as
@@ -747,7 +751,24 @@ def compute_polygon_section(baseline, boundary, dist1, dist2):
         dist1 = np.finfo(np.float).eps
     if dist2 == 0:
         dist2 = np.finfo(np.float).eps
+    boundary_pol = geom.Polygon(boundary)
     bl = np.array(baseline)
+    # extend first/last segment of baseline if not on polygon boundary
+    if boundary_pol.contains(geom.Point(bl[0])):
+        logger.debug(f'Extending leftmost end of baseline {bl} to polygon boundary')
+        l_point = boundary_pol.boundary.intersection(geom.LineString([(bl[0][0]-10*(bl[1][0]-bl[0][0]), bl[0][1]-10*(bl[1][1]-bl[0][1])), bl[0]]))
+        # intersection is incidental with boundary so take closest point instead
+        if l_point.type != 'Point':
+            bl[0] = np.array(nearest_points(geom.Point(bl[0]), boundary_pol)[1], 'int')
+        else:
+            bl[0] = np.array(l_point, 'int')
+    if boundary_pol.contains(geom.Point(bl[-1])):
+        logger.debug(f'Extending rightmost end of baseline {bl} to polygon boundary')
+        r_point = boundary_pol.boundary.intersection(geom.LineString([(bl[-1][0]-10*(bl[-2][0]-bl[-1][0]), bl[-1][1]-10*(bl[-2][1]-bl[-1][1])), bl[-1]]))
+        if r_point.type != 'Point':
+            bl[-1] = np.array(nearest_points(geom.Point(bl[-1]), boundary_pol)[1], 'int')
+        else:
+            bl[-1] = np.array(r_point, 'int')
     dists = np.cumsum(np.diag(np.roll(squareform(pdist(bl)), 1)))
     segs_idx = np.searchsorted(dists, [dist1, dist2])
     segs = np.dstack((bl[segs_idx-1], bl[segs_idx]))
