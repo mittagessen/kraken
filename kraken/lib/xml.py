@@ -293,6 +293,7 @@ def parse_alto(filename):
             region_data[rtype].append(boundary)
         data['regions'] = region_data
 
+        scripts = set(('default',))
         for line in lines:
             if line.get('BASELINE') is None:
                 logger.info('TextLine {} without baseline'.format(line.get('ID')))
@@ -327,7 +328,12 @@ def parse_alto(filename):
                 for tagref in tagrefs.split():
                     ltype = cls_map.get(tagref, None)
                     if ltype is not None:
+                        scripts.add(ltype)
                         break
             data['lines'].append({'baseline': baseline, 'boundary': boundary, 'text': text, 'script': ltype if ltype is not None else 'default'})
-        data['script_detection'] = False
+
+        if len(scripts) > 1:
+            data['script_detection'] = True
+        else:
+            data['script_detection'] = False
         return data
