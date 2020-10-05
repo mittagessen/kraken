@@ -56,6 +56,9 @@ def get_input_parser(type_str: str) -> Callable[[str], Dict[str, Any]]:
     elif type_str == 'page':
         from kraken.lib.xml import parse_page
         return parse_page
+    elif type_str == 'xml':
+        from kraken.lib.xml import parse_xml
+        return parse_xml
     elif type_str == 'image':
         return Image.open
 
@@ -222,7 +225,7 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, script_ignore, inpu
 @click.option('-o', '--suffix', default='', show_default=True,
               help='Suffix for output files from batch and PDF inputs.')
 @click.option('-v', '--verbose', default=0, count=True, show_default=True)
-@click.option('-f', '--format-type', type=click.Choice(['image', 'alto', 'page', 'pdf']), default='image',
+@click.option('-f', '--format-type', type=click.Choice(['image', 'alto', 'page', 'pdf', 'xml']), default='image',
               help='Sets the default input type. In image mode inputs are image '
                    'files, alto/page expects XML files in the respective format, pdf '
                    'expects PDF files with numbered suffixes added to output file '
