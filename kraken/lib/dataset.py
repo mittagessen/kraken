@@ -451,10 +451,17 @@ class PolygonGTDataset(Dataset):
             text = func(text)
             if not text:
                 raise KrakenInputException('Text line is empty after transformations')
+        if not baseline:
+            raise KrakenInputException('No baseline given for line')
+        if not boundary:
+            raise KrakenInputException('No boundary given for line')
         if self.preload:
             if not isinstance(image, Image.Image):
                 im = Image.open(image)
-            im, _ = next(extract_polygons(im, {'type': 'baselines', 'lines': [{'baseline': baseline, 'boundary': boundary}]}))
+            try:
+                im, _ = next(extract_polygons(im, {'type': 'baselines', 'lines': [{'baseline': baseline, 'boundary': boundary}]}))
+            except IndexError:
+                raise KrakenInputException('Patch extraction failed for baseline')
             try:
                 im = self.head_transforms(im)
                 if not is_bitonal(im):
