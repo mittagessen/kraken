@@ -182,7 +182,7 @@ def parse_page(filename):
                     logger.info('TextLine {} without baseline'.format(line.get('id')))
                     continue
             else:
-                logger.warning('TextLine {} without baseline'.format(line.get('id')))
+                logger.info('TextLine {} without baseline'.format(line.get('id')))
                 continue
             text = ''
             manual_transcription = line.find('./{*}TextEquiv')
@@ -295,16 +295,27 @@ def parse_alto(filename):
 
         for line in lines:
             if line.get('BASELINE') is None:
-                raise KrakenInputException('ALTO file {} contains no baseline information'.format(filename))
+                logger.info('TextLine {} without baseline'.format(line.get('ID')))
+                continue
             pol = line.find('./{*}Shape/{*}Polygon')
             boundary = None
             if pol is not None:
-                points = [int(float(x)) for x in pol.get('POINTS').split(' ')]
-                boundary = zip(points[::2], points[1::2])
-                boundary = [k for k, g in groupby(boundary)]
-            points = [int(float(x)) for x in line.get('BASELINE').split(' ')]
-            baseline = list(zip(points[::2], points[1::2]))
-            baseline =  [k for k, g in groupby(baseline)]
+                try:
+                    points = [int(float(x)) for x in pol.get('POINTS').split(' ')]
+                    boundary = zip(points[::2], points[1::2])
+                    boundary = [k for k, g in groupby(boundary)]
+                except ValueError:
+                    logger.info('TextLine {} without polygon'.format(line.get('ID')))
+            else:
+                logger.info('TextLine {} without polygon'.format(line.get('ID')))
+
+            baseline = None
+            try:
+                points = [int(float(x)) for x in line.get('BASELINE').split(' ')]
+                baseline = list(zip(points[::2], points[1::2]))
+                baseline =  [k for k, g in groupby(baseline)]
+            except ValueError:
+                logger.info('TextLine {} without baseline'.format(line.get('ID')))
 
             text = ''
             for el in line.xpath(".//*[local-name() = 'String'] | .//*[local-name() = 'SP']"):
