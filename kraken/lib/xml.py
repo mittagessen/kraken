@@ -161,7 +161,7 @@ def parse_page(filename):
         data['regions'] = region_data
 
         # parse line information
-        scripts = set()
+        scripts = set(('default',))
         for line in lines:
             pol = line.find('./{*}Coords')
             boundary = None
