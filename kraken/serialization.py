@@ -130,9 +130,9 @@ def serialize(records: Sequence[ocr_record],
     is_in_region = -1
     for idx, record in enumerate(records):
         if record.type == 'baselines':
-            l_obj = geom.LineString(record.baseline).centroid
+            l_obj = geom.LineString(record.baseline).interpolate(0.5, normalized=True)
         else:
-            l_obj = geom.LineString(record.line).centroid
+            l_obj = geom.LineString(record.line).interpolate(0.5, normalized=True)
         reg = list(filter(lambda x: x[1][1].contains(l_obj), region_map.items()))
         if len(reg) == 0:
             cur_ent = page['entities']
