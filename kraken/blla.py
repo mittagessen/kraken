@@ -24,6 +24,7 @@ import torch
 import logging
 import numpy as np
 import pkg_resources
+import shapely.geometry as geom
 import torch.nn.functional as F
 import torchvision.transforms as tf
 
@@ -31,6 +32,7 @@ from typing import Optional, Dict, Callable
 
 from scipy.ndimage.filters import gaussian_filter
 from skimage.filters import sobel
+
 
 from kraken.lib import vgsl, dataset
 from kraken.lib.util import pil2array, is_bitonal, get_im_str
@@ -136,9 +138,20 @@ def vec_lines(heatmap: torch.Tensor,
         baselines.extend([(bl_type,x) for x in vectorize_lines(heatmap[(st_sep, end_sep, idx), :, :])])
     logger.debug('Polygonizing lines')
     im_feats = gaussian_filter(sobel(scal_im), 2)
-    lines = list(filter(lambda x: x[2] is not None, zip([x[0] for x in baselines],
-                                                        [x[1] for x in baselines],
-                                                        calculate_polygonal_environment(baselines=[x[1] for x in baselines], im_feats=im_feats, suppl_obj=suppl_obj))))
+    lines = []
+    reg_pols = [geom.Polygon(x) for x in regions]
+    for bl_idx in range(len(baselines)):
+        bl = baselines[bl_idx]
+        mid_point = geom.LineString(bl[1]).interpolate(0.5, normalized=True)
+
+        suppl_obj = [x[1] for x in baselines[:bl_idx] + baselines[bl_idx+1:]]
+        for reg_idx, reg_pol in enumerate(reg_pols):
+            if reg_pol.contains(mid_point):
+                suppl_obj.append(regions[reg_idx])
+
+        pol = calculate_polygonal_environment(baselines=[bl[1]], im_feats=im_feats, suppl_obj=suppl_obj)
+        if pol is not None:
+            lines.append((bl[0], bl[1], pol[0]))
     logger.debug('Scaling vectorized lines')
     sc = scale_polygonal_lines([x[1:] for x in lines], scale)
     lines = list(zip([x[0] for x in lines], [x[0] for x in sc], [x[1] for x in sc]))
@@ -211,7 +224,8 @@ def segment(im,
     lines = vec_lines(**rets,
                       regions=line_regs,
                       reading_order_fn=reading_order_fn,
-                      text_direction=text_direction)
+                      text_direction=text_direction,
+                      suppl_obj=suppl_obj)
 
     if len(rets['cls_map']['baselines']) > 1:
         script_detection = True
