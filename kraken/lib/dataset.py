@@ -28,6 +28,7 @@ import torch.nn.functional as F
 import torchvision.transforms.functional as tf
 
 from os import path
+from shapely.ops import split, snap
 from PIL import Image, ImageDraw
 from itertools import groupby
 from collections import Counter, defaultdict
@@ -909,6 +910,7 @@ class BaselineSet(Dataset):
                 im, target = self.transform(im, target)
                 return {'image': im, 'target': target}
             except Exception:
+                raise
                 idx = np.random.randint(0, len(self.imgs))
                 logger.debug('Failed. Replacing with sample {}'.format(idx))
                 return self[np.random.randint(0, len(self.imgs))]
@@ -945,14 +947,18 @@ class BaselineSet(Dataset):
                 # buffer out line to desired width
                 line = [k for k, g in groupby(line)]
                 line = np.array(line)*scale
-                line_pol = np.array(geom.LineString(line).buffer(self.line_width/2, cap_style=2).boundary, dtype=np.int)
+                shp_line = geom.LineString(line)
+                split_offset = min(5, shp_line.length/2)
+                line_pol = np.array(shp_line.buffer(self.line_width/2, cap_style=2).boundary, dtype=np.int)
                 rr, cc = polygon(line_pol[:,1], line_pol[:,0], shape=image.shape[1:])
                 t[cls_idx, rr, cc] = 1
-                start_sep = np.array(geom.LineString(self._get_ortho_line(line[:2], line[0], self.line_width/4, 'l')).buffer(self.line_width/4, cap_style=2).boundary, dtype=np.int)
+                split_pt = shp_line.interpolate(split_offset).buffer(0.001)
+                start_sep = np.array((split(shp_line, split_pt)[0].buffer(self.line_width, cap_style=3).boundary), dtype=np.int)
                 rr_s, cc_s = polygon(start_sep[:,1], start_sep[:,0], shape=image.shape[1:])
                 t[start_sep_cls, rr_s, cc_s] = 1
                 t[start_sep_cls, rr, cc] = 0
-                end_sep = np.array(geom.LineString(self._get_ortho_line(line[-2:], line[-1], self.line_width/4, 'r')).buffer(self.line_width/4, cap_style=2).boundary, dtype=np.int)
+                split_pt = shp_line.interpolate(-split_offset).buffer(0.001)
+                end_sep = np.array((split(shp_line, split_pt)[-1].buffer(self.line_width, cap_style=3).boundary), dtype=np.int)
                 rr_s, cc_s = polygon(end_sep[:,1], end_sep[:,0], shape=image.shape[1:])
                 t[end_sep_cls, rr_s, cc_s] = 1
                 t[end_sep_cls, rr, cc] = 0
