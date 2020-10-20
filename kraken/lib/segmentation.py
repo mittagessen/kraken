@@ -345,13 +345,9 @@ def vectorize_regions(im: np.ndarray, threshold: float = 0.5):
         A list of lists containing the region polygons.
     """
     bin = im > threshold
-    contours = find_contours(bin, 0.5, fully_connected='high', positive_orientation='high')
-    if len(contours) == 0:
-        return contours
-    approx_contours = []
-    for contour in contours:
-        approx_contours.append(approximate_polygon(contour[:,[1,0]], 1).astype('uint').tolist())
-    return approx_contours
+    labelled = label(bin)
+    boundaries = [geom.Polygon(boundary_tracing(x)).simplify(3) for x in regionprops(labelled)]
+    return [np.array(x, dtype=np.uint)[:,[1,0]].tolist() for x in boundaries]
 
 
 def _rotate(image, angle, center, scale, cval=0):
