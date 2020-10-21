@@ -26,16 +26,17 @@ from collections import defaultdict
 from PIL import Image, ImageDraw
 
 from scipy.stats import linregress
-from scipy.spatial.distance import cdist, pdist, squareform
 from scipy.ndimage import maximum_filter
 from scipy.ndimage.filters import gaussian_filter
 from scipy.ndimage.morphology import distance_transform_cdt
+from scipy.spatial.distance import cdist, pdist, squareform
 
-from shapely.ops import nearest_points, unary_union, linemerge
+from shapely.ops import nearest_points, unary_union
 
-from skimage import draw
+from skimage import draw, filters
+from skimage.graph import MCP_Connect
 from skimage.filters import apply_hysteresis_threshold, sobel
-from skimage.measure import approximate_polygon, subdivide_polygon, find_contours, label
+from skimage.measure import approximate_polygon, subdivide_polygon, regionprops, label
 from skimage.morphology import skeletonize
 from skimage.transform import PiecewiseAffineTransform, SimilarityTransform, AffineTransform, warp
 
@@ -46,9 +47,6 @@ from kraken.lib.exceptions import KrakenInputException
 from scipy.signal import convolve2d
 from scipy.ndimage.filters import gaussian_filter
 
-from skimage import filters
-from skimage.graph import MCP_Connect
-from skimage.measure import regionprops, label
 
 logger = logging.getLogger('kraken')
 
@@ -136,22 +134,7 @@ def denoising_hysteresis_thresh(im, low, high, sigma):
     return apply_hysteresis_threshold(im, low, high)
 
 
-def moore_neighborhood(current, backtrack):  # y, x
-    """Returns clockwise list of pixels from the moore neighborhood of current\
-    pixel:
-    The first element is the coordinates of the backtrack pixel.
-    The following elements are the coordinates of the neighboring pixels in
-    clockwise order.
-    Parameters
-    ----------
-    current ([y, x]): Coordinates of the current pixel
-    backtrack ([y, x]): Coordinates of the backtrack pixel
-    Returns
-    -------
-    List of coordinates of the moore neighborood pixels, or 0 if the backtrack
-    pixel is not a current pixel neighbor
-    """
-
+def moore_neighborhood(current, backtrack):
     operations = np.array([[-1, 0], [-1, 1], [0, 1], [1, 1], [1, 0], [1, -1],
                            [0, -1], [-1, -1]])
     neighbors = (current + operations).astype(int)
@@ -164,18 +147,15 @@ def moore_neighborhood(current, backtrack):  # y, x
 
 
 def boundary_tracing(region):
-    """Coordinates of the region's boundary. The region must not have isolated
+    """
+    Find coordinates of the region's boundary. The region must not have isolated
     points.
-    Parameters
-    ----------
-    region : obj
-        Obtained with skimage.measure.regionprops()
-    Returns
-    -------
-    boundary : 2D array
-        List of coordinates of pixels in the boundary
-        The first element is the most upper left pixel of the region.
-        The following coordinates are in clockwise order.
+
+    Args:
+        region: object obtained with skimage.measure.regionprops().
+
+    Returns:
+        List of coordinates of pixels in the boundary.
     """
 
     # creating the binary image
