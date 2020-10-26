@@ -207,7 +207,11 @@ def boundary_tracing(region):
 def _extend_boundaries(baselines, bin_bl_map):
     # find baseline blob boundaries
     labelled = label(bin_bl_map)
-    boundaries = [geom.Polygon(boundary_tracing(x)).simplify(0.01) for x in regionprops(labelled)]
+    boundaries = []
+    for x in regionprops(labelled):
+        b = boundary_tracing(x)
+        if len(b) > 3:
+            boundaries.append(geom.Polygon(b).simplify(0.01).buffer(0))
 
     # extend lines to polygon boundary
     for bl in baselines:
