@@ -150,7 +150,7 @@ def vec_lines(heatmap: torch.Tensor,
                 suppl_obj.append(regions[reg_idx])
 
         pol = calculate_polygonal_environment(baselines=[bl[1]], im_feats=im_feats, suppl_obj=suppl_obj)
-        if pol is not None:
+        if pol[0] is not None:
             lines.append((bl[0], bl[1], pol[0]))
     logger.debug('Scaling vectorized lines')
     sc = scale_polygonal_lines([x[1:] for x in lines], scale)
