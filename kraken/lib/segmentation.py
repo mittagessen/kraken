@@ -446,7 +446,82 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
         t = min(x for x in [tmin, tmax] if x >= 0)
         return ray + (direction * t)
 
-    def _extract_patch(env_up, env_bottom, baseline, dir_vec):
+    def _calc_seam(baseline, polygon, angle, bias=100):
+        """
+        Calculates seam between baseline and ROI boundary on one side.
+
+        Adds a baseline-distance-weighted bias to the feature map, masks
+        out the bounding polygon and rotates the line so it is roughly
+        level.
+        """
+        MASK_VAL = 99999
+        r, c = draw.polygon(polygon[:,1], polygon[:,0])
+        c_min, c_max = int(polygon[:,0].min()), int(polygon[:,0].max())
+        r_min, r_max = int(polygon[:,1].min()), int(polygon[:,1].max())
+        patch = im_feats[r_min:r_max+2, c_min:c_max+2].copy()
+        # bias feature matrix by distance from baseline
+        mask = np.ones_like(patch)
+        for l in zip(baseline[:-1] - (c_min, r_min), baseline[1:] - (c_min, r_min)):
+            line_locs = draw.line(l[0][1], l[0][0], l[1][1], l[1][0])
+            mask[line_locs] = 0
+        dist_bias = distance_transform_cdt(mask)
+        # absolute mask
+        mask = np.ones_like(patch, dtype=np.bool)
+        mask[r-r_min, c-c_min] = False
+        # combine weights with features
+        patch[mask] = MASK_VAL
+        patch += (dist_bias*(np.mean(patch[patch != MASK_VAL])/bias))
+        extrema = baseline[(0,-1),:] - (c_min, r_min)
+        # scale line image to max 600 pixel width
+        scale = min(1.0, 600/(c_max-c_min))
+        tform, rotated_patch = _rotate(patch, angle, center=extrema[0], scale=scale, cval=MASK_VAL)
+        # ensure to cut off padding after rotation
+        x_offsets = np.sort(np.around(tform.inverse(extrema)[:,0]).astype('int'))
+        rotated_patch = rotated_patch[:,x_offsets[0]+1:x_offsets[1]]
+        # infinity pad for seamcarve
+        rotated_patch = np.pad(rotated_patch, ((1, 1), (0, 0)),  mode='constant', constant_values=np.inf)
+        r, c = rotated_patch.shape
+        # fold into shape (c, r-2 3)
+        A = np.lib.stride_tricks.as_strided(rotated_patch, (c, r-2, 3), (rotated_patch.strides[1],
+                                                                         rotated_patch.strides[0],
+                                                                         rotated_patch.strides[0]))
+        B = rotated_patch[1:-1,1:].swapaxes(0, 1)
+        backtrack = np.zeros_like(B, dtype='int')
+        T = np.empty((B.shape[1]), 'f')
+        R = np.arange(-1, len(T)-1)
+        for i in np.arange(c-1):
+            A[i].min(1, T)
+            backtrack[i] = A[i].argmin(1) + R
+            B[i] += T
+        # backtrack
+        seam = []
+        j = np.argmin(rotated_patch[1:-1,-1])
+        for i in range(c-2, 0, -1):
+            seam.append((i+x_offsets[0]+1, j))
+            j = backtrack[i, j]
+        seam = np.array(seam)[::-1]
+        # rotate back
+        seam = tform(seam).astype('int')
+        # filter out seam points in masked area of original patch/in padding
+        seam = seam[seam.min(axis=1)>=0,:]
+        m = (seam < mask.shape[::-1]).T
+        seam = seam[np.logical_and(m[0], m[1]), :]
+        seam = seam[np.invert(mask[seam.T[1], seam.T[0]])]
+        seam += (c_min, r_min)
+        return seam, seam[:, 1].mean()
+
+    def _compute_avg_line_height(env_up, env_bottom, baseline, dir_vec):
+        """
+        Computes the average line height.
+        """
+        upper_polygon = np.concatenate((baseline, env_up[::-1]))
+        bottom_polygon = np.concatenate((baseline, env_bottom[::-1]))
+        angle = np.arctan2(dir_vec[1], dir_vec[0])
+        _, top_avg = _calc_seam(baseline, upper_polygon, angle)
+        _, bottom_avg = _calc_seam(baseline, bottom_polygon, angle)
+        return top_avg, bottom_avg
+
+    def _extract_patch(env_up, env_bottom, baseline, dir_vec, avg_line_top, avg_line_bottom):
         """
         Calculate a line image patch from a ROI and the original baseline.
         """
@@ -454,78 +529,15 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
         bottom_polygon = np.concatenate((baseline, env_bottom[::-1]))
         angle = np.arctan2(dir_vec[1], dir_vec[0])
 
-        def _calc_seam(polygon, bias=100):
-            """
-            Calculates seam between baseline and ROI boundary on one side.
-
-            Adds a baseline-distance-weighted bias to the feature map, masks
-            out the bounding polygon and rotates the line so it is roughly
-            level.
-            """
-            MASK_VAL = 99999
-            r, c = draw.polygon(polygon[:,1], polygon[:,0])
-            c_min, c_max = int(polygon[:,0].min()), int(polygon[:,0].max())
-            r_min, r_max = int(polygon[:,1].min()), int(polygon[:,1].max())
-            patch = im_feats[r_min:r_max+2, c_min:c_max+2].copy()
-            # bias feature matrix by distance from baseline
-            mask = np.ones_like(patch)
-            for l in zip(baseline[:-1] - (c_min, r_min), baseline[1:] - (c_min, r_min)):
-                line_locs = draw.line(l[0][1], l[0][0], l[1][1], l[1][0])
-                mask[line_locs] = 0
-            dist_bias = distance_transform_cdt(mask)
-            # absolute mask
-            mask = np.ones_like(patch, dtype=np.bool)
-            mask[r-r_min, c-c_min] = False
-            # combine weights with features
-            patch[mask] = MASK_VAL
-            patch += (dist_bias*(np.mean(patch[patch != MASK_VAL])/bias))
-            extrema = baseline[(0,-1),:] - (c_min, r_min)
-            # scale line image to max 600 pixel width
-            scale = min(1.0, 600/(c_max-c_min))
-            tform, rotated_patch = _rotate(patch, angle, center=extrema[0], scale=scale, cval=MASK_VAL)
-            # ensure to cut off padding after rotation
-            x_offsets = np.sort(np.around(tform.inverse(extrema)[:,0]).astype('int'))
-            rotated_patch = rotated_patch[:,x_offsets[0]+1:x_offsets[1]]
-            # infinity pad for seamcarve
-            rotated_patch = np.pad(rotated_patch, ((1, 1), (0, 0)),  mode='constant', constant_values=np.inf)
-            r, c = rotated_patch.shape
-            # fold into shape (c, r-2 3)
-            A = np.lib.stride_tricks.as_strided(rotated_patch, (c, r-2, 3), (rotated_patch.strides[1],
-                                                                             rotated_patch.strides[0],
-                                                                             rotated_patch.strides[0]))
-            B = rotated_patch[1:-1,1:].swapaxes(0, 1)
-            backtrack = np.zeros_like(B, dtype='int')
-            T = np.empty((B.shape[1]), 'f')
-            R = np.arange(-1, len(T)-1)
-            for i in np.arange(c-1):
-                A[i].min(1, T)
-                backtrack[i] = A[i].argmin(1) + R
-                B[i] += T
-            # backtrack
-            seam = []
-            j = np.argmin(rotated_patch[1:-1,-1])
-            for i in range(c-2, 0, -1):
-                seam.append((i+x_offsets[0]+1, j))
-                j = backtrack[i, j]
-            seam = np.array(seam)[::-1]
-            # rotate back
-            seam = tform(seam).astype('int')
-            # filter out seam points in masked area of original patch/in padding
-            seam = seam[seam.min(axis=1)>=0,:]
-            m = (seam < mask.shape[::-1]).T
-            seam = seam[np.logical_and(m[0], m[1]), :]
-            seam = seam[np.invert(mask[seam.T[1], seam.T[0]])]
-            seam += (c_min, r_min)
-            return seam
-
-        upper_seam = _calc_seam(upper_polygon).astype('int')
-        bottom_seam = _calc_seam(bottom_polygon).astype('int')[::-1]
-        polygon = np.concatenate(([baseline[0]], upper_seam, [baseline[-1]], bottom_seam))
+        upper_seam, _ = _calc_seam(baseline, upper_polygon, angle)
+        bottom_seam, _ = _calc_seam(baseline, bottom_polygon, angle)
+        polygon = np.concatenate(([baseline[0]], upper_seam.astype('int'), [baseline[-1]], bottom_seam.astype('int')[::-1]))
         return approximate_polygon(polygon, 3).tolist()
 
     polygons = []
     if suppl_obj is None:
         suppl_obj = []
+    bounding_polygons = []
     for idx, line in enumerate(baselines):
         try:
             # find intercepts with image bounds on each side of baseline
@@ -588,8 +600,20 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
                 env_bottom.append(bottom_limit.coords[0])
             env_up = np.array(env_up, dtype='uint')
             env_bottom = np.array(env_bottom, dtype='uint')
-            polygons.append(_extract_patch(env_up, env_bottom, line.astype('int'), p_dir))
+            avg_top, avg_bottom = _compute_avg_line_height(env_up, env_bottom, line.astype('int'), p_dir)
+            bounding_polygons.append((line, env_up, env_bottom, p_dir, avg_top, avg_bottom))
         except Exception as e:
+            raise
+            bounding_polygons.append((None, None, None, None, None, None))
+
+    avg_top = np.mean([x[4] for x in bounding_polygons if x[4] is not None])
+    avg_bottom = np.mean([x[5] for x in bounding_polygons if x[5] is not None])
+    logger.info(f'class average line height: top {avg_top}, bottom {avg_bottom}')
+
+    for line, env_up, env_bottom, p_dir, _, _ in bounding_polygons:
+        if line is not None:
+            polygons.append(_extract_patch(env_up, env_bottom, line.astype('int'), p_dir, avg_top, avg_bottom))
+        else:
             polygons.append(None)
 
     if scale is not None:
