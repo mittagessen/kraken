@@ -21,28 +21,32 @@ import logging
 import warnings
 import numpy as np
 import shapely.geometry as geom
+from collections import defaultdict
 
 from PIL import Image, ImageDraw
 
 from scipy.stats import linregress
-from scipy.spatial import distance_matrix, Delaunay
-from scipy.sparse.csgraph import shortest_path
-from scipy.spatial.distance import cdist, pdist, squareform
 from scipy.ndimage import maximum_filter
-from scipy.ndimage.filters import gaussian_filter, gaussian_filter1d
+from scipy.ndimage.filters import gaussian_filter
 from scipy.ndimage.morphology import distance_transform_cdt
+from scipy.spatial.distance import cdist, pdist, squareform
 
-from shapely.ops import nearest_points, unary_union, linemerge
+from shapely.ops import nearest_points, unary_union
 
-from skimage import draw
+from skimage import draw, filters
+from skimage.graph import MCP_Connect
 from skimage.filters import apply_hysteresis_threshold, sobel
-from skimage.measure import approximate_polygon, subdivide_polygon, find_contours
-from skimage.morphology import medial_axis
+from skimage.measure import approximate_polygon, subdivide_polygon, regionprops, label
+from skimage.morphology import skeletonize
 from skimage.transform import PiecewiseAffineTransform, SimilarityTransform, AffineTransform, warp
 
 from typing import List, Tuple, Union, Dict, Any, Sequence, Optional
 
 from kraken.lib.exceptions import KrakenInputException
+
+from scipy.signal import convolve2d
+from scipy.ndimage.filters import gaussian_filter
+
 
 logger = logging.getLogger('kraken')
 
@@ -130,175 +134,110 @@ def denoising_hysteresis_thresh(im, low, high, sigma):
     return apply_hysteresis_threshold(im, low, high)
 
 
-def _find_superpixels(skeleton, heatmap, min_sp_dist):
-    logger.debug('Finding superpixels')
-    conf_map = heatmap * skeleton
-    sp_idx = np.unravel_index(np.argsort(1.-conf_map, axis=None), conf_map.shape)
-    if not sp_idx[0].any():
-        logger.info('No superpixel candidates found for line vectorizer. Likely empty page.')
-        return np.empty(0)
-    zeroes_idx = conf_map[sp_idx].argmin()
-    if not zeroes_idx:
-        logger.info('No superpixel candidates found for line vectorizer. Likely empty page.')
-        return np.empty(0)
-    sp_idx = sp_idx[0][:zeroes_idx], sp_idx[1][:zeroes_idx]
-    sp_can = [(sp_idx[0][0], sp_idx[1][0])]
-    for x in range(len(sp_idx[0])):
-        loc = np.array([[sp_idx[0][x], sp_idx[1][x]]])
-        if min(cdist(sp_can, loc)) > min_sp_dist:
-            sp_can.extend(loc.tolist())
-    return np.array(sp_can)
+def moore_neighborhood(current, backtrack):
+    operations = np.array([[-1, 0], [-1, 1], [0, 1], [1, 1], [1, 0], [1, -1],
+                           [0, -1], [-1, -1]])
+    neighbors = (current + operations).astype(int)
+
+    for i, point in enumerate(neighbors):
+        if np.all(point == backtrack):
+            # we return the sorted neighborhood
+            return np.concatenate((neighbors[i:], neighbors[:i]))
+    return 0
 
 
-def _compute_sp_states(sp_can, bl_map, st_map, end_map):
+def boundary_tracing(region):
     """
-    Estimates the superpixel state information.
-    """
-    sep_map = st_map + end_map
-    logger.debug('Triangulating superpixels')
-    # some pages might not contain
-    if len(sp_can) < 2:
-        logger.warning('Less than 2 superpixels in image. Nothing to vectorize.')
-        return {}
-    elif len(sp_can) < 3:
-        logger.warning('Less than 3 superpixels in image. Skipping triangulation')
-        key = tuple([tuple(sp_can[0]), tuple(sp_can[1])])
-        line_locs = draw.line(*(key[0] + key[1]))
-        intensities = {key: (bl_map[line_locs].mean(), bl_map[line_locs].var(), sep_map[line_locs].mean(), sep_map[line_locs].max())}
-        return intensities
-    tri = Delaunay(sp_can, qhull_options="QJ Pp")
-    indices, indptr = tri.vertex_neighbor_vertices
-    # dict mapping each edge to its intensity. Needed for subsequent clustering step.
-    intensities = {}
-    logger.debug('Computing superpixel state information')
-    for vertex in range(len(sp_can)):
-        # look up neighboring indices
-        neighbors = tri.points[indptr[indices[vertex]:indices[vertex+1]]]
-        # calculate intensity of line segments to neighbors in both bl map and separator map
-        intensity = []
-        for nb in neighbors.astype('int'):
-            key = [tuple(sp_can[vertex]), tuple(nb)]
-            key.sort()
-            key = tuple(key)
-            line_locs = draw.line(*(key[0] + key[1]))
-            intensities[key] = (bl_map[line_locs].mean(), bl_map[line_locs].var(), sep_map[line_locs].mean(), sep_map[line_locs].max())
-            intensity.append(intensities[key][0])
+    Find coordinates of the region's boundary. The region must not have isolated
+    points.
 
-    logger.debug('Filtering triangulation')
-    # filter edges in triangulation
-    for k, v in list(intensities.items()):
-        if v[0] < 0.4:
-            del intensities[k]
+    Args:
+        region: object obtained with skimage.measure.regionprops().
+
+    Returns:
+        List of coordinates of pixels in the boundary.
+    """
+
+    # creating the binary image
+    coords = region.coords
+    maxs = np.amax(coords, axis=0)
+    binary = np.zeros((maxs[0] + 2, maxs[1] + 2))
+    x = coords[:, 1]
+    y = coords[:, 0]
+    binary[tuple([y, x])] = 1
+
+    # initilization
+    # starting point is the most upper left point
+    idx_start = 0
+    while True:  # asserting that the starting point is not isolated
+        start = [y[idx_start], x[idx_start]]
+        focus_start = binary[start[0]-1:start[0]+2, start[1]-1:start[1]+2]
+        if np.sum(focus_start) > 1:
+            break
+        idx_start += 1
+
+    # Determining backtrack pixel for the first element
+    if (binary[start[0] + 1, start[1]] == 0 and
+            binary[start[0]+1, start[1]-1] == 0):
+        backtrack_start = [start[0]+1, start[1]]
+    else:
+        backtrack_start = [start[0], start[1] - 1]
+
+    current = start
+    backtrack = backtrack_start
+    boundary = []
+    counter = 0
+
+    while True:
+        neighbors_current = moore_neighborhood(current, backtrack)
+        y = neighbors_current[:, 0]
+        x = neighbors_current[:, 1]
+        idx = np.argmax(binary[tuple([y, x])])
+        boundary.append(current)
+        backtrack = neighbors_current[idx-1]
+        current = neighbors_current[idx]
+        counter += 1
+
+        if (np.all(current == start) and np.all(backtrack == backtrack_start)):
+            break
+
+    return np.array(boundary)
+
+
+def _extend_boundaries(baselines, bin_bl_map):
+    # find baseline blob boundaries
+    labelled = label(bin_bl_map)
+    boundaries = []
+    for x in regionprops(labelled):
+        b = boundary_tracing(x)
+        if len(b) > 3:
+            boundaries.append(geom.Polygon(b).simplify(0.01).buffer(0))
+
+    # extend lines to polygon boundary
+    for bl in baselines:
+        ls = geom.LineString(bl)
+        try:
+            boundary_pol = next(filter(lambda x: x.contains(ls), boundaries))
+        except Exception:
             continue
-        if v[1] > 5e-02:
-            del intensities[k]
-            continue
-        # filter edges with high separator affinity
-        if v[2] > 0.125 or v[3] > 0.25 or v[0] < 0.5:
-            del intensities[k]
-            continue
-
-    return intensities
-
-
-def _cluster_lines(intensities):
-    """
-    Clusters lines according to their intensities.
-    """
-    edge_list = list(intensities.keys())
-
-    def _point_in_cluster(p):
-        for idx, cluster in enumerate(clusters[1:]):
-            if p in [point for edge in cluster for point in edge]:
-                return idx+1
-        return 0
-
-    # cluster 
-    logger.debug('Computing clusters')
-    n = 0
-    clusters = [edge_list]
-    while len(edge_list) != n:
-        n = len(edge_list)
-        for edge in edge_list:
-            cl_p0 = _point_in_cluster(edge[0])
-            cl_p1 = _point_in_cluster(edge[1])
-            # new cluster casea
-            if not cl_p0 and not cl_p1:
-                edge_list.remove(edge)
-                clusters.append([edge])
-            # extend case
-            elif cl_p0 and not cl_p1:
-                edge_list.remove(edge)
-                clusters[cl_p0].append(edge)
-            elif cl_p1 and not cl_p0:
-                edge_list.remove(edge)
-                clusters[cl_p1].append(edge)
-            # merge case
-            elif cl_p0 != cl_p1 and cl_p0 and cl_p1:
-                edge_list.remove(edge)
-                clusters[min(cl_p0, cl_p1)].extend(clusters.pop(max(cl_p0, cl_p1)))
-                clusters[min(cl_p0, cl_p1)].append(edge)
-    return clusters
+        # 'left' side
+        if boundary_pol.contains(geom.Point(bl[0])):
+            l_point = boundary_pol.boundary.intersection(geom.LineString([(bl[0][0]-10*(bl[1][0]-bl[0][0]), bl[0][1]-10*(bl[1][1]-bl[0][1])), bl[0]]))
+            if l_point.type != 'Point':
+                bl[0] = np.array(nearest_points(geom.Point(bl[0]), boundary_pol)[1], 'int').tolist()
+            else:
+                bl[0] = np.array(l_point, 'int').tolist()
+        # 'right' side
+        if boundary_pol.contains(geom.Point(bl[-1])):
+            r_point = boundary_pol.boundary.intersection(geom.LineString([(bl[-1][0]-10*(bl[-2][0]-bl[-1][0]), bl[-1][1]-10*(bl[-2][1]-bl[-1][1])), bl[-1]]))
+            if r_point.type != 'Point':
+                bl[-1] = np.array(nearest_points(geom.Point(bl[-1]), boundary_pol)[1], 'int').tolist()
+            else:
+                bl[-1] = np.array(r_point, 'int').tolist()
+    return baselines
 
 
-def _interpolate_lines(clusters, elongation_offset, extent, st_map, end_map):
-    """
-    Interpolates the baseline clusters and sets the correct line direction.
-    """
-    logger.debug('Reticulating splines')
-    lines = []
-    extent = geom.Polygon([(0, 0), (extent[1]-1, 0), (extent[1]-1, extent[0]-1), (0, extent[0]-1), (0, 0)])
-    f_st_map = maximum_filter(st_map, size=20)
-    f_end_map = maximum_filter(end_map, size=20)
-    for cluster in clusters[1:]:
-        # find start-end point
-        points = [point for edge in cluster for point in edge]
-        dists = squareform(pdist(points))
-        i, j = np.unravel_index(dists.argmax(), dists.shape)
-        # build adjacency matrix for shortest path algo
-        adj_mat = np.full_like(dists, np.inf)
-        for l, r in cluster:
-            idx_l = points.index(l)
-            idx_r = points.index(r)
-            adj_mat[idx_l, idx_r] = dists[idx_l, idx_r]
-        # shortest path
-        _, pr = shortest_path(adj_mat, directed=False, return_predecessors=True, indices=i)
-        k = j
-        line = [points[j]]
-        while pr[k] != -9999:
-            k = pr[k]
-            line.append(points[k])
-        # smooth line
-        line = np.array(line[::-1])
-        line = approximate_polygon(line[:,[1,0]], 1)
-        lr_dir = line[0] - line[1]
-        lr_dir = (lr_dir.T  / np.sqrt(np.sum(lr_dir**2,axis=-1))) * elongation_offset/2
-        line[0] = line[0] + lr_dir
-        rr_dir = line[-1] - line[-2]
-        rr_dir = (rr_dir.T  / np.sqrt(np.sum(rr_dir**2,axis=-1))) * elongation_offset/2
-        line[-1] = line[-1] + rr_dir
-        ins = geom.LineString(line).intersection(extent)
-        if ins.type == 'MultiLineString':
-            ins = linemerge(ins)
-            # skip lines that don't merge cleanly
-            if ins.type != 'LineString':
-                continue
-        line = np.array(ins, dtype='uint')
-        l_end = tuple(line[0])[::-1]
-        r_end = tuple(line[-1])[::-1]
-        if f_st_map[l_end] - f_end_map[l_end] > 0.2 and f_st_map[r_end] - f_end_map[r_end] < -0.2:
-            pass
-        elif f_st_map[l_end] - f_end_map[l_end] < -0.2 and f_st_map[r_end] - f_end_map[r_end] > 0.2:
-            line = line[::-1]
-        else:
-            logger.debug('Insufficient marker confidences in output. Defaulting to upright line.')
-            if line[0][0] > line[-1][0]:
-                line = line[::-1]
-        lines.append(line.tolist())
-    return lines
-
-
-def vectorize_lines(im: np.ndarray, threshold: float = 0.2, min_sp_dist: int = 10):
+def vectorize_lines(im: np.ndarray, threshold: float = 0.15):
     """
     Vectorizes lines from a binarized array.
 
@@ -316,18 +255,64 @@ def vectorize_lines(im: np.ndarray, threshold: float = 0.2, min_sp_dist: int = 1
     end_map = im[1]
     sep_map = st_map + end_map
     bl_map = im[2]
-    # binarize
-    bin = im > threshold
-    skel, skel_dist_map = medial_axis(bin[2], return_distance=True)
-    elongation_offset = np.max(skel_dist_map)
-    sp_can = _find_superpixels(skel, heatmap=bl_map, min_sp_dist=min_sp_dist)
-    if not sp_can.size:
-        logger.warning('No superpixel candidates found in network output. Likely empty page.')
+    bl_map = filters.sato(bl_map, black_ridges=False)
+    bin_bl_map = bl_map > threshold
+    # skeletonize
+    line_skel = skeletonize(bin_bl_map)
+    # find end points
+    kernel = np.array([[1,1,1],[1,10,1],[1,1,1]])
+    line_extrema = np.transpose(np.where((convolve2d(line_skel, kernel, mode='same') == 11) * line_skel))
+
+    class LineMCP(MCP_Connect):
+        def __init__(self, *args, **kwargs):
+           super().__init__(*args, **kwargs)
+           self.connections = dict()
+           self.scores = defaultdict(lambda: np.inf)
+
+        def create_connection(self, id1, id2, pos1, pos2, cost1, cost2):
+            k = (min(id1, id2), max(id1, id2))
+            s = cost1 + cost2
+            if self.scores[k] > s:
+                self.connections[k] = (pos1, pos2, s)
+                self.scores[k] = s
+
+        def get_connections(self):
+            results = []
+            for k, (pos1, pos2, s) in self.connections.items():
+                results.append(np.concatenate([self.traceback(pos1), self.traceback(pos2)[::-1]]))
+            return results
+
+        def goal_reached(self, int_index, float_cumcost):
+            return 2 if float_cumcost else 0
+
+    mcp = LineMCP(~line_skel)
+    try:
+        mcp.find_costs(line_extrema)
+    except ValueError as e:
         return []
-    intensities = _compute_sp_states(sp_can, bl_map, st_map, end_map)
-    clusters = _cluster_lines(intensities)
-    lines = _interpolate_lines(clusters, elongation_offset, bl_map.shape, st_map, end_map)
-    return lines
+
+    lines = [approximate_polygon(line, 3).tolist() for line in mcp.get_connections()]
+    # extend baselines to blob boundary
+    lines = _extend_boundaries(lines, bin_bl_map)
+
+    # orient lines
+    f_st_map = maximum_filter(st_map, size=20)
+    f_end_map = maximum_filter(end_map, size=20)
+
+    oriented_lines = []
+    for bl in lines:
+        l_end = tuple(bl[0])
+        r_end = tuple(bl[-1])
+        if f_st_map[l_end] - f_end_map[l_end] > 0.2 and f_st_map[r_end] - f_end_map[r_end] < -0.2:
+            pass
+        elif f_st_map[l_end] - f_end_map[l_end] < -0.2 and f_st_map[r_end] - f_end_map[r_end] > 0.2:
+            bl = bl[::-1]
+        else:
+            logger.debug('Insufficient marker confidences in output. Defaulting to upright line.')
+        if bl[0][1] > bl[-1][1]:
+            bl = bl[::-1]
+        oriented_lines.append([x[::-1] for x in bl])
+    return oriented_lines
 
 
 def vectorize_regions(im: np.ndarray, threshold: float = 0.5):
@@ -344,13 +329,13 @@ def vectorize_regions(im: np.ndarray, threshold: float = 0.5):
         A list of lists containing the region polygons.
     """
     bin = im > threshold
-    contours = find_contours(bin, 0.5, fully_connected='high', positive_orientation='high')
-    if len(contours) == 0:
-        return contours
-    approx_contours = []
-    for contour in contours:
-        approx_contours.append(approximate_polygon(contour[:,[1,0]], 1).astype('uint').tolist())
-    return approx_contours
+    labelled = label(bin)
+    boundaries = []
+    for x in regionprops(labelled):
+        boundary = boundary_tracing(x)
+        if len(boundary) > 2:
+            boundaries.append(geom.Polygon(boundary).simplify(10).boundary)
+    return [np.array(x, dtype=np.uint)[:,[1,0]].tolist() for x in boundaries]
 
 
 def _rotate(image, angle, center, scale, cval=0):
