@@ -330,7 +330,11 @@ def vectorize_regions(im: np.ndarray, threshold: float = 0.5):
     """
     bin = im > threshold
     labelled = label(bin)
-    boundaries = [geom.Polygon(boundary_tracing(x)).simplify(3) for x in regionprops(labelled)]
+    boundaries = []
+    for x in regionprops(labelled):
+        boundary = boundary_tracing(x)
+        if len(boundary) > 2:
+            boundaries.append(geom.Polygon(boundary).simplify(10).boundary)
     return [np.array(x, dtype=np.uint)[:,[1,0]].tolist() for x in boundaries]
 
 

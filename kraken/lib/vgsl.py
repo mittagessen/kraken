@@ -507,7 +507,7 @@ class TorchVGSLModel(object):
             for name, layer in self.nn.to('cpu').named_children():
                 input = layer.serialize(name, input, net_builder)
             mlmodel = MLModel(net_builder.spec)
-            mlmodel.short_description = 'kraken recognition model'
+            mlmodel.short_description = 'kraken model'
             mlmodel.user_defined_metadata['vgsl'] = '[' + ' '.join(self.named_spec) + ']'
             if self.codec:
                 mlmodel.user_defined_metadata['codec'] = json.dumps(self.codec.c2l)
