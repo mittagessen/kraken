@@ -510,8 +510,9 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
         m = (seam < mask.shape[::-1]).T
         seam = seam[np.logical_and(m[0], m[1]), :]
         seam = seam[np.invert(mask[seam.T[1], seam.T[0]])]
+        seam_mean = seam[:, 1].mean()
         seam += (c_min, r_min)
-        return seam, seam[:, 1].mean()
+        return seam, seam_mean
 
     def _compute_avg_line_height(env_up, env_bottom, baseline, dir_vec):
         """
