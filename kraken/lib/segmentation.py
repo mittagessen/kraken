@@ -446,7 +446,7 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
         t = min(x for x in [tmin, tmax] if x >= 0)
         return ray + (direction * t)
 
-    def _calc_seam(baseline, polygon, angle, bias=100):
+    def _calc_seam(baseline, polygon, angle, bias_center=0, bias=100):
         """
         Calculates seam between baseline and ROI boundary on one side.
 
@@ -465,6 +465,9 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
             line_locs = draw.line(l[0][1], l[0][0], l[1][1], l[1][0])
             mask[line_locs] = 0
         dist_bias = distance_transform_cdt(mask)
+        if bias_center != 0:
+            mask[dist_bias[dist_bias==bias_center]] = 0
+            dist_bias = distance_transform_cdt(mask)
         # absolute mask
         mask = np.ones_like(patch, dtype=np.bool)
         mask[r-r_min, c-c_min] = False
@@ -529,8 +532,8 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
         bottom_polygon = np.concatenate((baseline, env_bottom[::-1]))
         angle = np.arctan2(dir_vec[1], dir_vec[0])
 
-        upper_seam, _ = _calc_seam(baseline, upper_polygon, angle)
-        bottom_seam, _ = _calc_seam(baseline, bottom_polygon, angle)
+        upper_seam, _ = _calc_seam(baseline, upper_polygon, angle, int(avg_line_top))
+        bottom_seam, _ = _calc_seam(baseline, bottom_polygon, angle, int(avg_line_bottom))
         polygon = np.concatenate(([baseline[0]], upper_seam.astype('int'), [baseline[-1]], bottom_seam.astype('int')[::-1]))
         return approximate_polygon(polygon, 3).tolist()
 
