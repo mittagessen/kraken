@@ -37,7 +37,8 @@ from skimage.filters import sobel
 from kraken.lib import vgsl, dataset
 from kraken.lib.util import pil2array, is_bitonal, get_im_str
 from kraken.lib.exceptions import KrakenInputException
-from kraken.lib.segmentation import (polygonal_reading_order,
+from kraken.lib.segmentation import (filter_supplementary_objects,
+                                     polygonal_reading_order,
                                      vectorize_lines, vectorize_regions,
                                      scale_polygonal_lines,
                                      calculate_polygonal_environment,
@@ -139,19 +140,14 @@ def vec_lines(heatmap: torch.Tensor,
     logger.debug('Polygonizing lines')
     im_feats = gaussian_filter(sobel(scal_im), 2)
     lines = []
-    reg_pols = [geom.Polygon(x) for x in regions]
-    for bl_idx in range(len(baselines)):
-        bl = baselines[bl_idx]
-        mid_point = geom.LineString(bl[1]).interpolate(0.5, normalized=True)
 
-        suppl_obj = [x[1] for x in baselines[:bl_idx] + baselines[bl_idx+1:]]
-        for reg_idx, reg_pol in enumerate(reg_pols):
-            if reg_pol.contains(mid_point):
-                suppl_obj.append(regions[reg_idx])
+    fs_objs = partial(filter_supplementary_objects, baselines=baselines, regions=regions)
+    pol = calculate_polygonal_environment(baselines=baselines, im_feats=im_feats, suppl_obj=fs_objs)
 
-        pol = calculate_polygonal_environment(baselines=[bl[1]], im_feats=im_feats, suppl_obj=suppl_obj)
-        if pol[0] is not None:
-            lines.append((bl[0], bl[1], pol[0]))
+    for bl_type, bl, polygon in zip([x[0] for x in baselines], [x[1] for x in baselines], pol):
+        if polygon is not None:
+            lines.append((bl_type, bl, polygon))
+
     logger.debug('Scaling vectorized lines')
     sc = scale_polygonal_lines([x[1:] for x in lines], scale)
     lines = list(zip([x[0] for x in lines], [x[0] for x in sc], [x[1] for x in sc]))
