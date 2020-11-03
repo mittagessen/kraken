@@ -40,7 +40,7 @@ from skimage.measure import approximate_polygon, subdivide_polygon, regionprops,
 from skimage.morphology import skeletonize
 from skimage.transform import PiecewiseAffineTransform, SimilarityTransform, AffineTransform, warp
 
-from typing import List, Tuple, Union, Dict, Any, Sequence, Optional
+from typing import List, Tuple, Union, Dict, Any, Sequence, Optional, Callable
 
 from kraken.lib.exceptions import KrakenInputException
 
@@ -373,9 +373,44 @@ def _rotate(image, angle, center, scale, cval=0):
     return tform, warp(image, tform, output_shape=output_shape, order=0, cval=cval, clip=False, preserve_range=True)
 
 
+def line_regions(line, regions):
+    """
+    Filters a list of regions by line association.
+
+    Args:
+        line (list): Polyline representing the line.
+        regions (list): List of region polygons
+
+    Returns:
+        A list of regions that contain the line mid-point.
+    """
+    mid_point = geom.LineString(line).interpolate(0.5, normalized=True)
+
+    reg_pols = [geom.Polygon(x) for x in regions]
+    regs = []
+    for reg_idx, reg_pol in enumerate(reg_pols):
+        if reg_pol.contains(mid_point):
+            regs.append(regions[reg_idx])
+    return regs
+
+
+def filter_supplementary_objects(line=None, baselines=None, regions=None):
+    """
+    Constructs the supplementary objects list for the polygonizer.
+    """
+    suppl_obj = []
+    if baselines is not None:
+        suppl_obj.extend([baseline for baseline in baselines if baseline != line])
+
+    if regions is not None:
+        suppl_obj.extend(line_regions(line, regions))
+
+    return suppl_obj
+
+
 def calculate_polygonal_environment(im: PIL.Image.Image = None,
                                     baselines: Sequence[Sequence[Tuple[int, int]]] = None,
-                                    suppl_obj: Sequence[Sequence[Tuple[int, int]]] = None,
+                                    suppl_fn: Callable = lambda x: [],
                                     im_feats: np.array = None,
                                     scale: Tuple[int, int] = None):
     """
@@ -386,12 +421,12 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
         im (PIL.Image): grayscale input image (mode 'L')
         baselines (sequence): List of lists containing a single baseline per
                               entry.
-        suppl_obj (sequence): List of lists containing additional polylines
-                              that should be considered hard boundaries for
-                              polygonizaton purposes. Can be used to prevent
-                              polygonization into non-text areas such as
-                              illustrations or to compute the polygonization of
-                              a subset of the lines in an image.
+        suppl_fn (callable): Function returning a list containing additional polylines
+                             that should be considered hard boundaries for
+                             polygonizaton purposes. Can be used to prevent
+                             polygonization into non-text areas such as
+                             illustrations or to compute the polygonization of
+                             a subset of the lines in an image.
         im_feats (numpy.array): An optional precomputed seamcarve energy map.
                                 Overrides data in `im`. The default map is
                                 `gaussian_filter(sobel(im), 2)`.
@@ -446,7 +481,7 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
         t = min(x for x in [tmin, tmax] if x >= 0)
         return ray + (direction * t)
 
-    def _calc_seam(baseline, polygon, angle, bias_center=0, bias=100):
+    def _calc_seam(baseline, polygon, angle, bias=100):
         """
         Calculates seam between baseline and ROI boundary on one side.
 
@@ -465,9 +500,6 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
             line_locs = draw.line(l[0][1], l[0][0], l[1][1], l[1][0])
             mask[line_locs] = 0
         dist_bias = distance_transform_cdt(mask)
-        if bias_center != 0:
-            mask[dist_bias[dist_bias==bias_center]] = 0
-            dist_bias = distance_transform_cdt(mask)
         # absolute mask
         mask = np.ones_like(patch, dtype=np.bool)
         mask[r-r_min, c-c_min] = False
@@ -503,6 +535,9 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
             seam.append((i+x_offsets[0]+1, j))
             j = backtrack[i, j]
         seam = np.array(seam)[::-1]
+        seam_mean = seam[:, 1].mean()
+        seam_std = seam[:, 1].std()
+        seam[:, 1] = np.clip(seam[:, 1], seam_mean-seam_std, seam_mean+seam_std)
         # rotate back
         seam = tform(seam).astype('int')
         # filter out seam points in masked area of original patch/in padding
@@ -510,22 +545,10 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
         m = (seam < mask.shape[::-1]).T
         seam = seam[np.logical_and(m[0], m[1]), :]
         seam = seam[np.invert(mask[seam.T[1], seam.T[0]])]
-        seam_mean = seam[:, 1].mean()
         seam += (c_min, r_min)
-        return seam, seam_mean
+        return seam
 
-    def _compute_avg_line_height(env_up, env_bottom, baseline, dir_vec):
-        """
-        Computes the average line height.
-        """
-        upper_polygon = np.concatenate((baseline, env_up[::-1]))
-        bottom_polygon = np.concatenate((baseline, env_bottom[::-1]))
-        angle = np.arctan2(dir_vec[1], dir_vec[0])
-        _, top_avg = _calc_seam(baseline, upper_polygon, angle)
-        _, bottom_avg = _calc_seam(baseline, bottom_polygon, angle)
-        return top_avg, bottom_avg
-
-    def _extract_patch(env_up, env_bottom, baseline, dir_vec, avg_line_top, avg_line_bottom):
+    def _extract_patch(env_up, env_bottom, baseline, dir_vec):
         """
         Calculate a line image patch from a ROI and the original baseline.
         """
@@ -533,14 +556,13 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
         bottom_polygon = np.concatenate((baseline, env_bottom[::-1]))
         angle = np.arctan2(dir_vec[1], dir_vec[0])
 
-        upper_seam, _ = _calc_seam(baseline, upper_polygon, angle, int(avg_line_top))
-        bottom_seam, _ = _calc_seam(baseline, bottom_polygon, angle, int(avg_line_bottom))
+        upper_seam = _calc_seam(baseline, upper_polygon, angle)
+        bottom_seam = _calc_seam(baseline, bottom_polygon, angle)
+
         polygon = np.concatenate(([baseline[0]], upper_seam.astype('int'), [baseline[-1]], bottom_seam.astype('int')[::-1]))
         return approximate_polygon(polygon, 3).tolist()
 
     polygons = []
-    if suppl_obj is None:
-        suppl_obj = []
     bounding_polygons = []
     for idx, line in enumerate(baselines):
         try:
@@ -571,6 +593,11 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
             # select baselines at least partially in each polygon
             side_a = [geom.LineString(upper_bounds_intersects)]
             side_b = [geom.LineString(bottom_bounds_intersects)]
+            suppl_obj = suppl_fn(line)
+
+            if len(suppl_obj) > 0:
+                suppl_obj = [(np.array(bl) * scale).astype('int').tolist() for bl in suppl_obj]
+
             for adj_line in baselines[:idx] + baselines[idx+1:] + suppl_obj:
                 adj_line = geom.LineString(adj_line)
                 if upper_polygon.intersects(adj_line):
@@ -604,20 +631,8 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
                 env_bottom.append(bottom_limit.coords[0])
             env_up = np.array(env_up, dtype='uint')
             env_bottom = np.array(env_bottom, dtype='uint')
-            avg_top, avg_bottom = _compute_avg_line_height(env_up, env_bottom, line.astype('int'), p_dir)
-            bounding_polygons.append((line, env_up, env_bottom, p_dir, avg_top, avg_bottom))
+            polygons.append(_extract_patch(env_up, env_bottom, line.astype('int'), p_dir))
         except Exception as e:
-            raise
-            bounding_polygons.append((None, None, None, None, None, None))
-
-    avg_top = np.mean([x[4] for x in bounding_polygons if x[4] is not None])
-    avg_bottom = np.mean([x[5] for x in bounding_polygons if x[5] is not None])
-    logger.info(f'class average line height: top {avg_top}, bottom {avg_bottom}')
-
-    for line, env_up, env_bottom, p_dir, _, _ in bounding_polygons:
-        if line is not None:
-            polygons.append(_extract_patch(env_up, env_bottom, line.astype('int'), p_dir, avg_top, avg_bottom))
-        else:
             polygons.append(None)
 
     if scale is not None:

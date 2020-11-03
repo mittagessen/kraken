@@ -28,6 +28,7 @@ import shapely.geometry as geom
 import torch.nn.functional as F
 import torchvision.transforms as tf
 
+from functools import partial
 from typing import Optional, Dict, Callable
 
 from scipy.ndimage.filters import gaussian_filter
@@ -138,11 +139,11 @@ def vec_lines(heatmap: torch.Tensor,
         logger.debug(f'Vectorizing lines of type {bl_type}')
         baselines.extend([(bl_type,x) for x in vectorize_lines(heatmap[(st_sep, end_sep, idx), :, :])])
     logger.debug('Polygonizing lines')
-    im_feats = gaussian_filter(sobel(scal_im), 2)
+    im_feats = sobel(scal_im)
     lines = []
 
-    fs_objs = partial(filter_supplementary_objects, baselines=baselines, regions=regions)
-    pol = calculate_polygonal_environment(baselines=baselines, im_feats=im_feats, suppl_obj=fs_objs)
+    fs_objs = partial(filter_supplementary_objects, baselines=suppl_obj, regions=regions)
+    pol = calculate_polygonal_environment(baselines=[x[1] for x in baselines], im_feats=im_feats, suppl_fn=fs_objs)
 
     for bl_type, bl, polygon in zip([x[0] for x in baselines], [x[1] for x in baselines], pol):
         if polygon is not None:
