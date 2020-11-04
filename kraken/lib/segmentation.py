@@ -151,6 +151,9 @@ def boundary_tracing(region):
     Find coordinates of the region's boundary. The region must not have isolated
     points.
 
+    Code copied from
+    https://github.com/machine-shop/deepwings/blob/master/deepwings/method_features_extraction/image_processing.py#L185
+
     Args:
         region: object obtained with skimage.measure.regionprops().
 
