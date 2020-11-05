@@ -54,13 +54,13 @@ class TestCLI(unittest.TestCase):
         Tests that segmentation is aborted when given color image.
         """
         with tempfile.NamedTemporaryFile() as fp:
-            result = self.runner.invoke(cli, ['-i', self.color_img, fp.name, 'segment'])
+            result = self.runner.invoke(cli, ['-r', '-i', self.color_img, fp.name, 'segment'])
             self.assertEqual(result.exit_code, 1)
 
-    def test_segment_bw_noscript(self):
+    def test_segment_color_noraise(self):
         """
-        Tests segmentation of b/w images without script detection
+        Tests that segmentation does not return 1 when given color image in noraise mode.
         """
         with tempfile.NamedTemporaryFile() as fp:
             result = self.runner.invoke(cli, ['-i', self.color_img, fp.name, 'segment'])
-            self.assertEqual(result.exit_code, 1)
+            self.assertEqual(result.exit_code, 0)
