@@ -344,7 +344,7 @@ def _repolygonize(im: Image.Image, lines):
     """
     im = Image.open(im).convert('L')
     polygons = calculate_polygonal_environment(im, [x['baseline'] for x in lines])
-    return [{'boundary': polygon, 'baseline': orig['baseline'], 'text': orig['text']} for orig, polygon in zip(lines, polygons)]
+    return [{'boundary': polygon, 'baseline': orig['baseline'], 'text': orig['text'], 'script': orig['script']} for orig, polygon in zip(lines, polygons)]
 
 
 def collate_sequences(batch):

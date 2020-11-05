@@ -451,9 +451,6 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
         scale = np.array((ow/w, oh/h))
         # rescale baselines
         baselines = [(np.array(bl) * scale).astype('int').tolist() for bl in baselines]
-        # rescale suppl_obj
-        if suppl_obj is not None:
-            suppl_obj = [(np.array(bl) * scale).astype('int').tolist() for bl in suppl_obj]
 
     if im_feats is None:
         bounds = np.array(im.size, dtype=np.float)
