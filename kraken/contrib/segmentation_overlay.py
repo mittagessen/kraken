@@ -3,8 +3,10 @@
 Draws a transparent overlay of baseline segmenter output over a list of image
 files.
 """
+import re
 import os
 import click
+import unicodedata
 from itertools import cycle
 from collections import defaultdict
 
@@ -12,6 +14,19 @@ cmap = cycle([(230, 25, 75, 127),
               (60, 180, 75, 127)])
 
 bmap = (0, 130, 200, 255)
+
+
+
+def slugify(value):
+    """
+    Normalizes string, converts to lowercase, removes non-alpha characters,
+    and converts spaces to hyphens.
+    """
+    value = unicodedata.normalize('NFKD', value)
+    value = re.sub(r'[^\w\s-]', '', value).strip().lower()
+    value = re.sub(r'[-\s]+', '-', value)
+    return value
+
 
 @click.command()
 @click.option('-f', '--format-type', type=click.Choice(['xml', 'alto', 'page']), default='xml',
@@ -42,7 +57,7 @@ def cli(format_type, model, repolygonize, files):
 
     from PIL import Image, ImageDraw
 
-    from kraken.lib import vgsl, xml
+    from kraken.lib import vgsl, xml, segmentation
     from kraken import blla
 
     if model is None:
@@ -55,6 +70,11 @@ def cli(format_type, model, repolygonize, files):
         for doc in files:
             click.echo(f'Processing {doc} ', nl=False)
             data = fn(doc)
+            if repolygonize:
+                im = Image.open(data['image']).convert('L')
+                lines = data['lines']
+                polygons = segmentation.calculate_polygonal_environment(im, [x['baseline'] for x in lines], scale=(1200, 0))
+                data['lines'] = [{'boundary': polygon, 'baseline': orig['baseline'], 'text': orig['text'], 'script': orig['script']} for orig, polygon in zip(lines, polygons)]
             # reorder lines by type
             lines = defaultdict(list)
             for  line in data['lines']:
@@ -71,15 +91,18 @@ def cli(format_type, model, repolygonize, files):
                         draw.line([tuple(x) for x in line['baseline']], fill=bmap, width=2, joint='curve')
                     draw.text(line['baseline'][0], str(idx), fill=(0, 0, 0, 255))
                 base_image = Image.alpha_composite(im, tmp)
-                base_image.save(f'high_{os.path.basename(doc)}_lines_{t}.png')
+                base_image.save(f'high_{os.path.basename(doc)}_lines_{slugify(t)}.png')
             for t, regs in data['regions'].items():
                 tmp = Image.new('RGBA', im.size, (0, 0, 0, 0))
                 draw = ImageDraw.Draw(tmp)
                 for reg in regs:
                     c = next(cmap)
-                    draw.polygon(reg, fill=c, outline=c[:3])
+                    try:
+                        draw.polygon(reg, fill=c, outline=c[:3])
+                    except Exception:
+                        pass
                 base_image = Image.alpha_composite(im, tmp)
-                base_image.save(f'high_{os.path.basename(doc)}_regions_{t}.png')
+                base_image.save(f'high_{os.path.basename(doc)}_regions_{slugify(t)}.png')
             click.secho('\u2713', fg='green')
     else:
         net = vgsl.TorchVGSLModel.load_model(model)
@@ -101,15 +124,19 @@ def cli(format_type, model, repolygonize, files):
                     draw.line([tuple(x) for x in line['baseline']], fill=bmap, width=2, joint='curve')
                     draw.text(line['baseline'][0], str(idx), fill=(0, 0, 0, 255))
                 base_image = Image.alpha_composite(im, tmp)
-                base_image.save(f'high_{os.path.basename(doc)}_lines_{t}.png')
+                base_image.save(f'high_{os.path.basename(doc)}_lines_{slugify(t)}.png')
             for t, regs in res['regions'].items():
                 tmp = Image.new('RGBA', im.size, (0, 0, 0, 0))
                 draw = ImageDraw.Draw(tmp)
                 for reg in regs:
                     c = next(cmap)
-                    draw.polygon([tuple(x) for x in reg], fill=c, outline=c[:3])
+                    try:
+                        draw.polygon([tuple(x) for x in reg], fill=c, outline=c[:3])
+                    except Exception:
+                        pass
+
                 base_image = Image.alpha_composite(im, tmp)
-                base_image.save(f'high_{os.path.basename(doc)}_regions_{t}.png')
+                base_image.save(f'high_{os.path.basename(doc)}_regions_{slugify(t)}.png')
             click.secho('\u2713', fg='green')
 
 if __name__ == '__main__':
