@@ -161,7 +161,7 @@ def segment(im,
             text_direction: str = 'horizontal-lr',
             mask: Optional[np.array] = None,
             reading_order_fn: Callable = polygonal_reading_order,
-            model=None,
+            model: str = pkg_resources.resource_filename(__name__, 'blla.mlmodel'),
             device: str = 'cpu'):
     """
     Segments a page into text lines using the baseline segmenter.
