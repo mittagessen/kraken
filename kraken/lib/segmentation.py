@@ -620,7 +620,6 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
             env_bottom = np.array(env_bottom, dtype='uint')
             polygons.append(_extract_patch(env_up, env_bottom, line.astype('int'), p_dir))
         except Exception as e:
-            raise
             polygons.append(None)
 
     if scale is not None:
