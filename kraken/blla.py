@@ -34,7 +34,6 @@ from typing import Optional, Dict, Callable, Union, List
 from scipy.ndimage.filters import gaussian_filter
 from skimage.filters import sobel
 
-
 from kraken.lib import vgsl, dataset
 from kraken.lib.util import pil2array, is_bitonal, get_im_str
 from kraken.lib.exceptions import KrakenInputException
@@ -134,7 +133,9 @@ def vec_lines(heatmap: torch.Tensor,
         logger.debug(f'Vectorizing lines of type {bl_type}')
         baselines.extend([(bl_type,x) for x in vectorize_lines(heatmap[(st_sep, end_sep, idx), :, :])])
     logger.debug('Polygonizing lines')
-    im_feats = sobel(scal_im)
+
+    im_feats = gaussian_filter(sobel(scal_im), 0.5)
+
     lines = []
     reg_pols = [geom.Polygon(x) for x in regions]
     for bl_idx in range(len(baselines)):

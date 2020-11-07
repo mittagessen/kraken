@@ -470,7 +470,7 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
         t = min(x for x in [tmin, tmax] if x >= 0)
         return ray + (direction * t)
 
-    def _calc_seam(baseline, polygon, angle, bias=100):
+    def _calc_seam(baseline, polygon, angle, bias=150):
         """
         Calculates seam between baseline and ROI boundary on one side.
 
