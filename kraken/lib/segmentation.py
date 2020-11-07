@@ -397,23 +397,9 @@ def line_regions(line, regions):
     return regs
 
 
-def filter_supplementary_objects(line=None, baselines=None, regions=None):
-    """
-    Constructs the supplementary objects list for the polygonizer.
-    """
-    suppl_obj = []
-    if baselines is not None:
-        suppl_obj.extend([baseline for baseline in baselines if baseline != line])
-
-    if regions is not None:
-        suppl_obj.extend(line_regions(line, regions))
-
-    return suppl_obj
-
-
 def calculate_polygonal_environment(im: PIL.Image.Image = None,
                                     baselines: Sequence[Sequence[Tuple[int, int]]] = None,
-                                    suppl_fn: Callable = lambda x: [],
+                                    suppl_obj: Sequence[Sequence[Tuple[int, int]]] = None,
                                     im_feats: np.array = None,
                                     scale: Tuple[int, int] = None):
     """
@@ -424,12 +410,12 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
         im (PIL.Image): grayscale input image (mode 'L')
         baselines (sequence): List of lists containing a single baseline per
                               entry.
-        suppl_fn (callable): Function returning a list containing additional polylines
-                             that should be considered hard boundaries for
-                             polygonizaton purposes. Can be used to prevent
-                             polygonization into non-text areas such as
-                             illustrations or to compute the polygonization of
-                             a subset of the lines in an image.
+        suppl_obj (sequence): List of lists containing additional polylines
+                              that should be considered hard boundaries for
+                              polygonizaton purposes. Can be used to prevent
+                              polygonization into non-text areas such as
+                              illustrations or to compute the polygonization of
+                              a subset of the lines in an image.
         im_feats (numpy.array): An optional precomputed seamcarve energy map.
                                 Overrides data in `im`. The default map is
                                 `gaussian_filter(sobel(im), 2)`.
@@ -451,6 +437,9 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
         scale = np.array((ow/w, oh/h))
         # rescale baselines
         baselines = [(np.array(bl) * scale).astype('int').tolist() for bl in baselines]
+        # rescale suppl_obj
+        if suppl_obj is not None:
+            suppl_obj = [(np.array(bl) * scale).astype('int').tolist() for bl in suppl_obj]
 
     if im_feats is None:
         bounds = np.array(im.size, dtype=np.float)
@@ -563,7 +552,9 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
         return approximate_polygon(polygon, 3).tolist()
 
     polygons = []
-    bounding_polygons = []
+    if suppl_obj is None:
+        suppl_obj = []
+
     for idx, line in enumerate(baselines):
         try:
             # find intercepts with image bounds on each side of baseline
@@ -593,10 +584,6 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
             # select baselines at least partially in each polygon
             side_a = [geom.LineString(upper_bounds_intersects)]
             side_b = [geom.LineString(bottom_bounds_intersects)]
-            suppl_obj = suppl_fn(line)
-
-            if len(suppl_obj) > 0:
-                suppl_obj = [(np.array(bl) * scale).astype('int').tolist() for bl in suppl_obj]
 
             for adj_line in baselines[:idx] + baselines[idx+1:] + suppl_obj:
                 adj_line = geom.LineString(adj_line)
@@ -633,6 +620,7 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
             env_bottom = np.array(env_bottom, dtype='uint')
             polygons.append(_extract_patch(env_up, env_bottom, line.astype('int'), p_dir))
         except Exception as e:
+            raise
             polygons.append(None)
 
     if scale is not None:

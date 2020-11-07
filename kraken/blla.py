@@ -29,7 +29,7 @@ import torch.nn.functional as F
 import torchvision.transforms as tf
 
 from functools import partial
-from typing import Optional, Dict, Callable
+from typing import Optional, Dict, Callable, Union, List
 
 from scipy.ndimage.filters import gaussian_filter
 from skimage.filters import sobel
@@ -38,8 +38,7 @@ from skimage.filters import sobel
 from kraken.lib import vgsl, dataset
 from kraken.lib.util import pil2array, is_bitonal, get_im_str
 from kraken.lib.exceptions import KrakenInputException
-from kraken.lib.segmentation import (filter_supplementary_objects,
-                                     polygonal_reading_order,
+from kraken.lib.segmentation import (polygonal_reading_order,
                                      vectorize_lines, vectorize_regions,
                                      scale_polygonal_lines,
                                      calculate_polygonal_environment,
@@ -58,10 +57,6 @@ def compute_segmentation_map(im,
     """
     im_str = get_im_str(im)
     logger.info(f'Segmenting {im_str}')
-
-    if model is None:
-        logger.info('No segmentation model given. Loading default model.')
-        model = vgsl.TorchVGSLModel.load_model(pkg_resources.resource_filename(__name__, 'blla.mlmodel'))
 
     if model.one_channel_mode == '1' and not is_bitonal(im):
         logger.warning('Running binary model on non-binary input image '
@@ -141,13 +136,19 @@ def vec_lines(heatmap: torch.Tensor,
     logger.debug('Polygonizing lines')
     im_feats = sobel(scal_im)
     lines = []
+    reg_pols = [geom.Polygon(x) for x in regions]
+    for bl_idx in range(len(baselines)):
+        bl = baselines[bl_idx]
+        mid_point = geom.LineString(bl[1]).interpolate(0.5, normalized=True)
 
-    fs_objs = partial(filter_supplementary_objects, baselines=suppl_obj, regions=regions)
-    pol = calculate_polygonal_environment(baselines=[x[1] for x in baselines], im_feats=im_feats, suppl_fn=fs_objs)
+        suppl_obj = [x[1] for x in baselines[:bl_idx] + baselines[bl_idx+1:]]
+        for reg_idx, reg_pol in enumerate(reg_pols):
+            if reg_pol.contains(mid_point):
+                suppl_obj.append(regions[reg_idx])
 
-    for bl_type, bl, polygon in zip([x[0] for x in baselines], [x[1] for x in baselines], pol):
-        if polygon is not None:
-            lines.append((bl_type, bl, polygon))
+        pol = calculate_polygonal_environment(baselines=[bl[1]], im_feats=im_feats, suppl_obj=suppl_obj)
+        if pol[0] is not None:
+            lines.append((bl[0], bl[1], pol[0]))
 
     logger.debug('Scaling vectorized lines')
     sc = scale_polygonal_lines([x[1:] for x in lines], scale)
@@ -161,7 +162,7 @@ def segment(im,
             text_direction: str = 'horizontal-lr',
             mask: Optional[np.array] = None,
             reading_order_fn: Callable = polygonal_reading_order,
-            model: str = pkg_resources.resource_filename(__name__, 'blla.mlmodel'),
+            model: Union[List[vgsl.TorchVGSLModel], vgsl.TorchVGSLModel] = None,
             device: str = 'cpu'):
     """
     Segments a page into text lines using the baseline segmenter.
@@ -180,9 +181,10 @@ def segment(im,
                                      Has to accept a list of tuples (baselines,
                                      polygon) and a text direction (`lr` or
                                      `rl`).
-        model (vgsl.TorchVGSLModel): A TorchVGSLModel containing a segmentation
-                                     model. If none is given a default model
-                                     will be loaded.
+        model (vgsl.TorchVGSLModel or list): One or more TorchVGSLModel
+                                             containing a segmentation model.
+                                             If none is given a default model
+                                             will be loaded.
         device (str or torch.Device): The target device to run the neural
                                       network on.
 
@@ -206,23 +208,31 @@ def segment(im,
         KrakenInputException if the input image is not binarized or the text
         direction is invalid.
     """
+    if model is None:
+        logger.info('No segmentation model given. Loading default model.')
+        model = vgsl.TorchVGSLModel.load_model(pkg_resources.resource_filename(__name__, 'blla.mlmodel'))
+
+    if isinstance(model, vgsl.TorchVGSLModel):
+        model = [model]
+
     im_str = get_im_str(im)
     logger.info(f'Segmenting {im_str}')
 
-    rets = compute_segmentation_map(im, mask, model, device)
-    regions = vec_regions(**rets)
-    # flatten regions for line ordering/fetch bounding regions
-    line_regs = []
-    suppl_obj = []
-    for cls, regs in regions.items():
-        line_regs.extend(regs)
-        if rets['bounding_regions'] is not None and cls in rets['bounding_regions']:
-            suppl_obj.extend(regs)
-    lines = vec_lines(**rets,
-                      regions=line_regs,
-                      reading_order_fn=reading_order_fn,
-                      text_direction=text_direction,
-                      suppl_obj=suppl_obj)
+    for net in model:
+        rets = compute_segmentation_map(im, mask, net, device)
+        regions = vec_regions(**rets)
+        # flatten regions for line ordering/fetch bounding regions
+        line_regs = []
+        suppl_obj = []
+        for cls, regs in regions.items():
+            line_regs.extend(regs)
+            if rets['bounding_regions'] is not None and cls in rets['bounding_regions']:
+                suppl_obj.extend(regs)
+        lines = vec_lines(**rets,
+                          regions=line_regs,
+                          reading_order_fn=reading_order_fn,
+                          text_direction=text_direction,
+                          suppl_obj=suppl_obj)
 
     if len(rets['cls_map']['baselines']) > 1:
         script_detection = True
