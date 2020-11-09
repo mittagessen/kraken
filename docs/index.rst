@@ -59,7 +59,7 @@ or by running pip in the git repository:
 conda
 -----
 
-Install the latest release through `conda <https://anaconda.org>`_:
+Install the latest development version through `conda <https://anaconda.org>`_:
 
 ::
 
@@ -134,12 +134,11 @@ To segment a binarized image into reading-order sorted baselines and regions:
 
   $ kraken -i bw.tif lines.json segment -bl
 
-To OCR an image using the default RNN and the previously generated page
-segmentation:jjjj
+To OCR an image using the default RNN:
 
 .. code-block:: console
 
-  $ kraken -i bw.tif image.txt ocr --lines lines.json
+  $ kraken -i bw.tif image.txt segment -bl ocr
 
 All commands and their parameters are documented, just add the standard
 ``--help`` flag for further information.
