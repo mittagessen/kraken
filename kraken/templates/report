@@ -13,6 +13,15 @@ Count	Missed	%Right
 {{ script.count }}	{{ script.errors }}	{{'%0.2f'| format(script.accuracy) }}%	{{ script.script }}
 {% endfor %}
 
+{% if report.bins %}
+Binned statistics
+Count	Missed	Insertions	Deletions	Substitutions	%Right
+{% for bin in report.bins %}
+{{ bin.count }}	{{ bin.errors }}	{{ bin.insertions }}		{{ bin.deletions }}		{{ bin.substitutions }}		{{'%0.2f'| format(bin.accuracy) }}%
+{% endfor %}
+
+{% endif %}
+
 Errors	Correct-Generated
 {% for count in report.counts %}
 {{ count.errors }}	{{ '{ ' }}{{ count.correct }}{{ ' }' }} - {{ '{ ' }}{{ count.generated }}{{ ' }' }}

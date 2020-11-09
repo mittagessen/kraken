@@ -226,7 +226,8 @@ def render_report(model: str,
                   scripts: Counter,
                   insertions: Counter,
                   deletions: int,
-                  substitutions: Counter) -> str:
+                  substitutions: Counter,
+                  stat_bins: List[Dict] = None) -> str:
     """
     Renders an accuracy report.
 
@@ -241,7 +242,8 @@ def render_report(model: str,
         deletions (int): Number of deletions
         substitutions (dict): Dictionary counting substitution operations per
                               Unicode script.
-
+        stat_bins (list): Binned versions of insertion, deletions, and
+                          substitutions.
     Returns:
         A string containing the rendered report.
     """
@@ -265,6 +267,14 @@ def render_report(model: str,
                                  'errors': v} for k, v in char_confusions.items() if k[0] != k[1]],
                                key=lambda x: x['errors'],
                                reverse=True)}
+    if stat_bins is not None:
+        print(stat_bins)
+        report['bins'] = [{'count': bin['count'],
+                           'errors': sum(bin['ins'].values()) + sum(bin['subs'].values()),
+                           'accuracy': 100 * (bin['count']-(sum(bin['ins'].values()) + sum(bin['subs'].values())))/bin['count'],
+                           'insertions': sum(bin['ins'].values()),
+                           'deletions': bin['dels'],
+                           'substitutions': sum(bin['subs'].values())} for bin in stat_bins]
     logger.debug('Initializing jinja environment.')
     env = Environment(loader=PackageLoader('kraken', 'templates'),
                       trim_blocks=True,

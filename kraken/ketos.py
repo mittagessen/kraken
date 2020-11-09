@@ -578,16 +578,16 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, threads,
                     for x, y in zip(pred, text):
                         chars += len(y)
                         c, algn1, algn2 = global_align(y, x)
-                        algn_gt.extend(algn1)
-                        algn_pred.extend(algn2)
+                        algn_gt.append(algn1)
+                        algn_pred.append(algn2)
                         error += c
                 except FileNotFoundError as e:
                     logger.warning('{} {}. Skipping.'.format(e.strerror, e.filename))
                 except KrakenInputException as e:
                     logger.warning(str(e))
         acc_list.append((chars-error)/chars)
-        confusions, scripts, ins, dels, subs = compute_confusions(algn_gt, algn_pred)
-        rep = render_report(p, chars, error, confusions, scripts, ins, dels, subs)
+        confusions, scripts, ins, dels, subs, stat_bins = compute_confusions(algn_gt, algn_pred)
+        rep = render_report(p, chars, error, confusions, scripts, ins, dels, subs, stat_bins)
         logger.info(rep)
         message(rep)
     logger.info('Average accuracy: {:0.2f}%, (stddev: {:0.2f})'.format(np.mean(acc_list) * 100, np.std(acc_list) * 100))

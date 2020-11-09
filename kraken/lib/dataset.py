@@ -228,12 +228,12 @@ def compute_confusions(algn1: Sequence[str], algn2: Sequence[str]):
         align2 (Sequence[str]): sequence 2
 
     Returns:
-        A tuple (counts, scripts, ins, dels, subs) with `counts` being per-character
-        confusions, `scripts` per-script counts, `ins` a dict with per script
-        insertions, `del` an integer of the number of deletions, `subs` per
-        script substitutions.
+        A tuple (counts, scripts, ins, dels, subs, bins) with `counts` being
+        per-character confusions, `scripts` per-script counts, `ins` a dict
+        with per script insertions, `del` an integer of the number of
+        deletions, `subs` per script substitutions.
     """
-    counts: Dict[Tuple[str, str], int] = Counter()
+
     with pkg_resources.resource_stream(__name__, 'scripts.json') as fp:
         script_map = json.load(fp)
 
@@ -243,23 +243,45 @@ def compute_confusions(algn1: Sequence[str], algn2: Sequence[str]):
                 return n
         return 'Unknown'
 
+    counts: Dict[Tuple[str, str], int] = Counter()
     scripts: Dict[Tuple[str, str], int] = Counter()
     ins: Dict[Tuple[str, str], int] = Counter()
     dels: int = 0
     subs: Dict[Tuple[str, str], int] = Counter()
-    for u,v in zip(algn1, algn2):
-        counts[(u, v)] += 1
-    for k, v in counts.items():
-        if k[0] == '':
-            dels += v
-        else:
-            script = _get_script(k[0])
-            scripts[script] += v
-            if k[1] == '':
-                ins[script] += v
-            elif k[0] != k[1]:
-                subs[script] += v
-    return counts, scripts, ins, dels, subs
+    # prepare bins
+    stat_bins: List[Dict] = []
+    bins = []
+    for i in range(10):
+        bins.append(Counter())
+        stat_bins.append({'count': 0, 'ins': Counter(), 'dels': 0, 'subs': Counter()})
+
+    for line in zip(algn1, algn2):
+        bin_len = int(np.ceil(len(line[0])/10))
+        al_1 = [line[0][i:i+bin_len] for i in range(0, len(line[0]), bin_len)]
+        al_2 = [line[1][i:i+bin_len] for i in range(0, len(line[1]), bin_len)]
+        for idx, chunk in enumerate(zip(al_1, al_2)):
+            for u,v in zip(*chunk):
+                bins[idx][(u, v)] += 1
+                counts[(u, v)] += 1
+
+    # calculate chunked statistics
+    for idx, count in enumerate(bins):
+        for k, v in count.items():
+            if k[0] == '':
+                stat_bins[idx]['dels'] += v
+                dels += v
+            else:
+                script = _get_script(k[0])
+                scripts[script] += v
+                stat_bins[idx]['count'] += v
+                if k[1] == '':
+                    ins[script] += v
+                    stat_bins[idx]['ins'][script] += v
+                elif k[0] != k[1]:
+                    stat_bins[idx]['subs'][script] += v
+                    subs[script] += v
+
+    return counts, scripts, ins, dels, subs, stat_bins
 
 def compute_error(model: TorchSeqRecognizer, validation_set: Iterable[Dict[str, torch.Tensor]]) -> Tuple[int, int]:
     """
