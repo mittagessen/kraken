@@ -29,7 +29,7 @@ binary wheel packages, so installing build-essential or your distributions
 equivalent is often unnecessary. kraken only runs on **Linux or Mac OS X**.
 Windows is not supported.
 
-Install the latest 1.0 release through `conda <https://anaconda.org>`_:
+Install the latest development version through `conda <https://anaconda.org>`_:
 
 ::
 
@@ -45,7 +45,7 @@ or:
 
 for CUDA acceleration with the appropriate hardware.
 
-It is also possible to install the same version from pypi:
+It is also possible to install the latest stable release from pypi:
 
 ::
 
@@ -82,18 +82,18 @@ To binarize a single image using the nlbin algorithm:
 
   $ kraken -i image.tif bw.png binarize
 
-To segment a binarized image into reading-order sorted lines:
+To segment an image (binarized or not) with the new baseline segmenter:
 
 ::
 
-  $ kraken -i bw.png lines.json segment
+  $ kraken -i image.tif lines.json segment -bl
+ 
 
-To OCR a binarized image using the default RNN and the previously generated
-page segmentation:
+To segment and OCR an image using the default model(s):
 
 ::
 
-  $ kraken -i bw.png image.txt ocr --lines lines.json
+  $ kraken -i image.tif image.txt segment -bl ocr
 
 All subcommands and options are documented. Use the ``help`` option to get more
 information.
@@ -106,4 +106,4 @@ Have a look at the `docs <http://kraken.re>`_
 Funding
 =======
 
-kraken is developed at `Université PSL <http://www.psl.eu>`_.
+kraken is developed at the `École Pratique des Hautes Études <http://ephe.fr>`_, `Université PSL <http://www.psl.eu>`_.
