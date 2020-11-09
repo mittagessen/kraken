@@ -268,7 +268,6 @@ def render_report(model: str,
                                key=lambda x: x['errors'],
                                reverse=True)}
     if stat_bins is not None:
-        print(stat_bins)
         report['bins'] = [{'count': bin['count'],
                            'errors': sum(bin['ins'].values()) + sum(bin['subs'].values()),
                            'accuracy': 100 * (bin['count']-(sum(bin['ins'].values()) + sum(bin['subs'].values())))/bin['count'],
