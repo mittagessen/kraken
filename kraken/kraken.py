@@ -40,6 +40,7 @@ logging.captureWarnings(True)
 logger = logging.getLogger('kraken')
 
 APP_NAME = 'kraken'
+SEGMENTATION_DEFAULT_MODEL = pkg_resources.resource_filename(__name__, 'blla.mlmodel')
 DEFAULT_MODEL = ['en-default.mlmodel']
 LEGACY_MODEL_DIR = '/usr/local/share/ocropus'
 
@@ -357,7 +358,7 @@ def binarize(threshold, zoom, escale, border, perc, range, low, high):
 @cli.command('segment')
 @click.pass_context
 @click.option('-i', '--model',
-              default=None,
+              default=SEGMENTATION_DEFAULT_MODEL,
               show_default=True, type=click.Path(exists=True),
               help='Baseline detection model to use')
 @click.option('-x/-bl', '--boxes/--baseline', default=True, show_default=True,
