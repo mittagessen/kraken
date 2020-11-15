@@ -212,9 +212,13 @@ def _extend_boundaries(baselines, bin_bl_map):
     labelled = label(bin_bl_map)
     boundaries = []
     for x in regionprops(labelled):
-        b = boundary_tracing(x)
-        if len(b) > 3:
-            boundaries.append(geom.Polygon(b).simplify(0.01).buffer(0))
+        try:
+            b = boundary_tracing(x)
+            if len(b) > 3:
+                boundaries.append(geom.Polygon(b).simplify(0.01).buffer(0))
+        except Exception as e:
+            logger.warning(f'Boundary tracing failed in baseline elongation: {e}')
+            continue
 
     # extend lines to polygon boundary
     for bl in baselines:
