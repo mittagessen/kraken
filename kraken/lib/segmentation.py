@@ -776,6 +776,26 @@ def compute_polygon_section(baseline, boundary, dist1, dist2):
     return o
 
 
+def concatenate_polygonal_lines(ims: List[Tuple[Image.Image, int]]):
+    """
+    Concatenates polygonal lines with baselines at a specific offset from the
+    top so that the baselines are continuous.
+    """
+    top_height = 0
+    bottom_height = 0
+    width = 0
+    for im, offset in ims:
+        top_height = max(top_height, offset)
+        bottom_height = max(bottom_height, im.size[1]-offset)
+        width = max(width, im.size[0])
+    aggr_im = Image.new(im[0].mode, (width, top_height+bottom_height))
+    left_offset = 0
+    for im, offset in ims:
+        aggr_im.paste(im, box=(left_offset, top_height-im.size[1]))
+        left_offset += im.size[0]
+    return aggr_im
+
+
 def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image:
     """
     Yields the subimages of image im defined in the list of bounding polygons
