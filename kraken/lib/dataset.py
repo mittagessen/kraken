@@ -33,7 +33,7 @@ from PIL import Image, ImageDraw
 from itertools import groupby
 from collections import Counter, defaultdict
 from torchvision import transforms
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import IterableDataset, Dataset, DataLoader
 from torch.nn.utils.rnn import pad_sequence
 from typing import Dict, List, Tuple, Iterable, Sequence, Callable, Optional, Any, Union, cast
 
@@ -407,7 +407,7 @@ class InfiniteDataLoader(DataLoader):
         return sample
 
 
-class PolygonGTDataset(Dataset):
+class PolygonGTDataset(IterableDataset):
     """
     Dataset for training a line recognition model from polygonal/baseline data.
     """
@@ -417,7 +417,8 @@ class PolygonGTDataset(Dataset):
                  reorder: bool = True,
                  im_transforms: Callable[[Any], torch.Tensor] = transforms.Compose([]),
                  preload: bool = True,
-                 augmentation: bool = False) -> None:
+                 augmentation: bool = False,
+                 batch_size: int = 1) -> None:
         self._images = []  # type:  Union[List[Image], List[torch.Tensor]]
         self._gt = []  # type:  List[str]
         self.alphabet = Counter()  # type: Counter
@@ -429,6 +430,8 @@ class PolygonGTDataset(Dataset):
         self.transforms = im_transforms
         self.preload = preload
         self.aug = None
+        self.iter_start = 0
+        self.batch_size = batch_size
 
         self.seg_type = 'baselines'
         # built text transformations
@@ -520,38 +523,67 @@ class PolygonGTDataset(Dataset):
         for im, gt in zip(self._images, self._gt):
             self.training_set.append((im, gt))
 
-    def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor]:
-        if self.preload:
-            x, y = self.training_set[index]
-            if self.aug:
-                x = x.permute((1, 2, 0)).numpy()
-                o = self.aug(image=x)
-                x = torch.tensor(o['image'].transpose(2, 0, 1))
-            return {'image': x, 'target': y}
+    def __iter__(self):
+        worker_info = torch.utils.data.get_worker_info()
+        start_offset = None
+        if worker_info is None:
+            self._index = (0, 0)
         else:
-            item = self.training_set[index]
+            start_offset = worker_info.id *  len(self.training_set)//worker_info.num_workers
+        self._im = None
+
+        self.pol_pairs = []
+        for idx, item in enumerate(self.training_set):
+            im = item[0][0]
             try:
-                logger.debug('Attempting to load {}'.format(item[0]))
-                im = item[0][0]
-                if not isinstance(im, Image.Image):
-                    im = Image.open(im)
-                im, _ = next(extract_polygons(im, {'type': 'baselines', 'lines': [{'baseline': item[0][1], 'boundary': item[0][2]}]}))
-                im = self.head_transforms(im)
-                if not is_bitonal(im):
-                    self.im_mode = im.mode
-                im = self.tail_transforms(im)
-                if self.aug:
-                    im = im.permute((1, 2, 0)).numpy()
-                    o = self.aug(image=im)
-                    im = torch.tensor(o['image'].transpose(2, 0, 1))
-                return {'image': im, 'target': item[1]}
+                line_im_idx = [x['im'] for x in self.pol_pairs].index(im)
+            except ValueError:
+                line_im_idx = len(self.pol_pairs)
+                self.pol_pairs.append({'im': im, 'lines': []})
+            self.pol_pairs[line_im_idx]['lines'].append({'baseline': item[0][1], 'boundary': item[0][2], 'text': item[1]})
+            if start_offset is not None and start_offset == idx:
+                self._index = (line_im_idx, len(self.pol_pairs[line_im_idx]['lines']))
+        return self
+
+
+    def __next__(self):
+        batch = []
+        while len(batch) < self.batch_size:
+            im = self.pol_pairs[self._index[0]]['im']
+            try:
+                if self._im is None or (self._im != im and self._im.filename != im):
+                    if not isinstance(im, Image.Image):
+                        im = Image.open(im)
+                    self._im = im
+                lines = self.pol_pairs[self._index[0]]['lines'][self._index[1]:self._index[1]+self.batch_size-len(batch)]
+                if len(lines) < self.batch_size:
+                    self._index = (self._index[0] + 1 if self._index[0] + 1 < len(self.pol_pairs) else 0, 0)
+                else:
+                    self._index = (self._index[0], self._index[1] + self.batch_size)
             except Exception:
-                idx = np.random.randint(0, len(self.training_set))
-                logger.debug('Failed. Replacing with sample {}'.format(idx))
-                return self[np.random.randint(0, len(self.training_set))]
+                logger.debug('Failed loading image {self._im}. Removing from dataset.')
+                self.pol_pairs.pop(self._index[0])
+                self._index = (self._index[0] if self._index[0] + 1 < len(self.pol_pairs) else 0, 0)
+            else:
+                try:
+                    for (im, _), text in zip(extract_polygons(self._im, {'type': 'baselines', 'lines': [{'baseline': x['baseline'], 'boundary': x['boundary']} for x in lines]}),
+                                     [x['text'] for x in lines]):
+                        im = self.head_transforms(im)
+                        if not is_bitonal(im):
+                            self.im_mode = im.mode
+                        im = self.tail_transforms(im)
+                        if self.aug:
+                            im = im.permute((1, 2, 0)).numpy()
+                            o = self.aug(image=im)
+                            im = torch.tensor(o['image'].transpose(2, 0, 1))
+                        batch.append({'image': im, 'target': text})
+                except Exception:
+                    pass
+        return collate_sequences(batch)
+
 
     def __len__(self) -> int:
-        return len(self.training_set)
+        return len(self.training_set)//self.batch_size
 
 
 class GroundTruthDataset(Dataset):
