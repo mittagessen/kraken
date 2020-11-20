@@ -565,7 +565,9 @@ class KrakenTrainer(object):
                               reorder=reorder,
                               im_transforms=transforms,
                               preload=preload,
-                              augmentation=hyper_params['augment'])
+                              augmentation=hyper_params['augment'],
+                              batch_size=hyper_params['batch_size'])
+
         bar = progress_callback('Building training set', len(training_data))
         for im in training_data:
             logger.debug(f'Adding line {im} to training set')
@@ -581,7 +583,8 @@ class KrakenTrainer(object):
                                whitespace_normalization=hyper_params['normalize_whitespace'],
                                reorder=reorder,
                                im_transforms=transforms,
-                               preload=preload)
+                               preload=preload,
+                               batch_size=hyper_params['batch_size'])
         bar = progress_callback('Building validation set', len(evaluation_data))
         for im in evaluation_data:
             logger.debug(f'Adding line {im} to validation set')
@@ -687,20 +690,18 @@ class KrakenTrainer(object):
             loader_threads = threads // 2
         else:
             loader_threads = threads
-        train_loader = InfiniteDataLoader(gt_set, batch_size=hyper_params['batch_size'],
-                                          shuffle=True,
-                                          num_workers=loader_threads,
-                                          pin_memory=True,
-                                          collate_fn=collate_sequences)
+        train_loader = DataLoader(gt_set,
+                                  num_workers=loader_threads,
+                                  pin_memory=True,
+                                  batch_size=None)
         threads = max(threads - loader_threads, 1)
 
         # don't encode validation set as the alphabets may not match causing encoding failures
         val_set.no_encode()
         val_loader = DataLoader(val_set,
-                                batch_size=hyper_params['batch_size'],
                                 num_workers=loader_threads,
                                 pin_memory=True,
-                                collate_fn=collate_sequences)
+                                batch_size=None)
 
         logger.debug('Constructing {} optimizer (lr: {}, momentum: {})'.format(hyper_params['optimizer'], hyper_params['lrate'], hyper_params['momentum']))
 
