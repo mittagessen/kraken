@@ -910,7 +910,6 @@ class BaselineSet(Dataset):
                 im, target = self.transform(im, target)
                 return {'image': im, 'target': target}
             except Exception:
-                raise
                 idx = np.random.randint(0, len(self.imgs))
                 logger.debug('Failed. Replacing with sample {}'.format(idx))
                 return self[np.random.randint(0, len(self.imgs))]
