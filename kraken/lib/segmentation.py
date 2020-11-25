@@ -788,6 +788,8 @@ def compute_polygon_section(baseline, boundary, dist1, dist2):
             bl[-1] = np.array(nearest_points(geom.Point(bl[-1]), boundary_pol)[1], 'int')
         else:
             bl[-1] = np.array(r_point, 'int')
+    dist1 = min(geom.LineString(bl).length - np.finfo(np.float).eps, dist1)
+    dist2 = min(geom.LineString(bl).length - np.finfo(np.float).eps, dist2)
     dists = np.cumsum(np.diag(np.roll(squareform(pdist(bl)), 1)))
     segs_idx = np.searchsorted(dists, [dist1, dist2])
     segs = np.dstack((bl[segs_idx-1], bl[segs_idx]))
