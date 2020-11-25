@@ -16,6 +16,7 @@
 """
 Utility functions for data loading and training of VGSL networks.
 """
+import math
 import json
 import regex
 import torch
@@ -528,8 +529,11 @@ class PolygonGTDataset(IterableDataset):
         start_offset = None
         if worker_info is None:
             self._index = (0, 0)
+            end_offset = len(self.training_set)-1
         else:
-            start_offset = worker_info.id *  len(self.training_set)//worker_info.num_workers
+            per_worker = int(math.ceil(len(self.training_set) / float(worker_info.num_workers)))
+            start_offset = worker_info.id * per_worker
+            end_offset = min(start_offset + per_worker, len(self.training_set)-1)
         self._im = None
 
         self.pol_pairs = []
@@ -543,12 +547,13 @@ class PolygonGTDataset(IterableDataset):
             self.pol_pairs[line_im_idx]['lines'].append({'baseline': item[0][1], 'boundary': item[0][2], 'text': item[1]})
             if start_offset is not None and start_offset == idx:
                 self._index = (line_im_idx, len(self.pol_pairs[line_im_idx]['lines']))
+            if end_offset is not None and end_offset == idx:
+                self._end_idx = (line_im_idx, len(self.pol_pairs[line_im_idx]['lines']))
         return self
-
 
     def __next__(self):
         batch = []
-        while len(batch) < self.batch_size:
+        while len(batch) < self.batch_size and self._index <= self._end_idx:
             im = self.pol_pairs[self._index[0]]['im']
             try:
                 if self._im is None or (self._im != im and self._im.filename != im):
@@ -557,13 +562,20 @@ class PolygonGTDataset(IterableDataset):
                     self._im = im
                 lines = self.pol_pairs[self._index[0]]['lines'][self._index[1]:self._index[1]+self.batch_size-len(batch)]
                 if len(lines) < self.batch_size:
-                    self._index = (self._index[0] + 1 if self._index[0] + 1 < len(self.pol_pairs) else 0, 0)
+                    if self._index[0] + 1 < self._end_idx[0]:
+                        self._index = (self._index[0] + 1, 0)
+                    else:
+                        raise StopIteration
                 else:
                     self._index = (self._index[0], self._index[1] + self.batch_size)
             except Exception:
                 logger.debug('Failed loading image {self._im}. Removing from dataset.')
                 self.pol_pairs.pop(self._index[0])
-                self._index = (self._index[0] if self._index[0] + 1 < len(self.pol_pairs) else 0, 0)
+                if self._index[0] + 1 < self._end_idx[0]:
+                    self._index = (self._index[0], 0)
+                    self._end_idx = (self._end_idx[0]-1, self._end_idx[1])
+                else:
+                    raise StopIteration
             else:
                 try:
                     for (im, _), text in zip(extract_polygons(self._im, {'type': 'baselines', 'lines': [{'baseline': x['baseline'], 'boundary': x['boundary']} for x in lines]}),
@@ -579,6 +591,10 @@ class PolygonGTDataset(IterableDataset):
                         batch.append({'image': im, 'target': text})
                 except Exception:
                     pass
+        if self._index == self._end_idx:
+            raise StopIteration
+        if not len(batch):
+            raise StopIteration
         return collate_sequences(batch)
 
 

@@ -690,10 +690,10 @@ class KrakenTrainer(object):
             loader_threads = threads // 2
         else:
             loader_threads = threads
-        train_loader = DataLoader(gt_set,
-                                  num_workers=loader_threads,
-                                  pin_memory=True,
-                                  batch_size=None)
+        train_loader = InfiniteDataLoader(gt_set,
+                                          num_workers=loader_threads,
+                                          pin_memory=True,
+                                          batch_size=None)
         threads = max(threads - loader_threads, 1)
 
         # don't encode validation set as the alphabets may not match causing encoding failures
