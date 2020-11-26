@@ -705,8 +705,9 @@ class KrakenTrainer(object):
 
         logger.debug('Constructing {} optimizer (lr: {}, momentum: {})'.format(hyper_params['optimizer'], hyper_params['lrate'], hyper_params['momentum']))
 
-        # set model type metadata field
+        # set model type metadata field and hyperparameters
         nn.model_type = 'recognition'
+        nn.hyper_params = hyper_params
 
         # set mode to trainindg
         nn.train()
@@ -998,9 +999,10 @@ class KrakenTrainer(object):
         val_loader = DataLoader(val_set, batch_size=1, shuffle=True, num_workers=loader_threads, pin_memory=True)
         threads = max((threads - loader_threads, 1))
 
-        # set model type metadata field and dump class_mapping
+        # set model type metadata field and dump class_mapping/hyperparams
         nn.model_type = 'segmentation'
         nn.user_metadata['class_mapping'] = val_set.class_mapping
+        nn.hyper_params = hyper_params
 
         # set mode to training
         nn.train()
