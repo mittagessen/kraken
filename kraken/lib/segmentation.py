@@ -262,7 +262,7 @@ def vectorize_lines(im: np.ndarray, threshold: float = 0.15):
     end_map = im[1]
     sep_map = st_map + end_map
     bl_map = im[2]
-    bl_map = filters.sato(bl_map, black_ridges=False)
+    bl_map = filters.sato(bl_map, black_ridges=False, mode='constant')
     bin_bl_map = bl_map > threshold
     # skeletonize
     line_skel = skeletonize(bin_bl_map)
