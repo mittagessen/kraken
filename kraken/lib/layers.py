@@ -370,6 +370,7 @@ class TransposedSummarizingRNN(Module):
         if seq_len is not None:
             if inputs.shape[0] != len(seq_len):
                 raise Exception(f'Height has to be 1 (not f{inputs.shape[0]} for batching/multi-sequences.')
+            seq_len = seq_len.cpu()
             inputs = pack_padded_sequence(inputs, seq_len, batch_first=True, enforce_sorted=False)
         # (H*N)WO
         o, _ = self.layer(inputs)
