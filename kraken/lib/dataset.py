@@ -527,6 +527,7 @@ class PolygonGTDataset(IterableDataset):
     def __iter__(self):
         worker_info = torch.utils.data.get_worker_info()
         start_offset = None
+
         if worker_info is None:
             self._index = (0, 0)
             end_offset = len(self.training_set)-1
@@ -549,6 +550,8 @@ class PolygonGTDataset(IterableDataset):
                 self._index = (line_im_idx, len(self.pol_pairs[line_im_idx]['lines']))
             if end_offset is not None and end_offset == idx:
                 self._end_idx = (line_im_idx, len(self.pol_pairs[line_im_idx]['lines']))
+        if not hasattr(self, '_end_idx'):
+            self._end_idx = (line_im_idx, len(self.pol_pairs[line_im_idx]['lines']))
         return self
 
     def __next__(self):
