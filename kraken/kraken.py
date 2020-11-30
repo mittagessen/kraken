@@ -292,10 +292,7 @@ def process_pipeline(subcommands, input, batch_input, suffix, verbose, format_ty
                     if 'n-pages' not in doc.get_fields():
                         logger.warning('{fpath} does not contain pages. Skipping.')
                         continue
-                    doc.flatten(background=255)
                     n_pages = doc.get('n-pages')
-                    page_width = doc.width
-                    page_height = doc.height / n_pages
 
                     dest_dict = {'idx': -1, 'src': fpath, 'uuid': None}
                     for i in range(0, n_pages):
@@ -303,9 +300,9 @@ def process_pipeline(subcommands, input, batch_input, suffix, verbose, format_ty
                         dest_dict['uuid'] = str(uuid.uuid4())
                         fd, filename = tempfile.mkstemp(suffix='.png')
                         os.close(fd)
-                        page = doc.crop(0, i * page_height, page_width, page_height)
+                        doc = pyvips.Image.new_from_file(fpath, dpi=300, page=i, access="sequential")
                         logger.info(f'Saving temporary image {fpath}:{dest_dict["idx"]} to {filename}')
-                        page.write_to_file(filename)
+                        doc.write_to_file(filename)
                         new_input.append((filename, pdf_format.format(**dest_dict) + suffix))
                         bar.update(1)
                 except pyvips.error.Error:
