@@ -426,7 +426,6 @@ class KrakenTrainer(object):
             self.stopper.update(eval_res['val_metric'])
             self.model.user_metadata['accuracy'].append((self.iterations, float(eval_res['val_metric'])))
             logger.info('Saving to {}_{}'.format(self.filename_prefix, self.stopper.epoch))
-            event_callback(epoch=self.stopper.epoch, **eval_res)
             # fill one_channel_mode after 1 iteration over training data set
             im_mode = self.train_set.dataset.im_mode
             if im_mode in ['1', 'L']:
@@ -436,6 +435,7 @@ class KrakenTrainer(object):
                 self.model.save_model('{}_{}.mlmodel'.format(self.filename_prefix, self.stopper.epoch))
             except Exception as e:
                 logger.error('Saving model failed: {}'.format(str(e)))
+            event_callback(epoch=self.stopper.epoch, **eval_res)
 
     @classmethod
     def recognition_train_gen(cls,
