@@ -450,8 +450,8 @@ class PolygonGTDataset(Dataset):
         """
         for func in self.text_transforms:
             text = func(text)
-            if not text:
-                raise KrakenInputException('Text line is empty after transformations')
+        if not text:
+            raise KrakenInputException('Text line is empty after transformations')
         if not baseline:
             raise KrakenInputException('No baseline given for line')
         if not boundary:
