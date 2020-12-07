@@ -226,9 +226,9 @@ class mm_rpred(object):
         xmin, xmax = min(flat_box[::2]), max(flat_box[::2])
         ymin, ymax = min(flat_box[1::2]), max(flat_box[1::2])
         rec = ocr_record('', [], [], [[xmin, ymin], [xmin, ymax], [xmax, ymax], [xmax, ymin]])
-        for script, (box, coords) in zip(map(lambda x: x[0], line['boxes'][0]),
-                                         extract_polygons(self.im, {'text_direction': line['text_direction'],
-                                                                    'boxes': map(lambda x: x[1], line['boxes'][0])})):
+        for script, (box, coords, _) in zip(map(lambda x: x[0], line['boxes'][0]),
+                                            extract_polygons(self.im, {'text_direction': line['text_direction'],
+                                                                       'boxes': map(lambda x: x[1], line['boxes'][0])})):
             # skip if script is set to ignore
             if self.script_ignore is not None and script in self.script_ignore:
                 logger.info('Ignoring {} line segment.'.format(script))
@@ -290,7 +290,7 @@ class mm_rpred(object):
 
     def _recognize_baseline_line(self, line):
         try:
-            box, coords = next(extract_polygons(self.im, line))
+            box, coords, _ = next(extract_polygons(self.im, line))
         except KrakenInputException as e:
             logger.warning(f'Extracting line failed: {e}')
             return ocr_record('', [], [], line['lines'][0])
