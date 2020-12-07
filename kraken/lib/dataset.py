@@ -419,7 +419,8 @@ class PolygonGTDataset(IterableDataset):
                  im_transforms: Callable[[Any], torch.Tensor] = transforms.Compose([]),
                  preload: bool = True,
                  augmentation: bool = False,
-                 batch_size: int = 1) -> None:
+                 batch_size: int = 1,
+                 context: int = 1) -> None:
         self._images = []  # type:  Union[List[Image], List[torch.Tensor]]
         self._gt = []  # type:  List[str]
         self.alphabet = Counter()  # type: Counter
@@ -433,6 +434,7 @@ class PolygonGTDataset(IterableDataset):
         self.aug = None
         self.iter_start = 0
         self.batch_size = batch_size
+        self.context = context
 
         self.seg_type = 'baselines'
         # built text transformations
@@ -581,7 +583,7 @@ class PolygonGTDataset(IterableDataset):
                     raise StopIteration
             else:
                 try:
-                    for (im, _), text in zip(extract_polygons(self._im, {'type': 'baselines', 'lines': [{'baseline': x['baseline'], 'boundary': x['boundary']} for x in lines]}),
+                    for (im, _, top_offset), text in zip(extract_polygons(self._im, {'type': 'baselines', 'lines': [{'baseline': x['baseline'], 'boundary': x['boundary']} for x in lines]}),
                                      [x['text'] for x in lines]):
                         im = self.head_transforms(im)
                         if not is_bitonal(im):
