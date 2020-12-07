@@ -851,9 +851,10 @@ def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image:
                 mask[r, c] = True
                 patch[mask != True] = 0
                 extrema = offset_polygon[(0,-1),:]
-                # scale line image to max 600 pixel width
                 tform, rotated_patch = _rotate(patch, angle, center=extrema[0], scale=1.0, cval=0)
                 i = Image.fromarray(rotated_patch.astype('uint8'))
+                # get offset of baseline from top of line
+                top_offset = tform(baseline[0] - (c_min, r_min))[0][1]
             # normal slow path with piecewise affine transformation
             else:
                 if len(pl) > 50:
@@ -866,6 +867,7 @@ def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image:
                 cum_lens = np.cumsum([0] + [l.length for l in bl])
                 # distance of intercept from start point and number of line segment
                 control_pts = []
+                top_offset = 0
                 for point in pl.geoms:
                     npoint = np.array(point)
                     line_idx, dist, intercept = min(((idx, line.project(point), np.array(line.interpolate(line.project(point)))) for idx, line in enumerate(bl)), key=lambda x: np.linalg.norm(npoint-x[2]))
@@ -880,6 +882,7 @@ def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image:
                     side = np.sign(side)
                     # signed perpendicular distance from the rectified distance
                     per_dist = side * np.linalg.norm(npoint-intercept)
+                    top_offset = min(top_offset, per_dist)
                     control_pts.append((line_dist, per_dist))
                 # calculate baseline destination points
                 bl_dst_pts = baseline[0] + np.dstack((cum_lens, np.zeros_like(cum_lens)))[0]
@@ -908,7 +911,7 @@ def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image:
                 tform.estimate(src_points, dst_points)
                 o = warp(patch, tform.inverse, output_shape=output_shape, preserve_range=True, order=order)
                 i = Image.fromarray(o.astype('uint8'))
-            yield i.crop(i.getbbox()), line
+            yield i.crop(i.getbbox()), line, int(np.abs(top_offset))
     else:
         if bounds['text_direction'].startswith('vertical'):
             angle = 90
