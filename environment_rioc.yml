@@ -22,7 +22,7 @@ dependencies:
   - pytorch=1.2.0='cuda92*'
   - cudatoolkit<=9.2
   - jsonschema
-  - scikit-image
+  - scikit-image<=0.17.2
   - shapely
   - pip
   - pyvips

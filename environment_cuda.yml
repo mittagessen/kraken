@@ -20,7 +20,7 @@ dependencies:
   - pytorch::pytorch>=1.5.0,<=1.7.0
   - cudatoolkit>=9.2
   - jsonschema
-  - scikit-image
+  - scikit-image<=0.17.2
   - shapely
   - pip
   - pyvips
