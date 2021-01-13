@@ -19,6 +19,7 @@ Utility functions for data loading and training of VGSL networks.
 import json
 import regex
 import torch
+import traceback
 import unicodedata
 import numpy as np
 import pkg_resources
@@ -469,7 +470,7 @@ class PolygonGTDataset(Dataset):
                     self.im_mode = im.mode
                 im = self.tail_transforms(im)
             except ValueError:
-                raise KrakenInputException('Image transforms failed on {}'.format(image))
+                raise KrakenInputException(f'Image transforms failed on {image}')
             self._images.append(im)
         else:
             self._images.append((image, baseline, boundary))
@@ -509,7 +510,7 @@ class PolygonGTDataset(Dataset):
         else:
             item = self.training_set[index]
             try:
-                logger.debug('Attempting to load {}'.format(item[0]))
+                logger.debug(f'Attempting to load {item[0]}')
                 im = item[0][0]
                 if not isinstance(im, Image.Image):
                     im = Image.open(im)
@@ -525,7 +526,8 @@ class PolygonGTDataset(Dataset):
                 return {'image': im, 'target': item[1]}
             except Exception:
                 idx = np.random.randint(0, len(self.training_set))
-                logger.debug('Failed. Replacing with sample {}'.format(idx))
+                logger.debug(traceback.format_exc())
+                logger.info(f'Failed. Replacing with sample {idx}')
                 return self[np.random.randint(0, len(self.training_set))]
 
     def __len__(self) -> int:
@@ -625,7 +627,7 @@ class GroundTruthDataset(Dataset):
             for func in self.text_transforms:
                 gt = func(gt)
             if not gt:
-                raise KrakenInputException('Text line is empty ({})'.format(fp.name))
+                raise KrakenInputException(f'Text line is empty ({fp.name})')
         if self.preload:
             try:
                 im = Image.open(image)
@@ -634,7 +636,7 @@ class GroundTruthDataset(Dataset):
                     self.im_mode = im.mode
                 im = self.tail_transforms(im)
             except ValueError:
-                raise KrakenInputException('Image transforms failed on {}'.format(image))
+                raise KrakenInputException(f'Image transforms failed on {image}')
             self._images.append(im)
         else:
             self._images.append(image)
@@ -656,7 +658,7 @@ class GroundTruthDataset(Dataset):
                     self.im_mode = im.mode
                 im = self.tail_transforms(im)
             except ValueError:
-                raise KrakenInputException('Image transforms failed on {}'.format(image))
+                raise KrakenInputException(f'Image transforms failed on {image}')
             self._images.append(im)
         else:
             self._images.append(image)
@@ -699,7 +701,7 @@ class GroundTruthDataset(Dataset):
         else:
             item = self.training_set[index]
             try:
-                logger.debug('Attempting to load {}'.format(item[0]))
+                logger.debug(f'Attempting to load {item[0]}')
                 im = item[0]
                 if not isinstance(im, Image.Image):
                     im = Image.open(im)
@@ -714,7 +716,8 @@ class GroundTruthDataset(Dataset):
                 return {'image': im, 'target': item[1]}
             except Exception:
                 idx = np.random.randint(0, len(self.training_set))
-                logger.debug('Failed. Replacing with sample {}'.format(idx))
+                logger.debug(traceback.format_exc())
+                logger.info(f'Failed. Replacing with sample {idx}')
                 return self[np.random.randint(0, len(self.training_set))]
 
     def __len__(self) -> int:
@@ -873,7 +876,7 @@ class BaselineSet(Dataset):
             regions (dict): A dict containing list of lists of coordinates {'region_type_0': [[x0, y0], ..., [xn, yn]]], 'region_type_1': ...}.
         """
         if self.mode:
-            raise Exception('The `add` method is incompatible with dataset mode {}'.format(self.mode))
+            raise Exception(f'The `add` method is incompatible with dataset mode {self.mode}')
         baselines_ = defaultdict(list)
         for line in baselines:
             line_type = self.mbl_dict.get(line['script'], line['script'])
@@ -909,9 +912,10 @@ class BaselineSet(Dataset):
                 im = Image.open(im)
                 im, target = self.transform(im, target)
                 return {'image': im, 'target': target}
-            except Exception as e:
+            except Exception:
                 idx = np.random.randint(0, len(self.imgs))
-                logger.debug(f'Failed with {e}. Replacing with sample {idx}')
+                logger.debug(traceback.format_exc())
+                logger.info(f'Failed. Replacing with sample {idx}')
                 return self[np.random.randint(0, len(self.imgs))]
         im, target = self.transform(im, target)
         return {'image': im, 'target': target}
