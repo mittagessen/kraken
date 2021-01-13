@@ -905,13 +905,13 @@ class BaselineSet(Dataset):
                 target = json.load(fp)
         if not isinstance(im, Image.Image):
             try:
-                logger.debug('Attempting to load {}'.format(im))
+                logger.debug(f'Attempting to load {im}')
                 im = Image.open(im)
                 im, target = self.transform(im, target)
                 return {'image': im, 'target': target}
-            except Exception:
+            except Exception as e:
                 idx = np.random.randint(0, len(self.imgs))
-                logger.debug('Failed. Replacing with sample {}'.format(idx))
+                logger.debug(f'Failed with {e}. Replacing with sample {idx}')
                 return self[np.random.randint(0, len(self.imgs))]
         im, target = self.transform(im, target)
         return {'image': im, 'target': target}
