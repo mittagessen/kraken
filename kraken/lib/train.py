@@ -766,7 +766,8 @@ class KrakenTrainer(object):
 
     @classmethod
     def segmentation_train_gen(cls,
-                               hyper_params: Dict = default_specs.SEGMENTATION_HYPER_PARAMS,
+                               hyper_params: Dict = None,
+                               load_hyper_parameters: bool = False,
                                progress_callback: Callable[[str, int], Callable[[None], None]] = lambda string, length: lambda: None,
                                message: Callable[[str], None] = lambda *args, **kwargs: None,
                                output: str = 'model',
@@ -776,7 +777,6 @@ class KrakenTrainer(object):
                                training_data: Sequence[Dict] = None,
                                evaluation_data: Sequence[Dict] = None,
                                threads: int = 1,
-                               load_hyper_parameters: bool = False,
                                force_binarization: bool = False,
                                format_type: str = 'path',
                                suppress_regions: bool = False,
@@ -820,14 +820,22 @@ class KrakenTrainer(object):
         # after data set initialization, otherwise to output size is still unknown.
         nn = None
 
+        hyper_params_ = default_specs.SEGMENTATION_HYPER_PARAMS
+
         if load:
             logger.info(f'Loading existing model from {load} ')
             message(f'Loading existing model from {load} ', nl=False)
             nn = vgsl.TorchVGSLModel.load_model(load)
             if load_hyper_parameters:
-                hyper_params.update(nn.hyper_params)
-                nn.hyper_params = hyper_params
+                hyper_params_.update(nn.hyper_params)
+                if (hyper_params_['quit'] == 'dumb' and
+                    hyper_params_['epochs'] >= hyper_params_['completed_epochs']):
+                    logger.warning(f'Using maximum epochs from loaded model, starting again from 0.')
+                    hyper_params_['epochs'] = 0
             message('\u2713', fg='green', nl=False)
+
+        hyper_params_.update(hyper_params)
+        hyper_params = hyper_params_
 
         # preparse input sizes from vgsl string to seed ground truth data set
         # sizes and dimension ordering.
@@ -883,7 +891,7 @@ class KrakenTrainer(object):
                               valid_regions=valid_regions,
                               merge_regions=merge_regions)
 
-        if format_type == None:
+        if format_type is None:
             for page in training_data:
                 gt_set.add(**page)
             for page in evaluation_data:
@@ -976,6 +984,8 @@ class KrakenTrainer(object):
             # numbering in the gt_set might be different
             gt_set.class_mapping = nn.user_metadata['class_mapping']
             val_set.class_mapping = nn.user_metadata['class_mapping']
+
+        nn.hyper_params = hyper_params
 
         message('Training line types:')
         for k, v in gt_set.class_mapping['baselines'].items():
