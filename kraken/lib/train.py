@@ -830,8 +830,8 @@ class KrakenTrainer(object):
                 if hyper_params:
                     hyper_params_.update(nn.hyper_params)
             message('\u2713', fg='green', nl=False)
-
-        hyper_params_.update(hyper_params)
+        if hyper_params:
+            hyper_params_.update(hyper_params)
         if (hyper_params_['quit'] == 'dumb' and
             hyper_params_['epochs'] >= hyper_params_['completed_epochs']):
             logger.warning('Maximum epochs reached (might be loaded from given model), starting again from 0.')
