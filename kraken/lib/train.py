@@ -827,14 +827,16 @@ class KrakenTrainer(object):
             message(f'Loading existing model from {load} ', nl=False)
             nn = vgsl.TorchVGSLModel.load_model(load)
             if load_hyper_parameters:
-                hyper_params_.update(nn.hyper_params)
-                if (hyper_params_['quit'] == 'dumb' and
-                    hyper_params_['epochs'] >= hyper_params_['completed_epochs']):
-                    logger.warning(f'Using maximum epochs from loaded model, starting again from 0.')
-                    hyper_params_['epochs'] = 0
+                if hyper_params:
+                    hyper_params_.update(nn.hyper_params)
             message('\u2713', fg='green', nl=False)
 
         hyper_params_.update(hyper_params)
+        if (hyper_params_['quit'] == 'dumb' and
+            hyper_params_['epochs'] >= hyper_params_['completed_epochs']):
+            logger.warning('Maximum epochs reached (might be loaded from given model), starting again from 0.')
+            hyper_params_['epochs'] = 0
+
         hyper_params = hyper_params_
 
         # preparse input sizes from vgsl string to seed ground truth data set
