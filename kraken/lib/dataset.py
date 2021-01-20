@@ -883,6 +883,7 @@ class BaselineSet(Dataset):
             if self.valid_baselines is None or line['script'] in self.valid_baselines:
                 baselines_[line_type].append(line['baseline'])
                 self.class_stats['baselines'][line_type] += 1
+
                 if line_type not in self.class_mapping['baselines']:
                     self.num_classes += 1
                     self.class_mapping['baselines'][line_type] = self.num_classes - 1
@@ -896,6 +897,7 @@ class BaselineSet(Dataset):
                 if reg_type not in self.class_mapping['regions']:
                     self.num_classes += 1
                     self.class_mapping['regions'][reg_type] = self.num_classes - 1
+
         self.targets.append({'baselines': baselines_, 'regions': regions_})
         self.imgs.append(image)
 
@@ -945,7 +947,11 @@ class BaselineSet(Dataset):
         end_sep_cls = self.class_mapping['aux']['_end_separator']
 
         for key, lines in target['baselines'].items():
-            cls_idx = self.class_mapping['baselines'][key]
+            try:
+                cls_idx = self.class_mapping['baselines'][key]
+            except KeyError:
+                # skip lines of classes not present in the training set
+                continue
             for line in lines:
                 # buffer out line to desired width
                 line = [k for k, g in groupby(line)]
@@ -966,7 +972,11 @@ class BaselineSet(Dataset):
                 t[end_sep_cls, rr_s, cc_s] = 1
                 t[end_sep_cls, rr, cc] = 0
         for key, regions in target['regions'].items():
-            cls_idx = self.class_mapping['regions'][key]
+            try:
+                cls_idx = self.class_mapping['regions'][key]
+            except KeyError:
+                # skip regions of classes not present in the training set
+                continue
             for region in regions:
                 region = np.array(region)*scale
                 rr, cc = polygon(region[:,1], region[:,0], shape=image.shape[1:])
