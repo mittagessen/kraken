@@ -438,8 +438,22 @@ class KrakenTrainer(object):
             event_callback(epoch=self.stopper.epoch, **eval_res)
 
     @classmethod
+    def load_model(cls, model_path: str,
+                   load_hyper_parameters: Optional[bool] = False,
+                   message: Callable[[str], None] = lambda *args, **kwargs: None):
+        logger.info(f'Loading existing model from {model_path} ')
+        message(f'Loading existing model from {model_path} ', nl=False)
+        nn = vgsl.TorchVGSLModel.load_model(model_path)
+        if load_hyper_parameters:
+            hyper_params = nn.hyper_params
+        else:
+            hyper_params = {}
+        message('\u2713', fg='green', nl=False)
+        return nn, hyper_params
+
+    @classmethod
     def recognition_train_gen(cls,
-                              hyper_params: Dict = default_specs.RECOGNITION_HYPER_PARAMS,
+                              hyper_params: Dict = None,
                               progress_callback: Callable[[str, int], Callable[[None], None]] = lambda string, length: lambda: None,
                               message: Callable[[str], None] = lambda *args, **kwargs: None,
                               output: str = 'model',
@@ -487,18 +501,23 @@ class KrakenTrainer(object):
         Returns:
             A KrakenTrainer object.
         """
+
+        hyper_params_ = default_specs.RECOGNITION_HYPER_PARAMS
+
         # load model if given. if a new model has to be created we need to do that
         # after data set initialization, otherwise to output size is still unknown.
-        nn = None
-
         if load:
-            logger.info(f'Loading existing model from {load} ')
-            message(f'Loading existing model from {load} ', nl=False)
-            nn = vgsl.TorchVGSLModel.load_model(load)
-            if load_hyper_parameters:
-                hyper_params.update(nn.hyper_params)
-                nn.hyper_params = hyper_params
-            message('\u2713', fg='green', nl=False)
+            nn, hp = cls.load_model(load,
+                                    load_hyper_parameters=load_hyper_parameters,
+                                    message=message)
+            hyper_params_.update(hp)
+        else:
+            nn = None
+
+        if hyper_params:
+            hyper_params_.update(hyper_params)
+
+        hyper_params = hyper_params_
 
         DatasetClass = GroundTruthDataset
         valid_norm = True
@@ -546,6 +565,7 @@ class KrakenTrainer(object):
             batch, height, width, channels = [int(x) for x in m.groups()]
         else:
             batch, channels, height, width = nn.input
+
         transforms = generate_input_transforms(batch, height, width, channels, hyper_params['pad'], valid_norm, force_binarization)
 
         if len(training_data) > 2500 and not preload:
@@ -612,7 +632,6 @@ class KrakenTrainer(object):
             logger.info(f'{char}\t{v}')
 
         logger.debug('Encoding training set')
-
 
         # use model codec when given
         if append:
@@ -703,6 +722,9 @@ class KrakenTrainer(object):
                                 collate_fn=collate_sequences)
 
         logger.debug('Constructing {} optimizer (lr: {}, momentum: {})'.format(hyper_params['optimizer'], hyper_params['lrate'], hyper_params['momentum']))
+
+        # updates model's hyper params with users defined
+        nn.hyper_params = hyper_params
 
         # set model type metadata field
         nn.model_type = 'recognition'
@@ -823,25 +845,14 @@ class KrakenTrainer(object):
         hyper_params_ = default_specs.SEGMENTATION_HYPER_PARAMS
 
         if load:
-            logger.info(f'Loading existing model from {load} ')
-            message(f'Loading existing model from {load} ', nl=False)
-            nn = vgsl.TorchVGSLModel.load_model(load)
-            if load_hyper_parameters:
-                if hyper_params:
-                    hyper_params_.update(nn.hyper_params)
-            message('\u2713', fg='green', nl=False)
-        if hyper_params:
-            hyper_params_.update(hyper_params)
-        if (hyper_params_['quit'] == 'dumb' and
-            hyper_params_['epochs'] >= hyper_params_['completed_epochs']):
-            logger.warning('Maximum epochs reached (might be loaded from given model), starting again from 0.')
-            hyper_params_['epochs'] = 0
-
-        hyper_params = hyper_params_
-
-        # preparse input sizes from vgsl string to seed ground truth data set
-        # sizes and dimension ordering.
-        if not nn:
+            nn, hp = cls.load_model(load,
+                                    load_hyper_parameters=load_hyper_parameters,
+                                    message=message)
+            hyper_params_.update(hp)
+            batch, channels, height, width = nn.input
+        else:
+            # preparse input sizes from vgsl string to seed ground truth data set
+            # sizes and dimension ordering.
             spec = spec.strip()
             if spec[0] != '[' or spec[-1] != ']':
                 logger.error(f'VGSL spec "{spec}" not bracketed')
@@ -852,8 +863,16 @@ class KrakenTrainer(object):
                 logger.error(f'Invalid input spec {blocks[0]}')
                 return None
             batch, height, width, channels = [int(x) for x in m.groups()]
-        else:
-            batch, channels, height, width = nn.input
+
+        if hyper_params:
+            hyper_params_.update(hyper_params)
+
+        if (hyper_params_['quit'] == 'dumb' and
+            hyper_params_['epochs'] >= hyper_params_['completed_epochs']):
+            logger.warning('Maximum epochs reached (might be loaded from given model), starting again from 0.')
+            hyper_params_['epochs'] = 0
+
+        hyper_params = hyper_params_
 
         transforms = generate_input_transforms(batch, height, width, channels, 0, valid_norm=False)
 
@@ -987,6 +1006,7 @@ class KrakenTrainer(object):
             gt_set.class_mapping = nn.user_metadata['class_mapping']
             val_set.class_mapping = nn.user_metadata['class_mapping']
 
+        # updates model's hyper params with users defined
         nn.hyper_params = hyper_params
 
         message('Training line types:')
