@@ -32,6 +32,7 @@ from kraken.lib import models, vgsl, segmentation, default_specs
 from kraken.lib.util import make_printable
 from kraken.lib.codec import PytorchCodec
 from kraken.lib.dataset import BaselineSet, GroundTruthDataset, PolygonGTDataset, generate_input_transforms, preparse_xml_data, InfiniteDataLoader, compute_error, collate_sequences
+from kraken.lib.models import validate_hyper_parameters
 from kraken.lib.exceptions import KrakenInputException, KrakenEncodeException
 
 from torch.utils.data import DataLoader
@@ -517,6 +518,8 @@ class KrakenTrainer(object):
         if hyper_params:
             hyper_params_.update(hyper_params)
 
+        validate_hyper_parameters(hyper_params_)
+
         hyper_params = hyper_params_
 
         DatasetClass = GroundTruthDataset
@@ -867,10 +870,7 @@ class KrakenTrainer(object):
         if hyper_params:
             hyper_params_.update(hyper_params)
 
-        if (hyper_params_['quit'] == 'dumb' and
-            hyper_params_['epochs'] >= hyper_params_['completed_epochs']):
-            logger.warning('Maximum epochs reached (might be loaded from given model), starting again from 0.')
-            hyper_params_['epochs'] = 0
+        validate_hyper_parameters(hyper_params_)
 
         hyper_params = hyper_params_
 
