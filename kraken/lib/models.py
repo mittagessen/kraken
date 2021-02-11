@@ -191,3 +191,13 @@ def load_any(fname: str, train: bool = False, device: str = 'cpu') -> TorchSeqRe
     seq = TorchSeqRecognizer(nn, train=train, device=device)
     seq.kind = kind
     return seq
+
+
+def validate_hyper_parameters(hyper_params):
+    """
+    Validate some model's hyper parameters and modify them in place if need be.
+    """
+    if (hyper_params['quit'] == 'dumb' and
+        hyper_params['completed_epochs'] >= hyper_params['epochs']):
+        logger.warning('Maximum epochs reached (might be loaded from given model), starting again from 0.')
+        hyper_params['completed_epochs'] = 0
