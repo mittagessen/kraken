@@ -645,8 +645,8 @@ class KrakenTrainer(object):
                 elif resize == 'add':
                     message('Adding missing labels to network ', nl=False)
                     logger.info(f'Resizing codec to include {len(alpha_diff)} new code points')
-                    codec.c2l.update({k: [v] for v, k in enumerate(alpha_diff, start=codec.max_label()+1)})
-                    nn.add_codec(PytorchCodec(codec.c2l))
+                    codec = codec.add_labels(alpha_diff)
+                    nn.add_codec(codec)
                     logger.info(f'Resizing last layer in network to {codec.max_label()+1} outputs')
                     nn.resize_output(codec.max_label()+1)
                     gt_set.encode(nn.codec)
