@@ -194,3 +194,77 @@ class TestLayers(unittest.TestCase):
         o = conv(torch.randn(1, 5, 24, 12))
         self.assertLessEqual(0, o[0].min())
         self.assertLessEqual(0, o[0].max())
+
+    def test_linsoftmax_resize_add(self):
+        """
+        Tests resizing of a fully connected layer.
+        """
+        lin = layers.LinSoftmax(20, 10)
+        w_cp = lin.lin.weight.clone()
+        b_cp = lin.lin.bias.clone()
+        lin.resize(25)
+        self.assertTrue(w_cp.eq(lin.lin.weight[:10, :]).all())
+        self.assertTrue(b_cp.eq(lin.lin.bias[:10]).all())
+        self.assertTrue(lin.lin.weight.shape[0] == 25)
+        self.assertTrue(lin.lin.bias.shape[0] == 25)
+
+    def test_linsoftmax_resize_remove(self):
+        """
+        Tests resizing of a fully connected layer.
+        """
+        lin = layers.LinSoftmax(20, 10)
+        w_cp = lin.lin.weight.clone()
+        b_cp = lin.lin.bias.clone()
+        lin.resize(5, (1, 5, 6, 7, 9))
+        self.assertTrue(w_cp[(0, 2, 3, 4, 8), :].eq(lin.lin.weight).all())
+        self.assertTrue(b_cp[(0, 2, 3, 4, 8),].eq(lin.lin.bias).all())
+
+    def test_linsoftmax_resize_both(self):
+        """
+        Tests resizing of a fully connected layer.
+        """
+        lin = layers.LinSoftmax(20, 10)
+        w_cp = lin.lin.weight.clone()
+        b_cp = lin.lin.bias.clone()
+        lin.resize(25, (1, 5, 6, 7, 9))
+        self.assertTrue(w_cp[(0, 2, 3, 4, 8), :].eq(lin.lin.weight[:5, :]).all())
+        self.assertTrue(b_cp[(0, 2, 3, 4, 8),].eq(lin.lin.bias[:5]).all())
+        self.assertTrue(lin.lin.weight.shape[0] == 25)
+        self.assertTrue(lin.lin.bias.shape[0] == 25)
+
+    def test_conv_resize_add(self):
+        """
+        Tests resizing of a convolutional output layer.
+        """
+        conv = layers.ActConv2D(20, 10, (1, 1), (1, 1))
+        w_cp = conv.co.weight.clone()
+        b_cp = conv.co.bias.clone()
+        conv.resize(25)
+        self.assertTrue(w_cp.eq(conv.co.weight[:10, :]).all())
+        self.assertTrue(b_cp.eq(conv.co.bias[:10]).all())
+        self.assertTrue(conv.co.weight.shape[0] == 25)
+        self.assertTrue(conv.co.bias.shape[0] == 25)
+
+    def test_conv_resize_remove(self):
+        """
+        Tests resizing of a convolutional output layer.
+        """
+        conv = layers.ActConv2D(20, 10, (1, 1), (1, 1))
+        w_cp = conv.co.weight.clone()
+        b_cp = conv.co.bias.clone()
+        conv.resize(5, (1, 5, 6, 7, 9))
+        self.assertTrue(w_cp[(0, 2, 3, 4, 8), :].eq(conv.co.weight).all())
+        self.assertTrue(b_cp[(0, 2, 3, 4, 8),].eq(conv.co.bias).all())
+
+    def test_conv_resize_both(self):
+        """
+        Tests resizing of a convolutional output layer.
+        """
+        conv = layers.ActConv2D(20, 10, (1, 1), (1, 1))
+        w_cp = conv.co.weight.clone()
+        b_cp = conv.co.bias.clone()
+        conv.resize(25, (1, 5, 6, 7, 9))
+        self.assertTrue(w_cp[(0, 2, 3, 4, 8), :].eq(conv.co.weight[:5, :]).all())
+        self.assertTrue(b_cp[(0, 2, 3, 4, 8),].eq(conv.co.bias[:5]).all())
+        self.assertTrue(conv.co.weight.shape[0] == 25)
+        self.assertTrue(conv.co.bias.shape[0] == 25)

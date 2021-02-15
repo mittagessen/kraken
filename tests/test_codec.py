@@ -8,7 +8,7 @@ from nose.tools import raises
 from torch import IntTensor
 
 from kraken.lib import codec
-from kraken.lib.exceptions import KrakenEncodeException
+from kraken.lib.exceptions import KrakenEncodeException, KrakenCodecException
 
 class TestCodec(unittest.TestCase):
 
@@ -28,6 +28,8 @@ class TestCodec(unittest.TestCase):
 
         self.invalid_c_sequence = 'aaababbcaaa'
         self.valid_c_sequence = 'aaababbaaabbbb'
+
+        self.ada_sequence = 'cdaabae'
 
         self.invalid_l_sequence = [(45, 78, 778, 0.3793492615638364),
                                    (10, 203, 859, 0.9485075253700872),
@@ -224,3 +226,60 @@ class TestCodec(unittest.TestCase):
         Test correct handling of unencodable sequences (many-to-many encoder)
         """
         self.m2m_codec.encode(self.invalid_c_sequence)
+
+    def test_codec_add_simple(self):
+        """
+        Test adding of new code points to codec.
+        """
+        prev_len = len(self.o2o_codec)
+        codec = self.o2o_codec.add_labels('cde')
+        self.assertEqual(len(codec), prev_len + 3)
+        self.assertTrue(codec.encode(self.ada_sequence).eq(
+                        IntTensor([3, 4, 1, 1, 2, 1, 5])).all())
+
+    def test_codec_add_list(self):
+        """
+        Test adding of new code points to codec.
+        """
+        prev_len = len(self.o2o_codec)
+        codec = self.o2o_codec.add_labels(['cd', 'e'])
+        self.assertEqual(len(codec), prev_len + 2)
+        self.assertTrue(codec.encode(self.ada_sequence).eq(
+                        IntTensor([3, 1, 1, 2, 1, 4])).all())
+
+    def test_codec_add_dict(self):
+        """
+        Test adding of new code points to codec.
+        """
+        prev_len = len(self.o2o_codec)
+        codec = self.o2o_codec.add_labels({'cd': [3], 'e': [4]})
+        self.assertEqual(len(codec), prev_len + 2)
+        self.assertTrue(codec.encode(self.ada_sequence).eq(
+                        IntTensor([3, 1, 1, 2, 1, 4])).all())
+
+    def test_codec_merge_both(self):
+        """
+        Test merging of a codec adding and removing code points
+        """
+        merge_codec = codec.PytorchCodec('acde')
+        new_codec, del_labels = self.o2o_codec.merge(merge_codec)
+        self.assertEqual(del_labels, {2})
+        self.assertEqual(new_codec.c2l, {'a': [1], 'c': [2], 'd': [3], 'e': [4]})
+
+    def test_codec_merge_add(self):
+        """
+        Test merging of a codec adding and removing code points
+        """
+        merge_codec = codec.PytorchCodec('abcde')
+        new_codec, del_labels = self.o2o_codec.merge(merge_codec)
+        self.assertEqual(del_labels, set())
+        self.assertEqual(new_codec.c2l, {'a': [1], 'b': [2], 'c': [3], 'd': [4], 'e': [5]})
+
+    def test_codec_merge_remove(self):
+        """
+        Test merging of a codec removing code points
+        """
+        merge_codec = codec.PytorchCodec('a')
+        new_codec, del_labels = self.o2o_codec.merge(merge_codec)
+        self.assertEqual(del_labels, {2})
+        self.assertEqual(new_codec.c2l, {'a': [1]})

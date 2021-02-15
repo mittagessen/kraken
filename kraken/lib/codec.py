@@ -23,7 +23,7 @@ import numpy as np
 
 from typing import List, Tuple, Set, Union, Dict, Sequence
 from torch import IntTensor
-from kraken.lib.exceptions import KrakenEncodeException
+from kraken.lib.exceptions import KrakenEncodeException, KrakenCodecException
 
 __all__ = ['PytorchCodec']
 
@@ -192,8 +192,32 @@ class PytorchCodec(object):
         # add mappings not in original codec
         add_list = {cseq: enc for cseq, enc in codec.c2l.items() if cseq not in self.c2l}
         # renumber
-        start_idx = max(label for v in c2l_cand.values() for label in v) + 1
+        start_idx = max((0,) + tuple(label for v in c2l_cand.values() for label in v)) + 1
         add_labels = {k: v for v, k in enumerate(sorted(set(label for v in add_list.values() for label in v)), start_idx)}
         for k, v in add_list.items():
             c2l_cand[k] = [add_labels[label] for label in v]
         return PytorchCodec(c2l_cand), set(rm_labels)
+
+    def add_labels(self, charset: Union[Dict[str, Sequence[int]], Sequence[str], str]) -> 'PytorchCodec':
+        """
+        Adds additional characters/labels to the codec.
+
+        charset may either be a string, a list or a dict. In the first case
+        each code point will be assigned a label, in the second case each
+        string in the list will be assigned a label, and in the final case each
+        key string will be mapped to the value sequence of integers. In the
+        first two cases labels will be assigned automatically.
+
+        As 0 is the blank label in a CTC output layer, output labels and input
+        dictionaries are/should be 1-indexed.
+
+        Args:
+            charset (unicode, list, dict): Input character set.
+        """
+        if isinstance(charset, dict):
+            c2l = self.c2l.copy()
+            c2l.update(charset)
+        else:
+            c2l = self.c2l.copy()
+            c2l.update({k: [v] for v, k in enumerate(sorted(charset), start=self.max_label()+1)})
+        return PytorchCodec(c2l)
