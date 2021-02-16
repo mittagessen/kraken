@@ -446,12 +446,12 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
             suppl_obj = [(np.array(bl) * scale).astype('int').tolist() for bl in suppl_obj]
 
     if im_feats is None:
-        bounds = np.array(im.size, dtype=np.float)
+        bounds = np.array(im.size, dtype=np.float) - 1
         im = np.array(im)
          # compute image gradient
         im_feats = gaussian_filter(sobel(im), 0.5)
     else:
-        bounds = np.array(im_feats.shape[::-1], dtype=np.float)
+        bounds = np.array(im_feats.shape[::-1], dtype=np.float) - 1
 
     def _ray_intersect_boundaries(ray, direction, aabb):
         """
