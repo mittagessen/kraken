@@ -447,7 +447,7 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
 
     if im_feats is None:
         bounds = np.array(im.size, dtype=np.float) - 1
-        im = np.array(im)
+        im = np.array(im.convert('L'))
          # compute image gradient
         im_feats = gaussian_filter(sobel(im), 0.5)
     else:
@@ -624,6 +624,7 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
             env_bottom = np.array(env_bottom, dtype='uint')
             polygons.append(_extract_patch(env_up, env_bottom, line.astype('int'), p_dir))
         except Exception as e:
+            raise
             polygons.append(None)
 
     if scale is not None:
