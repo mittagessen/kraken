@@ -244,7 +244,7 @@ def _extend_boundaries(baselines, bin_bl_map):
     return baselines
 
 
-def vectorize_lines(im: np.ndarray, threshold: float = 0.15):
+def vectorize_lines(im: np.ndarray, threshold: float = 0.15, min_length=5):
     """
     Vectorizes lines from a binarized array.
 
@@ -252,6 +252,8 @@ def vectorize_lines(im: np.ndarray, threshold: float = 0.15):
         im (np.ndarray): Array of shape (3, H, W) with the first dimension
                          being probabilities for (start_separators,
                          end_separators, baseline).
+        threshold (float): Threshold for baseline blob detection.
+        min_length (int): Minimal length of output baselines.
 
     Returns:
         [[x0, y0, ... xn, yn], [xm, ym, ..., xk, yk], ... ]
@@ -318,7 +320,8 @@ def vectorize_lines(im: np.ndarray, threshold: float = 0.15):
             logger.debug('Insufficient marker confidences in output. Defaulting to upright line.')
         if bl[0][1] > bl[-1][1]:
             bl = bl[::-1]
-        oriented_lines.append([x[::-1] for x in bl])
+        if geom.LineString(bl).length >= min_length:
+            oriented_lines.append([x[::-1] for x in bl])
     return oriented_lines
 
 
@@ -505,7 +508,7 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
         tform, rotated_patch = _rotate(patch, angle, center=extrema[0], scale=scale, cval=MASK_VAL)
         # ensure to cut off padding after rotation
         x_offsets = np.sort(np.around(tform.inverse(extrema)[:,0]).astype('int'))
-        rotated_patch = rotated_patch[:,x_offsets[0]+1:x_offsets[1]]
+        rotated_patch = rotated_patch[:,x_offsets[0]:x_offsets[1]+1]
         # infinity pad for seamcarve
         rotated_patch = np.pad(rotated_patch, ((1, 1), (0, 0)),  mode='constant', constant_values=np.inf)
         r, c = rotated_patch.shape
