@@ -31,7 +31,7 @@ from typing import cast, Tuple, Callable, List, Dict, Any, Optional, Sequence
 from kraken.lib import models, vgsl, segmentation, default_specs
 from kraken.lib.util import make_printable
 from kraken.lib.codec import PytorchCodec
-from kraken.lib.dataset import BaselineSet, GroundTruthDataset, PolygonGTDataset, generate_input_transforms, preparse_xml_data, InfiniteDataLoader, compute_error, collate_sequences
+from kraken.lib.dataset import BaselineSet, GroundTruthDataset, PolygonGTDataset, generate_input_transforms, preparse_xml_data, InfiniteDataLoader, compute_error, collate_sequences, AsynchronousLoader
 from kraken.lib.models import validate_hyper_parameters
 from kraken.lib.exceptions import KrakenInputException, KrakenEncodeException
 
@@ -714,6 +714,8 @@ class KrakenTrainer(object):
                                           num_workers=loader_threads,
                                           pin_memory=True,
                                           collate_fn=collate_sequences)
+        if device != 'cpu':
+            train_loader = AsynchronousLoader(train_loader, device, q_size=32, len(train_loader))
         threads = max(threads - loader_threads, 1)
 
         # don't encode validation set as the alphabets may not match causing encoding failures
@@ -723,6 +725,8 @@ class KrakenTrainer(object):
                                 num_workers=loader_threads,
                                 pin_memory=True,
                                 collate_fn=collate_sequences)
+        if device != 'cpu':
+            val_loader = AsynchronousLoader(val_loader, device, q_size=32)
 
         logger.debug('Constructing {} optimizer (lr: {}, momentum: {})'.format(hyper_params['optimizer'], hyper_params['lrate'], hyper_params['momentum']))
 
