@@ -715,7 +715,7 @@ class KrakenTrainer(object):
                                           pin_memory=True,
                                           collate_fn=collate_sequences)
         if device != 'cpu':
-            train_loader = AsynchronousLoader(train_loader, device, q_size=32, len(train_loader))
+            train_loader = AsynchronousLoader(train_loader, device, q_size=32, num_batches=len(train_loader))
         threads = max(threads - loader_threads, 1)
 
         # don't encode validation set as the alphabets may not match causing encoding failures
