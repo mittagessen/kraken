@@ -57,7 +57,7 @@ def compute_segmentation_map(im,
     im_str = get_im_str(im)
     logger.info(f'Segmenting {im_str}')
 
-    if model.input[1] == 1 and model.one_channel_mode == '1' and not is_bitonal(im):
+    if model.one_channel_mode == '1' and not is_bitonal(im):
         logger.warning('Running binary model on non-binary input image '
                        '(mode {}). This will result in severely degraded '
                        'performance'.format(im.mode))
