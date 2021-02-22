@@ -527,7 +527,7 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
         # backtrack
         seam = []
         j = np.argmin(rotated_patch[1:-1,-1])
-        for i in range(c-2, 0, -1):
+        for i in range(c-2, -2, -1):
             seam.append((i+x_offsets[0]+1, j))
             j = backtrack[i, j]
         seam = np.array(seam)[::-1]
