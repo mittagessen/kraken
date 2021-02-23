@@ -153,10 +153,6 @@ def serialize(records: Sequence[ocr_record],
         # addition to bounding boxes
         if record.type == 'baselines':
             page['seg_type'] = 'baselines'
-        # skip empty records
-        if not record.prediction:
-            logger.debug('Empty record. Skipping')
-            continue
         line = {'index': idx,
                 'bbox': max_bbox([record.line]),
                 'cuts': record.cuts,

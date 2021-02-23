@@ -85,13 +85,24 @@ def binarizer(threshold, zoom, escale, border, perc, range, low, high, input, ou
     try:
         res = binarization.nlbin(im, threshold, zoom, escale, border, perc, range,
                                  low, high)
-        form = None
-        ext = os.path.splitext(output)[1]
-        if ext in ['.jpg', '.jpeg', '.JPG', '.JPEG', '']:
-            form = 'png'
-            if ext:
-                logger.warning('jpeg does not support 1bpp images. Forcing to png.')
-        res.save(output, format=form)
+        if ctx.meta['last_process'] and ctx.meta['output_mode'] != 'native':
+            with open_file(output, 'w', encoding='utf-8') as fp:
+                fp = cast(IO[Any], fp)
+                logger.info('Serializing as {} into {}'.format(ctx.meta['output_mode'], output))
+                res.save(f'{output}.png')
+                from kraken import serialization
+                fp.write(serialization.serialize([],
+                                                 image_name=f'{output}.png',
+                                                 image_size=res.size,
+                                                 template=ctx.meta['output_mode']))
+        else:
+            form = None
+            ext = os.path.splitext(output)[1]
+            if ext in ['.jpg', '.jpeg', '.JPG', '.JPEG', '']:
+                form = 'png'
+                if ext:
+                    logger.warning('jpeg does not support 1bpp images. Forcing to png.')
+            res.save(output, format=form)
         ctx.meta['base_image'] = output
     except Exception:
         message('\u2717', fg='red')
@@ -134,9 +145,29 @@ def segmenter(legacy, model, text_direction, scale, maxcolseps, black_colseps,
     except Exception:
         message('\u2717', fg='red')
         raise
-    with open_file(output, 'w') as fp:
-        fp = cast(IO[Any], fp)
-        json.dump(res, fp)
+    if ctx.meta['last_process'] and ctx.meta['output_mode'] != 'native':
+        with open_file(output, 'w', encoding='utf-8') as fp:
+            fp = cast(IO[Any], fp)
+            logger.info('Serializing as {} into {}'.format(ctx.meta['output_mode'], output))
+            from kraken import serialization
+            from kraken.rpred import ocr_record
+            if 'type' in res and res['type'] == 'baselines':
+                records = [ocr_record('', '', '', bl) for bl in res['lines']]
+            else:
+                records = []
+                for line in res['boxes']:
+                    xmin, xmax = min(line[::2]), max(line[::2])
+                    ymin, ymax = min(line[1::2]), max(line[1::2])
+                    records.append(ocr_record('', [], [], [[xmin, ymin], [xmin, ymax], [xmax, ymax], [xmax, ymin]]))
+            fp.write(serialization.serialize(records,
+                                             image_name=ctx.meta['base_image'],
+                                             image_size=im.size,
+                                             regions=res['regions'] if 'regions' in res else None,
+                                             template=ctx.meta['output_mode']))
+    else:
+        with open_file(output, 'w') as fp:
+            fp = cast(IO[Any], fp)
+            json.dump(res, fp)
     message('\u2713', fg='green')
 
 
@@ -200,15 +231,15 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, script_ignore, inpu
     with open_file(output, 'w', encoding='utf-8') as fp:
         fp = cast(IO[Any], fp)
         message(f'Writing recognition results for {ctx.meta["orig_file"]}\t', nl=False)
-        logger.info('Serializing as {} into {}'.format(ctx.meta['mode'], output))
-        if ctx.meta['mode'] != 'text':
+        logger.info('Serializing as {} into {}'.format(ctx.meta['output_mode'], output))
+        if ctx.meta['output_mode'] != 'text':
             from kraken import serialization
             fp.write(serialization.serialize(preds, ctx.meta['base_image'],
                                              Image.open(ctx.meta['base_image']).size,
                                              ctx.meta['text_direction'],
                                              scripts,
                                              bounds['regions'] if 'regions' in bounds else None,
-                                             ctx.meta['mode']))
+                                             ctx.meta['output_mode']))
         else:
             fp.write('\n'.join(s.prediction for s in preds))
         message('\u2713', fg='green')
@@ -236,11 +267,21 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, script_ignore, inpu
               help='Format for output of PDF files. valid fields '
                    'are `src` (source file), `idx` (page number), and `uuid` (v4 uuid). '
                    '`-o` suffixes are appended to this format string.')
+@click.option('-h', '--hocr', 'serializer',
+              help='Switch between hOCR, ALTO, abbyyXML, PageXML or "native"'
+              'output. Native are plain image files for image, JSON for'
+              'segmentation, and text for transcription output.',
+              flag_value='hocr')
+@click.option('-a', '--alto', 'serializer', flag_value='alto')
+@click.option('-y', '--abbyy', 'serializer', flag_value='abbyyxml')
+@click.option('-x', '--pagexml', 'serializer', flag_value='pagexml')
+@click.option('-n', '--native', 'serializer', flag_value='native', default=True,
+              show_default=True)
 @click.option('-d', '--device', default='cpu', show_default=True,
               help='Select device to use (cpu, cuda:0, cuda:1, ...)')
 @click.option('-r', '--raise-on-error/--no-raise-on-error', default=False, show_default=True,
               help='Raises the exception that caused processing to fail in the case of an error')
-def cli(input, batch_input, suffix, verbose, format_type, pdf_format, device, raise_on_error):
+def cli(input, batch_input, suffix, verbose, format_type, pdf_format, serializer, device, raise_on_error):
     """
     Base command for recognition functionality.
 
@@ -252,6 +293,7 @@ def cli(input, batch_input, suffix, verbose, format_type, pdf_format, device, ra
     ctx.meta['device'] = device
     ctx.meta['input_format_type'] = format_type if format_type != 'pdf' else 'image'
     ctx.meta['raise_failed'] = raise_on_error
+    ctx.meta['output_mode'] = serializer
     log.set_logger(logger, level=30-min(10*verbose, 20))
 
 
@@ -313,6 +355,7 @@ def process_pipeline(subcommands, input, batch_input, suffix, verbose, format_ty
 
     for io_pair in input:
         ctx.meta['first_process'] = True
+        ctx.meta['last_process'] = False
         ctx.meta['orig_file'] = io_pair[0]
         if 'base_image' in ctx.meta:
             del ctx.meta['base_image']
@@ -321,7 +364,9 @@ def process_pipeline(subcommands, input, batch_input, suffix, verbose, format_ty
             for tmp in tmps:
                 os.close(tmp[0])
             fc = [io_pair[0]] + [tmp[1] for tmp in tmps] + [io_pair[1]]
-            for task, input, output in zip(subcommands, fc, fc[1:]):
+            for idx, (task, input, output) in enumerate(zip(subcommands, fc, fc[1:])):
+                if len(fc)-2 == idx:
+                    ctx.meta['last_process'] = True
                 task(input=input, output=output)
         except Exception as e:
             logger.error(f'Failed processing {io_pair[0]}: {str(e)}')
@@ -438,20 +483,13 @@ def _validate_mm(ctx, param, value):
               help='Reorder code points to logical order')
 @click.option('-s', '--no-segmentation', default=False, show_default=True, is_flag=True,
               help='Enables non-segmentation mode treating each input image as a whole line.')
-@click.option('-h', '--hocr', 'serializer', help='Switch between hOCR, '
-              'ALTO, and plain text output', flag_value='hocr')
-@click.option('-a', '--alto', 'serializer', flag_value='alto')
-@click.option('-y', '--abbyy', 'serializer', flag_value='abbyyxml')
-@click.option('-x', '--pagexml', 'serializer', flag_value='pagexml')
-@click.option('-t', '--text', 'serializer', flag_value='text', default=True,
-              show_default=True)
 @click.option('-d', '--text-direction', default='horizontal-tb',
               show_default=True,
               type=click.Choice(['horizontal-tb', 'vertical-lr', 'vertical-rl']),
               help='Sets principal text direction in serialization output')
 @click.option('--threads', default=1, show_default=True, type=click.IntRange(1),
               help='Number of threads to use for OpenMP parallelization.')
-def ocr(ctx, model, pad, reorder, no_segmentation, serializer, text_direction, threads):
+def ocr(ctx, model, pad, reorder, no_segmentation, text_direction, threads):
     """
     Recognizes text in line images.
     """
@@ -494,7 +532,6 @@ def ocr(ctx, model, pad, reorder, no_segmentation, serializer, text_direction, t
     nm[k].nn.set_num_threads(threads)
 
     # set output mode
-    ctx.meta['mode'] = serializer
     ctx.meta['text_direction'] = text_direction
     return partial(recognizer,
                    model=nm,
