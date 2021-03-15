@@ -232,7 +232,7 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, script_ignore, inpu
         fp = cast(IO[Any], fp)
         message(f'Writing recognition results for {ctx.meta["orig_file"]}\t', nl=False)
         logger.info('Serializing as {} into {}'.format(ctx.meta['output_mode'], output))
-        if ctx.meta['output_mode'] != 'text':
+        if ctx.meta['output_mode'] != 'native':
             from kraken import serialization
             fp.write(serialization.serialize(preds, ctx.meta['base_image'],
                                              Image.open(ctx.meta['base_image']).size,
