@@ -65,30 +65,6 @@ class TrainStopper(object):
         pass
 
 
-def annealing_const(start: float, end: float, pct: float) -> float:
-    return start
-
-
-def annealing_linear(start: float, end: float, pct: float) -> float:
-    return start + pct * (end-start)
-
-
-def annealing_cos(start: float, end: float, pct: float) -> float:
-    co = np.cos(np.pi * pct) + 1
-    return end + (start-end)/2 * co
-
-
-class annealing_exponential(object):
-    def __init__(self, decay: float = 0.96, decay_steps: int = 10):
-        self.decay = decay
-        self.decay_steps = 10
-        self.steps_pct = 0.0
-
-    def __call__(self, start, end, pct):
-        self.steps_pct += pct
-        return start * (self.decay ** self.steps_pct/self.decay_steps)
-
-
 class TrainScheduler(object):
     """
     Implements learning rate scheduling.
@@ -812,7 +788,8 @@ class KrakenTrainer(object):
                                merge_baselines: Optional[Dict[str, str]] = None,
                                bounding_regions: Optional[Sequence[str]] = None,
                                resize: str = 'fail',
-                               augment: bool = False):
+                               augment: bool = False,
+                               topline: bool = False):
         """
         This is an ugly constructor that takes all the arguments from the command
         line driver, finagles the datasets, models, and hyperparameters correctly
@@ -901,7 +878,8 @@ class KrakenTrainer(object):
                              valid_baselines=valid_baselines,
                              merge_baselines=merge_baselines,
                              valid_regions=valid_regions,
-                             merge_regions=merge_regions)
+                             merge_regions=merge_regions,
+                             topline=topline)
         val_set = BaselineSet(evaluation_data,
                               line_width=hyper_params['line_width'],
                               im_transforms=transforms,
@@ -910,7 +888,8 @@ class KrakenTrainer(object):
                               valid_baselines=valid_baselines,
                               merge_baselines=merge_baselines,
                               valid_regions=valid_regions,
-                              merge_regions=merge_regions)
+                              merge_regions=merge_regions,
+                              topline=topline)
 
         if format_type is None:
             for page in training_data:
@@ -1005,6 +984,9 @@ class KrakenTrainer(object):
             # numbering in the gt_set might be different
             gt_set.class_mapping = nn.user_metadata['class_mapping']
             val_set.class_mapping = nn.user_metadata['class_mapping']
+
+        # set baseline location for postprocessing
+        nn.user_metadata['topline'] = topline
 
         # updates model's hyper params with users defined
         nn.hyper_params = hyper_params
