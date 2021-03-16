@@ -213,6 +213,16 @@ def segment(im,
         logger.info('No segmentation model given. Loading default model.')
         model = vgsl.TorchVGSLModel.load_model(pkg_resources.resource_filename(__name__, 'blla.mlmodel'))
 
+    logger.debug('Model line types:')
+    for k, v in model.class_mapping['baselines'].items():
+        logger.debug(f'  {k}\t{v}')
+    logger.debug('Model region types:')
+    for k, v in model .class_mapping['regions'].items():
+        logger.debug(f'  {k}\t{v}')
+
+    if 'topline' in nn.user_metadata:
+        logger.debug(f'Baseline location: {"top" if nn.user_metadata["topline"] else "bottom"}')
+
     if isinstance(model, vgsl.TorchVGSLModel):
         model = [model]
 
