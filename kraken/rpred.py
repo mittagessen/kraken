@@ -383,4 +383,4 @@ def rpred(network: TorchSeqRecognizer,
             rewrite_boxes.append([('default', box)])
         bounds['boxes'] = rewrite_boxes
         bounds['script_detection'] = True
-    return mm_rpred({'default': network}, im, bounds, pad, bidi_reordering)
+    return mm_rpred(defaultdict(lambda: network), im, bounds, pad, bidi_reordering)
