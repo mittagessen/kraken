@@ -64,126 +64,149 @@ class TrainStopper(object):
         """
         pass
 
+class annealing_step(object):
+    def __init__(self, optimizer, step_size, gamma=0.1):
+        self.scheduler = lr_scheduler.StepLR(optimizer, step_size, gamma)
 
-def annealing_const(start: float, end: float, pct: float) -> float:
-    return start
+    def __call__(self, *args, **kwargs):
+        self.scheduler.step()
 
+    @property
+    def call_frequency(self):
+        return 'epoch'
 
-def annealing_linear(start: float, end: float, pct: float) -> float:
-    return start + pct * (end-start)
+class annealing_const(object):
+    def __init__(self, *args, **kwargs):
+        pass
 
+    def __call__(self, *args, **kwargs):
+        pass
 
-def annealing_cos(start: float, end: float, pct: float) -> float:
-    co = np.cos(np.pi * pct) + 1
-    return end + (start-end)/2 * co
-
+    @property
+    def call_frequency(self):
+        return 'epoch'
 
 class annealing_exponential(object):
-    def __init__(self, decay: float = 0.96, decay_steps: int = 10):
-        self.decay = decay
-        self.decay_steps = 10
-        self.steps_pct = 0.0
+    def __init__(self, optimizer, step_size, gamma=0.1):
+        self.scheduler = lr_scheduler.ExponentialLR(optimizer, gamma)
+        self.step_size = step_size
+        self.step = 0
 
-    def __call__(self, start, end, pct):
-        self.steps_pct += pct
-        return start * (self.decay ** self.steps_pct/self.decay_steps)
+    def __call__(self, *args, **kwargs):
+        self.step += 1
+        if not self.step % self.step_size:
+            logger.info('Reducing learning rate exponentially.')
+            self.scheduler.step()
 
+    @property
+    def call_frequency(self):
+        return 'epoch'
+
+class annealing_reduceonplateau(object):
+    def __init__(self, optimizer, patience=5, factor=0.1, mode='max', min_lr=1e-7):
+        self.scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode=mode, factor=factor, patience=patience, min_lr=min_lr)
+
+    def __call__(self, *args, **kwargs):
+        self.scheduler.step(kwargs['val_loss'])
+
+    @property
+    def call_frequency(self):
+        return 'epoch'
+
+class annealing_cosine(object):
+    def __init__(self, optimizer, t_max=50, eta_min=1e-7):
+        self.scheduler = lr_scheduler.CosineAnnealingLR(optimizer, t_max, eta_min)
+
+    def __call__(self, *args, **kwargs):
+        self.scheduler.step()
+
+    @property
+    def call_frequency(self):
+        return 'epoch'
+
+
+class annealing_onecycle(object):
+    def __init__(self, optimizer, max_lr=1e-3, epochs=50, steps_per_epoch=None):
+        self.scheduler = lr_scheduler.CosineAnnealingLR(optimizer, max_lr=max_lr, epochs=epochs, steps_per_epoch=steps_per_epoch)
+
+    def __call__(self, *args, **kwargs):
+        self.scheduler.step()
+
+    @property
+    def call_frequency(self):
+        return 'batch'
 
 class TrainScheduler(object):
     """
     Implements learning rate scheduling.
     """
     def __init__(self, optimizer: torch.optim.Optimizer) -> None:
-        self.steps: List[Dict[str, Any]] = []
+        self.steps = []
         self.optimizer = optimizer
-        self.cycle: Any = None
+        self.iterations = 0
+        self.epoch_iterations = 0
+        self.steps = None
+        self.lr_sched = None
+        self.cycle = False
 
     def add_phase(self,
-                  iterations: int,
-                  lrate: Tuple[float, float] = (1e-4, 1e-4),
-                  momentum: Tuple[float, float] = (0.9, 0.9),
-                  wd: float = 0.0,
-                  lr_annealing_fn: Callable[[float, float, float], float] = annealing_const,
-                  mom_annealing_fn: Callable[[float, float, float], float] = annealing_const) -> None:
-
+                  steps: int,
+                  annealing_fn: Callable = None) -> None:
         """
         Adds a new phase to the scheduler.
 
         Args:
-            sched (kraken.lib.train.Trainscheduler): TrainScheduler instance
-            epochs (int): Number of iterations per cycle
+            steps (int): Number of step for this scheduler. Can be epochs or
+                         iteration depending on the scheduler.
             max_lr (float): Peak learning rate
-            div (float): divisor to determine minimum learning rate (min_lr = max_lr / div)
-            max_mon (float): Maximum momentum
-            min_mon (float): Minimum momentum
-            wd (float): Weight decay
-            lr_annealing_fn (Callable[[int, int, int], float]): LR change
-            function. Can be one of `annealing_const` (keeping start value),
-            `annealing_linear` (linear change), and `annealing_cos` (cosine
-                    change).
-            mom_annealing_fn (Callable[[int, int, int], float]): momentum change fn
+            annealing_fn (Callable): LR change function.
         """
-        self.steps.extend([{'lr': lr_annealing_fn(*lrate, pct=x/iterations),
-                            'momentum': mom_annealing_fn(*momentum, pct=x/iterations),
-                            'weight_decay': wd} for x in range(iterations)])
+        self.lengths.append(steps)
+        self.steps.append(annealing_fn(self.optimizer))
 
-    def step(self) -> None:
+    def batch_step(self, loss = None) -> None:
         """
         Performs an optimization step.
         """
         if not self.cycle:
-            self.cycle = cycle(self.steps)
-        kwargs = next(self.cycle)
-        for param_group in self.optimizer.param_groups:
-            param_group.update(kwargs)
+            self.length = cycle(self.length)
+            self.lr_sched = cycle(self.lr_sched)
+            self.cycle = True
 
+        if self.lr_sched is None:
+            self.steps = next(self.lengths)
+            self.lr_sched = next(self.steps)
 
-def add_exponential_decay(sched: TrainScheduler, iterations: int,
-                          epoch_len: int = 1000,
-                          lr: float = 0.001, decay: float = 0.96,
-                          momentum: float = 0.95, wd: float = 0.0):
-    """
-    Adds 1cycle policy [0] phases to a learning rate scheduler.
+        self.iterations += 1
+        if self.lr_sched.call_frequency == 'batch':
+            logger.debug('Adjusting learning rate (batch)')
+            self.lr_sched(loss=loss)
+            if self.iterations == self.steps:
+                self.iterations = 0
+                self.steps = next(self.lengths)
+                self.lr_sched = next(self.steps)
 
-    [0] Smith, Leslie N. "A disciplined approach to neural network
-    hyper-parameters: Part 1--learning rate, batch size, momentum, and weight
-    decay." arXiv preprint arXiv:1803.09820 (2018).
+    def epoch_step(self, val_loss = None) -> None:
+        """
+        Performs an optimization step.
+        """
+        if not self.cycle:
+            self.lengths = cycle(self.lengths)
+            self.lr_sched = cycle(self.lr_sched)
+            self.cycle = True
 
-    Args:
-        sched (kraken.lib.train.Trainscheduler): TrainScheduler instance
-        iterations (int): Number of iterations per cycle
-        max_lr (float): Peak learning rate
-        div (float): divisor to determine minimum learning rate (min_lr = max_lr / div)
-        max_mon (float): Maximum momentum
-        min_mon (float): Minimum momentum
-        wd (float): Weight decay
-    """
-    annealing_fn = annealing_exponential(0.8, iterations/epoch_len)
-    for _ in range(1, 1000):
-        sched.add_phase(iterations, (lr, lr), (momentum, momentum), wd, annealing_fn, annealing_const)
+        if self.lr_sched is None:
+            self.steps = next(self.lengths)
+            self.lr_sched = next(self.steps)
 
-
-def add_1cycle(sched: TrainScheduler, iterations: int,
-               max_lr: float = 1e-4, div: float = 25.0,
-               max_mom: float = 0.95, min_mom: float = 0.85, wd: float = 0.0):
-    """
-    Adds 1cycle policy [0] phases to a learning rate scheduler.
-
-    [0] Smith, Leslie N. "A disciplined approach to neural network
-    hyper-parameters: Part 1--learning rate, batch size, momentum, and weight
-    decay." arXiv preprint arXiv:1803.09820 (2018).
-
-    Args:
-        sched (kraken.lib.train.Trainscheduler): TrainScheduler instance
-        iterations (int): Number of iterations per cycle
-        max_lr (float): Peak learning rate
-        div (float): divisor to determine minimum learning rate (min_lr = max_lr / div)
-        max_mon (float): Maximum momentum
-        min_mon (float): Minimum momentum
-        wd (float): Weight decay
-    """
-    sched.add_phase(iterations//2, (max_lr/div, max_lr), (max_mom, min_mom), wd, annealing_linear, annealing_linear)
-    sched.add_phase(iterations//2, (max_lr, max_lr/div), (min_mom, max_mom), wd, annealing_cos, annealing_cos)
+        self.epoch_iterations += 1
+        if self.lr_sched.call_frequency == 'epoch':
+            logger.debug('Adjusting learning rate (epoch)')
+            self.lr_sched(val_loss=val_loss)
+            if self.epoch_iterations == self.steps:
+                self.epoch_iterations = 0
+                self.steps = next(self.lengths)
+                self.lr_sched = next(self.steps)
 
 
 class EarlyStopping(TrainStopper):
@@ -396,8 +419,6 @@ class KrakenTrainer(object):
 
         while self.stopper.trigger():
             for _, batch in zip(range(self.event_it), self.train_set):
-                if self.lr_scheduler:
-                    self.lr_scheduler.step()
                 input, target = batch['image'], batch['target']
                 input = input.to(self.device, non_blocking=True)
                 target = target.to(self.device, non_blocking=True)
@@ -418,12 +439,16 @@ class KrakenTrainer(object):
                     self.optimizer.step()
                 else:
                     logger.debug('infinite loss in trial')
+                if self.lr_scheduler:
+                    self.lr_scheduler.batch_step(loss=loss)
                 iteration_callback()
                 # prevent memory leak
                 del loss, o
             self.iterations += self.event_it
             logger.debug('Starting evaluation run')
             eval_res = self.evaluator(self.model, self.val_set, self.device)
+            if self.lr_scheduler:
+                self.lr_scheduler.epoch_step(val_loss=eval_res['val_metric'])
             self.stopper.update(eval_res['val_metric'])
             self.model.user_metadata['accuracy'].append((self.iterations, float(eval_res['val_metric'])))
             logger.info('Saving to {}_{}'.format(self.filename_prefix, self.stopper.epoch))
@@ -739,33 +764,41 @@ class KrakenTrainer(object):
         logger.debug(f'Set OpenMP threads to {threads}')
         nn.set_num_threads(threads)
 
-        optim = getattr(torch.optim, hyper_params['optimizer'])(nn.nn.parameters(), lr=0)
+        if hyper_params['optimizer'] == 'Adam':
+            optim = torch.optim.Adam(nn.nn.parameters(), lr=hyper_params['lrate'], weight_decay=hyper_params['weight_decay'])
+        else:
+            optim = getattr(torch.optim, hyper_params['optimizer'])(nn.nn.parameters(),
+                                                                    lr=hyper_params['lrate'],
+                                                                    momentum=hyper_params['momentum'],
+                                                                    weight_decay=hyper_params['weight_decay'])
 
         if 'seg_type' not in nn.user_metadata:
             nn.user_metadata['seg_type'] = 'baselines' if format_type != 'path' else 'bbox'
 
         tr_it = TrainScheduler(optim)
         if hyper_params['schedule'] == '1cycle':
-            add_1cycle(tr_it,
-                       int(len(gt_set) * hyper_params['epochs']),
-                       hyper_params['lrate'],
-                       hyper_params['momentum'],
-                       hyper_params['momentum'] - 0.10,
-                       hyper_params['weight_decay'])
+            annealing_one = partial(annealing_onecycle, max_lr=hyper_params['lrate'], epochs=hyper_params['epochs'], steps_per_epoch=len(gt_set))
+            tr_it.add_phase(int(len(gt_set) * hyper_params['epochs']),
+                            annealing_one)
         elif hyper_params['schedule'] == 'exponential':
-            add_exponential_decay(tr_it,
-                                  int(len(gt_set) * hyper_params['epochs']),
-                                  len(gt_set),
-                                  hyper_params['lrate'],
-                                  0.95,
-                                  hyper_params['momentum'],
-                                  hyper_params['weight_decay'])
+            annealing_exp = partial(annealing_exponential, step_size=hyper_params['step_size'], gamma=hyper_params['gamma'])
+            tr_it.add_phase(int(len(gt_set) * hyper_params['epochs']),
+                            annealing_exp)
+        elif hyper_params['schedule'] == 'step':
+            annealing_step = partial(annealing_step, step_size=hyper_params['step_size'], gamma=hyper_params['gamma'])
+            tr_it.add_phase(int(len(gt_set) * hyper_params['epochs']),
+                            annealing_step)
+        elif hyper_params['schedule'] == 'reduceonplateau':
+            annealing_red = partial(annealing_reduceonplateau, patience=hyper_params['rop_patience'], factor=hyper_params['gamma'])
+            tr_it.add_phase(int(len(gt_set) * hyper_params['epochs']),
+                            annealing_red)
+        elif hyper_params['schedule'] == 'cosine':
+            annealing_cos = partial(annealing_cosine, t_max=hyper_params['cos_t_max'])
+            tr_it.add_phase(int(len(gt_set) * hyper_params['epochs']),
+                            annealing_cos)
         else:
             # constant learning rate scheduler
-            tr_it.add_phase(1,
-                            2*(hyper_params['lrate'],),
-                            2*(hyper_params['momentum'],),
-                            hyper_params['weight_decay'],
+            tr_it.add_phase(int(len(gt_set) * hyper_params['epochs']),
                             annealing_const)
 
         if hyper_params['quit'] == 'early':
@@ -1039,30 +1072,39 @@ class KrakenTrainer(object):
         logger.debug(f'Set OpenMP threads to {threads}')
         nn.set_num_threads(threads)
 
-        optim = getattr(torch.optim, hyper_params['optimizer'])(nn.nn.parameters(), lr=0)
+        if hyper_params['optimizer'] == 'Adam':
+            optim = torch.optim.Adam(nn.nn.parameters(), lr=hyper_params['lrate'], weight_decay=hyper_params['weight_decay'])
+        else:
+            optim = getattr(torch.optim, hyper_params['optimizer'])(nn.nn.parameters(),
+                                                                    lr=hyper_params['lrate'],
+                                                                    momentum=hyper_params['momentum'],
+                                                                    weight_decay=hyper_params['weight_decay'])
 
         tr_it = TrainScheduler(optim)
+        tr_it = TrainScheduler(optim)
         if hyper_params['schedule'] == '1cycle':
-            add_1cycle(tr_it,
-                       int(len(gt_set) * hyper_params['epochs']),
-                       hyper_params['lrate'],
-                       hyper_params['momentum'],
-                       hyper_params['momentum'] - 0.10,
-                       hyper_params['weight_decay'])
+            annealing_one = partial(annealing_onecycle, max_lr=hyper_params['lrate'], epochs=hyper_params['epochs'], steps_per_epoch=len(gt_set))
+            tr_it.add_phase(int(len(gt_set) * hyper_params['epochs']),
+                            annealing_one)
         elif hyper_params['schedule'] == 'exponential':
-            add_exponential_decay(tr_it,
-                                  int(len(gt_set) * hyper_params['epochs']),
-                                  len(gt_set),
-                                  hyper_params['lrate'],
-                                  0.95,
-                                  hyper_params['momentum'],
-                                  hyper_params['weight_decay'])
+            annealing_exp = partial(annealing_exponential, step_size=hyper_params['step_size'], gamma=hyper_params['gamma'])
+            tr_it.add_phase(int(len(gt_set) * hyper_params['epochs']),
+                            annealing_exp)
+        elif hyper_params['schedule'] == 'step':
+            annealing_step = partial(annealing_step, step_size=hyper_params['step_size'], gamma=hyper_params['gamma'])
+            tr_it.add_phase(int(len(gt_set) * hyper_params['epochs']),
+                            annealing_step)
+        elif hyper_params['schedule'] == 'reduceonplateau':
+            annealing_red = partial(annealing_reduceonplateau, patience=hyper_params['rop_patience'], factor=hyper_params['gamma'])
+            tr_it.add_phase(int(len(gt_set) * hyper_params['epochs']),
+                            annealing_red)
+        elif hyper_params['schedule'] == 'cosine':
+            annealing_cos = partial(annealing_cosine, t_max=hyper_params['cos_t_max'])
+            tr_it.add_phase(int(len(gt_set) * hyper_params['epochs']),
+                            annealing_cos)
         else:
             # constant learning rate scheduler
-            tr_it.add_phase(1,
-                            2*(hyper_params['lrate'],),
-                            2*(hyper_params['momentum'],),
-                            hyper_params['weight_decay'],
+            tr_it.add_phase(int(len(gt_set) * hyper_params['epochs']),
                             annealing_const)
 
         if hyper_params['quit'] == 'early':
