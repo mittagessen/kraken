@@ -26,6 +26,7 @@ import numpy as np
 import torch.nn.functional as F
 
 from itertools import cycle
+from functools import partial
 from typing import cast, Tuple, Callable, List, Dict, Any, Optional, Sequence
 
 from kraken.lib import models, vgsl, segmentation, default_specs
@@ -66,7 +67,7 @@ class TrainStopper(object):
 
 class annealing_step(object):
     def __init__(self, optimizer, step_size, gamma=0.1):
-        self.scheduler = lr_scheduler.StepLR(optimizer, step_size, gamma)
+        self.scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size, gamma)
 
     def __call__(self, *args, **kwargs):
         self.scheduler.step()
@@ -88,7 +89,7 @@ class annealing_const(object):
 
 class annealing_exponential(object):
     def __init__(self, optimizer, step_size, gamma=0.1):
-        self.scheduler = lr_scheduler.ExponentialLR(optimizer, gamma)
+        self.scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma)
         self.step_size = step_size
         self.step = 0
 
@@ -104,7 +105,7 @@ class annealing_exponential(object):
 
 class annealing_reduceonplateau(object):
     def __init__(self, optimizer, patience=5, factor=0.1, mode='max', min_lr=1e-7):
-        self.scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode=mode, factor=factor, patience=patience, min_lr=min_lr)
+        self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode=mode, factor=factor, patience=patience, min_lr=min_lr)
 
     def __call__(self, *args, **kwargs):
         self.scheduler.step(kwargs['val_loss'])
@@ -115,7 +116,7 @@ class annealing_reduceonplateau(object):
 
 class annealing_cosine(object):
     def __init__(self, optimizer, t_max=50, eta_min=1e-7):
-        self.scheduler = lr_scheduler.CosineAnnealingLR(optimizer, t_max, eta_min)
+        self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, t_max, eta_min)
 
     def __call__(self, *args, **kwargs):
         self.scheduler.step()
@@ -127,7 +128,7 @@ class annealing_cosine(object):
 
 class annealing_onecycle(object):
     def __init__(self, optimizer, max_lr=1e-3, epochs=50, steps_per_epoch=None):
-        self.scheduler = lr_scheduler.CosineAnnealingLR(optimizer, max_lr=max_lr, epochs=epochs, steps_per_epoch=steps_per_epoch)
+        self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, max_lr=max_lr, epochs=epochs, steps_per_epoch=steps_per_epoch)
 
     def __call__(self, *args, **kwargs):
         self.scheduler.step()
@@ -142,10 +143,11 @@ class TrainScheduler(object):
     """
     def __init__(self, optimizer: torch.optim.Optimizer) -> None:
         self.steps = []
+        self.lengths = []
         self.optimizer = optimizer
         self.iterations = 0
         self.epoch_iterations = 0
-        self.steps = None
+        self.t_steps = 0
         self.lr_sched = None
         self.cycle = False
 
@@ -169,21 +171,23 @@ class TrainScheduler(object):
         Performs an optimization step.
         """
         if not self.cycle:
-            self.length = cycle(self.length)
-            self.lr_sched = cycle(self.lr_sched)
+            logger.debug('First call to lr scheduler')
+            self.lengths = cycle(self.lengths)
+            self.steps = cycle(self.steps)
             self.cycle = True
 
         if self.lr_sched is None:
-            self.steps = next(self.lengths)
+            self.t_steps = next(self.lengths)
             self.lr_sched = next(self.steps)
 
         self.iterations += 1
         if self.lr_sched.call_frequency == 'batch':
             logger.debug('Adjusting learning rate (batch)')
             self.lr_sched(loss=loss)
-            if self.iterations == self.steps:
+            if self.iterations == self.t_steps:
+                logger.debug('Switching to next lr scheduler')
                 self.iterations = 0
-                self.steps = next(self.lengths)
+                self.t_steps = next(self.lengths)
                 self.lr_sched = next(self.steps)
 
     def epoch_step(self, val_loss = None) -> None:
@@ -191,21 +195,23 @@ class TrainScheduler(object):
         Performs an optimization step.
         """
         if not self.cycle:
+            logger.debug('First call to lr scheduler')
             self.lengths = cycle(self.lengths)
-            self.lr_sched = cycle(self.lr_sched)
+            self.steps = cycle(self.steps)
             self.cycle = True
 
         if self.lr_sched is None:
-            self.steps = next(self.lengths)
+            self.t_steps = next(self.lengths)
             self.lr_sched = next(self.steps)
 
         self.epoch_iterations += 1
         if self.lr_sched.call_frequency == 'epoch':
             logger.debug('Adjusting learning rate (epoch)')
             self.lr_sched(val_loss=val_loss)
-            if self.epoch_iterations == self.steps:
+            if self.epoch_iterations == self.t_steps:
+                logger.debug('Switching to next lr scheduler')
                 self.epoch_iterations = 0
-                self.steps = next(self.lengths)
+                self.t_steps = next(self.lengths)
                 self.lr_sched = next(self.steps)
 
 
