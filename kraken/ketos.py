@@ -117,7 +117,7 @@ def _validate_merging(ctx, param, value):
 @click.option('-m', '--momentum', show_default=True, default=SEGMENTATION_HYPER_PARAMS['momentum'], help='Momentum')
 @click.option('-w', '--weight-decay', show_default=True, default=SEGMENTATION_HYPER_PARAMS['weight_decay'], help='Weight decay')
 @click.option('--schedule', show_default=True, type=click.Choice(['constant', '1cycle', 'exponential', 'cosine', 'step', 'reduceonplateau']), default=RECOGNITION_HYPER_PARAMS['schedule'],
-              help='Set learning rate scheduler. For 1cycle, cycle length is determined by the `--epoch` option.')
+              help='Set learning rate scheduler. For 1cycle, cycle length is determined by the `--step-size` option.')
 @click.option('-g', '--gamma', show_default=True, default=RECOGNITION_HYPER_PARAMS['gamma'], help='Decay factor for exponential, step, and reduceonplateau learning rate schedules')
 @click.option('-ss', '--step-size', show_default=True, default=RECOGNITION_HYPER_PARAMS['step_size'], help='Number of validation runs between learning rate decay for exponential and step LR schedules')
 @click.option('--sched-patience', show_default=True, default=RECOGNITION_HYPER_PARAMS['rop_patience'], help='Minimal number of validation runs between LR reduction for reduceonplateau LR schedule.')

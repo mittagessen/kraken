@@ -783,7 +783,7 @@ class KrakenTrainer(object):
 
         tr_it = TrainScheduler(optim)
         if hyper_params['schedule'] == '1cycle':
-            annealing_one = partial(annealing_onecycle, max_lr=hyper_params['lrate'], epochs=hyper_params['epochs'], steps_per_epoch=len(gt_set))
+            annealing_one = partial(annealing_onecycle, max_lr=hyper_params['lrate'], epochs=hyper_params['step_size'], steps_per_epoch=len(gt_set))
             tr_it.add_phase(int(len(gt_set) * hyper_params['epochs']),
                             annealing_one)
         elif hyper_params['schedule'] == 'exponential':
