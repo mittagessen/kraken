@@ -1,7 +1,7 @@
 # this is an anaconda environment for ancient compute clusters such as inria's
 # rioc. It uses the anaconda builds of pytorch which are compatible down to
 # RH6 but it requires an outdated version of pillow with security bugs.
-name: kraken
+name: krakenRA
 channels:
   - defaults
   - conda-forge
