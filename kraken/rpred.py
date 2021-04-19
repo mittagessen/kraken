@@ -229,6 +229,7 @@ class mm_rpred(object):
         for script, (box, coords) in zip(map(lambda x: x[0], line['boxes'][0]),
                                          extract_polygons(self.im, {'text_direction': line['text_direction'],
                                                                     'boxes': map(lambda x: x[1], line['boxes'][0])})):
+            self.box = box
             # skip if script is set to ignore
             if self.script_ignore is not None and script in self.script_ignore:
                 logger.info('Ignoring {} line segment.'.format(script))
@@ -257,12 +258,9 @@ class mm_rpred(object):
             logger.debug('Convert to absolute coordinates')
             # calculate recognized LSTM locations of characters
             # scale between network output and network input
-            net_scale = line.shape[2]/self.nets[script].outputs.shape[2]
+            self.net_scale = line.shape[2]/self.nets[script].outputs.shape[2]
             # scale between network input and original line
-            in_scale = box.size[0]/(line.shape[2]-2*self.pad)
-
-            def _scale_val(val, min_val, max_val):
-                return int(round(min(max(((val*net_scale)-self.pad)*in_scale, min_val), max_val)))
+            self.in_scale = box.size[0]/(line.shape[2]-2*self.pad)
 
             pred = ''.join(x[0] for x in preds)
             pos = []
@@ -270,12 +268,12 @@ class mm_rpred(object):
 
             for _, start, end, c in preds:
                 if self.bounds['text_direction'].startswith('horizontal'):
-                    xmin = coords[0] + _scale_val(start, 0, box.size[0])
-                    xmax = coords[0] + _scale_val(end, 0, box.size[0])
+                    xmin = coords[0] + self._scale_val(start, 0, self.box.size[0])
+                    xmax = coords[0] + self._scale_val(end, 0, self.box.size[0])
                     pos.append([[xmin, coords[1]], [xmin, coords[3]], [xmax, coords[3]], [xmax, coords[1]]])
                 else:
-                    ymin = coords[1] + _scale_val(start, 0, box.size[1])
-                    ymax = coords[1] + _scale_val(start, 0, box.size[1])
+                    ymin = coords[1] + self._scale_val(start, 0, self.box.size[1])
+                    ymax = coords[1] + self._scale_val(end, 0, self.box.size[1])
                     pos.append([[coords[0], ymin], [coords[2], ymin], [coords[2], ymax], [coords[0], ymax]])
                 conf.append(c)
             rec.prediction += pred
@@ -295,6 +293,8 @@ class mm_rpred(object):
             logger.warning(f'Extracting line failed: {e}')
             return ocr_record('', [], [], line['lines'][0])
 
+        self.box = box
+
         script = coords['script']
         # check if boxes are non-zero in any dimension
         if 0 in box.size:
@@ -312,12 +312,10 @@ class mm_rpred(object):
         preds = self.nets[script].predict(line.unsqueeze(0))[0]
         # calculate recognized LSTM locations of characters
         # scale between network output and network input
-        net_scale = line.shape[2]/self.nets[script].outputs.shape[2]
+        self.net_scale = line.shape[2]/self.nets[script].outputs.shape[2]
         # scale between network input and original line
-        in_scale = box.size[0]/(line.shape[2]-2*self.pad)
+        self.in_scale = box.size[0]/(line.shape[2]-2*self.pad)
 
-        def _scale_val(val, min_val, max_val):
-            return int(round(min(max(((val*net_scale)-self.pad)*in_scale, min_val), max_val-1)))
 
         # XXX: fix bounding box calculation ocr_record for multi-codepoint labels.
         pred = ''.join(x[0] for x in preds)
@@ -326,8 +324,8 @@ class mm_rpred(object):
         for _, start, end, c in preds:
             pos.append(compute_polygon_section(coords['baseline'],
                                                coords['boundary'],
-                                               _scale_val(start, 0, box.size[0]),
-                                               _scale_val(end, 0, box.size[0])))
+                                               self._scale_val(start, 0, self.box.size[0]),
+                                               self._scale_val(end, 0, self.box.size[0])))
             conf.append(c)
         if self.bidi_reordering:
             logger.debug('BiDi reordering record.')
@@ -348,6 +346,9 @@ class mm_rpred(object):
 
     def __len__(self):
         return self.len
+
+    def _scale_val(self, val, min_val, max_val):
+        return int(round(min(max(((val*self.net_scale)-self.pad)*self.in_scale, min_val), max_val-1)))
 
 
 def rpred(network: TorchSeqRecognizer,
