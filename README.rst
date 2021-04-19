@@ -95,6 +95,12 @@ To segment and OCR an image using the default model(s):
 
   $ kraken -i image.tif image.txt segment -bl ocr
 
+To visualize the results of the line segmenter (lines and baselines):
+
+::
+
+  $ python linevis.py --lb 1 -i image.jpg -o output.jpg -f lines.json
+
 All subcommands and options are documented. Use the ``help`` option to get more
 information.
 
