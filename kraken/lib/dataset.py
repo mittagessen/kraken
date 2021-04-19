@@ -54,6 +54,106 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+#part added for RandAugment
+
+import random
+
+
+def blur(v):
+    from albumentations import MotionBlur, MedianBlur, Blur, OneOf
+    assert 3 < v < 7
+    v = int(v)
+    if v%2 == 0:
+        v = v+1
+    return OneOf([
+        MotionBlur(blur_limit=v, p=1),
+        MedianBlur(blur_limit=v, p=1),
+        Blur(blur_limit=v, p=1)])
+
+
+def shiftscalerotate0(v):
+    from albumentations import ShiftScaleRotate
+    assert 0 < v < 1
+    return ShiftScaleRotate(shift_limit=0.0625 * v, scale_limit=0.2 * v, rotate_limit=45 * v, p=1)
+
+def shiftscalerotate1(v):
+    from albumentations import ShiftScaleRotate
+    assert 0 < v < 1
+    return ShiftScaleRotate(shift_limit=0.0625 * v, scale_limit=0.2 * v, rotate_limit=3 * v, p=1)
+
+
+def transfo(v):
+    from albumentations import OpticalDistortion, ElasticTransform, OneOf
+    assert 0.01 < v < 0.1
+    return OneOf([
+        OpticalDistortion(distort_limit=v, p=1),
+        ElasticTransform(alpha=10*v, sigma=500*v, alpha_affine=500*v, p=1)])
+
+
+def saturation(v):
+    from albumentations import HueSaturationValue
+    assert 0 < v < 1
+    return HueSaturationValue(hue_shift_limit=20 * v, sat_shift_limit=0.1 * v, val_shift_limit=0.1 * v, p=1)
+
+def flip(v):
+    from albumentations import Flip
+    assert 0 < v < 1
+    return Flip(p=1)
+
+def randomrotate90(v):
+    from albumentations import RandomRotate90
+    assert 0 < v < 1
+    return RandomRotate90(p=1)
+
+def augment_list(transfos=0):  # operations and their ranges
+    if transfos == 0:
+        l = [
+            (blur, 3, 7),  # 1
+            (shiftscalerotate0, 0, 0.1),  # 2
+            (transfo, 0.01, 0.1),  # 3
+        ]
+
+    elif transfos == 1:
+        l = [
+            (blur, 3, 7),  # 1
+            (shiftscalerotate1, 0, 0.1),  # 2
+            (transfo, 0.01, 0.1),  # 3
+        ]
+
+    elif transfos == 2:
+        l = [
+            (blur, 3, 7),  # 1
+            (shiftscalerotate0, 0, 0.1),  # 2
+            (transfo, 0.01, 0.1),   # 3
+            (saturation, 0, 1),     # 4
+            (randomrotate90, 0, 1),     # 5
+            (flip, 0, 1)    # 6
+        ]
+
+
+    return l
+
+
+class UniformAugment:
+    def __init__(self, ops_num=2, transfo=0):
+        self._augment_list = augment_list(transfos=transfo)
+        self._ops_num = ops_num
+
+    def __call__(self):
+        from albumentations import ToFloat, Compose
+        # Selecting unique num_ops transforms for each image would help the
+        #   training procedure.
+        ops = random.sample(self._augment_list, k=self._ops_num)
+        comp=[]
+        comp.append(ToFloat())
+        for op in ops:
+            augment_fn, low, high = op
+            probability = 1  # random.random()
+            if random.random() < probability:
+                comp.append(augment_fn(random.uniform(low, high)))
+        return Compose(comp)
+
+#END of the part added for RandAugment
 
 def generate_input_transforms(batch: int, height: int, width: int, channels: int, pad: int, valid_norm: bool = True, force_binarization=False) -> transforms.Compose:
     """
@@ -418,24 +518,7 @@ class PolygonGTDataset(Dataset):
         if reorder:
             self.text_transforms.append(bd.get_display)
         if augmentation:
-            from albumentations import (
-                Compose, ToFloat, FromFloat, Flip, OneOf, MotionBlur, MedianBlur, Blur,
-                ShiftScaleRotate, OpticalDistortion, ElasticTransform, RandomBrightnessContrast,
-                )
-
-            self.aug = Compose([
-                                ToFloat(),
-                                OneOf([
-                                    MotionBlur(p=0.2),
-                                    MedianBlur(blur_limit=3, p=0.1),
-                                    Blur(blur_limit=3, p=0.1),
-                                ], p=0.2),
-                                ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.2, rotate_limit=3, p=0.2),
-                                OneOf([
-                                    OpticalDistortion(p=0.3),
-                                    ElasticTransform(p=0.1),
-                                ], p=0.2),
-                               ], p=0.5)
+            self.aug = UniformAugment(ops_num=2, transfo=0)
 
         self.im_mode = '1'
 
@@ -599,19 +682,10 @@ class GroundTruthDataset(Dataset):
                 ShiftScaleRotate, OpticalDistortion, ElasticTransform, RandomBrightnessContrast,
                 )
 
-            self.aug = Compose([
-                                ToFloat(),
-                                OneOf([
-                                    MotionBlur(p=0.2),
-                                    MedianBlur(blur_limit=3, p=0.1),
-                                    Blur(blur_limit=3, p=0.1),
-                                ], p=0.2),
-                                ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.2, rotate_limit=45, p=0.2),
-                                OneOf([
-                                    OpticalDistortion(p=0.3),
-                                    ElasticTransform(p=0.1),
-                                ], p=0.2),
-                               ], p=0.5)
+            self.aug = UniformAugment(ops_num=2, transfo=1)
+
+
+
 
         self.im_mode = '1'
 
@@ -835,22 +909,8 @@ class BaselineSet(Dataset):
                 HueSaturationValue,
                 )
 
-            self.aug = Compose([
-                                ToFloat(),
-                                RandomRotate90(),
-                                Flip(),
-                                OneOf([
-                                    MotionBlur(p=0.2),
-                                    MedianBlur(blur_limit=3, p=0.1),
-                                    Blur(blur_limit=3, p=0.1),
-                                ], p=0.2),
-                                ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.2, rotate_limit=45, p=0.2),
-                                OneOf([
-                                    OpticalDistortion(p=0.3),
-                                    ElasticTransform(p=0.1),
-                                ], p=0.2),
-                                HueSaturationValue(hue_shift_limit=20, sat_shift_limit=0.1, val_shift_limit=0.1, p=0.3),
-                               ], p=0.5)
+            self.aug = UniformAugment(ops_num=2,transfo=2)
+
         self.imgs = imgs
         self.line_width = line_width
         # split image transforms into two. one part giving the final PIL image
