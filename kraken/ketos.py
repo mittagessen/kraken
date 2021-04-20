@@ -440,7 +440,7 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
                                                   resize=resize,
                                                   augment=augment)
 
-    with  log.progressbar(label='stage {}/{}'.format(1, trainer.stopper.epochs if trainer.stopper.epochs > 0 else '∞'),
+    with  log.progressbar(label='stages {}/{}'.format(1, trainer.stopper.epochs if trainer.stopper.epochs > 0 else '∞'),
                           length=trainer.event_it, show_pos=True) as bar:
 
         def _draw_progressbar():
