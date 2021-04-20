@@ -143,7 +143,6 @@ class UniformAugment:
         from albumentations import ToFloat, Compose
         # Selecting unique num_ops transforms for each image would help the
         #   training procedure.
-        print("using RA")
         ops = random.sample(self._augment_list, k=self._ops_num)
         comp=[]
         comp.append(ToFloat())
