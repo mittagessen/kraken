@@ -518,7 +518,8 @@ class PolygonGTDataset(Dataset):
         if reorder:
             self.text_transforms.append(bd.get_display)
         if augmentation:
-            self.aug = UniformAugment(ops_num=2, transfo=0)
+            augmentation = UniformAugment(ops_num=2, transfo=0)
+            self.aug = augmentation()
 
         self.im_mode = '1'
 
@@ -682,7 +683,8 @@ class GroundTruthDataset(Dataset):
                 ShiftScaleRotate, OpticalDistortion, ElasticTransform, RandomBrightnessContrast,
                 )
 
-            self.aug = UniformAugment(ops_num=2, transfo=1)
+            augmenations = UniformAugment(ops_num=2, transfo=1)
+            self.aug = augmentations()
 
 
 
@@ -909,7 +911,8 @@ class BaselineSet(Dataset):
                 HueSaturationValue,
                 )
 
-            self.aug = UniformAugment(ops_num=3,transfo=2)
+            augmentations = UniformAugment(ops_num=3,transfo=2)
+            self.aug = augmentations()
 
         self.imgs = imgs
         self.line_width = line_width
