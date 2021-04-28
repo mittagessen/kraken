@@ -518,8 +518,8 @@ class PolygonGTDataset(Dataset):
         if reorder:
             self.text_transforms.append(bd.get_display)
         if augmentation:
-            augmentation = UniformAugment(ops_num=2, transfo=0)
-            self.aug = augmentation()
+            augmentations = UniformAugment(ops_num=2, transfo=0)
+            self.aug = augmentations()
 
         self.im_mode = '1'
 
@@ -683,7 +683,7 @@ class GroundTruthDataset(Dataset):
                 ShiftScaleRotate, OpticalDistortion, ElasticTransform, RandomBrightnessContrast,
                 )
 
-            augmenations = UniformAugment(ops_num=2, transfo=1)
+            augmentations = UniformAugment(ops_num=2, transfo=1)
             self.aug = augmentations()
 
 
