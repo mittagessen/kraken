@@ -39,8 +39,11 @@ def slugify(value):
               'link to source images.')
 @click.option('-i', '--model', default=None, show_default=True, type=click.Path(exists=True),
               help='Transcription model to use.')
+@click.option('-o', '--output', type=click.Choice(['alto', 'pagexml', 'overlay']),
+              show_default=True, default='overlay', help='Output mode. Either page or'
+              ' alto for xml output, overlay for image overlays.')
 @click.argument('files', nargs=-1)
-def cli(format_type, model, files):
+def cli(format_type, model, output, files):
     """
     A script producing overlays of lines and regions from either ALTO or
     PageXML files or run a model to do the same.
@@ -53,7 +56,7 @@ def cli(format_type, model, files):
     from PIL import Image, ImageDraw
 
     from kraken.lib import models, xml
-    from kraken import align
+    from kraken import align, serialization
 
     if format_type == 'xml':
         fn = xml.parse_xml
@@ -69,14 +72,18 @@ def cli(format_type, model, files):
         data = fn(doc)
         im = Image.open(data['image']).convert('RGBA')
         records = align.forced_align(data, net)
-        tmp = Image.new('RGBA', im.size, (0, 0, 0, 0))
-        draw = ImageDraw.Draw(tmp)
-        for record in records:
-            for pol in record.cuts:
-                c = next(cmap)
-                draw.polygon([tuple(x) for x in pol], fill=c, outline=c[:3])
-        base_image = Image.alpha_composite(im, tmp)
-        base_image.save(f'high_{os.path.basename(doc)}_algn.png')
+        if output == 'overlay':
+            tmp = Image.new('RGBA', im.size, (0, 0, 0, 0))
+            draw = ImageDraw.Draw(tmp)
+            for record in records:
+                for pol in record.cuts:
+                    c = next(cmap)
+                    draw.polygon([tuple(x) for x in pol], fill=c, outline=c[:3])
+            base_image = Image.alpha_composite(im, tmp)
+            base_image.save(f'high_{os.path.basename(doc)}_algn.png')
+        else:
+            with open(f'{os.path.basename(doc)}_algn.xml', 'w') as fp:
+                fp.write(serialization.serialize(records, image_name=data['image'], regions=data['regions'], template=output))
         click.secho('\u2713', fg='green')
 
 if __name__ == '__main__':
