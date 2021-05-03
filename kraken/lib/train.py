@@ -878,8 +878,7 @@ class KrakenTrainer(object):
                              valid_baselines=valid_baselines,
                              merge_baselines=merge_baselines,
                              valid_regions=valid_regions,
-                             merge_regions=merge_regions,
-                             topline=topline)
+                             merge_regions=merge_regions)
         val_set = BaselineSet(evaluation_data,
                               line_width=hyper_params['line_width'],
                               im_transforms=transforms,
@@ -888,8 +887,7 @@ class KrakenTrainer(object):
                               valid_baselines=valid_baselines,
                               merge_baselines=merge_baselines,
                               valid_regions=valid_regions,
-                              merge_regions=merge_regions,
-                              topline=topline)
+                              merge_regions=merge_regions)
 
         if format_type is None:
             for page in training_data:
@@ -908,6 +906,7 @@ class KrakenTrainer(object):
             message('\u2713', fg='green')
             if bounding_regions is not None:
                 nn.user_metadata['bounding_regions'] = bounding_regions
+            nn.user_metadata['topline'] = topline
         else:
             if gt_set.class_mapping['baselines'].keys() != nn.user_metadata['class_mapping']['baselines'].keys() or \
                gt_set.class_mapping['regions'].keys() != nn.user_metadata['class_mapping']['regions'].keys():
