@@ -108,21 +108,21 @@ def randomrotate90(v):
 def augment_list(transfos=0):  # operations and their ranges
     if transfos == 0:
         l = [
-            (blur, 3, 7),  # 1
+            (blur, 3, 5),  # 1
             (shiftscalerotate0, 0, 0.1),  # 2
             (transfo, 0.01, 0.1),  # 3
         ]
 
     elif transfos == 1:
         l = [
-            (blur, 3, 7),  # 1
+            (blur, 3, 5),  # 1
             (shiftscalerotate1, 0, 0.1),  # 2
             (transfo, 0.01, 0.1),  # 3
         ]
 
     elif transfos == 2:
         l = [
-            (blur, 3, 7),  # 1
+            (blur, 3, 5),  # 1
             (shiftscalerotate0, 0, 0.1),  # 2
             (transfo, 0.01, 0.1),   # 3
             (saturation, 0, 1),     # 4
