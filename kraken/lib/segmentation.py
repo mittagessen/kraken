@@ -42,6 +42,7 @@ from skimage.transform import PiecewiseAffineTransform, SimilarityTransform, Aff
 
 from typing import List, Tuple, Union, Dict, Any, Sequence, Optional, Callable
 
+from kraken.lib import default_specs
 from kraken.lib.exceptions import KrakenInputException
 
 from scipy.signal import convolve2d
@@ -414,7 +415,8 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
                                     baselines: Sequence[Sequence[Tuple[int, int]]] = None,
                                     suppl_obj: Sequence[Sequence[Tuple[int, int]]] = None,
                                     im_feats: np.array = None,
-                                    scale: Tuple[int, int] = None):
+                                    scale: Tuple[int, int] = None,
+                                    topline: bool = False):
     """
     Given a list of baselines and an input image, calculates a polygonal
     environment around each baseline.
@@ -435,6 +437,11 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
         scale (tuple): A 2-tuple (h, w) containing optional scale factors of
                        the input. Values of 0 are used for aspect-preserving
                        scaling. `None` skips input scaling.
+        topline (bool): Switch to change default baseline location for offset
+                        calculation purposes. If set to False, baselines are
+                        assumed to be on the bottom of the text line and will
+                        be offset upwards, if set to True, baselines are on the
+                        top and will be offset downwards.
     Returns:
         List of lists of coordinates. If no polygonization could be compute for
         a baseline `None` is returned instead.
@@ -571,7 +578,12 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
     for idx, line in enumerate(baselines):
         try:
             # find intercepts with image bounds on each side of baseline
+            line = geom.LineString(line)
+            line = line.parallel_offset(default_specs.SEGMENTATION_HYPER_PARAMS['line_width'], side='left' if topline else 'right')
             line = np.array(line, dtype=np.float)
+            # parallel_offset on the right reverses the coordinate order
+            if not topline:
+                line = line[::-1]
             # calculate magnitude-weighted average direction vector
             lengths = np.linalg.norm(np.diff(line.T), axis=0)
             p_dir = np.mean(np.diff(line.T) * lengths/lengths.sum(), axis=1)

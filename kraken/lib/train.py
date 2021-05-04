@@ -851,7 +851,8 @@ class KrakenTrainer(object):
                                merge_baselines: Optional[Dict[str, str]] = None,
                                bounding_regions: Optional[Sequence[str]] = None,
                                resize: str = 'fail',
-                               augment: bool = False):
+                               augment: bool = False,
+                               topline: bool = False):
         """
         This is an ugly constructor that takes all the arguments from the command
         line driver, finagles the datasets, models, and hyperparameters correctly
@@ -968,6 +969,7 @@ class KrakenTrainer(object):
             message('\u2713', fg='green')
             if bounding_regions is not None:
                 nn.user_metadata['bounding_regions'] = bounding_regions
+            nn.user_metadata['topline'] = topline
         else:
             if gt_set.class_mapping['baselines'].keys() != nn.user_metadata['class_mapping']['baselines'].keys() or \
                gt_set.class_mapping['regions'].keys() != nn.user_metadata['class_mapping']['regions'].keys():
