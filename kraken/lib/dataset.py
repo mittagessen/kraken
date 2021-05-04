@@ -61,7 +61,7 @@ import random
 
 def blur(v):
     from albumentations import MotionBlur, MedianBlur, Blur, OneOf
-    assert 3 < v < 7
+    assert 3 < v < 5
     v = int(v)
     if v%2 == 0:
         v = v+1
@@ -517,9 +517,8 @@ class PolygonGTDataset(Dataset):
             self.text_transforms.append(lambda x: regex.sub('\s', ' ', x).strip())
         if reorder:
             self.text_transforms.append(bd.get_display)
-        if augmentation:
-            augmentations = UniformAugment(ops_num=2, transfo=0)
-            self.aug = augmentations()
+        if augmentation:  
+            self.aug = UniformAugment(ops_num=2, transfo=0)
 
         self.im_mode = '1'
 
@@ -588,7 +587,8 @@ class PolygonGTDataset(Dataset):
             x, y = self.training_set[index]
             if self.aug:
                 x = x.permute((1, 2, 0)).numpy()
-                o = self.aug(image=x)
+                augmentation = self.aug()
+                o = augmentation(image=x)
                 x = torch.tensor(o['image'].transpose(2, 0, 1))
             return {'image': x, 'target': y}
         else:
@@ -683,8 +683,7 @@ class GroundTruthDataset(Dataset):
                 ShiftScaleRotate, OpticalDistortion, ElasticTransform, RandomBrightnessContrast,
                 )
 
-            augmentations = UniformAugment(ops_num=2, transfo=1)
-            self.aug = augmentations()
+            self.aug = UniformAugment(ops_num=2, transfo=1)
 
 
 
@@ -770,7 +769,8 @@ class GroundTruthDataset(Dataset):
             x, y = self.training_set[index]
             if self.aug:
                 im = x.permute((1, 2, 0)).numpy()
-                o = self.aug(image=im)
+                augmentation = self.aug()
+                o = augmentation(image=x)
                 im = torch.tensor(o['image'].transpose(2, 0, 1))
                 return {'image': im, 'target': y}
             return {'image': x, 'target': y}
@@ -911,8 +911,7 @@ class BaselineSet(Dataset):
                 HueSaturationValue,
                 )
 
-            augmentations = UniformAugment(ops_num=3,transfo=2)
-            self.aug = augmentations()
+            self.aug = UniformAugment(ops_num=3,transfo=2)
 
         self.imgs = imgs
         self.line_width = line_width
@@ -1050,7 +1049,8 @@ class BaselineSet(Dataset):
         if self.aug:
             image = image.permute(1, 2, 0).numpy()
             target = target.permute(1, 2, 0).numpy()
-            o = self.aug(image=image, mask=target)
+            augmentation = self.aug()
+            o = augmentation(image=x, mask = target)
             image = torch.tensor(o['image']).permute(2, 0, 1)
             target = torch.tensor(o['mask']).permute(2, 0, 1)
         return image, target
