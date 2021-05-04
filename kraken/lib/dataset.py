@@ -770,7 +770,7 @@ class GroundTruthDataset(Dataset):
             if self.aug:
                 im = x.permute((1, 2, 0)).numpy()
                 augmentation = self.aug()
-                o = augmentation(image=x)
+                o = augmentation(image=im)
                 im = torch.tensor(o['image'].transpose(2, 0, 1))
                 return {'image': im, 'target': y}
             return {'image': x, 'target': y}
@@ -1047,13 +1047,13 @@ class BaselineSet(Dataset):
                 t[cls_idx, rr, cc] = 1
         target = t
         if self.aug:
-            image = image.permute(1, 2, 0).numpy()
+            im = image.permute(1, 2, 0).numpy()
             target = target.permute(1, 2, 0).numpy()
             augmentation = self.aug()
-            o = augmentation(image=x, mask = target)
-            image = torch.tensor(o['image']).permute(2, 0, 1)
+            o = augmentation(image=im, mask = target)
+            im = torch.tensor(o['image']).permute(2, 0, 1)
             target = torch.tensor(o['mask']).permute(2, 0, 1)
-        return image, target
+        return im, target
 
     def __len__(self):
         return len(self.imgs)
