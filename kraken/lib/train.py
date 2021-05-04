@@ -812,7 +812,8 @@ class KrakenTrainer(object):
                                merge_baselines: Optional[Dict[str, str]] = None,
                                bounding_regions: Optional[Sequence[str]] = None,
                                resize: str = 'fail',
-                               augment: bool = False):
+                               augment: bool = False,
+                               topline: bool = False):
         """
         This is an ugly constructor that takes all the arguments from the command
         line driver, finagles the datasets, models, and hyperparameters correctly

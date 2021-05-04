@@ -119,6 +119,7 @@ def vec_lines(heatmap: torch.Tensor,
               regions: Dict = None,
               scal_im = None,
               suppl_obj = None,
+              topline = False,
               **kwargs):
     """
     Computes lines from a stack of heatmaps, a class mapping, and scaling
@@ -147,7 +148,7 @@ def vec_lines(heatmap: torch.Tensor,
             if reg_pol.contains(mid_point):
                 suppl_obj.append(regions[reg_idx])
 
-        pol = calculate_polygonal_environment(baselines=[bl[1]], im_feats=im_feats, suppl_obj=suppl_obj)
+        pol = calculate_polygonal_environment(baselines=[bl[1]], im_feats=im_feats, suppl_obj=suppl_obj, topline=topline)
         if pol[0] is not None:
             lines.append((bl[0], bl[1], pol[0]))
 
@@ -213,16 +214,6 @@ def segment(im,
         logger.info('No segmentation model given. Loading default model.')
         model = vgsl.TorchVGSLModel.load_model(pkg_resources.resource_filename(__name__, 'blla.mlmodel'))
 
-    logger.debug('Model line types:')
-    for k, v in model.class_mapping['baselines'].items():
-        logger.debug(f'  {k}\t{v}')
-    logger.debug('Model region types:')
-    for k, v in model .class_mapping['regions'].items():
-        logger.debug(f'  {k}\t{v}')
-
-    if 'topline' in nn.user_metadata:
-        logger.debug(f'Baseline location: {"top" if nn.user_metadata["topline"] else "bottom"}')
-
     if isinstance(model, vgsl.TorchVGSLModel):
         model = [model]
 
@@ -230,6 +221,8 @@ def segment(im,
     logger.info(f'Segmenting {im_str}')
 
     for net in model:
+        if 'topline' in net.user_metadata:
+            logger.debug(f'Baseline location: {"top" if netn.user_metadata["topline"] else "bottom"}')
         rets = compute_segmentation_map(im, mask, net, device)
         regions = vec_regions(**rets)
         # flatten regions for line ordering/fetch bounding regions
@@ -243,7 +236,8 @@ def segment(im,
                           regions=line_regs,
                           reading_order_fn=reading_order_fn,
                           text_direction=text_direction,
-                          suppl_obj=suppl_obj)
+                          suppl_obj=suppl_obj,
+                          topline=net.user_metadata['topline'] if 'topline' in net.user_metadata else False)
 
     if len(rets['cls_map']['baselines']) > 1:
         script_detection = True

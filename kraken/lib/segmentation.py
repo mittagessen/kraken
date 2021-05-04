@@ -577,6 +577,9 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
             line = geom.LineString(line)
             line = line.parallel_offset(default_specs.SEGMENTATION_HYPER_PARAMS['line_width'], side='left' if topline else 'right')
             line = np.array(line, dtype=np.float)
+            # parallel_offset on the right reverses the coordinate order
+            if not topline:
+                line = line[::-1]
             # calculate magnitude-weighted average direction vector
             lengths = np.linalg.norm(np.diff(line.T), axis=0)
             p_dir = np.mean(np.diff(line.T) * lengths/lengths.sum(), axis=1)
