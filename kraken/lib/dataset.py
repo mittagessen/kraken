@@ -74,7 +74,7 @@ def blur(v):
 def shift0(v):
     from albumentations import ShiftScaleRotate
     assert 0 < v < 1
-    return ShiftScaleRotate(shift_limit_y=0.0625 * v, shitf_limit_x=0, scale_limit=0, rotate_limit=0,border_mode=cv2.BORDER_CONSTANT,p=1)
+    return ShiftScaleRotate(shift_limit_y=0.0625 * v, shift_limit_x=0, scale_limit=0, rotate_limit=0,border_mode=cv2.BORDER_CONSTANT,p=1)
 
 
 def rotate0(v):
@@ -86,7 +86,7 @@ def rotate0(v):
 def shift1(v):
     from albumentations import ShiftScaleRotate
     assert 0 < v < 1
-    return ShiftScaleRotate(shift_limit_y=0.0625 * v, shitf_limit_x=0, scale_limit=0, rotate_limit=0,border_mode=cv2.BORDER_CONSTANT,p=1)
+    return ShiftScaleRotate(shift_limit_y=0.0625 * v, shift_limit_x=0, scale_limit=0, rotate_limit=0,border_mode=cv2.BORDER_CONSTANT,p=1)
 
 
 def rotate1(v):
