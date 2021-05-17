@@ -71,23 +71,34 @@ def blur(v):
         Blur(blur_limit=v, p=1)])
 
 
-def shiftscalerotate0(v):
+def shift0(v):
     from albumentations import ShiftScaleRotate
     assert 0 < v < 1
-    return ShiftScaleRotate(shift_limit=0.0625 * v, scale_limit=0.2 * v, rotate_limit=45 * v, p=1)
+    return ShiftScaleRotate(shift_limit_y=0.0625 * v, shitf_limit_x=0, scale_limit=0, rotate_limit=0,border_mode=cv2.BORDER_CONSTANT,p=1)
 
-def shiftscalerotate1(v):
+
+def rotate0(v):
     from albumentations import ShiftScaleRotate
     assert 0 < v < 1
-    return ShiftScaleRotate(shift_limit=0.0625 * v, scale_limit=0.2 * v, rotate_limit=3 * v, p=1)
+    return ShiftScaleRotate(shift_limit=0, scale_limit=0, rotate_limit=1 * v,border_mode=cv2.BORDER_CONSTANT, p=1)
 
 
-def transfo(v):
-    from albumentations import OpticalDistortion, ElasticTransform, OneOf
+def shift1(v):
+    from albumentations import ShiftScaleRotate
+    assert 0 < v < 1
+    return ShiftScaleRotate(shift_limit_y=0.0625 * v, shitf_limit_x=0, scale_limit=0, rotate_limit=0,border_mode=cv2.BORDER_CONSTANT,p=1)
+
+
+def rotate1(v):
+    from albumentations import ShiftScaleRotate
+    assert 0 < v < 1
+    return ShiftScaleRotate(shift_limit=0, scale_limit=0, rotate_limit=3 * v,border_mode=cv2.BORDER_CONSTANT, p=1)
+
+
+def opticaldistortion(v):
+    from albumentations import OpticalDistortion
     assert 0.01 < v < 0.1
-    return OneOf([
-        OpticalDistortion(distort_limit=v, p=1),
-        ElasticTransform(alpha=10*v, sigma=500*v, alpha_affine=500*v, p=1)])
+    return OpticalDistortion(distort_limit=v, border_mode=cv2.BORDER_CONSTANT, p=1)
 
 
 def saturation(v):
@@ -109,22 +120,25 @@ def augment_list(transfos=0):  # operations and their ranges
     if transfos == 0:
         l = [
             (blur, 3, 5),  # 1
-            (shiftscalerotate0, 0, 0.1),  # 2
-            (transfo, 0.01, 0.1),  # 3
+            (shift0, 0, 1),  # 2
+            (rotate0, 0, 1),
+            (opticaldistortion, 0.01, 0.1),  # 3
         ]
 
     elif transfos == 1:
         l = [
             (blur, 3, 5),  # 1
-            (shiftscalerotate1, 0, 0.1),  # 2
-            (transfo, 0.01, 0.1),  # 3
+            (shift1, 0, 1),  # 2
+            (rotate1, 0, 1),
+            (opticaldistortion, 0.01, 0.1),  # 3
         ]
 
     elif transfos == 2:
         l = [
             (blur, 3, 5),  # 1
-            (shiftscalerotate0, 0, 0.1),  # 2
-            (transfo, 0.01, 0.1),   # 3
+            (shift0, 0, 1),  # 2
+            (rotate0, 0, 1),
+            (opticaldistortion, 0.01, 0.1),   # 3
             (saturation, 0, 1),     # 4
             (randomrotate90, 0, 1),     # 5
             (flip, 0, 1)    # 6
