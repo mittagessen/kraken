@@ -116,13 +116,33 @@ def randomrotate90(v):
     assert 0 < v < 1
     return RandomRotate90(p=1)
 
+def cutout(v):
+    from albumentations import Cutout
+    assert 0 < v < 1
+    i=int(v*10)
+    return Cutout(num_holes = i, max_h_size=20,max_w_size=20,p=1)
+
+def downscale(v):
+    from albumentations import Downscale
+    assert 0.20 < v < 0.30
+    return Downscale(scale_min=v,scale_max=v,p=1)
+
+def griddistortion(v):
+    from albumentations import GridDistortion
+    assert 0 < v < 0.3
+    im = A.GridDistortion(num_steps=15, distort_limit=[-v,0.5], border_mode=cv2.BORDER_CONSTANT,p=1)(image=im)['image']
+  
+
 def augment_list(transfos=0):  # operations and their ranges
     if transfos == 0:
         l = [
             (blur, 3, 5),  # 1
             (shift0, 0, 1),  # 2
             (rotate0, 0, 1),
-            (opticaldistortion, 0.01, 0.1),  # 3
+            (opticaldistortion, 0.01, 0.1),
+            (cutout, 0, 1),
+            (downscale, 0.20, 0.30),
+            (griddistortion, 0, 0.3)
         ]
 
     elif transfos == 1:
@@ -131,6 +151,9 @@ def augment_list(transfos=0):  # operations and their ranges
             (shift1, 0, 1),  # 2
             (rotate1, 0, 1),
             (opticaldistortion, 0.01, 0.1),  # 3
+            (cutout, 0, 1),
+            (downscale, 0.20, 0.30),
+            (griddistortion, 0, 0.3)
         ]
 
     elif transfos == 2:
