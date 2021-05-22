@@ -130,7 +130,7 @@ def downscale(v):
 def griddistortion(v):
     from albumentations import GridDistortion
     assert 0 < v < 0.3
-    im = GridDistortion(num_steps=15, distort_limit=[-v,0.5], border_mode=cv2.BORDER_CONSTANT,p=1)(image=im)['image']
+    im = GridDistortion(num_steps=15, distort_limit=[-v,0.5], border_mode=cv2.BORDER_CONSTANT,p=1)
   
 
 def augment_list(transfos=0):  # operations and their ranges
