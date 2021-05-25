@@ -21,6 +21,7 @@ import regex
 import unicodedata
 
 from os import path
+from PIL import Image
 from kraken.binarization import nlbin
 
 def pil_to_mode(im, mode):
@@ -36,7 +37,7 @@ def pil_dewarp(im, lnorm):
     return dewarp(lnorm, im)
 
 def pil_fixed_resize(im, scale):
-    return _fixed_resize(im, scale, Image.LANCZOS)))
+    return _fixed_resize(im, scale, Image.LANCZOS)
 
 def tensor_invert(im):
     return im.max() - im

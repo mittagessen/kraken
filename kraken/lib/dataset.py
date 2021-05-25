@@ -29,6 +29,7 @@ import torch.nn.functional as F
 import torchvision.transforms.functional as tf
 
 from os import path
+from functools import partial
 from shapely.ops import split, snap
 from PIL import Image, ImageDraw
 from itertools import groupby
@@ -135,7 +136,7 @@ def generate_input_transforms(batch: int, height: int, width: int, channels: int
     out_transforms.append(transforms.ToTensor())
     # invert
     out_transforms.append(transforms.Lambda(F_t.tensor_invert))
-    out_transforms.append(transforms.Lambda(partial(F_t, perm=perm)))
+    out_transforms.append(transforms.Lambda(partial(F_t.pil_to_mode, perm=perm)))
     return transforms.Compose(out_transforms)
 
 
