@@ -27,6 +27,7 @@ import torch.nn.functional as F
 
 from itertools import cycle
 from functools import partial
+from multiprocessing import Pool
 from typing import cast, Tuple, Callable, List, Dict, Any, Optional, Sequence
 
 from kraken.lib import models, vgsl, segmentation, default_specs
@@ -585,7 +586,6 @@ class KrakenTrainer(object):
                 if repolygonize:
                     logger.warning('Repolygonization enabled with box lines. Will be ignored.')
 
-
         # preparse input sizes from vgsl string to seed ground truth data set
         # sizes and dimension ordering.
         if not nn:
@@ -621,15 +621,17 @@ class KrakenTrainer(object):
                               preload=preload,
                               augmentation=hyper_params['augment'])
         bar = progress_callback('Building training set', len(training_data))
-        for im in training_data:
-            logger.debug(f'Adding line {im} to training set')
-            try:
-                gt_set.add(**im)
-                bar()
-            except FileNotFoundError as e:
-                logger.warning(f'{e.strerror}: {e.filename}. Skipping.')
-            except KrakenInputException as e:
-                logger.warning(str(e))
+
+        with Pool(processes=threads) as pool:
+            for im in pool.imap_unordered(gt_set.parse, training_data):
+                logger.debug(f'Adding line {im} to training set')
+                try:
+                    #gt_set.add(**im)
+                    bar()
+                except FileNotFoundError as e:
+                    logger.warning(f'{e.strerror}: {e.filename}. Skipping.')
+                except KrakenInputException as e:
+                    logger.warning(str(e))
 
         val_set = DatasetClass(normalization=hyper_params['normalization'],
                                whitespace_normalization=hyper_params['normalize_whitespace'],
@@ -637,15 +639,16 @@ class KrakenTrainer(object):
                                im_transforms=transforms,
                                preload=preload)
         bar = progress_callback('Building validation set', len(evaluation_data))
-        for im in evaluation_data:
-            logger.debug(f'Adding line {im} to validation set')
-            try:
-                val_set.add(**im)
-                bar()
-            except FileNotFoundError as e:
-                logger.warning(f'{e.strerror}: {e.filename}. Skipping.')
-            except KrakenInputException as e:
-                logger.warning(str(e))
+        with Pool(processes=threads) as pool:
+            for im in pool.imap_unordered(val_set.parse, evaluation_data):
+                logger.debug(f'Adding line {im} to validation set')
+                try:
+                    val_set.add(**im)
+                    bar()
+                except FileNotFoundError as e:
+                    logger.warning(f'{e.strerror}: {e.filename}. Skipping.')
+                except KrakenInputException as e:
+                    logger.warning(str(e))
 
         if len(gt_set._images) == 0:
             logger.error('No valid training data was provided to the train command. Please add valid XML or line data.')
