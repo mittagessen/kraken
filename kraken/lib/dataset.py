@@ -449,6 +449,28 @@ class PolygonGTDataset(Dataset):
             baseline (list): A list of coordinates [[x0, y0], ..., [xn, yn]].
             boundary (list): A polygon mask for the line.
         """
+        if 'preparse' not in kwargs or not kwargs['preparse']:
+            kwargs = self.parse(image, text, baseline, boundary, *args, **kwargs)
+        if kwargs['preload']:
+            self.im_mode = kwargs['im_mode']
+            self._images.append(kwargs['image'])
+        else:
+            self._images.append((kwargs['image'], kwargs['baseline'], kwargs['boundary']))
+        self._gt.append(kwargs['text'])
+        self.alphabet.update(kwargs['text'])
+
+    def parse(self, image: Union[str, Image.Image], text: str, baseline: List[Tuple[int, int]], boundary: List[Tuple[int, int]], *args, **kwargs):
+        """
+        Parses a sample for the dataset and returns it.
+
+        This function is mainly uses for parallelized loading of training data.
+
+        Args:
+            im (path): Path to the whole page image
+            text (str): Transcription of the line.
+            baseline (list): A list of coordinates [[x0, y0], ..., [xn, yn]].
+            boundary (list): A polygon mask for the line.
+        """
         for func in self.text_transforms:
             text = func(text)
         if not text:
@@ -466,16 +488,13 @@ class PolygonGTDataset(Dataset):
                 raise KrakenInputException('Patch extraction failed for baseline')
             try:
                 im = self.head_transforms(im)
-                if not is_bitonal(im):
-                    self.im_mode = im.mode
                 im = self.tail_transforms(im)
             except ValueError:
                 raise KrakenInputException(f'Image transforms failed on {image}')
             self._images.append(im)
+            return {'text': text, 'image': im, 'baseline': baseline, 'boundary': boundary, 'im_mode': im.mode, 'preload': True, 'preparse': True}
         else:
-            self._images.append((image, baseline, boundary))
-        self._gt.append(text)
-        self.alphabet.update(text)
+            return {'text': text, 'image': image, 'baseline': baseline, 'boundary': boundary, 'preload': False, 'preparse': True}
 
     def encode(self, codec: Optional[PytorchCodec] = None) -> None:
         """
@@ -622,6 +641,23 @@ class GroundTruthDataset(Dataset):
         Args:
             image (str): Input image path
         """
+        if 'preparse' not in kwargs or not kwargs['preparse']:
+            kwargs = self.parse(image, *args, **kwargs)
+        if kwargs['preload']:
+            self.im_mode = kwargs['im_mode']
+        self._images.append(kwargs['image'])
+        self._gt.append(kwargs['text'])
+        self.alphabet.update(kwargs['text'])
+
+    def parse(self, image: Union[str, Image.Image], *args, **kwargs) -> Dict:
+        """
+        Parses a sample for this dataset.
+
+        This is mostly used to parallelize populating the dataset.
+
+        Args:
+            image (str): Input image path
+        """
         with open(self.split(image), 'r', encoding='utf-8') as fp:
             gt = fp.read().strip('\n\r')
             for func in self.text_transforms:
@@ -632,16 +668,12 @@ class GroundTruthDataset(Dataset):
             try:
                 im = Image.open(image)
                 im = self.head_transforms(im)
-                if not is_bitonal(im):
-                    self.im_mode = im.mode
                 im = self.tail_transforms(im)
             except ValueError:
                 raise KrakenInputException(f'Image transforms failed on {image}')
-            self._images.append(im)
+            return {'image': im, 'text': gt, 'im_mode': im.mode, 'preload': True, 'preparse': True}
         else:
-            self._images.append(image)
-        self._gt.append(gt)
-        self.alphabet.update(gt)
+            return {'image': image, 'text': gt, 'preload': False, 'preparse': True}
 
     def add_loaded(self, image: Image.Image, gt: str) -> None:
         """
