@@ -19,6 +19,7 @@ facilitate pickling.
 """
 import regex
 import unicodedata
+import bidi.algorithm as bd
 
 from os import path
 from PIL import Image

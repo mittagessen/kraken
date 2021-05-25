@@ -397,11 +397,11 @@ class PolygonGTDataset(Dataset):
         self.seg_type = 'baselines'
         # built text transformations
         if normalization:
-            self.text_transforms.append(lambda x: unicodedata.normalize(cast(str, normalization), x))
+            self.text_transforms.append(partial(F_t.text_normalize, normalization=normalization))
         if whitespace_normalization:
-            self.text_transforms.append(lambda x: regex.sub('\s', ' ', x).strip())
+            self.text_transforms.append(F_t.text_whitespace_normalize)
         if reorder:
-            self.text_transforms.append(bd.get_display)
+            self.text_transforms.append(F_t.text_reorder)
         if augmentation:
             from albumentations import (
                 Compose, ToFloat, FromFloat, Flip, OneOf, MotionBlur, MedianBlur, Blur,
@@ -544,7 +544,7 @@ class GroundTruthDataset(Dataset):
 
     All data is cached in memory.
     """
-    def __init__(self, split: Callable[[str], str] = lambda x: path.splitext(x)[0],
+    def __init__(self, split: Callable[[str], str] = F_t.default_split,
                  suffix: str = '.gt.txt',
                  normalization: Optional[str] = None,
                  whitespace_normalization: bool = True,
@@ -577,7 +577,7 @@ class GroundTruthDataset(Dataset):
             preload (bool): Enables preloading and preprocessing of image files.
         """
         self.suffix = suffix
-        self.split = lambda x: split(x) + self.suffix
+        self.split = partial(F_t.suffix_split, split=split, suffix=suffix)
         self._images = []  # type:  Union[List[Image], List[torch.Tensor]]
         self._gt = []  # type:  List[str]
         self.alphabet = Counter()  # type: Counter
@@ -592,11 +592,11 @@ class GroundTruthDataset(Dataset):
         self.seg_type = 'bbox'
         # built text transformations
         if normalization:
-            self.text_transforms.append(lambda x: unicodedata.normalize(cast(str, normalization), x))
+            self.text_transforms.append(partial(F_t.text_normalize, normalization=normalization))
         if whitespace_normalization:
-            self.text_transforms.append(lambda x: regex.sub('\s', ' ', x).strip())
+            self.text_transforms.append(F_t.text_whitespace_normalize)
         if reorder:
-            self.text_transforms.append(bd.get_display)
+            self.text_transforms.append(F_t.text_reorder)
         if augmentation:
             from albumentations import (
                 Compose, ToFloat, FromFloat, Flip, OneOf, MotionBlur, MedianBlur, Blur,
