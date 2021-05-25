@@ -124,7 +124,7 @@ def cutout(v):
 
 def downscale(v):
     from albumentations import Downscale
-    assert 0.20 < v < 0.30
+    assert 0 < v < 0.30
     return Downscale(scale_min=v,scale_max=v,p=1)
 
 def griddistortion(v):
@@ -152,7 +152,7 @@ def augment_list(transfos=0):  # operations and their ranges
             (rotate1, 0, 1),
             (opticaldistortion, 0.01, 0.1),  # 3
             (cutout, 0, 1),
-            (downscale, 0.20, 0.30),
+            (downscale, 0, 0.30),
             (griddistortion, 0, 0.3)
         ]
 
@@ -555,7 +555,7 @@ class PolygonGTDataset(Dataset):
         if reorder:
             self.text_transforms.append(bd.get_display)
         if augmentation:  
-            self.aug = UniformAugment(ops_num=2, transfo=0)
+            self.aug = UniformAugment(ops_num=3, transfo=0)
 
         self.im_mode = '1'
 
@@ -720,7 +720,7 @@ class GroundTruthDataset(Dataset):
                 ShiftScaleRotate, OpticalDistortion, ElasticTransform, RandomBrightnessContrast,
                 )
 
-            self.aug = UniformAugment(ops_num=2, transfo=1)
+            self.aug = UniformAugment(ops_num=3, transfo=1)
 
 
 
