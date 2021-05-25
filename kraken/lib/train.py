@@ -43,7 +43,13 @@ from torch.utils.data import DataLoader
 logger = logging.getLogger(__name__)
 
 def _star_fun(fun, kwargs):
-    return fun(**kwargs)
+    try:
+        return fun(**kwargs)
+    except FileNotFoundError as e:
+        logger.warning(f'{e.strerror}: {e.filename}. Skipping.')
+    except KrakenInputException as e:
+        logger.warning(str(e))
+    return None
 
 class TrainStopper(object):
 
@@ -628,13 +634,9 @@ class KrakenTrainer(object):
         with Pool(processes=threads) as pool:
             for im in pool.imap_unordered(partial(_star_fun, gt_set.parse), training_data):
                 logger.debug(f'Adding line {im} to training set')
-                try:
+                if im:
                     gt_set.add(**im)
-                    bar()
-                except FileNotFoundError as e:
-                    logger.warning(f'{e.strerror}: {e.filename}. Skipping.')
-                except KrakenInputException as e:
-                    logger.warning(str(e))
+                bar()
 
         val_set = DatasetClass(normalization=hyper_params['normalization'],
                                whitespace_normalization=hyper_params['normalize_whitespace'],
@@ -645,13 +647,9 @@ class KrakenTrainer(object):
         with Pool(processes=threads) as pool:
             for im in pool.imap_unordered(partial(_star_fun, val_set.parse), evaluation_data):
                 logger.debug(f'Adding line {im} to validation set')
-                try:
+                if im:
                     val_set.add(**im)
-                    bar()
-                except FileNotFoundError as e:
-                    logger.warning(f'{e.strerror}: {e.filename}. Skipping.')
-                except KrakenInputException as e:
-                    logger.warning(str(e))
+                bar()
 
         if len(gt_set._images) == 0:
             logger.error('No valid training data was provided to the train command. Please add valid XML or line data.')
