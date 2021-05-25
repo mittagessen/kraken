@@ -41,12 +41,15 @@ from typing import Dict, List, Tuple, Iterable, Sequence, Callable, Optional, An
 from skimage.draw import polygon
 
 from kraken.lib.xml import parse_alto, parse_page, parse_xml
+
 from kraken.lib.util import is_bitonal
 from kraken.lib.codec import PytorchCodec
 from kraken.lib.models import TorchSeqRecognizer
 from kraken.lib.segmentation import extract_polygons, calculate_polygonal_environment
 from kraken.lib.exceptions import KrakenInputException
 from kraken.lib.lineest import CenterNormalizer, dewarp
+
+from kraken.lib import functional_im_transforms as F_t
 
 __all__ = ['BaselineSet', 'PolygonGTDataset', 'GroundTruthDataset', 'compute_error', 'generate_input_transforms', 'preparse_xml_data']
 
@@ -113,46 +116,27 @@ def generate_input_transforms(batch: int, height: int, width: int, channels: int
                                                                                    pad))
 
     out_transforms = []
-    out_transforms.append(transforms.Lambda(lambda x: x.convert(mode)))
+    out_transforms.append(transforms.Lambda(partial(F_t.pil_to_mode, mode=mode)))
 
     if force_binarization:
-        out_transforms.append(transforms.Lambda(lambda x: nlbin(im)))
+        out_transforms.append(transforms.Lambda(F_t.pil_to_bin))
     # dummy transforms to ensure we can determine color mode of input material
     # from first two transforms. It's stupid but it works.
-    out_transforms.append(transforms.Lambda(lambda x: x))
+    out_transforms.append(transforms.Lambda(F_t.dummy))
     if scale != (0, 0):
         if center_norm:
             lnorm = CenterNormalizer(scale[0])
-            out_transforms.append(transforms.Lambda(lambda x: dewarp(lnorm, x)))
-            out_transforms.append(transforms.Lambda(lambda x: x.convert(mode)))
+            out_transforms.append(transforms.Lambda(partial(F_t.pil_dewarp, lnorm=lnorm)))
+            out_transforms.append(transforms.Lambda(partial(F_t.pil_to_mode, mode=mode)))
         else:
-            out_transforms.append(transforms.Lambda(lambda x: _fixed_resize(x, scale, Image.LANCZOS)))
+            out_transforms.append(transforms.Lambda(partial(F_t.pil_fixed_resize, scale=scale)))
     if pad:
         out_transforms.append(transforms.Pad((pad, 0), fill=255))
     out_transforms.append(transforms.ToTensor())
     # invert
-    out_transforms.append(transforms.Lambda(lambda x: x.max() - x))
-    out_transforms.append(transforms.Lambda(lambda x: x.permute(*perm)))
+    out_transforms.append(transforms.Lambda(F_t.tensor_invert))
+    out_transforms.append(transforms.Lambda(partial(F_t, perm=perm)))
     return transforms.Compose(out_transforms)
-
-
-def _fixed_resize(img, size, interpolation=Image.LANCZOS):
-    """
-    Doesn't do the annoying runtime scale dimension switching the default
-    pytorch transform does.
-
-    Args:
-        img (PIL.Image): image to resize
-        size (tuple): Tuple (height, width)
-    """
-    w, h = img.size
-    oh, ow = size
-    if oh == 0:
-        oh = int(h * ow/w)
-    elif ow == 0:
-        ow = int(w * oh/h)
-    img = img.resize((ow, oh), interpolation)
-    return img
 
 
 def _fast_levenshtein(seq1: Sequence[Any], seq2: Sequence[Any]) -> int:
