@@ -27,7 +27,7 @@ import torch.nn.functional as F
 
 from itertools import cycle
 from functools import partial
-from multiprocessing import Pool
+from torch.multiprocessing import Pool
 from typing import cast, Tuple, Callable, List, Dict, Any, Optional, Sequence
 
 from kraken.lib import models, vgsl, segmentation, default_specs
@@ -42,6 +42,8 @@ from torch.utils.data import DataLoader
 
 logger = logging.getLogger(__name__)
 
+def _star_fun(fun, kwargs):
+    return fun(**kwargs)
 
 class TrainStopper(object):
 
@@ -622,11 +624,12 @@ class KrakenTrainer(object):
                               augmentation=hyper_params['augment'])
         bar = progress_callback('Building training set', len(training_data))
 
+
         with Pool(processes=threads) as pool:
-            for im in pool.imap_unordered(gt_set.parse, training_data):
+            for im in pool.imap_unordered(partial(_star_fun, gt_set.parse), training_data):
                 logger.debug(f'Adding line {im} to training set')
                 try:
-                    #gt_set.add(**im)
+                    gt_set.add(**im)
                     bar()
                 except FileNotFoundError as e:
                     logger.warning(f'{e.strerror}: {e.filename}. Skipping.')
@@ -640,7 +643,7 @@ class KrakenTrainer(object):
                                preload=preload)
         bar = progress_callback('Building validation set', len(evaluation_data))
         with Pool(processes=threads) as pool:
-            for im in pool.imap_unordered(val_set.parse, evaluation_data):
+            for im in pool.imap_unordered(partial(_star_fun, val_set.parse), evaluation_data):
                 logger.debug(f'Adding line {im} to validation set')
                 try:
                     val_set.add(**im)

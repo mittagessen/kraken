@@ -23,7 +23,9 @@ import bidi.algorithm as bd
 
 from os import path
 from PIL import Image
+
 from kraken.binarization import nlbin
+from kraken.lib.lineest import CenterNormalizer, dewarp
 
 def pil_to_mode(im, mode):
     return im.convert(mode)
@@ -71,7 +73,7 @@ def text_whitespace_normalize(text):
     return regex.sub('\s', ' ', text).strip()
 
 def text_reorder(text):
-    return bg.get_display(text)
+    return bd.get_display(text)
 
 def default_split(x):
     return path.splitext(x)[0]

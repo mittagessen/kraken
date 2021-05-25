@@ -136,7 +136,7 @@ def generate_input_transforms(batch: int, height: int, width: int, channels: int
     out_transforms.append(transforms.ToTensor())
     # invert
     out_transforms.append(transforms.Lambda(F_t.tensor_invert))
-    out_transforms.append(transforms.Lambda(partial(F_t.pil_to_mode, perm=perm)))
+    out_transforms.append(transforms.Lambda(partial(F_t.tensor_permute, perm=perm)))
     return transforms.Compose(out_transforms)
 
 
@@ -424,7 +424,7 @@ class PolygonGTDataset(Dataset):
 
         self.im_mode = '1'
 
-    def add(self, image: Union[str, Image.Image], text: str, baseline: List[Tuple[int, int]], boundary: List[Tuple[int, int]], *args, **kwargs):
+    def add(self, *args, **kwargs):
         """
         Adds a line to the dataset.
 
@@ -619,7 +619,7 @@ class GroundTruthDataset(Dataset):
 
         self.im_mode = '1'
 
-    def add(self, image: Union[str, Image.Image], *args, **kwargs) -> None:
+    def add(self, *args, **kwargs) -> None:
         """
         Adds a line-image-text pair to the dataset.
 
