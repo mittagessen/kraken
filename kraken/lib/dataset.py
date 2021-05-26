@@ -29,6 +29,7 @@ import torch.nn.functional as F
 import torchvision.transforms.functional as tf
 
 from os import path
+from functools import partial
 from shapely.ops import split, snap
 from PIL import Image, ImageDraw
 from itertools import groupby
@@ -41,12 +42,15 @@ from typing import Dict, List, Tuple, Iterable, Sequence, Callable, Optional, An
 from skimage.draw import polygon
 
 from kraken.lib.xml import parse_alto, parse_page, parse_xml
+
 from kraken.lib.util import is_bitonal
 from kraken.lib.codec import PytorchCodec
 from kraken.lib.models import TorchSeqRecognizer
 from kraken.lib.segmentation import extract_polygons, calculate_polygonal_environment
 from kraken.lib.exceptions import KrakenInputException
 from kraken.lib.lineest import CenterNormalizer, dewarp
+
+from kraken.lib import functional_im_transforms as F_t
 
 __all__ = ['BaselineSet', 'PolygonGTDataset', 'GroundTruthDataset', 'compute_error', 'generate_input_transforms', 'preparse_xml_data']
 
@@ -113,46 +117,27 @@ def generate_input_transforms(batch: int, height: int, width: int, channels: int
                                                                                    pad))
 
     out_transforms = []
-    out_transforms.append(transforms.Lambda(lambda x: x.convert(mode)))
+    out_transforms.append(transforms.Lambda(partial(F_t.pil_to_mode, mode=mode)))
 
     if force_binarization:
-        out_transforms.append(transforms.Lambda(lambda x: nlbin(im)))
+        out_transforms.append(transforms.Lambda(F_t.pil_to_bin))
     # dummy transforms to ensure we can determine color mode of input material
     # from first two transforms. It's stupid but it works.
-    out_transforms.append(transforms.Lambda(lambda x: x))
+    out_transforms.append(transforms.Lambda(F_t.dummy))
     if scale != (0, 0):
         if center_norm:
             lnorm = CenterNormalizer(scale[0])
-            out_transforms.append(transforms.Lambda(lambda x: dewarp(lnorm, x)))
-            out_transforms.append(transforms.Lambda(lambda x: x.convert(mode)))
+            out_transforms.append(transforms.Lambda(partial(F_t.pil_dewarp, lnorm=lnorm)))
+            out_transforms.append(transforms.Lambda(partial(F_t.pil_to_mode, mode=mode)))
         else:
-            out_transforms.append(transforms.Lambda(lambda x: _fixed_resize(x, scale, Image.LANCZOS)))
+            out_transforms.append(transforms.Lambda(partial(F_t.pil_fixed_resize, scale=scale)))
     if pad:
         out_transforms.append(transforms.Pad((pad, 0), fill=255))
     out_transforms.append(transforms.ToTensor())
     # invert
-    out_transforms.append(transforms.Lambda(lambda x: x.max() - x))
-    out_transforms.append(transforms.Lambda(lambda x: x.permute(*perm)))
+    out_transforms.append(transforms.Lambda(F_t.tensor_invert))
+    out_transforms.append(transforms.Lambda(partial(F_t.tensor_permute, perm=perm)))
     return transforms.Compose(out_transforms)
-
-
-def _fixed_resize(img, size, interpolation=Image.LANCZOS):
-    """
-    Doesn't do the annoying runtime scale dimension switching the default
-    pytorch transform does.
-
-    Args:
-        img (PIL.Image): image to resize
-        size (tuple): Tuple (height, width)
-    """
-    w, h = img.size
-    oh, ow = size
-    if oh == 0:
-        oh = int(h * ow/w)
-    elif ow == 0:
-        ow = int(w * oh/h)
-    img = img.resize((ow, oh), interpolation)
-    return img
 
 
 def _fast_levenshtein(seq1: Sequence[Any], seq2: Sequence[Any]) -> int:
@@ -412,11 +397,11 @@ class PolygonGTDataset(Dataset):
         self.seg_type = 'baselines'
         # built text transformations
         if normalization:
-            self.text_transforms.append(lambda x: unicodedata.normalize(cast(str, normalization), x))
+            self.text_transforms.append(partial(F_t.text_normalize, normalization=normalization))
         if whitespace_normalization:
-            self.text_transforms.append(lambda x: regex.sub('\s', ' ', x).strip())
+            self.text_transforms.append(F_t.text_whitespace_normalize)
         if reorder:
-            self.text_transforms.append(bd.get_display)
+            self.text_transforms.append(F_t.text_reorder)
         if augmentation:
             from albumentations import (
                 Compose, ToFloat, FromFloat, Flip, OneOf, MotionBlur, MedianBlur, Blur,
@@ -439,9 +424,31 @@ class PolygonGTDataset(Dataset):
 
         self.im_mode = '1'
 
-    def add(self, image: Union[str, Image.Image], text: str, baseline: List[Tuple[int, int]], boundary: List[Tuple[int, int]], *args, **kwargs):
+    def add(self, *args, **kwargs):
         """
         Adds a line to the dataset.
+
+        Args:
+            im (path): Path to the whole page image
+            text (str): Transcription of the line.
+            baseline (list): A list of coordinates [[x0, y0], ..., [xn, yn]].
+            boundary (list): A polygon mask for the line.
+        """
+        if 'preparse' not in kwargs or not kwargs['preparse']:
+            kwargs = self.parse(image, text, baseline, boundary, *args, **kwargs)
+        if kwargs['preload']:
+            self.im_mode = kwargs['im_mode']
+            self._images.append(kwargs['image'])
+        else:
+            self._images.append((kwargs['image'], kwargs['baseline'], kwargs['boundary']))
+        self._gt.append(kwargs['text'])
+        self.alphabet.update(kwargs['text'])
+
+    def parse(self, image: Union[str, Image.Image], text: str, baseline: List[Tuple[int, int]], boundary: List[Tuple[int, int]], *args, **kwargs):
+        """
+        Parses a sample for the dataset and returns it.
+
+        This function is mainly uses for parallelized loading of training data.
 
         Args:
             im (path): Path to the whole page image
@@ -466,16 +473,13 @@ class PolygonGTDataset(Dataset):
                 raise KrakenInputException('Patch extraction failed for baseline')
             try:
                 im = self.head_transforms(im)
-                if not is_bitonal(im):
-                    self.im_mode = im.mode
                 im = self.tail_transforms(im)
             except ValueError:
                 raise KrakenInputException(f'Image transforms failed on {image}')
             self._images.append(im)
+            return {'text': text, 'image': im, 'baseline': baseline, 'boundary': boundary, 'im_mode': im.mode, 'preload': True, 'preparse': True}
         else:
-            self._images.append((image, baseline, boundary))
-        self._gt.append(text)
-        self.alphabet.update(text)
+            return {'text': text, 'image': image, 'baseline': baseline, 'boundary': boundary, 'preload': False, 'preparse': True}
 
     def encode(self, codec: Optional[PytorchCodec] = None) -> None:
         """
@@ -540,7 +544,7 @@ class GroundTruthDataset(Dataset):
 
     All data is cached in memory.
     """
-    def __init__(self, split: Callable[[str], str] = lambda x: path.splitext(x)[0],
+    def __init__(self, split: Callable[[str], str] = F_t.default_split,
                  suffix: str = '.gt.txt',
                  normalization: Optional[str] = None,
                  whitespace_normalization: bool = True,
@@ -573,7 +577,7 @@ class GroundTruthDataset(Dataset):
             preload (bool): Enables preloading and preprocessing of image files.
         """
         self.suffix = suffix
-        self.split = lambda x: split(x) + self.suffix
+        self.split = partial(F_t.suffix_split, split=split, suffix=suffix)
         self._images = []  # type:  Union[List[Image], List[torch.Tensor]]
         self._gt = []  # type:  List[str]
         self.alphabet = Counter()  # type: Counter
@@ -588,11 +592,11 @@ class GroundTruthDataset(Dataset):
         self.seg_type = 'bbox'
         # built text transformations
         if normalization:
-            self.text_transforms.append(lambda x: unicodedata.normalize(cast(str, normalization), x))
+            self.text_transforms.append(partial(F_t.text_normalize, normalization=normalization))
         if whitespace_normalization:
-            self.text_transforms.append(lambda x: regex.sub('\s', ' ', x).strip())
+            self.text_transforms.append(F_t.text_whitespace_normalize)
         if reorder:
-            self.text_transforms.append(bd.get_display)
+            self.text_transforms.append(F_t.text_reorder)
         if augmentation:
             from albumentations import (
                 Compose, ToFloat, FromFloat, Flip, OneOf, MotionBlur, MedianBlur, Blur,
@@ -615,9 +619,26 @@ class GroundTruthDataset(Dataset):
 
         self.im_mode = '1'
 
-    def add(self, image: Union[str, Image.Image], *args, **kwargs) -> None:
+    def add(self, *args, **kwargs) -> None:
         """
         Adds a line-image-text pair to the dataset.
+
+        Args:
+            image (str): Input image path
+        """
+        if 'preparse' not in kwargs or not kwargs['preparse']:
+            kwargs = self.parse(image, *args, **kwargs)
+        if kwargs['preload']:
+            self.im_mode = kwargs['im_mode']
+        self._images.append(kwargs['image'])
+        self._gt.append(kwargs['text'])
+        self.alphabet.update(kwargs['text'])
+
+    def parse(self, image: Union[str, Image.Image], *args, **kwargs) -> Dict:
+        """
+        Parses a sample for this dataset.
+
+        This is mostly used to parallelize populating the dataset.
 
         Args:
             image (str): Input image path
@@ -632,16 +653,12 @@ class GroundTruthDataset(Dataset):
             try:
                 im = Image.open(image)
                 im = self.head_transforms(im)
-                if not is_bitonal(im):
-                    self.im_mode = im.mode
                 im = self.tail_transforms(im)
             except ValueError:
                 raise KrakenInputException(f'Image transforms failed on {image}')
-            self._images.append(im)
+            return {'image': im, 'text': gt, 'im_mode': im.mode, 'preload': True, 'preparse': True}
         else:
-            self._images.append(image)
-        self._gt.append(gt)
-        self.alphabet.update(gt)
+            return {'image': image, 'text': gt, 'preload': False, 'preparse': True}
 
     def add_loaded(self, image: Image.Image, gt: str) -> None:
         """
