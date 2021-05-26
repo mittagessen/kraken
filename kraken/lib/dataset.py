@@ -124,7 +124,7 @@ def cutout(v):
 
 def downscale(v):
     from albumentations import Downscale
-    assert 0 < v < 0.30
+    assert 0.20 < v < 0.99
     return Downscale(scale_min=v,scale_max=v,p=1)
 
 def griddistortion(v):
@@ -141,7 +141,7 @@ def augment_list(transfos=0):  # operations and their ranges
             (rotate0, 0, 1),
             (opticaldistortion, 0.01, 0.1),
             (cutout, 0, 1),
-            (downscale, 0.20, 0.30),
+            (downscale, 0.20, 0.99),
             (griddistortion, 0, 0.3)
         ]
 
@@ -152,7 +152,7 @@ def augment_list(transfos=0):  # operations and their ranges
             (rotate1, 0, 1),
             (opticaldistortion, 0.01, 0.1),  # 3
             (cutout, 0, 1),
-            (downscale, 0, 0.30),
+            (downscale, 20, 0.99),
             (griddistortion, 0, 0.3)
         ]
 
