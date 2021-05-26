@@ -67,7 +67,7 @@ def _fixed_resize(img, size, interpolation=Image.LANCZOS):
     return img
 
 def text_normalize(text, normalization):
-    return unicodedata.normalize(normalization, x)
+    return unicodedata.normalize(normalization, text)
 
 def text_whitespace_normalize(text):
     return regex.sub('\s', ' ', text).strip()
