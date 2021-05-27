@@ -1,4 +1,4 @@
-name: krakenRA4
+name: krakenRA5
 channels:
   - defaults
   - conda-forge
