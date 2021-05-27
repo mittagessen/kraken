@@ -152,7 +152,7 @@ def augment_list(transfos=0):  # operations and their ranges
             (rotate1, 0, 1),
             (opticaldistortion, 0.01, 0.1),  # 3
             (cutout, 0, 1),
-            (downscale, 20, 0.99),
+            (downscale, 0.20, 0.99),
             (griddistortion, 0, 0.3)
         ]
 
