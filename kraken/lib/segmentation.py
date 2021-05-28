@@ -245,7 +245,7 @@ def _extend_boundaries(baselines, bin_bl_map):
     return baselines
 
 
-def vectorize_lines(im: np.ndarray, threshold: float = 0.15, min_length=5):
+def vectorize_lines(im: np.ndarray, threshold: float = 0.17, min_length=5):
     """
     Vectorizes lines from a binarized array.
 
