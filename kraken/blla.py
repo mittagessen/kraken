@@ -222,7 +222,7 @@ def segment(im,
 
     for net in model:
         if 'topline' in net.user_metadata:
-            logger.debug(f'Baseline location: {"top" if netn.user_metadata["topline"] else "bottom"}')
+            logger.debug(f'Baseline location: {"top" if net.user_metadata["topline"] else "bottom"}')
         rets = compute_segmentation_map(im, mask, net, device)
         regions = vec_regions(**rets)
         # flatten regions for line ordering/fetch bounding regions
