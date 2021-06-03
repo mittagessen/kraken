@@ -119,8 +119,8 @@ def randomrotate90(v):
 def cutout(v):
     from albumentations import Cutout
     assert 0 < v < 1
-    i=v*20
-    return Cutout(num_holes = 10, max_h_size=i,max_w_size=v,p=1)
+    i=int(v*20)
+    return Cutout(num_holes = i, max_h_size=20,max_w_size=20,p=1)
 
 def downscale(v):
     from albumentations import Downscale
