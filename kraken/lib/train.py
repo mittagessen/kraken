@@ -630,12 +630,16 @@ class KrakenTrainer(object):
                               augmentation=hyper_params['augment'])
         bar = progress_callback('Building training set', len(training_data))
 
-
-        with Pool(processes=threads) as pool:
-            for im in pool.imap_unordered(partial(_star_fun, gt_set.parse), training_data, 5):
-                logger.debug(f'Adding line {im} to training set')
-                if im:
-                    gt_set.add(**im)
+        if threads:
+            with Pool(processes=threads) as pool:
+                for im in pool.imap_unordered(partial(_star_fun, gt_set.parse), training_data, 5):
+                    logger.debug(f'Adding line {im} to training set')
+                    if im:
+                        gt_set.add(**im)
+                    bar()
+        else:
+            for im in training_data:
+                gt_set.add(**im)
                 bar()
 
         val_set = DatasetClass(normalization=hyper_params['normalization'],
@@ -643,12 +647,19 @@ class KrakenTrainer(object):
                                reorder=reorder,
                                im_transforms=transforms,
                                preload=preload)
+
         bar = progress_callback('Building validation set', len(evaluation_data))
-        with Pool(processes=threads) as pool:
-            for im in pool.imap_unordered(partial(_star_fun, val_set.parse), evaluation_data, 5):
-                logger.debug(f'Adding line {im} to validation set')
-                if im:
-                    val_set.add(**im)
+
+        if threads:
+            with Pool(processes=threads) as pool:
+                for im in pool.imap_unordered(partial(_star_fun, val_set.parse), evaluation_data, 5):
+                    logger.debug(f'Adding line {im} to validation set')
+                    if im:
+                        val_set.add(**im)
+                    bar()
+        else:
+            for im in evaluation_data:
+                gt_set.add(**im)
                 bar()
 
         if len(gt_set._images) == 0:

@@ -435,7 +435,7 @@ class PolygonGTDataset(Dataset):
             boundary (list): A polygon mask for the line.
         """
         if 'preparse' not in kwargs or not kwargs['preparse']:
-            kwargs = self.parse(image, text, baseline, boundary, *args, **kwargs)
+            kwargs = self.parse(*args, **kwargs)
         if kwargs['preload']:
             self.im_mode = kwargs['im_mode']
             self._images.append(kwargs['image'])
@@ -627,7 +627,7 @@ class GroundTruthDataset(Dataset):
             image (str): Input image path
         """
         if 'preparse' not in kwargs or not kwargs['preparse']:
-            kwargs = self.parse(image, *args, **kwargs)
+            kwargs = self.parse(*args, **kwargs)
         if kwargs['preload']:
             self.im_mode = kwargs['im_mode']
         self._images.append(kwargs['image'])
