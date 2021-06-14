@@ -57,7 +57,7 @@ logger = logging.getLogger(__name__)
 #part added for RandAugment
 
 import random
-import cv2
+
 
 def blur(v):
     from albumentations import MotionBlur, MedianBlur, Blur, OneOf
@@ -71,34 +71,23 @@ def blur(v):
         Blur(blur_limit=v, p=1)])
 
 
-def shift0(v):
+def shiftscalerotate0(v):
     from albumentations import ShiftScaleRotate
     assert 0 < v < 1
-    return ShiftScaleRotate(shift_limit_y=0.0625 * v, shift_limit_x=0, scale_limit=0, rotate_limit=0,border_mode=cv2.BORDER_CONSTANT,p=1)
+    return ShiftScaleRotate(shift_limit=0.0625 * v, scale_limit=0.2 * v, rotate_limit=45 * v, p=1)
 
-
-def rotate0(v):
+def shiftscalerotate1(v):
     from albumentations import ShiftScaleRotate
     assert 0 < v < 1
-    return ShiftScaleRotate(shift_limit=0, scale_limit=0, rotate_limit=1 * v,border_mode=cv2.BORDER_CONSTANT, p=1)
+    return ShiftScaleRotate(shift_limit=0.0625 * v, scale_limit=0.2 * v, rotate_limit=3 * v, p=1)
 
 
-def shift1(v):
-    from albumentations import ShiftScaleRotate
-    assert 0 < v < 1
-    return ShiftScaleRotate(shift_limit_y=0.0625 * v, shift_limit_x=0, scale_limit=0, rotate_limit=0,border_mode=cv2.BORDER_CONSTANT,p=1)
-
-
-def rotate1(v):
-    from albumentations import ShiftScaleRotate
-    assert 0 < v < 1
-    return ShiftScaleRotate(shift_limit=0, scale_limit=0, rotate_limit=3 * v,border_mode=cv2.BORDER_CONSTANT, p=1)
-
-
-def opticaldistortion(v):
-    from albumentations import OpticalDistortion
-    assert 0.01 < v < 0.1
-    return OpticalDistortion(distort_limit=v, border_mode=cv2.BORDER_CONSTANT, p=1)
+def transfo(v):
+    from albumentations import OpticalDistortion, ElasticTransform, OneOf
+    assert 0 < v < 0.1
+    return OneOf([
+        OpticalDistortion(distort_limit=v, p=1),
+        ElasticTransform(alpha=10*v, sigma=500*v, alpha_affine=500*v, p=1)])
 
 
 def saturation(v):
@@ -116,52 +105,26 @@ def randomrotate90(v):
     assert 0 < v < 1
     return RandomRotate90(p=1)
 
-def cutout(v):
-    from albumentations import Cutout
-    assert 0 < v < 1
-    i=int(v*20)
-    return Cutout(num_holes = i, max_h_size=20,max_w_size=20,p=1)
-
-def downscale(v):
-    from albumentations import Downscale
-    assert 0.40 < v < 0.99
-    return Downscale(scale_min=v,scale_max=v,p=1)
-
-def griddistortion(v):
-    from albumentations import GridDistortion
-    assert 0 < v < 0.3
-    im = GridDistortion(num_steps=15, distort_limit=[-v,0.5], border_mode=cv2.BORDER_CONSTANT,p=1)
-  
-
 def augment_list(transfos=0):  # operations and their ranges
     if transfos == 0:
         l = [
             (blur, 3, 5),  # 1
-            (shift0, 0, 1),  # 2
-            (rotate0, 0, 1),
-            (opticaldistortion, 0.01, 0.1),
-            (cutout, 0, 1),
-            (downscale, 0.40, 0.99),
-            (griddistortion, 0, 0.3)
+            (shiftscalerotate0, 0, 1),  # 2
+            (transfo, 0.01, 0.1),  # 3
         ]
 
     elif transfos == 1:
         l = [
             (blur, 3, 5),  # 1
-            (shift1, 0, 1),  # 2
-            (rotate1, 0, 1),
-            (opticaldistortion, 0.01, 0.1),  # 3
-            (cutout, 0, 1),
-            (downscale, 0.40, 0.99),
-            (griddistortion, 0, 0.3)
+            (shiftscalerotate1, 0, 1),  # 2
+            (transfo, 0.01, 0.1),  # 3
         ]
 
     elif transfos == 2:
         l = [
             (blur, 3, 5),  # 1
-            (shift0, 0, 1),  # 2
-            (rotate0, 0, 1),
-            (opticaldistortion, 0.01, 0.1),   # 3
+            (shiftscalerotate0, 0, 0.1),  # 2
+            (transfo, 0.01, 0.1),   # 3
             (saturation, 0, 1),     # 4
             (randomrotate90, 0, 1),     # 5
             (flip, 0, 1)    # 6
@@ -196,7 +159,6 @@ def generate_input_transforms(batch: int, height: int, width: int, channels: int
     """
     Generates a torchvision transformation converting a PIL.Image into a
     tensor usable in a network forward pass.
-
     Args:
         batch (int): mini-batch size
         height (int): height of input image in pixels
@@ -208,7 +170,6 @@ def generate_input_transforms(batch: int, height: int, width: int, channels: int
                            standard scaling.
         force_binarization (bool): Forces binarization of input images using
                                    the nlbin algorithm.
-
     Returns:
         A torchvision transformation composition converting the input image to
         the appropriate tensor.
@@ -277,7 +238,6 @@ def _fixed_resize(img, size, interpolation=Image.LANCZOS):
     """
     Doesn't do the annoying runtime scale dimension switching the default
     pytorch transform does.
-
     Args:
         img (PIL.Image): image to resize
         size (tuple): Tuple (height, width)
@@ -311,11 +271,9 @@ def _fast_levenshtein(seq1: Sequence[Any], seq2: Sequence[Any]) -> int:
 def global_align(seq1: Sequence[Any], seq2: Sequence[Any]) -> Tuple[int, List[str], List[str]]:
     """
     Computes a global alignment of two strings.
-
     Args:
         seq1 (Sequence[Any]):
         seq2 (Sequence[Any]):
-
     Returns a tuple (distance, list(algn1), list(algn2))
     """
     # calculate cost and direction matrix
@@ -360,11 +318,9 @@ def global_align(seq1: Sequence[Any], seq2: Sequence[Any]) -> Tuple[int, List[st
 def compute_confusions(algn1: Sequence[str], algn2: Sequence[str]):
     """
     Compute confusion matrices from two globally aligned strings.
-
     Args:
         align1 (Sequence[str]): sequence 1
         align2 (Sequence[str]): sequence 2
-
     Returns:
         A tuple (counts, scripts, ins, dels, subs) with `counts` being per-character
         confusions, `scripts` per-script counts, `ins` a dict with per script
@@ -402,11 +358,9 @@ def compute_confusions(algn1: Sequence[str], algn2: Sequence[str]):
 def compute_error(model: TorchSeqRecognizer, validation_set: Iterable[Dict[str, torch.Tensor]]) -> Tuple[int, int]:
     """
     Computes error report from a model and a list of line image-text pairs.
-
     Args:
         model (kraken.lib.models.TorchSeqRecognizer): Model used for recognition
         validation_set (list): List of tuples (image, text) for validation
-
     Returns:
         A tuple with total number of characters and edit distance across the
         whole validation set.
@@ -424,17 +378,14 @@ def compute_error(model: TorchSeqRecognizer, validation_set: Iterable[Dict[str, 
 def preparse_xml_data(filenames, format_type='xml', repolygonize=False):
     """
     Loads training data from a set of xml files.
-
     Extracts line information from Page/ALTO xml files for training of
     recognition models.
-
     Args:
         filenames (list): List of XML files.
         format_type (str): Either `page`, `alto` or `xml` for
                            autodetermination.
         repolygonize (bool): (Re-)calculates polygon information using the
                              kraken algorithm.
-
     Returns:
         A list of dicts {'text': text, 'baseline': [[x0, y0], ...], 'boundary':
         [[x0, y0], ...], 'image': PIL.Image}.
@@ -472,11 +423,9 @@ def _repolygonize(im: Image.Image, lines):
     """
     Helper function taking an output of the lib.xml parse_* functions and
     recalculating the contained polygonization.
-
     Args:
         im (Image.Image): Input image
         lines (list): List of dicts [{'boundary': [[x0, y0], ...], 'baseline': [[x0, y0], ...], 'text': 'abcvsd'}, {...]
-
     Returns:
         A data structure `lines` with a changed polygonization.
     """
@@ -562,7 +511,6 @@ class PolygonGTDataset(Dataset):
     def add(self, image: Union[str, Image.Image], text: str, baseline: List[Tuple[int, int]], boundary: List[Tuple[int, int]], *args, **kwargs):
         """
         Adds a line to the dataset.
-
         Args:
             im (path): Path to the whole page image
             text (str): Transcription of the line.
@@ -600,7 +548,6 @@ class PolygonGTDataset(Dataset):
     def encode(self, codec: Optional[PytorchCodec] = None) -> None:
         """
         Adds a codec to the dataset and encodes all text lines.
-
         Has to be run before sampling from the dataset.
         """
         if codec:
@@ -658,7 +605,6 @@ class PolygonGTDataset(Dataset):
 class GroundTruthDataset(Dataset):
     """
     Dataset for training a line recognition model.
-
     All data is cached in memory.
     """
     def __init__(self, split: Callable[[str], str] = lambda x: path.splitext(x)[0],
@@ -671,7 +617,6 @@ class GroundTruthDataset(Dataset):
                  augmentation: bool = False) -> None:
         """
         Reads a list of image-text pairs and creates a ground truth set.
-
         Args:
             split (func): Function for generating the base name without
                           extensions from paths
@@ -730,7 +675,6 @@ class GroundTruthDataset(Dataset):
     def add(self, image: Union[str, Image.Image], *args, **kwargs) -> None:
         """
         Adds a line-image-text pair to the dataset.
-
         Args:
             image (str): Input image path
         """
@@ -758,7 +702,6 @@ class GroundTruthDataset(Dataset):
     def add_loaded(self, image: Image.Image, gt: str) -> None:
         """
         Adds an already loaded line-image-text pair to the dataset.
-
         Args:
             image (PIL.Image.Image): Line image
             gt (str): Text contained in the line image
@@ -782,7 +725,6 @@ class GroundTruthDataset(Dataset):
     def encode(self, codec: Optional[PytorchCodec] = None) -> None:
         """
         Adds a codec to the dataset and encodes all text lines.
-
         Has to be run before sampling from the dataset.
         """
         if codec:
@@ -853,7 +795,6 @@ class BaselineSet(Dataset):
                  merge_regions: Dict[str, Sequence[str]] = None):
         """
         Reads a list of image-json pairs and creates a data set.
-
         Args:
             imgs (list):
             suffix (int): Suffix to attach to image base name to load JSON
@@ -948,7 +889,7 @@ class BaselineSet(Dataset):
                 HueSaturationValue,
                 )
 
-            self.aug = UniformAugment(ops_num=4,transfo=2)
+            self.aug = UniformAugment(ops_num=3,transfo=2)
 
         self.imgs = imgs
         self.line_width = line_width
@@ -966,7 +907,6 @@ class BaselineSet(Dataset):
             **kwargs):
         """
         Adds a page to the dataset.
-
         Args:
             im (path): Path to the whole page image
             baseline (dict): A list containing dicts with a list of coordinates
