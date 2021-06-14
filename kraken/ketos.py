@@ -155,7 +155,7 @@ def _validate_merging(ctx, param, value):
                    'added, `both` will set the layer to match exactly '
                    'the training data classes, `fail` will abort if training data and model '
                    'classes do not match.')
-@click.option('-bl/-tl', '--baseline/--topline', show_default=True,
+@click.option('-tl/-bl', '--topline/--baseline', show_default=True,
         default=False, help='Switch for the baseline location in the scripts. '
         'Set to topline if the data is annotated with a hanging baseline, as is '
         'common with Hebrew, Bengali, Devanagari, etc.')
@@ -166,7 +166,7 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
              training_files, evaluation_files, threads, load_hyper_parameters,
              force_binarization, format_type, suppress_regions,
              suppress_baselines, valid_regions, valid_baselines, merge_regions,
-             merge_baselines, bounding_regions, augment, resize, baseline, ground_truth):
+             merge_baselines, bounding_regions, augment, resize, topline, ground_truth):
     """
     Trains a baseline labeling model for layout analysis
     """
@@ -257,7 +257,7 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
                                                    bounding_regions=bounding_regions,
                                                    augment=augment,
                                                    resize=resize,
-                                                   topline=baseline)
+                                                   topline=topline)
 
     with log.progressbar(label='stage {}/{}'.format(1, trainer.stopper.epochs if trainer.stopper.epochs > 0 else '∞'),
                          length=trainer.event_it, show_pos=True) as bar:
