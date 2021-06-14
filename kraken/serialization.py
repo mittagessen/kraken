@@ -193,6 +193,9 @@ def serialize(records: Sequence[ocr_record],
                         pol = geom.LineString(x).buffer(0.5, cap_style=2)
                     if pol.area == 0.0:
                         pol = pol.buffer(0.5)
+                    # if area is still 0 it's probably a point
+                    if pol.area == 0.0:
+                        pol = geom.Point(x[0]).buffer(0.5)
                     pols.append(pol)
                 pols = unary_union(pols)
                 coords = np.array(pols.convex_hull.exterior.coords, dtype=np.uint).tolist()
