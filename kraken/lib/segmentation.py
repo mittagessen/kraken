@@ -26,7 +26,7 @@ from collections import defaultdict
 from PIL import Image, ImageDraw
 
 from scipy.stats import linregress
-from scipy.ndimage import maximum_filter
+from scipy.ndimage import maximum_filter, binary_erosion
 from scipy.ndimage.filters import gaussian_filter
 from scipy.ndimage.morphology import distance_transform_cdt
 from scipy.spatial.distance import cdist, pdist, squareform
@@ -512,6 +512,8 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
         # absolute mask
         mask = np.ones_like(patch, dtype=np.bool)
         mask[r-r_min, c-c_min] = False
+        # dilate mask to compensate for aliasing during rotation
+        mask = binary_erosion(mask, iterations=2)
         # combine weights with features
         patch[mask] = MASK_VAL
         patch += (dist_bias*(np.mean(patch[patch != MASK_VAL])/bias))
