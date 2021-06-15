@@ -145,7 +145,7 @@ class mm_rpred(object):
                  im: Image.Image,
                  bounds: dict,
                  pad: int = 16,
-                 bidi_reordering: bool = True,
+                 bidi_reordering: Union[bool, str] = True,
                  script_ignore: Optional[List[str]] = None) -> Generator[ocr_record, None, None]:
         """
         Multi-model version of kraken.rpred.rpred.
@@ -164,9 +164,10 @@ class mm_rpred(object):
                             'text_direction' containing
                             'horizontal-lr/rl/vertical-lr/rl'.
             pad (int): Extra blank padding to the left and right of text line
-            bidi_reordering (bool): Reorder classes in the ocr_record according to
-                                    the Unicode bidirectional algorithm for correct
-                                    display.
+            bidi_reordering (bool|str): Reorder classes in the ocr_record according to
+                                        the Unicode bidirectional algorithm for
+                                        correct display. Set to L/R/AL to
+                                        override default text direction.
             script_ignore (list): List of scripts to ignore during recognition
         Yields:
             An ocr_record containing the recognized text, absolute character
@@ -286,7 +287,7 @@ class mm_rpred(object):
             rec.confidences.extend(conf)
         if self.bidi_reordering:
             logger.debug('BiDi reordering record.')
-            return bidi_record(rec)
+            return bidi_record(rec, base_dir=self.bidi_reordering if self.bidi_reordering in ('L', 'R', 'AL') else None)
         else:
             logger.debug('Emitting raw record')
             return rec
@@ -334,8 +335,8 @@ class mm_rpred(object):
             conf.append(c)
         if self.bidi_reordering:
             logger.debug('BiDi reordering record.')
-            rec = bidi_record(ocr_record(pred, pos, conf, coords))
-            return rec
+            return bidi_record(ocr_record(pred, pos, conf, coords),
+                               base_dir=self.bidi_reordering if self.bidi_reordering in ('L', 'R', 'AL') else None)
         else:
             logger.debug('Emitting raw record')
             return ocr_record(pred, pos, conf, coords)
@@ -360,7 +361,7 @@ def rpred(network: TorchSeqRecognizer,
           im: Image.Image,
           bounds: dict,
           pad: int = 16,
-          bidi_reordering: bool = True) -> Generator[ocr_record, None, None]:
+          bidi_reordering: Union[bool, str] = True) -> Generator[ocr_record, None, None]:
     """
     Uses a TorchSeqRecognizer and a segmentation to recognize text
 
@@ -375,9 +376,10 @@ def rpred(network: TorchSeqRecognizer,
         pad (int): Extra blank padding to the left and right of text line.
                    Auto-disabled when expected network inputs are incompatible
                    with padding.
-        bidi_reordering (bool): Reorder classes in the ocr_record according to
-                                the Unicode bidirectional algorithm for correct
-                                display.
+        bidi_reordering (bool|str): Reorder classes in the ocr_record according to
+                                    the Unicode bidirectional algorithm for correct
+                                    display. Set to L|R|AL to change base text
+                                    direction.
     Yields:
         An ocr_record containing the recognized text, absolute character
         positions, and confidence values for each character.
