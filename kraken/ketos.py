@@ -324,6 +324,11 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
                    'the training data, `fail` will abort if training data and model '
                    'codec do not match.')
 @click.option('--reorder/--no-reorder', show_default=True, default=True, help='Reordering of code points to display order')
+@click.option('--base-dir', show_default=True, default='auto',
+              type=click.Choice(['L', 'R', 'auto']), help='Set base text '
+              'direction.  This should be set to the direction used during the '
+              'creation of the training data. If set to `auto` it will be '
+              'overridden by any explicit value given in the input files.')
 @click.option('-t', '--training-files', show_default=True, default=None, multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with additional paths to training data')
@@ -359,7 +364,7 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
           lag, min_delta, device, optimizer, lrate, momentum, weight_decay,
           schedule, gamma, step_size, sched_patience, cos_max, partition,
           normalization, normalize_whitespace, codec, resize, reorder,
-          training_files, evaluation_files, preload, threads,
+          base_dir, training_files, evaluation_files, preload, threads,
           load_hyper_parameters, repolygonize, force_binarization, format_type,
           augment, ground_truth):
     """
@@ -408,6 +413,9 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
 
     if len(ground_truth) == 0:
         raise click.UsageError('No training data was provided to the train command. Use `-t` or the `ground_truth` argument.')
+
+    if reorder and base_dir != 'auto':
+        reorder = base_dir
 
     np.random.shuffle(ground_truth)
     training_files = ground_truth[:int(len(ground_truth) * partition)]
@@ -481,6 +489,11 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
               'padding around lines')
 @click.option('--threads', show_default=True, default=1, help='Number of OpenMP threads when running on CPU.')
 @click.option('--reorder/--no-reorder', show_default=True, default=True, help='Reordering of code points to display order')
+@click.option('--base-dir', show_default=True, default='auto',
+              type=click.Choice(['L', 'R', 'auto']), help='Set base text '
+              'direction.  This should be set to the direction used during the '
+              'creation of the training data. If set to `auto` it will be '
+              'overridden by any explicit value given in the input files.')
 @click.option('-u', '--normalization', show_default=True, type=click.Choice(['NFD', 'NFKD', 'NFC', 'NFKC']),
               default=None, help='Ground truth normalization')
 @click.option('-n', '--normalize-whitespace/--no-normalize-whitespace',
@@ -506,7 +519,7 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
               'containing the baseline information.')
 @click.argument('test_set', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def test(ctx, batch_size, model, evaluation_files, device, pad, threads,
-         reorder, normalization, normalize_whitespace, repolygonize,
+         reorder, base_dir, normalization, normalize_whitespace, repolygonize,
          force_binarization, format_type, test_set):
     """
     Evaluate on a test set.
@@ -562,6 +575,9 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, threads,
 
     if len(test_set) == 0:
         raise click.UsageError('No evaluation data was provided to the test command. Use `-e` or the `test_set` argument.')
+
+    if reorder and base_dir != 'auto':
+        reorder = base_dir
 
     acc_list = []
     for p, net in nn.items():
