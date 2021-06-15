@@ -390,7 +390,7 @@ class PolygonGTDataset(Dataset):
             whitespace_normalization (str): Normalizes unicode whitespace and
                                             strips whitespace.
             reorder (bool|str): Whether to rearrange code points in "display"/LTR
-                                order. Set to L|R|AL to change the default text
+                                order. Set to L|R to change the default text
                                 direction.
             im_transforms (func): Function taking an PIL.Image and returning a
                                   tensor suitable for forward passes.
@@ -415,7 +415,7 @@ class PolygonGTDataset(Dataset):
         if whitespace_normalization:
             self.text_transforms.append(F_t.text_whitespace_normalize)
         if reorder:
-            if reorder in ('L', 'R', 'AL'):
+            if reorder in ('L', 'R'):
                 self.text_transforms.append(partial(F_t.text_reorder, base_dir=reorder))
             else:
                 self.text_transforms.append(F_t.text_reorder)
@@ -588,7 +588,7 @@ class GroundTruthDataset(Dataset):
             whitespace_normalization (str): Normalizes unicode whitespace and
                                             strips whitespace.
             reorder (bool|str): Whether to rearrange code points in "display"/LTR
-                                order. Set to L|R|AL to change the default text
+                                order. Set to L|R to change the default text
                                 direction.
             im_transforms (func): Function taking an PIL.Image and returning a
                                   tensor suitable for forward passes.
@@ -614,7 +614,7 @@ class GroundTruthDataset(Dataset):
         if whitespace_normalization:
             self.text_transforms.append(F_t.text_whitespace_normalize)
         if reorder:
-            if reorder in ('L', 'R', 'AL'):
+            if reorder in ('L', 'R'):
                 self.text_transforms.append(partial(F_t.text_reorder, base_dir=reorder))
             else:
                 self.text_transforms.append(F_t.text_reorder)

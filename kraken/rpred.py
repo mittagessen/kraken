@@ -101,10 +101,10 @@ def bidi_record(record: ocr_record, base_dir=None) -> ocr_record:
     """
     storage = bd.get_empty_storage()
 
-    if base_dir not in ('L', 'R', 'AL'):
+    if base_dir not in ('L', 'R'):
         base_level = bd.get_base_level(record.prediction)
     else:
-        base_level = {'L': 0, 'AL': 1, 'R': 1}[base_dir]
+        base_level = {'L': 0, 'R': 1}[base_dir]
 
     storage['base_level'] = base_level
     storage['base_dir'] = ('L', 'R')[base_level]
@@ -166,7 +166,7 @@ class mm_rpred(object):
             pad (int): Extra blank padding to the left and right of text line
             bidi_reordering (bool|str): Reorder classes in the ocr_record according to
                                         the Unicode bidirectional algorithm for
-                                        correct display. Set to L/R/AL to
+                                        correct display. Set to L|R to
                                         override default text direction.
             script_ignore (list): List of scripts to ignore during recognition
         Yields:
@@ -378,7 +378,7 @@ def rpred(network: TorchSeqRecognizer,
                    with padding.
         bidi_reordering (bool|str): Reorder classes in the ocr_record according to
                                     the Unicode bidirectional algorithm for correct
-                                    display. Set to L|R|AL to change base text
+                                    display. Set to L|R to change base text
                                     direction.
     Yields:
         An ocr_record containing the recognized text, absolute character
