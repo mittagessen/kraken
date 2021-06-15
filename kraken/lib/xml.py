@@ -67,7 +67,7 @@ def parse_xml(filename):
         A dict {'image': impath, lines: [{'boundary': [[x0, y0], ...],
         'baseline': [[x0, y0], ...]}, {...], 'text': 'apdjfqpf', 'script':
         'script_type'}, regions: {'region_type_0': [[[x0, y0], ...], ...],
-        ...}}
+        ...}, 'base_dir': None}
     """
     with open(filename, 'rb') as fp:
         try:
@@ -127,8 +127,21 @@ def parse_page(filename):
         image = doc.find('.//{*}Page')
         if image is None or image.get('imageFilename') is None:
             raise KrakenInputException('No valid image filename found in PageXML file {}'.format(filename))
+        try:
+            base_dir = {'left-to-right': 'L',
+                        'right-to-left': 'R',
+                        'top-to-bottom': 'L',
+                        'bottom-to-top': 'R',
+                        None: None}[image.get('readingDirection')]
+        except KeyError:
+            logger.warning(f'Invalid value {image.get("readingDirection")} encountered in page-level reading direction.')
+            base_dir = None
         lines = doc.findall('.//{*}TextLine')
-        data = {'image': os.path.join(base_dir, image.get('imageFilename')), 'lines': [], 'type': 'baselines', 'regions': {}}
+        data = {'image': os.path.join(base_dir, image.get('imageFilename')),
+                'lines': [],
+                'type': 'baselines',
+                'base_dir': base_dir,
+                'regions': {}}
         # find all image regions
         regions = []
         for x in page_regions.keys():
@@ -221,7 +234,7 @@ def parse_alto(filename):
         A dict {'image': impath, lines: [{'boundary': [[x0, y0], ...],
         'baseline': [[x0, y0], ...]}, {...], 'text': 'apdjfqpf', 'script':
         'script_type'}, regions: {'region_type_0': [[[x0, y0], ...], ...],
-        ...}}
+        ...}, 'base_dir': None}
     """
     with open(filename, 'rb') as fp:
         base_dir = dirname(filename)
@@ -233,7 +246,11 @@ def parse_alto(filename):
         if image is None or not image.text:
             raise KrakenInputException('No valid filename found in ALTO file')
         lines = doc.findall('.//{*}TextLine')
-        data = {'image': os.path.join(base_dir, image.text), 'lines': [], 'type': 'baselines', 'regions': {}}
+        data = {'image': os.path.join(base_dir, image.text),
+                'lines': [],
+                'type': 'baselines',
+                'base_dir': None,
+                'regions': {}}
         # find all image regions
         regions = []
         for x in alto_regions.keys():
