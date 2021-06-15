@@ -72,8 +72,8 @@ def text_normalize(text, normalization):
 def text_whitespace_normalize(text):
     return regex.sub('\s', ' ', text).strip()
 
-def text_reorder(text):
-    return bd.get_display(text)
+def text_reorder(text, base_dir=None):
+    return bd.get_display(text, base_dir=base_dir)
 
 def default_split(x):
     return path.splitext(x)[0]

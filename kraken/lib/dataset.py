@@ -378,10 +378,24 @@ class PolygonGTDataset(Dataset):
     def __init__(self,
                  normalization: Optional[str] = None,
                  whitespace_normalization: bool = True,
-                 reorder: bool = True,
+                 reorder: Union[bool, str] = True,
                  im_transforms: Callable[[Any], torch.Tensor] = transforms.Compose([]),
                  preload: bool = True,
                  augmentation: bool = False) -> None:
+        """
+        Creates a dataset for a polygonal (baseline) transcription model.
+
+        Args:
+            normalization (str): Unicode normalization for gt
+            whitespace_normalization (str): Normalizes unicode whitespace and
+                                            strips whitespace.
+            reorder (bool|str): Whether to rearrange code points in "display"/LTR
+                                order. Set to L|R|AL to change the default text
+                                direction.
+            im_transforms (func): Function taking an PIL.Image and returning a
+                                  tensor suitable for forward passes.
+            preload (bool): Enables preloading and preprocessing of image files.
+        """
         self._images = []  # type:  Union[List[Image], List[torch.Tensor]]
         self._gt = []  # type:  List[str]
         self.alphabet = Counter()  # type: Counter
@@ -401,7 +415,10 @@ class PolygonGTDataset(Dataset):
         if whitespace_normalization:
             self.text_transforms.append(F_t.text_whitespace_normalize)
         if reorder:
-            self.text_transforms.append(F_t.text_reorder)
+            if reorder in ('L', 'R', 'AL'):
+                self.text_transforms.append(partial(F_t.text_reorder, base_dir=reorder))
+            else:
+                self.text_transforms.append(F_t.text_reorder)
         if augmentation:
             from albumentations import (
                 Compose, ToFloat, FromFloat, Flip, OneOf, MotionBlur, MedianBlur, Blur,
@@ -548,7 +565,7 @@ class GroundTruthDataset(Dataset):
                  suffix: str = '.gt.txt',
                  normalization: Optional[str] = None,
                  whitespace_normalization: bool = True,
-                 reorder: bool = True,
+                 reorder: Union[bool, str] = True,
                  im_transforms: Callable[[Any], torch.Tensor] = transforms.Compose([]),
                  preload: bool = True,
                  augmentation: bool = False) -> None:
@@ -570,8 +587,9 @@ class GroundTruthDataset(Dataset):
             normalization (str): Unicode normalization for gt
             whitespace_normalization (str): Normalizes unicode whitespace and
                                             strips whitespace.
-            reorder (bool): Whether to rearrange code points in "display"/LTR
-                            order
+            reorder (bool|str): Whether to rearrange code points in "display"/LTR
+                                order. Set to L|R|AL to change the default text
+                                direction.
             im_transforms (func): Function taking an PIL.Image and returning a
                                   tensor suitable for forward passes.
             preload (bool): Enables preloading and preprocessing of image files.
@@ -596,7 +614,10 @@ class GroundTruthDataset(Dataset):
         if whitespace_normalization:
             self.text_transforms.append(F_t.text_whitespace_normalize)
         if reorder:
-            self.text_transforms.append(F_t.text_reorder)
+            if reorder in ('L', 'R', 'AL'):
+                self.text_transforms.append(partial(F_t.text_reorder, base_dir=reorder))
+            else:
+                self.text_transforms.append(F_t.text_reorder)
         if augmentation:
             from albumentations import (
                 Compose, ToFloat, FromFloat, Flip, OneOf, MotionBlur, MedianBlur, Blur,
