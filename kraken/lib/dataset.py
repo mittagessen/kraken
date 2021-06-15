@@ -996,18 +996,18 @@ class BaselineSet(Dataset):
                 line = np.array(line)*scale
                 shp_line = geom.LineString(line)
                 split_offset = min(5, shp_line.length/2)
-                line_pol = np.array(shp_line.buffer(self.line_width, cap_style=2).boundary, dtype=np.int)
+                line_pol = np.array(shp_line.buffer(self.line_width/2, cap_style=2).boundary, dtype=np.int)
                 rr, cc = polygon(line_pol[:,1], line_pol[:,0], shape=image.shape[1:])
                 t[cls_idx, rr, cc] = 1
                 split_pt = shp_line.interpolate(split_offset).buffer(0.001)
                 # top
-                start_sep = np.array((split(shp_line, split_pt)[0].buffer(1.5*self.line_width, cap_style=3).boundary), dtype=np.int)
+                start_sep = np.array((split(shp_line, split_pt)[0].buffer(self.line_width, cap_style=3).boundary), dtype=np.int)
                 rr_s, cc_s = polygon(start_sep[:,1], start_sep[:,0], shape=image.shape[1:])
                 t[start_sep_cls, rr_s, cc_s] = 1
                 t[start_sep_cls, rr, cc] = 0
                 split_pt = shp_line.interpolate(-split_offset).buffer(0.001)
                 # top
-                end_sep = np.array((split(shp_line, split_pt)[-1].buffer(1.5*self.line_width, cap_style=3).boundary), dtype=np.int)
+                end_sep = np.array((split(shp_line, split_pt)[-1].buffer(self.line_width, cap_style=3).boundary), dtype=np.int)
                 rr_s, cc_s = polygon(end_sep[:,1], end_sep[:,0], shape=image.shape[1:])
                 t[end_sep_cls, rr_s, cc_s] = 1
                 t[end_sep_cls, rr, cc] = 0

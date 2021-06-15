@@ -48,6 +48,7 @@ class ocr_record(object):
         self.confidences = confidences
         self.script = None if 'script' not in line else line['script']
         self.type = 'baselines' if 'baseline' in line else 'box'
+        self.base_dir = None
         if self.type == 'baselines':
             self.line = line['boundary']
             self.baseline = line['baseline']
@@ -133,6 +134,7 @@ def bidi_record(record: ocr_record, base_dir=None) -> ocr_record:
         line = record.line
     rec = ocr_record(prediction, cuts, confidences, line)
     rec.script = record.script
+    rec.base_dir = base_dir
     return rec
 
 
