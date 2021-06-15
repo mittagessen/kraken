@@ -86,7 +86,7 @@ class ocr_record(object):
             raise TypeError('Invalid argument type')
 
 
-def bidi_record(record: ocr_record) -> ocr_record:
+def bidi_record(record: ocr_record, base_dir=None) -> ocr_record:
     """
     Reorders a record using the Unicode BiDi algorithm.
 
@@ -100,7 +100,12 @@ def bidi_record(record: ocr_record) -> ocr_record:
         kraken.rpred.ocr_record
     """
     storage = bd.get_empty_storage()
-    base_level = bd.get_base_level(record.prediction)
+
+    if base_dir not in ('L', 'R', 'AL'):
+        base_level = bd.get_base_level(record.prediction)
+    else:
+        base_level = {'L': 0, 'AL': 1, 'R': 1}[base_dir]
+
     storage['base_level'] = base_level
     storage['base_dir'] = ('L', 'R')[base_level]
 
