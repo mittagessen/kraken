@@ -291,7 +291,7 @@ class mm_rpred(object):
             rec.confidences.extend(conf)
         if self.bidi_reordering:
             logger.debug('BiDi reordering record.')
-            return bidi_record(rec, base_dir=self.bidi_reordering if self.bidi_reordering in ('L', 'R', 'AL') else None)
+            return bidi_record(rec, base_dir=self.bidi_reordering if self.bidi_reordering in ('L', 'R') else None)
         else:
             logger.debug('Emitting raw record')
             return rec
@@ -340,7 +340,7 @@ class mm_rpred(object):
         if self.bidi_reordering:
             logger.debug('BiDi reordering record.')
             return bidi_record(ocr_record(pred, pos, conf, coords),
-                               base_dir=self.bidi_reordering if self.bidi_reordering in ('L', 'R', 'AL') else None)
+                               base_dir=self.bidi_reordering if self.bidi_reordering in ('L', 'R') else None)
         else:
             logger.debug('Emitting raw record')
             return ocr_record(pred, pos, conf, coords)

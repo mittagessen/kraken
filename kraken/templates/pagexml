@@ -30,7 +30,7 @@
 		<Created>{{ page.date }}</Created>
 		<LastChange>{{ page.date }}</LastChange>
 	</Metadata>
-	<Page imageFilename="{{ page.name }}" imageWidth="{{ page.size[0] }}" imageHeight="{{ page.size[1] }}">
+	<Page imageFilename="{{ page.name }}" imageWidth="{{ page.size[0] }}" imageHeight="{{ page.size[1] }}" {% if page.base_dir %}readingDirection="{{ page.base_dir }}"{% endif %}>
 	{% for entity in page.entities %}
                 {% if entity.type == "region" %}
                         {% if loop.previtem and loop.previtem.type == 'line' %}

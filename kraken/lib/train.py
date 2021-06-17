@@ -28,7 +28,7 @@ import torch.nn.functional as F
 from itertools import cycle
 from functools import partial
 from torch.multiprocessing import Pool
-from typing import cast, Tuple, Callable, List, Dict, Any, Optional, Sequence
+from typing import cast, Tuple, Callable, List, Dict, Any, Optional, Sequence, Union
 
 from kraken.lib import models, vgsl, segmentation, default_specs
 from kraken.lib.util import make_printable
