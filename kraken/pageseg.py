@@ -377,6 +377,11 @@ def segment(im, text_direction: str = 'horizontal-lr',
     binary = np.array(a > 0.5*(np.amin(a) + np.amax(a)), 'i')
     binary = 1 - binary
 
+    _, ccs = morph.label(binary)
+    if ccs > np.dot(*im.size)/(30*30):
+        logger.warning(f'To many connected components for a page image: {ccs}')
+        return {'text_direction': text_direction, 'boxes':  []}
+
     if not scale:
         scale = estimate_scale(binary)
 
