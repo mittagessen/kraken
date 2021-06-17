@@ -180,6 +180,8 @@ class mm_rpred(object):
             networks is incomplete.
         """
         seg_types = set(recognizer.seg_type for recognizer in nets.values())
+        if isinstance(nets, defaultdict):
+            seg_types.add(nets.default_factory().seg_type)
         if ('type' in bounds and bounds['type'] not in seg_types) or len(seg_types) > 1:
             logger.warning('Recognizers with segmentation types {} will be '
                            'applied to segmentation of type {}. This will likely result '
