@@ -502,7 +502,7 @@ class KrakenTrainer(object):
                               append: Optional[int] = None,
                               load: Optional[str] = None,
                               device: str = 'cpu',
-                              reorder: bool = True,
+                              reorder: Union[bool, str] = True,
                               training_data: Sequence[Dict] = None,
                               evaluation_data: Sequence[Dict] = None,
                               preload: Optional[bool] = None,
