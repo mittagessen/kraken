@@ -188,6 +188,9 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, script_ignore, inpu
             doc = get_input_parser(ctx.meta['input_format_type'])(input)
             ctx.meta['base_image'] = doc['image']
             doc['text_direction'] = 'horizontal-lr'
+            if doc['base_dir'] and bidi_reordering is True:
+                message(f'Setting base text direction for BiDi reordering to {doc["base_dir"]} (from XML input file)')
+                bidi_reordering = doc['base_dir']
             bounds = doc
     try:
         im = Image.open(ctx.meta['base_image'])
@@ -481,6 +484,11 @@ def _validate_mm(ctx, param, value):
               'padding around lines')
 @click.option('-n', '--reorder/--no-reorder', show_default=True, default=True,
               help='Reorder code points to logical order')
+@click.option('--base-dir', show_default=True, default='auto',
+              type=click.Choice(['L', 'R', 'auto']), help='Set base text '
+              'direction.  This should be set to the direction used during the '
+              'creation of the training data. If set to `auto` it will be '
+              'overridden by any explicit value given in the input files.')
 @click.option('-s', '--no-segmentation', default=False, show_default=True, is_flag=True,
               help='Enables non-segmentation mode treating each input image as a whole line.')
 @click.option('-d', '--text-direction', default='horizontal-tb',
@@ -489,7 +497,7 @@ def _validate_mm(ctx, param, value):
               help='Sets principal text direction in serialization output')
 @click.option('--threads', default=1, show_default=True, type=click.IntRange(1),
               help='Number of threads to use for OpenMP parallelization.')
-def ocr(ctx, model, pad, reorder, no_segmentation, text_direction, threads):
+def ocr(ctx, model, pad, reorder, base_dir, no_segmentation, text_direction, threads):
     """
     Recognizes text in line images.
     """
@@ -497,6 +505,9 @@ def ocr(ctx, model, pad, reorder, no_segmentation, text_direction, threads):
 
     if ctx.meta['input_format_type'] != 'image' and no_segmentation:
         raise click.BadParameter('no_segmentation mode is incompatible with page/alto inputs')
+
+    if reorder and base_dir != 'auto':
+        reorder = base_dir
 
     # first we try to find the model in the absolue path, then ~/.kraken, then
     # LEGACY_MODEL_DIR
