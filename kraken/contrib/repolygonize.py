@@ -7,7 +7,7 @@ the kraken polygonizer.
 import click
 
 @click.command()
-@click.option('-f', '--format-type', type=click.Choice(['alto', 'page', 'xml']), default='xml',
+@click.option('-f', '--format-type', type=click.Choice(['alto', 'page']), default='alto',
               help='Sets the input document format. In ALTO and PageXML mode all'
               'data is extracted from xml files containing both baselines, polygons, and a'
               'link to source images.')
@@ -29,7 +29,6 @@ def cli(format_type, files):
 
     from kraken.lib import xml
     from kraken import serialization, rpred
-    from kraken.lib.dataset import _fixed_resize
     from PIL import Image
     from kraken.lib.segmentation import calculate_polygonal_environment, scale_polygonal_lines
 
@@ -52,19 +51,19 @@ def cli(format_type, files):
             lines = doc.findall('.//{*}TextLine')
             idx = 0
             for line in lines:
-                pol = line.find('./{*}Shape/{*}Polygon')
+                pol = line.find('./{*}Coords')
                 if pol is not None:
-                    pol.attrib['POINTS'] = ' '.join([str(coord) for pt in o[idx] for coord in pt])
+                    pol.attrib['points'] = ' '.join([','.join([str(x) for x in pt]) for pt in o[idx]])
                     idx += 1
             with open(splitext(fname)[0] + '_rewrite.xml', 'wb') as fp:
                 doc.write(fp, encoding='UTF-8', xml_declaration=True)
 
-    if format_type == 'xml':
-        parse_fn = xml.parse_xml
-    elif format_type == 'page':
+    if format_type == 'page':
         parse_fn = xml.parse_page
+        repl_fn = _repl_page
     else:
         parse_fn = xml.parse_alto
+        repl_fn = _repl_alto
 
     for doc in files:
         click.echo(f'Processing {doc} ', nl=False)
@@ -75,7 +74,7 @@ def cli(format_type, files):
             bl = x['baseline'] if x['baseline'] is not None else [0, 0]
             l.append(bl)
         o = calculate_polygonal_environment(im, l, scale=(1800, 0))
-        print(o)
+        repl_fn(doc, o)
 
 if __name__ == '__main__':
     cli()
