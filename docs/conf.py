@@ -297,5 +297,5 @@ texinfo_documents = [
 # If true, do not generate a @detailmenu in the "Top" node's menu.
 #texinfo_no_detailmenu = False
 
-smv_branch_whitelist = None
+smv_branch_whitelist = r'master'
 smv_tag_whitelist = r'^[2-9]\.\d+(\.0)?$'
