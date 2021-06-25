@@ -35,6 +35,7 @@ from subprocess import Popen, PIPE
 extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.napoleon',
+    'sphinx_multiversion',
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -165,7 +166,7 @@ html_static_path = ['_static']
 # Custom sidebar templates, maps document names to template names.
 html_sidebars = {
     'index':    ['sidebarintro.html', 'navigation.html', 'searchbox.html', 'versions.html'],
-    '**':       ['localtoc.html', 'relations.html', 'searchbox.html']
+    '**':       ['localtoc.html', 'relations.html', 'searchbox.html', 'versions.html']
 }
 
 # Additional templates that should be rendered to pages, maps page names to
@@ -296,11 +297,5 @@ texinfo_documents = [
 # If true, do not generate a @detailmenu in the "Top" node's menu.
 #texinfo_no_detailmenu = False
 
-scv_whitelist_branches = ('master',)
-import re
-scv_whitelist_tags = (re.compile(r'^\d+\.\d+\.0$'),)
-
-scv_greatest_tag = True
-
-scv_show_banner = True
-scv_banner_greatest_tag = True
+smv_branch_whitelist = None
+smv_tag_whitelist = r'^[2-9]\.\d+(\.0)?$'
