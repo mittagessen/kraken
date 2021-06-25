@@ -128,19 +128,19 @@ def parse_page(filename):
         if image is None or image.get('imageFilename') is None:
             raise KrakenInputException('No valid image filename found in PageXML file {}'.format(filename))
         try:
-            base_dir = {'left-to-right': 'L',
-                        'right-to-left': 'R',
-                        'top-to-bottom': 'L',
-                        'bottom-to-top': 'R',
-                        None: None}[image.get('readingDirection')]
+            base_direction = {'left-to-right': 'L',
+                              'right-to-left': 'R',
+                              'top-to-bottom': 'L',
+                              'bottom-to-top': 'R',
+                              None: None}[image.get('readingDirection')]
         except KeyError:
             logger.warning(f'Invalid value {image.get("readingDirection")} encountered in page-level reading direction.')
-            base_dir = None
+            base_direction = None
         lines = doc.findall('.//{*}TextLine')
         data = {'image': os.path.join(base_dir, image.get('imageFilename')),
                 'lines': [],
                 'type': 'baselines',
-                'base_dir': base_dir,
+                'base_dir': base_direction,
                 'regions': {}}
         # find all image regions
         regions = []
