@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 """
-Draws a transparent overlay of baseline segmenter output over a list of image
-files.
+A script setting the metadata of segmentation models.
 """
 import re
 import os
