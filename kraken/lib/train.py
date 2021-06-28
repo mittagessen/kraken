@@ -658,7 +658,7 @@ class KrakenTrainer(object):
                     bar()
         else:
             for im in evaluation_data:
-                gt_set.add(**im)
+                val_set.add(**im)
                 bar()
 
         if len(gt_set._images) == 0:
