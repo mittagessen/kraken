@@ -263,7 +263,7 @@ def compute_error(model: TorchSeqRecognizer, validation_set: Iterable[Dict[str, 
     error = 0
     for batch in validation_set:
         preds = model.predict_string(batch['image'], batch['seq_lens'])
-        total_chars += batch['target_lens'].sum()
+        total_chars += int(batch['target_lens'].sum())
         for pred, text in zip(preds, batch['target']):
             error += _fast_levenshtein(pred, text)
     return total_chars, error
