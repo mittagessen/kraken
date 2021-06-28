@@ -473,10 +473,11 @@ class PolygonGTDataset(Dataset):
             baseline (list): A list of coordinates [[x0, y0], ..., [xn, yn]].
             boundary (list): A polygon mask for the line.
         """
+        orig_text = text
         for func in self.text_transforms:
             text = func(text)
         if not text:
-            raise KrakenInputException('Text line is empty after transformations')
+            raise KrakenInputException(f'Text line "{orig_text}" is empty after transformations')
         if not baseline:
             raise KrakenInputException('No baseline given for line')
         if not boundary:
