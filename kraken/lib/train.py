@@ -638,7 +638,10 @@ class KrakenTrainer(object):
                     bar()
         else:
             for im in training_data:
-                gt_set.add(**im)
+                try:
+                    gt_set.add(**im)
+                except KrakenInputException as e:
+                    logger.warning(str(e))
                 bar()
 
         val_set = DatasetClass(normalization=hyper_params['normalization'],
@@ -658,7 +661,10 @@ class KrakenTrainer(object):
                     bar()
         else:
             for im in evaluation_data:
-                val_set.add(**im)
+                try:
+                    val_set.add(**im)
+                except KrakenInputException as e:
+                    logger.warning(str(e))
                 bar()
 
         if len(gt_set._images) == 0:
