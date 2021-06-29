@@ -441,7 +441,8 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
                         calculation purposes. If set to False, baselines are
                         assumed to be on the bottom of the text line and will
                         be offset upwards, if set to True, baselines are on the
-                        top and will be offset downwards.
+                        top and will be offset downwards. If set to None, no
+                        offset will be applied.
     Returns:
         List of lists of coordinates. If no polygonization could be compute for
         a baseline `None` is returned instead.
@@ -581,7 +582,7 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
         try:
             # find intercepts with image bounds on each side of baseline
             line = geom.LineString(line)
-            line = line.parallel_offset(default_specs.SEGMENTATION_HYPER_PARAMS['line_width'], side='left' if topline else 'right')
+            line = line.parallel_offset(default_specs.SEGMENTATION_HYPER_PARAMS['line_width'] if topline is not None else 0, side='left' if topline else 'right')
             line = np.array(line, dtype=np.float)
             # parallel_offset on the right reverses the coordinate order
             if not topline:
