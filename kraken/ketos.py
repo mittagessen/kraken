@@ -155,10 +155,12 @@ def _validate_merging(ctx, param, value):
                    'added, `both` will set the layer to match exactly '
                    'the training data classes, `fail` will abort if training data and model '
                    'classes do not match.')
-@click.option('-tl/-bl', '--topline/--baseline', show_default=True,
-        default=False, help='Switch for the baseline location in the scripts. '
-        'Set to topline if the data is annotated with a hanging baseline, as is '
-        'common with Hebrew, Bengali, Devanagari, etc.')
+@click.option('-tl', '--topline', topline, show_default=True, flag_value=True, default=False,
+              help='Switch for the baseline location in the scripts. '
+                   'Set to topline if the data is annotated with a hanging baseline, as is '
+                   'common with Hebrew, Bengali, Devanagari, etc. Set to centerline for ')
+@click.option('-bl', '--baseline', show_default=True, flag_value=False)
+@click.option('-cl', '--centerline', show_default=True, flag_value=None)
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
              lag, min_delta, device, optimizer, lrate, momentum, weight_decay,
