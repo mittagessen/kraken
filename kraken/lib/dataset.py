@@ -57,7 +57,7 @@ logger = logging.getLogger(__name__)
 #part added for RandAugment
 
 import random
-
+import cv2
 
 def blur(v):
     from albumentations import MotionBlur, MedianBlur, Blur, OneOf
@@ -71,23 +71,34 @@ def blur(v):
         Blur(blur_limit=v, p=1)])
 
 
-def shiftscalerotate0(v):
+def shift0(v):
     from albumentations import ShiftScaleRotate
     assert 0 < v < 1
-    return ShiftScaleRotate(shift_limit=0.0625 * v, scale_limit=0.2 * v, rotate_limit=45 * v, p=1)
+    return ShiftScaleRotate(shift_limit_y=0.0625 * v, shift_limit_x=0, scale_limit=0, rotate_limit=0,border_mode=cv2.BORDER_CONSTANT,p=1)
 
-def shiftscalerotate1(v):
+
+def rotate0(v):
     from albumentations import ShiftScaleRotate
     assert 0 < v < 1
-    return ShiftScaleRotate(shift_limit=0.0625 * v, scale_limit=0.2 * v, rotate_limit=3 * v, p=1)
+    return ShiftScaleRotate(shift_limit=0, scale_limit=0, rotate_limit=1 * v,border_mode=cv2.BORDER_CONSTANT, p=1)
 
 
-def transfo(v):
-    from albumentations import OpticalDistortion, ElasticTransform, OneOf
-    assert 0 < v < 0.1
-    return OneOf([
-        OpticalDistortion(distort_limit=v, p=1),
-        ElasticTransform(alpha=10*v, sigma=500*v, alpha_affine=500*v, p=1)])
+def shift1(v):
+    from albumentations import ShiftScaleRotate
+    assert 0 < v < 1
+    return ShiftScaleRotate(shift_limit_y=0.0625 * v, shift_limit_x=0, scale_limit=0, rotate_limit=0,border_mode=cv2.BORDER_CONSTANT,p=1)
+
+
+def rotate1(v):
+    from albumentations import ShiftScaleRotate
+    assert 0 < v < 1
+    return ShiftScaleRotate(shift_limit=0, scale_limit=0, rotate_limit=3 * v,border_mode=cv2.BORDER_CONSTANT, p=1)
+
+
+def opticaldistortion(v):
+    from albumentations import OpticalDistortion
+    assert 0.01 < v < 0.1
+    return OpticalDistortion(distort_limit=v, border_mode=cv2.BORDER_CONSTANT, p=1)
 
 
 def saturation(v):
@@ -105,29 +116,55 @@ def randomrotate90(v):
     assert 0 < v < 1
     return RandomRotate90(p=1)
 
+def cutout(v):
+    from albumentations import Cutout
+    assert 0 < v < 1
+    i=int(v*20)
+    return Cutout(num_holes = i, max_h_size=20,max_w_size=20,p=1)
+
+def downscale(v):
+    from albumentations import Downscale
+    assert 0.40 < v < 0.99
+    return Downscale(scale_min=v,scale_max=0.99,p=1)
+
+def griddistortion(v):
+    from albumentations import GridDistortion
+    assert 0 < v < 0.3
+    im = GridDistortion(num_steps=15, distort_limit=[-v,0.5], border_mode=cv2.BORDER_CONSTANT,p=1)
+  
+
 def augment_list(transfos=0):  # operations and their ranges
     if transfos == 0:
         l = [
-            (blur, 3, 5),  # 1
-            (shiftscalerotate0, 0, 1),  # 2
-            (transfo, 0.01, 0.1),  # 3
+            (blur, 5, 5),  # 1
+            (shift0, 1, 1),  # 2
+            (rotate0, 1, 1),
+            (opticaldistortion, 0.1, 0.1),
+            (cutout, 0, 1),
+            (downscale, 0.40, 0.40),
+            (griddistortion, 0.3, 0.3)
         ]
 
     elif transfos == 1:
         l = [
-            (blur, 3, 5),  # 1
-            (shiftscalerotate1, 0, 1),  # 2
-            (transfo, 0.01, 0.1),  # 3
+            (blur, 5, 5),  # 1
+            (shift1, 1, 1),  # 2
+            (rotate1, 1, 1),
+            (opticaldistortion, 0.1, 0.1),  # 3
+            (cutout, 0, 1),
+            (downscale, 0.40, 0.40),
+            (griddistortion, 0.3, 0.3)
         ]
 
     elif transfos == 2:
         l = [
-            (blur, 3, 5),  # 1
-            (shiftscalerotate0, 0, 0.1),  # 2
-            (transfo, 0.01, 0.1),   # 3
-            (saturation, 0, 1),     # 4
-            (randomrotate90, 0, 1),     # 5
-            (flip, 0, 1)    # 6
+            (blur, 5, 5),  # 1
+            (shift0, 1, 1),  # 2
+            (rotate0, 1, 1),
+            (opticaldistortion, 0.1, 0.1),   # 3
+            (saturation, 1, 1),     # 4
+            (randomrotate90, 1, 1),     # 5
+            (flip, 1, 1)    # 6
         ]
 
 
@@ -889,7 +926,7 @@ class BaselineSet(Dataset):
                 HueSaturationValue,
                 )
 
-            self.aug = UniformAugment(ops_num=3,transfo=2)
+            self.aug = UniformAugment(ops_num=4,transfo=2)
 
         self.imgs = imgs
         self.line_width = line_width
