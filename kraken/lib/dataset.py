@@ -61,7 +61,7 @@ import cv2
 
 def blur(v):
     from albumentations import MotionBlur, MedianBlur, Blur, OneOf
-    assert 3 < v < 5
+    assert 3 < v <= 5
     v = int(v)
     if v%2 == 0:
         v = v+1
@@ -73,63 +73,63 @@ def blur(v):
 
 def shift0(v):
     from albumentations import ShiftScaleRotate
-    assert 0 < v < 1
+    assert 0 < v <= 1
     return ShiftScaleRotate(shift_limit_y=0.0625 * v, shift_limit_x=0, scale_limit=0, rotate_limit=0,border_mode=cv2.BORDER_CONSTANT,p=1)
 
 
 def rotate0(v):
     from albumentations import ShiftScaleRotate
-    assert 0 < v < 1
+    assert 0 < v <= 1
     return ShiftScaleRotate(shift_limit=0, scale_limit=0, rotate_limit=1 * v,border_mode=cv2.BORDER_CONSTANT, p=1)
 
 
 def shift1(v):
     from albumentations import ShiftScaleRotate
-    assert 0 < v < 1
+    assert 0 < v <= 1
     return ShiftScaleRotate(shift_limit_y=0.0625 * v, shift_limit_x=0, scale_limit=0, rotate_limit=0,border_mode=cv2.BORDER_CONSTANT,p=1)
 
 
 def rotate1(v):
     from albumentations import ShiftScaleRotate
-    assert 0 < v < 1
+    assert 0 < v <= 1
     return ShiftScaleRotate(shift_limit=0, scale_limit=0, rotate_limit=3 * v,border_mode=cv2.BORDER_CONSTANT, p=1)
 
 
 def opticaldistortion(v):
     from albumentations import OpticalDistortion
-    assert 0.01 < v < 0.1
+    assert 0.01 < v <= 0.1
     return OpticalDistortion(distort_limit=v, border_mode=cv2.BORDER_CONSTANT, p=1)
 
 
 def saturation(v):
     from albumentations import HueSaturationValue
-    assert 0 < v < 1
+    assert 0 < v <= 1
     return HueSaturationValue(hue_shift_limit=20 * v, sat_shift_limit=0.1 * v, val_shift_limit=0.1 * v, p=1)
 
 def flip(v):
     from albumentations import Flip
-    assert 0 < v < 1
+    assert 0 < v <= 1
     return Flip(p=1)
 
 def randomrotate90(v):
     from albumentations import RandomRotate90
-    assert 0 < v < 1
+    assert 0 < v <= 1
     return RandomRotate90(p=1)
 
 def cutout(v):
     from albumentations import Cutout
-    assert 0 < v < 1
+    assert 0 < v <= 1
     i=int(v*20)
     return Cutout(num_holes = i, max_h_size=20,max_w_size=20,p=1)
 
 def downscale(v):
     from albumentations import Downscale
-    assert 0.40 < v < 0.99
+    assert 0.40 <= v < 0.99
     return Downscale(scale_min=v,scale_max=0.99,p=1)
 
 def griddistortion(v):
     from albumentations import GridDistortion
-    assert 0 < v < 0.3
+    assert 0 < v <= 0.3
     im = GridDistortion(num_steps=15, distort_limit=[-v,0.5], border_mode=cv2.BORDER_CONSTANT,p=1)
   
 
