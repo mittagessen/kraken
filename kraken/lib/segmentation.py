@@ -491,7 +491,7 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
         t = min(x for x in [tmin, tmax] if x >= 0)
         return ray + (direction * t)
 
-    def _calc_seam(baseline, polygon, angle, bias=150):
+    def _calc_seam(baseline, polygon, angle, offset, bias=150):
         """
         Calculates seam between baseline and ROI boundary on one side.
 
@@ -550,6 +550,8 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
         seam_mean = seam[:, 1].mean()
         seam_std = seam[:, 1].std()
         seam[:, 1] = np.clip(seam[:, 1], seam_mean-seam_std, seam_mean+seam_std)
+        # clip to ensure boundary doesn't traverse offset baseline
+        seam[:, 1] = np.clip(seam[:, 1], offset, None)
         # rotate back
         seam = tform(seam).astype('int')
         # filter out seam points in masked area of original patch/in padding
@@ -560,7 +562,7 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
         seam += (c_min, r_min)
         return seam
 
-    def _extract_patch(env_up, env_bottom, baseline, dir_vec):
+    def _extract_patch(env_up, env_bottom, baseline, dir_vec, end_points, offset, topline):
         """
         Calculate a line image patch from a ROI and the original baseline.
         """
@@ -568,10 +570,10 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
         bottom_polygon = np.concatenate((baseline, env_bottom[::-1]))
         angle = np.arctan2(dir_vec[1], dir_vec[0])
 
-        upper_seam = _calc_seam(baseline, upper_polygon, angle)
-        bottom_seam = _calc_seam(baseline, bottom_polygon, angle)
+        upper_seam = _calc_seam(baseline, upper_polygon, angle, offset if topline else 0)
+        bottom_seam = _calc_seam(baseline, bottom_polygon, angle, offset if topline is False else 0)
 
-        polygon = np.concatenate(([baseline[0]], upper_seam.astype('int'), [baseline[-1]], bottom_seam.astype('int')[::-1]))
+        polygon = np.concatenate(([end_points[0]], upper_seam.astype('int'), [end_points[-1]], bottom_seam.astype('int')[::-1]))
         return approximate_polygon(polygon, 3).tolist()
 
     polygons = []
@@ -581,11 +583,13 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
     for idx, line in enumerate(baselines):
         try:
             # find intercepts with image bounds on each side of baseline
+            end_points = (line[0], line[-1])
             line = geom.LineString(line)
-            line = line.parallel_offset(default_specs.SEGMENTATION_HYPER_PARAMS['line_width'] if topline is not None else 0, side='left' if topline else 'right')
+            offset = default_specs.SEGMENTATION_HYPER_PARAMS['line_width'] if topline is not None else 0
+            line = line.parallel_offset(offset, side='left' if topline else 'right')
             line = np.array(line, dtype=np.float)
             # parallel_offset on the right reverses the coordinate order
-            if not topline:
+            if topline is False:
                 line = line[::-1]
             # calculate magnitude-weighted average direction vector
             lengths = np.linalg.norm(np.diff(line.T), axis=0)
@@ -646,7 +650,7 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
                 env_bottom.append(bottom_limit.coords[0])
             env_up = np.array(env_up, dtype='uint')
             env_bottom = np.array(env_bottom, dtype='uint')
-            polygons.append(_extract_patch(env_up, env_bottom, line.astype('int'), p_dir))
+            polygons.append(_extract_patch(env_up, env_bottom, line.astype('int'), p_dir, end_points, offset, topline))
         except Exception as e:
             logger.warning(f'Polygonizer failed on line {idx}: {e}')
             polygons.append(None)
