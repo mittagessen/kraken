@@ -140,9 +140,6 @@ def augment_list(transfos=0):  # operations and their ranges
             (shift0, 1, 1),  # 2
             (rotate0, 1, 1),
             (opticaldistortion, 0.1, 0.1),
-            (cutout, 0, 1),
-            (downscale, 0.40, 0.40),
-            (griddistortion, 0.3, 0.3)
         ]
 
     elif transfos == 1:
@@ -151,9 +148,6 @@ def augment_list(transfos=0):  # operations and their ranges
             (shift1, 1, 1),  # 2
             (rotate1, 1, 1),
             (opticaldistortion, 0.1, 0.1),  # 3
-            (cutout, 0, 1),
-            (downscale, 0.40, 0.40),
-            (griddistortion, 0.3, 0.3)
         ]
 
     elif transfos == 2:
@@ -541,7 +535,7 @@ class PolygonGTDataset(Dataset):
         if reorder:
             self.text_transforms.append(bd.get_display)
         if augmentation:  
-            self.aug = UniformAugment(ops_num=3, transfo=0)
+            self.aug = UniformAugment(ops_num=2, transfo=0)
 
         self.im_mode = '1'
 
@@ -702,7 +696,7 @@ class GroundTruthDataset(Dataset):
                 ShiftScaleRotate, OpticalDistortion, ElasticTransform, RandomBrightnessContrast,
                 )
 
-            self.aug = UniformAugment(ops_num=3, transfo=1)
+            self.aug = UniformAugment(ops_num=2, transfo=1)
 
 
 
