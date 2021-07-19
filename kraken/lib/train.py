@@ -1070,6 +1070,18 @@ class KrakenTrainer(object):
         # updates model's hyper params with users defined
         nn.hyper_params = hyper_params
 
+        # change topline/baseline switch
+        loc = {None: 'centerline',
+               True: 'topline',
+               False: 'baseline'}
+
+        if 'topline' not in nn.user_metadata:
+            logger.warning(f'Setting baseline location to {loc[topline]} from unset model.')
+        elif nn.user_metadata['topline'] != topline:
+            from_loc = loc[nn.user_metadata["topline"]]
+            logger.warning(f'Changing baseline location from {from_loc} to {loc[topline]}.')
+        nn.user_metadata['topline'] = topline
+
         message('Training line types:')
         for k, v in gt_set.class_mapping['baselines'].items():
             message(f'  {k}\t{v}\t{gt_set.class_stats["baselines"][k]}')

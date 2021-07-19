@@ -155,13 +155,13 @@ def _validate_merging(ctx, param, value):
                    'added, `both` will set the layer to match exactly '
                    'the training data classes, `fail` will abort if training data and model '
                    'classes do not match.')
-@click.option('-tl', '--topline', 'topline', show_default=True, flag_value=True, default=False,
+@click.option('-tl', '--topline', 'topline', show_default=True, flag_value='topline',
               help='Switch for the baseline location in the scripts. '
                    'Set to topline if the data is annotated with a hanging baseline, as is '
                    'common with Hebrew, Bengali, Devanagari, etc. Set to '
                    ' centerline for scripts annotated with a central line.')
-@click.option('-bl', '--baseline', 'topline', flag_value=False)
-@click.option('-cl', '--centerline', 'topline', flag_value=None)
+@click.option('-cl', '--centerline', 'topline', flag_value='centerline')
+@click.option('-bl', '--baseline', 'topline', flag_value='baseline', default='baseline')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
              lag, min_delta, device, optimizer, lrate, momentum, weight_decay,
@@ -237,6 +237,10 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
         ctx.meta['bar'] = log.progressbar(label=label, length=length, show_pos=True)
         ctx.meta['bar'].__enter__()
         return lambda: ctx.meta['bar'].update(1)
+
+    topline = {'topline': True,
+               'baseline': False,
+               'centerline': None}[topline]
 
     trainer = KrakenTrainer.segmentation_train_gen(hyper_params,
                                                    message=message,
