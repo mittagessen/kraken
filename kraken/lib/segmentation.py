@@ -578,8 +578,15 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
             upper_seam = geom.LineString(_calc_seam(offset_baseline, upper_offset_polygon, angle)).simplify(1)
             bottom_seam = geom.LineString(_calc_seam(baseline, bottom_polygon, angle)).simplify(1)
 
-        upper_seam = np.array(upper_seam.parallel_offset(offset//2, side='right'), dtype=np.int)[::-1]
-        bottom_seam = np.array(bottom_seam.parallel_offset(offset//2, side='left'), dtype=np.int)
+        # ugly workaround against GEOM parallel_offset bug creating a
+        # MultiLineString out of offset LineString
+        if upper_seam.parallel_offset(offset//2, side='right').type == 'MultiLineString':
+            upper_seam = np.array(upper_seam, dtype=np.int)
+        else:
+            upper_seam = np.array(upper_seam.parallel_offset(offset//2, side='right'), dtype=np.int)[::-1]
+        if bottom_seam.parallel_offset(offset//2, side='right').type != 'MultiLineString':
+            bottom_seam = bottom_seam.parallel_offset(offset//2, side='right')
+        bottom_seam = np.array(bottom_seam, dtype=np.int)
 
         polygon = np.concatenate(([end_points[0]], upper_seam, [end_points[-1]], bottom_seam[::-1]))
         return polygon
@@ -671,6 +678,7 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
                                            topline,
                                            offset))
         except Exception as e:
+            raise
             logger.warning(f'Polygonizer failed on line {idx}: {e}')
             polygons.append(None)
 
