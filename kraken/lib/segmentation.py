@@ -678,7 +678,6 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
                                            topline,
                                            offset))
         except Exception as e:
-            raise
             logger.warning(f'Polygonizer failed on line {idx}: {e}')
             polygons.append(None)
 
