@@ -54,14 +54,16 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-#part added for RandAugment
+#Part added for UniformAugment
 
 import random
 import cv2
 
+#Definition of the transformations that will be used for UniformAugment
+
 def blur(v):
     from albumentations import MotionBlur, MedianBlur, Blur, OneOf
-    assert 3 < v <= 5
+    assert 3 < v < 5
     v = int(v)
     if v%2 == 0:
         v = v+1
@@ -73,94 +75,52 @@ def blur(v):
 
 def shift0(v):
     from albumentations import ShiftScaleRotate
-    assert 0 < v <= 1
+    assert 0 < v < 1
     return ShiftScaleRotate(shift_limit_y=0.0625 * v, shift_limit_x=0, scale_limit=0, rotate_limit=0,border_mode=cv2.BORDER_CONSTANT,p=1)
 
 
 def rotate0(v):
     from albumentations import ShiftScaleRotate
-    assert 0 < v <= 1
+    assert 0 < v < 1
     return ShiftScaleRotate(shift_limit=0, scale_limit=0, rotate_limit=1 * v,border_mode=cv2.BORDER_CONSTANT, p=1)
 
 
 def shift1(v):
     from albumentations import ShiftScaleRotate
-    assert 0 < v <= 1
+    assert 0 < v < 1
     return ShiftScaleRotate(shift_limit_y=0.0625 * v, shift_limit_x=0, scale_limit=0, rotate_limit=0,border_mode=cv2.BORDER_CONSTANT,p=1)
 
 
 def rotate1(v):
     from albumentations import ShiftScaleRotate
-    assert 0 < v <= 1
+    assert 0 < v < 1
     return ShiftScaleRotate(shift_limit=0, scale_limit=0, rotate_limit=3 * v,border_mode=cv2.BORDER_CONSTANT, p=1)
 
 
 def opticaldistortion(v):
     from albumentations import OpticalDistortion
-    assert 0.01 < v <= 0.1
+    assert 0 < v < 0.1
     return OpticalDistortion(distort_limit=v, border_mode=cv2.BORDER_CONSTANT, p=1)
 
 
-def saturation(v):
-    from albumentations import HueSaturationValue
-    assert 0 < v <= 1
-    return HueSaturationValue(hue_shift_limit=20 * v, sat_shift_limit=0.1 * v, val_shift_limit=0.1 * v, p=1)
-
-def flip(v):
-    from albumentations import Flip
-    assert 0 < v <= 1
-    return Flip(p=1)
-
-def randomrotate90(v):
-    from albumentations import RandomRotate90
-    assert 0 < v <= 1
-    return RandomRotate90(p=1)
-
-def cutout(v):
-    from albumentations import Cutout
-    assert 0 < v <= 1
-    i=int(v*20)
-    return Cutout(num_holes = i, max_h_size=20,max_w_size=20,p=1)
-
-def downscale(v):
-    from albumentations import Downscale
-    assert 0.40 <= v < 0.99
-    return Downscale(scale_min=v,scale_max=0.99,p=1)
-
-def griddistortion(v):
-    from albumentations import GridDistortion
-    assert 0 < v <= 0.3
-    im = GridDistortion(num_steps=15, distort_limit=[-v,0.5], border_mode=cv2.BORDER_CONSTANT,p=1)
-  
+#Definition of the lists of operations and the ranges for the value of their parameters
 
 def augment_list(transfos=0):  # operations and their ranges
     if transfos == 0:
         l = [
-            (blur, 5, 5),  # 1
-            (shift0, 1, 1),  # 2
-            (rotate0, 1, 1),
-            (opticaldistortion, 0.1, 0.1),
+            (blur, 3, 5),  # 1
+            (shift0, 0, 1),  # 2
+            (rotate0, 0, 1),
+            (opticaldistortion, 0, 0.1),  # 3
         ]
 
     elif transfos == 1:
         l = [
-            (blur, 5, 5),  # 1
-            (shift1, 1, 1),  # 2
-            (rotate1, 1, 1),
-            (opticaldistortion, 0.1, 0.1),  # 3
+            (blur, 3, 5),  # 1
+            (shift1, 0, 1),  # 2
+            (rotate1, 0, 1),
+            (opticaldistortion, 0, 0.1),  # 3
         ]
-
-    elif transfos == 2:
-        l = [
-            (blur, 5, 5),  # 1
-            (shift0, 1, 1),  # 2
-            (rotate0, 1, 1),
-            (opticaldistortion, 0.1, 0.1),   # 3
-            (saturation, 1, 1),     # 4
-            (randomrotate90, 1, 1),     # 5
-            (flip, 1, 1)    # 6
-        ]
-
 
     return l
 
@@ -172,8 +132,6 @@ class UniformAugment:
 
     def __call__(self):
         from albumentations import ToFloat, Compose
-        # Selecting unique num_ops transforms for each image would help the
-        #   training procedure.
         ops = random.sample(self._augment_list, k=self._ops_num)
         comp=[]
         comp.append(ToFloat())
@@ -184,7 +142,7 @@ class UniformAugment:
                 comp.append(augment_fn(random.uniform(low, high)))
         return Compose(comp)
 
-#END of the part added for RandAugment
+#END of the part added for UniformAugment
 
 def generate_input_transforms(batch: int, height: int, width: int, channels: int, pad: int, valid_norm: bool = True, force_binarization=False) -> transforms.Compose:
     """
@@ -691,15 +649,7 @@ class GroundTruthDataset(Dataset):
         if reorder:
             self.text_transforms.append(bd.get_display)
         if augmentation:
-            from albumentations import (
-                Compose, ToFloat, FromFloat, Flip, OneOf, MotionBlur, MedianBlur, Blur,
-                ShiftScaleRotate, OpticalDistortion, ElasticTransform, RandomBrightnessContrast,
-                )
-
             self.aug = UniformAugment(ops_num=2, transfo=1)
-
-
-
 
         self.im_mode = '1'
 
@@ -920,7 +870,22 @@ class BaselineSet(Dataset):
                 HueSaturationValue,
                 )
 
-            self.aug = UniformAugment(ops_num=4,transfo=2)
+            self.aug = Compose([
+                                ToFloat(),
+                                RandomRotate90(),
+                                Flip(),
+                                OneOf([
+                                    MotionBlur(p=0.2),
+                                    MedianBlur(blur_limit=3, p=0.1),
+                                    Blur(blur_limit=3, p=0.1),
+                                ], p=0.2),
+                                ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.2, rotate_limit=45, p=0.2),
+                                OneOf([
+                                    OpticalDistortion(p=0.3),
+                                    ElasticTransform(p=0.1),
+                                ], p=0.2),
+                                HueSaturationValue(hue_shift_limit=20, sat_shift_limit=0.1, val_shift_limit=0.1, p=0.3),
+                               ], p=0.5)
 
         self.imgs = imgs
         self.line_width = line_width
