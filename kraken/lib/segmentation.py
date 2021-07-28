@@ -580,13 +580,14 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
 
         # ugly workaround against GEOM parallel_offset bug creating a
         # MultiLineString out of offset LineString
-        if upper_seam.parallel_offset(offset//2, side='right').type == 'MultiLineString':
+        if upper_seam.parallel_offset(offset//2, side='right').type == 'MultiLineString' or offset == 0:
             upper_seam = np.array(upper_seam, dtype=np.int)
         else:
             upper_seam = np.array(upper_seam.parallel_offset(offset//2, side='right'), dtype=np.int)[::-1]
-        if bottom_seam.parallel_offset(offset//2, side='right').type != 'MultiLineString':
-            bottom_seam = bottom_seam.parallel_offset(offset//2, side='right')
-        bottom_seam = np.array(bottom_seam, dtype=np.int)
+        if bottom_seam.parallel_offset(offset//2, side='left').type == 'MultiLineString' or offset == 0:
+            bottom_seam = np.array(bottom_seam, dtype=np.int)
+        else:
+            bottom_seam = np.array(bottom_seam.parallel_offset(offset//2, side='left'), dtype=np.int)
 
         polygon = np.concatenate(([end_points[0]], upper_seam, [end_points[-1]], bottom_seam[::-1]))
         return polygon
@@ -606,7 +607,7 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
             offset_line = np.array(offset_line, dtype=np.float)
 
             # parallel_offset on the right reverses the coordinate order
-            if topline is False:
+            if not topline:
                 offset_line = offset_line[::-1]
             # calculate magnitude-weighted average direction vector
             lengths = np.linalg.norm(np.diff(line.T), axis=0)
