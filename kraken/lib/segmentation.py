@@ -572,11 +572,11 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
         angle = np.arctan2(dir_vec[1], dir_vec[0])
 
         if topline:
-            upper_seam = geom.LineString(_calc_seam(baseline, upper_polygon, angle)).simplify(1)
-            bottom_seam = geom.LineString(_calc_seam(offset_baseline, bottom_offset_polygon, angle)).simplify(1)
+            upper_seam = geom.LineString(_calc_seam(baseline, upper_polygon, angle)).simplify(5)
+            bottom_seam = geom.LineString(_calc_seam(offset_baseline, bottom_offset_polygon, angle)).simplify(5)
         else:
-            upper_seam = geom.LineString(_calc_seam(offset_baseline, upper_offset_polygon, angle)).simplify(1)
-            bottom_seam = geom.LineString(_calc_seam(baseline, bottom_polygon, angle)).simplify(1)
+            upper_seam = geom.LineString(_calc_seam(offset_baseline, upper_offset_polygon, angle)).simplify(5)
+            bottom_seam = geom.LineString(_calc_seam(baseline, bottom_polygon, angle)).simplify(5)
 
         # ugly workaround against GEOM parallel_offset bug creating a
         # MultiLineString out of offset LineString
