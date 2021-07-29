@@ -257,7 +257,10 @@ class EarlyStopping(TrainStopper):
         if self.auto_delta:
             self.min_delta = (1 - self.best_loss)/20
             logger.debug('Rescaling early stopping loss to {}'.format(self.min_delta))
-        if (val_loss - self.best_loss) >= self.min_delta:
+        if np.isclose(1., val_loss):
+            logger.debug('Validation loss is close to perfect. Triggering early stopping.')
+            self.wait = self.lag
+        elif (val_loss - self.best_loss) >= self.min_delta:
             logger.debug('Resetting early stopping counter')
             self.wait = 0
             self.best_loss = val_loss
