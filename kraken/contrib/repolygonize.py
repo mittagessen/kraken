@@ -8,8 +8,8 @@ import click
 
 @click.command()
 @click.option('-f', '--format-type', type=click.Choice(['alto', 'page']), default='alto',
-              help='Sets the input document format. In ALTO and PageXML mode all'
-              'data is extracted from xml files containing both baselines, polygons, and a'
+              help='Sets the input document format. In ALTO and PageXML mode all '
+              'data is extracted from xml files containing both baselines, polygons, and a '
               'link to source images.')
 @click.argument('files', nargs=-1)
 def cli(format_type, files):

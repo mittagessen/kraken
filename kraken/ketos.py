@@ -133,14 +133,14 @@ def _validate_merging(ctx, param, value):
 @click.option('--load-hyper-parameters/--no-load-hyper-parameters', show_default=True, default=False,
               help='When loading an existing model, retrieve hyper-parameters from the model')
 @click.option('--force-binarization/--no-binarization', show_default=True,
-              default=False, help='Forces input images to be binary, otherwise'
-              'the appropriate color format will be auto-determined through the'
+              default=False, help='Forces input images to be binary, otherwise '
+              'the appropriate color format will be auto-determined through the '
               'network specification. Will be ignored in `path` mode.')
 @click.option('-f', '--format-type', type=click.Choice(['path', 'xml', 'alto', 'page']), default='xml',
-              help='Sets the training data format. In ALTO and PageXML mode all'
-              'data is extracted from xml files containing both baselines and a'
-              'link to source images. In `path` mode arguments are image files'
-              'sharing a prefix up to the last extension with JSON `.path` files'
+              help='Sets the training data format. In ALTO and PageXML mode all '
+              'data is extracted from xml files containing both baselines and a '
+              'link to source images. In `path` mode arguments are image files '
+              'sharing a prefix up to the last extension with JSON `.path` files '
               'containing the baseline information.')
 @click.option('--suppress-regions/--no-suppress-regions', show_default=True, default=False, help='Disables region segmentation training.')
 @click.option('--suppress-baselines/--no-suppress-baselines', show_default=True, default=False, help='Disables baseline segmentation training.')
@@ -506,23 +506,23 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
 @click.option('-n', '--normalize-whitespace/--no-normalize-whitespace',
               show_default=True, default=True, help='Normalizes unicode whitespace')
 @click.option('--repolygonize/--no-repolygonize', show_default=True,
-              default=False, help='Repolygonizes line data in ALTO/PageXML'
-              'files. This ensures that the trained model is compatible with the'
-              'segmenter in kraken even if the original image files either do'
-              'not contain anything but transcriptions and baseline information'
-              'or the polygon data was created using a different method. Will'
-              'be ignored in `path` mode. Note, that this option will be slow'
-              'and will not scale input images to the same size as the segmenter'
+              default=False, help='Repolygonizes line data in ALTO/PageXML '
+              'files. This ensures that the trained model is compatible with the '
+              'segmenter in kraken even if the original image files either do '
+              'not contain anything but transcriptions and baseline information '
+              'or the polygon data was created using a different method. Will '
+              'be ignored in `path` mode. Note, that this option will be slow '
+              'and will not scale input images to the same size as the segmenter '
               'does.')
 @click.option('--force-binarization/--no-binarization', show_default=True,
-              default=False, help='Forces input images to be binary, otherwise'
-              'the appropriate color format will be auto-determined through the'
+              default=False, help='Forces input images to be binary, otherwise '
+              'the appropriate color format will be auto-determined through the '
               'network specification. Will be ignored in `path` mode.')
 @click.option('-f', '--format-type', type=click.Choice(['path', 'xml', 'alto', 'page']), default='path',
-              help='Sets the training data format. In ALTO and PageXML mode all'
-              'data is extracted from xml files containing both baselines and a'
-              'link to source images. In `path` mode arguments are image files'
-              'sharing a prefix up to the last extension with JSON `.path` files'
+              help='Sets the training data format. In ALTO and PageXML mode all '
+              'data is extracted from xml files containing both baselines and a '
+              'link to source images. In `path` mode arguments are image files '
+              'sharing a prefix up to the last extension with JSON `.path` files '
               'containing the baseline information.')
 @click.argument('test_set', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def test(ctx, batch_size, model, evaluation_files, device, pad, threads,

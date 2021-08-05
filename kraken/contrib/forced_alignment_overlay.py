@@ -34,14 +34,14 @@ def slugify(value):
 
 @click.command()
 @click.option('-f', '--format-type', type=click.Choice(['xml', 'alto', 'page']), default='xml',
-              help='Sets the input document format. In ALTO and PageXML mode all'
-              'data is extracted from xml files containing both baselines, polygons, and a'
+              help='Sets the input document format. In ALTO and PageXML mode all '
+              'data is extracted from xml files containing both baselines, polygons, and a '
               'link to source images.')
 @click.option('-i', '--model', default=None, show_default=True, type=click.Path(exists=True),
               help='Transcription model to use.')
 @click.option('-o', '--output', type=click.Choice(['alto', 'pagexml', 'overlay']),
-              show_default=True, default='overlay', help='Output mode. Either page or'
-              ' alto for xml output, overlay for image overlays.')
+              show_default=True, default='overlay', help='Output mode. Either page or '
+              'alto for xml output, overlay for image overlays.')
 @click.argument('files', nargs=-1)
 def cli(format_type, model, output, files):
     """
