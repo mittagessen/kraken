@@ -30,19 +30,19 @@ def slugify(value):
 
 @click.command()
 @click.option('-f', '--format-type', type=click.Choice(['xml', 'alto', 'page']), default='xml',
-              help='Sets the input document format. In ALTO and PageXML mode all'
-              'data is extracted from xml files containing both baselines, polygons, and a'
+              help='Sets the input document format. In ALTO and PageXML mode all '
+              'data is extracted from xml files containing both baselines, polygons, and a '
               'link to source images.')
 @click.option('-i', '--model', default=None, show_default=True, type=click.Path(exists=True),
               help='Baseline detection model to use. Overrides format type and expects image files as input.')
 @click.option('--repolygonize/--no-repolygonize', show_default=True,
-              default=False, help='Repolygonizes line data in ALTO/PageXML'
-              'files. This ensures that the trained model is compatible with the'
-              'segmenter in kraken even if the original image files either do'
-              'not contain anything but transcriptions and baseline information'
-              'or the polygon data was created using a different method. Will'
-              'be ignored in `path` mode. Note, that this option will be slow'
-              'and will not scale input images to the same size as the segmenter'
+              default=False, help='Repolygonizes line data in ALTO/PageXML '
+              'files. This ensures that the trained model is compatible with the '
+              'segmenter in kraken even if the original image files either do '
+              'not contain anything but transcriptions and baseline information '
+              'or the polygon data was created using a different method. Will '
+              'be ignored in `path` mode. Note, that this option will be slow '
+              'and will not scale input images to the same size as the segmenter '
               'does.')
 @click.argument('files', nargs=-1)
 def cli(format_type, model, repolygonize, files):
