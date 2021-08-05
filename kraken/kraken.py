@@ -271,8 +271,8 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, script_ignore, inpu
                    'are `src` (source file), `idx` (page number), and `uuid` (v4 uuid). '
                    '`-o` suffixes are appended to this format string.')
 @click.option('-h', '--hocr', 'serializer',
-              help='Switch between hOCR, ALTO, abbyyXML, PageXML or "native"'
-              'output. Native are plain image files for image, JSON for'
+              help='Switch between hOCR, ALTO, abbyyXML, PageXML or "native" '
+              'output. Native are plain image files for image, JSON for '
               'segmentation, and text for transcription output.',
               flag_value='hocr')
 @click.option('-a', '--alto', 'serializer', flag_value='alto')
