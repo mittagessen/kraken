@@ -35,10 +35,10 @@ def cli(files):
         heat.save(splitext(img)[0] + '.heat.png')
         overlay = Image.new('RGBA', scal_im.size, (0, 130, 200, 255))
         bl = Image.composite(overlay, scal_im.convert('RGBA'), heat)
-        heat = Image.fromarray((o[ds.class_mapping['aux']['_start_separator']]*255).astype('uint8'))
+        heat = Image.fromarray((o[ds.class_mapping['aux']['_top_separator']]*255).astype('uint8'))
         overlay = Image.new('RGBA', scal_im.size, (230, 25, 75, 255))
         bl = Image.composite(overlay, bl, heat)
-        heat = Image.fromarray((o[ds.class_mapping['aux']['_end_separator']]*255).astype('uint8'))
+        heat = Image.fromarray((o[ds.class_mapping['aux']['_bottom_separator']]*255).astype('uint8'))
         overlay = Image.new('RGBA', scal_im.size, (60, 180, 75, 255))
         bl = Image.composite(overlay, bl, heat).save(splitext(img)[0] + '.overlay.png')
         del o
