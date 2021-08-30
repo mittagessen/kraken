@@ -7,6 +7,7 @@ import re
 import os
 import click
 import unicodedata
+from lxml import etree
 from itertools import cycle
 from collections import defaultdict
 
@@ -31,15 +32,36 @@ def slugify(value):
     value = re.sub(r'[-\s]+', '-', value)
     return value
 
+def _repl_alto(fname, cuts):
+    with open(fname, 'rb') as fp:
+        doc = etree.parse(fp)
+        lines = doc.findall('.//{*}TextLine')
+        for line, line_cuts in zip(lines, cuts):
+            glyphs = line.findall('../{*}Glyph/{*}Shape/{*}Polygon')
+            for glyph, cut in zip(glyphs, line_cuts):
+                glyph.attrib['POINTS'] = ' '.join([str(coord) for pt in cut for coord in pt])
+        with open(f'{os.path.basename(fname)}_algn.xml', 'wb') as fp:
+            doc.write(fp, encoding='UTF-8', xml_declaration=True)
+
+def _repl_page(fname, cuts):
+    with open(fname, 'rb') as fp:
+        doc = etree.parse(fp)
+        lines = doc.findall('.//{*}TextLine')
+        for line, line_cuts in zip(lines, cuts):
+            glyphs = line.findall('../{*}Glyph/{*}Coords')
+            for glyph, cut in zip(glyphs, line_cuts):
+                glyph.attrib['points'] = ' '.join([','.join([str(x) for x in pt]) for pt in cut])
+        with open(f'{os.path.basename(fname)}_algn.xml', 'wb') as fp:
+            doc.write(fp, encoding='UTF-8', xml_declaration=True)
 
 @click.command()
-@click.option('-f', '--format-type', type=click.Choice(['xml', 'alto', 'page']), default='xml',
+@click.option('-f', '--format-type', type=click.Choice(['alto', 'page']), default='page',
               help='Sets the input document format. In ALTO and PageXML mode all '
               'data is extracted from xml files containing both baselines, polygons, and a '
               'link to source images.')
 @click.option('-i', '--model', default=None, show_default=True, type=click.Path(exists=True),
               help='Transcription model to use.')
-@click.option('-o', '--output', type=click.Choice(['alto', 'pagexml', 'overlay']),
+@click.option('-o', '--output', type=click.Choice(['xml', 'overlay']),
               show_default=True, default='overlay', help='Output mode. Either page or '
               'alto for xml output, overlay for image overlays.')
 @click.argument('files', nargs=-1)
@@ -58,12 +80,12 @@ def cli(format_type, model, output, files):
     from kraken.lib import models, xml
     from kraken import align, serialization
 
-    if format_type == 'xml':
-        fn = xml.parse_xml
-    elif format_type == 'alto':
-        fn = xml.parse_palto
+    if format_type == 'alto':
+        fn = xml.parse_alto
+        repl_fn = _repl_alto
     else:
         fn = xml.parse_page
+        repl_fn = _repl_page
     click.echo(f'Loading model {model}')
     net = models.load_any(model)
 
@@ -82,8 +104,7 @@ def cli(format_type, model, output, files):
             base_image = Image.alpha_composite(im, tmp)
             base_image.save(f'high_{os.path.basename(doc)}_algn.png')
         else:
-            with open(f'{os.path.basename(doc)}_algn.xml', 'w') as fp:
-                fp.write(serialization.serialize(records, image_name=data['image'], regions=data['regions'], template=output))
+            repl_fn(doc, records)
         click.secho('\u2713', fg='green')
 
 if __name__ == '__main__':
