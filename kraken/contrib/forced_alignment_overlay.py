@@ -36,10 +36,29 @@ def _repl_alto(fname, cuts):
     with open(fname, 'rb') as fp:
         doc = etree.parse(fp)
         lines = doc.findall('.//{*}TextLine')
+        char_idx = 0
         for line, line_cuts in zip(lines, cuts):
-            glyphs = line.findall('../{*}Glyph/{*}Shape/{*}Polygon')
-            for glyph, cut in zip(glyphs, line_cuts):
-                glyph.attrib['POINTS'] = ' '.join([str(coord) for pt in cut for coord in pt])
+            idx = 0
+            for el in line:
+                if el.tag.endswith('Shape'):
+                    continue
+                elif el.tag.endswith('SP'):
+                    idx +=1
+                elif el.tag.endswith('String'):
+                    str_len = len(el.get('CONTENT'))
+                    # clear out all 
+                    for chld in el:
+                        if chld.tag.endswith('Glyph'):
+                            el.remove(chld)
+                    for char in line_cuts[idx:str_len]:
+                        glyph = etree.SubElement(el, 'Glyph')
+                        glyph.set('ID', f'char_{char_idx}')
+                        char_idx += 1
+                        glyph.set('CONTENT', char[0])
+                        glyph.set('GC', str(char[2]))
+                        pol = etree.SubElement(etree.SubElement(glyph, 'Shape'), 'Polygon')
+                        pol.set('POINTS', ' '.join([str(coord) for pt in char[1] for coord in pt]))
+                    idx += str_len
         with open(f'{os.path.basename(fname)}_algn.xml', 'wb') as fp:
             doc.write(fp, encoding='UTF-8', xml_declaration=True)
 
