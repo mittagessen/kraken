@@ -20,7 +20,7 @@ dependencies:
   - cpuonly
   - pytorch::pytorch>=1.5.0,<=1.7.0
   - jsonschema
-  - scikit-image<=0.17.2
+  - scikit-image>=0.17.0
   - shapely
   - pip
   - pyvips
