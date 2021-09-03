@@ -22,6 +22,42 @@ output document for one input document follow the basic syntax:
 
 In particular subcommands may be chained.
 
+There are other ways to define inputs and outputs as the syntax shown above can
+become rather cumbersome for large amounts of files.
+
+As such there are a couple of ways to deal with multiple files in a compact
+way. The first is batch processing:
+
+.. code-block:: console
+
+        $ kraken -I '*.png' -o ocr.txt segment ...
+
+which expands the `glob expression
+<https://en.wikipedia.org/wiki/Glob_(programming)>`_ in kraken internally and
+appends the suffix defined with `-o` to each output file. An input file
+`xyz.png` will therefore produce an output file `xyz.png.ocr.txt`. A second way
+is to input multi-image files directly. These can be either in PDF, TIFF, or
+JPEG2000 format and are specified like:
+
+.. code-block:: console
+
+        $ kraken -I some.pdf -o ocr.txt -f pdf segment ...
+
+This will internally extract all page images from the input PDF file and write
+one output file with an index (can be changed using the `-p` option) and the
+suffix defined with `-o`.
+
+The `-f` option can not only be used to extract data from PDF/TIFF/JPEG2000
+files but also various XML formats. In these cases the appropriate data is
+automatically selected from the inputs, image data for segmentation or line and
+region segmentation for recognition:
+
+.. code-block:: console
+
+        $ kraken -i alto.xml alto.ocr.txt -i page.xml page.ocr.txt -f xml ocr ...
+
+The code is able to automatically determine if a file is in PageXML or ALTO format.
+
 Binarization
 ------------
 
