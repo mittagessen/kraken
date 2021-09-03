@@ -28,6 +28,7 @@ from scipy.spatial import ConvexHull
 
 from kraken.rpred import ocr_record
 from kraken.lib.util import make_printable
+from kraken.lib.segmentation import is_in_region
 
 from typing import List, Tuple, Iterable, Optional, Sequence, Dict
 
@@ -131,10 +132,10 @@ def serialize(records: Sequence[ocr_record],
     is_in_region = -1
     for idx, record in enumerate(records):
         if record.type == 'baselines':
-            l_obj = geom.LineString(record.baseline).interpolate(0.5, normalized=True)
+            l_obj = geom.LineString(record.baseline)
         else:
-            l_obj = geom.LineString(record.line).interpolate(0.5, normalized=True)
-        reg = list(filter(lambda x: x[1][1].contains(l_obj), region_map.items()))
+            l_obj = geom.LineString(record.line)
+        reg = list(filter(lambda x: is_in_region(l_obj, x[1][1]), region_map.items()))
         if len(reg) == 0:
             cur_ent = page['entities']
         elif reg[0][0] != is_in_region:

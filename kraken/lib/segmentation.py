@@ -713,13 +713,13 @@ def polygonal_reading_order(lines: Sequence[Tuple[List, List]],
     indizes = {}
     for line_idx, line in enumerate(lines):
         l = geom.LineString(line[1])
-        is_in_region = False
+        in_region = False
         for idx, reg in enumerate(r):
-            if reg.contains(l):
+            if is_in_region(l, reg):
                 region_lines[idx].append((line_idx, (slice(l.bounds[1], l.bounds[0]), slice(l.bounds[3], l.bounds[2]))))
-                is_in_region = True
+                in_region = True
                 break
-        if not is_in_region:
+        if not in_region:
             bounds.append((slice(l.bounds[1], l.bounds[0]), slice(l.bounds[3], l.bounds[2])))
             indizes[line_idx] = ('line', line)
     # order everything in regions
@@ -744,6 +744,22 @@ def polygonal_reading_order(lines: Sequence[Tuple[List, List]],
         else:
             ordered_lines.extend(lines[x] for x in intra_region_order[indizes[i][1]])
     return ordered_lines
+
+
+def is_in_region(line, region) -> bool:
+    """
+    Tests if a line is inside a region, i.e. if the mid point of the baseline
+    is inside the region.
+
+    Args:
+        line (geom.LineString): line to test
+        region (geom.Polygon):
+
+    Returns:
+        False if line is not inside region, True otherwise
+    """
+    l_obj = line.interpolate(0.5, normalized=True)
+    return region.contains(l_obj)
 
 
 def scale_regions(regions: Sequence[Tuple[List, List]],
