@@ -347,7 +347,7 @@ def recognition_evaluator_fn(model, val_loader, device):
     rec = models.TorchSeqRecognizer(model, device=device)
     chars, error = compute_error(rec, val_loader)
     model.train()
-    accuracy = ((chars-error)/chars)
+    accuracy = ((chars-error)/(chars + np.finfo(np.float).eps))
     return {'val_metric': accuracy, 'accuracy': accuracy, 'chars': chars, 'error': error}
 
 
