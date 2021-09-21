@@ -129,7 +129,7 @@ def serialize(records: Sequence[ocr_record],
     if regions is not None:
         page['types'].extend(list(regions.keys()))
 
-    is_in_region = -1
+    is_in_reg = -1
     for idx, record in enumerate(records):
         if record.type == 'baselines':
             l_obj = geom.LineString(record.baseline)
@@ -138,9 +138,9 @@ def serialize(records: Sequence[ocr_record],
         reg = list(filter(lambda x: is_in_region(l_obj, x[1][1]), region_map.items()))
         if len(reg) == 0:
             cur_ent = page['entities']
-        elif reg[0][0] != is_in_region:
+        elif reg[0][0] != is_in_reg:
             reg = reg[0]
-            is_in_region = reg[0]
+            is_in_reg = reg[0]
             region = {'index': reg[0],
                       'bbox': [int(x) for x in reg[1][1].bounds],
                       'boundary': [list(x) for x in reg[1][2]],
