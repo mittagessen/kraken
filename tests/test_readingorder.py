@@ -4,6 +4,7 @@ from __future__ import absolute_import, division, print_function
 
 import unittest
 import os
+from typing import Sequence, Tuple
 
 import shapely.geometry as geom
 import numpy as np
@@ -12,6 +13,14 @@ from kraken.lib.segmentation import is_in_region, reading_order, topsort
 
 thisfile = os.path.abspath(os.path.dirname(__file__))
 resources = os.path.abspath(os.path.join(thisfile, 'resources'))
+
+
+def polygon_slices(polygon: Sequence) -> Tuple:
+    """Convert polygons to slices for reading_order"""
+    linestr = geom.LineString(polygon)
+    slices = (slice(linestr.bounds[1], linestr.bounds[0]),
+             slice(linestr.bounds[3], linestr.bounds[2]))
+    return slices
 
 
 class TestReadingOrder(unittest.TestCase):
@@ -55,12 +64,8 @@ class TestReadingOrder(unittest.TestCase):
         
         """
         polygon0 = [[10, 10], [10, 20], [100, 20], [100, 10], [10, 10]]
-        linestr0 = geom.LineString(polygon0)
-        line0 = (slice(linestr0.bounds[1], linestr0.bounds[0]), slice(linestr0.bounds[3], linestr0.bounds[2]))
         polygon1 = [[10, 30], [10, 40], [100, 40], [100, 30], [10, 30]]
-        linestr1 = geom.LineString(polygon1)
-        line1 = (slice(linestr1.bounds[1], linestr1.bounds[0]), slice(linestr1.bounds[3], linestr1.bounds[2]))
-        order = reading_order([line0, line1])
+        order = reading_order([polygon_slices(line) for line in [polygon0, polygon1]])
         # line0 should come before line1, lines do not come before themselves
         expected = np.array([[0, 1], [0, 0]])
         self.assertTrue(np.array_equal(order, expected), "Reading order is not as expected: {}".format(order))
@@ -76,12 +81,8 @@ class TestReadingOrder(unittest.TestCase):
         
         """
         polygon0 = [[10, 10], [10, 30], [100, 30], [100, 10], [10, 10]]
-        linestr0 = geom.LineString(polygon0)
-        line0 = (slice(linestr0.bounds[1], linestr0.bounds[0]), slice(linestr0.bounds[3], linestr0.bounds[2]))
         polygon1 = [[10, 30], [10, 40], [100, 40], [100, 30], [10, 30]]
-        linestr1 = geom.LineString(polygon1)
-        line1 = (slice(linestr1.bounds[1], linestr1.bounds[0]), slice(linestr1.bounds[3], linestr1.bounds[2]))
-        order = reading_order([line0, line1])
+        order = reading_order([polygon_slices(line) for line in [polygon0, polygon1]])
         # line0 should come before line1, lines do not come before themselves
         expected = np.array([[0, 1], [0, 0]])
         self.assertTrue(np.array_equal(order, expected), "Reading order is not as expected: {}".format(order))
@@ -96,12 +97,8 @@ class TestReadingOrder(unittest.TestCase):
         
         """
         polygon0 = [[10, 10], [10, 20], [100, 20], [100, 10], [10, 10]]
-        linestr0 = geom.LineString(polygon0)
-        line0 = (slice(linestr0.bounds[1], linestr0.bounds[0]), slice(linestr0.bounds[3], linestr0.bounds[2]))
         polygon1 = [[150, 10], [150, 20], [250, 20], [250, 10], [150, 10]]
-        linestr1 = geom.LineString(polygon1)
-        line1 = (slice(linestr1.bounds[1], linestr1.bounds[0]), slice(linestr1.bounds[3], linestr1.bounds[2]))
-        order = reading_order([line0, line1])
+        order = reading_order([polygon_slices(line) for line in [polygon0, polygon1]])
         # line0 should come before line1, lines do not come before themselves
         expected = np.array([[0, 1], [0, 0]])
         self.assertTrue(np.array_equal(order, expected), "Reading order is not as expected: {}".format(order))
@@ -116,12 +113,8 @@ class TestReadingOrder(unittest.TestCase):
         
         """
         polygon0 = [[10, 10], [10, 20], [100, 20], [100, 10], [10, 10]]
-        linestr0 = geom.LineString(polygon0)
-        line0 = (slice(linestr0.bounds[1], linestr0.bounds[0]), slice(linestr0.bounds[3], linestr0.bounds[2]))
         polygon1 = [[100, 10], [100, 20], [250, 20], [250, 10], [100, 10]]
-        linestr1 = geom.LineString(polygon1)
-        line1 = (slice(linestr1.bounds[1], linestr1.bounds[0]), slice(linestr1.bounds[3], linestr1.bounds[2]))
-        order = reading_order([line0, line1])
+        order = reading_order([polygon_slices(line) for line in [polygon0, polygon1]])
         # line0 should come before line1, lines do not come before themselves
         expected = np.array([[0, 1], [0, 0]])
         self.assertTrue(np.array_equal(order, expected), "Reading order is not as expected: {}".format(order))
@@ -131,12 +124,8 @@ class TestReadingOrder(unittest.TestCase):
         Real example: lines are in reverse order.
         """
         polygon0 = [[474, 2712], [466, 2669], [1741, 2655], [1749, 2696], [1746, 2709], [474, 2725]]
-        linestr0 = geom.LineString(polygon0)
-        line0 = (slice(linestr0.bounds[1], linestr0.bounds[0]), slice(linestr0.bounds[3], linestr0.bounds[2]))
         polygon1 = [[493, 2409], [488, 2374], [1733, 2361], [1741, 2395], [1738, 2409], [493, 2422]]
-        linestr1 = geom.LineString(polygon1)
-        line1 = (slice(linestr1.bounds[1], linestr1.bounds[0]), slice(linestr1.bounds[3], linestr1.bounds[2]))
-        order = reading_order([line0, line1])
+        order = reading_order([polygon_slices(line) for line in [polygon0, polygon1]])
         # line1 should come before line0, lines do not come before themselves
         expected = np.array([[0, 0], [1, 0]])
         self.assertTrue(np.array_equal(order, expected), "Reading order is not as expected: {}".format(order))
@@ -146,12 +135,8 @@ class TestReadingOrder(unittest.TestCase):
         Real (modified) example: lines are in order.
         """
         polygon0 = [[493, 2409], [488, 2374], [1733, 2361], [1741, 2395], [1738, 2409], [493, 2422]]
-        linestr0 = geom.LineString(polygon0)
-        line0 = (slice(linestr0.bounds[1], linestr0.bounds[0]), slice(linestr0.bounds[3], linestr0.bounds[2]))
         polygon1 = [[474, 2712], [466, 2669], [1741, 2655], [1749, 2696], [1746, 2709], [474, 2725]]
-        linestr1 = geom.LineString(polygon1)
-        line1 = (slice(linestr1.bounds[1], linestr1.bounds[0]), slice(linestr1.bounds[3], linestr1.bounds[2]))
-        order = reading_order([line0, line1])
+        order = reading_order([polygon_slices(line) for line in [polygon0, polygon1]])
         # line0 should come before line1, lines do not come before themselves
         expected = np.array([[0, 1], [0, 0]])
         self.assertTrue(np.array_equal(order, expected), "Reading order is not as expected: {}".format(order))
