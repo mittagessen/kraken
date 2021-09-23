@@ -112,7 +112,7 @@ class TestReadingOrder(unittest.TestCase):
         In this example, the boundaries are rectangles that align horizontally,
         have horizontal base lines and touch::
 
-            AAAA  BBBB
+            AAAABBBB
         
         """
         polygon0 = [[10, 10], [10, 20], [100, 20], [100, 10], [10, 10]]
