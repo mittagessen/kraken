@@ -196,7 +196,7 @@ def rewrite_ocr_page_title(xhtml, file_name, image_x, image_y):
     return xhtml
 
 if not(os.path.isdir(args.inputDir)):
-    print('Input directory "'+image_dir+'" does not exist.\n\tExiting ...')
+    print('Input directory "'+args.inputDir+'" does not exist.\n\tExiting ...')
     sys.exit(1)
 
 #Create the output directory if it doesn't exist

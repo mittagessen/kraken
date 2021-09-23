@@ -814,9 +814,9 @@ class KrakenTrainer(object):
             tr_it.add_phase(int(len(gt_set) * hyper_params['epochs']),
                             annealing_exp)
         elif hyper_params['schedule'] == 'step':
-            annealing_step = partial(annealing_step, step_size=hyper_params['step_size'], gamma=hyper_params['gamma'])
+            annealing_step_p = partial(annealing_step, step_size=hyper_params['step_size'], gamma=hyper_params['gamma'])
             tr_it.add_phase(int(len(gt_set) * hyper_params['epochs']),
-                            annealing_step)
+                            annealing_step_p)
         elif hyper_params['schedule'] == 'reduceonplateau':
             annealing_red = partial(annealing_reduceonplateau, patience=hyper_params['rop_patience'], factor=hyper_params['gamma'])
             tr_it.add_phase(int(len(gt_set) * hyper_params['epochs']),
@@ -1134,9 +1134,9 @@ class KrakenTrainer(object):
             tr_it.add_phase(int(len(gt_set) * hyper_params['epochs']),
                             annealing_exp)
         elif hyper_params['schedule'] == 'step':
-            annealing_step = partial(annealing_step, step_size=hyper_params['step_size'], gamma=hyper_params['gamma'])
+            annealing_step_p = partial(annealing_step, step_size=hyper_params['step_size'], gamma=hyper_params['gamma'])
             tr_it.add_phase(int(len(gt_set) * hyper_params['epochs']),
-                            annealing_step)
+                            annealing_step_p)
         elif hyper_params['schedule'] == 'reduceonplateau':
             annealing_red = partial(annealing_reduceonplateau, patience=hyper_params['rop_patience'], factor=hyper_params['gamma'])
             tr_it.add_phase(int(len(gt_set) * hyper_params['epochs']),
