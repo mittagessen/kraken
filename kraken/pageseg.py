@@ -20,25 +20,18 @@ kraken.pageseg
 
 Layout analysis and script detection methods.
 """
-from itertools import groupby
-
-import json
 import logging
 import numpy as np
-import pkg_resources
 
 from typing import Tuple, List, Callable, Optional, Dict, Any
 from scipy.ndimage.filters import (gaussian_filter, uniform_filter,
                                    maximum_filter)
 
-from kraken.lib import models
 from kraken.lib import morph, sl
 from kraken.lib.util import pil2array, is_bitonal, get_im_str
 from kraken.lib.exceptions import KrakenInputException
 from kraken.lib.segmentation import reading_order, topsort
 
-from kraken.rpred import rpred
-from kraken.serialization import max_bbox
 
 __all__ = ['segment']
 
@@ -256,12 +249,12 @@ def compute_line_seeds(binary: np.array, bottom: np.array, top: np.array,
         transitions = sorted([(y, 1) for y in find(bmarked[:, x])] +
                              [(y, 0) for y in find(tmarked[:, x])])[::-1]
         transitions += [(0, 0)]
-        for l in range(len(transitions)-1):
-            y0, s0 = transitions[l]
+        for ls in range(len(transitions)-1):
+            y0, s0 = transitions[ls]
             if s0 == 0:
                 continue
             seeds[y0-delta:y0, x] = 1
-            y1, s1 = transitions[l+1]
+            y1, s1 = transitions[ls+1]
             if s1 == 0 and (y0-y1) < 5*scale:
                 seeds[y1:y0, x] = 1
     seeds = maximum_filter(seeds, (1, int(1+scale)))
@@ -417,7 +410,7 @@ def segment(im, text_direction: str = 'horizontal-lr',
     segmentation = llabels*binary
 
     lines = compute_lines(segmentation, scale)
-    order = reading_order_fn([l.bounds for l in lines], text_direction[-2:])
+    order = reading_order_fn([line.bounds for line in lines], text_direction[-2:])
     lsort = topsort(order)
     lines = [lines[i].bounds for i in lsort]
     lines = [(s2.start, s1.start, s2.stop, s1.stop) for s1, s2 in lines]
@@ -426,4 +419,6 @@ def segment(im, text_direction: str = 'horizontal-lr',
         pad = (pad, pad)
     lines = [(max(x[0]-pad[0], 0), x[1], min(x[2]+pad[1], im.size[0]), x[3]) for x in lines]
 
-    return {'text_direction': text_direction, 'boxes':  rotate_lines(lines, 360-angle, offset).tolist(), 'script_detection': False}
+    return {'text_direction': text_direction,
+            'boxes': rotate_lines(lines, 360-angle, offset).tolist(),
+            'script_detection': False}

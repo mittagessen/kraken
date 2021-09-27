@@ -26,7 +26,6 @@ import pkg_resources
 
 from typing import Dict, Union, List, cast, Any, IO, Callable
 from functools import partial
-from itertools import cycle
 from PIL import Image
 
 import click
@@ -139,7 +138,14 @@ def segmenter(legacy, model, text_direction, scale, maxcolseps, black_colseps,
     message('Segmenting\t', nl=False)
     try:
         if legacy:
-            res = pageseg.segment(im, text_direction, scale, maxcolseps, black_colseps, no_hlines=remove_hlines, pad=pad, mask=mask)
+            res = pageseg.segment(im,
+                                  text_direction,
+                                  scale,
+                                  maxcolseps,
+                                  black_colseps,
+                                  no_hlines=remove_hlines,
+                                  pad=pad,
+                                  mask=mask)
         else:
             res = blla.segment(im, text_direction, mask=mask, model=model, device=device)
     except Exception:
@@ -297,7 +303,7 @@ def cli(input, batch_input, suffix, verbose, format_type, pdf_format, serializer
     ctx.meta['input_format_type'] = format_type if format_type != 'pdf' else 'image'
     ctx.meta['raise_failed'] = raise_on_error
     ctx.meta['output_mode'] = serializer
-    log.set_logger(logger, level=30-min(10*verbose, 20))
+    log.set_logger(logger, level=30 - min(10 * verbose, 20))
 
 
 @cli.resultcallback()
@@ -368,7 +374,7 @@ def process_pipeline(subcommands, input, batch_input, suffix, verbose, format_ty
                 os.close(tmp[0])
             fc = [io_pair[0]] + [tmp[1] for tmp in tmps] + [io_pair[1]]
             for idx, (task, input, output) in enumerate(zip(subcommands, fc, fc[1:])):
-                if len(fc)-2 == idx:
+                if len(fc) - 2 == idx:
                     ctx.meta['last_process'] = True
                 task(input=input, output=output)
         except Exception as e:
@@ -433,7 +439,7 @@ def segment(ctx, model, boxes, text_direction, scale, maxcolseps,
         logger.warning(f'Baseline model ({model}) given but legacy segmenter selected. Forcing to -bl.')
         boxes = False
 
-    if boxes == False:
+    if boxes is False:
         if not model:
             model = SEGMENTATION_DEFAULT_MODEL
         from kraken.lib.vgsl import TorchVGSLModel
@@ -571,16 +577,11 @@ def show(ctx, model_id):
             combining.append(make_printable(char))
         else:
             chars.append(char)
-    message('name: {}\n\n{}\n\n{}\nscripts: {}\nalphabet: {} {}\naccuracy: {:.2f}%\nlicense: {}\nauthor(s): {}\ndate: {}'.format(model_id,
-                                                                                                                                 desc['summary'],
-                                                                                                                                 desc['description'],
-                                                                                                                                 ' '.join(desc['script']),
-                                                                                                                                 ''.join(chars),
-                                                                                                                                 ', '.join(combining),
-                                                                                                                                 desc['accuracy'],
-                                                                                                                                 desc['license']['id'],
-                                                                                                                                 '; '.join(x['name'] for x in desc['creators']),
-                                                                                                                                 desc['publication_date']))
+    message(
+        'name: {}\n\n{}\n\n{}\nscripts: {}\nalphabet: {} {}\naccuracy: {:.2f}%\nlicense: {}\nauthor(s): {}\ndate: {}'.format(
+            model_id, desc['summary'], desc['description'], ' '.join(
+                desc['script']), ''.join(chars), ', '.join(combining), desc['accuracy'], desc['license']['id'], '; '.join(
+                x['name'] for x in desc['creators']), desc['publication_date']))
     ctx.exit(0)
 
 

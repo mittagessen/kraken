@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# Copyright 2021 Teklia 
+# Copyright 2021 Teklia
 # Copyright 2021 Benjamin Kiessling
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -38,14 +38,14 @@ logger = logging.getLogger('kraken')
 try:
     import pywrapfst as fst
 
-    _get_fst = lambda: fst.VectorFst()
-    _get_best_weight = lambda x: fst.Weight.one(fst.weight_type())
+    _get_fst = lambda: fst.VectorFst() # NOQA
+    _get_best_weight = lambda x: fst.Weight.one(fst.weight_type()) # NOQA
 except ImportError:
     logger.info('pywrapfst not available. Falling back to openfst_python.')
     try:
         import openfst_python as fst
-        _get_fst = lambda: fst.Fst()
-        _get_best_weight = lambda x: 0
+        _get_fst = lambda: fst.Fst() # NOQA
+        _get_best_weight = lambda x: 0 # NOQA
     except ImportError:
         logger.error('Neither pywrapfst nor openfst_python bindings available.')
         raise
@@ -128,7 +128,7 @@ def fst_from_text(line, codec):
         # We will end with the empty char # at pos 1 (see: kraken.lib.codec.py)
         try:
             encoded_char = codec.encode(char)[0] + 1
-        except KrakenEncodeException as e:
+        except KrakenEncodeException:
             encoded_char = 0
             logger.warning(f'Error while encoding code point {char}. Skipping.')
         # Espilon loop

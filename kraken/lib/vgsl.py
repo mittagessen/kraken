@@ -105,11 +105,17 @@ class TorchVGSLModel(object):
         """
         self.spec = spec
         self.named_spec = []  # type:  List[str]
-        self.ops = [self.build_rnn, self.build_dropout, self.build_maxpool, self.build_conv, self.build_output, self.build_reshape, self.build_groupnorm]
+        self.ops = [self.build_rnn, self.build_dropout, self.build_maxpool,
+                    self.build_conv, self.build_output, self.build_reshape,
+                    self.build_groupnorm]
         self.codec = None  # type: Optional[PytorchCodec]
         self.criterion = None  # type: Any
         self.nn = layers.MultiParamSequential()
-        self.user_metadata = {'accuracy': [], 'seg_type': None, 'one_channel_mode': None, 'model_type': None, 'hyper_params': {}}  # type: dict[str, str]
+        self.user_metadata = {'accuracy': [],
+                              'seg_type': None,
+                              'one_channel_mode': None,
+                              'model_type': None,
+                              'hyper_params': {}}  # type: dict[str, str]
 
         self.idx = -1
         spec = spec.strip()
@@ -448,7 +454,11 @@ class TorchVGSLModel(object):
         if 'codec' in mlmodel.user_defined_metadata:
             nn.add_codec(PytorchCodec(json.loads(mlmodel.user_defined_metadata['codec'])))
 
-        nn.user_metadata = {'accuracy': [], 'seg_type': 'bbox', 'one_channel_mode': '1', 'model_type': None, 'hyper_params': {}}  # type: dict[str, str]
+        nn.user_metadata = {'accuracy': [],
+                            'seg_type': 'bbox',
+                            'one_channel_mode': '1',
+                            'model_type': None,
+                            'hyper_params': {}}  # type: dict[str, str]
         if 'kraken_meta' in mlmodel.user_defined_metadata:
             nn.user_metadata.update(json.loads(mlmodel.user_defined_metadata['kraken_meta']))
         return nn
@@ -607,7 +617,9 @@ class TorchVGSLModel(object):
         self.named_spec[-1] = 'O{}{}{}{}{}'.format(m.group('name'), m.group('dim'), m.group('type'), aug, output_size)
         self.spec = '[' + ' '.join(self.named_spec) + ']'
 
-    def build_rnn(self, input: Tuple[int, int, int, int], block: str) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
+    def build_rnn(self,
+                  input: Tuple[int, int, int, int],
+                  block: str) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
         """
         Builds an LSTM/GRU layer returning number of outputs and layer.
         """
@@ -626,10 +638,13 @@ class TorchVGSLModel(object):
             legacy = 'ocropy'
         hidden = int(m.group(7))
         fn = layers.TransposedSummarizingRNN(input[1], hidden, direction, dim, summarize, legacy)
-        logger.debug('{}\t\trnn\tdirection {} transposed {} summarize {} out {} legacy {}'.format(self.idx+1, direction, dim, summarize, hidden, legacy))
+        logger.debug(f'{self.idx+1}\t\trnn\tdirection {direction} transposed {dim} '
+                     f'summarize {summarize} out {hidden} legacy {legacy}')
         return fn.get_shape(input), self.get_layer_name(type, m.group('name')), fn
 
-    def build_dropout(self, input: Tuple[int, int, int, int], block: str) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
+    def build_dropout(self,
+                      input: Tuple[int, int, int, int],
+                      block: str) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
         pattern = re.compile(r'(?P<type>Do)(?P<name>{\w+})?(?P<p>(\d+(\.\d*)?|\.\d+))?(,(?P<dim>\d+))?')
         m = pattern.match(block)
         if not m:
@@ -640,7 +655,9 @@ class TorchVGSLModel(object):
         logger.debug('{}\t\tdropout\tprobability {} dims {}'.format(self.idx+1, prob, dim))
         return fn.get_shape(input), self.get_layer_name(m.group('type'), m.group('name')), fn
 
-    def build_groupnorm(self, input: Tuple[int, int, int, int], block: str) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
+    def build_groupnorm(self,
+                        input: Tuple[int, int, int, int],
+                        block: str) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
         pattern = re.compile(r'(?P<type>Gn)(?P<name>{\w+})?(?P<groups>\d+)')
         m = pattern.match(block)
         if not m:
@@ -650,11 +667,14 @@ class TorchVGSLModel(object):
         logger.debug('{}\t\tgroupnorm\tgroups {}'.format(self.idx+1, groups))
         return fn.get_shape(input), self.get_layer_name(m.group('type'), m.group('name')), fn
 
-    def build_conv(self, input: Tuple[int, int, int, int], block: str) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
+    def build_conv(self,
+                   input: Tuple[int, int, int, int],
+                   block: str) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
         """
         Builds a 2D convolution layer.
         """
-        pattern = re.compile(r'(?P<type>C)(?P<nl>s|t|r|l|m)(?P<name>{\w+})?(\d+),(\d+),(?P<out>\d+)(,(?P<stride_y>\d+),(?P<stride_x>\d+))?')
+        pattern = re.compile(r'(?P<type>C)(?P<nl>s|t|r|l|m)(?P<name>{\w+})?(\d+),'
+                             r'(\d+),(?P<out>\d+)(,(?P<stride_y>\d+),(?P<stride_x>\d+))?')
         m = pattern.match(block)
         if not m:
             return None, None, None
@@ -663,10 +683,13 @@ class TorchVGSLModel(object):
         stride = (int(m.group('stride_y')), int(m.group('stride_x'))) if m.group('stride_x') else (1, 1)
         nl = m.group('nl')
         fn = layers.ActConv2D(input[1], filters, kernel_size, stride, nl)
-        logger.debug('{}\t\tconv\tkernel {} x {} filters {} stride {} activation {}'.format(self.idx+1, kernel_size[0], kernel_size[1], filters, stride, nl))
+        logger.debug(f'{self.idx+1}\t\tconv\tkernel {kernel_size[0]} x {kernel_size[1]} '
+                     f'filters {filters} stride {stride} activation {nl}')
         return fn.get_shape(input), self.get_layer_name(m.group('type'), m.group('name')), fn
 
-    def build_maxpool(self, input: Tuple[int, int, int, int], block: str) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
+    def build_maxpool(self,
+                      input: Tuple[int, int, int, int],
+                      block: str) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
         """
         Builds a maxpool layer.
         """
@@ -678,14 +701,17 @@ class TorchVGSLModel(object):
         stride = (kernel_size[0] if not m.group(5) else int(m.group(5)),
                   kernel_size[1] if not m.group(6) else int(m.group(6)))
         fn = layers.MaxPool(kernel_size, stride)
-        logger.debug('{}\t\tmaxpool\tkernel {} x {} stride {} x {}'.format(self.idx+1, kernel_size[0], kernel_size[1], stride[0], stride[1]))
+        logger.debug(f'{self.idx+1}\t\tmaxpool\tkernel {kernel_size[0]} x {kernel_size[1]} stride {stride[0]} x {stride[1]}')
         return fn.get_shape(input), self.get_layer_name(m.group('type'), m.group('name')), fn
 
-    def build_reshape(self, input: Tuple[int, int, int, int], block: str) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
+    def build_reshape(self,
+                      input: Tuple[int, int, int, int],
+                      block: str) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
         """
         Builds a reshape layer
         """
-        pattern = re.compile(r'(?P<type>S)(?P<name>{\w+})?(?P<dim>\d+)\((?P<part_a>\d+)x(?P<part_b>\d+)\)(?P<high>\d+),(?P<low>\d+)')
+        pattern = re.compile(r'(?P<type>S)(?P<name>{\w+})?(?P<dim>\d+)\((?P<part_a>\d+)x'
+                             r'(?P<part_b>\d+)\)(?P<high>\d+),(?P<low>\d+)')
         m = pattern.match(block)
         if not m:
             return None, None, None
@@ -714,7 +740,9 @@ class TorchVGSLModel(object):
         fn = layers.Reshape(src_dim, part_a, part_b, high, low)
         return fn.get_shape(input), self.get_layer_name(m.group('type'), m.group('name')), fn
 
-    def build_output(self, input: Tuple[int, int, int, int], block: str) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
+    def build_output(self,
+                     input: Tuple[int, int, int, int],
+                     block: str) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
         """
         Builds an output layer.
         """

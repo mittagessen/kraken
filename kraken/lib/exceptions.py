@@ -7,6 +7,7 @@ All custom exceptions raised by kraken's modules and packages. Packages should
 always define their exceptions here.
 """
 
+
 class KrakenCodecException(Exception):
 
     def __init__(self, message=None):

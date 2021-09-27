@@ -20,6 +20,7 @@ class MultiParamSequential(Sequential):
     """
     Sequential variant accepting multiple arguments.
     """
+
     def forward(self, *inputs):
         for module in self._modules.values():
             if type(inputs) == tuple:
@@ -27,6 +28,7 @@ class MultiParamSequential(Sequential):
             else:
                 inputs = module(inputs)
         return inputs
+
 
 def PeepholeLSTMCell(input: torch.Tensor,
                      hidden: Tuple[torch.Tensor, torch.Tensor],
@@ -146,6 +148,7 @@ class Reshape(Module):
     """
     Reshapes input and moves it into other dimensions.
     """
+
     def __init__(self, src_dim: int, part_a: int, part_b: int, high: int, low: int) -> None:
         """
         A wrapper around reshape with serialization and layer arithmetic.
@@ -223,6 +226,7 @@ class MaxPool(Module):
     """
     A simple wrapper for MaxPool layers
     """
+
     def __init__(self, kernel_size: Tuple[int, int], stride: Tuple[int, int]) -> None:
         """
         A wrapper around MaxPool layers with serialization and layer arithmetic.
@@ -268,6 +272,7 @@ class Dropout(Module):
     """
     A simple wrapper for dropout layers
     """
+
     def __init__(self, p: float, dim: int) -> None:
         """
         A wrapper around dropout layers with serialization and layer arithmetic.
@@ -310,6 +315,7 @@ class TransposedSummarizingRNN(Module):
     """
     An RNN wrapper allowing time axis transpositions and other
     """
+
     def __init__(self,
                  input_size: int,
                  hidden_size: int,
@@ -486,10 +492,12 @@ class TransposedSummarizingRNN(Module):
             builder.add_bidirlstm(name=name,
                                   W_h=_reorder_indim(self.layer.weight_hh_l0),
                                   W_x=_reorder_indim(self.layer.weight_ih_l0),
-                                  b=_reorder_indim((self.layer.bias_ih_l0 + self.layer.bias_hh_l0)) if not self.legacy else None,
+                                  b=_reorder_indim((self.layer.bias_ih_l0 + self.layer.bias_hh_l0)
+                                                   ) if not self.legacy else None,
                                   W_h_back=_reorder_indim(self.layer.weight_hh_l0_reverse),
                                   W_x_back=_reorder_indim(self.layer.weight_ih_l0_reverse),
-                                  b_back=_reorder_indim((self.layer.bias_ih_l0_reverse + self.layer.bias_hh_l0_reverse)) if not self.legacy else None,
+                                  b_back=_reorder_indim((self.layer.bias_ih_l0_reverse +
+                                                        self.layer.bias_hh_l0_reverse)) if not self.legacy else None,
                                   hidden_size=self.hidden_size,
                                   input_size=self.input_size,
                                   input_names=[input],
@@ -521,6 +529,7 @@ class LinSoftmax(Module):
     """
     A wrapper for linear projection + softmax dealing with dimensionality mangling.
     """
+
     def __init__(self, input_size: int, output_size: int, augmentation: bool = False) -> None:
         """
 
@@ -624,6 +633,7 @@ class ActConv2D(Module):
     A wrapper for convolution + activation with automatic padding ensuring no
     dropped columns.
     """
+
     def __init__(self, in_channels: int, out_channels: int, kernel_size: Tuple[int, int], stride: Tuple[int, int], nl: str = 'l') -> None:
         super().__init__()
         self.in_channels = in_channels
@@ -655,13 +665,15 @@ class ActConv2D(Module):
         if self.nl:
             o = self.nl(o)
         if seq_len is not None:
-            seq_len = torch.clamp(torch.floor((seq_len+2*self.padding[1]-(self.kernel_size[1]-1)-1).float()/self.stride[1]+1), min=1).int()
+            seq_len = torch.clamp(torch.floor(
+                (seq_len+2*self.padding[1]-(self.kernel_size[1]-1)-1).float()/self.stride[1]+1), min=1).int()
         return o, seq_len
 
     def get_shape(self, input: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
         self.output_shape = (input[0],
                              self.out_channels,
-                             int(max(np.floor((input[2]+2*self.padding[0]-(self.kernel_size[0]-1)-1)/self.stride[0]+1), 1) if input[2] != 0 else 0),
+                             int(max(np.floor((input[2]+2*self.padding[0]-(self.kernel_size[0]-1)-1) /
+                                 self.stride[0]+1), 1) if input[2] != 0 else 0),
                              int(max(np.floor((input[3]+2*self.padding[1]-(self.kernel_size[1]-1)-1)/self.stride[1]+1), 1) if input[3] != 0 else 0))
         return self.output_shape
 
@@ -734,6 +746,7 @@ class GroupNorm(Module):
     """
     A group normalization layer
     """
+
     def __init__(self, in_channels: int, num_groups: int) -> None:
         super().__init__()
         self.in_channels = in_channels

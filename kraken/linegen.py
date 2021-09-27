@@ -26,7 +26,9 @@ available at [0].
 Line degradation uses a local model described in [1].
 
 [0] https://github.com/googlei18n/nototools
-[1] Kanungo, Tapas, et al. "A statistical, nonparametric methodology for document degradation model validation." IEEE Transactions on Pattern Analysis and Machine Intelligence 22.11 (2000): 1209-1223.
+[1] Kanungo, Tapas, et al. "A statistical, nonparametric methodology for
+document degradation model validation." IEEE Transactions on Pattern Analysis
+and Machine Intelligence 22.11 (2000): 1209-1223.
 
 """
 
@@ -149,7 +151,9 @@ pango.pango_layout_set_font_description.argtypes = [ctypes.POINTER(PangoLayout),
 pango.pango_layout_get_context.argtypes = [ctypes.POINTER(PangoLayout)]
 pango.pango_layout_get_context.restype = ctypes.POINTER(PangoContext)
 
-pango.pango_layout_get_pixel_extents.argtypes = [ctypes.POINTER(PangoLayout), ctypes.POINTER(PangoRectangle), ctypes.POINTER(PangoRectangle)]
+pango.pango_layout_get_pixel_extents.argtypes = [ctypes.POINTER(PangoLayout),
+                                                 ctypes.POINTER(PangoRectangle),
+                                                 ctypes.POINTER(PangoRectangle)]
 
 
 class LineGenerator(object):

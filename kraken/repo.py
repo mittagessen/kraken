@@ -35,7 +35,10 @@ MODEL_REPO = 'https://zenodo.org/api/'
 SUPPORTED_MODELS = set(['kraken_pytorch'])
 
 
-def publish_model(model_file: BinaryIO = None, metadata: dict = None, access_token: str = None, callback: Callable[..., Any] = lambda: None) -> str:
+def publish_model(model_file: BinaryIO = None,
+                  metadata: dict = None,
+                  access_token: str = None,
+                  callback: Callable[..., Any] = lambda: None) -> str:
     """
     Publishes a model to the repository.
 
@@ -76,9 +79,9 @@ def publish_model(model_file: BinaryIO = None, metadata: dict = None, access_tok
                         'access_right': 'open',
                         'communities': [{'identifier': 'ocr_models'}],
                         'keywords': ['kraken_pytorch'],
-                        'license': metadata['license'],
+                        'license': metadata['license']
                         }
-           }
+            }
     # add link to training data to metadata
     if 'source' in metadata:
         data['metadata']['related_identifiers'] = [{'relation': 'isSupplementTo', 'identifier': metadata['source']}]
@@ -148,8 +151,8 @@ def get_description(model_id: str, callback: Callable[..., Any] = lambda: None) 
     callback()
     resp = r.json()
     if resp['hits']['total'] != 1:
-        logger.error('Found {} models when querying for id \'{}\''.format(resp['hits']['total'], model_id))
-        raise KrakenRepoException('Found {} models when querying for id \'{}\''.format(model_id))
+        logger.error(f'Found {resp["hits"]["total"]} models when querying for id \'{model_id}\'')
+        raise KrakenRepoException(f'Found {resp["hits"]["total"]} models when querying for id \'{model_id}\'')
     record = resp['hits']['hits'][0]
     metadata = record['metadata']
     if 'keywords' not in metadata:
@@ -157,7 +160,7 @@ def get_description(model_id: str, callback: Callable[..., Any] = lambda: None) 
         raise KrakenRepoException('No keywords included on deposit.')
     model_type = SUPPORTED_MODELS.intersection(metadata['keywords'])
     if not model_type:
-        msg = 'Unsupported model type(s): {}'.format(', '.format(metadata['keywords']))
+        msg = 'Unsupported model type(s): {}'.format(', '.join(metadata['keywords']))
         logger.error(msg)
         raise KrakenRepoException(msg)
     meta_json = None
@@ -170,7 +173,7 @@ def get_description(model_id: str, callback: Callable[..., Any] = lambda: None) 
             try:
                 meta_json = r.json()
             except Exception:
-                msg = 'Metadata for \'{}\' ({}) not in JSON format'.format(record['metadata']['title'], record['metadata']['doi'])
+                msg = f'Metadata for \'{record["metadata"]["title"]}\' ({record["metadata"]["doi"]}) not in JSON format'
                 logger.error(msg)
                 raise KrakenRepoException(msg)
     if not meta_json:
@@ -232,7 +235,7 @@ def get_listing(callback: Callable[..., Any] = lambda: None) -> dict:
                 try:
                     metadata = r.json()
                 except Exception:
-                    msg = 'Metadata for \'{}\' ({}) not in JSON format'.format(record['metadata']['title'], record['metadata']['doi'])
+                    msg = f'Metadata for \'{record["metadata"]["title"]}\' ({record["metadata"]["doi"]}) not in JSON format'
                     logger.error(msg)
                     raise KrakenRepoException(msg)
         # merge metadata.jsn into DataCite

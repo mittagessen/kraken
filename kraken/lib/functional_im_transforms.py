@@ -25,28 +25,36 @@ from os import path
 from PIL import Image
 
 from kraken.binarization import nlbin
-from kraken.lib.lineest import CenterNormalizer, dewarp
+from kraken.lib.lineest import dewarp
+
 
 def pil_to_mode(im, mode):
     return im.convert(mode)
 
+
 def pil_to_bin(im):
     return nlbin(im)
+
 
 def dummy(x):
     return x
 
+
 def pil_dewarp(im, lnorm):
     return dewarp(lnorm, im)
+
 
 def pil_fixed_resize(im, scale):
     return _fixed_resize(im, scale, Image.LANCZOS)
 
+
 def tensor_invert(im):
     return im.max() - im
 
+
 def tensor_permute(im, perm):
     return im.permute(*perm)
+
 
 def _fixed_resize(img, size, interpolation=Image.LANCZOS):
     """
@@ -66,17 +74,22 @@ def _fixed_resize(img, size, interpolation=Image.LANCZOS):
     img = img.resize((ow, oh), interpolation)
     return img
 
+
 def text_normalize(text, normalization):
     return unicodedata.normalize(normalization, text)
 
+
 def text_whitespace_normalize(text):
-    return regex.sub('\s', ' ', text).strip()
+    return regex.sub(r'\s', ' ', text).strip()
+
 
 def text_reorder(text, base_dir=None):
     return bd.get_display(text, base_dir=base_dir)
 
+
 def default_split(x):
     return path.splitext(x)[0]
+
 
 def suffix_split(x, split, suffix):
     return split(x) + suffix

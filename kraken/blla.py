@@ -28,7 +28,6 @@ import shapely.geometry as geom
 import torch.nn.functional as F
 import torchvision.transforms as tf
 
-from functools import partial
 from typing import Optional, Dict, Callable, Union, List
 
 from scipy.ndimage.filters import gaussian_filter
@@ -46,6 +45,7 @@ from kraken.lib.segmentation import (polygonal_reading_order,
 __all__ = ['segment']
 
 logger = logging.getLogger(__name__)
+
 
 def compute_segmentation_map(im,
                              mask: Optional[np.array] = None,
@@ -117,9 +117,9 @@ def vec_lines(heatmap: torch.Tensor,
               text_direction: str = 'horizontal-lr',
               reading_order_fn: Callable = polygonal_reading_order,
               regions: Dict = None,
-              scal_im = None,
-              suppl_obj = None,
-              topline = False,
+              scal_im: np.array = None,
+              suppl_obj: List = None,
+              topline: bool = False,
               **kwargs):
     """
     Computes lines from a stack of heatmaps, a class mapping, and scaling
@@ -132,7 +132,7 @@ def vec_lines(heatmap: torch.Tensor,
     baselines = []
     for bl_type, idx in cls_map['baselines'].items():
         logger.debug(f'Vectorizing lines of type {bl_type}')
-        baselines.extend([(bl_type,x) for x in vectorize_lines(heatmap[(st_sep, end_sep, idx), :, :])])
+        baselines.extend([(bl_type, x) for x in vectorize_lines(heatmap[(st_sep, end_sep, idx), :, :])])
     logger.debug('Polygonizing lines')
 
     im_feats = gaussian_filter(sobel(scal_im), 0.5)

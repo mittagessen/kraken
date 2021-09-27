@@ -24,8 +24,6 @@ import shapely.geometry as geom
 from shapely.ops import unary_union
 from collections import Counter
 
-from scipy.spatial import ConvexHull
-
 from kraken.rpred import ocr_record
 from kraken.lib.util import make_printable
 from kraken.lib.segmentation import is_in_region
@@ -147,7 +145,7 @@ def serialize(records: Sequence[ocr_record],
                       'region_type': reg[1][0],
                       'lines': [],
                       'type': 'region'
-                     }
+                      }
             page['entities'].append(region)
             cur_ent = region['lines']
 
@@ -178,7 +176,11 @@ def serialize(records: Sequence[ocr_record],
                           'confidences': record.confidences[line_offset:line_offset + len(segment)],
                           'cuts': record.cuts[line_offset:line_offset + len(segment)],
                           'text': segment,
-                          'recognition': [{'bbox': max_bbox([cut]), 'boundary': cut, 'confidence': conf, 'text': char, 'index': cid}
+                          'recognition': [{'bbox': max_bbox([cut]),
+                                           'boundary': cut,
+                                           'confidence': conf,
+                                           'text': char,
+                                           'index': cid}
                                           for conf, cut, char, cid in
                                           zip(record.confidences[line_offset:line_offset + len(segment)],
                                               record.cuts[line_offset:line_offset + len(segment)],

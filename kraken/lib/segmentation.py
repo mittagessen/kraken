@@ -23,13 +23,12 @@ import numpy as np
 import shapely.geometry as geom
 from collections import defaultdict
 
-from PIL import Image, ImageDraw
+from PIL import Image
 
 from scipy.stats import linregress
 from scipy.ndimage import maximum_filter, binary_erosion
-from scipy.ndimage.filters import gaussian_filter
 from scipy.ndimage.morphology import distance_transform_cdt
-from scipy.spatial.distance import cdist, pdist, squareform
+from scipy.spatial.distance import pdist, squareform
 
 from shapely.ops import nearest_points, unary_union
 
@@ -40,7 +39,7 @@ from skimage.measure import approximate_polygon, subdivide_polygon, regionprops,
 from skimage.morphology import skeletonize
 from skimage.transform import PiecewiseAffineTransform, SimilarityTransform, AffineTransform, warp
 
-from typing import List, Tuple, Union, Dict, Any, Sequence, Optional, Callable
+from typing import List, Tuple, Union, Dict, Any, Sequence, Optional
 
 from kraken.lib import default_specs
 from kraken.lib.exceptions import KrakenInputException
@@ -60,6 +59,7 @@ __all__ = ['reading_order',
            'scale_regions',
            'compute_polygon_section',
            'extract_polygons']
+
 
 def reading_order(lines: Sequence, text_direction: str = 'lr') -> List:
     """Given the list of lines (a list of 2D slices), computes
@@ -121,8 +121,8 @@ def topsort(order: np.array) -> np.array:
             return
         visited[k] = 1
         a, = np.nonzero(np.ravel(order[:, k]))
-        for l in a:
-            _visit(l)
+        for line in a:
+            _visit(line)
         L.append(k)
 
     for k in range(n):
@@ -230,19 +230,45 @@ def _extend_boundaries(baselines, bin_bl_map):
             continue
         # 'left' side
         if boundary_pol.contains(geom.Point(bl[0])):
-            l_point = boundary_pol.boundary.intersection(geom.LineString([(bl[0][0]-10*(bl[1][0]-bl[0][0]), bl[0][1]-10*(bl[1][1]-bl[0][1])), bl[0]]))
+            l_point = boundary_pol.boundary.intersection(geom.LineString([(bl[0][0]-10*(bl[1][0]-bl[0][0]),
+                                                                           bl[0][1]-10*(bl[1][1]-bl[0][1])), bl[0]]))
             if l_point.type != 'Point':
                 bl[0] = np.array(nearest_points(geom.Point(bl[0]), boundary_pol)[1], 'int').tolist()
             else:
                 bl[0] = np.array(l_point, 'int').tolist()
         # 'right' side
         if boundary_pol.contains(geom.Point(bl[-1])):
-            r_point = boundary_pol.boundary.intersection(geom.LineString([(bl[-1][0]-10*(bl[-2][0]-bl[-1][0]), bl[-1][1]-10*(bl[-2][1]-bl[-1][1])), bl[-1]]))
+            r_point = boundary_pol.boundary.intersection(geom.LineString([(bl[-1][0]-10*(bl[-2][0]-bl[-1][0]),
+                                                                           bl[-1][1]-10*(bl[-2][1]-bl[-1][1])),
+                                                                          bl[-1]]))
             if r_point.type != 'Point':
                 bl[-1] = np.array(nearest_points(geom.Point(bl[-1]), boundary_pol)[1], 'int').tolist()
             else:
                 bl[-1] = np.array(r_point, 'int').tolist()
     return baselines
+
+
+class LineMCP(MCP_Connect):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.connections = dict()
+        self.scores = defaultdict(lambda: np.inf)
+
+    def create_connection(self, id1, id2, pos1, pos2, cost1, cost2):
+        k = (min(id1, id2), max(id1, id2))
+        s = cost1 + cost2
+        if self.scores[k] > s:
+            self.connections[k] = (pos1, pos2, s)
+            self.scores[k] = s
+
+    def get_connections(self):
+        results = []
+        for k, (pos1, pos2, s) in self.connections.items():
+            results.append(np.concatenate([self.traceback(pos1), self.traceback(pos2)[::-1]]))
+        return results
+
+    def goal_reached(self, int_index, float_cumcost):
+        return 2 if float_cumcost else 0
 
 
 def vectorize_lines(im: np.ndarray, threshold: float = 0.17, min_length=5):
@@ -263,42 +289,19 @@ def vectorize_lines(im: np.ndarray, threshold: float = 0.17, min_length=5):
     # split into baseline and separator map
     st_map = im[0]
     end_map = im[1]
-    sep_map = st_map + end_map
     bl_map = im[2]
     bl_map = filters.sato(bl_map, black_ridges=False, mode='constant')
     bin_bl_map = bl_map > threshold
     # skeletonize
     line_skel = skeletonize(bin_bl_map)
     # find end points
-    kernel = np.array([[1,1,1],[1,10,1],[1,1,1]])
+    kernel = np.array([[1, 1, 1], [1, 10, 1], [1, 1, 1]])
     line_extrema = np.transpose(np.where((convolve2d(line_skel, kernel, mode='same') == 11) * line_skel))
-
-    class LineMCP(MCP_Connect):
-        def __init__(self, *args, **kwargs):
-           super().__init__(*args, **kwargs)
-           self.connections = dict()
-           self.scores = defaultdict(lambda: np.inf)
-
-        def create_connection(self, id1, id2, pos1, pos2, cost1, cost2):
-            k = (min(id1, id2), max(id1, id2))
-            s = cost1 + cost2
-            if self.scores[k] > s:
-                self.connections[k] = (pos1, pos2, s)
-                self.scores[k] = s
-
-        def get_connections(self):
-            results = []
-            for k, (pos1, pos2, s) in self.connections.items():
-                results.append(np.concatenate([self.traceback(pos1), self.traceback(pos2)[::-1]]))
-            return results
-
-        def goal_reached(self, int_index, float_cumcost):
-            return 2 if float_cumcost else 0
 
     mcp = LineMCP(~line_skel)
     try:
         mcp.find_costs(line_extrema)
-    except ValueError as e:
+    except ValueError:
         return []
 
     lines = [approximate_polygon(line, 3).tolist() for line in mcp.get_connections()]
@@ -352,7 +355,7 @@ def vectorize_regions(im: np.ndarray, threshold: float = 0.5):
         boundaries = [boundaries.boundary]
     else:
         boundaries = [x.boundary for x in unary_union(boundaries)]
-    return [np.array(x, dtype=np.uint)[:,[1,0]].tolist() for x in boundaries]
+    return [np.array(x, dtype=np.uint)[:, [1, 0]].tolist() for x in boundaries]
 
 
 def _rotate(image, angle, center, scale, cval=0):
@@ -465,7 +468,7 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
     if im_feats is None:
         bounds = np.array(im.size, dtype=np.float) - 1
         im = np.array(im.convert('L'))
-         # compute image gradient
+        # compute image gradient
         im_feats = gaussian_filter(sobel(im), 0.5)
     else:
         bounds = np.array(im_feats.shape[::-1], dtype=np.float) - 1
@@ -500,14 +503,17 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
         level.
         """
         MASK_VAL = 99999
-        r, c = draw.polygon(polygon[:,1], polygon[:,0])
-        c_min, c_max = int(polygon[:,0].min()), int(polygon[:,0].max())
-        r_min, r_max = int(polygon[:,1].min()), int(polygon[:,1].max())
+        r, c = draw.polygon(polygon[:, 1], polygon[:, 0])
+        c_min, c_max = int(polygon[:, 0].min()), int(polygon[:, 0].max())
+        r_min, r_max = int(polygon[:, 1].min()), int(polygon[:, 1].max())
         patch = im_feats[r_min:r_max+2, c_min:c_max+2].copy()
         # bias feature matrix by distance from baseline
         mask = np.ones_like(patch)
-        for l in zip(baseline[:-1] - (c_min, r_min), baseline[1:] - (c_min, r_min)):
-            line_locs = draw.line(l[0][1], l[0][0], l[1][1], l[1][0])
+        for line_seg in zip(baseline[:-1] - (c_min, r_min), baseline[1:] - (c_min, r_min)):
+            line_locs = draw.line(line_seg[0][1],
+                                  line_seg[0][0],
+                                  line_seg[1][1],
+                                  line_seg[1][0])
             mask[line_locs] = 0
         dist_bias = distance_transform_cdt(mask)
         # absolute mask
@@ -518,13 +524,13 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
         # combine weights with features
         patch[mask] = MASK_VAL
         patch += (dist_bias*(np.mean(patch[patch != MASK_VAL])/bias))
-        extrema = baseline[(0,-1),:] - (c_min, r_min)
+        extrema = baseline[(0, -1), :] - (c_min, r_min)
         # scale line image to max 600 pixel width
         scale = min(1.0, 600/(c_max-c_min))
         tform, rotated_patch = _rotate(patch, angle, center=extrema[0], scale=scale, cval=MASK_VAL)
         # ensure to cut off padding after rotation
-        x_offsets = np.sort(np.around(tform.inverse(extrema)[:,0]).astype('int'))
-        rotated_patch = rotated_patch[:,x_offsets[0]:x_offsets[1]+1]
+        x_offsets = np.sort(np.around(tform.inverse(extrema)[:, 0]).astype('int'))
+        rotated_patch = rotated_patch[:, x_offsets[0]:x_offsets[1]+1]
         # infinity pad for seamcarve
         rotated_patch = np.pad(rotated_patch, ((1, 1), (0, 0)),  mode='constant', constant_values=np.inf)
         r, c = rotated_patch.shape
@@ -532,7 +538,7 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
         A = np.lib.stride_tricks.as_strided(rotated_patch, (c, r-2, 3), (rotated_patch.strides[1],
                                                                          rotated_patch.strides[0],
                                                                          rotated_patch.strides[0]))
-        B = rotated_patch[1:-1,1:].swapaxes(0, 1)
+        B = rotated_patch[1:-1, 1:].swapaxes(0, 1)
         backtrack = np.zeros_like(B, dtype='int')
         T = np.empty((B.shape[1]), 'f')
         R = np.arange(-1, len(T)-1)
@@ -542,7 +548,7 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
             B[i] += T
         # backtrack
         seam = []
-        j = np.argmin(rotated_patch[1:-1,-1])
+        j = np.argmin(rotated_patch[1:-1, -1])
         for i in range(c-2, -2, -1):
             seam.append((i+x_offsets[0]+1, j))
             j = backtrack[i, j]
@@ -553,7 +559,7 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
         # rotate back
         seam = tform(seam).astype('int')
         # filter out seam points in masked area of original patch/in padding
-        seam = seam[seam.min(axis=1)>=0,:]
+        seam = seam[seam.min(axis=1) >= 0, :]
         m = (seam < mask.shape[::-1]).T
         seam = seam[np.logical_and(m[0], m[1]), :]
         seam = seam[np.invert(mask[seam.T[1], seam.T[0]])]
@@ -612,7 +618,8 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
             # calculate magnitude-weighted average direction vector
             lengths = np.linalg.norm(np.diff(line.T), axis=0)
             p_dir = np.mean(np.diff(line.T) * lengths/lengths.sum(), axis=1)
-            p_dir = (p_dir.T / np.sqrt(np.sum(p_dir**2,axis=-1)))
+            p_dir = (p_dir.T / np.sqrt(np.sum(p_dir**2, axis=-1)))
+
             def _calc_roi(line):
                 # interpolate baseline
                 ls = geom.LineString(line)
@@ -626,8 +633,10 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
                 upper_bounds_intersects = []
                 bottom_bounds_intersects = []
                 for point in ip_line:
-                    upper_bounds_intersects.append(_ray_intersect_boundaries(point, (p_dir*(-1,1))[::-1], bounds+1).astype('int'))
-                    bottom_bounds_intersects.append(_ray_intersect_boundaries(point, (p_dir*(1,-1))[::-1], bounds+1).astype('int'))
+                    upper_bounds_intersects.append(_ray_intersect_boundaries(
+                        point, (p_dir*(-1, 1))[::-1], bounds+1).astype('int'))
+                    bottom_bounds_intersects.append(_ray_intersect_boundaries(
+                        point, (p_dir*(1, -1))[::-1], bounds+1).astype('int'))
                 # build polygon between baseline and bbox intersects
                 upper_polygon = geom.Polygon(ip_line.tolist() + upper_bounds_intersects)
                 bottom_polygon = geom.Polygon(ip_line.tolist() + bottom_bounds_intersects)
@@ -644,6 +653,7 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
                         side_b.append(adj_line)
                 side_a = unary_union(side_a).buffer(1).boundary
                 side_b = unary_union(side_b).buffer(1).boundary
+
                 def _find_closest_point(pt, intersects):
                     spt = geom.Point(pt)
                     if intersects.type == 'MultiPoint':
@@ -657,13 +667,16 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
                         else:
                             return nearest_points(spt, t)[1]
                     else:
-                        raise Exception('No intersection with boundaries. Shapely intersection object: {}'.format(intersects.wkt))
+                        raise Exception(f'No intersection with boundaries. Shapely intersection object: {intersects.wkt}')
+
                 env_up = []
                 env_bottom = []
                 # find orthogonal (to linear regression) intersects with adjacent objects to complete roi
                 for point, upper_bounds_intersect, bottom_bounds_intersect in zip(ip_line, upper_bounds_intersects, bottom_bounds_intersects):
-                    upper_limit = _find_closest_point(point, geom.LineString([point, upper_bounds_intersect]).intersection(side_a))
-                    bottom_limit = _find_closest_point(point, geom.LineString([point, bottom_bounds_intersect]).intersection(side_b))
+                    upper_limit = _find_closest_point(point, geom.LineString(
+                        [point, upper_bounds_intersect]).intersection(side_a))
+                    bottom_limit = _find_closest_point(point, geom.LineString(
+                        [point, bottom_bounds_intersect]).intersection(side_b))
                     env_up.append(upper_limit.coords[0])
                     env_bottom.append(bottom_limit.coords[0])
                 env_up = np.array(env_up, dtype='uint')
@@ -712,15 +725,17 @@ def polygonal_reading_order(lines: Sequence[Tuple[List, List]],
     region_lines = [[] for _ in range(len(r))]
     indizes = {}
     for line_idx, line in enumerate(lines):
-        l = geom.LineString(line[1])
+        s_line = geom.LineString(line[1])
         in_region = False
         for idx, reg in enumerate(r):
-            if is_in_region(l, reg):
-                region_lines[idx].append((line_idx, (slice(l.bounds[1], l.bounds[0]), slice(l.bounds[3], l.bounds[2]))))
+            if is_in_region(s_line, reg):
+                region_lines[idx].append((line_idx, (slice(s_line.bounds[1], s_line.bounds[0]),
+                                                     slice(s_line.bounds[3], s_line.bounds[2]))))
                 in_region = True
                 break
         if not in_region:
-            bounds.append((slice(l.bounds[1], l.bounds[0]), slice(l.bounds[3], l.bounds[2])))
+            bounds.append((slice(s_line.bounds[1], s_line.bounds[0]),
+                           slice(s_line.bounds[3], s_line.bounds[2])))
             indizes[line_idx] = ('line', line)
     # order everything in regions
     intra_region_order = [[] for _ in range(len(r))]
@@ -807,8 +822,8 @@ def _test_intersect(bp, uv, bs):
     u = bp - np.roll(bs, 2)
     v = bs - np.roll(bs, 2)
     points = []
-    for dir in ((1,-1), (-1,1)):
-        w = (uv * dir * (1,-1))[::-1]
+    for dir in ((1, -1), (-1, 1)):
+        w = (uv * dir * (1, -1))[::-1]
         z = np.dot(v, w)
         t1 = np.cross(v, u) / z
         t2 = np.dot(u, w) / z
@@ -847,7 +862,8 @@ def compute_polygon_section(baseline, boundary, dist1, dist2):
     # extend first/last segment of baseline if not on polygon boundary
     if boundary_pol.contains(geom.Point(bl[0])):
         logger.debug(f'Extending leftmost end of baseline {bl} to polygon boundary')
-        l_point = boundary_pol.boundary.intersection(geom.LineString([(bl[0][0]-10*(bl[1][0]-bl[0][0]), bl[0][1]-10*(bl[1][1]-bl[0][1])), bl[0]]))
+        l_point = boundary_pol.boundary.intersection(geom.LineString(
+            [(bl[0][0]-10*(bl[1][0]-bl[0][0]), bl[0][1]-10*(bl[1][1]-bl[0][1])), bl[0]]))
         # intersection is incidental with boundary so take closest point instead
         if l_point.type != 'Point':
             bl[0] = np.array(nearest_points(geom.Point(bl[0]), boundary_pol)[1], 'int')
@@ -855,7 +871,8 @@ def compute_polygon_section(baseline, boundary, dist1, dist2):
             bl[0] = np.array(l_point, 'int')
     if boundary_pol.contains(geom.Point(bl[-1])):
         logger.debug(f'Extending rightmost end of baseline {bl} to polygon boundary')
-        r_point = boundary_pol.boundary.intersection(geom.LineString([(bl[-1][0]-10*(bl[-2][0]-bl[-1][0]), bl[-1][1]-10*(bl[-2][1]-bl[-1][1])), bl[-1]]))
+        r_point = boundary_pol.boundary.intersection(geom.LineString(
+            [(bl[-1][0]-10*(bl[-2][0]-bl[-1][0]), bl[-1][1]-10*(bl[-2][1]-bl[-1][1])), bl[-1]]))
         if r_point.type != 'Point':
             bl[-1] = np.array(nearest_points(geom.Point(bl[-1]), boundary_pol)[1], 'int')
         else:
@@ -866,12 +883,12 @@ def compute_polygon_section(baseline, boundary, dist1, dist2):
     segs_idx = np.searchsorted(dists, [dist1, dist2])
     segs = np.dstack((bl[segs_idx-1], bl[segs_idx]))
     # compute unit vector of segments (NOT orthogonal)
-    norm_vec = (segs[...,1] - segs[...,0])
+    norm_vec = (segs[..., 1] - segs[..., 0])
     norm_vec_len = np.sqrt(np.sum(norm_vec**2, axis=1))
     unit_vec = norm_vec / np.tile(norm_vec_len, (2, 1)).T
     # find point start/end point on segments
     seg_dists = (dist1, dist2) - dists[segs_idx-1]
-    seg_points = segs[...,0] + (seg_dists * unit_vec.T).T
+    seg_points = segs[..., 0] + (seg_dists * unit_vec.T).T
     # get intersects
     bounds = np.array(boundary)
     try:
@@ -897,9 +914,6 @@ def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image:
         (PIL.Image) the extracted subimage
     """
     if 'type' in bounds and bounds['type'] == 'baselines':
-        old_settings = np.seterr(all='ignore')
-
-        siz = np.array(im.size, dtype=np.float)
         # select proper interpolation scheme depending on shape
         if im.mode == '1':
             order = 0
@@ -911,11 +925,11 @@ def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image:
         for line in bounds['lines']:
             pl = np.array(line['boundary'])
             baseline = np.array(line['baseline'])
-            c_min, c_max = int(pl[:,0].min()), int(pl[:,0].max())
-            r_min, r_max = int(pl[:,1].min()), int(pl[:,1].max())
+            c_min, c_max = int(pl[:, 0].min()), int(pl[:, 0].max())
+            r_min, r_max = int(pl[:, 1].min()), int(pl[:, 1].max())
 
             if (pl < 0).any() or (pl.max(axis=0)[::-1] >= im.shape[:2]).any():
-                raise KrakenInputException(f'Line polygon outside of image bounds')
+                raise KrakenInputException('Line polygon outside of image bounds')
             if (baseline < 0).any() or (baseline.max(axis=0)[::-1] >= im.shape[:2]).any():
                 raise KrakenInputException('Baseline outside of image bounds')
 
@@ -927,18 +941,18 @@ def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image:
                     warnings.simplefilter('ignore', RuntimeWarning)
                     slope, _, _, _, _ = linregress(baseline[:, 0], baseline[:, 1])
                 if np.isnan(slope):
-                    p_dir = np.array([0., np.sign(np.diff(baseline[(0, -1),1])).item()*1.])
+                    p_dir = np.array([0., np.sign(np.diff(baseline[(0, -1), 1])).item()*1.])
                 else:
-                    p_dir = np.array([1, np.sign(np.diff(baseline[(0, -1),0])).item()*slope])
-                    p_dir = (p_dir.T / np.sqrt(np.sum(p_dir**2,axis=-1)))
+                    p_dir = np.array([1, np.sign(np.diff(baseline[(0, -1), 0])).item()*slope])
+                    p_dir = (p_dir.T / np.sqrt(np.sum(p_dir**2, axis=-1)))
                 angle = np.arctan2(p_dir[1], p_dir[0])
                 patch = im[r_min:r_max+1, c_min:c_max+1].copy()
                 offset_polygon = pl - (c_min, r_min)
-                r, c = draw.polygon(offset_polygon[:,1], offset_polygon[:,0])
+                r, c = draw.polygon(offset_polygon[:, 1], offset_polygon[:, 0])
                 mask = np.zeros(patch.shape[:2], dtype=np.bool)
                 mask[r, c] = True
                 patch[mask != True] = 0
-                extrema = offset_polygon[(0,-1),:]
+                extrema = offset_polygon[(0, -1), :]
                 # scale line image to max 600 pixel width
                 tform, rotated_patch = _rotate(patch, angle, center=extrema[0], scale=1.0, cval=0)
                 i = Image.fromarray(rotated_patch.astype('uint8'))
@@ -951,12 +965,14 @@ def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image:
 
                 bl = zip(baseline[:-1:], baseline[1::])
                 bl = [geom.LineString(x) for x in bl]
-                cum_lens = np.cumsum([0] + [l.length for l in bl])
+                cum_lens = np.cumsum([0] + [line.length for line in bl])
                 # distance of intercept from start point and number of line segment
                 control_pts = []
                 for point in pl.geoms:
                     npoint = np.array(point)
-                    line_idx, dist, intercept = min(((idx, line.project(point), np.array(line.interpolate(line.project(point)))) for idx, line in enumerate(bl)), key=lambda x: np.linalg.norm(npoint-x[2]))
+                    line_idx, dist, intercept = min(((idx, line.project(point),
+                                                      np.array(line.interpolate(line.project(point)))) for idx, line in enumerate(bl)),
+                                                    key=lambda x: np.linalg.norm(npoint-x[2]))
                     # absolute distance from start of line
                     line_dist = cum_lens[line_idx] + dist
                     intercept = np.array(intercept)
@@ -974,10 +990,10 @@ def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image:
                 # calculate bounding polygon destination points
                 pol_dst_pts = np.array([baseline[0] + (line_dist, per_dist) for line_dist, per_dist in control_pts])
                 # extract bounding box patch
-                c_dst_min, c_dst_max = int(pol_dst_pts[:,0].min()), int(pol_dst_pts[:,0].max())
-                r_dst_min, r_dst_max = int(pol_dst_pts[:,1].min()), int(pol_dst_pts[:,1].max())
+                c_dst_min, c_dst_max = int(pol_dst_pts[:, 0].min()), int(pol_dst_pts[:, 0].max())
+                r_dst_min, r_dst_max = int(pol_dst_pts[:, 1].min()), int(pol_dst_pts[:, 1].max())
                 output_shape = np.around((r_dst_max - r_dst_min + 1, c_dst_max - c_dst_min + 1))
-                patch = im[r_min:r_max+1,c_min:c_max+1].copy()
+                patch = im[r_min:r_max+1, c_min:c_max+1].copy()
                 # offset src points by patch shape
                 offset_polygon = full_polygon - (c_min, r_min)
                 offset_baseline = baseline - (c_min, r_min)
@@ -986,7 +1002,7 @@ def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image:
                 offset_pol_dst_pts = pol_dst_pts - (c_dst_min, r_dst_min)
                 # mask out points outside bounding polygon
                 mask = np.zeros(patch.shape[:2], dtype=np.bool)
-                r, c = draw.polygon(offset_polygon[:,1], offset_polygon[:,0])
+                r, c = draw.polygon(offset_polygon[:, 1], offset_polygon[:, 0])
                 mask[r, c] = True
                 patch[mask != True] = 0
                 # estimate piecewise transform

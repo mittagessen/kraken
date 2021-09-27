@@ -23,7 +23,7 @@ import numpy as np
 
 from typing import List, Tuple, Set, Union, Dict, Sequence
 from torch import IntTensor
-from kraken.lib.exceptions import KrakenEncodeException, KrakenCodecException
+from kraken.lib.exceptions import KrakenEncodeException
 
 __all__ = ['PytorchCodec']
 
@@ -73,7 +73,7 @@ class PytorchCodec(object):
         """
         Returns the maximum label value.
         """
-        return max(l for labels in self.c2l.values() for l in labels)
+        return max(label for labels in self.c2l.values() for label in labels)
 
     def encode(self, s: str) -> IntTensor:
         """
@@ -181,14 +181,14 @@ class PytorchCodec(object):
         # remove labels from candidate list that are in use for other decodings
         rm_labels = [label for v in rm_candidates.values() for label in v]
         for v in c2l_cand.values():
-            for l in rm_labels:
-                if l in v:
-                    rm_labels.remove(l)
+            for label in rm_labels:
+                if label in v:
+                    rm_labels.remove(label)
         # iteratively remove labels, decrementing subsequent labels to close
         # (new) holes in the codec.
         offset_rm_labels = [v-idx for idx, v in enumerate(sorted(set(rm_labels)))]
         for rlabel in offset_rm_labels:
-            c2l_cand = {k: [l-1 if l > rlabel else l for l in v] for k, v in c2l_cand.items()}
+            c2l_cand = {k: [label-1 if label > rlabel else label for label in v] for k, v in c2l_cand.items()}
         # add mappings not in original codec
         add_list = {cseq: enc for cseq, enc in codec.c2l.items() if cseq not in self.c2l}
         # renumber

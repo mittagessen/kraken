@@ -26,11 +26,9 @@ from click import open_file
 from bidi.algorithm import get_display
 
 from typing import cast, Set, List, IO, Any, Dict
-from collections import defaultdict
 
 from kraken.lib import log
 from kraken.lib.exceptions import KrakenCairoSurfaceException
-from kraken.lib.exceptions import KrakenEncodeException
 from kraken.lib.exceptions import KrakenInputException
 from kraken.lib.default_specs import (SEGMENTATION_HYPER_PARAMS,
                                       RECOGNITION_HYPER_PARAMS,
@@ -41,6 +39,7 @@ APP_NAME = 'kraken'
 
 logging.captureWarnings(True)
 logger = logging.getLogger('kraken')
+
 
 def message(msg, **styles):
     if logger.getEffectiveLevel() >= 30:
@@ -60,7 +59,7 @@ def cli(verbose, seed):
         from torch import manual_seed
         manual_seed(seed)
 
-    log.set_logger(logger, level=30-min(10*verbose, 20))
+    log.set_logger(logger, level=30 - min(10 * verbose, 20))
 
 
 def _validate_manifests(ctx, param, value):
@@ -81,13 +80,14 @@ def _expand_gt(ctx, param, value):
         images.extend([x for x in glob.iglob(expression, recursive=True) if os.path.isfile(x)])
     return images
 
+
 def _validate_merging(ctx, param, value):
     """
     Maps baseline/region merging to a dict of merge structures.
     """
     if not value:
         return None
-    merge_dict = {} # type: Dict[str, str]
+    merge_dict = {}  # type: Dict[str, str]
     try:
         for m in value:
             k, v = m.split(':')
@@ -96,33 +96,84 @@ def _validate_merging(ctx, param, value):
         raise click.BadParameter('Mappings must be in format target:src')
     return merge_dict
 
+
 @cli.command('segtrain')
 @click.pass_context
 @click.option('-o', '--output', show_default=True, type=click.Path(), default='model', help='Output model file')
 @click.option('-s', '--spec', show_default=True,
               default=SEGMENTATION_SPEC,
               help='VGSL spec of the baseline labeling network')
-@click.option('--line-width', show_default=True, default=SEGMENTATION_HYPER_PARAMS['line_width'], help='The height of each baseline in the target after scaling')
-@click.option('-i', '--load', show_default=True, type=click.Path(exists=True, readable=True), help='Load existing file to continue training')
+@click.option('--line-width',
+              show_default=True,
+              default=SEGMENTATION_HYPER_PARAMS['line_width'],
+              help='The height of each baseline in the target after scaling')
+@click.option('-i', '--load', show_default=True, type=click.Path(exists=True,
+              readable=True), help='Load existing file to continue training')
 @click.option('-F', '--freq', show_default=True, default=SEGMENTATION_HYPER_PARAMS['freq'], type=click.FLOAT,
               help='Model saving and report generation frequency in epochs during training')
-@click.option('-q', '--quit', show_default=True, default=SEGMENTATION_HYPER_PARAMS['quit'], type=click.Choice(['early', 'dumb']),
+@click.option('-q',
+              '--quit',
+              show_default=True,
+              default=SEGMENTATION_HYPER_PARAMS['quit'],
+              type=click.Choice(['early',
+                                 'dumb']),
               help='Stop condition for training. Set to `early` for early stopping or `dumb` for fixed number of epochs')
-@click.option('-N', '--epochs', show_default=True, default=SEGMENTATION_HYPER_PARAMS['epochs'], help='Number of epochs to train for')
-@click.option('--lag', show_default=True, default=SEGMENTATION_HYPER_PARAMS['lag'], help='Number of evaluations (--report frequence) to wait before stopping training without improvement')
-@click.option('--min-delta', show_default=True, default=SEGMENTATION_HYPER_PARAMS['min_delta'], type=click.FLOAT, help='Minimum improvement between epochs to reset early stopping. By default it scales the delta by the best loss')
+@click.option('-N',
+              '--epochs',
+              show_default=True,
+              default=SEGMENTATION_HYPER_PARAMS['epochs'],
+              help='Number of epochs to train for')
+@click.option('--lag',
+              show_default=True,
+              default=SEGMENTATION_HYPER_PARAMS['lag'],
+              help='Number of evaluations (--report frequence) to wait before stopping training without improvement')
+@click.option('--min-delta',
+              show_default=True,
+              default=SEGMENTATION_HYPER_PARAMS['min_delta'],
+              type=click.FLOAT,
+              help='Minimum improvement between epochs to reset early stopping. By default it scales the delta by the best loss')
 @click.option('-d', '--device', show_default=True, default='cpu', help='Select device to use (cpu, cuda:0, cuda:1, ...)')
-@click.option('--optimizer', show_default=True, default=SEGMENTATION_HYPER_PARAMS['optimizer'], type=click.Choice(['Adam', 'SGD', 'RMSprop']), help='Select optimizer')
+@click.option('--optimizer',
+              show_default=True,
+              default=SEGMENTATION_HYPER_PARAMS['optimizer'],
+              type=click.Choice(['Adam',
+                                 'SGD',
+                                 'RMSprop']),
+              help='Select optimizer')
 @click.option('-r', '--lrate', show_default=True, default=SEGMENTATION_HYPER_PARAMS['lrate'], help='Learning rate')
 @click.option('-m', '--momentum', show_default=True, default=SEGMENTATION_HYPER_PARAMS['momentum'], help='Momentum')
-@click.option('-w', '--weight-decay', show_default=True, default=SEGMENTATION_HYPER_PARAMS['weight_decay'], help='Weight decay')
-@click.option('--schedule', show_default=True, type=click.Choice(['constant', '1cycle', 'exponential', 'cosine', 'step', 'reduceonplateau']), default=RECOGNITION_HYPER_PARAMS['schedule'],
+@click.option('-w', '--weight-decay', show_default=True,
+              default=SEGMENTATION_HYPER_PARAMS['weight_decay'], help='Weight decay')
+@click.option('--schedule',
+              show_default=True,
+              type=click.Choice(['constant',
+                                 '1cycle',
+                                 'exponential',
+                                 'cosine',
+                                 'step',
+                                 'reduceonplateau']),
+              default=RECOGNITION_HYPER_PARAMS['schedule'],
               help='Set learning rate scheduler. For 1cycle, cycle length is determined by the `--step-size` option.')
-@click.option('-g', '--gamma', show_default=True, default=RECOGNITION_HYPER_PARAMS['gamma'], help='Decay factor for exponential, step, and reduceonplateau learning rate schedules')
-@click.option('-ss', '--step-size', show_default=True, default=RECOGNITION_HYPER_PARAMS['step_size'], help='Number of validation runs between learning rate decay for exponential and step LR schedules')
-@click.option('--sched-patience', show_default=True, default=RECOGNITION_HYPER_PARAMS['rop_patience'], help='Minimal number of validation runs between LR reduction for reduceonplateau LR schedule.')
-@click.option('--cos-max', show_default=True, default=RECOGNITION_HYPER_PARAMS['cos_t_max'], help='Epoch of minimal learning rate for cosine LR scheduler.')
-@click.option('-p', '--partition', show_default=True, default=0.9, help='Ground truth data partition ratio between train/validation set')
+@click.option('-g',
+              '--gamma',
+              show_default=True,
+              default=RECOGNITION_HYPER_PARAMS['gamma'],
+              help='Decay factor for exponential, step, and reduceonplateau learning rate schedules')
+@click.option('-ss',
+              '--step-size',
+              show_default=True,
+              default=RECOGNITION_HYPER_PARAMS['step_size'],
+              help='Number of validation runs between learning rate decay for exponential and step LR schedules')
+@click.option('--sched-patience',
+              show_default=True,
+              default=RECOGNITION_HYPER_PARAMS['rop_patience'],
+              help='Minimal number of validation runs between LR reduction for reduceonplateau LR schedule.')
+@click.option('--cos-max',
+              show_default=True,
+              default=RECOGNITION_HYPER_PARAMS['cos_t_max'],
+              help='Epoch of minimal learning rate for cosine LR scheduler.')
+@click.option('-p', '--partition', show_default=True, default=0.9,
+              help='Ground truth data partition ratio between train/validation set')
 @click.option('-t', '--training-files', show_default=True, default=None, multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with additional paths to training data')
@@ -142,14 +193,34 @@ def _validate_merging(ctx, param, value):
               'link to source images. In `path` mode arguments are image files '
               'sharing a prefix up to the last extension with JSON `.path` files '
               'containing the baseline information.')
-@click.option('--suppress-regions/--no-suppress-regions', show_default=True, default=False, help='Disables region segmentation training.')
-@click.option('--suppress-baselines/--no-suppress-baselines', show_default=True, default=False, help='Disables baseline segmentation training.')
-@click.option('-vr', '--valid-regions', show_default=True, default=None, multiple=True, help='Valid region types in training data. May be used multiple times.')
-@click.option('-vb', '--valid-baselines', show_default=True, default=None, multiple=True, help='Valid baseline types in training data. May be used multiple times.')
-@click.option('-mr', '--merge-regions', show_default=True, default=None, help='Region merge mapping. One or more mappings of the form `$target:$src` where $src is merged into $target.', multiple=True, callback=_validate_merging)
-@click.option('-mb', '--merge-baselines', show_default=True, default=None, help='Baseline type merge mapping. Same syntax as `--merge-regions`', multiple=True, callback=_validate_merging)
-@click.option('-br', '--bounding-regions', show_default=True, default=None, multiple=True, help='Regions treated as boundaries for polygonization purposes. May be used multiple times.')
-@click.option('--augment/--no-augment', show_default=True, default=SEGMENTATION_HYPER_PARAMS['augment'], help='Enable image augmentation')
+@click.option('--suppress-regions/--no-suppress-regions', show_default=True,
+              default=False, help='Disables region segmentation training.')
+@click.option('--suppress-baselines/--no-suppress-baselines', show_default=True,
+              default=False, help='Disables baseline segmentation training.')
+@click.option('-vr', '--valid-regions', show_default=True, default=None, multiple=True,
+              help='Valid region types in training data. May be used multiple times.')
+@click.option('-vb', '--valid-baselines', show_default=True, default=None, multiple=True,
+              help='Valid baseline types in training data. May be used multiple times.')
+@click.option('-mr',
+              '--merge-regions',
+              show_default=True,
+              default=None,
+              help='Region merge mapping. One or more mappings of the form `$target:$src` where $src is merged into $target.',
+              multiple=True,
+              callback=_validate_merging)
+@click.option('-mb',
+              '--merge-baselines',
+              show_default=True,
+              default=None,
+              help='Baseline type merge mapping. Same syntax as `--merge-regions`',
+              multiple=True,
+              callback=_validate_merging)
+@click.option('-br', '--bounding-regions', show_default=True, default=None, multiple=True,
+              help='Regions treated as boundaries for polygonization purposes. May be used multiple times.')
+@click.option('--augment/--no-augment',
+              show_default=True,
+              default=SEGMENTATION_HYPER_PARAMS['augment'],
+              help='Enable image augmentation')
 @click.option('--resize', show_default=True, default='fail', type=click.Choice(['add', 'both', 'fail']),
               help='Output layer resizing option. If set to `add` new classes will be '
                    'added, `both` will set the layer to match exactly '
@@ -173,8 +244,6 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
     """
     Trains a baseline labeling model for layout analysis
     """
-    import re
-    import torch
     import shutil
     import numpy as np
 
@@ -184,11 +253,6 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
         raise click.BadOptionUsage('resize', 'resize option requires loading an existing model')
 
     logger.info('Building ground truth set from {} document images'.format(len(ground_truth) + len(training_files)))
-
-
-    # load model if given. if a new model has to be created we need to do that
-    # after data set initialization, otherwise to output size is still unknown.
-    nn = None
 
     # populate hyperparameters from command line args
     hyper_params = SEGMENTATION_HYPER_PARAMS.copy()
@@ -207,8 +271,7 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
                          'gamma': gamma,
                          'step_size': step_size,
                          'rop_patience': sched_patience,
-                         'cos_t_max': cos_max
-                        })
+                         'cos_t_max': cos_max})
 
     # disable automatic partition when given evaluation set explicitly
     if evaluation_files:
@@ -273,9 +336,15 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
             bar.update(1)
 
         def _print_eval(epoch, accuracy, mean_acc, mean_iu, freq_iu, **kwargs):
-            message('Accuracy report ({}) mean_iu: {:0.4f} freq_iu: {:0.4f} mean_acc: {:0.4f} accuracy: {:0.4f}'.format(epoch, mean_iu, freq_iu, mean_acc, accuracy))
+            message(
+                'Accuracy report ({}) mean_iu: {:0.4f} freq_iu: {:0.4f} mean_acc: {:0.4f} accuracy: {:0.4f}'.format(
+                    epoch,
+                    mean_iu,
+                    freq_iu,
+                    mean_acc,
+                    accuracy))
             # reset progress bar
-            bar.label = 'stage {}/{}'.format(epoch+1, trainer.stopper.epochs if trainer.stopper.epochs > 0 else '∞')
+            bar.label = 'stage {}/{}'.format(epoch + 1, trainer.stopper.epochs if trainer.stopper.epochs > 0 else '∞')
             bar.pos = 0
             bar.finished = False
             bar.start = bar.last_eta = time.time()
@@ -283,8 +352,10 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
         trainer.run(_print_eval, _draw_progressbar)
 
     if quit == 'early':
-        message('Moving best model {0}_{1}.mlmodel ({2}) to {0}_best.mlmodel'.format(output, trainer.stopper.best_epoch, trainer.stopper.best_loss))
-        logger.info('Moving best model {0}_{1}.mlmodel ({2}) to {0}_best.mlmodel'.format(output, trainer.stopper.best_epoch, trainer.stopper.best_loss))
+        message('Moving best model {0}_{1}.mlmodel ({2}) to {0}_best.mlmodel'.format(
+            output, trainer.stopper.best_epoch, trainer.stopper.best_loss))
+        logger.info('Moving best model {0}_{1}.mlmodel ({2}) to {0}_best.mlmodel'.format(
+            output, trainer.stopper.best_epoch, trainer.stopper.best_loss))
         shutil.copy(f'{output}_{trainer.stopper.best_epoch}.mlmodel', f'{output}_best.mlmodel')
 
 
@@ -299,30 +370,76 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
               help='VGSL spec of the network to train. CTC layer will be added automatically.')
 @click.option('-a', '--append', show_default=True, default=None, type=click.INT,
               help='Removes layers before argument and then appends spec. Only works when loading an existing model')
-@click.option('-i', '--load', show_default=True, type=click.Path(exists=True, readable=True), help='Load existing file to continue training')
+@click.option('-i', '--load', show_default=True, type=click.Path(exists=True,
+              readable=True), help='Load existing file to continue training')
 @click.option('-F', '--freq', show_default=True, default=RECOGNITION_HYPER_PARAMS['freq'], type=click.FLOAT,
               help='Model saving and report generation frequency in epochs during training')
-@click.option('-q', '--quit', show_default=True, default=RECOGNITION_HYPER_PARAMS['quit'], type=click.Choice(['early', 'dumb']),
+@click.option('-q',
+              '--quit',
+              show_default=True,
+              default=RECOGNITION_HYPER_PARAMS['quit'],
+              type=click.Choice(['early',
+                                 'dumb']),
               help='Stop condition for training. Set to `early` for early stooping or `dumb` for fixed number of epochs')
-@click.option('-N', '--epochs', show_default=True, default=RECOGNITION_HYPER_PARAMS['epochs'], help='Number of epochs to train for')
-@click.option('--lag', show_default=True, default=RECOGNITION_HYPER_PARAMS['lag'], help='Number of evaluations (--report frequence) to wait before stopping training without improvement')
-@click.option('--min-delta', show_default=True, default=RECOGNITION_HYPER_PARAMS['min_delta'], type=click.FLOAT, help='Minimum improvement between epochs to reset early stopping. Default is scales the delta by the best loss')
+@click.option('-N',
+              '--epochs',
+              show_default=True,
+              default=RECOGNITION_HYPER_PARAMS['epochs'],
+              help='Number of epochs to train for')
+@click.option('--lag',
+              show_default=True,
+              default=RECOGNITION_HYPER_PARAMS['lag'],
+              help='Number of evaluations (--report frequence) to wait before stopping training without improvement')
+@click.option('--min-delta',
+              show_default=True,
+              default=RECOGNITION_HYPER_PARAMS['min_delta'],
+              type=click.FLOAT,
+              help='Minimum improvement between epochs to reset early stopping. Default is scales the delta by the best loss')
 @click.option('-d', '--device', show_default=True, default='cpu', help='Select device to use (cpu, cuda:0, cuda:1, ...)')
-@click.option('--optimizer', show_default=True, default=RECOGNITION_HYPER_PARAMS['optimizer'], type=click.Choice(['Adam', 'SGD', 'RMSprop']), help='Select optimizer')
+@click.option('--optimizer',
+              show_default=True,
+              default=RECOGNITION_HYPER_PARAMS['optimizer'],
+              type=click.Choice(['Adam',
+                                 'SGD',
+                                 'RMSprop']),
+              help='Select optimizer')
 @click.option('-r', '--lrate', show_default=True, default=RECOGNITION_HYPER_PARAMS['lrate'], help='Learning rate')
 @click.option('-m', '--momentum', show_default=True, default=RECOGNITION_HYPER_PARAMS['momentum'], help='Momentum')
 @click.option('-w', '--weight-decay', show_default=True, default=RECOGNITION_HYPER_PARAMS['weight_decay'], help='Weight decay')
-@click.option('--schedule', show_default=True, type=click.Choice(['constant', '1cycle', 'exponential', 'cosine', 'step', 'reduceonplateau']), default=RECOGNITION_HYPER_PARAMS['schedule'],
+@click.option('--schedule',
+              show_default=True,
+              type=click.Choice(['constant',
+                                 '1cycle',
+                                 'exponential',
+                                 'cosine',
+                                 'step',
+                                 'reduceonplateau']),
+              default=RECOGNITION_HYPER_PARAMS['schedule'],
               help='Set learning rate scheduler. For 1cycle, cycle length is determined by the `--epoch` option.')
-@click.option('-g', '--gamma', show_default=True, default=RECOGNITION_HYPER_PARAMS['gamma'], help='Decay factor for exponential, step, and reduceonplateau learning rate schedules')
-@click.option('-ss', '--step-size', show_default=True, default=RECOGNITION_HYPER_PARAMS['step_size'], help='Number of validation runs between learning rate decay for exponential and step LR schedules')
-@click.option('--sched-patience', show_default=True, default=RECOGNITION_HYPER_PARAMS['rop_patience'], help='Minimal number of validation runs between LR reduction for reduceonplateau LR schedule.')
-@click.option('--cos-max', show_default=True, default=RECOGNITION_HYPER_PARAMS['cos_t_max'], help='Epoch of minimal learning rate for cosine LR scheduler.')
-@click.option('-p', '--partition', show_default=True, default=0.9, help='Ground truth data partition ratio between train/validation set')
+@click.option('-g',
+              '--gamma',
+              show_default=True,
+              default=RECOGNITION_HYPER_PARAMS['gamma'],
+              help='Decay factor for exponential, step, and reduceonplateau learning rate schedules')
+@click.option('-ss',
+              '--step-size',
+              show_default=True,
+              default=RECOGNITION_HYPER_PARAMS['step_size'],
+              help='Number of validation runs between learning rate decay for exponential and step LR schedules')
+@click.option('--sched-patience',
+              show_default=True,
+              default=RECOGNITION_HYPER_PARAMS['rop_patience'],
+              help='Minimal number of validation runs between LR reduction for reduceonplateau LR schedule.')
+@click.option('--cos-max',
+              show_default=True,
+              default=RECOGNITION_HYPER_PARAMS['cos_t_max'],
+              help='Epoch of minimal learning rate for cosine LR scheduler.')
+@click.option('-p', '--partition', show_default=True, default=0.9,
+              help='Ground truth data partition ratio between train/validation set')
 @click.option('-u', '--normalization', show_default=True, type=click.Choice(['NFD', 'NFKD', 'NFC', 'NFKC']),
               default=RECOGNITION_HYPER_PARAMS['normalization'], help='Ground truth normalization')
-@click.option('-n', '--normalize-whitespace/--no-normalize-whitespace',
-              show_default=True, default=RECOGNITION_HYPER_PARAMS['normalize_whitespace'], help='Normalizes unicode whitespace')
+@click.option('-n', '--normalize-whitespace/--no-normalize-whitespace', show_default=True,
+              default=RECOGNITION_HYPER_PARAMS['normalize_whitespace'], help='Normalizes unicode whitespace')
 @click.option('-c', '--codec', show_default=True, default=None, type=click.File(mode='r', lazy=True),
               help='Load a codec JSON definition (invalid if loading existing model)')
 @click.option('--resize', show_default=True, default='fail', type=click.Choice(['add', 'both', 'fail']),
@@ -342,7 +459,8 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
 @click.option('-e', '--evaluation-files', show_default=True, default=None, multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
-@click.option('--preload/--no-preload', show_default=True, default=None, help='Hard enable/disable for training data preloading')
+@click.option('--preload/--no-preload', show_default=True, default=None,
+              help='Hard enable/disable for training data preloading')
 @click.option('--threads', show_default=True, default=1, help='Number of OpenMP threads and workers when running on CPU.')
 @click.option('--load-hyper-parameters/--no-load-hyper-parameters', show_default=True, default=False,
               help='When loading an existing model, retrieve hyperparameters from the model')
@@ -365,7 +483,10 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
               'link to source images. In `path` mode arguments are image files '
               'sharing a prefix up to the last extension with `.gt.txt` text files '
               'containing the transcription.')
-@click.option('--augment/--no-augment', show_default=True, default=RECOGNITION_HYPER_PARAMS['augment'], help='Enable image augmentation')
+@click.option('--augment/--no-augment',
+              show_default=True,
+              default=RECOGNITION_HYPER_PARAMS['augment'],
+              help='Enable image augmentation')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
           lag, min_delta, device, optimizer, lrate, momentum, weight_decay,
@@ -406,8 +527,7 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
                          'cos_t_max': cos_max,
                          'normalization': normalization,
                          'normalize_whitespace': normalize_whitespace,
-                         'augment': augment
-                        })
+                         'augment': augment})
 
     # disable automatic partition when given evaluation set explicitly
     if evaluation_files:
@@ -460,8 +580,8 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
                                                   resize=resize,
                                                   augment=augment)
 
-    with  log.progressbar(label='stage {}/{}'.format(1, trainer.stopper.epochs if trainer.stopper.epochs > 0 else '∞'),
-                          length=trainer.event_it, show_pos=True) as bar:
+    with log.progressbar(label='stage {}/{}'.format(1, trainer.stopper.epochs if trainer.stopper.epochs > 0 else '∞'),
+                         length=trainer.event_it, show_pos=True) as bar:
 
         def _draw_progressbar():
             bar.update(1)
@@ -469,7 +589,7 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
         def _print_eval(epoch, accuracy, chars, error, **kwargs):
             message('Accuracy report ({}) {:0.4f} {} {}'.format(epoch, accuracy, chars, error))
             # reset progress bar
-            bar.label = 'stage {}/{}'.format(epoch+1, trainer.stopper.epochs if trainer.stopper.epochs > 0 else '∞')
+            bar.label = 'stage {}/{}'.format(epoch + 1, trainer.stopper.epochs if trainer.stopper.epochs > 0 else '∞')
             bar.pos = 0
             bar.finished = False
             bar.start = bar.last_eta = time.time()
@@ -477,8 +597,10 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
         trainer.run(_print_eval, _draw_progressbar)
 
     if quit == 'early':
-        message('Moving best model {0}_{1}.mlmodel ({2}) to {0}_best.mlmodel'.format(output, trainer.stopper.best_epoch, trainer.stopper.best_loss))
-        logger.info('Moving best model {0}_{1}.mlmodel ({2}) to {0}_best.mlmodel'.format(output, trainer.stopper.best_epoch, trainer.stopper.best_loss))
+        message('Moving best model {0}_{1}.mlmodel ({2}) to {0}_best.mlmodel'.format(
+            output, trainer.stopper.best_epoch, trainer.stopper.best_loss))
+        logger.info('Moving best model {0}_{1}.mlmodel ({2}) to {0}_best.mlmodel'.format(
+            output, trainer.stopper.best_epoch, trainer.stopper.best_loss))
         shutil.copy(f'{output}_{trainer.stopper.best_epoch}.mlmodel', f'{output}_best.mlmodel')
 
 
@@ -534,10 +656,7 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, threads,
     if not model:
         raise click.UsageError('No model to evaluate given.')
 
-    import regex
-    import unicodedata
     import numpy as np
-    from PIL import Image
     from torch.utils.data import DataLoader
 
     from kraken.serialization import render_report
@@ -571,7 +690,6 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, threads,
         DatasetClass = PolygonGTDataset
     else:
         DatasetClass = GroundTruthDataset
-        t = []
         if force_binarization:
             logger.warning('Forced binarization enabled in `path` mode. Will be ignored.')
             force_binarization = False
@@ -631,7 +749,7 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, threads,
                     logger.warning('{} {}. Skipping.'.format(e.strerror, e.filename))
                 except KrakenInputException as e:
                     logger.warning(str(e))
-        acc_list.append((chars-error)/chars)
+        acc_list.append((chars - error) / chars)
         confusions, scripts, ins, dels, subs = compute_confusions(algn_gt, algn_pred)
         rep = render_report(p, chars, error, confusions, scripts, ins, dels, subs)
         logger.info(rep)
@@ -655,7 +773,10 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, threads,
               help='Skip rotation of vertical lines')
 @click.option('-o', '--output', type=click.Path(), default='training', show_default=True,
               help='Output directory')
-@click.option('--format', default='{idx:06d}', show_default=True, help='Format for extractor output. valid fields are `src` (source file), `idx` (line number), and `uuid` (v4 uuid)')
+@click.option('--format',
+              default='{idx:06d}',
+              show_default=True,
+              help='Format for extractor output. valid fields are `src` (source file), `idx` (line number), and `uuid` (v4 uuid)')
 @click.argument('transcriptions', nargs=-1, type=click.File(lazy=True))
 def extract(ctx, binarize, normalization, normalize_whitespace, reorder,
             rotate, output, format, transcriptions):
@@ -877,8 +998,8 @@ def line_generator(ctx, font, maxlines, encoding, normalization, renormalize,
         for t in text:
             with click.open_file(t, encoding=encoding) as fp:
                 logger.info('Reading {}'.format(t))
-                for l in fp:
-                    lines.add(l.rstrip('\r\n'))
+                for line in fp:
+                    lines.add(line.rstrip('\r\n'))
     if normalization:
         lines = set([unicodedata.normalize(normalization, line) for line in lines])
     if strip:
@@ -975,17 +1096,28 @@ def publish(ctx, metadata, access_token, model):
         if 'accuracy' in nn.nn.user_metadata and nn.nn.user_metadata['accuracy']:
             accuracy_default = nn.nn.user_metadata['accuracy'][-1][1] * 100
         accuracy = click.prompt('accuracy on test set', type=float, default=accuracy_default)
-        script = [click.prompt('script', type=click.Choice(sorted(schema['properties']['script']['items']['enum'])), show_choices=True)]
-        license = click.prompt('license', type=click.Choice(sorted(schema['properties']['license']['enum'])), show_choices=True)
+        script = [
+            click.prompt(
+                'script',
+                type=click.Choice(
+                    sorted(
+                        schema['properties']['script']['items']['enum'])),
+                show_choices=True)]
+        license = click.prompt(
+            'license',
+            type=click.Choice(
+                sorted(
+                    schema['properties']['license']['enum'])),
+            show_choices=True)
         metadata = {
-                'authors': [{'name': author, 'affiliation': affiliation}],
-                'summary': summary,
-                'description': description,
-                'accuracy': accuracy,
-                'license': license,
-                'script': script,
-                'name': os.path.basename(model),
-                'graphemes': ['a']
+            'authors': [{'name': author, 'affiliation': affiliation}],
+            'summary': summary,
+            'description': description,
+            'accuracy': accuracy,
+            'license': license,
+            'script': script,
+            'name': os.path.basename(model),
+            'graphemes': ['a']
         }
         while True:
             try:

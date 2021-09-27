@@ -46,14 +46,14 @@ page_regions = {'TextRegion': 'text',
                 'AdvertRegion': 'advert',
                 'NoiseRegion': 'noise',
                 'UnknownRegion': 'unknown',
-                'CustomRegion': 'custom'
-               }
+                'CustomRegion': 'custom'}
 
 # same for ALTO
 alto_regions = {'TextBlock': 'text',
                 'IllustrationType': 'illustration',
                 'GraphicalElementType': 'graphic',
                 'ComposedBlock': 'composed'}
+
 
 def parse_xml(filename):
     """
@@ -117,7 +117,6 @@ def parse_page(filename):
         pts = zip(points[::2], points[1::2])
         return [k for k, g in groupby(pts)]
 
-
     with open(filename, 'rb') as fp:
         base_dir = dirname(filename)
         try:
@@ -153,7 +152,7 @@ def parse_page(filename):
             if coords is not None and not coords.get('points').isspace() and len(coords.get('points')):
                 try:
                     coords = _parse_coords(coords.get('points'))
-                except:
+                except Exception:
                     logger.warning('Region {} without coordinates'.format(region.get('id')))
                     continue
             else:
@@ -181,7 +180,7 @@ def parse_page(filename):
             if pol is not None and not pol.get('points').isspace() and len(pol.get('points')):
                 try:
                     boundary = _parse_coords(pol.get('points'))
-                except:
+                except Exception:
                     logger.info('TextLine {} without polygon'.format(line.get('id')))
                     pass
             else:
@@ -191,7 +190,7 @@ def parse_page(filename):
             if base is not None and not base.get('points').isspace() and len(base.get('points')):
                 try:
                     baseline = _parse_coords(base.get('points'))
-                except:
+                except Exception:
                     logger.info('TextLine {} without baseline'.format(line.get('id')))
                     continue
             else:
@@ -282,7 +281,8 @@ def parse_alto(filename):
                 points = [int(float(x)) for x in coords.get('POINTS').split(' ')]
                 boundary = zip(points[::2], points[1::2])
                 boundary = [k for k, g in groupby(boundary)]
-            elif region.get('HPOS') is not None and region.get('VPOS') is not None and region.get('WIDTH') is not None and region.get('HEIGHT') is not None:
+            elif (region.get('HPOS') is not None and region.get('VPOS') is not None and
+                  region.get('WIDTH') is not None and region.get('HEIGHT') is not None):
                 # use rectangular definition
                 x_min = int(float(region.get('HPOS')))
                 y_min = int(float(region.get('VPOS')))
@@ -305,8 +305,8 @@ def parse_alto(filename):
             if rtype is None:
                 rtype = alto_regions[region.tag.split('}')[-1]]
             if boundary == page_boundary and rtype == 'text':
-                    logger.info('Skipping TextBlock with same size as page image.')
-                    continue
+                logger.info('Skipping TextBlock with same size as page image.')
+                continue
             region_data[rtype].append(boundary)
         data['regions'] = region_data
 
@@ -331,7 +331,7 @@ def parse_alto(filename):
             try:
                 points = [int(float(x)) for x in line.get('BASELINE').split(' ')]
                 baseline = list(zip(points[::2], points[1::2]))
-                baseline =  [k for k, g in groupby(baseline)]
+                baseline = [k for k, g in groupby(baseline)]
             except ValueError:
                 logger.info('TextLine {} without baseline'.format(line.get('ID')))
 
@@ -347,7 +347,10 @@ def parse_alto(filename):
                     if ltype is not None:
                         scripts.add(ltype)
                         break
-            data['lines'].append({'baseline': baseline, 'boundary': boundary, 'text': text, 'script': ltype if ltype is not None else 'default'})
+            data['lines'].append({'baseline': baseline,
+                                  'boundary': boundary,
+                                  'text': text,
+                                  'script': ltype if ltype is not None else 'default'})
 
         if len(scripts) > 1:
             data['script_detection'] = True

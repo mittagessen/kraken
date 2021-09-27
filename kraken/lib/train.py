@@ -20,7 +20,6 @@ import re
 import abc
 import math
 import torch
-import shutil
 import logging
 import numpy as np
 import torch.nn.functional as F
@@ -28,12 +27,14 @@ import torch.nn.functional as F
 from itertools import cycle
 from functools import partial
 from torch.multiprocessing import Pool
-from typing import cast, Tuple, Callable, List, Dict, Any, Optional, Sequence, Union
+from typing import cast, Callable, Dict, Optional, Sequence, Union
 
 from kraken.lib import models, vgsl, segmentation, default_specs
 from kraken.lib.util import make_printable
-from kraken.lib.codec import PytorchCodec
-from kraken.lib.dataset import BaselineSet, GroundTruthDataset, PolygonGTDataset, generate_input_transforms, preparse_xml_data, InfiniteDataLoader, compute_error, collate_sequences
+from kraken.lib.dataset import (BaselineSet, GroundTruthDataset,
+                                PolygonGTDataset, generate_input_transforms,
+                                preparse_xml_data, InfiniteDataLoader,
+                                compute_error, collate_sequences)
 from kraken.lib.models import validate_hyper_parameters
 from kraken.lib.exceptions import KrakenInputException, KrakenEncodeException
 
@@ -41,6 +42,7 @@ from torch.utils.data import DataLoader
 
 
 logger = logging.getLogger(__name__)
+
 
 def _star_fun(fun, kwargs):
     try:
@@ -50,6 +52,7 @@ def _star_fun(fun, kwargs):
     except KrakenInputException as e:
         logger.warning(str(e))
     return None
+
 
 class TrainStopper(object):
 
@@ -74,6 +77,7 @@ class TrainStopper(object):
         """
         pass
 
+
 class annealing_step(object):
     def __init__(self, optimizer, step_size, gamma=0.1):
         self.scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size, gamma)
@@ -85,6 +89,7 @@ class annealing_step(object):
     def call_frequency(self):
         return 'epoch'
 
+
 class annealing_const(object):
     def __init__(self, *args, **kwargs):
         pass
@@ -95,6 +100,7 @@ class annealing_const(object):
     @property
     def call_frequency(self):
         return 'epoch'
+
 
 class annealing_exponential(object):
     def __init__(self, optimizer, step_size, gamma=0.1):
@@ -112,9 +118,14 @@ class annealing_exponential(object):
     def call_frequency(self):
         return 'epoch'
 
+
 class annealing_reduceonplateau(object):
     def __init__(self, optimizer, patience=5, factor=0.1, mode='max', min_lr=1e-7):
-        self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode=mode, factor=factor, patience=patience, min_lr=min_lr)
+        self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,
+                                                                    mode=mode,
+                                                                    factor=factor,
+                                                                    patience=patience,
+                                                                    min_lr=min_lr)
 
     def __call__(self, *args, **kwargs):
         self.scheduler.step(kwargs['val_loss'])
@@ -122,6 +133,7 @@ class annealing_reduceonplateau(object):
     @property
     def call_frequency(self):
         return 'epoch'
+
 
 class annealing_cosine(object):
     def __init__(self, optimizer, t_max=50, eta_min=1e-7):
@@ -137,7 +149,10 @@ class annealing_cosine(object):
 
 class annealing_onecycle(object):
     def __init__(self, optimizer, max_lr=1e-3, epochs=50, steps_per_epoch=None):
-        self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, max_lr=max_lr, epochs=epochs, steps_per_epoch=steps_per_epoch)
+        self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer,
+                                                                    max_lr=max_lr,
+                                                                    epochs=epochs,
+                                                                    steps_per_epoch=steps_per_epoch)
 
     def __call__(self, *args, **kwargs):
         self.scheduler.step()
@@ -146,10 +161,12 @@ class annealing_onecycle(object):
     def call_frequency(self):
         return 'batch'
 
+
 class TrainScheduler(object):
     """
     Implements learning rate scheduling.
     """
+
     def __init__(self, optimizer: torch.optim.Optimizer) -> None:
         self.steps = []
         self.lengths = []
@@ -175,7 +192,7 @@ class TrainScheduler(object):
         self.lengths.append(steps)
         self.steps.append(annealing_fn(self.optimizer))
 
-    def batch_step(self, loss = None) -> None:
+    def batch_step(self, loss: float = None) -> None:
         """
         Performs an optimization step.
         """
@@ -199,7 +216,7 @@ class TrainScheduler(object):
                 self.t_steps = next(self.lengths)
                 self.lr_sched = next(self.steps)
 
-    def epoch_step(self, val_loss = None) -> None:
+    def epoch_step(self, val_loss: float = None) -> None:
         """
         Performs an optimization step.
         """
@@ -229,6 +246,7 @@ class EarlyStopping(TrainStopper):
     Early stopping to terminate training when validation loss doesn't improve
     over a certain time.
     """
+
     def __init__(self, min_delta: float = None, lag: int = 1000) -> None:
         """
         Args:
@@ -255,7 +273,7 @@ class EarlyStopping(TrainStopper):
         self.wait += 1
 
         if self.auto_delta:
-            self.min_delta = (1 - self.best_loss)/20
+            self.min_delta = (1 - self.best_loss) / 20
             logger.debug('Rescaling early stopping loss to {}'.format(self.min_delta))
         if np.isclose(1., val_loss.cpu().numpy()):
             logger.debug('Validation loss is close to perfect. Triggering early stopping.')
@@ -274,6 +292,7 @@ class EpochStopping(TrainStopper):
     """
     Dumb stopping after a fixed number of iterations.
     """
+
     def __init__(self, epochs: int) -> None:
         """
         Args:
@@ -299,6 +318,7 @@ class NoStopping(TrainStopper):
     """
     Never stops training.
     """
+
     def __init__(self) -> None:
         super().__init__()
 
@@ -347,7 +367,7 @@ def recognition_evaluator_fn(model, val_loader, device):
     rec = models.TorchSeqRecognizer(model, device=device)
     chars, error = compute_error(rec, val_loader)
     model.train()
-    accuracy = ((chars-error)/(chars + np.finfo(np.float).eps))
+    accuracy = ((chars - error) / (chars + np.finfo(np.float).eps))
     return {'val_metric': accuracy, 'accuracy': accuracy, 'chars': chars, 'error': error}
 
 
@@ -363,7 +383,7 @@ def baseline_label_evaluator_fn(model, val_loader, device):
 
     with torch.no_grad():
         for batch in val_loader:
-            x,y = batch['image'], batch['target']
+            x, y = batch['image'], batch['target']
             x = x.to(device)
             y = y.to(device)
             pred, _ = model.nn(x)
@@ -382,18 +402,23 @@ def baseline_label_evaluator_fn(model, val_loader, device):
     # all_positives = tp + fp
     # actual_positives = tp + fn
     # true_positivies = tp
-    pixel_accuracy = corrects.sum()/all_n.sum()
-    mean_accuracy = torch.mean(corrects/all_n)
-    iu = (intersections+smooth)/(unions+smooth)
+    pixel_accuracy = corrects.sum() / all_n.sum()
+    mean_accuracy = torch.mean(corrects / all_n)
+    iu = (intersections + smooth) / (unions + smooth)
     mean_iu = torch.mean(iu)
-    freq_iu = torch.sum(cls_cnt/cls_cnt.sum() * iu)
-    return {'accuracy': pixel_accuracy, 'mean_acc': mean_accuracy, 'mean_iu': mean_iu, 'freq_iu': freq_iu, 'val_metric': mean_iu}
+    freq_iu = torch.sum(cls_cnt / cls_cnt.sum() * iu)
+    return {'accuracy': pixel_accuracy,
+            'mean_acc': mean_accuracy,
+            'mean_iu': mean_iu,
+            'freq_iu': freq_iu,
+            'val_metric': mean_iu}
 
 
 class KrakenTrainer(object):
     """
     Class encapsulating the recognition model training process.
     """
+
     def __init__(self,
                  model: vgsl.TorchVGSLModel,
                  optimizer: torch.optim.Optimizer,
@@ -610,7 +635,13 @@ class KrakenTrainer(object):
         else:
             batch, channels, height, width = nn.input
 
-        transforms = generate_input_transforms(batch, height, width, channels, hyper_params['pad'], valid_norm, force_binarization)
+        transforms = generate_input_transforms(batch,
+                                               height,
+                                               width,
+                                               channels,
+                                               hyper_params['pad'],
+                                               valid_norm,
+                                               force_binarization)
 
         if len(training_data) > 2500 and not preload:
             logger.info('Disabling preloading for large (>2500) training data set. Enable by setting --preload parameter')
@@ -674,11 +705,15 @@ class KrakenTrainer(object):
             logger.error('No valid training data was provided to the train command. Please add valid XML or line data.')
             return None
 
-        logger.info(f'Training set {len(gt_set._images)} lines, validation set {len(val_set._images)} lines, alphabet {len(gt_set.alphabet)} symbols')
+        logger.info(f'Training set {len(gt_set._images)} lines, validation set '
+                    f'{len(val_set._images)} lines, alphabet {len(gt_set.alphabet)} '
+                    'symbols')
         alpha_diff_only_train = set(gt_set.alphabet).difference(set(val_set.alphabet))
         alpha_diff_only_val = set(val_set.alphabet).difference(set(gt_set.alphabet))
         if alpha_diff_only_train:
-            logger.warning(f'alphabet mismatch: chars in training set only: {alpha_diff_only_train} (not included in accuracy test during training)')
+            logger.warning(f'alphabet mismatch: chars in training set only: '
+                           f'{alpha_diff_only_train} (not included in accuracy test '
+                           'during training)')
         if alpha_diff_only_val:
             logger.warning(f'alphabet mismatch: chars in validation set only: {alpha_diff_only_val} (not trained)')
         logger.info('grapheme\tcount')
@@ -697,7 +732,7 @@ class KrakenTrainer(object):
             gt_set.encode(codec)
             message('Slicing and dicing model ', nl=False)
             # now we can create a new model
-            spec = '[{} O1c{}]'.format(spec[1:-1], gt_set.codec.max_label()+1)
+            spec = '[{} O1c{}]'.format(spec[1:-1], gt_set.codec.max_label() + 1)
             logger.info(f'Appending {spec} to existing model {nn.spec} after {append}')
             nn.append(append, spec)
             nn.add_codec(gt_set.codec)
@@ -724,7 +759,7 @@ class KrakenTrainer(object):
                     codec = codec.add_labels(alpha_diff)
                     nn.add_codec(codec)
                     logger.info(f'Resizing last layer in network to {codec.max_label()+1} outputs')
-                    nn.resize_output(codec.max_label()+1)
+                    nn.resize_output(codec.max_label() + 1)
                     gt_set.encode(nn.codec)
                     message('\u2713', fg='green')
                 elif resize == 'both':
@@ -732,9 +767,10 @@ class KrakenTrainer(object):
                     logger.info(f'Resizing network or given codec to {gt_set.alphabet} code sequences')
                     gt_set.encode(None)
                     ncodec, del_labels = codec.merge(gt_set.codec)
-                    logger.info(f'Deleting {len(del_labels)} output classes from network ({len(codec)-len(del_labels)} retained)')
+                    logger.info(f'Deleting {len(del_labels)} output classes from network '
+                                f'({len(codec)-len(del_labels)} retained)')
                     gt_set.encode(ncodec)
-                    nn.resize_output(ncodec.max_label()+1, del_labels)
+                    nn.resize_output(ncodec.max_label() + 1, del_labels)
                     message('\u2713', fg='green')
                 else:
                     logger.error(f'invalid resize parameter value {resize}')
@@ -742,7 +778,7 @@ class KrakenTrainer(object):
         else:
             gt_set.encode(codec)
             logger.info(f'Creating new model {spec} with {gt_set.codec.max_label()+1} outputs')
-            spec = '[{} O1c{}]'.format(spec[1:-1], gt_set.codec.max_label()+1)
+            spec = '[{} O1c{}]'.format(spec[1:-1], gt_set.codec.max_label() + 1)
             nn = vgsl.TorchVGSLModel(spec)
             # initialize weights
             message('Initializing model ', nl=False)
@@ -752,7 +788,8 @@ class KrakenTrainer(object):
             message('\u2713', fg='green')
 
         if nn.one_channel_mode and gt_set.im_mode != nn.one_channel_mode:
-            logger.warning(f'Neural network has been trained on mode {nn.one_channel_mode} images, training set contains mode {gt_set.im_mode} data. Consider setting `force_binarization`')
+            logger.warning(f'Neural network has been trained on mode {nn.one_channel_mode} images, '
+                           f'training set contains mode {gt_set.im_mode} data. Consider setting `force_binarization`')
 
         if format_type != 'path' and nn.seg_type == 'bbox':
             logger.warning('Neural network has been trained on bounding box image information but training set is polygonal.')
@@ -778,7 +815,8 @@ class KrakenTrainer(object):
                                 pin_memory=True,
                                 collate_fn=collate_sequences)
 
-        logger.debug('Constructing {} optimizer (lr: {}, momentum: {})'.format(hyper_params['optimizer'], hyper_params['lrate'], hyper_params['momentum']))
+        logger.debug('Constructing {} optimizer (lr: {}, momentum: {})'.format(
+            hyper_params['optimizer'], hyper_params['lrate'], hyper_params['momentum']))
 
         # updates model's hyper params with users defined
         nn.hyper_params = hyper_params
@@ -806,23 +844,33 @@ class KrakenTrainer(object):
 
         tr_it = TrainScheduler(optim)
         if hyper_params['schedule'] == '1cycle':
-            annealing_one = partial(annealing_onecycle, max_lr=hyper_params['lrate'], epochs=hyper_params['step_size'], steps_per_epoch=len(gt_set))
+            annealing_one = partial(annealing_onecycle,
+                                    max_lr=hyper_params['lrate'],
+                                    epochs=hyper_params['step_size'],
+                                    steps_per_epoch=len(gt_set))
             tr_it.add_phase(int(len(gt_set) * hyper_params['epochs']),
                             annealing_one)
         elif hyper_params['schedule'] == 'exponential':
-            annealing_exp = partial(annealing_exponential, step_size=hyper_params['step_size'], gamma=hyper_params['gamma'])
+            annealing_exp = partial(annealing_exponential,
+                                    step_size=hyper_params['step_size'],
+                                    gamma=hyper_params['gamma'])
             tr_it.add_phase(int(len(gt_set) * hyper_params['epochs']),
                             annealing_exp)
         elif hyper_params['schedule'] == 'step':
-            annealing_step_p = partial(annealing_step, step_size=hyper_params['step_size'], gamma=hyper_params['gamma'])
+            annealing_step_p = partial(annealing_step,
+                                       step_size=hyper_params['step_size'],
+                                       gamma=hyper_params['gamma'])
             tr_it.add_phase(int(len(gt_set) * hyper_params['epochs']),
                             annealing_step_p)
         elif hyper_params['schedule'] == 'reduceonplateau':
-            annealing_red = partial(annealing_reduceonplateau, patience=hyper_params['rop_patience'], factor=hyper_params['gamma'])
+            annealing_red = partial(annealing_reduceonplateau,
+                                    patience=hyper_params['rop_patience'],
+                                    factor=hyper_params['gamma'])
             tr_it.add_phase(int(len(gt_set) * hyper_params['epochs']),
                             annealing_red)
         elif hyper_params['schedule'] == 'cosine':
-            annealing_cos = partial(annealing_cosine, t_max=hyper_params['cos_t_max'])
+            annealing_cos = partial(annealing_cosine,
+                                    t_max=hyper_params['cos_t_max'])
             tr_it.add_phase(int(len(gt_set) * hyper_params['epochs']),
                             annealing_cos)
         else:
@@ -997,12 +1045,15 @@ class KrakenTrainer(object):
             if gt_set.class_mapping['baselines'].keys() != nn.user_metadata['class_mapping']['baselines'].keys() or \
                gt_set.class_mapping['regions'].keys() != nn.user_metadata['class_mapping']['regions'].keys():
 
-                bl_diff = set(gt_set.class_mapping['baselines'].keys()).symmetric_difference(set(nn.user_metadata['class_mapping']['baselines'].keys()))
-                regions_diff = set(gt_set.class_mapping['regions'].keys()).symmetric_difference(set(nn.user_metadata['class_mapping']['regions'].keys()))
+                bl_diff = set(gt_set.class_mapping['baselines'].keys()).symmetric_difference(
+                    set(nn.user_metadata['class_mapping']['baselines'].keys()))
+                regions_diff = set(gt_set.class_mapping['regions'].keys()).symmetric_difference(
+                    set(nn.user_metadata['class_mapping']['regions'].keys()))
 
                 if resize == 'fail':
                     logger.error(f'Training data and model class mapping differ (bl: {bl_diff}, regions: {regions_diff}')
-                    raise KrakenInputException(f'Training data and model class mapping differ (bl: {bl_diff}, regions: {regions_diff}')
+                    raise KrakenInputException(
+                        f'Training data and model class mapping differ (bl: {bl_diff}, regions: {regions_diff}')
                 elif resize == 'add':
                     new_bls = gt_set.class_mapping['baselines'].keys() - nn.user_metadata['class_mapping']['baselines'].keys()
                     new_regions = gt_set.class_mapping['regions'].keys() - nn.user_metadata['class_mapping']['regions'].keys()
@@ -1032,20 +1083,21 @@ class KrakenTrainer(object):
 
                     del_indices = [nn.user_metadata['class_mapping']['baselines'][x] for x in del_bls]
                     del_indices.extend(nn.user_metadata['class_mapping']['regions'][x] for x in del_regions)
-                    nn.resize_output(cls_idx + len(new_bls) + len(new_regions) - len(del_bls) - len(del_regions) + 1, del_indices)
+                    nn.resize_output(cls_idx + len(new_bls) + len(new_regions) -
+                                     len(del_bls) - len(del_regions) + 1, del_indices)
 
                     # delete old baseline/region types
                     cls_idx = min(min(nn.user_metadata['class_mapping']['baselines'].values()) if nn.user_metadata['class_mapping']['baselines'] else np.inf,
                                   min(nn.user_metadata['class_mapping']['regions'].values()) if nn.user_metadata['class_mapping']['regions'] else np.inf)
 
                     bls = {}
-                    for k,v in sorted(nn.user_metadata['class_mapping']['baselines'].items(), key=lambda item: item[1]):
+                    for k, v in sorted(nn.user_metadata['class_mapping']['baselines'].items(), key=lambda item: item[1]):
                         if k not in del_bls:
                             bls[k] = cls_idx
                             cls_idx += 1
 
                     regions = {}
-                    for k,v in sorted(nn.user_metadata['class_mapping']['regions'].items(), key=lambda item: item[1]):
+                    for k, v in sorted(nn.user_metadata['class_mapping']['regions'].items(), key=lambda item: item[1]):
                         if k not in del_regions:
                             regions[k] = cls_idx
                             cls_idx += 1
@@ -1126,19 +1178,28 @@ class KrakenTrainer(object):
         tr_it = TrainScheduler(optim)
         tr_it = TrainScheduler(optim)
         if hyper_params['schedule'] == '1cycle':
-            annealing_one = partial(annealing_onecycle, max_lr=hyper_params['lrate'], epochs=hyper_params['epochs'], steps_per_epoch=len(gt_set))
+            annealing_one = partial(annealing_onecycle,
+                                    max_lr=hyper_params['lrate'],
+                                    epochs=hyper_params['epochs'],
+                                    steps_per_epoch=len(gt_set))
             tr_it.add_phase(int(len(gt_set) * hyper_params['epochs']),
                             annealing_one)
         elif hyper_params['schedule'] == 'exponential':
-            annealing_exp = partial(annealing_exponential, step_size=hyper_params['step_size'], gamma=hyper_params['gamma'])
+            annealing_exp = partial(annealing_exponential,
+                                    step_size=hyper_params['step_size'],
+                                    gamma=hyper_params['gamma'])
             tr_it.add_phase(int(len(gt_set) * hyper_params['epochs']),
                             annealing_exp)
         elif hyper_params['schedule'] == 'step':
-            annealing_step_p = partial(annealing_step, step_size=hyper_params['step_size'], gamma=hyper_params['gamma'])
+            annealing_step_p = partial(annealing_step,
+                                       step_size=hyper_params['step_size'],
+                                       gamma=hyper_params['gamma'])
             tr_it.add_phase(int(len(gt_set) * hyper_params['epochs']),
                             annealing_step_p)
         elif hyper_params['schedule'] == 'reduceonplateau':
-            annealing_red = partial(annealing_reduceonplateau, patience=hyper_params['rop_patience'], factor=hyper_params['gamma'])
+            annealing_red = partial(annealing_reduceonplateau,
+                                    patience=hyper_params['rop_patience'],
+                                    factor=hyper_params['gamma'])
             tr_it.add_phase(int(len(gt_set) * hyper_params['epochs']),
                             annealing_red)
         elif hyper_params['schedule'] == 'cosine':

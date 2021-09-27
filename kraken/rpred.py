@@ -183,10 +183,9 @@ class mm_rpred(object):
         if isinstance(nets, defaultdict):
             seg_types.add(nets.default_factory().seg_type)
         if ('type' in bounds and bounds['type'] not in seg_types) or len(seg_types) > 1:
-            logger.warning('Recognizers with segmentation types {} will be '
-                           'applied to segmentation of type {}. This will likely result '
-                           'in severely degraded performace'.format(seg_types,
-                            bounds['type'] if 'type' in bounds else None))
+            logger.warning(f'Recognizers with segmentation types {seg_types} will be '
+                           f'applied to segmentation of type {bounds["type"] if "type" in bounds else None}. '
+                           f'This will likely result in severely degraded performace')
         one_channel_modes = set(recognizer.nn.one_channel_mode for recognizer in nets.values())
         if '1' in one_channel_modes and len(one_channel_modes) > 1:
             raise KrakenInputException('Mixing binary and non-binary recognition models is not supported.')
@@ -325,7 +324,6 @@ class mm_rpred(object):
         self.net_scale = line.shape[2]/self.nets[script].outputs.shape[2]
         # scale between network input and original line
         self.in_scale = box.size[0]/(line.shape[2]-2*self.pad)
-
 
         # XXX: fix bounding box calculation ocr_record for multi-codepoint labels.
         pred = ''.join(x[0] for x in preds)

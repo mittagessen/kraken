@@ -17,27 +17,22 @@
 Utility functions for data loading and training of VGSL networks.
 """
 import json
-import regex
 import torch
 import traceback
-import unicodedata
 import numpy as np
 import pkg_resources
-import bidi.algorithm as bd
 import shapely.geometry as geom
 import torch.nn.functional as F
-import torchvision.transforms.functional as tf
 
 from os import path
+from PIL import Image
 from functools import partial
-from shapely.ops import split, snap
-from PIL import Image, ImageDraw
+from shapely.ops import split
 from itertools import groupby
-from collections import Counter, defaultdict
 from torchvision import transforms
+from collections import Counter, defaultdict
 from torch.utils.data import Dataset, DataLoader
-from torch.nn.utils.rnn import pad_sequence
-from typing import Dict, List, Tuple, Iterable, Sequence, Callable, Optional, Any, Union, cast
+from typing import Dict, List, Tuple, Iterable, Sequence, Callable, Optional, Any, Union
 
 from skimage.draw import polygon
 
@@ -48,18 +43,29 @@ from kraken.lib.codec import PytorchCodec
 from kraken.lib.models import TorchSeqRecognizer
 from kraken.lib.segmentation import extract_polygons, calculate_polygonal_environment
 from kraken.lib.exceptions import KrakenInputException
-from kraken.lib.lineest import CenterNormalizer, dewarp
+from kraken.lib.lineest import CenterNormalizer
 
 from kraken.lib import functional_im_transforms as F_t
 
-__all__ = ['BaselineSet', 'PolygonGTDataset', 'GroundTruthDataset', 'compute_error', 'generate_input_transforms', 'preparse_xml_data']
+__all__ = ['BaselineSet',
+           'PolygonGTDataset',
+           'GroundTruthDataset',
+           'compute_error',
+           'generate_input_transforms',
+           'preparse_xml_data']
 
 import logging
 
 logger = logging.getLogger(__name__)
 
 
-def generate_input_transforms(batch: int, height: int, width: int, channels: int, pad: int, valid_norm: bool = True, force_binarization=False) -> transforms.Compose:
+def generate_input_transforms(batch: int,
+                              height: int,
+                              width: int,
+                              channels: int,
+                              pad: int,
+                              valid_norm: bool = True,
+                              force_binarization=False) -> transforms.Compose:
     """
     Generates a torchvision transformation converting a PIL.Image into a
     tensor usable in a network forward pass.
@@ -80,7 +86,7 @@ def generate_input_transforms(batch: int, height: int, width: int, channels: int
         A torchvision transformation composition converting the input image to
         the appropriate tensor.
     """
-    scale = (height, width) # type: Tuple[int, int]
+    scale = (height, width)  # type: Tuple[int, int]
     center_norm = False
     mode = 'RGB' if channels == 3 else 'L'
     if height == 1 and width == 0 and channels > 3:
@@ -103,18 +109,11 @@ def generate_input_transforms(batch: int, height: int, width: int, channels: int
         perm = (0, 1, 2)
         pad = 0
     else:
-        raise KrakenInputException('Invalid input spec {}, {}, {}, {}, {}'.format(batch,
-                                                                                  height,
-                                                                                  width,
-                                                                                  channels,
-                                                                                  pad))
+        raise KrakenInputException(f'Invalid input spec {batch}, {height}, {width}, {channels}, {pad}.')
+
     if mode != 'L' and force_binarization:
-        raise KrakenInputException('Invalid input spec {}, {}, {}, {} in'
-                                   ' combination with forced binarization.'.format(batch,
-                                                                                   height,
-                                                                                   width,
-                                                                                   channels,
-                                                                                   pad))
+        raise KrakenInputException(f'Invalid input spec {batch}, {height}, {width}, {channels}, {pad} in '
+                                   'combination with forced binarization.')
 
     out_transforms = []
     out_transforms.append(transforms.Lambda(partial(F_t.pil_to_mode, mode=mode)))
@@ -191,17 +190,17 @@ def global_align(seq1: Sequence[Any], seq2: Sequence[Any]) -> Tuple[int, List[st
     i = len(direction) - 1
     j = len(direction[0]) - 1
     while direction[i][j] != (-1, 0):
-        k, l = direction[i][j]
-        if k == i - 1 and l == j - 1:
+        k, m = direction[i][j]
+        if k == i - 1 and m == j - 1:
             algn1.insert(0, seq1[i - 1])
             algn2.insert(0, seq2[j - 1])
         elif k < i:
             algn1.insert(0, seq1[i - 1])
             algn2.insert(0, '')
-        elif l < j:
+        elif m < j:
             algn1.insert(0, '')
             algn2.insert(0, seq2[j - 1])
-        i, j = k, l
+        i, j = k, m
     return d, algn1, algn2
 
 
@@ -233,7 +232,7 @@ def compute_confusions(algn1: Sequence[str], algn2: Sequence[str]):
     ins: Dict[Tuple[str, str], int] = Counter()
     dels: int = 0
     subs: Dict[Tuple[str, str], int] = Counter()
-    for u,v in zip(algn1, algn2):
+    for u, v in zip(algn1, algn2):
         counts[(u, v)] += 1
     for k, v in counts.items():
         if k[0] == '':
@@ -246,6 +245,7 @@ def compute_confusions(algn1: Sequence[str], algn2: Sequence[str]):
             elif k[0] != k[1]:
                 subs[script] += v
     return counts, scripts, ins, dels, subs
+
 
 def compute_error(model: TorchSeqRecognizer, validation_set: Iterable[Dict[str, torch.Tensor]]) -> Tuple[int, int]:
     """
@@ -296,6 +296,7 @@ def preparse_xml_data(filenames, format_type='xml', repolygonize=False):
         parse_fn = parse_page
     else:
         raise Exception(f'invalid format {format_type} for preparse_xml_data')
+
     for fn in filenames:
         try:
             data = parse_fn(fn)
@@ -330,7 +331,10 @@ def _repolygonize(im: Image.Image, lines):
     """
     im = Image.open(im).convert('L')
     polygons = calculate_polygonal_environment(im, [x['baseline'] for x in lines])
-    return [{'boundary': polygon, 'baseline': orig['baseline'], 'text': orig['text'], 'script': orig['script']} for orig, polygon in zip(lines, polygons)]
+    return [{'boundary': polygon,
+             'baseline': orig['baseline'],
+             'text': orig['text'],
+             'script': orig['script']} for orig, polygon in zip(lines, polygons)]
 
 
 def collate_sequences(batch):
@@ -421,8 +425,8 @@ class PolygonGTDataset(Dataset):
                 self.text_transforms.append(F_t.text_reorder)
         if augmentation:
             from albumentations import (
-                Compose, ToFloat, FromFloat, Flip, OneOf, MotionBlur, MedianBlur, Blur,
-                ShiftScaleRotate, OpticalDistortion, ElasticTransform, RandomBrightnessContrast,
+                Compose, ToFloat, OneOf, MotionBlur, MedianBlur, Blur,
+                ShiftScaleRotate, OpticalDistortion, ElasticTransform,
                 )
 
             self.aug = Compose([
@@ -461,7 +465,13 @@ class PolygonGTDataset(Dataset):
         self._gt.append(kwargs['text'])
         self.alphabet.update(kwargs['text'])
 
-    def parse(self, image: Union[str, Image.Image], text: str, baseline: List[Tuple[int, int]], boundary: List[Tuple[int, int]], *args, **kwargs):
+    def parse(self,
+              image: Union[str, Image.Image],
+              text: str,
+              baseline: List[Tuple[int, int]],
+              boundary: List[Tuple[int, int]],
+              *args,
+              **kwargs):
         """
         Parses a sample for the dataset and returns it.
 
@@ -486,7 +496,8 @@ class PolygonGTDataset(Dataset):
             if not isinstance(image, Image.Image):
                 im = Image.open(image)
             try:
-                im, _ = next(extract_polygons(im, {'type': 'baselines', 'lines': [{'baseline': baseline, 'boundary': boundary}]}))
+                im, _ = next(extract_polygons(im, {'type': 'baselines',
+                                                   'lines': [{'baseline': baseline, 'boundary': boundary}]}))
             except IndexError:
                 raise KrakenInputException('Patch extraction failed for baseline')
             try:
@@ -495,9 +506,20 @@ class PolygonGTDataset(Dataset):
             except ValueError:
                 raise KrakenInputException(f'Image transforms failed on {image}')
             self._images.append(im)
-            return {'text': text, 'image': im, 'baseline': baseline, 'boundary': boundary, 'im_mode': im.mode, 'preload': True, 'preparse': True}
+            return {'text': text,
+                    'image': im,
+                    'baseline': baseline,
+                    'boundary': boundary,
+                    'im_mode': im.mode,
+                    'preload': True,
+                    'preparse': True}
         else:
-            return {'text': text, 'image': image, 'baseline': baseline, 'boundary': boundary, 'preload': False, 'preparse': True}
+            return {'text': text,
+                    'image': image,
+                    'baseline': baseline,
+                    'boundary': boundary,
+                    'preload': False,
+                    'preparse': True}
 
     def encode(self, codec: Optional[PytorchCodec] = None) -> None:
         """
@@ -536,7 +558,8 @@ class PolygonGTDataset(Dataset):
                 im = item[0][0]
                 if not isinstance(im, Image.Image):
                     im = Image.open(im)
-                im, _ = next(extract_polygons(im, {'type': 'baselines', 'lines': [{'baseline': item[0][1], 'boundary': item[0][2]}]}))
+                im, _ = next(extract_polygons(im, {'type': 'baselines',
+                                                   'lines': [{'baseline': item[0][1], 'boundary': item[0][2]}]}))
                 im = self.head_transforms(im)
                 if not is_bitonal(im):
                     self.im_mode = im.mode
@@ -621,8 +644,8 @@ class GroundTruthDataset(Dataset):
                 self.text_transforms.append(F_t.text_reorder)
         if augmentation:
             from albumentations import (
-                Compose, ToFloat, FromFloat, Flip, OneOf, MotionBlur, MedianBlur, Blur,
-                ShiftScaleRotate, OpticalDistortion, ElasticTransform, RandomBrightnessContrast,
+                Compose, ToFloat, OneOf, MotionBlur, MedianBlur, Blur,
+                ShiftScaleRotate, OpticalDistortion, ElasticTransform,
                 )
 
             self.aug = Compose([
@@ -869,8 +892,8 @@ class BaselineSet(Dataset):
             raise Exception('invalid dataset mode')
         if augmentation:
             from albumentations import (
-                Compose, ToFloat, FromFloat, RandomRotate90, Flip, OneOf, MotionBlur, MedianBlur, Blur,
-                ShiftScaleRotate, OpticalDistortion, ElasticTransform, RandomBrightnessContrast,
+                Compose, ToFloat, RandomRotate90, Flip, OneOf, MotionBlur, MedianBlur, Blur,
+                ShiftScaleRotate, OpticalDistortion, ElasticTransform,
                 HueSaturationValue,
                 )
 
@@ -912,7 +935,9 @@ class BaselineSet(Dataset):
             baseline (dict): A list containing dicts with a list of coordinates
                              and script types [{'baseline': [[x0, y0], ...,
                              [xn, yn]], 'script': 'script_type'}, ...]
-            regions (dict): A dict containing list of lists of coordinates {'region_type_0': [[x0, y0], ..., [xn, yn]]], 'region_type_1': ...}.
+            regions (dict): A dict containing list of lists of coordinates
+                            {'region_type_0': [[x0, y0], ..., [xn, yn]]],
+                            'region_type_1': ...}.
         """
         if self.mode:
             raise Exception(f'The `add` method is incompatible with dataset mode {self.mode}')
@@ -964,10 +989,10 @@ class BaselineSet(Dataset):
     @staticmethod
     def _get_ortho_line(lineseg, point, line_width, offset):
         lineseg = np.array(lineseg)
-        norm_vec = lineseg[1,...] - lineseg[0,...]
+        norm_vec = lineseg[1, ...] - lineseg[0, ...]
         norm_vec_len = np.sqrt(np.sum(norm_vec**2))
         unit_vec = norm_vec / norm_vec_len
-        ortho_vec = unit_vec[::-1] * ((1,-1), (-1,1))
+        ortho_vec = unit_vec[::-1] * ((1, -1), (-1, 1))
         if offset == 'l':
             point -= unit_vec * line_width
         else:
@@ -998,18 +1023,20 @@ class BaselineSet(Dataset):
                 shp_line = geom.LineString(line)
                 split_offset = min(5, shp_line.length/2)
                 line_pol = np.array(shp_line.buffer(self.line_width/2, cap_style=2).boundary, dtype=np.int)
-                rr, cc = polygon(line_pol[:,1], line_pol[:,0], shape=image.shape[1:])
+                rr, cc = polygon(line_pol[:, 1], line_pol[:, 0], shape=image.shape[1:])
                 t[cls_idx, rr, cc] = 1
                 split_pt = shp_line.interpolate(split_offset).buffer(0.001)
                 # top
-                start_sep = np.array((split(shp_line, split_pt)[0].buffer(self.line_width, cap_style=3).boundary), dtype=np.int)
-                rr_s, cc_s = polygon(start_sep[:,1], start_sep[:,0], shape=image.shape[1:])
+                start_sep = np.array((split(shp_line, split_pt)[0].buffer(self.line_width,
+                                                                          cap_style=3).boundary), dtype=np.int)
+                rr_s, cc_s = polygon(start_sep[:, 1], start_sep[:, 0], shape=image.shape[1:])
                 t[start_sep_cls, rr_s, cc_s] = 1
                 t[start_sep_cls, rr, cc] = 0
                 split_pt = shp_line.interpolate(-split_offset).buffer(0.001)
                 # top
-                end_sep = np.array((split(shp_line, split_pt)[-1].buffer(self.line_width, cap_style=3).boundary), dtype=np.int)
-                rr_s, cc_s = polygon(end_sep[:,1], end_sep[:,0], shape=image.shape[1:])
+                end_sep = np.array((split(shp_line, split_pt)[-1].buffer(self.line_width,
+                                                                         cap_style=3).boundary), dtype=np.int)
+                rr_s, cc_s = polygon(end_sep[:, 1], end_sep[:, 0], shape=image.shape[1:])
                 t[end_sep_cls, rr_s, cc_s] = 1
                 t[end_sep_cls, rr, cc] = 0
         for key, regions in target['regions'].items():
@@ -1020,7 +1047,7 @@ class BaselineSet(Dataset):
                 continue
             for region in regions:
                 region = np.array(region)*scale
-                rr, cc = polygon(region[:,1], region[:,0], shape=image.shape[1:])
+                rr, cc = polygon(region[:, 1], region[:, 0], shape=image.shape[1:])
                 t[cls_idx, rr, cc] = 1
         target = t
         if self.aug:
