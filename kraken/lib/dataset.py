@@ -692,7 +692,7 @@ class GroundTruthDataset(Dataset):
         """
         if self.preload:
             try:
-                im = self.head_transforms(im)
+                im = self.head_transforms(image)
                 if not is_bitonal(im):
                     self.im_mode = im.mode
                 im = self.tail_transforms(im)

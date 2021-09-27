@@ -39,7 +39,7 @@ try:
     import pywrapfst as fst
 
     _get_fst = lambda: fst.VectorFst()
-    _get_best_weight = lambda x: fst.Weight.one(f.weight_type())
+    _get_best_weight = lambda x: fst.Weight.one(fst.weight_type())
 except ImportError:
     logger.info('pywrapfst not available. Falling back to openfst_python.')
     try:

@@ -25,7 +25,7 @@ import unicodedata
 from click import open_file
 from bidi.algorithm import get_display
 
-from typing import cast, Set, List, IO, Any
+from typing import cast, Set, List, IO, Any, Dict
 from collections import defaultdict
 
 from kraken.lib import log

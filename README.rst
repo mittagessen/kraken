@@ -1,8 +1,8 @@
 Description
 ===========
 
-.. image:: https://travis-ci.org/mittagessen/kraken.svg?branch=master
-    :target: https://travis-ci.org/mittagessen/kraken
+.. image:: https://github.com/mittagessen/kraken/actions/workflows/test.yml/badge.svg
+    :target: https://github.com/mittagessen/kraken/actions/workflows/test.yml
 
 kraken is a turn-key OCR system optimized for historical and non-Latin script
 material.
