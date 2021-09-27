@@ -414,6 +414,196 @@ def line_regions(line, regions):
     return regs
 
 
+def _ray_intersect_boundaries(ray, direction, aabb):
+    """
+    Simplified version of [0] for 2d and AABB anchored at (0,0).
+
+    [0] http://gamedev.stackexchange.com/questions/18436/most-efficient-aabb-vs-ray-collision-algorithms
+    """
+    dir_fraction = np.empty(2, dtype=ray.dtype)
+    dir_fraction[direction == 0.0] = np.inf
+    dir_fraction[direction != 0.0] = np.divide(1.0, direction[direction != 0.0])
+
+    t1 = (-ray[0]) * dir_fraction[0]
+    t2 = (aabb[0] - ray[0]) * dir_fraction[0]
+    t3 = (-ray[1]) * dir_fraction[1]
+    t4 = (aabb[1] - ray[1]) * dir_fraction[1]
+
+    tmin = max(min(t1, t2), min(t3, t4))
+    tmax = min(max(t1, t2), max(t3, t4))
+
+    t = min(x for x in [tmin, tmax] if x >= 0)
+    return ray + (direction * t)
+
+
+def _calc_seam(baseline, polygon, angle, im_feats, bias=150):
+    """
+    Calculates seam between baseline and ROI boundary on one side.
+
+    Adds a baseline-distance-weighted bias to the feature map, masks
+    out the bounding polygon and rotates the line so it is roughly
+    level.
+    """
+    MASK_VAL = 99999
+    r, c = draw.polygon(polygon[:, 1], polygon[:, 0])
+    c_min, c_max = int(polygon[:, 0].min()), int(polygon[:, 0].max())
+    r_min, r_max = int(polygon[:, 1].min()), int(polygon[:, 1].max())
+    patch = im_feats[r_min:r_max+2, c_min:c_max+2].copy()
+    # bias feature matrix by distance from baseline
+    mask = np.ones_like(patch)
+    for line_seg in zip(baseline[:-1] - (c_min, r_min), baseline[1:] - (c_min, r_min)):
+        line_locs = draw.line(line_seg[0][1],
+                              line_seg[0][0],
+                              line_seg[1][1],
+                              line_seg[1][0])
+        mask[line_locs] = 0
+    dist_bias = distance_transform_cdt(mask)
+    # absolute mask
+    mask = np.ones_like(patch, dtype=np.bool)
+    mask[r-r_min, c-c_min] = False
+    # dilate mask to compensate for aliasing during rotation
+    mask = binary_erosion(mask, iterations=2)
+    # combine weights with features
+    patch[mask] = MASK_VAL
+    patch += (dist_bias*(np.mean(patch[patch != MASK_VAL])/bias))
+    extrema = baseline[(0, -1), :] - (c_min, r_min)
+    # scale line image to max 600 pixel width
+    scale = min(1.0, 600/(c_max-c_min))
+    tform, rotated_patch = _rotate(patch, angle, center=extrema[0], scale=scale, cval=MASK_VAL)
+    # ensure to cut off padding after rotation
+    x_offsets = np.sort(np.around(tform.inverse(extrema)[:, 0]).astype('int'))
+    rotated_patch = rotated_patch[:, x_offsets[0]:x_offsets[1]+1]
+    # infinity pad for seamcarve
+    rotated_patch = np.pad(rotated_patch, ((1, 1), (0, 0)),  mode='constant', constant_values=np.inf)
+    r, c = rotated_patch.shape
+    # fold into shape (c, r-2 3)
+    A = np.lib.stride_tricks.as_strided(rotated_patch, (c, r-2, 3), (rotated_patch.strides[1],
+                                                                     rotated_patch.strides[0],
+                                                                     rotated_patch.strides[0]))
+    B = rotated_patch[1:-1, 1:].swapaxes(0, 1)
+    backtrack = np.zeros_like(B, dtype='int')
+    T = np.empty((B.shape[1]), 'f')
+    R = np.arange(-1, len(T)-1)
+    for i in np.arange(c-1):
+        A[i].min(1, T)
+        backtrack[i] = A[i].argmin(1) + R
+        B[i] += T
+    # backtrack
+    seam = []
+    j = np.argmin(rotated_patch[1:-1, -1])
+    for i in range(c-2, -2, -1):
+        seam.append((i+x_offsets[0]+1, j))
+        j = backtrack[i, j]
+    seam = np.array(seam)[::-1]
+    seam_mean = seam[:, 1].mean()
+    seam_std = seam[:, 1].std()
+    seam[:, 1] = np.clip(seam[:, 1], seam_mean-seam_std, seam_mean+seam_std)
+    # rotate back
+    seam = tform(seam).astype('int')
+    # filter out seam points in masked area of original patch/in padding
+    seam = seam[seam.min(axis=1) >= 0, :]
+    m = (seam < mask.shape[::-1]).T
+    seam = seam[np.logical_and(m[0], m[1]), :]
+    seam = seam[np.invert(mask[seam.T[1], seam.T[0]])]
+    seam += (c_min, r_min)
+    return seam
+
+
+def _extract_patch(env_up, env_bottom, baseline, offset_baseline, end_points, dir_vec, topline, offset, im_feats):
+    """
+    Calculate a line image patch from a ROI and the original baseline.
+    """
+    upper_polygon = np.concatenate((baseline, env_up[::-1]))
+    bottom_polygon = np.concatenate((baseline, env_bottom[::-1]))
+    upper_offset_polygon = np.concatenate((offset_baseline, env_up[::-1]))
+    bottom_offset_polygon = np.concatenate((offset_baseline, env_bottom[::-1]))
+
+    angle = np.arctan2(dir_vec[1], dir_vec[0])
+
+    if topline:
+        upper_seam = geom.LineString(_calc_seam(baseline, upper_polygon, angle, im_feats)).simplify(5)
+        bottom_seam = geom.LineString(_calc_seam(offset_baseline, bottom_offset_polygon, angle, im_feats)).simplify(5)
+    else:
+        upper_seam = geom.LineString(_calc_seam(offset_baseline, upper_offset_polygon, angle, im_feats)).simplify(5)
+        bottom_seam = geom.LineString(_calc_seam(baseline, bottom_polygon, angle, im_feats)).simplify(5)
+
+    # ugly workaround against GEOM parallel_offset bug creating a
+    # MultiLineString out of offset LineString
+    if upper_seam.parallel_offset(offset//2, side='right').type == 'MultiLineString' or offset == 0:
+        upper_seam = np.array(upper_seam, dtype=np.int)
+    else:
+        upper_seam = np.array(upper_seam.parallel_offset(offset//2, side='right'), dtype=np.int)[::-1]
+    if bottom_seam.parallel_offset(offset//2, side='left').type == 'MultiLineString' or offset == 0:
+        bottom_seam = np.array(bottom_seam, dtype=np.int)
+    else:
+        bottom_seam = np.array(bottom_seam.parallel_offset(offset//2, side='left'), dtype=np.int)
+
+    polygon = np.concatenate(([end_points[0]], upper_seam, [end_points[-1]], bottom_seam[::-1]))
+    return polygon
+
+
+def _calc_roi(line, bounds, baselines, suppl_obj, p_dir):
+    # interpolate baseline
+    ls = geom.LineString(line)
+    ip_line = [line[0]]
+    dist = 10
+    while dist < ls.length:
+        ip_line.append(np.array(ls.interpolate(dist)))
+        dist += 10
+    ip_line.append(line[-1])
+    ip_line = np.array(ip_line)
+    upper_bounds_intersects = []
+    bottom_bounds_intersects = []
+    for point in ip_line:
+        upper_bounds_intersects.append(_ray_intersect_boundaries(point, (p_dir*(-1, 1))[::-1], bounds+1).astype('int'))
+        bottom_bounds_intersects.append(_ray_intersect_boundaries(point, (p_dir*(1, -1))[::-1], bounds+1).astype('int'))
+    # build polygon between baseline and bbox intersects
+    upper_polygon = geom.Polygon(ip_line.tolist() + upper_bounds_intersects)
+    bottom_polygon = geom.Polygon(ip_line.tolist() + bottom_bounds_intersects)
+
+    # select baselines at least partially in each polygon
+    side_a = [geom.LineString(upper_bounds_intersects)]
+    side_b = [geom.LineString(bottom_bounds_intersects)]
+
+    for adj_line in baselines + suppl_obj:
+        adj_line = geom.LineString(adj_line)
+        if upper_polygon.intersects(adj_line):
+            side_a.append(adj_line)
+        elif bottom_polygon.intersects(adj_line):
+            side_b.append(adj_line)
+    side_a = unary_union(side_a).buffer(1).boundary
+    side_b = unary_union(side_b).buffer(1).boundary
+
+    def _find_closest_point(pt, intersects):
+        spt = geom.Point(pt)
+        if intersects.type == 'MultiPoint':
+            return min([p for p in intersects], key=lambda x: spt.distance(x))
+        elif intersects.type == 'Point':
+            return intersects
+        elif intersects.type == 'GeometryCollection' and len(intersects) > 0:
+            t = min([p for p in intersects], key=lambda x: spt.distance(x))
+            if t == 'Point':
+                return t
+            else:
+                return nearest_points(spt, t)[1]
+        else:
+            raise Exception(f'No intersection with boundaries. Shapely intersection object: {intersects.wkt}')
+
+    env_up = []
+    env_bottom = []
+    # find orthogonal (to linear regression) intersects with adjacent objects to complete roi
+    for point, upper_bounds_intersect, bottom_bounds_intersect in zip(ip_line, upper_bounds_intersects, bottom_bounds_intersects):
+        upper_limit = _find_closest_point(point, geom.LineString(
+            [point, upper_bounds_intersect]).intersection(side_a))
+        bottom_limit = _find_closest_point(point, geom.LineString(
+            [point, bottom_bounds_intersect]).intersection(side_b))
+        env_up.append(upper_limit.coords[0])
+        env_bottom.append(bottom_limit.coords[0])
+    env_up = np.array(env_up, dtype='uint')
+    env_bottom = np.array(env_bottom, dtype='uint')
+    return env_up, env_bottom
+
+
 def calculate_polygonal_environment(im: PIL.Image.Image = None,
                                     baselines: Sequence[Sequence[Tuple[int, int]]] = None,
                                     suppl_obj: Sequence[Sequence[Tuple[int, int]]] = None,
@@ -473,138 +663,12 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
     else:
         bounds = np.array(im_feats.shape[::-1], dtype=np.float) - 1
 
-    def _ray_intersect_boundaries(ray, direction, aabb):
-        """
-        Simplified version of [0] for 2d and AABB anchored at (0,0).
-
-        [0] http://gamedev.stackexchange.com/questions/18436/most-efficient-aabb-vs-ray-collision-algorithms
-        """
-        dir_fraction = np.empty(2, dtype=ray.dtype)
-        dir_fraction[direction == 0.0] = np.inf
-        dir_fraction[direction != 0.0] = np.divide(1.0, direction[direction != 0.0])
-
-        t1 = (-ray[0]) * dir_fraction[0]
-        t2 = (aabb[0] - ray[0]) * dir_fraction[0]
-        t3 = (-ray[1]) * dir_fraction[1]
-        t4 = (aabb[1] - ray[1]) * dir_fraction[1]
-
-        tmin = max(min(t1, t2), min(t3, t4))
-        tmax = min(max(t1, t2), max(t3, t4))
-
-        t = min(x for x in [tmin, tmax] if x >= 0)
-        return ray + (direction * t)
-
-    def _calc_seam(baseline, polygon, angle, bias=150):
-        """
-        Calculates seam between baseline and ROI boundary on one side.
-
-        Adds a baseline-distance-weighted bias to the feature map, masks
-        out the bounding polygon and rotates the line so it is roughly
-        level.
-        """
-        MASK_VAL = 99999
-        r, c = draw.polygon(polygon[:, 1], polygon[:, 0])
-        c_min, c_max = int(polygon[:, 0].min()), int(polygon[:, 0].max())
-        r_min, r_max = int(polygon[:, 1].min()), int(polygon[:, 1].max())
-        patch = im_feats[r_min:r_max+2, c_min:c_max+2].copy()
-        # bias feature matrix by distance from baseline
-        mask = np.ones_like(patch)
-        for line_seg in zip(baseline[:-1] - (c_min, r_min), baseline[1:] - (c_min, r_min)):
-            line_locs = draw.line(line_seg[0][1],
-                                  line_seg[0][0],
-                                  line_seg[1][1],
-                                  line_seg[1][0])
-            mask[line_locs] = 0
-        dist_bias = distance_transform_cdt(mask)
-        # absolute mask
-        mask = np.ones_like(patch, dtype=np.bool)
-        mask[r-r_min, c-c_min] = False
-        # dilate mask to compensate for aliasing during rotation
-        mask = binary_erosion(mask, iterations=2)
-        # combine weights with features
-        patch[mask] = MASK_VAL
-        patch += (dist_bias*(np.mean(patch[patch != MASK_VAL])/bias))
-        extrema = baseline[(0, -1), :] - (c_min, r_min)
-        # scale line image to max 600 pixel width
-        scale = min(1.0, 600/(c_max-c_min))
-        tform, rotated_patch = _rotate(patch, angle, center=extrema[0], scale=scale, cval=MASK_VAL)
-        # ensure to cut off padding after rotation
-        x_offsets = np.sort(np.around(tform.inverse(extrema)[:, 0]).astype('int'))
-        rotated_patch = rotated_patch[:, x_offsets[0]:x_offsets[1]+1]
-        # infinity pad for seamcarve
-        rotated_patch = np.pad(rotated_patch, ((1, 1), (0, 0)),  mode='constant', constant_values=np.inf)
-        r, c = rotated_patch.shape
-        # fold into shape (c, r-2 3)
-        A = np.lib.stride_tricks.as_strided(rotated_patch, (c, r-2, 3), (rotated_patch.strides[1],
-                                                                         rotated_patch.strides[0],
-                                                                         rotated_patch.strides[0]))
-        B = rotated_patch[1:-1, 1:].swapaxes(0, 1)
-        backtrack = np.zeros_like(B, dtype='int')
-        T = np.empty((B.shape[1]), 'f')
-        R = np.arange(-1, len(T)-1)
-        for i in np.arange(c-1):
-            A[i].min(1, T)
-            backtrack[i] = A[i].argmin(1) + R
-            B[i] += T
-        # backtrack
-        seam = []
-        j = np.argmin(rotated_patch[1:-1, -1])
-        for i in range(c-2, -2, -1):
-            seam.append((i+x_offsets[0]+1, j))
-            j = backtrack[i, j]
-        seam = np.array(seam)[::-1]
-        seam_mean = seam[:, 1].mean()
-        seam_std = seam[:, 1].std()
-        seam[:, 1] = np.clip(seam[:, 1], seam_mean-seam_std, seam_mean+seam_std)
-        # rotate back
-        seam = tform(seam).astype('int')
-        # filter out seam points in masked area of original patch/in padding
-        seam = seam[seam.min(axis=1) >= 0, :]
-        m = (seam < mask.shape[::-1]).T
-        seam = seam[np.logical_and(m[0], m[1]), :]
-        seam = seam[np.invert(mask[seam.T[1], seam.T[0]])]
-        seam += (c_min, r_min)
-        return seam
-
-    def _extract_patch(env_up, env_bottom, baseline, offset_baseline, end_points, dir_vec, topline, offset):
-        """
-        Calculate a line image patch from a ROI and the original baseline.
-        """
-        upper_polygon = np.concatenate((baseline, env_up[::-1]))
-        bottom_polygon = np.concatenate((baseline, env_bottom[::-1]))
-        upper_offset_polygon = np.concatenate((offset_baseline, env_up[::-1]))
-        bottom_offset_polygon = np.concatenate((offset_baseline, env_bottom[::-1]))
-
-        angle = np.arctan2(dir_vec[1], dir_vec[0])
-
-        if topline:
-            upper_seam = geom.LineString(_calc_seam(baseline, upper_polygon, angle)).simplify(5)
-            bottom_seam = geom.LineString(_calc_seam(offset_baseline, bottom_offset_polygon, angle)).simplify(5)
-        else:
-            upper_seam = geom.LineString(_calc_seam(offset_baseline, upper_offset_polygon, angle)).simplify(5)
-            bottom_seam = geom.LineString(_calc_seam(baseline, bottom_polygon, angle)).simplify(5)
-
-        # ugly workaround against GEOM parallel_offset bug creating a
-        # MultiLineString out of offset LineString
-        if upper_seam.parallel_offset(offset//2, side='right').type == 'MultiLineString' or offset == 0:
-            upper_seam = np.array(upper_seam, dtype=np.int)
-        else:
-            upper_seam = np.array(upper_seam.parallel_offset(offset//2, side='right'), dtype=np.int)[::-1]
-        if bottom_seam.parallel_offset(offset//2, side='left').type == 'MultiLineString' or offset == 0:
-            bottom_seam = np.array(bottom_seam, dtype=np.int)
-        else:
-            bottom_seam = np.array(bottom_seam.parallel_offset(offset//2, side='left'), dtype=np.int)
-
-        polygon = np.concatenate(([end_points[0]], upper_seam, [end_points[-1]], bottom_seam[::-1]))
-        return polygon
-
     polygons = []
     if suppl_obj is None:
         suppl_obj = []
 
     for idx, line in enumerate(baselines):
         try:
-            # find intercepts with image bounds on each side of baseline
             end_points = (line[0], line[-1])
             line = geom.LineString(line)
             offset = default_specs.SEGMENTATION_HYPER_PARAMS['line_width'] if topline is not None else 0
@@ -620,69 +684,8 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
             p_dir = np.mean(np.diff(line.T) * lengths/lengths.sum(), axis=1)
             p_dir = (p_dir.T / np.sqrt(np.sum(p_dir**2, axis=-1)))
 
-            def _calc_roi(line):
-                # interpolate baseline
-                ls = geom.LineString(line)
-                ip_line = [line[0]]
-                dist = 10
-                while dist < ls.length:
-                    ip_line.append(np.array(ls.interpolate(dist)))
-                    dist += 10
-                ip_line.append(line[-1])
-                ip_line = np.array(ip_line)
-                upper_bounds_intersects = []
-                bottom_bounds_intersects = []
-                for point in ip_line:
-                    upper_bounds_intersects.append(_ray_intersect_boundaries(
-                        point, (p_dir*(-1, 1))[::-1], bounds+1).astype('int'))
-                    bottom_bounds_intersects.append(_ray_intersect_boundaries(
-                        point, (p_dir*(1, -1))[::-1], bounds+1).astype('int'))
-                # build polygon between baseline and bbox intersects
-                upper_polygon = geom.Polygon(ip_line.tolist() + upper_bounds_intersects)
-                bottom_polygon = geom.Polygon(ip_line.tolist() + bottom_bounds_intersects)
+            env_up, env_bottom = _calc_roi(line, bounds, baselines[:idx] + baselines[idx+1:], suppl_obj, p_dir)
 
-                # select baselines at least partially in each polygon
-                side_a = [geom.LineString(upper_bounds_intersects)]
-                side_b = [geom.LineString(bottom_bounds_intersects)]
-
-                for adj_line in baselines[:idx] + baselines[idx+1:] + suppl_obj:
-                    adj_line = geom.LineString(adj_line)
-                    if upper_polygon.intersects(adj_line):
-                        side_a.append(adj_line)
-                    elif bottom_polygon.intersects(adj_line):
-                        side_b.append(adj_line)
-                side_a = unary_union(side_a).buffer(1).boundary
-                side_b = unary_union(side_b).buffer(1).boundary
-
-                def _find_closest_point(pt, intersects):
-                    spt = geom.Point(pt)
-                    if intersects.type == 'MultiPoint':
-                        return min([p for p in intersects], key=lambda x: spt.distance(x))
-                    elif intersects.type == 'Point':
-                        return intersects
-                    elif intersects.type == 'GeometryCollection' and len(intersects) > 0:
-                        t = min([p for p in intersects], key=lambda x: spt.distance(x))
-                        if t == 'Point':
-                            return t
-                        else:
-                            return nearest_points(spt, t)[1]
-                    else:
-                        raise Exception(f'No intersection with boundaries. Shapely intersection object: {intersects.wkt}')
-
-                env_up = []
-                env_bottom = []
-                # find orthogonal (to linear regression) intersects with adjacent objects to complete roi
-                for point, upper_bounds_intersect, bottom_bounds_intersect in zip(ip_line, upper_bounds_intersects, bottom_bounds_intersects):
-                    upper_limit = _find_closest_point(point, geom.LineString(
-                        [point, upper_bounds_intersect]).intersection(side_a))
-                    bottom_limit = _find_closest_point(point, geom.LineString(
-                        [point, bottom_bounds_intersect]).intersection(side_b))
-                    env_up.append(upper_limit.coords[0])
-                    env_bottom.append(bottom_limit.coords[0])
-                env_up = np.array(env_up, dtype='uint')
-                env_bottom = np.array(env_bottom, dtype='uint')
-                return env_up, env_bottom
-            env_up, env_bottom = _calc_roi(line)
             polygons.append(_extract_patch(env_up,
                                            env_bottom,
                                            line.astype('int'),
@@ -690,8 +693,10 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
                                            end_points,
                                            p_dir,
                                            topline,
-                                           offset))
+                                           offset,
+                                           im_feats))
         except Exception as e:
+            raise
             logger.warning(f'Polygonizer failed on line {idx}: {e}')
             polygons.append(None)
 
