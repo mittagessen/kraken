@@ -116,7 +116,7 @@ def vec_lines(heatmap: torch.Tensor,
               scale: float,
               text_direction: str = 'horizontal-lr',
               reading_order_fn: Callable = polygonal_reading_order,
-              regions: Dict = None,
+              regions: List = None,
               scal_im: np.array = None,
               suppl_obj: List = None,
               topline: bool = False,
@@ -235,6 +235,9 @@ def segment(im,
             line_regs.extend(regs)
             if rets['bounding_regions'] is not None and cls in rets['bounding_regions']:
                 suppl_obj.extend(regs)
+        # convert back to net scale
+        suppl_obj = scale_regions(suppl_obj, 1/rets['scale'])
+        line_regs = scale_regions(line_regs, 1/rets['scale'])
         lines = vec_lines(**rets,
                           regions=line_regs,
                           reading_order_fn=reading_order_fn,
