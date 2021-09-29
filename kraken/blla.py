@@ -35,7 +35,7 @@ from skimage.filters import sobel
 
 from kraken.lib import vgsl, dataset
 from kraken.lib.util import pil2array, is_bitonal, get_im_str
-from kraken.lib.exceptions import KrakenInputException
+from kraken.lib.exceptions import KrakenInputException, KrakenInvalidModelException
 from kraken.lib.segmentation import (polygonal_reading_order,
                                      vectorize_lines, vectorize_regions,
                                      scale_polygonal_lines,
@@ -216,6 +216,12 @@ def segment(im,
 
     if isinstance(model, vgsl.TorchVGSLModel):
         model = [model]
+
+    for nn in model:
+        if nn.model_type != 'segmentation':
+            raise KrakenInvalidModelException(f'Invalid model type {nn.model_type} for {nn}')
+        if 'class_mapping' not in nn.user_metadata:
+            raise KrakenInvalidModelException(f'Segmentation model {nn} does not contain valid class mapping')
 
     im_str = get_im_str(im)
     logger.info(f'Segmenting {im_str}')
