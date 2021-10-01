@@ -61,7 +61,7 @@ __all__ = ['reading_order',
            'extract_polygons']
 
 
-def reading_order(lines: Sequence, text_direction: str = 'lr') -> List:
+def reading_order(lines: Sequence[Tuple[slice, slice]], text_direction: str = 'lr') -> np.ndarray:
     """Given the list of lines (a list of 2D slices), computes
     the partial reading order.  The output is a binary 2D array
     such that order[i,j] is true if line i comes before line j
@@ -107,7 +107,7 @@ def reading_order(lines: Sequence, text_direction: str = 'lr') -> List:
     return order
 
 
-def topsort(order: np.array) -> np.array:
+def topsort(order: np.ndarray) -> List[int]:
     """Given a binary array defining a partial order (o[i,j]==True means i<j),
     compute a topological sort.  This is a quick and dirty implementation
     that works for up to a few thousand elements."""
@@ -607,7 +607,7 @@ def _calc_roi(line, bounds, baselines, suppl_obj, p_dir):
 def calculate_polygonal_environment(im: PIL.Image.Image = None,
                                     baselines: Sequence[Sequence[Tuple[int, int]]] = None,
                                     suppl_obj: Sequence[Sequence[Tuple[int, int]]] = None,
-                                    im_feats: np.array = None,
+                                    im_feats: np.ndarray = None,
                                     scale: Tuple[int, int] = None,
                                     topline: bool = False):
     """
@@ -782,7 +782,7 @@ def is_in_region(line, region) -> bool:
     return region.contains(l_obj)
 
 
-def scale_regions(regions: Sequence[Tuple[List, List]],
+def scale_regions(regions: Sequence[Tuple[List[int], List[int]]],
                   scale: Union[float, Tuple[float, float]]) -> Sequence[Tuple[List, List]]:
     """
     Scales baselines/polygon coordinates by a certain factor.
