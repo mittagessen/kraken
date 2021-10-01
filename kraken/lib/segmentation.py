@@ -459,7 +459,7 @@ def _calc_seam(baseline, polygon, angle, im_feats, bias=150):
         mask[line_locs] = 0
     dist_bias = distance_transform_cdt(mask)
     # absolute mask
-    mask = np.ones_like(patch, dtype=np.bool)
+    mask = np.ones_like(patch, dtype=bool)
     mask[r-r_min, c-c_min] = False
     # dilate mask to compensate for aliasing during rotation
     mask = binary_erosion(mask, iterations=2)
@@ -954,7 +954,7 @@ def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image:
                 patch = im[r_min:r_max+1, c_min:c_max+1].copy()
                 offset_polygon = pl - (c_min, r_min)
                 r, c = draw.polygon(offset_polygon[:, 1], offset_polygon[:, 0])
-                mask = np.zeros(patch.shape[:2], dtype=np.bool)
+                mask = np.zeros(patch.shape[:2], dtype=bool)
                 mask[r, c] = True
                 patch[mask != True] = 0
                 extrema = offset_polygon[(0, -1), :]
@@ -1006,7 +1006,7 @@ def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image:
                 offset_bl_dst_pts = bl_dst_pts - (c_dst_min, r_dst_min)
                 offset_pol_dst_pts = pol_dst_pts - (c_dst_min, r_dst_min)
                 # mask out points outside bounding polygon
-                mask = np.zeros(patch.shape[:2], dtype=np.bool)
+                mask = np.zeros(patch.shape[:2], dtype=bool)
                 r, c = draw.polygon(offset_polygon[:, 1], offset_polygon[:, 0])
                 mask[r, c] = True
                 patch[mask != True] = 0
