@@ -530,13 +530,13 @@ def _extract_patch(env_up, env_bottom, baseline, offset_baseline, end_points, di
     # ugly workaround against GEOM parallel_offset bug creating a
     # MultiLineString out of offset LineString
     if upper_seam.parallel_offset(offset//2, side='right').type == 'MultiLineString' or offset == 0:
-        upper_seam = np.array(upper_seam, dtype=np.int)
+        upper_seam = np.array(upper_seam, dtype=int)
     else:
-        upper_seam = np.array(upper_seam.parallel_offset(offset//2, side='right'), dtype=np.int)[::-1]
+        upper_seam = np.array(upper_seam.parallel_offset(offset//2, side='right'), dtype=int)[::-1]
     if bottom_seam.parallel_offset(offset//2, side='left').type == 'MultiLineString' or offset == 0:
-        bottom_seam = np.array(bottom_seam, dtype=np.int)
+        bottom_seam = np.array(bottom_seam, dtype=int)
     else:
-        bottom_seam = np.array(bottom_seam.parallel_offset(offset//2, side='left'), dtype=np.int)
+        bottom_seam = np.array(bottom_seam.parallel_offset(offset//2, side='left'), dtype=int)
 
     polygon = np.concatenate(([end_points[0]], upper_seam, [end_points[-1]], bottom_seam[::-1]))
     return polygon
