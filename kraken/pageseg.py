@@ -97,7 +97,7 @@ def compute_boxmap(binary: np.ndarray, scale: float,
     return boxmap
 
 
-def compute_lines(segmentation, scale):
+def compute_lines(segmentation: np.ndarray, scale: float) -> List[record]:
     """Given a line segmentation map, computes a list
     of tuples consisting of 2D slices and masked images."""
     logger.debug('Convert segmentation to lines')
