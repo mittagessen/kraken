@@ -10,13 +10,13 @@ from PIL import Image
 __all__ = ['pil2array', 'array2pil', 'is_bitonal', 'make_printable', 'get_im_str']
 
 
-def pil2array(im: Image.Image, alpha: int = 0) -> np.array:
+def pil2array(im: Image.Image, alpha: int = 0) -> np.ndarray:
     if im.mode == '1':
         return np.array(im.convert('L'))
     return np.array(im)
 
 
-def array2pil(a: np.array) -> Image:
+def array2pil(a: np.ndarray) -> Image:
     if a.dtype == np.dtype("B"):
         if a.ndim == 2:
             return Image.frombytes("L", (a.shape[1], a.shape[0]),

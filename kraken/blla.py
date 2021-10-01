@@ -48,7 +48,7 @@ logger = logging.getLogger(__name__)
 
 
 def compute_segmentation_map(im,
-                             mask: Optional[np.array] = None,
+                             mask: Optional[np.ndarray] = None,
                              model=None,
                              device: str = 'cpu'):
     """
@@ -117,7 +117,7 @@ def vec_lines(heatmap: torch.Tensor,
               text_direction: str = 'horizontal-lr',
               reading_order_fn: Callable = polygonal_reading_order,
               regions: List = None,
-              scal_im: np.array = None,
+              scal_im: np.ndarray = None,
               suppl_obj: List = None,
               topline: bool = False,
               **kwargs):
@@ -162,7 +162,7 @@ def vec_lines(heatmap: torch.Tensor,
 
 def segment(im,
             text_direction: str = 'horizontal-lr',
-            mask: Optional[np.array] = None,
+            mask: Optional[np.ndarray] = None,
             reading_order_fn: Callable = polygonal_reading_order,
             model: Union[List[vgsl.TorchVGSLModel], vgsl.TorchVGSLModel] = None,
             device: str = 'cpu'):
