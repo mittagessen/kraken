@@ -656,12 +656,12 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
             suppl_obj = [(np.array(bl) * scale).astype('int').tolist() for bl in suppl_obj]
 
     if im_feats is None:
-        bounds = np.array(im.size, dtype=np.float) - 1
+        bounds = np.array(im.size, dtype=float) - 1
         im = np.array(im.convert('L'))
         # compute image gradient
         im_feats = gaussian_filter(sobel(im), 0.5)
     else:
-        bounds = np.array(im_feats.shape[::-1], dtype=np.float) - 1
+        bounds = np.array(im_feats.shape[::-1], dtype=float) - 1
 
     polygons = []
     if suppl_obj is None:
@@ -673,8 +673,8 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
             line = geom.LineString(line)
             offset = default_specs.SEGMENTATION_HYPER_PARAMS['line_width'] if topline is not None else 0
             offset_line = line.parallel_offset(offset, side='left' if topline else 'right')
-            line = np.array(line, dtype=np.float)
-            offset_line = np.array(offset_line, dtype=np.float)
+            line = np.array(line, dtype=float)
+            offset_line = np.array(offset_line, dtype=float)
 
             # parallel_offset on the right reverses the coordinate order
             if not topline:
