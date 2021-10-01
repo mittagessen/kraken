@@ -705,9 +705,9 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
     return polygons
 
 
-def polygonal_reading_order(lines: Sequence[Tuple[List, List]],
+def polygonal_reading_order(lines: Sequence[Tuple[List[Tuple[int, int]], List[Tuple[int, int]]]],
                             text_direction: str = 'lr',
-                            regions: Optional[Sequence[List[Tuple[int, int]]]] = None) -> Sequence[Tuple[List, List]]:
+                            regions: Optional[Sequence[List[Tuple[int, int]]]] = None) -> Sequence[Tuple[List[Tuple[int, int]], List[Tuple[int, int]]]]:
     """
     Given a list of baselines and regions, calculates the correct reading order
     and applies it to the input.
