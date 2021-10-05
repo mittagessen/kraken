@@ -75,7 +75,7 @@ def nlbin(im: Image.Image,
     raw = pil2array(im)
     logger.debug('Scaling and normalizing')
     # rescale image to between -1 or 0 and 1
-    raw = raw/np.float(np.iinfo(raw.dtype).max)
+    raw = raw/float(np.iinfo(raw.dtype).max)
     # perform image normalization
     if np.amax(raw) == np.amin(raw):
         logger.warning(f'Trying to binarize empty image {im_str}')
