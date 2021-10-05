@@ -64,7 +64,7 @@ def cli(format_type, model, repolygonize, files):
         if format_type == 'xml':
             fn = xml.parse_xml
         elif format_type == 'alto':
-            fn = xml.parse_palto
+            fn = xml.parse_alto
         else:
             fn = xml.parse_page
         for doc in files:
