@@ -285,7 +285,7 @@ class Dropout(Module):
         elif dim == 2:
             self.layer = torch.nn.Dropout2d(p)
 
-    def forward(self, inputs: torch.Tensor, seq_len: torch.Tensor = None) -> Tuple[torch.tensor, torch.Tensor]:
+    def forward(self, inputs: torch.Tensor, seq_len: torch.Tensor = None) -> Tuple[torch.Tensor, torch.Tensor]:
         return self.layer(inputs), seq_len
 
     def get_shape(self, input: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
