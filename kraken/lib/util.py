@@ -16,7 +16,7 @@ def pil2array(im: Image.Image, alpha: int = 0) -> np.ndarray:
     return np.array(im)
 
 
-def array2pil(a: np.ndarray) -> Image:
+def array2pil(a: np.ndarray) -> Image.Image:
     if a.dtype == np.dtype("B"):
         if a.ndim == 2:
             return Image.frombytes("L", (a.shape[1], a.shape[0]),

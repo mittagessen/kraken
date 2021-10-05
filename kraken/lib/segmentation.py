@@ -906,7 +906,7 @@ def compute_polygon_section(baseline, boundary, dist1, dist2):
     return o
 
 
-def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image:
+def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image.Image:
     """
     Yields the subimages of image im defined in the list of bounding polygons
     with baselines preserving order.
@@ -916,7 +916,7 @@ def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image:
         bounds (list): A list of tuples (x1, y1, x2, y2)
 
     Yields:
-        (PIL.Image) the extracted subimage
+        (PIL.Image.Image) the extracted subimage
     """
     if 'type' in bounds and bounds['type'] == 'baselines':
         # select proper interpolation scheme depending on shape
