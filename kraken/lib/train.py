@@ -63,7 +63,7 @@ class TrainStopper(object):
         self.epoch = 0
 
     @abc.abstractmethod
-    def update(self, val_loss: float) -> None:
+    def update(self, val_loss: torch.float) -> None:
         """
         Updates the internal state of the train stopper.
         """
@@ -192,7 +192,7 @@ class TrainScheduler(object):
         self.lengths.append(steps)
         self.steps.append(annealing_fn(self.optimizer))
 
-    def batch_step(self, loss: float = None) -> None:
+    def batch_step(self, loss: torch.float = None) -> None:
         """
         Performs an optimization step.
         """
@@ -216,7 +216,7 @@ class TrainScheduler(object):
                 self.t_steps = next(self.lengths)
                 self.lr_sched = next(self.steps)
 
-    def epoch_step(self, val_loss: float = None) -> None:
+    def epoch_step(self, val_loss: torch.float = None) -> None:
         """
         Performs an optimization step.
         """
@@ -264,7 +264,7 @@ class EarlyStopping(TrainStopper):
         self.lag = lag
         self.wait = -1
 
-    def update(self, val_loss: float) -> None:
+    def update(self, val_loss: torch.float) -> None:
         """
         Updates the internal validation loss state and increases counter by
         one.
@@ -301,7 +301,7 @@ class EpochStopping(TrainStopper):
         super().__init__()
         self.epochs = epochs
 
-    def update(self, val_loss: float) -> None:
+    def update(self, val_loss: torch.float) -> None:
         """
         Only update internal best iteration
         """
@@ -322,7 +322,7 @@ class NoStopping(TrainStopper):
     def __init__(self) -> None:
         super().__init__()
 
-    def update(self, val_loss: float) -> None:
+    def update(self, val_loss: torch.float) -> None:
         """
         Only update internal best iteration
         """
@@ -367,12 +367,12 @@ def recognition_evaluator_fn(model, val_loader, device):
     rec = models.TorchSeqRecognizer(model, device=device)
     chars, error = compute_error(rec, val_loader)
     model.train()
-    accuracy = ((chars - error) / (chars + np.finfo(np.float).eps))
+    accuracy = ((chars - error) / (chars + torch.finfo(torch.float).eps))
     return {'val_metric': accuracy, 'accuracy': accuracy, 'chars': chars, 'error': error}
 
 
 def baseline_label_evaluator_fn(model, val_loader, device):
-    smooth = np.finfo(np.float).eps
+    smooth = torch.finfo(torch.float).eps
     val_set = val_loader.dataset
     corrects = torch.zeros(val_set.num_classes, dtype=torch.double).to(device)
     all_n = torch.zeros(val_set.num_classes, dtype=torch.double).to(device)
