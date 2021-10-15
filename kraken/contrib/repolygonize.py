@@ -11,8 +11,15 @@ import click
               help='Sets the input document format. In ALTO and PageXML mode all '
               'data is extracted from xml files containing both baselines, polygons, and a '
               'link to source images.')
+@click.option('-tl', '--topline', 'topline', show_default=True, flag_value='topline',
+              help='Switch for the baseline location in the scripts. '
+                   'Set to topline if the data is annotated with a hanging baseline, as is '
+                   'common with Hebrew, Bengali, Devanagari, etc. Set to '
+                   ' centerline for scripts annotated with a central line.')
+@click.option('-cl', '--centerline', 'topline', flag_value='centerline')
+@click.option('-bl', '--baseline', 'topline', flag_value='baseline', default='baseline')
 @click.argument('files', nargs=-1)
-def cli(format_type, files):
+def cli(format_type, topline, files):
     """
     A small script repolygonizing line boundaries in ALTO or PageXML files.
     """
@@ -65,6 +72,10 @@ def cli(format_type, files):
         parse_fn = xml.parse_alto
         repl_fn = _repl_alto
 
+    topline = {'topline': True,
+               'baseline': False,
+               'centerline': None}[topline]
+
     for doc in files:
         click.echo(f'Processing {doc} ', nl=False)
         seg = parse_fn(doc)
@@ -73,7 +84,7 @@ def cli(format_type, files):
         for x in seg['lines']:
             bl = x['baseline'] if x['baseline'] is not None else [0, 0]
             l.append(bl)
-        o = calculate_polygonal_environment(im, l, scale=(1800, 0))
+        o = calculate_polygonal_environment(im, l, scale=(1800, 0), topline=topline)
         repl_fn(doc, o)
 
 if __name__ == '__main__':
