@@ -61,7 +61,7 @@ __all__ = ['reading_order',
            'extract_polygons']
 
 
-def reading_order(lines: Sequence, text_direction: str = 'lr') -> List:
+def reading_order(lines: Sequence[Tuple[slice, slice]], text_direction: str = 'lr') -> np.ndarray:
     """Given the list of lines (a list of 2D slices), computes
     the partial reading order.  The output is a binary 2D array
     such that order[i,j] is true if line i comes before line j
@@ -107,7 +107,7 @@ def reading_order(lines: Sequence, text_direction: str = 'lr') -> List:
     return order
 
 
-def topsort(order: np.array) -> np.array:
+def topsort(order: np.ndarray) -> List[int]:
     """Given a binary array defining a partial order (o[i,j]==True means i<j),
     compute a topological sort.  This is a quick and dirty implementation
     that works for up to a few thousand elements."""
@@ -459,7 +459,7 @@ def _calc_seam(baseline, polygon, angle, im_feats, bias=150):
         mask[line_locs] = 0
     dist_bias = distance_transform_cdt(mask)
     # absolute mask
-    mask = np.ones_like(patch, dtype=np.bool)
+    mask = np.ones_like(patch, dtype=bool)
     mask[r-r_min, c-c_min] = False
     # dilate mask to compensate for aliasing during rotation
     mask = binary_erosion(mask, iterations=2)
@@ -530,13 +530,13 @@ def _extract_patch(env_up, env_bottom, baseline, offset_baseline, end_points, di
     # ugly workaround against GEOM parallel_offset bug creating a
     # MultiLineString out of offset LineString
     if upper_seam.parallel_offset(offset//2, side='right').type == 'MultiLineString' or offset == 0:
-        upper_seam = np.array(upper_seam, dtype=np.int)
+        upper_seam = np.array(upper_seam, dtype=int)
     else:
-        upper_seam = np.array(upper_seam.parallel_offset(offset//2, side='right'), dtype=np.int)[::-1]
+        upper_seam = np.array(upper_seam.parallel_offset(offset//2, side='right'), dtype=int)[::-1]
     if bottom_seam.parallel_offset(offset//2, side='left').type == 'MultiLineString' or offset == 0:
-        bottom_seam = np.array(bottom_seam, dtype=np.int)
+        bottom_seam = np.array(bottom_seam, dtype=int)
     else:
-        bottom_seam = np.array(bottom_seam.parallel_offset(offset//2, side='left'), dtype=np.int)
+        bottom_seam = np.array(bottom_seam.parallel_offset(offset//2, side='left'), dtype=int)
 
     polygon = np.concatenate(([end_points[0]], upper_seam, [end_points[-1]], bottom_seam[::-1]))
     return polygon
@@ -607,7 +607,7 @@ def _calc_roi(line, bounds, baselines, suppl_obj, p_dir):
 def calculate_polygonal_environment(im: PIL.Image.Image = None,
                                     baselines: Sequence[Sequence[Tuple[int, int]]] = None,
                                     suppl_obj: Sequence[Sequence[Tuple[int, int]]] = None,
-                                    im_feats: np.array = None,
+                                    im_feats: np.ndarray = None,
                                     scale: Tuple[int, int] = None,
                                     topline: bool = False):
     """
@@ -656,12 +656,12 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
             suppl_obj = [(np.array(bl) * scale).astype('int').tolist() for bl in suppl_obj]
 
     if im_feats is None:
-        bounds = np.array(im.size, dtype=np.float) - 1
+        bounds = np.array(im.size, dtype=float) - 1
         im = np.array(im.convert('L'))
         # compute image gradient
         im_feats = gaussian_filter(sobel(im), 0.5)
     else:
-        bounds = np.array(im_feats.shape[::-1], dtype=np.float) - 1
+        bounds = np.array(im_feats.shape[::-1], dtype=float) - 1
 
     polygons = []
     if suppl_obj is None:
@@ -673,8 +673,8 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
             line = geom.LineString(line)
             offset = default_specs.SEGMENTATION_HYPER_PARAMS['line_width'] if topline is not None else 0
             offset_line = line.parallel_offset(offset, side='left' if topline else 'right')
-            line = np.array(line, dtype=np.float)
-            offset_line = np.array(offset_line, dtype=np.float)
+            line = np.array(line, dtype=float)
+            offset_line = np.array(offset_line, dtype=float)
 
             # parallel_offset on the right reverses the coordinate order
             if not topline:
@@ -705,9 +705,9 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
     return polygons
 
 
-def polygonal_reading_order(lines: Sequence[Tuple[List, List]],
+def polygonal_reading_order(lines: Sequence[Tuple[List[Tuple[int, int]], List[Tuple[int, int]]]],
                             text_direction: str = 'lr',
-                            regions: Optional[Sequence[List[Tuple[int, int]]]] = None) -> Sequence[Tuple[List, List]]:
+                            regions: Optional[Sequence[List[Tuple[int, int]]]] = None) -> Sequence[Tuple[List[Tuple[int, int]], List[Tuple[int, int]]]]:
     """
     Given a list of baselines and regions, calculates the correct reading order
     and applies it to the input.
@@ -782,7 +782,7 @@ def is_in_region(line, region) -> bool:
     return region.contains(l_obj)
 
 
-def scale_regions(regions: Sequence[Tuple[List, List]],
+def scale_regions(regions: Sequence[Tuple[List[int], List[int]]],
                   scale: Union[float, Tuple[float, float]]) -> Sequence[Tuple[List, List]]:
     """
     Scales baselines/polygon coordinates by a certain factor.
@@ -906,7 +906,7 @@ def compute_polygon_section(baseline, boundary, dist1, dist2):
     return o
 
 
-def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image:
+def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image.Image:
     """
     Yields the subimages of image im defined in the list of bounding polygons
     with baselines preserving order.
@@ -916,7 +916,7 @@ def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image:
         bounds (list): A list of tuples (x1, y1, x2, y2)
 
     Yields:
-        (PIL.Image) the extracted subimage
+        (PIL.Image.Image) the extracted subimage
     """
     if 'type' in bounds and bounds['type'] == 'baselines':
         # select proper interpolation scheme depending on shape
@@ -954,7 +954,7 @@ def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image:
                 patch = im[r_min:r_max+1, c_min:c_max+1].copy()
                 offset_polygon = pl - (c_min, r_min)
                 r, c = draw.polygon(offset_polygon[:, 1], offset_polygon[:, 0])
-                mask = np.zeros(patch.shape[:2], dtype=np.bool)
+                mask = np.zeros(patch.shape[:2], dtype=bool)
                 mask[r, c] = True
                 patch[mask != True] = 0
                 extrema = offset_polygon[(0, -1), :]
@@ -1006,7 +1006,7 @@ def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image:
                 offset_bl_dst_pts = bl_dst_pts - (c_dst_min, r_dst_min)
                 offset_pol_dst_pts = pol_dst_pts - (c_dst_min, r_dst_min)
                 # mask out points outside bounding polygon
-                mask = np.zeros(patch.shape[:2], dtype=np.bool)
+                mask = np.zeros(patch.shape[:2], dtype=bool)
                 r, c = draw.polygon(offset_polygon[:, 1], offset_polygon[:, 0])
                 mask[r, c] = True
                 patch[mask != True] = 0

@@ -43,7 +43,7 @@ def nlbin(im: Image.Image,
           perc: int = 80,
           range: int = 20,
           low: int = 5,
-          high: int = 90) -> Image:
+          high: int = 90) -> Image.Image:
     """
     Performs binarization using non-linear processing.
 
@@ -59,7 +59,7 @@ def nlbin(im: Image.Image,
         high (int): Percentile for white estimation
 
     Returns:
-        PIL.Image containing the binarized image
+        PIL.Image.Image containing the binarized image
 
     Raises:
         KrakenInputException when trying to binarize an empty image.
@@ -75,7 +75,7 @@ def nlbin(im: Image.Image,
     raw = pil2array(im)
     logger.debug('Scaling and normalizing')
     # rescale image to between -1 or 0 and 1
-    raw = raw/np.float(np.iinfo(raw.dtype).max)
+    raw = raw/float(np.iinfo(raw.dtype).max)
     # perform image normalization
     if np.amax(raw) == np.amin(raw):
         logger.warning(f'Trying to binarize empty image {im_str}')

@@ -15,7 +15,7 @@ thisfile = os.path.abspath(os.path.dirname(__file__))
 resources = os.path.abspath(os.path.join(thisfile, 'resources'))
 
 
-def polygon_slices(polygon: Sequence) -> Tuple:
+def polygon_slices(polygon: Sequence[Tuple[int, int]]) -> Tuple[slice, slice]:
     """Convert polygons to slices for reading_order"""
     linestr = geom.LineString(polygon)
     slices = (slice(linestr.bounds[1], linestr.bounds[0]),
@@ -40,8 +40,8 @@ class TestReadingOrder(unittest.TestCase):
         """
         A real baseline should be in its polygonization.
         """
-        line = geom.LineString([(268,656), (888,656)])
-        polygon = geom.Polygon([(268,656), (265,613), (885,611), (888,656), (885,675), (265,672)])
+        line = geom.LineString([(268, 656), (888, 656)])
+        polygon = geom.Polygon([(268, 656), (265, 613), (885, 611), (888, 656), (885, 675), (265, 672)])
         self.assertTrue(is_in_region(line, polygon))
     
     def test_is_in_region3(self):
@@ -125,6 +125,38 @@ class TestReadingOrder(unittest.TestCase):
         expected = np.array([[0, 1], [0, 0]])
         self.assertTrue(np.array_equal(order, expected), "Reading order is not as expected: {}".format(order))
 
+    def test_order_simple_right_left(self):
+        """
+        Two lines (as their polygonal boundaries) are in reverse RTL-order.
+        In this example, the boundaries are rectangles that align horizontally,
+        have horizontal base lines and do not overlap or touch::
+
+            BBBB  AAAA
+        
+        """
+        polygon0 = [[10, 10], [10, 20], [100, 20], [100, 10], [10, 10]]
+        polygon1 = [[150, 10], [150, 20], [250, 20], [250, 10], [150, 10]]
+        order = reading_order([polygon_slices(line) for line in [polygon0, polygon1]], 'rl')
+        # line1 should come before line0, lines do not come before themselves
+        expected = np.array([[0, 0], [1, 0]])
+        self.assertTrue(np.array_equal(order, expected), "Reading order is not as expected: {}".format(order))
+
+    def test_order_simple_right_left_touching(self):
+        """
+        Two lines (as their polygonal boundaries) are in reverse RTL-order.
+        In this example, the boundaries are rectangles that align horizontally,
+        have horizontal base lines and touch::
+
+            BBBBAAAA
+        
+        """
+        polygon0 = [[10, 10], [10, 20], [100, 20], [100, 10], [10, 10]]
+        polygon1 = [[100, 10], [100, 20], [250, 20], [250, 10], [100, 10]]
+        order = reading_order([polygon_slices(line) for line in [polygon0, polygon1]])
+        # line1 should come before line0, lines do not come before themselves
+        expected = np.array([[0, 0], [1, 0]])
+        self.assertTrue(np.array_equal(order, expected), "Reading order is not as expected: {}".format(order))
+
     def test_order_real_reverse(self):
         """
         Real example: lines are in reverse order.
@@ -157,30 +189,30 @@ class TestReadingOrder(unittest.TestCase):
         """
         Return list for three lines that are already in order.
         """
-        partial_sort = np.array([[1,1,1], [0,1,1], [0,0,1]])
-        expected = [0,1,2]
+        partial_sort = np.array([[1, 1, 1], [0, 1, 1], [0, 0, 1]])
+        expected = [0, 1, 2]
         self.assertTrue(np.array_equal(topsort(partial_sort), expected))
 
     def test_topsort_ordered_no_self(self):
         """
         Return list for three lines that are already in order.
         """
-        partial_sort = np.array([[0,1,1], [0,0,1], [0,0,0]])
-        expected = [0,1,2]
+        partial_sort = np.array([[0, 1, 1], [0, 0, 1], [0, 0, 0]])
+        expected = [0, 1, 2]
         self.assertTrue(np.array_equal(topsort(partial_sort), expected))
 
     def test_topsort_unordered(self):
         """
         Return list for three lines that are partially in order.
         """
-        partial_sort = np.array([[1,1,1], [0,1,0], [0,1,1]])
-        expected = [0,2,1]
+        partial_sort = np.array([[1, 1, 1], [0, 1, 0], [0, 1, 1]])
+        expected = [0, 2, 1]
         self.assertTrue(np.array_equal(topsort(partial_sort), expected))
 
     def test_topsort_unordered_no_self(self):
         """
         Return list for three lines that are partially in order.
         """
-        partial_sort = np.array([[0,1,1], [0,0,0], [0,1,0]])
-        expected = [0,2,1]
+        partial_sort = np.array([[0, 1, 1], [0, 0, 0], [0, 1, 0]])
+        expected = [0, 2, 1]
         self.assertTrue(np.array_equal(topsort(partial_sort), expected))

@@ -62,7 +62,7 @@ class TorchSeqRecognizer(object):
         self.device = device
         self.nn.to(device)
 
-    def forward(self, line: torch.Tensor, lens: torch.Tensor = None) -> np.array:
+    def forward(self, line: torch.Tensor, lens: torch.Tensor = None) -> np.ndarray:
         """
         Performs a forward pass on a torch tensor of one or more lines with
         shape (N, C, H, W) and returns a numpy array (N, W, C).

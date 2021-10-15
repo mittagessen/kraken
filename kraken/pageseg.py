@@ -46,7 +46,7 @@ class record(object):
         self.__dict__.update(kw)
         self.label = 0  # type: int
         self.bounds = []  # type: List
-        self.mask = None  # type: np.array
+        self.mask = None  # type: np.ndarray
 
 
 def find(condition):
@@ -55,7 +55,7 @@ def find(condition):
     return res
 
 
-def binary_objects(binary: np.array) -> np.array:
+def binary_objects(binary: np.ndarray) -> np.ndarray:
     """
     Labels features in an array and segments them into objects.
     """
@@ -64,7 +64,7 @@ def binary_objects(binary: np.array) -> np.array:
     return objects
 
 
-def estimate_scale(binary: np.array) -> float:
+def estimate_scale(binary: np.ndarray) -> float:
     """
     Estimates image scale based on number of connected components.
     """
@@ -79,9 +79,9 @@ def estimate_scale(binary: np.array) -> float:
     return scale
 
 
-def compute_boxmap(binary: np.array, scale: float,
+def compute_boxmap(binary: np.ndarray, scale: float,
                    threshold: Tuple[float, int] = (.5, 4),
-                   dtype: str = 'i') -> np.array:
+                   dtype: str = 'i') -> np.ndarray:
     """
     Returns grapheme cluster-like boxes based on connected components.
     """
@@ -97,7 +97,7 @@ def compute_boxmap(binary: np.array, scale: float,
     return boxmap
 
 
-def compute_lines(segmentation, scale):
+def compute_lines(segmentation: np.ndarray, scale: float) -> List[record]:
     """Given a line segmentation map, computes a list
     of tuples consisting of 2D slices and masked images."""
     logger.debug('Convert segmentation to lines')
@@ -119,7 +119,7 @@ def compute_lines(segmentation, scale):
     return lines
 
 
-def compute_separators_morph(binary: np.array, scale: float, sepwiden: int = 10, maxcolseps: int = 2) -> np.array:
+def compute_separators_morph(binary: np.ndarray, scale: float, sepwiden: int = 10, maxcolseps: int = 2) -> np.ndarray:
     """Finds vertical black lines corresponding to column separators."""
     logger.debug('Finding vertical black column lines')
     d0 = int(max(5, scale/4))
@@ -132,12 +132,12 @@ def compute_separators_morph(binary: np.array, scale: float, sepwiden: int = 10,
     return vert
 
 
-def compute_colseps_conv(binary: np.array, scale: float = 1.0,
-                         minheight: int = 10, maxcolseps: int = 2) -> np.array:
+def compute_colseps_conv(binary: np.ndarray, scale: float = 1.0,
+                         minheight: int = 10, maxcolseps: int = 2) -> np.ndarray:
     """Find column separators by convolution and thresholding.
 
     Args:
-        binary (numpy.array):
+        binary (numpy.ndarray):
         scale (float):
         minheight (int):
         maxcolseps (int):
@@ -163,12 +163,12 @@ def compute_colseps_conv(binary: np.array, scale: float = 1.0,
     return seps
 
 
-def compute_black_colseps(binary: np.array, scale: float, maxcolseps: int) -> Tuple[np.array, np.array]:
+def compute_black_colseps(binary: np.ndarray, scale: float, maxcolseps: int) -> Tuple[np.ndarray, np.ndarray]:
     """
     Computes column separators from vertical black lines.
 
     Args:
-        binary (numpy.array): Numpy array of the binary image
+        binary (numpy.ndarray): Numpy array of the binary image
         scale (float):
 
     Returns:
@@ -181,12 +181,12 @@ def compute_black_colseps(binary: np.array, scale: float, maxcolseps: int) -> Tu
     return colseps, binary
 
 
-def compute_white_colseps(binary: np.array, scale: float, maxcolseps: int) -> Tuple[np.array, np.array]:
+def compute_white_colseps(binary: np.ndarray, scale: float, maxcolseps: int) -> Tuple[np.ndarray, np.ndarray]:
     """
     Computes column separators either from vertical black lines or whitespace.
 
     Args:
-        binary (numpy.array): Numpy array of the binary image
+        binary (numpy.ndarray): Numpy array of the binary image
         scale (float):
 
     Returns:
@@ -195,19 +195,19 @@ def compute_white_colseps(binary: np.array, scale: float, maxcolseps: int) -> Tu
     return compute_colseps_conv(binary, scale, maxcolseps=maxcolseps)
 
 
-def norm_max(v: np.array) -> np.array:
+def norm_max(v: np.ndarray) -> np.ndarray:
     """
     Normalizes the input array by maximum value.
     """
     return v/np.amax(v)
 
 
-def compute_gradmaps(binary: np.array, scale: float, gauss: bool = False):
+def compute_gradmaps(binary: np.ndarray, scale: float, gauss: bool = False):
     """
     Use gradient filtering to find baselines
 
     Args:
-        binary (numpy.array):
+        binary (numpy.ndarray):
         scale (float):
         gauss (bool): Use gaussian instead of uniform filtering
 
@@ -229,8 +229,8 @@ def compute_gradmaps(binary: np.array, scale: float, gauss: bool = False):
     return bottom, top, boxmap
 
 
-def compute_line_seeds(binary: np.array, bottom: np.array, top: np.array,
-                       colseps: np.array, scale: float, threshold: float = 0.2) -> np.array:
+def compute_line_seeds(binary: np.ndarray, bottom: np.ndarray, top: np.ndarray,
+                       colseps: np.ndarray, scale: float, threshold: float = 0.2) -> np.ndarray:
     """
     Base on gradient maps, computes candidates for baselines and xheights.
     Then, it marks the regions between the two as a line seed.
@@ -263,17 +263,17 @@ def compute_line_seeds(binary: np.array, bottom: np.array, top: np.array,
     return seeds
 
 
-def remove_hlines(binary: np.array, scale: float, maxsize: int = 10) -> np.array:
+def remove_hlines(binary: np.ndarray, scale: float, maxsize: int = 10) -> np.ndarray:
     """
     Removes horizontal black lines that only interfere with page segmentation.
 
         Args:
-            binary (numpy.array):
+            binary (numpy.ndarray):
             scale (float):
             maxsize (int): maximum size of removed lines
 
         Returns:
-            numpy.array containing the filtered image.
+            numpy.ndarray containing the filtered image.
 
     """
     logger.debug('Filtering horizontal lines')
@@ -285,7 +285,7 @@ def remove_hlines(binary: np.array, scale: float, maxsize: int = 10) -> np.array
     return np.array(labels != 0, 'B')
 
 
-def rotate_lines(lines: np.array, angle: float, offset: int) -> np.array:
+def rotate_lines(lines: np.ndarray, angle: float, offset: int) -> np.ndarray:
     """
     Rotates line bounding boxes around the origin and adding and offset.
     """
@@ -306,7 +306,7 @@ def segment(im, text_direction: str = 'horizontal-lr',
             black_colseps: bool = False,
             no_hlines: bool = True,
             pad: int = 0,
-            mask: Optional[np.array] = None,
+            mask: Optional[np.ndarray] = None,
             reading_order_fn: Callable = reading_order) -> Dict[str, Any]:
     """
     Segments a page into text lines.

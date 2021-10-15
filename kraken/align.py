@@ -63,12 +63,12 @@ def _shortest_path(graph):
     return fst.shortestpath(graph)
 
 
-def fst_from_lattice(outputs: np.array):
+def fst_from_lattice(outputs: np.ndarray):
     """
     Generates an FST from the network output tensor.
 
     Arguments:
-        outputs (np.array): Output tensor of shape (Batch, Labels, Length).
+        outputs (np.ndarray): Output tensor of shape (Batch, Labels, Length).
 
     Returns:
         An OpenFST FST object.
