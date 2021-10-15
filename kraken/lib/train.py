@@ -589,6 +589,10 @@ class KrakenTrainer(object):
 
         hyper_params = hyper_params_
 
+        logger.info('Hyperparameters')
+        for k, v in hyper_params.items():
+            logger.info(f'{k}:\t{v}')
+
         DatasetClass = GroundTruthDataset
         valid_norm = True
         if format_type and format_type != 'path':
