@@ -19,8 +19,10 @@
 						<TextEquiv conf="{{ char.confidence|round(4) }}"><Unicode>{{ char.text|e }}</Unicode></TextEquiv>
 					</Glyph>
 				{% endfor %}
+					<TextEquiv conf="{{ (segment.confidences|sum / segment.confidences|length)|round(4) }}"><Unicode>{{ segment.text|e }}</Unicode></TextEquiv>
 				</Word>
 				{% endfor %}
+				{% if line.confidences|length %}<TextEquiv conf="{{ (line.confidences|sum / line.confidences|length)|round(4) }}"><Unicode>{% for segment in line.recognition %}{{ segment.text|e }}{% endfor %}</Unicode></TextEquiv>{% endif %}
 			</TextLine>
 {% endmacro %}
 <?xml version="1.0" encoding="UTF-8"?>
