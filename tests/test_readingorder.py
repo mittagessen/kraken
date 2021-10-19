@@ -18,8 +18,8 @@ resources = os.path.abspath(os.path.join(thisfile, 'resources'))
 def polygon_slices(polygon: Sequence[Tuple[int, int]]) -> Tuple[slice, slice]:
     """Convert polygons to slices for reading_order"""
     linestr = geom.LineString(polygon)
-    slices = (slice(linestr.bounds[1], linestr.bounds[0]),
-             slice(linestr.bounds[3], linestr.bounds[2]))
+    slices = (slice(linestr.bounds[1], linestr.bounds[3]),
+             slice(linestr.bounds[0], linestr.bounds[2]))
     return slices
 
 
