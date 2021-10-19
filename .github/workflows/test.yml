@@ -19,7 +19,7 @@ jobs:
       - name: Install dependencies and kraken
         run: |
           python -m pip install --upgrade pip
-          pip install wheel pbr flake8 pytest nose hocr-spec
+          pip install wheel pbr flake8 pytest hocr-spec
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
           python setup.py install
       - name: Lint with flake8
