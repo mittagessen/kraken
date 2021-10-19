@@ -177,25 +177,30 @@ class TestCodec(unittest.TestCase):
         """
         Test correct handling of undecodable sequences (one-to-one decoder)
         """
-        self.o2o_codec.decode(self.invalid_l_sequence)
+        self.assertEqual(self.o2o_codec.decode(self.invalid_l_sequence), [])
 
     def test_m2o_decode_invalid_nonstrict(self):
         """
         Test correct handling of undecodable sequences (many-to-one decoder)
         """
-        self.m2o_codec.decode(self.invalid_l_sequence)
+        self.assertEqual(self.m2o_codec.decode(self.invalid_l_sequence), [])
 
     def test_o2m_decode_invalid_nonstrict(self):
         """
         Test correct handling of undecodable sequences (one-to-many decoder)
         """
-        self.o2m_codec.decode(self.invalid_l_sequence)
+        self.assertEqual(self.o2m_codec.decode(self.invalid_l_sequence),
+                         [('a', 203, 831, 0.8195729875383888)])
 
     def test_m2m_decode_invalid_nonstrict(self):
         """
         Test correct handling of undecodable sequences (many-to-many decoder)
         """
-        self.m2m_codec.decode(self.invalid_l_sequence)
+        self.assertEqual(self.m2m_codec.decode(self.invalid_l_sequence),
+                         [('a', 203, 831, 0.8195729875383888),
+                          ('a', 203, 831, 0.8195729875383888),
+                          ('a', 203, 831, 0.8195729875383888)])
+
 
     def test_o2o_encode_invalid_nonstrict(self):
         """
