@@ -732,7 +732,7 @@ class KrakenTrainer(object):
             gt_set.encode(codec)
             message('Slicing and dicing model ', nl=False)
             # now we can create a new model
-            spec = '[{} O1c{}]'.format(spec[1:-1], gt_set.codec.max_label() + 1)
+            spec = '[{} O1c{}]'.format(spec[1:-1], gt_set.codec.max_label + 1)
             logger.info(f'Appending {spec} to existing model {nn.spec} after {append}')
             nn.append(append, spec)
             nn.add_codec(gt_set.codec)
@@ -758,8 +758,8 @@ class KrakenTrainer(object):
                     logger.info(f'Resizing codec to include {len(alpha_diff)} new code points')
                     codec = codec.add_labels(alpha_diff)
                     nn.add_codec(codec)
-                    logger.info(f'Resizing last layer in network to {codec.max_label()+1} outputs')
-                    nn.resize_output(codec.max_label() + 1)
+                    logger.info(f'Resizing last layer in network to {codec.max_label+1} outputs')
+                    nn.resize_output(codec.max_label + 1)
                     gt_set.encode(nn.codec)
                     message('\u2713', fg='green')
                 elif resize == 'both':
@@ -767,18 +767,19 @@ class KrakenTrainer(object):
                     logger.info(f'Resizing network or given codec to {gt_set.alphabet} code sequences')
                     gt_set.encode(None)
                     ncodec, del_labels = codec.merge(gt_set.codec)
+                    nn.add_codec(ncodec)
                     logger.info(f'Deleting {len(del_labels)} output classes from network '
                                 f'({len(codec)-len(del_labels)} retained)')
                     gt_set.encode(ncodec)
-                    nn.resize_output(ncodec.max_label() + 1, del_labels)
+                    nn.resize_output(ncodec.max_label + 1, del_labels)
                     message('\u2713', fg='green')
                 else:
                     logger.error(f'invalid resize parameter value {resize}')
                     return None
         else:
             gt_set.encode(codec)
-            logger.info(f'Creating new model {spec} with {gt_set.codec.max_label()+1} outputs')
-            spec = '[{} O1c{}]'.format(spec[1:-1], gt_set.codec.max_label() + 1)
+            logger.info(f'Creating new model {spec} with {gt_set.codec.max_label+1} outputs')
+            spec = '[{} O1c{}]'.format(spec[1:-1], gt_set.codec.max_label + 1)
             nn = vgsl.TorchVGSLModel(spec)
             # initialize weights
             message('Initializing model ', nl=False)
