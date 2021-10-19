@@ -237,3 +237,6 @@ class PytorchCodec(object):
             c2l = self.c2l.copy()
             c2l.update({k: [v] for v, k in enumerate(sorted(charset), start=self.max_label+1)})
         return PytorchCodec(c2l, self.strict)
+
+    def __repr__(self):
+        return f'PytorchCodec({self.c2l})'
