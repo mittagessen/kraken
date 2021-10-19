@@ -123,7 +123,7 @@ class PytorchCodec(object):
                     break
             if not encodable_suffix:
                 if self.strict:
-                    raise KrakenEncodeException(f'Non-encodable sequence {s[idx:idx+5]}... encountered. Advancing one code point.')
+                    raise KrakenEncodeException(f'Non-encodable sequence {s[idx:idx+5]}... encountered.')
                 logger.warning(f'Non-encodable sequence {s[idx:idx+5]}... encountered. Advancing one code point.')
                 idx += 1
 
@@ -164,7 +164,7 @@ class PytorchCodec(object):
                     break
             if not decodable_suffix:
                 if self.strict:
-                    raise KrakenEncodeException(f'Non-decodable sequence {labels[idx:idx+5]}... encountered. Advancing one label.')
+                    raise KrakenEncodeException(f'Non-decodable sequence {labels[idx:idx+5]}... encountered.')
                 logger.debug(f'Non-decodable sequence {labels[idx:idx+5]}... encountered. Advancing one label.')
                 idx += 1
         return decoded
