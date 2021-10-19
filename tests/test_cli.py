@@ -9,7 +9,7 @@ from PIL import Image
 from click.testing import CliRunner
 from kraken.kraken import cli
 
-from nose.tools import raises
+from pytest import raises
 
 thisfile = os.path.abspath(os.path.dirname(__file__))
 resources = os.path.abspath(os.path.join(thisfile, 'resources'))

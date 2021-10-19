@@ -8,7 +8,7 @@ import unittest
 
 from PIL import Image
 from lxml import etree
-from io import BytesIO 
+from io import BytesIO
 from kraken.transcribe import TranscriptionInterface
 
 thisfile = os.path.abspath(os.path.dirname(__file__))

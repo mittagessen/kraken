@@ -18,21 +18,23 @@
 pytorch compatible codec with many-to-many mapping between labels and
 graphemes.
 """
-import regex
+import logging
 import numpy as np
 
+from collections import Counter
 from typing import List, Tuple, Set, Union, Dict, Sequence
 from torch import IntTensor
-from kraken.lib.exceptions import KrakenEncodeException
+from kraken.lib.exceptions import KrakenEncodeException, KrakenCodecException
 
 __all__ = ['PytorchCodec']
 
+logger = logging.getLogger(__name__)
 
 class PytorchCodec(object):
     """
     Translates between labels and graphemes.
     """
-    def __init__(self, charset: Union[Dict[str, Sequence[int]], Sequence[str], str]) -> None:
+    def __init__(self, charset: Union[Dict[str, Sequence[int]], Sequence[str], str], strict=False) -> None:
         """
         Builds a codec converting between graphemes/code points and integer
         label sequences.
@@ -48,20 +50,19 @@ class PytorchCodec(object):
 
         Args:
             charset (unicode, list, dict): Input character set.
+            strict (bool): Flag indicating if encoding/decoding errors should
+                           be ignored.
         """
         if isinstance(charset, dict):
             self.c2l = charset
         else:
+            cc = Counter(charset)
+            if len(cc) < len(charset):
+                raise KrakenCodecException(f'Duplicate entry in codec definition string: {cc}')
             self.c2l = {k: [v] for v, k in enumerate(sorted(charset), start=1)}
-        # map integer labels to code points because regex only works with strings
-        self.l2c = {}  # type: Dict[str, str]
-        for k, v in self.c2l.items():
-            self.l2c[''.join(chr(c) for c in v)] = k
-
-        # sort prefixes for c2l regex
-        self.c2l_regex = regex.compile(r'|'.join(regex.escape(x) for x in sorted(self.c2l.keys(), key=len, reverse=True)))
-        # sort prefixes for l2c regex
-        self.l2c_regex = regex.compile(r'|'.join(regex.escape(x) for x in sorted(self.l2c.keys(), key=len, reverse=True)))
+        self.c_sorted = sorted(self.c2l.keys(), key=len, reverse=True)
+        self.l2c = {tuple(v): k for k, v in self.c2l.items()}  # type: Dict[Tuple[int], str]
+        self.strict = strict
 
     def __len__(self) -> int:
         """
@@ -69,6 +70,24 @@ class PytorchCodec(object):
         """
         return len(self.l2c.keys())
 
+    @property
+    def is_valid(self) -> bool:
+        """
+        Returns True if the codec is prefix-free (in label space) and
+        non-singular (in character space).
+        """
+        # quick test for non-singularity
+        if len(self.l2c.keys()) > len(set(self.l2c.values())):
+                return False
+
+        for i, code_1 in enumerate(sorted(self.l2c.keys())):
+            for j, code_2 in enumerate(sorted(self.l2c.keys())):
+                if i != j and code_1[:len(code_2)] == code_2:
+                    return False
+
+        return True
+
+    @property
     def max_label(self) -> int:
         """
         Returns the maximum label value.
@@ -79,6 +98,8 @@ class PytorchCodec(object):
         """
         Encodes a string into a sequence of labels.
 
+        If the code is non-singular we greedily encode the longest sequence first.
+
         Args:
             s (str): Input unicode string
 
@@ -86,12 +107,24 @@ class PytorchCodec(object):
             (torch.IntTensor) encoded label sequence
 
         Raises:
-            KrakenEncodeException if encoding fails.
+
         """
-        splits = self._greedy_split(s, self.c2l_regex)
         labels = []  # type: List[int]
-        for c in splits:
-            labels.extend(self.c2l[c])
+        idx = 0
+        while idx < len(s):
+            encodable_suffix = False
+            for code in self.c_sorted:
+                if s[idx:].startswith(code):
+                    labels.extend(self.c2l[code])
+                    idx += len(code)
+                    encodable_suffix = True
+                    break
+            if not encodable_suffix:
+                if self.strict:
+                    raise KrakenEncodeException(f'Non-encodable sequence {s[idx:idx+5]}... encountered. Advancing one code point.')
+                logger.warning(f'Non-encodable sequence {s[idx:idx+5]}... encountered. Advancing one code point.')
+                idx += 1
+
         return IntTensor(labels)
 
     def decode(self, labels: Sequence[Tuple[int, int, int, float]]) -> List[Tuple[str, int, int, float]]:
@@ -110,48 +143,29 @@ class PytorchCodec(object):
         Returns:
             list: A list of tuples (code point, start, end, confidence)
         """
-        # map into unicode space
-        uni_labels = ''.join(chr(v) for v, _, _, _ in labels)
         start = [x for _, x, _, _ in labels]
         end = [x for _, _, x, _ in labels]
         con = [x for _, _, _, x in labels]
-        splits = self._greedy_split(uni_labels, self.l2c_regex)
+        labels = tuple(x for x, _, _, _ in labels)
         decoded = []
         idx = 0
-        for i in splits:
-            decoded.extend([(c, s, e, u) for c, s, e, u in zip(self.l2c[i],
-                                                               len(self.l2c[i]) * [start[idx]],
-                                                               len(self.l2c[i]) * [end[idx + len(i) - 1]],
-                                                               len(self.l2c[i]) * [np.mean(con[idx:idx + len(i)])])])
-            idx += len(i)
+        while idx < len(labels):
+            decodable_suffix = False
+            for code in self.l2c.keys():
+                if code == labels[idx:idx+len(code)]:
+                    decoded.extend([(c, s, e, u) for c, s, e, u in zip(self.l2c[code],
+                                                                       len(self.l2c[code]) * [start[idx]],
+                                                                       len(self.l2c[code]) * [end[idx + len(code) - 1]],
+                                                                       len(self.l2c[code]) * [np.mean(con[idx:idx + len(code)])])])
+                    idx += len(code)
+                    decodable_suffix = True
+                    break
+            if not decodable_suffix:
+                if self.strict:
+                    raise KrakenEncodeException(f'Non-decodable sequence {labels[idx:idx+5]}... encountered. Advancing one label.')
+                logger.debug(f'Non-decodable sequence {labels[idx:idx+5]}... encountered. Advancing one label.')
+                idx += 1
         return decoded
-
-    def _greedy_split(self, input: str, re: regex.Regex) -> List[str]:
-        """
-        Splits an input string greedily from a list of prefixes. Stops when no
-        more matches are found.
-
-        Args:
-            input (str): input string
-            re (regex.Regex): Prefix match object
-
-        Returns:
-            (list) of prefixes
-
-        Raises:
-            (KrakenEncodeException) if no prefix match is found for some part
-            of the string.
-        """
-        r = []  # type: List[str]
-        idx = 0
-        while True:
-            mo = re.match(input, idx)
-            if mo is None or idx == len(input):
-                if len(input) > idx:
-                    raise KrakenEncodeException('No prefix matches for input after {}'.format(idx))
-                return r
-            r.append(mo.group())
-            idx = mo.end()
 
     def merge(self, codec: 'PytorchCodec') -> Tuple['PytorchCodec', Set]:
         """
@@ -196,7 +210,7 @@ class PytorchCodec(object):
         add_labels = {k: v for v, k in enumerate(sorted(set(label for v in add_list.values() for label in v)), start_idx)}
         for k, v in add_list.items():
             c2l_cand[k] = [add_labels[label] for label in v]
-        return PytorchCodec(c2l_cand), set(rm_labels)
+        return PytorchCodec(c2l_cand, self.strict), set(rm_labels)
 
     def add_labels(self, charset: Union[Dict[str, Sequence[int]], Sequence[str], str]) -> 'PytorchCodec':
         """
@@ -219,5 +233,5 @@ class PytorchCodec(object):
             c2l.update(charset)
         else:
             c2l = self.c2l.copy()
-            c2l.update({k: [v] for v, k in enumerate(sorted(charset), start=self.max_label()+1)})
-        return PytorchCodec(c2l)
+            c2l.update({k: [v] for v, k in enumerate(sorted(charset), start=self.max_label+1)})
+        return PytorchCodec(c2l, self.strict)

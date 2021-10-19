@@ -5,7 +5,7 @@ from __future__ import absolute_import, division, print_function
 import unittest
 import os
 
-from nose.tools import raises
+from pytest import raises
 
 from PIL import Image
 from kraken.binarization import nlbin
@@ -20,13 +20,13 @@ class TestBinarization(unittest.TestCase):
     """
     Tests of the nlbin function for binarization of images
     """
-    @raises(KrakenInputException)
     def test_not_binarize_empty(self):
         """
         Test that mode '1' images aren't binarized again.
         """
-        with Image.new('1', (1000,1000)) as im:
-            nlbin(im)
+        with raises(KrakenInputException):
+            with Image.new('1', (1000,1000)) as im:
+                nlbin(im)
 
     def test_not_binarize_bw(self):
         """
