@@ -43,7 +43,8 @@ class PytorchCodec(object):
         each code point will be assigned a label, in the second case each
         string in the list will be assigned a label, and in the final case each
         key string will be mapped to the value sequence of integers. In the
-        first two cases labels will be assigned automatically.
+        first two cases labels will be assigned automatically. When a mapping
+        is manually provided the label codes need to be a prefix-free code.
 
         As 0 is the blank label in a CTC output layer, output labels and input
         dictionaries are/should be 1-indexed.
