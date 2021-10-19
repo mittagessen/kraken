@@ -199,80 +199,86 @@ class TestCodec(unittest.TestCase):
 
     def test_o2o_encode_invalid_nonstrict(self):
         """
-        Test correct handling of unencodable sequences (one-to-one encoder)
+        Test correct handling of noisy character sequences (one-to-one encoder)
         """
-        self.o2o_codec.encode(self.invalid_c_sequence)
+        self.assertTrue(self.o2o_codec.encode(self.invalid_c_sequence).eq(
+                        IntTensor([1, 1, 1, 2, 1, 2, 2, 1, 1, 1])).all())
 
     def test_m2o_encode_invalid_nonstrict(self):
         """
-        Test correct handling of unencodable sequences (many-to-one encoder)
+        Test correct handling of noisy character sequences (many-to-one encoder)
         """
-        self.m2o_codec.encode(self.invalid_c_sequence)
+        self.assertTrue(self.m2o_codec.encode(self.invalid_c_sequence).eq(
+                        IntTensor([3, 4, 1, 4, 4, 3])).all())
 
     def test_o2m_encode_invalid_nonstrict(self):
         """
-        Test correct handling of unencodable sequences (one-to-many encoder)
+        Test correct handling of noisy character sequences (one-to-many encoder)
         """
-        self.o2m_codec.encode(self.invalid_c_sequence)
+        self.assertTrue(self.o2m_codec.encode(self.invalid_c_sequence).eq(
+                        IntTensor([10, 11, 12, 10, 11, 12, 10, 11, 12, 12, 45,
+                                   80, 10, 11, 12, 12, 45, 80, 12, 45, 80, 10,
+                                   11, 12, 10, 11, 12, 10, 11, 12])).all())
 
     def test_m2m_encode_invalid_nonstrict(self):
         """
-        Test correct handling of unencodable sequences (many-to-many encoder)
+        Test correct handling of noisy character sequences (many-to-many encoder)
         """
-        self.m2m_codec.encode(self.invalid_c_sequence)
+        self.assertTrue(self.m2m_codec.encode(self.invalid_c_sequence).eq(
+                        IntTensor([10, 11, 12, 12, 11, 15, 10, 11, 12])).all())
 
     def test_o2o_decode_invalid(self):
         """
-        Test correct handling of undecodable sequences (one-to-one decoder)
+        Test correct handling of undecodable sequences (one-to-one decoder) in strict mode
         """
         with raises(KrakenEncodeException):
             self.o2o_codec_strict.decode(self.invalid_l_sequence)
 
     def test_m2o_decode_invalid(self):
         """
-        Test correct handling of undecodable sequences (many-to-one decoder)
+        Test correct handling of undecodable sequences (many-to-one decoder) in strict mode
         """
         with raises(KrakenEncodeException):
             self.m2o_codec_strict.decode(self.invalid_l_sequence)
 
     def test_o2m_decode_invalid(self):
         """
-        Test correct handling of undecodable sequences (one-to-many decoder)
+        Test correct handling of undecodable sequences (one-to-many decoder) in strict mode
         """
         with raises(KrakenEncodeException):
             self.o2m_codec_strict.decode(self.invalid_l_sequence)
 
     def test_m2m_decode_invalid(self):
         """
-        Test correct handling of undecodable sequences (many-to-many decoder)
+        Test correct handling of undecodable sequences (many-to-many decoder) in strict mode
         """
         with raises(KrakenEncodeException):
             self.m2m_codec_strict.decode(self.invalid_l_sequence)
 
     def test_o2o_encode_invalid(self):
         """
-        Test correct handling of unencodable sequences (one-to-one encoder)
+        Test correct handling of unencodable sequences (one-to-one encoder) in strict mode
         """
         with raises(KrakenEncodeException):
             self.o2o_codec_strict.encode(self.invalid_c_sequence)
 
     def test_m2o_encode_invalid(self):
         """
-        Test correct handling of unencodable sequences (many-to-one encoder)
+        Test correct handling of unencodable sequences (many-to-one encoder) in strict mode
         """
         with raises(KrakenEncodeException):
             self.m2o_codec_strict.encode(self.invalid_c_sequence)
 
     def test_o2m_encode_invalid(self):
         """
-        Test correct handling of unencodable sequences (one-to-many encoder)
+        Test correct handling of unencodable sequences (one-to-many encoder) in strict mode
         """
         with raises(KrakenEncodeException):
             self.o2m_codec_strict.encode(self.invalid_c_sequence)
 
     def test_m2m_encode_invalid(self):
         """
-        Test correct handling of unencodable sequences (many-to-many encoder)
+        Test correct handling of unencodable sequences (many-to-many encoder) in strict mode
         """
         with raises(KrakenEncodeException):
             self.m2m_codec_strict.encode(self.invalid_c_sequence)
