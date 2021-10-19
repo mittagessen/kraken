@@ -63,6 +63,8 @@ class PytorchCodec(object):
         self.c_sorted = sorted(self.c2l.keys(), key=len, reverse=True)
         self.l2c = {tuple(v): k for k, v in self.c2l.items()}  # type: Dict[Tuple[int], str]
         self.strict = strict
+        if not self.is_valid:
+            raise KrakenCodecException('Codec is not valid (non-singular/non-prefix free).')
 
     def __len__(self) -> int:
         """
@@ -74,10 +76,10 @@ class PytorchCodec(object):
     def is_valid(self) -> bool:
         """
         Returns True if the codec is prefix-free (in label space) and
-        non-singular (in character space).
+        non-singular (in both directions).
         """
         # quick test for non-singularity
-        if len(self.l2c.keys()) > len(set(self.l2c.values())):
+        if len(self.l2c.keys()) != len(self.c2l.keys()):
                 return False
 
         for i, code_1 in enumerate(sorted(self.l2c.keys())):

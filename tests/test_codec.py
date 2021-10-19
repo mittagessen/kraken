@@ -26,8 +26,8 @@ class TestCodec(unittest.TestCase):
         self.o2m_codec = codec.PytorchCodec({'a': [10, 11, 12], 'b': [12, 45, 80]})
         self.o2m_codec_strict = codec.PytorchCodec({'a': [10, 11, 12], 'b': [12, 45, 80]}, strict=True)
         # codec mapping many code points to many labels
-        self.m2m_codec = codec.PytorchCodec({'aaa': [10, 11, 12], 'aa': [10, 10], 'a': [10], 'bb': [15], 'b': [12]})
-        self.m2m_codec_strict = codec.PytorchCodec({'aaa': [10, 11, 12], 'aa': [10, 10], 'a': [10], 'bb': [15], 'b': [12]}, strict=True)
+        self.m2m_codec = codec.PytorchCodec({'aaa': [10, 11, 12], 'aa': [9, 9], 'a': [11], 'bb': [15], 'b': [12]})
+        self.m2m_codec_strict = codec.PytorchCodec({'aaa': [10, 11, 12], 'aa': [9, 9], 'a': [11], 'bb': [15], 'b': [12]}, strict=True)
 
         self.invalid_c_sequence = 'aaababbcaaa'
         self.valid_c_sequence = 'aaababbaaabbbb'
@@ -70,8 +70,7 @@ class TestCodec(unittest.TestCase):
         Test correct encoding of many-to-many code point sequence
         """
         self.assertTrue(self.m2m_codec.encode(self.valid_c_sequence).eq(
-                        IntTensor([10, 11, 12, 12, 10, 15, 10, 11, 12,
-                                   15, 15])).all())
+                        IntTensor([10, 11, 12, 12, 11, 15, 10, 11, 12, 15, 15])).all())
 
     def test_o2o_decode(self):
         """
@@ -172,7 +171,7 @@ class TestCodec(unittest.TestCase):
                                                                       (12, 375, 872, 0.26908722769105353),
                                                                       (15, 296, 889, 0.44251812620463726),
                                                                       (15, 237, 930, 0.5456105208117391)])),
-                         'aaababbaaabbbb')
+                         'aaabbbaaabbbb')
 
     def test_o2o_decode_invalid_nonstrict(self):
         """
