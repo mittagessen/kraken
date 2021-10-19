@@ -6,7 +6,7 @@ import unittest
 import os
 
 from PIL import Image
-from nose.tools import raises
+from pytest import raises
 
 from kraken.pageseg import segment
 from kraken.lib.exceptions import KrakenInputException
@@ -20,13 +20,13 @@ class TestPageSeg(unittest.TestCase):
     """
     Tests of the page segmentation functionality
     """
-    @raises(KrakenInputException)
     def test_segment_color(self):
         """
         Test correct handling of color input.
         """
-        with Image.open(os.path.join(resources, 'input.jpg')) as im:
-            segment(im)
+        with raises(KrakenInputException):
+            with Image.open(os.path.join(resources, 'input.jpg')) as im:
+                segment(im)
 
     def test_segment_bw(self):
         """

@@ -6,8 +6,6 @@ from setuptools import setup
 
 setup(
     include_package_data=True,
-    test_suite="nose.collector",
-    tests_require=['nose', 'hocr-spec'],
     setup_requires=['pbr'],
     pbr=True,
 )

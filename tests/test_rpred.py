@@ -6,7 +6,7 @@ import os
 import unittest
 
 from PIL import Image
-from nose.tools import raises
+from pytest import raises
 
 from kraken.lib.models import load_any
 from kraken.rpred import rpred
@@ -26,11 +26,11 @@ class TestRecognition(unittest.TestCase):
     def tearDown(self):
         self.im.close()
 
-    @raises(KrakenInputException)
     def test_rpred_outbounds(self):
         """
         Tests correct handling of invalid line coordinates.
         """
-        nn = load_any(os.path.join(resources, 'toy.clstm'))
-        pred = rpred(nn, self.im, {'boxes': [[-1, -1, 10000, 10000]], 'text_direction': 'horizontal'}, True)
-        next(pred)
+        with raises(KrakenInputException):
+            nn = load_any(os.path.join(resources, 'toy.clstm'))
+            pred = rpred(nn, self.im, {'boxes': [[-1, -1, 10000, 10000]], 'text_direction': 'horizontal'}, True)
+            next(pred)

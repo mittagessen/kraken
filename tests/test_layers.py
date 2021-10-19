@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 import unittest
 
-from nose.tools import raises
-
 import torch
 from kraken.lib import layers
 

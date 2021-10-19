@@ -4,7 +4,7 @@ import os
 import tempfile
 import pickle
 
-from nose.tools import raises
+from pytest import raises
 
 import kraken.lib.lstm
 
@@ -26,12 +26,12 @@ class TestModels(unittest.TestCase):
         self.temp.close()
         os.unlink(self.temp.name)
 
-    @raises(KrakenInvalidModelException)
     def test_load_invalid(self):
         """
         Tests correct handling of invalid files.
         """
-        models.load_any(self.temp.name)
+        with raises(KrakenInvalidModelException):
+            models.load_any(self.temp.name)
 
     def test_load_clstm(self):
         """
@@ -40,21 +40,21 @@ class TestModels(unittest.TestCase):
         rnn = models.load_any(os.path.join(resources, 'toy.clstm').encode('utf-8'))
         self.assertIsInstance(rnn, models.TorchSeqRecognizer)
 
-    @raises(KrakenInvalidModelException)
     def test_load_pyrnn_no_seqrecognizer(self):
         """
         Test correct handling of non-SeqRecognizer pickles.
         """
         pickle.dump(u'Iámnõtãrécðçnízer', self.temp)
         self.temp.close()
-        models.load_any(self.temp.name)
+        with raises(KrakenInvalidModelException):
+            models.load_any(self.temp.name)
 
-    @raises(KrakenInvalidModelException)
     def test_load_any_pyrnn_py3(self):
         """
         Test load_any doesn't load pickled models on python 3
         """
-        rnn = models.load_any(os.path.join(resources, 'model.pyrnn.gz'))
+        with raises(KrakenInvalidModelException):
+            rnn = models.load_any(os.path.join(resources, 'model.pyrnn.gz'))
 
     def test_load_any_proto(self):
         """
