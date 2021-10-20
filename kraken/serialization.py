@@ -116,6 +116,7 @@ def serialize(records: Sequence[ocr_record],
     char_idx = 0
     region_map = {} # type: Dict[int, Tuple]
     region_serialization = {} # type: Dict[int, dict]
+    region_order = [] # type: List[int]
     idx = 0
     if regions is not None:
         for reg_type, regs in regions.items():
@@ -149,6 +150,9 @@ def serialize(records: Sequence[ocr_record],
             reg = c_regs[0]
             is_in_reg = reg[0]
             region = region_serialization[is_in_reg]
+            if is_in_reg not in region_order:
+                region_order.append(is_in_reg)
+                page['entities'].append(region)
             cur_ent = region['lines']
 
         # set field to indicate the availability of baseline segmentation in
@@ -211,7 +215,6 @@ def serialize(records: Sequence[ocr_record],
             seg_idx += 1
             line_offset += len(segment)
         cur_ent.append(line)
-    page['entities'].extend([r for r in region_serialization.values() if len(r['lines']) > 0])
     logger.debug('Initializing jinja environment.')
     env = Environment(loader=PackageLoader('kraken', 'templates'),
                       trim_blocks=True,
