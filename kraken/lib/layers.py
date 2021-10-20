@@ -172,7 +172,7 @@ class Reshape(Module):
         self.high = high
         self.low = low
 
-    def forward(self, input: torch.Tensor, seq_len: torch.Tensor = None) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, input: torch.Tensor, seq_len: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         initial_len = input.shape[3]
         # split dimension src_dim into part_a x part_b
         input = input.reshape(input.shape[:self.src_dim] + (self.part_a, self.part_b) + input.shape[self.src_dim + 1:])
@@ -236,7 +236,7 @@ class MaxPool(Module):
         self.stride = stride
         self.layer = torch.nn.MaxPool2d(kernel_size, stride)
 
-    def forward(self, inputs: torch.Tensor, seq_len: torch.Tensor = None) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, inputs: torch.Tensor, seq_len: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         o = self.layer(inputs)
         if seq_len is not None:
             seq_len = torch.floor((seq_len-(self.kernel_size[1]-1)-1).float()/self.stride[1]+1).int()
@@ -285,7 +285,7 @@ class Dropout(Module):
         elif dim == 2:
             self.layer = torch.nn.Dropout2d(p)
 
-    def forward(self, inputs: torch.Tensor, seq_len: torch.Tensor = None) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, inputs: torch.Tensor, seq_len: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         return self.layer(inputs), seq_len
 
     def get_shape(self, input: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
@@ -346,7 +346,7 @@ class TransposedSummarizingRNN(Module):
         self.summarize = summarize
         self.legacy = legacy
         self.input_size = input_size
-        if self.legacy:
+        if self.legacy is not None:
             self.input_size += 1
         self.hidden_size = hidden_size
         self.bidi = direction == 'b'
@@ -361,13 +361,13 @@ class TransposedSummarizingRNN(Module):
                                        batch_first=True,
                                        bias=False if legacy else True)
 
-    def forward(self, inputs: torch.Tensor, seq_len: torch.Tensor = None) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, inputs: torch.Tensor, seq_len: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         # NCHW -> HNWC
         inputs = inputs.permute(2, 0, 3, 1)
         if self.transpose:
             # HNWC -> WNHC
             inputs = inputs.transpose(0, 2)
-        if self.legacy:
+        if self.legacy is not None:
             ones = torch.ones(inputs.shape[:3] + (1,))
             inputs = torch.cat([ones, inputs], dim=3)
         # HNWC -> (H*N)WC
@@ -553,7 +553,7 @@ class LinSoftmax(Module):
 
         self.lin = torch.nn.Linear(self.input_size, output_size)
 
-    def forward(self, inputs: torch.Tensor, seq_len: torch.Tensor = None) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, inputs: torch.Tensor, seq_len: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         # move features (C) to last dimension for linear activation
         # NCHW -> NWHC
         inputs = inputs.transpose(1, 3)
@@ -641,8 +641,6 @@ class ActConv2D(Module):
         self.out_channels = out_channels
         self.stride = stride
         self.padding = tuple((k - 1) // 2 for k in kernel_size)
-        self.nl = None
-        self.nl_name = None
         if nl == 's':
             self.nl = torch.sigmoid
             self.nl_name = 'SIGMOID'
@@ -657,13 +655,13 @@ class ActConv2D(Module):
             self.nl_name = 'RELU'
         else:
             self.nl_name = 'LINEAR'
+            self.nl = lambda x: x
         self.co = torch.nn.Conv2d(in_channels, out_channels, kernel_size,
                                   stride=stride, padding=self.padding)
 
-    def forward(self, inputs: torch.Tensor, seq_len: torch.Tensor = None) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, inputs: torch.Tensor, seq_len: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         o = self.co(inputs)
-        if self.nl:
-            o = self.nl(o)
+        o = self.nl(o)
         if seq_len is not None:
             seq_len = torch.clamp(torch.floor(
                 (seq_len+2*self.padding[1]-(self.kernel_size[1]-1)-1).float()/self.stride[1]+1), min=1).int()
@@ -754,7 +752,7 @@ class GroupNorm(Module):
 
         self.layer = torch.nn.GroupNorm(num_groups, in_channels)
 
-    def forward(self, inputs: torch.Tensor, seq_len: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, inputs: torch.Tensor, seq_len: torch.Tensor) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         o = self.layer(inputs)
         return o, seq_len
 
