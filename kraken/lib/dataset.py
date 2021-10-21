@@ -505,7 +505,7 @@ class PolygonGTDataset(Dataset):
                 im = self.tail_transforms(im)
             except ValueError:
                 raise KrakenInputException(f'Image transforms failed on {image}')
-            self._images.append(im)
+            
             return {'text': text,
                     'image': im,
                     'baseline': baseline,
