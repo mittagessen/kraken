@@ -2,20 +2,36 @@
 
 from __future__ import absolute_import, division, print_function
 
-import unittest
-import json
 import os
+import json
+import unittest
+import tempfile
+import numpy as np
 
 from lxml import etree
 from io import StringIO
 from hocr_spec import HocrValidator
 from collections import Counter
 
-from kraken import rpred
-from kraken import serialization
+from kraken import rpred, serialization
+from kraken.lib import xml
 
 thisfile = os.path.abspath(os.path.dirname(__file__))
 resources = os.path.abspath(os.path.join(thisfile, 'resources'))
+
+def roundtrip(self, records, fp):
+    """
+    Checks that the order of lines after serialization and deserialization is
+    equal to the records.
+    """
+    with tempfile.NamedTemporaryFile() as out:
+        fp.seek(0)
+        out.write(fp.getvalue().encode('utf-8'))
+        doc = xml.parse_xml(out.name)['lines']
+        for orig_line, parsed_line in zip(records, doc):
+            self.assertSequenceEqual(np.array(orig_line.baseline).tolist(),
+                                     np.array(parsed_line['baseline']).tolist(),
+                                     msg='Baselines differ after serialization.')
 
 def validate_hocr(self, fp):
     fp.seek(0)
@@ -122,6 +138,7 @@ class TestSerializations(unittest.TestCase):
 
         fp.write(serialization.serialize(self.bl_records, image_name='foo.png', template='alto'))
         validate_alto(self, fp)
+        roundtrip(self, self.bl_records, fp)
 
     def test_bl_abbyyxml_serialization_validation(self):
         """
@@ -143,6 +160,7 @@ class TestSerializations(unittest.TestCase):
 
         fp.write(serialization.serialize(self.bl_records, image_name='foo.png', template='pagexml'))
         validate_page(self, fp)
+        roundtrip(self, self.bl_records, fp)
 
     def test_bl_region_alto_serialization_validation(self):
         """
@@ -152,6 +170,7 @@ class TestSerializations(unittest.TestCase):
 
         fp.write(serialization.serialize(self.bl_records, image_name='foo.png', template='alto', regions=self.bl_regions))
         validate_alto(self, fp)
+        roundtrip(self, self.bl_records, fp)
 
     def test_bl_region_abbyyxml_serialization_validation(self):
         """
@@ -173,3 +192,4 @@ class TestSerializations(unittest.TestCase):
 
         fp.write(serialization.serialize(self.bl_records, image_name='foo.png', template='pagexml', regions=self.bl_regions))
         validate_page(self, fp)
+        roundtrip(self, self.bl_records, fp)
