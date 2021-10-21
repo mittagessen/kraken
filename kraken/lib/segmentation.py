@@ -734,13 +734,13 @@ def polygonal_reading_order(lines: Sequence[Tuple[List[Tuple[int, int]], List[Tu
         in_region = False
         for idx, reg in enumerate(r):
             if is_in_region(s_line, reg):
-                region_lines[idx].append((line_idx, (slice(s_line.bounds[1], s_line.bounds[0]),
-                                                     slice(s_line.bounds[3], s_line.bounds[2]))))
+                region_lines[idx].append((line_idx, (slice(s_line.bounds[1], s_line.bounds[3]),
+                                                     slice(s_line.bounds[0], s_line.bounds[2]))))
                 in_region = True
                 break
         if not in_region:
-            bounds.append((slice(s_line.bounds[1], s_line.bounds[0]),
-                           slice(s_line.bounds[3], s_line.bounds[2])))
+            bounds.append((slice(s_line.bounds[1], s_line.bounds[3]),
+                           slice(s_line.bounds[0], s_line.bounds[2])))
             indizes[line_idx] = ('line', line)
     # order everything in regions
     intra_region_order = [[] for _ in range(len(r))]
@@ -750,7 +750,7 @@ def polygonal_reading_order(lines: Sequence[Tuple[List[Tuple[int, int]], List[Tu
             lsort = topsort(order)
             intra_region_order[idx] = [region_lines[idx][i][0] for i in lsort]
             reg = reg.bounds
-            bounds.append((slice(reg[1], reg[0]), slice(reg[3], reg[2])))
+            bounds.append((slice(reg[1], reg[3]), slice(reg[0], reg[2])))
             indizes[line_idx+idx+1] = ('region', idx)
     # order unassigned lines and regions
     order = reading_order(bounds, text_direction)
