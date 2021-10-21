@@ -59,7 +59,12 @@ class TestSerializations(unittest.TestCase):
     """
     def setUp(self):
         with open(os.path.join(resources, 'records.json'), 'r') as fp:
-            self.records = [rpred.ocr_record(**x) for x in json.load(fp)]
+            self.box_records = [rpred.ocr_record(**x) for x in json.load(fp)]
+
+        with open(os.path.join(resources, 'bl_records.json'), 'r') as fp:
+            recs = json.load(fp)
+            self.bl_records = [rpred.ocr_record(**bl) for bl in recs['lines']]
+            self.bl_regions = recs['regions']
 
     def test_box_vertical_hocr_serialization(self):
         """
@@ -67,7 +72,7 @@ class TestSerializations(unittest.TestCase):
         """
         fp = StringIO()
 
-        fp.write(serialization.serialize(self.records, image_name='foo.png', writing_mode='vertical-lr', template='hocr'))
+        fp.write(serialization.serialize(self.box_records, image_name='foo.png', writing_mode='vertical-lr', template='hocr'))
         validate_hocr(self, fp)
 
     def test_box_hocr_serialization(self):
@@ -76,7 +81,7 @@ class TestSerializations(unittest.TestCase):
         """
         fp = StringIO()
 
-        fp.write(serialization.serialize(self.records, image_name='foo.png', template='hocr'))
+        fp.write(serialization.serialize(self.box_records, image_name='foo.png', template='hocr'))
         validate_hocr(self, fp)
 
     def test_box_alto_serialization_validation(self):
@@ -85,7 +90,7 @@ class TestSerializations(unittest.TestCase):
         """
         fp = StringIO()
 
-        fp.write(serialization.serialize(self.records, image_name='foo.png', template='alto'))
+        fp.write(serialization.serialize(self.box_records, image_name='foo.png', template='alto'))
         validate_alto(self, fp)
 
     def test_box_abbyyxml_serialization_validation(self):
@@ -94,7 +99,7 @@ class TestSerializations(unittest.TestCase):
         """
         fp = StringIO()
 
-        fp.write(serialization.serialize(self.records, image_name='foo.png', template='abbyyxml'))
+        fp.write(serialization.serialize(self.box_records, image_name='foo.png', template='abbyyxml'))
         doc = etree.fromstring(fp.getvalue().encode('utf-8'))
         with open(os.path.join(resources, 'FineReader10-schema-v1.xml')) as schema_fp:
             abbyy_schema = etree.XMLSchema(etree.parse(schema_fp))
@@ -106,5 +111,65 @@ class TestSerializations(unittest.TestCase):
         """
         fp = StringIO()
 
-        fp.write(serialization.serialize(self.records, image_name='foo.png', template='pagexml'))
+        fp.write(serialization.serialize(self.box_records, image_name='foo.png', template='pagexml'))
+        validate_page(self, fp)
+
+    def test_bl_alto_serialization_validation(self):
+        """
+        Validates output against ALTO schema
+        """
+        fp = StringIO()
+
+        fp.write(serialization.serialize(self.bl_records, image_name='foo.png', template='alto'))
+        validate_alto(self, fp)
+
+    def test_bl_abbyyxml_serialization_validation(self):
+        """
+        Validates output against abbyyXML schema
+        """
+        fp = StringIO()
+
+        fp.write(serialization.serialize(self.bl_records, image_name='foo.png', template='abbyyxml'))
+        doc = etree.fromstring(fp.getvalue().encode('utf-8'))
+        with open(os.path.join(resources, 'FineReader10-schema-v1.xml')) as schema_fp:
+            abbyy_schema = etree.XMLSchema(etree.parse(schema_fp))
+            abbyy_schema.assertValid(doc)
+
+    def test_bl_pagexml_serialization_validation(self):
+        """
+        Validates output against abbyyXML schema
+        """
+        fp = StringIO()
+
+        fp.write(serialization.serialize(self.bl_records, image_name='foo.png', template='pagexml'))
+        validate_page(self, fp)
+
+    def test_bl_region_alto_serialization_validation(self):
+        """
+        Validates output against ALTO schema
+        """
+        fp = StringIO()
+
+        fp.write(serialization.serialize(self.bl_records, image_name='foo.png', template='alto', regions=self.bl_regions))
+        validate_alto(self, fp)
+
+    def test_bl_region_abbyyxml_serialization_validation(self):
+        """
+        Validates output against abbyyXML schema
+        """
+        fp = StringIO()
+
+        fp.write(serialization.serialize(self.bl_records, image_name='foo.png', template='abbyyxml', regions=self.bl_regions))
+        doc = etree.fromstring(fp.getvalue().encode('utf-8'))
+        with open(os.path.join(resources, 'FineReader10-schema-v1.xml')) as schema_fp:
+            abbyy_schema = etree.XMLSchema(etree.parse(schema_fp))
+            abbyy_schema.assertValid(doc)
+
+    def test_bl_region_pagexml_serialization_validation(self):
+        """
+        Validates output against abbyyXML schema
+        """
+        fp = StringIO()
+
+        fp.write(serialization.serialize(self.bl_records, image_name='foo.png', template='pagexml', regions=self.bl_regions))
         validate_page(self, fp)
