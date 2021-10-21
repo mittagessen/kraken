@@ -114,22 +114,12 @@ def serialize(records: Sequence[ocr_record],
             'base_dir': [rec.base_dir for rec in records][0]}  # type: dict
     seg_idx = 0
     char_idx = 0
-    region_map = {} # type: Dict[int, Tuple]
-    region_serialization = {} # type: Dict[int, dict]
-    region_order = [] # type: List[int]
+    region_map = {}
     idx = 0
     if regions is not None:
-        for reg_type, regs in regions.items():
-            for reg_boundary in regs:
-                reg_poly = geom.Polygon(reg_boundary)
-                region_map[idx] = (reg_type, reg_poly, reg_boundary)
-                region_serialization[idx] = {'index': idx,
-                      'bbox': [int(x) for x in reg_poly.bounds],
-                      'boundary': [list(x) for x in reg_boundary],
-                      'region_type': reg_type,
-                      'lines': [],
-                      'type': 'region'
-                      }
+        for id, regs in regions.items():
+            for reg in regs:
+                region_map[idx] = (id, geom.Polygon(reg), reg)
                 idx += 1
 
     # build region and line type dict
@@ -143,16 +133,20 @@ def serialize(records: Sequence[ocr_record],
             l_obj = geom.LineString(record.baseline)
         else:
             l_obj = geom.LineString(record.line)
-        c_regs = list(filter(lambda x: is_in_region(l_obj, x[1][1]), region_map.items()))
-        if len(c_regs) == 0:
+        reg = list(filter(lambda x: is_in_region(l_obj, x[1][1]), region_map.items()))
+        if len(reg) == 0:
             cur_ent = page['entities']
-        elif c_regs[0][0] != is_in_reg:
-            reg = c_regs[0]
+        elif reg[0][0] != is_in_reg:
+            reg = reg[0]
             is_in_reg = reg[0]
-            region = region_serialization[is_in_reg]
-            if is_in_reg not in region_order:
-                region_order.append(is_in_reg)
-                page['entities'].append(region)
+            region = {'index': reg[0],
+                      'bbox': [int(x) for x in reg[1][1].bounds],
+                      'boundary': [list(x) for x in reg[1][2]],
+                      'region_type': reg[1][0],
+                      'lines': [],
+                      'type': 'region'
+                      }
+            page['entities'].append(region)
             cur_ent = region['lines']
 
         # set field to indicate the availability of baseline segmentation in
