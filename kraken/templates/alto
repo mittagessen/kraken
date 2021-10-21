@@ -19,6 +19,9 @@
 			<Polygon POINTS="{{ line.boundary|sum(start=[])|join(' ') }}"/>
 		</Shape>
 	{% endif %}
+        {% if line.recognition|length() == 0 %}
+		<String CONTENT=""/>
+	{% else %}
 	{% for segment in line.recognition %}
 		{# ALTO forbids encoding whitespace before any String/Shape tags #}
 		{% if segment.text is whitespace and loop.index > 1 %}
@@ -58,6 +61,7 @@
 		</String>
 		{% endif %}
 	{% endfor %}
+	{% endif %}
 </TextLine>
 {%- endmacro %}
 <?xml version="1.0" encoding="UTF-8"?>
