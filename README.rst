@@ -51,6 +51,13 @@ It is also possible to install the latest stable release from pypi:
 
   $ pip install kraken
 
+If you want direct PDF and multi-image TIFF/JPEG2000 support it is necessary to
+install the `pdf` extras package:
+
+::
+
+  $ pip install kraken[pdf]
+
 Finally you'll have to scrounge up a model to do the actual recognition of
 characters. To download the default model for printed English text and place it
 in the kraken directory for the current user:
