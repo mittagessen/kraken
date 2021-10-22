@@ -17,14 +17,14 @@ dependencies:
   - protobuf>=3.0
   - jinja2
   - pytorch::torchvision
-  - pytorch::pytorch>=1.5.0,<1.10
+  - pytorch::pytorch>=1.5.0,<1.11
   - cudatoolkit>=9.2
   - jsonschema
   - scikit-image>=0.17.0
   - shapely
   - pip
   - pyvips
-  - imagemagick<7.0.9
+  - imagemagick>=7.1.0
   - pip:
     - coremltools>=3.3
-    - git+https://github.com/mittagessen/kraken.git@master
+    - file:.

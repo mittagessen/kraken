@@ -33,14 +33,16 @@ Install the latest development version through `conda <https://anaconda.org>`_:
 
 ::
 
-  $ wget https://raw.githubusercontent.com/mittagessen/kraken/master/environment.yml
+  $ git clone git://github.com/mittagessen/kraken.git 
+  $ cd kraken
   $ conda env create -f environment.yml
 
 or:
 
 ::
 
-  $ wget https://raw.githubusercontent.com/mittagessen/kraken/master/environment_cuda.yml
+  $ git clone git://github.com/mittagessen/kraken.git 
+  $ cd kraken
   $ conda env create -f environment_cuda.yml
 
 for CUDA acceleration with the appropriate hardware.
