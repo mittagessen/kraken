@@ -27,7 +27,7 @@ ALTO
 Kraken parses and produces files according to the upcoming version of the ALTO
 standard: 4.2. It validates against version 4.1 with the exception of the
 `redefinition <https://github.com/altoxml/schema/issues/32>`_ of the `BASELINE`
-attribute to accomodate polygonal chain baselines. An example showing the
+attribute to accommodate polygonal chain baselines. An example showing the
 attributes necessary for segmentation and recognition training follows:
 
 .. literalinclude:: alto.xml
@@ -253,10 +253,10 @@ Training a segmentation model is very similar to training one for
 Testing
 -------
 
-Picking a particular model from a pool or getting a more detailled look on the
+Picking a particular model from a pool or getting a more detailed look on the
 recognition accuracy can be done with the `test` command. It uses transcribed
 lines, the test set, in the same format as the `train` command, recognizes the
-line images with one or more models, and creates a detailled report of the
+line images with one or more models, and creates a detailed report of the
 differences from the ground truth for each of them.
 
 ======================================================= ======
@@ -340,6 +340,6 @@ adding a number of image files as the final argument:
    ...
    Average accuracy: 14.12%, (stddev: 0.00)
 
-The report(s) contains character accuracy measured per script and a detailled
+The report(s) contains character accuracy measured per script and a detailed
 list of confusions. When evaluating multiple models the last line of the output
 will the average accuracy and the standard deviation across all of them.

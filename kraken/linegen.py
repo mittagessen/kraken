@@ -163,7 +163,7 @@ class LineGenerator(object):
     def __init__(self, family='Sans', font_size=32, font_weight=400, language=None):
         self.language = language
         self.font = pango.pango_font_description_new()
-        # XXX: get PANGO_SCALE programatically from somewhere
+        # XXX: get PANGO_SCALE programmatically from somewhere
         logger.debug('Setting font {}, size {}, weight {}'.format(family, font_size, font_weight))
         pango.pango_font_description_set_size(self.font, font_size * 1024)
         pango.pango_font_description_set_family(self.font, family)

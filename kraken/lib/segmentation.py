@@ -170,7 +170,7 @@ def boundary_tracing(region):
     y = coords[:, 0]
     binary[tuple([y, x])] = 1
 
-    # initilization
+    # initialization
     # starting point is the most upper left point
     idx_start = 0
     while True:  # asserting that the starting point is not isolated

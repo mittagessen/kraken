@@ -6,7 +6,7 @@ from statistics import mean
 from lxml import etree
 from PIL import Image
 
-#a custom exception to indiate when a page or other element doesn't 
+#a custom exception to indicate when a page or other element doesn't
 #have a bounding box where we would expect it.
 class BboxError(Exception):
     pass
@@ -212,7 +212,7 @@ if (args.verbose):
     print("Input dir:", args.inputDir)
     print("Output dir:", args.outputDir)
 
-#everthing looks good. Let's loop over the html files in inputDir
+#everything looks good. Let's loop over the html files in inputDir
 xslt_to_xhtml = etree.XML('''\
 <xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" version="1.0"
    xmlns:html='http://www.w3.org/1999/xhtml'>
