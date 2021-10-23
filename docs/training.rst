@@ -134,7 +134,7 @@ that can be adjusted:
 
 Training a network will take some time on a modern computer, even with the
 default parameters. While the exact time required is unpredictable as training
-is a somewhat random process a rough guide is that accuracy seldomly improves
+is a somewhat random process a rough guide is that accuracy seldom improves
 after 50 epochs reached between 8 and 24 hours of training. 
 
 When to stop training is a matter of experience; the default setting employs a
@@ -360,7 +360,7 @@ The first section of the report consists of a simple accounting of the number
 of characters in the ground truth, the errors in the recognition output and the
 resulting accuracy in per cent.
 
-The next table lists the number of insertions (characters occuring in the
+The next table lists the number of insertions (characters occurring in the
 ground truth but not in the recognition output), substitutions (misrecognized
 characters), and deletions (superfluous characters recognized by the model).
 

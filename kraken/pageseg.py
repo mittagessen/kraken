@@ -380,7 +380,7 @@ def segment(im, text_direction: str = 'horizontal-lr',
 
     if no_hlines:
         binary = remove_hlines(binary, scale)
-    # emptyish images wll cause exceptions here.
+    # emptyish images will cause exceptions here.
 
     try:
         if mask:

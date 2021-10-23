@@ -133,7 +133,7 @@ Recurrent Layers
         b runs the RNN bidirectionally.
         s (optional) summarizes the output in the requested dimension, return the last step.
 
-Adds either an LSTM or GRU recurrent layer to the network using eiter the `x`
+Adds either an LSTM or GRU recurrent layer to the network using either the `x`
 (width) or `y` (height) dimension as the time axis. Input features are the
 channel dimension and the non-time-axis dimension (height/width) is treated as
 another batch dimension. For example, a `Lfx25` layer on an `1, 16, 906, 32`

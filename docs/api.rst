@@ -115,7 +115,7 @@ different algorithms available, each with strengths and weaknesses. For most
 material the kraken-provided binarization should be sufficient, though. This
 does not mean that a segmentation model trained on RGB images will have equal
 accuracy for B/W, grayscale, and RGB inputs. Nevertheless the drop in quality
-will often be modest or non-existant in for color models while non-binarized
+will often be modest or non-existent in for color models while non-binarized
 inputs to a binary model will cause severe degradation (and a warning to that
 notion).
 
@@ -287,7 +287,7 @@ Training
 
 There are catch-all constructors for quickly setting up
 :cls:`kraken.lib.train.KrakenTrainer` instances for all training needs. They
-largely map the comand line utils `ketos train` and `ketos segtrain` to a
+largely map the command line utils `ketos train` and `ketos segtrain` to a
 programmatic interface. The arguments are identical, apart from a
 differentiation between general arguments (data sources and setup, file names,
 devices, ...) and hyperparameters (optimizers, learning rate schedules,
