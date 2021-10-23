@@ -15,14 +15,12 @@
 # permissions and limitations under the License.
 import os
 import time
-import json
 import glob
 import uuid
 import click
 import logging
 import unicodedata
 
-from click import open_file
 from bidi.algorithm import get_display
 
 from typing import cast, Set, List, IO, Any, Dict
@@ -880,6 +878,8 @@ def transcription(ctx, text_direction, scale, bw, maxcolseps,
     """
     Creates transcription environments for ground truth generation.
     """
+    import json
+
     from PIL import Image
 
     from kraken import rpred
@@ -914,7 +914,7 @@ def transcription(ctx, text_direction, scale, bw, maxcolseps,
             if not lines:
                 res = pageseg.segment(im_bin, text_direction, scale, maxcolseps, black_colseps, pad=pad)
             else:
-                with open_file(lines, 'r') as fp:
+                with click.open_file(lines, 'r') as fp:
                     try:
                         fp = cast(IO[Any], fp)
                         res = json.load(fp)

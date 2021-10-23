@@ -60,7 +60,6 @@ def progressbar(*args, **kwargs):
     Slight extension to click's progressbar disabling output on when log level
     is set below 30.
     """
-    import logging
     logger = logging.getLogger(__name__)
     bar = click.progressbar(*args, **kwargs)
     if logger.getEffectiveLevel() < 30:

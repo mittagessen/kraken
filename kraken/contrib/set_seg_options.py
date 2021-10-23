@@ -2,13 +2,8 @@
 """
 A script setting the metadata of segmentation models.
 """
-import re
-import os
 import click
 import shutil
-import unicodedata
-from itertools import cycle
-from collections import defaultdict
 
 @click.command()
 @click.option('-b', '--bounding-region', multiple=True, help='Sets region identifiers which bound line bounding polygons')

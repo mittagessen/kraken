@@ -45,7 +45,7 @@ def cli(model, files):
         bl = Image.composite(overlay, bl, heat)
         heat = Image.fromarray((o[0]*255).astype('uint8'))
         overlay = Image.new('RGBA', scal_im.size, (60, 180, 75, 255))
-        bl = Image.composite(overlay, bl, heat).save(splitext(img)[0] + '.overlay.png')
+        Image.composite(overlay, bl, heat).save(splitext(img)[0] + '.overlay.png')
         del o
         del im
 

@@ -1,8 +1,5 @@
 # flake8: noqa
-import numpy as np
-
 from typing import Dict
-from scipy.ndimage import measurements
 from scipy.special import expit
 
 initial_range = 0.1
@@ -24,7 +21,6 @@ class Codec(object):
         return len(list(self.code2char.keys()))
     def encode(self, s):
         "Encode the string `s` into a code sequence."
-        tab = self.char2code
         dflt = self.char2code["~"]
         return [self.char2code.get(c,dflt) for c in s]
     def decode(self, l):

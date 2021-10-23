@@ -724,7 +724,7 @@ class TorchVGSLModel(object):
 
         if part_a == 0:
             part_a = -1
-        if part_b == 0:
+        elif part_b == 0:
             part_b = -1
 
         if src_dim != high and src_dim != low:

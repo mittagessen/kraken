@@ -182,7 +182,6 @@ def parse_page(filename):
                     boundary = _parse_coords(pol.get('points'))
                 except Exception:
                     logger.info('TextLine {} without polygon'.format(line.get('id')))
-                    pass
             else:
                 logger.info('TextLine {} without polygon'.format(line.get('id')))
             base = line.find('./{*}Baseline')
