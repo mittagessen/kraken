@@ -701,6 +701,8 @@ class GroundTruthDataset(Dataset):
                 im = self.tail_transforms(im)
             except ValueError:
                 raise KrakenInputException(f'Image transforms failed on {image}')
+            except ZeroDivisionError:
+                raise KrakenInputException(f'Image transforms failed on {image}')
             return {'image': im, 'text': gt, 'im_mode': im.mode, 'preload': True, 'preparse': True}
         else:
             return {'image': image, 'text': gt, 'preload': False, 'preparse': True}
