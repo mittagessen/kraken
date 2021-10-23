@@ -9,9 +9,6 @@ import click
 import unicodedata
 from lxml import etree
 from itertools import cycle
-from collections import defaultdict
-
-from PIL import Image, ImageDraw
 
 cmap = cycle([(230, 25, 75, 127),
               (60, 180, 75, 127),

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #2020, Bruce Robertson
 #Master file at https://github.com/brobertson/Lace2-tools/blob/master/normalize_hocr.py
-import html, os, sys, argparse, PIL
+import html, os, sys, argparse
 from statistics import mean
 from lxml import etree
 from PIL import Image
@@ -122,7 +122,7 @@ def confidence_summary(treeIn):
             confs_string = word_data[1].split(' ')[2:]
             bbox_only = word_data[0]
             #convert to floats for math operations
-            confs = test_list = [float(i) for i in confs_string]
+            confs = [float(i) for i in confs_string]
             minimum = round(min(confs),2)
             average = round(mean(confs),2)
             #add attributes with these summary values
@@ -257,7 +257,7 @@ for root, dirs, files in os.walk(args.inputDir):
                                 #remove '.html' and add '.png'
                                 image_file_name = file_name[:-5] + '.png'
                                 image_path = os.path.join(args.imageDir, image_file_name)
-                                image = PIL.Image.open(image_path)
+                                image = Image.open(image_path)
                                 image_x, image_y = image.size
                                 rewrite_ocr_page_title(xhtml, file_name, image_x, image_y)
                                 fix_word_span_area(xhtml)

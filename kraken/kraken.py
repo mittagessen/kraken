@@ -29,7 +29,6 @@ from functools import partial
 from PIL import Image
 
 import click
-from click import open_file
 
 from kraken.lib import log
 
@@ -85,7 +84,7 @@ def binarizer(threshold, zoom, escale, border, perc, range, low, high, input, ou
         res = binarization.nlbin(im, threshold, zoom, escale, border, perc, range,
                                  low, high)
         if ctx.meta['last_process'] and ctx.meta['output_mode'] != 'native':
-            with open_file(output, 'w', encoding='utf-8') as fp:
+            with click.open_file(output, 'w', encoding='utf-8') as fp:
                 fp = cast(IO[Any], fp)
                 logger.info('Serializing as {} into {}'.format(ctx.meta['output_mode'], output))
                 res.save(f'{output}.png')
@@ -152,7 +151,7 @@ def segmenter(legacy, model, text_direction, scale, maxcolseps, black_colseps,
         message('\u2717', fg='red')
         raise
     if ctx.meta['last_process'] and ctx.meta['output_mode'] != 'native':
-        with open_file(output, 'w', encoding='utf-8') as fp:
+        with click.open_file(output, 'w', encoding='utf-8') as fp:
             fp = cast(IO[Any], fp)
             logger.info('Serializing as {} into {}'.format(ctx.meta['output_mode'], output))
             from kraken import serialization
@@ -171,7 +170,7 @@ def segmenter(legacy, model, text_direction, scale, maxcolseps, black_colseps,
                                              regions=res['regions'] if 'regions' in res else None,
                                              template=ctx.meta['output_mode']))
     else:
-        with open_file(output, 'w') as fp:
+        with click.open_file(output, 'w') as fp:
             fp = cast(IO[Any], fp)
             json.dump(res, fp)
     message('\u2713', fg='green')
@@ -204,7 +203,7 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, script_ignore, inpu
         raise click.BadParameter(str(e))
 
     if not bounds and ctx.meta['base_image'] != input:
-        with open_file(input, 'r') as fp:
+        with click.open_file(input, 'r') as fp:
             try:
                 fp = cast(IO[Any], fp)
                 bounds = json.load(fp)
@@ -237,7 +236,7 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, script_ignore, inpu
             preds.append(pred)
 
     ctx = click.get_current_context()
-    with open_file(output, 'w', encoding='utf-8') as fp:
+    with click.open_file(output, 'w', encoding='utf-8') as fp:
         fp = cast(IO[Any], fp)
         message(f'Writing recognition results for {ctx.meta["orig_file"]}\t', nl=False)
         logger.info('Serializing as {} into {}'.format(ctx.meta['output_mode'], output))
@@ -369,7 +368,7 @@ def process_pipeline(subcommands, input, batch_input, suffix, verbose, format_ty
         if 'base_image' in ctx.meta:
             del ctx.meta['base_image']
         try:
-            tmps = [tempfile.mkstemp() for cmd in subcommands[1:]]
+            tmps = [tempfile.mkstemp() for _ in subcommands[1:]]
             for tmp in tmps:
                 os.close(tmp[0])
             fc = [io_pair[0]] + [tmp[1] for tmp in tmps] + [io_pair[1]]
