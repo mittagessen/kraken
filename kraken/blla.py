@@ -65,6 +65,12 @@ def compute_segmentation_map(im,
     model.eval()
     model.to(device)
 
+    batch, channels, height, width = model.input
+    transforms = dataset.generate_input_transforms(batch, height, width, channels, 0, valid_norm=False)
+    res_tf = tf.Compose(transforms.transforms[:3])
+    scal_im = res_tf(im).convert('L')
+
+    tensor_im = transforms(im)
     if mask:
         if mask.mode != '1' and not is_bitonal(mask):
             logger.error('Mask is not bitonal')
@@ -74,16 +80,11 @@ def compute_segmentation_map(im,
             logger.error('Mask size {mask.size} doesn\'t match image size {im.size}')
             raise KrakenInputException('Mask size {mask.size} doesn\'t match image size {im.size}')
         logger.info('Masking enabled in segmenter.')
-        mask = pil2array(mask)
-
-    batch, channels, height, width = model.input
-    transforms = dataset.generate_input_transforms(batch, height, width, channels, 0, valid_norm=False)
-    res_tf = tf.Compose(transforms.transforms[:3])
-    scal_im = res_tf(im).convert('L')
+        tensor_im[~transforms(mask).bool()] = 0
 
     with torch.no_grad():
         logger.debug('Running network forward pass')
-        o, _ = model.nn(transforms(im).unsqueeze(0).to(device))
+        o, _ = model.nn(tensor_im.unsqueeze(0).to(device))
     logger.debug('Upsampling network output')
     o = F.interpolate(o, size=scal_im.size[::-1])
     o = o.squeeze().cpu().numpy()
