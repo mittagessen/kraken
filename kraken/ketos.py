@@ -550,6 +550,11 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
         evaluation_files = ground_truth[int(len(ground_truth) * partition):]
         logger.debug(f'Taking {len(evaluation_files)} lines/files from training set for evaluation')
 
+    if codec:
+        logger.debug(f'Loading codec file from {codec}')
+        with open_file(codec, 'r') as fp:
+            codec = json.load(codec)
+
     def _init_progressbar(label, length):
         if 'bar' in ctx.meta:
             ctx.meta['bar'].__exit__(None, None, None)
