@@ -31,6 +31,7 @@ from typing import cast, Callable, Dict, Optional, Sequence, Union
 
 from kraken.lib import models, vgsl, segmentation, default_specs
 from kraken.lib.util import make_printable
+from kraken.lib.codec import PytorchCodec
 from kraken.lib.dataset import (BaselineSet, GroundTruthDataset,
                                 PolygonGTDataset, generate_input_transforms,
                                 preparse_xml_data, InfiniteDataLoader,
@@ -729,7 +730,16 @@ class KrakenTrainer(object):
                 char = '\t' + char
             logger.info(f'{char}\t{v}')
 
-        logger.debug('Encoding training set')
+        if codec:
+            logger.info('Instantiating codec')
+            codec = PytorchCodec(codec)
+            for k, v in codec.c2l.items():
+                char = make_printable(k)
+                if char == k:
+                    char = '\t' + char
+                logger.info(f'{char}\t{v}')
+
+        logger.info('Encoding training set')
 
         # use model codec when given
         if append:

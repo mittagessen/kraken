@@ -502,6 +502,7 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
     if resize != 'fail' and not load:
         raise click.BadOptionUsage('resize', 'resize option requires loading an existing model')
 
+    import json
     import shutil
     import numpy as np
     from kraken.lib.train import KrakenTrainer
@@ -552,8 +553,7 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
 
     if codec:
         logger.debug(f'Loading codec file from {codec}')
-        with open_file(codec, 'r') as fp:
-            codec = json.load(codec)
+        codec = json.load(codec)
 
     def _init_progressbar(label, length):
         if 'bar' in ctx.meta:
