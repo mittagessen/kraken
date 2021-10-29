@@ -101,6 +101,12 @@ option                                                  action
                                                         enforce an explicit train/validation set split and deal with 
                                                         training sets with more lines than the command line can process. Can be used more than once.
 -e, --evaluation-files                                  File(s) with paths to evaluation data. Overrides the `-p` parameter.
+-f, --format-type                                       Sets the training and evaluation data format.
+                                                        Valid choices are 'path', 'xml' (default), 'alto' and 'page'.
+                                                        In `alto` and `page` XML mode all data is extracted from XML files
+                                                        containing both baselines and a link to source images.
+                                                        In `path` mode arguments are image files sharing a prefix up to the last
+                                                        extension with JSON `.path` files containing the baseline information.
 --preload / --no-preload                                Hard enable/disable for training data preloading. Preloading 
                                                         training data into memory is enabled per default for sets with less than 2500 lines.
 --threads                                               Number of OpenMP threads when running on CPU. Defaults to min(4, #cores).
