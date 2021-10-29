@@ -670,7 +670,7 @@ class KrakenTrainer(object):
                               augmentation=hyper_params['augment'])
         bar = progress_callback('Building training set', len(training_data))
 
-        if threads:
+        if threads and threads > 1:
             with Pool(processes=threads) as pool:
                 for im in pool.imap_unordered(partial(_star_fun, gt_set.parse), training_data, 5):
                     logger.debug(f'Adding line {im} to training set')
@@ -693,7 +693,7 @@ class KrakenTrainer(object):
 
         bar = progress_callback('Building validation set', len(evaluation_data))
 
-        if threads:
+        if threads and threads > 1:
             with Pool(processes=threads) as pool:
                 for im in pool.imap_unordered(partial(_star_fun, val_set.parse), evaluation_data, 5):
                     logger.debug(f'Adding line {im} to validation set')
