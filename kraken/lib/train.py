@@ -31,6 +31,7 @@ from typing import cast, Callable, Dict, Optional, Sequence, Union
 
 from kraken.lib import models, vgsl, segmentation, default_specs
 from kraken.lib.util import make_printable
+from kraken.lib.codec import PytorchCodec
 from kraken.lib.dataset import (BaselineSet, GroundTruthDataset,
                                 PolygonGTDataset, generate_input_transforms,
                                 preparse_xml_data, InfiniteDataLoader,
@@ -669,7 +670,7 @@ class KrakenTrainer(object):
                               augmentation=hyper_params['augment'])
         bar = progress_callback('Building training set', len(training_data))
 
-        if threads:
+        if threads and threads > 1:
             with Pool(processes=threads) as pool:
                 for im in pool.imap_unordered(partial(_star_fun, gt_set.parse), training_data, 5):
                     logger.debug(f'Adding line {im} to training set')
@@ -692,7 +693,7 @@ class KrakenTrainer(object):
 
         bar = progress_callback('Building validation set', len(evaluation_data))
 
-        if threads:
+        if threads and threads > 1:
             with Pool(processes=threads) as pool:
                 for im in pool.imap_unordered(partial(_star_fun, val_set.parse), evaluation_data, 5):
                     logger.debug(f'Adding line {im} to validation set')
@@ -729,7 +730,16 @@ class KrakenTrainer(object):
                 char = '\t' + char
             logger.info(f'{char}\t{v}')
 
-        logger.debug('Encoding training set')
+        if codec:
+            logger.info('Instantiating codec')
+            codec = PytorchCodec(codec)
+            for k, v in codec.c2l.items():
+                char = make_printable(k)
+                if char == k:
+                    char = '\t' + char
+                logger.info(f'{char}\t{v}')
+
+        logger.info('Encoding training set')
 
         # use model codec when given
         if append:

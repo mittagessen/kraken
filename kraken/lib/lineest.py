@@ -59,6 +59,8 @@ class CenterNormalizer(object):
 
     def normalize(self, img, order=1, dtype=np.dtype('f'), cval=0):
         dewarped = self.dewarp(img, cval=cval, dtype=dtype)
+        if dewarped.shape[0] == 0:
+            dewarped = img
         scaled = scale_to_h(dewarped, self.target_height, order=order,
                             dtype=dtype, cval=cval)
         return scaled

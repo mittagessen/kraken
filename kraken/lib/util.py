@@ -27,7 +27,7 @@ def array2pil(a: np.ndarray) -> Image.Image:
         else:
             raise Exception("bad image rank")
     elif a.dtype == np.dtype('float32'):
-        return Image.frombytes("F", (a.shape[1], a.shape[0]), a.tostring())
+        return Image.frombytes("F", (a.shape[1], a.shape[0]), a.tobytes())
     else:
         raise Exception("unknown image type")
 
