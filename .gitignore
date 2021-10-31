@@ -51,7 +51,3 @@ coverage.xml
 
 # Sphinx documentation
 docs/_build/
-
-# Jupyter temp
-kraken/.ipynb_checkpoints/
-*.ipynb_checkpoints*
