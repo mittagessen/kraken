@@ -927,6 +927,8 @@ def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image.Image:
         im = np.array(im)
 
         for line in bounds['lines']:
+            if line['boundary'] is None:
+                raise KrakenInputException('No boundary given for line')
             pl = np.array(line['boundary'])
             baseline = np.array(line['baseline'])
             c_min, c_max = int(pl[:, 0].min()), int(pl[:, 0].max())

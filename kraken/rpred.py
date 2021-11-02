@@ -32,6 +32,7 @@ from kraken.lib.segmentation import extract_polygons, compute_polygon_section
 from kraken.lib.exceptions import KrakenInputException
 from kraken.lib.dataset import generate_input_transforms
 
+import copy
 
 __all__ = ['ocr_record', 'bidi_record', 'mm_rpred', 'rpred']
 
@@ -386,6 +387,7 @@ def rpred(network: TorchSeqRecognizer,
         An ocr_record containing the recognized text, absolute character
         positions, and confidence values for each character.
     """
+    bounds = copy.deepcopy(bounds)
     if 'boxes' in bounds:
         boxes = bounds['boxes']
         rewrite_boxes = []
