@@ -17,7 +17,7 @@ output block. For example:
 
         [1,48,0,1 Cr3,3,32 Mp2,2 Cr3,3,64 Mp2,2 S1(1x12)1,3 Lbx100 Do O1c103]
 
-The first block defines the input in order of [batch, heigh, width, channels]
+The first block defines the input in order of [batch, height, width, channels]
 with zero-valued dimensions being variable. Integer valued height or width
 input specifications will result in the input images being automatically scaled
 in either dimension.
