@@ -116,3 +116,10 @@ Funding
 =======
 
 kraken is developed at the `École Pratique des Hautes Études <http://ephe.fr>`_, `Université PSL <http://www.psl.eu>`_.
+
+This project was partially funded through the RESILIENCE project, funded from
+the European Union’s Horizon 2020 Framework Programme for Research and
+Innovation.
+
+![Co-financed by the the European Union](https://ec.europa.eu/regional_policy/sources/information/logos_downloadcenter/eu_funded_en.jpg)
+
