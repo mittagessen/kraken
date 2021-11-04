@@ -361,7 +361,7 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
 @click.pass_context
 @click.option('-B', '--batch-size', show_default=True, type=click.INT,
               default=RECOGNITION_HYPER_PARAMS['batch_size'], help='batch sample size')
-@click.option('-p', '--pad', show_default=True, type=click.INT, default=16, help='Left and right '
+@click.option('--pad', show_default=True, type=click.INT, default=16, help='Left and right '
               'padding around lines')
 @click.option('-o', '--output', show_default=True, type=click.Path(), default='model', help='Output model file')
 @click.option('-s', '--spec', show_default=True, default=RECOGNITION_SPEC,
@@ -617,7 +617,7 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with paths to evaluation data.')
 @click.option('-d', '--device', show_default=True, default='cpu', help='Select device to use (cpu, cuda:0, cuda:1, ...)')
-@click.option('-p', '--pad', show_default=True, type=click.INT, default=16, help='Left and right '
+@click.option('--pad', show_default=True, type=click.INT, default=16, help='Left and right '
               'padding around lines')
 @click.option('--threads', show_default=True, default=1, help='Number of OpenMP threads when running on CPU.')
 @click.option('--reorder/--no-reorder', show_default=True, default=True, help='Reordering of code points to display order')

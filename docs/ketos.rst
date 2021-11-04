@@ -60,7 +60,7 @@ both from scratch and from existing models. Here are its command line options:
 ======================================================= ======
 option                                                  action
 ======================================================= ======
--p, --pad                                               Left and right padding around lines
+--pad                                                   Left and right padding around lines
 -o, --output                                            Output model file prefix. Defaults to model.
 -s, --spec                                              VGSL spec of the network to train. CTC layer
                                                         will be added automatically. default:
@@ -271,7 +271,7 @@ option                                                  action
 -m, --model                                             Model(s) to evaluate.
 -e, --evaluation-files                                  File(s) with paths to evaluation data.
 -d, --device                                            Select device to use.
--p, --pad                                               Left and right padding around lines.
+--pad                                                   Left and right padding around lines.
 
 
 Transcriptions are handed to the command in the same way as for the `train`
