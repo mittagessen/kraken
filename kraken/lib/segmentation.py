@@ -81,6 +81,8 @@ def reading_order(lines: Sequence[Tuple[slice, slice]], text_direction: str = 'l
         return u[1].stop < v[1].start
 
     def _separates(w, u, v):
+        if w == u or w == v:
+            return 0
         if w[0].stop < min(u[0].start, v[0].start):
             return 0
         if w[0].start > max(u[0].stop, v[0].stop):
@@ -103,6 +105,7 @@ def reading_order(lines: Sequence[Tuple[slice, slice]], text_direction: str = 'l
             else:
                 if [w for w in lines if _separates(w, u, v)] == []:
                     if horizontal_order(u, v):
+                        print(f'{u} - {v}')
                         order[i, j] = 1
     return order
 
