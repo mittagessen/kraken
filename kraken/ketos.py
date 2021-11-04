@@ -21,6 +21,7 @@ import click
 import logging
 import unicodedata
 
+from PIL import Image
 from bidi.algorithm import get_display
 
 from typing import cast, Set, List, IO, Any, Dict
@@ -38,6 +39,8 @@ APP_NAME = 'kraken'
 logging.captureWarnings(True)
 logger = logging.getLogger('kraken')
 
+# raise default max image size to 20k * 20k pixels
+Image.MAX_IMAGE_PIXELS = 20000 ** 2
 
 def message(msg, **styles):
     if logger.getEffectiveLevel() >= 30:

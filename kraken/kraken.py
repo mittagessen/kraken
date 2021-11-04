@@ -42,6 +42,8 @@ SEGMENTATION_DEFAULT_MODEL = pkg_resources.resource_filename(__name__, 'blla.mlm
 DEFAULT_MODEL = ['en-default.mlmodel']
 LEGACY_MODEL_DIR = '/usr/local/share/ocropus'
 
+# raise default max image size to 20k * 20k pixels
+Image.MAX_IMAGE_PIXELS = 20000 ** 2
 
 def message(msg: str, **styles) -> None:
     if logger.getEffectiveLevel() >= 30:
