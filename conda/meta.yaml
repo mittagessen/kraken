@@ -1,33 +1,37 @@
 package:
   name: kraken
-  version: {{ environ['VERSION'] }}
+  version: {{ GIT_DESCRIBE_TAG }}
 
 source:
-  path: ..
+  git_url: ..
 
 requirements:
   build:
-     - python==3.6.6
+     - python
      - setuptools
      - pbr
   run:
-     - python==3.6.6
+     - python
      - python-bidi
      - lxml
-     - future
      - regex
      - requests
      - click>=7.0
      - numpy
-     - pillow
+     - pillow>=6.2.2
      - scipy
-     - protobuf>=3.0.0
+     - protobuf>=3.0
      - jinja2
-     - torchvision
-     - pytorch-cpu>=1.0.0
+     - conda-forge::torchvision
+     - conda-forge::pytorch>=1.5.0,<1.11
+     - cudatoolkit>=9.2
      - jsonschema
-     - coremltools
-
+     - scikit-image>=0.17.0
+     - shapely
+     - pyvips
+     - imagemagick>=7.1.0
+     - coremltools>=3.3
+     - libffi # [osx]
 about:
   home: http://kraken.re
   license: Apache License

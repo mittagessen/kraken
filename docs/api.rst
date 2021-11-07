@@ -286,7 +286,7 @@ Training
 --------
 
 There are catch-all constructors for quickly setting up
-:cls:`kraken.lib.train.KrakenTrainer` instances for all training needs. They
+:class:`kraken.lib.train.KrakenTrainer` instances for all training needs. They
 largely map the command line utils `ketos train` and `ketos segtrain` to a
 programmatic interface. The arguments are identical, apart from a
 differentiation between general arguments (data sources and setup, file names,

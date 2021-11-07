@@ -7,8 +7,8 @@ kraken
 
    advanced
    Training <ketos>
-   API tutorial <api>
-   API reference <api_docs>
+   API Tutorial <api>
+   API Reference <api_docs>
    Models <models>
 
 kraken is a turn-key OCR system optimized for historical and non-Latin script
@@ -36,47 +36,74 @@ Pull requests and code contributions are always welcome.
 Installation
 ============
 
-kraken requires some external libraries to run. On Debian/Ubuntu they may be
-installed using:
+Kraken can be run on Linux or Mac OS X (both x64 and ARM). Installation through
+the on-board *pip* utility and the `anaconda <https://anaconda.org>`_
+scientific computing python are supported.
+
+Installation using Pip
+----------------------
 
 .. code-block:: console
 
-        # apt install libpangocairo-1.0 libxml2 libblas3 liblapack3 python3-dev python3-pip libvips
-
-pip
----
-
-.. code-block:: console
-
-  $ pip3 install kraken
+  $ pip install kraken
 
 or by running pip in the git repository:
 
 .. code-block:: console
 
-  $ pip3 install .
+  $ pip install .
 
-conda
------
+If you want direct PDF and multi-image TIFF/JPEG2000 support it is necessary to
+install the `pdf` extras package for PyPi:
 
-Install the latest development version through `conda <https://anaconda.org>`_:
+.. code-block:: console
 
-::
+   $ pip install kraken[pdf]
 
-  $ wget https://raw.githubusercontent.com/mittagessen/kraken/master/environment.yml
+or
+
+.. code-block:: console
+
+   $ pip install .[pdf]
+
+respectively.
+
+Installation using Conda
+------------------------
+
+To install the stable version through `conda <https://anaconda.org>`_:
+
+.. code-block:: console
+
+   $ conda install -c conda-forge -c mittagessen kraken
+
+Again PDF/multi-page TIFF/JPEG2000 support requires some additional dependencies:
+
+.. code-block:: console
+
+   $ conda install -c conda-forge pyvips
+
+The git repository contains some environment files that aid in setting up the latest development version:
+
+
+.. code-block:: console
+
+  $ git clone git://github.com/mittagessen/kraken.git 
+  $ cd kraken
   $ conda env create -f environment.yml
 
 or:
 
-::
+.. code-block:: console
 
-  $ wget https://raw.githubusercontent.com/mittagessen/kraken/master/environment_cuda.yml
+  $ git clone git://github.com/mittagessen/kraken.git 
+  $ cd kraken
   $ conda env create -f environment_cuda.yml
 
 for CUDA acceleration with the appropriate hardware.
 
-Models
-------
+Finding Recognition Models
+--------------------------
 
 Finally you'll have to scrounge up a recognition model to do the actual
 recognition of characters. To download the default English text recognition
@@ -155,3 +182,16 @@ License
 
 ``Kraken`` is provided under the terms and conditions of the `Apache 2.0
 License <https://github.com/mittagessen/kraken/blob/master/LICENSE>`_.
+
+Funding
+=======
+
+kraken is developed at the `École Pratique des Hautes Études <http://ephe.fr>`_, `Université PSL <http://www.psl.eu>`_.
+
+This project was partially funded through the RESILIENCE project, funded from
+the European Union’s Horizon 2020 Framework Programme for Research and
+Innovation.
+
+.. image:: https://ec.europa.eu/regional_policy/sources/information/logos_downloadcenter/eu_funded_en.jpg
+  :alt: Co-financed by the European Union
+

@@ -12,8 +12,6 @@
 # All configuration values have a default; values that are commented out
 # serve to show the default.
 
-from __future__ import absolute_import
-
 import sys
 import os
 import shlex
@@ -27,16 +25,25 @@ from subprocess import Popen, PIPE
 # -- General configuration ------------------------------------------------
 
 # If your documentation needs a minimal Sphinx version, state it here.
-#needs_sphinx = '1.0'
+needs_sphinx = '2.0'
 
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
     'sphinx.ext.autodoc',
+    'sphinx.ext.autodoc.typehints',
+    'autoapi.extension',
     'sphinx.ext.napoleon',
+    'sphinx.ext.githubpages',
     'sphinx_multiversion',
 ]
+
+autodoc_typehints = 'description'
+
+autoapi_type = 'python'
+autoapi_dirs = ['../kraken']
+autoapi_generate_api_docs = False
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -123,7 +130,6 @@ html_theme = 'alabaster'
 html_theme_options = {
     'github_user': 'mittagessen',
     'github_repo': 'kraken',
-    'travis_button': 'true',
 }
 
 # Add any paths that contain custom themes here, relative to this directory.
@@ -169,6 +175,7 @@ html_sidebars = {
     '**':       ['localtoc.html', 'relations.html', 'searchbox.html', 'versions.html']
 }
 
+html_baseurl = 'kraken.re'
 # Additional templates that should be rendered to pages, maps page names to
 # template names.
 #html_additional_pages = {}
@@ -236,8 +243,8 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-  (master_doc, 'kraken.tex', u'kraken Documentation',
-   u'mittagessen', 'manual'),
+  (master_doc, 'kraken.tex', 'kraken Documentation',
+   'mittagessen', 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
@@ -266,7 +273,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    (master_doc, 'kraken', u'kraken Documentation',
+    (master_doc, 'kraken', 'kraken Documentation',
      [author], 1)
 ]
 
@@ -280,7 +287,7 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-  (master_doc, 'kraken', u'kraken Documentation',
+  (master_doc, 'kraken', 'kraken Documentation',
    author, 'kraken', 'One line description of project.',
    'Miscellaneous'),
 ]

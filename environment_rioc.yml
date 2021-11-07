@@ -9,7 +9,6 @@ dependencies:
   - python>=3.6
   - python-bidi
   - lxml
-  - future
   - regex
   - requests
   - click>=7.0
@@ -24,9 +23,8 @@ dependencies:
   - jsonschema
   - scikit-image>=0.17.0
   - shapely
-  - pip
   - pyvips
   - imagemagick<7.0.9
+  - coremltools>=3.3
   - pip:
-    - coremltools>=3.3
     - git+https://github.com/mittagessen/kraken.git@master

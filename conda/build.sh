@@ -1,1 +1,1 @@
-$PYTHON setup.py install
+pip install --no-deps .

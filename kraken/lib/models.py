@@ -179,13 +179,11 @@ def load_any(fname: str, train: bool = False, device: str = 'cpu') -> TorchSeqRe
             nn = TorchVGSLModel.load_clstm_model(fname)
             kind = 'clstm'
         except Exception:
-            nn = TorchVGSLModel.load_pronn_model(fname)
-            kind = 'pronn'
-        try:
-            nn = TorchVGSLModel.load_pyrnn_model(fname)
-            kind = 'pyrnn'
-        except Exception:
-            pass
+            try:
+                nn = TorchVGSLModel.load_pronn_model(fname)
+                kind = 'pronn'
+            except Exception:
+                pass
     if not nn:
         raise KrakenInvalidModelException('File {} not loadable by any parser.'.format(fname))
     seq = TorchSeqRecognizer(nn, train=train, device=device)

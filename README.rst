@@ -24,12 +24,35 @@ kraken's main features are:
 Installation
 ============
 
-When using a recent version of pip all dependencies will be installed from
-binary wheel packages, so installing build-essential or your distributions
-equivalent is often unnecessary. kraken only runs on **Linux or Mac OS X**.
-Windows is not supported.
+kraken only runs on **Linux or Mac OS X**. Windows is not supported.
 
-Install the latest development version through `conda <https://anaconda.org>`_:
+The latest stable releases can be installed either from `PyPi <https://pypi.org>`_:
+
+::
+
+  $ pip install kraken
+
+or through `conda <https://anaconda.org>`_:
+
+::
+
+  $ conda install -c conda-forge -c mittagessen kraken
+
+If you want direct PDF and multi-image TIFF/JPEG2000 support it is necessary to
+install the `pdf` extras package for PyPi:
+
+::
+
+  $ pip install kraken[pdf]
+
+or install `pyvips` manually with conda:
+
+::
+
+  $ conda install -c conda-forge pyvips
+
+Conda environment files are provided which for the seamless installation of the
+master branch as well:
 
 ::
 
@@ -46,19 +69,6 @@ or:
   $ conda env create -f environment_cuda.yml
 
 for CUDA acceleration with the appropriate hardware.
-
-It is also possible to install the latest stable release from pypi:
-
-::
-
-  $ pip install kraken
-
-If you want direct PDF and multi-image TIFF/JPEG2000 support it is necessary to
-install the `pdf` extras package:
-
-::
-
-  $ pip install kraken[pdf]
 
 Finally you'll have to scrounge up a model to do the actual recognition of
 characters. To download the default model for printed English text and place it

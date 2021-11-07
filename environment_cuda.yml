@@ -2,12 +2,10 @@ name: kraken
 channels:
   - defaults
   - conda-forge
-  - pytorch
 dependencies:
   - python>=3.6
   - python-bidi
   - lxml
-  - future
   - regex
   - requests
   - click>=7.0
@@ -16,15 +14,14 @@ dependencies:
   - scipy
   - protobuf>=3.0
   - jinja2
-  - pytorch::torchvision
-  - pytorch::pytorch>=1.5.0,<1.11
+  - conda-forge::torchvision
+  - conda-forge::pytorch>=1.5.0,<1.11
   - cudatoolkit>=9.2
   - jsonschema
   - scikit-image>=0.17.0
   - shapely
-  - pip
   - pyvips
   - imagemagick>=7.1.0
+  - coremltools>=3.3
   - pip:
-    - coremltools>=3.3
     - file:.
