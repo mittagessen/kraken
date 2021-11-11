@@ -105,7 +105,7 @@ def reading_order(lines: Sequence[Tuple[slice, slice]], text_direction: str = 'l
             else:
                 if [w for w in lines if _separates(w, u, v)] == []:
                     if horizontal_order(u, v):
-                        print(f'{u} - {v}')
+                        logger.debug(f'{u} - {v}')
                         order[i, j] = 1
     return order
 
