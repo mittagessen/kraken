@@ -373,14 +373,14 @@ class TransposedSummarizingRNN(Module):
         # HNWC -> (H*N)WC
         siz = inputs.size()
         inputs = inputs.contiguous().view(-1, siz[2], siz[3])
-        if seq_len is not None:
+        if not self.transpose and seq_len is not None:
             if inputs.shape[0] != len(seq_len):
                 raise Exception(f'Height has to be 1 (not f{inputs.shape[0]} for batching/multi-sequences.')
             seq_len = seq_len.cpu()
             inputs = pack_padded_sequence(inputs, seq_len, batch_first=True, enforce_sorted=False)
         # (H*N)WO
         o, _ = self.layer(inputs)
-        if seq_len is not None:
+        if not self.transpose and seq_len is not None:
             o, seq_len = pad_packed_sequence(o, batch_first=True)
         # resize to HNWO
         o = o.view(siz[0], siz[1], siz[2], self.output_size)
