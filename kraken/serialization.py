@@ -111,7 +111,7 @@ def serialize(records: Sequence[ocr_record],
             'writing_mode': writing_mode,
             'scripts': scripts,
             'date': datetime.datetime.now().isoformat(),
-            'base_dir': [rec.base_dir for rec in records][0]}  # type: dict
+            'base_dir': [rec.base_dir for rec in records][0] if len(records) else None}  # type: dict
     seg_idx = 0
     char_idx = 0
     region_map = {}
