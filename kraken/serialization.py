@@ -209,6 +209,20 @@ def serialize(records: Sequence[ocr_record],
             seg_idx += 1
             line_offset += len(segment)
         cur_ent.append(line)
+
+    # No records but there are regions -> serialize all regions
+    if not records and regions:
+        logger.debug(f'No lines given but {len(region_map)}. Serialize all regions.')
+        for reg in region_map.items():
+            region = {'index': reg[0],
+                      'bbox': [int(x) for x in reg[1][1].bounds],
+                      'boundary': [list(x) for x in reg[1][2]],
+                      'region_type': reg[1][0],
+                      'lines': [],
+                      'type': 'region'
+                      }
+            page['entities'].append(region)
+
     logger.debug('Initializing jinja environment.')
     env = Environment(loader=PackageLoader('kraken', 'templates'),
                       trim_blocks=True,
