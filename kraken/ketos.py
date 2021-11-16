@@ -153,25 +153,25 @@ def _validate_merging(ctx, param, value):
                                  'cosine',
                                  'step',
                                  'reduceonplateau']),
-              default=RECOGNITION_HYPER_PARAMS['schedule'],
+              default=SEGMENTATION_HYPER_PARAMS['schedule'],
               help='Set learning rate scheduler. For 1cycle, cycle length is determined by the `--step-size` option.')
 @click.option('-g',
               '--gamma',
               show_default=True,
-              default=RECOGNITION_HYPER_PARAMS['gamma'],
+              default=SEGMENTATION_HYPER_PARAMS['gamma'],
               help='Decay factor for exponential, step, and reduceonplateau learning rate schedules')
 @click.option('-ss',
               '--step-size',
               show_default=True,
-              default=RECOGNITION_HYPER_PARAMS['step_size'],
+              default=SEGMENTATION_HYPER_PARAMS['step_size'],
               help='Number of validation runs between learning rate decay for exponential and step LR schedules')
 @click.option('--sched-patience',
               show_default=True,
-              default=RECOGNITION_HYPER_PARAMS['rop_patience'],
+              default=SEGMENTATION_HYPER_PARAMS['rop_patience'],
               help='Minimal number of validation runs between LR reduction for reduceonplateau LR schedule.')
 @click.option('--cos-max',
               show_default=True,
-              default=RECOGNITION_HYPER_PARAMS['cos_t_max'],
+              default=SEGMENTATION_HYPER_PARAMS['cos_t_max'],
               help='Epoch of minimal learning rate for cosine LR scheduler.')
 @click.option('-p', '--partition', show_default=True, default=0.9,
               help='Ground truth data partition ratio between train/validation set')
@@ -406,7 +406,8 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
               help='Select optimizer')
 @click.option('-r', '--lrate', show_default=True, default=RECOGNITION_HYPER_PARAMS['lrate'], help='Learning rate')
 @click.option('-m', '--momentum', show_default=True, default=RECOGNITION_HYPER_PARAMS['momentum'], help='Momentum')
-@click.option('-w', '--weight-decay', show_default=True, default=RECOGNITION_HYPER_PARAMS['weight_decay'], help='Weight decay')
+@click.option('-w', '--weight-decay', show_default=True, type=float,
+              default=RECOGNITION_HYPER_PARAMS['weight_decay'], help='Weight decay')
 @click.option('--schedule',
               show_default=True,
               type=click.Choice(['constant',
