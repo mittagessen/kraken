@@ -248,7 +248,7 @@ def _draw_on_surface(surface, font, language, text):
     return max(ink_rect.width, logical_rect.width), max(ink_rect.height, logical_rect.height)
 
 
-def ocropy_degrade(im, distort=1.0, dsigma=20.0, eps=0.03, delta=0.3, degradations=((0.5, 0.0, 0.5, 0.0))):
+def ocropy_degrade(im, distort=1.0, dsigma=20.0, eps=0.03, delta=0.3, degradations=((0.5, 0.0, 0.5, 0.0),)):
     """
     Degrades and distorts a line using the same noise model used by ocropus.
 
