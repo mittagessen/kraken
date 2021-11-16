@@ -151,7 +151,7 @@ class TestSerializations(unittest.TestCase):
 
     def test_bl_pagexml_serialization_validation(self):
         """
-        Validates output against abbyyXML schema
+        Validates output against PageXML schema
         """
         fp = StringIO()
 
@@ -183,10 +183,40 @@ class TestSerializations(unittest.TestCase):
 
     def test_bl_region_pagexml_serialization_validation(self):
         """
-        Validates output against abbyyXML schema
+        Validates output against PageXML schema
         """
         fp = StringIO()
 
         fp.write(serialization.serialize(self.bl_records, image_name='foo.png', template='pagexml', regions=self.bl_regions))
         validate_page(self, fp)
         roundtrip(self, self.bl_records, fp)
+
+    def test_region_only_alto_serialization_validation(self):
+        """
+        Validates output without baselines (but regions) against ALTO schema
+        """
+        fp = StringIO()
+
+        fp.write(serialization.serialize([], image_name='foo.png', template='alto', regions=self.bl_regions))
+        validate_alto(self, fp)
+
+    def test_region_only_abbyyxml_serialization_validation(self):
+        """
+        Validates output without baselines (but regions) against abbyyXML schema
+        """
+        fp = StringIO()
+
+        fp.write(serialization.serialize([], image_name='foo.png', template='abbyyxml', regions=self.bl_regions))
+        doc = etree.fromstring(fp.getvalue().encode('utf-8'))
+        with open(os.path.join(resources, 'FineReader10-schema-v1.xml')) as schema_fp:
+            abbyy_schema = etree.XMLSchema(etree.parse(schema_fp))
+            abbyy_schema.assertValid(doc)
+
+    def test_region_only_pagexml_serialization_validation(self):
+        """
+        Validates output without baselines (but regions) against PageXML schema
+        """
+        fp = StringIO()
+
+        fp.write(serialization.serialize([], image_name='foo.png', template='pagexml', regions=self.bl_regions))
+        validate_page(self, fp)
