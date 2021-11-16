@@ -262,6 +262,7 @@ class EarlyStopping(TrainStopper):
         super().__init__()
         self.min_delta = min_delta
         self.auto_delta = False if min_delta else True
+        self.best_sig_loss = self.best_loss
         self.lag = lag
         self.wait = -1
 
@@ -279,9 +280,12 @@ class EarlyStopping(TrainStopper):
         if np.isclose(1., val_loss.cpu().numpy()):
             logger.debug('Validation loss is close to perfect. Triggering early stopping.')
             self.wait = self.lag
-        elif (val_loss - self.best_loss) >= self.min_delta:
+        elif (val_loss - self.best_sig_loss) >= self.min_delta:
             logger.debug('Resetting early stopping counter')
             self.wait = 0
+            self.best_sig_loss = val_loss
+        # keep track of best absolute loss
+        if val_loss > self.best_loss:
             self.best_loss = val_loss
             self.best_epoch = self.epoch
 
