@@ -970,7 +970,7 @@ def transcription(ctx, text_direction, scale, bw, maxcolseps,
               help="Discard lines above length (in Unicode codepoints).")
 @click.option('--strip/--no-strip', help="Remove whitespace from start and end "
               "of lines.")
-@click.option('-d', '--disable-degradation', is_flag=True, help='Dont degrade '
+@click.option('-D', '--disable-degradation', is_flag=True, help='Dont degrade '
               'output lines.')
 @click.option('-a', '--alpha', type=click.FLOAT, default=1.5,
               help="Mean of folded normal distribution for sampling foreground pixel flip probability")
