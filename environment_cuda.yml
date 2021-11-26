@@ -23,5 +23,6 @@ dependencies:
   - pyvips
   - imagemagick>=7.1.0
   - coremltools>=3.3
+  - pyarrow
   - pip:
     - file:.

@@ -32,6 +32,7 @@ requirements:
      - imagemagick>=7.1.0
      - coremltools>=3.3
      - libffi # [osx]
+     - pyarrow
 about:
   home: http://kraken.re
   license: Apache License
