@@ -27,5 +27,6 @@ dependencies:
   - imagemagick<7.0.9
   - coremltools>=3.3
   - pyarrow
+  - pip
   - pip:
     - git+https://github.com/mittagessen/kraken.git@master
