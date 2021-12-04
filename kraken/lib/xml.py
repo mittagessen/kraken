@@ -16,13 +16,14 @@
 """
 ALTO/Page data loaders for segmentation training
 """
-
 import os.path
+import pathlib
 import logging
 
 from itertools import groupby
 from lxml import etree
 from os.path import dirname
+from typing import Union, Dict, Any
 
 from collections import defaultdict
 from kraken.lib.exceptions import KrakenInputException
@@ -55,13 +56,13 @@ alto_regions = {'TextBlock': 'text',
                 'ComposedBlock': 'composed'}
 
 
-def parse_xml(filename):
+def parse_xml(filename: Union[str, pathlib.Path]) -> Dict[str, Any]:
     """
     Parses either a PageXML or ALTO file with autodetermination of the file
     format.
 
     Args:
-        filename (str): path to an XML file.
+        filename: path to an XML file.
 
     Returns:
         A dict {'image': impath, lines: [{'boundary': [[x0, y0], ...],
@@ -82,13 +83,13 @@ def parse_xml(filename):
         raise KrakenInputException(f'Unknown XML format in {filename}')
 
 
-def parse_page(filename):
+def parse_page(filename: Union[str, pathlib.Path]) -> Dict[str, Any]:
     """
     Parses a PageXML file, returns the baselines defined in it, and loads the
     referenced image.
 
     Args:
-        filename (str): path to a PageXML file.
+        filename: path to a PageXML file.
 
     Returns:
         A dict {'image': impath, lines: [{'boundary': [[x0, y0], ...],
@@ -206,13 +207,17 @@ def parse_page(filename):
                     text += el.text
             # retrieve line tag if custom string is set and contains
             l_type = 'default'
+            split_type = None
             custom_str = line.get('custom')
             if custom_str:
                 cs = _parse_page_custom(custom_str)
                 if 'structure' in cs and 'type' in cs['structure']:
                     l_type = cs['structure']['type']
+                # retrieve data split if encoded in custom string.
+                if 'split' in cs and 'type' in cs['split'] and cs['split']['type'] in ['train', 'validation', 'test']:
+                    split_type = cs['split']['type']
             scripts.add(l_type)
-            data['lines'].append({'baseline': baseline, 'boundary': boundary, 'text': text, 'script': l_type})
+            data['lines'].append({'baseline': baseline, 'boundary': boundary, 'text': text, 'script': l_type, 'split': split_type})
         if len(scripts) > 1:
             data['script_detection'] = True
         else:
@@ -220,13 +225,13 @@ def parse_page(filename):
         return data
 
 
-def parse_alto(filename):
+def parse_alto(filename: Union[str, pathlib.Path]) -> Dict[str, Any]:
     """
     Parses an ALTO file, returns the baselines defined in it, and loads the
     referenced image.
 
     Args:
-        filename (str): path to an ALTO file.
+        filename: path to an ALTO file.
 
     Returns:
         A dict {'image': impath, lines: [{'boundary': [[x0, y0], ...],
@@ -349,7 +354,8 @@ def parse_alto(filename):
             data['lines'].append({'baseline': baseline,
                                   'boundary': boundary,
                                   'text': text,
-                                  'script': ltype if ltype is not None else 'default'})
+                                  'script': ltype if ltype is not None else 'default',
+                                  'split': None,})
 
         if len(scripts) > 1:
             data['script_detection'] = True
