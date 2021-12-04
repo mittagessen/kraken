@@ -16,10 +16,14 @@
 """
 Utility functions for data loading and training of VGSL networks.
 """
+import io
 import json
 import torch
+import pathlib
+import warnings
 import traceback
 import numpy as np
+import pyarrow as pa
 import pkg_resources
 import shapely.geometry as geom
 import torch.nn.functional as F
@@ -31,8 +35,8 @@ from shapely.ops import split
 from itertools import groupby
 from torchvision import transforms
 from collections import Counter, defaultdict
-from torch.utils.data import Dataset, DataLoader
-from typing import Dict, List, Tuple, Iterable, Sequence, Callable, Optional, Any, Union
+from torch.utils.data import Dataset, DataLoader, get_worker_info
+from typing import Dict, List, Tuple, Iterator, Iterable, Sequence, Callable, Optional, Any, Union
 
 from skimage.draw import polygon
 
@@ -375,6 +379,146 @@ class InfiniteDataLoader(DataLoader):
         return sample
 
 
+class ArrowIPCRecognitionDataset(Dataset):
+    """
+    Dataset for training a recognition model from a precompiled dataset in
+    Arrow IPC format.
+    """
+    def __init__(self,
+                 normalization: Optional[str] = None,
+                 whitespace_normalization: bool = True,
+                 reorder: Union[bool, str] = True,
+                 im_transforms: Callable[[Any], torch.Tensor] = transforms.Compose([]),
+                 augmentation: bool = False,
+                 split_filter: Optional[str] = None) -> None:
+        """
+        Creates a dataset for a polygonal (baseline) transcription model.
+
+        Args:
+            normalization: Unicode normalization for gt
+            whitespace_normalization: Normalizes unicode whitespace and strips
+                                      whitespace.
+            reorder: Whether to rearrange code points in "display"/LTR order.
+                     Set to L|R to change the default text direction.
+            im_transforms: Function taking an PIL.Image and returning a tensor
+                           suitable for forward passes.
+            augmentation: Enables preloading and preprocessing of image files.
+            split_filter: Enables filtering of the dataset according to mask
+                          values in the set split. If set to `None` all rows
+                          are sampled, if set to `train`, `validation`, or
+                          `test` only rows with the appropriate flag set in the
+                          file will be considered.
+        """
+        self.alphabet = Counter()  # type: Counter
+        self.text_transforms = []  # type: List[Callable[[str], str]]
+        self.transforms = im_transforms
+        self.aug = None
+        self.split_filter = None
+        self._num_lines = 0
+        self.arrow_table = None
+
+        self.seg_type = 'baselines'
+        # built text transformations
+        if normalization:
+            self.text_transforms.append(partial(F_t.text_normalize, normalization=normalization))
+        if whitespace_normalization:
+            self.text_transforms.append(F_t.text_whitespace_normalize)
+        if reorder:
+            if reorder in ('L', 'R'):
+                self.text_transforms.append(partial(F_t.text_reorder, base_dir=reorder))
+            else:
+                self.text_transforms.append(F_t.text_reorder)
+        if augmentation:
+            from albumentations import (
+                Compose, ToFloat, OneOf, MotionBlur, MedianBlur, Blur,
+                ShiftScaleRotate, OpticalDistortion, ElasticTransform,
+                )
+
+            self.aug = Compose([
+                                ToFloat(),
+                                OneOf([
+                                    MotionBlur(p=0.2),
+                                    MedianBlur(blur_limit=3, p=0.1),
+                                    Blur(blur_limit=3, p=0.1),
+                                ], p=0.2),
+                                ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.2, rotate_limit=3, p=0.2),
+                                OneOf([
+                                    OpticalDistortion(p=0.3),
+                                    ElasticTransform(p=0.1),
+                                ], p=0.2),
+                               ], p=0.5)
+        if split_filter:
+            if split_filter in ['train', 'validation', 'test']:
+                self.split_filter = split_filter
+            else:
+                raise ValueError(f'split_filter has to be one of [train, validation, test] (is {split_filter}).')
+        self.im_mode = '1'
+
+    def add(self, file: Union[str, pathlib.Path]) -> None:
+        """
+        Adds an Arrow IPC file to the dataset.
+
+        Args:
+            file: Location of the precompiled dataset file.
+        """
+        # extract metadata and update alphabet
+        with pa.memory_map(file, 'rb') as source:
+            ds_table = pa.ipc.open_file(source).read_all()
+            raw_metadata = ds_table.schema.metadata
+            if not raw_metadata or b'lines' not in raw_metadata:
+                raise ValueError(f'{file} does not contain a valid metadata record.')
+            metadata = json.loads(raw_metadata[b'lines'])
+        if metadata['type'] != 'kraken_recognition_baseline':
+            raise ValueError(f'Unknown type {metadata["type"]} of dataset.')
+        if self.split_filter and metadata['counts'][self.split_filter] == 0:
+            logger.warning(f'No explicit split for "{self.split_filter}" in dataset {file} (with splits {metadata["counts"].items()}).')
+            return
+        if metadata['im_mode'] > self.im_mode:
+            logger.info(f'Upgrading "im_mode" from {self.im_mode} to {metadata["im_mode"]}.')
+            self.im_mode = metadata['im_mode']
+        self.alphabet.update(metadata['alphabet'])
+        num_lines = metadata['counts'][self.split_filter] if self.split_filter else metadata['counts']['all']
+        if not self.arrow_table:
+            self.arrow_table = ds_table
+        else:
+            self.arrow_table = pa.concat_tables([self.arrow_table, ds_table])
+        self._num_lines += num_lines
+
+    def encode(self, codec: Optional[PytorchCodec] = None) -> None:
+        """
+        Adds a codec to the dataset (but does NOT actually encode the text!).
+        """
+        if codec:
+            self.codec = codec
+        else:
+            self.codec = PytorchCodec(''.join(self.alphabet.keys()))
+
+    def no_encode(self) -> None:
+        """
+        Creates an unencoded dataset.
+        """
+        pass
+
+    def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor]:
+        if self.split_filter:
+            table = self.arrow_table.filter(self.arrow_table.column(self.split_filter))
+        else:
+            table = self.arrow_table
+        sample = table.column('lines')[index].as_py()
+        logger.debug(f'Loading sample {index}')
+        im = Image.open(io.BytesIO(sample['im']))
+        im = self.transforms(im)
+        if self.aug:
+            im = im.permute((1, 2, 0)).numpy()
+            o = self.aug(image=im)
+            im = torch.tensor(o['image'].transpose(2, 0, 1))
+        return {'image': im, 'target': self.codec.encode(sample['text'])}
+
+    def __len__(self) -> int:
+        return self._num_lines
+
+
+
 class PolygonGTDataset(Dataset):
     """
     Dataset for training a line recognition model from polygonal/baseline data.
@@ -399,6 +543,7 @@ class PolygonGTDataset(Dataset):
             im_transforms (func): Function taking an PIL.Image and returning a
                                   tensor suitable for forward passes.
             preload (bool): Enables preloading and preprocessing of image files.
+            augmentation (bool): Enables augmentation.
         """
         self._images = []  # type:  Union[List[Image], List[torch.Tensor]]
         self._gt = []  # type:  List[str]
@@ -409,6 +554,10 @@ class PolygonGTDataset(Dataset):
         self.head_transforms = transforms.Compose(im_transforms.transforms[:2])
         self.tail_transforms = transforms.Compose(im_transforms.transforms[2:])
         self.transforms = im_transforms
+        if preload:
+            warnings.warn('Preloading is deprecated and will be removed in the '
+                          'next major release of kraken. Use precompiled datasets '
+                          'instead.', PendingDeprecationWarning, stacklevel=2)
         self.preload = preload
         self.aug = None
 
@@ -505,7 +654,7 @@ class PolygonGTDataset(Dataset):
                 im = self.tail_transforms(im)
             except ValueError:
                 raise KrakenInputException(f'Image transforms failed on {image}')
-            
+
             return {'text': text,
                     'image': im,
                     'baseline': baseline,
@@ -617,6 +766,7 @@ class GroundTruthDataset(Dataset):
             im_transforms (func): Function taking an PIL.Image and returning a
                                   tensor suitable for forward passes.
             preload (bool): Enables preloading and preprocessing of image files.
+            augmentation (bool): Enables augmentation.
         """
         self.suffix = suffix
         self.split = partial(F_t.suffix_split, split=split, suffix=suffix)
@@ -631,6 +781,11 @@ class GroundTruthDataset(Dataset):
         self.aug = None
 
         self.preload = preload
+        if preload:
+            warnings.warn('Preloading is deprecated and will be removed in the '
+                          'next major release of kraken. Use precompiled datasets '
+                          'instead.', PendingDeprecationWarning, stacklevel=2)
+
         self.seg_type = 'bbox'
         # built text transformations
         if normalization:
