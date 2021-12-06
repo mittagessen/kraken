@@ -7,10 +7,21 @@ from pytest import raises
 from PIL import Image
 from kraken.lib.dataset import ImageInputTransforms
 
+from kraken.lib.util import is_bitonal
 from kraken.lib.exceptions import KrakenInputException
 
 thisfile = Path(__file__).resolve().parent
 resources = thisfile / 'resources'
+
+def check_output(self, config, im, output_tensor):
+    if config['height'] != 0:
+        self.assertEqual(config['height'], output_tensor.shape[1])
+    if config['width'] != 0:
+        self.assertEqual(config['width'], output_tensor.shape[2])
+    if config['force_binarization'] or is_bitonal(im):
+        self.assertEqual(len(output_tensor.int().unique()), 2)
+    if config['channels'] == 3:
+        self.assertEqual(output_tensor.shape[0], 3)
 
 class TestInputTransforms(unittest.TestCase):
     """
@@ -19,6 +30,7 @@ class TestInputTransforms(unittest.TestCase):
 
     def setUp(self):
         self.im = Image.open(resources / '000236.png')
+
         self.simple_inst = {'batch': 1,
                             'height': 48,
                             'width': 0,
@@ -75,6 +87,7 @@ class TestInputTransforms(unittest.TestCase):
         for k, v in self.simple_inst.items():
             self.assertEqual(getattr(tf, k), v)
         self.assertFalse(tf.centerline_norm)
+        check_output(self, self.simple_inst, self.im, tf(self.im))
 
     def test_imageinputtransforms_simple_rgb(self):
         """
@@ -84,6 +97,7 @@ class TestInputTransforms(unittest.TestCase):
         for k, v in self.simple_inst_rgb.items():
             self.assertEqual(getattr(tf, k), v)
         self.assertFalse(tf.centerline_norm)
+        check_output(self, self.simple_inst_rgb, self.im, tf(self.im))
 
     def test_imageinputtransforms_norm_rgb(self):
         """
@@ -94,6 +108,7 @@ class TestInputTransforms(unittest.TestCase):
         for k, v in self.simple_inst_norm_rgb.items():
             self.assertEqual(getattr(tf, k), v)
         self.assertFalse(tf.centerline_norm)
+        check_output(self, self.simple_inst_norm_rgb, self.im, tf(self.im))
 
     def test_imageinputtransforms_simple_norm(self):
         """
@@ -103,6 +118,7 @@ class TestInputTransforms(unittest.TestCase):
         for k, v in self.simple_inst_norm.items():
             self.assertEqual(getattr(tf, k), v)
         self.assertTrue(tf.centerline_norm)
+        check_output(self, self.simple_inst_norm, self.im, tf(self.im))
 
     def test_imageinputtransforms_channel_height(self):
         """
@@ -117,6 +133,7 @@ class TestInputTransforms(unittest.TestCase):
             else:
                 self.assertEqual(getattr(tf, k), v)
         self.assertFalse(tf.centerline_norm)
+        check_output(self, self.channel_height_inst, self.im, tf(self.im))
 
     def test_imageinputtransforms_invalid_channels(self):
         """
