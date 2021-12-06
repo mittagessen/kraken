@@ -479,12 +479,13 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
               default=False, help='Forces input images to be binary, otherwise '
               'the appropriate color format will be auto-determined through the '
               'network specification. Will be ignored in `path` mode.')
-@click.option('-f', '--format-type', type=click.Choice(['path', 'xml', 'alto', 'page']), default='path',
+@click.option('-f', '--format-type', type=click.Choice(['path', 'xml', 'alto', 'page', 'binary']), default='path',
               help='Sets the training data format. In ALTO and PageXML mode all '
               'data is extracted from xml files containing both line definitions and a '
               'link to source images. In `path` mode arguments are image files '
               'sharing a prefix up to the last extension with `.gt.txt` text files '
-              'containing the transcription.')
+              'containing the transcription. In binary mode files are datasets '
+              'files containing pre-extracted text lines.')
 @click.option('--augment/--no-augment',
               show_default=True,
               default=RECOGNITION_HYPER_PARAMS['augment'],
@@ -647,12 +648,13 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
               default=False, help='Forces input images to be binary, otherwise '
               'the appropriate color format will be auto-determined through the '
               'network specification. Will be ignored in `path` mode.')
-@click.option('-f', '--format-type', type=click.Choice(['path', 'xml', 'alto', 'page']), default='path',
+@click.option('-f', '--format-type', type=click.Choice(['path', 'xml', 'alto', 'page', 'binary']), default='path',
               help='Sets the training data format. In ALTO and PageXML mode all '
               'data is extracted from xml files containing both baselines and a '
               'link to source images. In `path` mode arguments are image files '
               'sharing a prefix up to the last extension with JSON `.path` files '
-              'containing the baseline information.')
+              'containing the baseline information. In `binary` mode files are '
+              'collections of pre-extracted text line images.')
 @click.argument('test_set', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def test(ctx, batch_size, model, evaluation_files, device, pad, threads,
          reorder, base_dir, normalization, normalize_whitespace, repolygonize,
@@ -690,12 +692,18 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, threads,
     if len(test_set) == 0:
         raise click.UsageError('No evaluation data was provided to the test command. Use `-e` or the `test_set` argument.')
 
-    if format_type != 'path':
+    if format_type in ['xml', 'page', 'alto']:
         if repolygonize:
             message('Repolygonizing data')
         test_set = preparse_xml_data(test_set, format_type, repolygonize)
         valid_norm = False
         DatasetClass = PolygonGTDataset
+    elif format_type == 'binary':
+        DatasetClass = ArrowIPCRecognitionDataset
+        if repolygonize:
+            logger.warning('Repolygonization enabled in `binary` mode. Will be ignored.')
+        test_set = [{'file': file} for file in test_set]
+        valid_norm = False
     else:
         DatasetClass = GroundTruthDataset
         if force_binarization:

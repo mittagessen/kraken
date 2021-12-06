@@ -535,11 +535,11 @@ class KrakenTrainer(object):
                               output: str = 'model',
                               spec: str = default_specs.RECOGNITION_SPEC,
                               append: Optional[int] = None,
-                              load: Optional[str] = None,
+                              load: Optional[Union[str, pathlib.Path]] = None,
                               device: str = 'cpu',
                               reorder: Union[bool, str] = True,
-                              training_data: Sequence[Dict] = None,
-                              evaluation_data: Sequence[Dict] = None,
+                              training_data: Union[Sequence[Union[[pathlib.Path, str]]], Sequence[Dict[str, Any]] = None,
+                              evaluation_data: Union[Sequence[Union[[pathlib.Path, str]]], Sequence[Dict[str, Any]] = None,
                               preload: Optional[bool] = None,
                               threads: int = 1,
                               load_hyper_parameters: bool = False,
@@ -603,7 +603,7 @@ class KrakenTrainer(object):
 
         DatasetClass = GroundTruthDataset
         valid_norm = True
-        if format_type and format_type != 'path':
+        if format_type in ['xml', 'page', 'alto']:
             logger.info(f'Parsing {len(training_data)} XML files for training data')
             if repolygonize:
                 message('Repolygonizing data')
@@ -611,6 +611,15 @@ class KrakenTrainer(object):
             evaluation_data = preparse_xml_data(evaluation_data, format_type, repolygonize)
             DatasetClass = PolygonGTDataset
             valid_norm = False
+        elif format_type == 'binary':
+            logger.info(f'Got {len(training_data)+len(evaluation_data)} binary dataset files')
+            DatasetClass = ArrowIPCRecognitionDataset
+            if repolygonize:
+                logger.warning('Repolygonization enabled in `binary` mode. Will be ignored.')
+            valid_norm = False
+            training_data = [{'file': file} for file in training_data]
+            if evaluation_data:
+                evaluation_data = [{'file': file} for file in evaluation_data]
         elif format_type == 'path':
             if force_binarization:
                 logger.warning('Forced binarization enabled in `path` mode. Will be ignored.')
@@ -675,7 +684,7 @@ class KrakenTrainer(object):
                               augmentation=hyper_params['augment'])
         bar = progress_callback('Building training set', len(training_data))
 
-        if threads and threads > 1:
+        if (threads and threads > 1) or format_type is not 'binary':
             with Pool(processes=threads) as pool:
                 for im in pool.imap_unordered(partial(_star_fun, gt_set.parse), training_data, 5):
                     logger.debug(f'Adding line {im} to training set')
@@ -698,7 +707,7 @@ class KrakenTrainer(object):
 
         bar = progress_callback('Building validation set', len(evaluation_data))
 
-        if threads and threads > 1:
+        if (threads and threads > 1) or format_type is not 'binary':
             with Pool(processes=threads) as pool:
                 for im in pool.imap_unordered(partial(_star_fun, val_set.parse), evaluation_data, 5):
                     logger.debug(f'Adding line {im} to validation set')
@@ -717,8 +726,8 @@ class KrakenTrainer(object):
             logger.error('No valid training data was provided to the train command. Please add valid XML or line data.')
             return None
 
-        logger.info(f'Training set {len(gt_set._images)} lines, validation set '
-                    f'{len(val_set._images)} lines, alphabet {len(gt_set.alphabet)} '
+        logger.info(f'Training set {len(gt_set)} lines, validation set '
+                    f'{len(val_set)} lines, alphabet {len(gt_set.alphabet)} '
                     'symbols')
         alpha_diff_only_train = set(gt_set.alphabet).difference(set(val_set.alphabet))
         alpha_diff_only_val = set(val_set.alphabet).difference(set(gt_set.alphabet))

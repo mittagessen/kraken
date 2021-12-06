@@ -1,18 +1,13 @@
 """
 VGSL plumbing
 """
-import io
 import re
-import sys
 import json
-import gzip
 import torch
 import logging
 
 from torch import nn
 from typing import Sequence, List, Tuple, Union, Optional, Iterable, Callable, Dict, Any
-
-import kraken.lib.lstm
 
 from kraken.lib import layers
 from kraken.lib import clstm_pb2

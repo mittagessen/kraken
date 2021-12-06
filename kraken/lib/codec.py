@@ -30,6 +30,7 @@ __all__ = ['PytorchCodec']
 
 logger = logging.getLogger(__name__)
 
+
 class PytorchCodec(object):
     """
     Translates between labels and graphemes.
@@ -81,7 +82,7 @@ class PytorchCodec(object):
         """
         # quick test for non-singularity
         if len(self.l2c.keys()) != len(self.c2l.keys()):
-                return False
+            return False
 
         for i, code_1 in enumerate(sorted(self.l2c.keys())):
             for j, code_2 in enumerate(sorted(self.l2c.keys())):

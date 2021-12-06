@@ -426,7 +426,7 @@ def parse_alto(filename: Union[str, pathlib.Path]) -> Dict[str, Any]:
                                   'boundary': boundary,
                                   'text': text,
                                   'script': ltype if ltype is not None else 'default',
-                                  'split': None,})
+                                  'split': None, })
 
         if len(scripts) > 1:
             data['script_detection'] = True

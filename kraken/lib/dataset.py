@@ -35,8 +35,8 @@ from shapely.ops import split
 from itertools import groupby
 from torchvision import transforms
 from collections import Counter, defaultdict
-from torch.utils.data import Dataset, DataLoader, get_worker_info
-from typing import Dict, List, Tuple, Iterator, Iterable, Sequence, Callable, Optional, Any, Union
+from torch.utils.data import Dataset, DataLoader
+from typing import Dict, List, Tuple, Iterable, Sequence, Callable, Optional, Any, Union
 
 from skimage.draw import polygon
 
@@ -45,7 +45,7 @@ from kraken.lib.xml import parse_alto, parse_page, parse_xml, preparse_xml_data
 from kraken.lib.util import is_bitonal
 from kraken.lib.codec import PytorchCodec
 from kraken.lib.models import TorchSeqRecognizer
-from kraken.lib.segmentation import extract_polygons, calculate_polygonal_environment
+from kraken.lib.segmentation import extract_polygons
 from kraken.lib.exceptions import KrakenInputException
 from kraken.lib.lineest import CenterNormalizer
 
@@ -91,7 +91,7 @@ class ImageInputTransforms(transforms.Compose):
         """
         super().__init__(None)
 
-        self._scale = (height, width) # type: Tuple[int, int]
+        self._scale = (height, width)  # type: Tuple[int, int]
         self._pad = pad
         self._valid_norm = valid_norm
         self._force_binarization = force_binarization
@@ -406,6 +406,7 @@ def compute_error(model: TorchSeqRecognizer, validation_set: Iterable[Dict[str, 
             error += _fast_levenshtein(pred, text)
     return total_chars, error
 
+
 def collate_sequences(batch):
     """
     Sorts and pads sequences.
@@ -421,6 +422,7 @@ def collate_sequences(batch):
         labels = torch.cat([x['target'] for x in sorted_batch]).long()
     label_lens = torch.LongTensor([len(x['target']) for x in sorted_batch])
     return {'image': seqs, 'target': labels, 'seq_lens': seq_lens, 'target_lens': label_lens}
+
 
 class InfiniteDataLoader(DataLoader):
     """
@@ -454,6 +456,7 @@ class ArrowIPCRecognitionDataset(Dataset):
                  reorder: Union[bool, str] = True,
                  im_transforms: Callable[[Any], torch.Tensor] = transforms.Compose([]),
                  augmentation: bool = False,
+                 preload: bool = False,
                  split_filter: Optional[str] = None) -> None:
         """
         Creates a dataset for a polygonal (baseline) transcription model.
@@ -467,6 +470,7 @@ class ArrowIPCRecognitionDataset(Dataset):
             im_transforms: Function taking an PIL.Image and returning a tensor
                            suitable for forward passes.
             augmentation: Enables preloading and preprocessing of image files.
+            preload: Ignored.
             split_filter: Enables filtering of the dataset according to mask
                           values in the set split. If set to `None` all rows
                           are sampled, if set to `train`, `validation`, or
@@ -798,7 +802,7 @@ class PolygonGTDataset(Dataset):
                 return self[np.random.randint(0, len(self.training_set))]
 
     def __len__(self) -> int:
-        return len(self.training_set)
+        return len(self._images)
 
 
 class GroundTruthDataset(Dataset):
@@ -996,7 +1000,7 @@ class GroundTruthDataset(Dataset):
                 return self[np.random.randint(0, len(self.training_set))]
 
     def __len__(self) -> int:
-        return len(self.training_set)
+        return len(self._images)
 
 
 class BaselineSet(Dataset):
