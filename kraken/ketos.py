@@ -668,7 +668,8 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, threads,
 
     from kraken.serialization import render_report
     from kraken.lib import models
-    from kraken.lib.dataset import global_align, compute_confusions, preparse_xml_data, PolygonGTDataset, GroundTruthDataset, ImageInputTransforms, collate_sequences
+    from kraken.lib.xml import preparse_xml_data
+    from kraken.lib.dataset import global_align, compute_confusions, PolygonGTDataset, GroundTruthDataset, ImageInputTransforms, collate_sequences
 
     logger.info('Building test set from {} line images'.format(len(test_set) + len(evaluation_files)))
 

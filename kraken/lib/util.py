@@ -2,10 +2,13 @@
 Ocropus's magic PIL-numpy array conversion routines. They express slightly
 different behavior from PIL.Image.toarray().
 """
+import torch
 import unicodedata
 import numpy as np
 
 from PIL import Image
+
+from typing import Union
 
 __all__ = ['pil2array', 'array2pil', 'is_bitonal', 'make_printable', 'get_im_str']
 
@@ -32,18 +35,21 @@ def array2pil(a: np.ndarray) -> Image.Image:
         raise Exception("unknown image type")
 
 
-def is_bitonal(im: Image.Image) -> bool:
+def is_bitonal(im: Union[Image.Image, torch.Tensor]) -> bool:
     """
-    Tests a PIL.Image for bitonality.
+    Tests a PIL image or torch tensor for bitonality.
 
     Args:
-        im (PIL.Image.Image): Image to test
+        im: Image to test
 
     Returns:
         True if the image contains only two different color values. False
         otherwise.
     """
-    return im.getcolors(2) is not None and len(im.getcolors(2)) == 2
+    if isinstance(im, Image.Image):
+        return im.getcolors(2) is not None and len(im.getcolors(2)) == 2
+    elif isinstance(im, torch.Tensor):
+        return len(im.int().unique()) == 2
 
 
 def get_im_str(im: Image.Image) -> str:

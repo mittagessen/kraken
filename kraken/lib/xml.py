@@ -23,9 +23,11 @@ import logging
 from itertools import groupby
 from lxml import etree
 from os.path import dirname
-from typing import Union, Dict, Any
+from PIL import Image
+from typing import Union, Dict, Any, Sequence
 
 from collections import defaultdict
+from kraken.lib.segmentation import calculate_polygonal_environment
 from kraken.lib.exceptions import KrakenInputException
 
 logger = logging.getLogger(__name__)
@@ -54,6 +56,75 @@ alto_regions = {'TextBlock': 'text',
                 'IllustrationType': 'illustration',
                 'GraphicalElementType': 'graphic',
                 'ComposedBlock': 'composed'}
+
+
+def preparse_xml_data(filenames: Sequence[Union[str, pathlib.Path]],
+                      format_type: str = 'xml',
+                      repolygonize: bool = False) -> Dict[str, Any]:
+    """
+    Loads training data from a set of xml files.
+
+    Extracts line information from Page/ALTO xml files for training of
+    recognition models.
+
+    Args:
+        filenames: List of XML files.
+        format_type: Either `page`, `alto` or `xml` for autodetermination.
+        repolygonize: (Re-)calculates polygon information using the kraken
+                      algorithm.
+
+    Returns:
+        A list of dicts {'text': text, 'baseline': [[x0, y0], ...], 'boundary':
+        [[x0, y0], ...], 'image': PIL.Image}.
+    """
+    training_pairs = []
+    if format_type == 'xml':
+        parse_fn = parse_xml
+    elif format_type == 'alto':
+        parse_fn = parse_alto
+    elif format_type == 'page':
+        parse_fn = parse_page
+    else:
+        raise Exception(f'invalid format {format_type} for preparse_xml_data')
+
+    for fn in filenames:
+        try:
+            data = parse_fn(fn)
+        except KrakenInputException as e:
+            logger.warning(e)
+            continue
+        try:
+            with open(data['image'], 'rb') as fp:
+                Image.open(fp)
+        except FileNotFoundError as e:
+            logger.warning(f'Could not open file {e.filename} in {fn}')
+            continue
+        if repolygonize:
+            logger.info('repolygonizing {} lines in {}'.format(len(data['lines']), data['image']))
+            data['lines'] = _repolygonize(data['image'], data['lines'])
+        for line in data['lines']:
+            training_pairs.append({'image': data['image'], **line})
+    return training_pairs
+
+
+def _repolygonize(im: Image.Image, lines: Sequence[Dict[str, Any]]):
+    """
+    Helper function taking an output of the lib.xml parse_* functions and
+    recalculating the contained polygonization.
+
+    Args:
+        im (Image.Image): Input image
+        lines (list): List of dicts [{'boundary': [[x0, y0], ...], 'baseline': [[x0, y0], ...], 'text': 'abcvsd'}, {...]
+
+    Returns:
+        A data structure `lines` with a changed polygonization.
+    """
+    im = Image.open(im).convert('L')
+    polygons = calculate_polygonal_environment(im, [x['baseline'] for x in lines])
+    return [{'boundary': polygon,
+             'baseline': orig['baseline'],
+             'text': orig['text'],
+             'script': orig['script']} for orig, polygon in zip(lines, polygons)]
 
 
 def parse_xml(filename: Union[str, pathlib.Path]) -> Dict[str, Any]:

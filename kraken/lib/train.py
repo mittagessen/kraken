@@ -30,12 +30,13 @@ from torch.multiprocessing import Pool
 from typing import cast, Callable, Dict, Optional, Sequence, Union
 
 from kraken.lib import models, vgsl, segmentation, default_specs
+from kraken.lib.xml import preparse_xml_data
 from kraken.lib.util import make_printable
 from kraken.lib.codec import PytorchCodec
 from kraken.lib.dataset import (BaselineSet, GroundTruthDataset,
                                 PolygonGTDataset, ImageInputTransforms,
-                                preparse_xml_data, InfiniteDataLoader,
-                                compute_error, collate_sequences)
+                                InfiniteDataLoader, compute_error,
+                                collate_sequences)
 from kraken.lib.models import validate_hyper_parameters
 from kraken.lib.exceptions import KrakenInputException, KrakenEncodeException
 

@@ -40,7 +40,7 @@ from typing import Dict, List, Tuple, Iterator, Iterable, Sequence, Callable, Op
 
 from skimage.draw import polygon
 
-from kraken.lib.xml import parse_alto, parse_page, parse_xml
+from kraken.lib.xml import parse_alto, parse_page, parse_xml, preparse_xml_data
 
 from kraken.lib.util import is_bitonal
 from kraken.lib.codec import PytorchCodec
@@ -406,75 +406,6 @@ def compute_error(model: TorchSeqRecognizer, validation_set: Iterable[Dict[str, 
             error += _fast_levenshtein(pred, text)
     return total_chars, error
 
-
-def preparse_xml_data(filenames, format_type='xml', repolygonize=False):
-    """
-    Loads training data from a set of xml files.
-
-    Extracts line information from Page/ALTO xml files for training of
-    recognition models.
-
-    Args:
-        filenames (list): List of XML files.
-        format_type (str): Either `page`, `alto` or `xml` for
-                           autodetermination.
-        repolygonize (bool): (Re-)calculates polygon information using the
-                             kraken algorithm.
-
-    Returns:
-        A list of dicts {'text': text, 'baseline': [[x0, y0], ...], 'boundary':
-        [[x0, y0], ...], 'image': PIL.Image}.
-    """
-    training_pairs = []
-    if format_type == 'xml':
-        parse_fn = parse_xml
-    elif format_type == 'alto':
-        parse_fn = parse_alto
-    elif format_type == 'page':
-        parse_fn = parse_page
-    else:
-        raise Exception(f'invalid format {format_type} for preparse_xml_data')
-
-    for fn in filenames:
-        try:
-            data = parse_fn(fn)
-        except KrakenInputException as e:
-            logger.warning(e)
-            continue
-        try:
-            with open(data['image'], 'rb') as fp:
-                Image.open(fp)
-        except FileNotFoundError as e:
-            logger.warning(f'Could not open file {e.filename} in {fn}')
-            continue
-        if repolygonize:
-            logger.info('repolygonizing {} lines in {}'.format(len(data['lines']), data['image']))
-            data['lines'] = _repolygonize(data['image'], data['lines'])
-        for line in data['lines']:
-            training_pairs.append({'image': data['image'], **line})
-    return training_pairs
-
-
-def _repolygonize(im: Image.Image, lines):
-    """
-    Helper function taking an output of the lib.xml parse_* functions and
-    recalculating the contained polygonization.
-
-    Args:
-        im (Image.Image): Input image
-        lines (list): List of dicts [{'boundary': [[x0, y0], ...], 'baseline': [[x0, y0], ...], 'text': 'abcvsd'}, {...]
-
-    Returns:
-        A data structure `lines` with a changed polygonization.
-    """
-    im = Image.open(im).convert('L')
-    polygons = calculate_polygonal_environment(im, [x['baseline'] for x in lines])
-    return [{'boundary': polygon,
-             'baseline': orig['baseline'],
-             'text': orig['text'],
-             'script': orig['script']} for orig, polygon in zip(lines, polygons)]
-
-
 def collate_sequences(batch):
     """
     Sorts and pads sequences.
@@ -490,7 +421,6 @@ def collate_sequences(batch):
         labels = torch.cat([x['target'] for x in sorted_batch]).long()
     label_lens = torch.LongTensor([len(x['target']) for x in sorted_batch])
     return {'image': seqs, 'target': labels, 'seq_lens': seq_lens, 'target_lens': label_lens}
-
 
 class InfiniteDataLoader(DataLoader):
     """
@@ -736,7 +666,7 @@ class PolygonGTDataset(Dataset):
         if 'preparse' not in kwargs or not kwargs['preparse']:
             kwargs = self.parse(*args, **kwargs)
         if kwargs['preload']:
-            if kwargs['im_mode'] > self.im_mode and self.transforms.mode >= kwargs['im_mode']:
+            if kwargs['im_mode'] > self.im_mode:
                 logger.info(f'Upgrading "im_mode" from {self.im_mode} to {kwargs["im_mode"]}.')
                 self.im_mode = kwargs['im_mode']
             self._images.append(kwargs['image'])
@@ -782,6 +712,12 @@ class PolygonGTDataset(Dataset):
                 raise KrakenInputException('Patch extraction failed for baseline')
             try:
                 im = self.transforms(im)
+                if im.shape[0] == 3:
+                    im_mode = 'RGB'
+                elif im.shape[0] == 1:
+                    im_mode = 'L'
+                if is_bitonal(im):
+                    im_mode = '1'
             except ValueError:
                 raise KrakenInputException(f'Image transforms failed on {image}')
 
@@ -789,7 +725,7 @@ class PolygonGTDataset(Dataset):
                     'image': im,
                     'baseline': baseline,
                     'boundary': boundary,
-                    'im_mode': im.mode,
+                    'im_mode': im_mode,
                     'preload': True,
                     'preparse': True}
         else:
@@ -840,6 +776,16 @@ class PolygonGTDataset(Dataset):
                 im, _ = next(extract_polygons(im, {'type': 'baselines',
                                                    'lines': [{'baseline': item[0][1], 'boundary': item[0][2]}]}))
                 im = self.transforms(im)
+                if im.shape[0] == 3:
+                    im_mode = 'RGB'
+                elif im.shape[0] == 1:
+                    im_mode = 'L'
+                if is_bitonal(im):
+                    im_mode = '1'
+
+                if im_mode > self.im_mode:
+                    logger.info(f'Upgrading "im_mode" from {self.im_mode} to {im_mode}')
+                    self.im_mode = im_mode
                 if self.aug:
                     im = im.permute((1, 2, 0)).numpy()
                     o = self.aug(image=im)
@@ -952,10 +898,9 @@ class GroundTruthDataset(Dataset):
         """
         if 'preparse' not in kwargs or not kwargs['preparse']:
             kwargs = self.parse(*args, **kwargs)
-        if kwargs['preload']:
-            if kwargs['im_mode'] > self.im_mode and self.transforms.mode >= kwargs['im_mode']:
-                logger.info(f'upgrading "im_mode" from {self.im_mode} to {kwargs["im_mode"]}.')
-                self.im_mode = kwargs['im_mode']
+        if kwargs['preload'] and kwargs['im_mode'] > self.im_mode:
+            logger.info(f'upgrading "im_mode" from {self.im_mode} to {kwargs["im_mode"]}.')
+            self.im_mode = kwargs['im_mode']
         self._images.append(kwargs['image'])
         self._gt.append(kwargs['text'])
         self.alphabet.update(kwargs['text'])
@@ -979,9 +924,15 @@ class GroundTruthDataset(Dataset):
             try:
                 im = Image.open(image)
                 im = self.transforms(im)
+                if im.shape[0] == 3:
+                    im_mode = 'RGB'
+                elif im.shape[0] == 1:
+                    im_mode = 'L'
+                if is_bitonal(im):
+                    im_mode = '1'
             except ValueError:
                 raise KrakenInputException(f'Image transforms failed on {image}')
-            return {'image': im, 'text': gt, 'im_mode': im.mode, 'preload': True, 'preparse': True}
+            return {'image': im, 'text': gt, 'im_mode': im_mode, 'preload': True, 'preparse': True}
         else:
             return {'image': image, 'text': gt, 'preload': False, 'preparse': True}
 
@@ -1024,6 +975,15 @@ class GroundTruthDataset(Dataset):
                 if not isinstance(im, Image.Image):
                     im = Image.open(im)
                 im = self.transforms(im)
+                if im.shape[0] == 3:
+                    im_mode = 'RGB'
+                elif im.shape[0] == 1:
+                    im_mode = 'L'
+                if is_bitonal(im):
+                    im_mode = '1'
+                if im_mode > self.im_mode:
+                    logger.info(f'Upgrading "im_mode" from {self.im_mode} to {im_mode}')
+                    self.im_mode = im_mode
                 if self.aug:
                     im = im.permute((1, 2, 0)).numpy()
                     o = self.aug(image=im)
