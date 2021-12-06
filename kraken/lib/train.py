@@ -33,10 +33,10 @@ from kraken.lib import models, vgsl, segmentation, default_specs
 from kraken.lib.xml import preparse_xml_data
 from kraken.lib.util import make_printable
 from kraken.lib.codec import PytorchCodec
-from kraken.lib.dataset import (BaselineSet, GroundTruthDataset,
-                                PolygonGTDataset, ImageInputTransforms,
-                                InfiniteDataLoader, compute_error,
-                                collate_sequences)
+from kraken.lib.dataset import (ArrowIPCRecognitionDataset, BaselineSet,
+                                GroundTruthDataset, PolygonGTDataset,
+                                ImageInputTransforms, InfiniteDataLoader,
+                                compute_error, collate_sequences)
 from kraken.lib.models import validate_hyper_parameters
 from kraken.lib.exceptions import KrakenInputException, KrakenEncodeException
 

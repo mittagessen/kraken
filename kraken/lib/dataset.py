@@ -51,7 +51,8 @@ from kraken.lib.lineest import CenterNormalizer
 
 from kraken.lib import functional_im_transforms as F_t
 
-__all__ = ['BaselineSet',
+__all__ = ['ArrowIPCRecognitionDataset',
+           'BaselineSet',
            'PolygonGTDataset',
            'GroundTruthDataset',
            'ImageInputTransforms',
