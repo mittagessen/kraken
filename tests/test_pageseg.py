@@ -1,16 +1,15 @@
 # -*- coding: utf-8 -*-
-import os
 import unittest
 
 from PIL import Image
 from pytest import raises
+from pathlib import Path
 
 from kraken.pageseg import segment
 from kraken.lib.exceptions import KrakenInputException
 
-thisfile = os.path.abspath(os.path.dirname(__file__))
-resources = os.path.abspath(os.path.join(thisfile, 'resources'))
-
+thisfile = Path(__file__).resolve().parent
+resources = thisfile / 'resources'
 
 class TestPageSeg(unittest.TestCase):
 
@@ -22,14 +21,14 @@ class TestPageSeg(unittest.TestCase):
         Test correct handling of color input.
         """
         with raises(KrakenInputException):
-            with Image.open(os.path.join(resources, 'input.jpg')) as im:
+            with Image.open(resources / 'input.jpg') as im:
                 segment(im)
 
     def test_segment_bw(self):
         """
         Tests segmentation of bi-level input.
         """
-        with Image.open(os.path.join(resources, 'bw.png')) as im:
+        with Image.open(resources / 'bw.png') as im:
             lines = segment(im)
             # test if line count is roughly correct
             self.assertAlmostEqual(len(lines['boxes']), 30, msg='Segmentation differs '

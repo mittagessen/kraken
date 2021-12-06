@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import unittest
-import os
 
 from pytest import raises
 

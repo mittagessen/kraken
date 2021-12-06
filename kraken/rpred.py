@@ -30,7 +30,7 @@ from kraken.lib.util import get_im_str, is_bitonal
 from kraken.lib.models import TorchSeqRecognizer
 from kraken.lib.segmentation import extract_polygons, compute_polygon_section
 from kraken.lib.exceptions import KrakenInputException
-from kraken.lib.dataset import generate_input_transforms
+from kraken.lib.dataset import ImageInputTransforms
 
 import copy
 
@@ -222,7 +222,7 @@ class mm_rpred(object):
             logger.debug('Loading line transforms for {}'.format(script))
             network = nets[script]
             batch, channels, height, width = network.nn.input
-            self.ts[script] = generate_input_transforms(batch, height, width, channels, pad, valid_norm)
+            self.ts[script] = ImageInputTransforms(batch, height, width, channels, pad, valid_norm)
 
         self.im = im
         self.nets = nets

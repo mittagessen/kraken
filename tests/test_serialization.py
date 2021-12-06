@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import os
 import json
 import unittest
 import tempfile
@@ -7,14 +6,15 @@ import numpy as np
 
 from lxml import etree
 from io import StringIO
+from pathlib import Path
 from hocr_spec import HocrValidator
 from collections import Counter
 
 from kraken import rpred, serialization
 from kraken.lib import xml
 
-thisfile = os.path.abspath(os.path.dirname(__file__))
-resources = os.path.abspath(os.path.join(thisfile, 'resources'))
+thisfile = Path(__file__).resolve().parent
+resources = thisfile / 'resources'
 
 def roundtrip(self, records, fp):
     """
@@ -50,7 +50,7 @@ def validate_page(self, fp):
     counts = Counter(ids)
     self.assertEqual(counts.most_common(1)[0][1], 1, msg='Duplicate IDs in PageXML output')
 
-    with open(os.path.join(resources, 'pagecontent.xsd')) as schema_fp:
+    with open(resources / 'pagecontent.xsd') as schema_fp:
         page_schema = etree.XMLSchema(etree.parse(schema_fp))
         page_schema.assertValid(doc)
 
@@ -61,7 +61,7 @@ def validate_alto(self, fp):
     counts = Counter(ids)
     self.assertEqual(counts.most_common(1)[0][1], 1, msg='Duplicate IDs in ALTO output')
 
-    with open(os.path.join(resources, 'alto-4-2.xsd')) as schema_fp:
+    with open(resources / 'alto-4-2.xsd') as schema_fp:
         alto_schema = etree.XMLSchema(etree.parse(schema_fp))
         alto_schema.assertValid(doc)
 
@@ -71,10 +71,10 @@ class TestSerializations(unittest.TestCase):
     Tests for output serialization
     """
     def setUp(self):
-        with open(os.path.join(resources, 'records.json'), 'r') as fp:
+        with open(resources /'records.json', 'r') as fp:
             self.box_records = [rpred.ocr_record(**x) for x in json.load(fp)]
 
-        with open(os.path.join(resources, 'bl_records.json'), 'r') as fp:
+        with open(resources / 'bl_records.json', 'r') as fp:
             recs = json.load(fp)
             self.bl_records = [rpred.ocr_record(**bl) for bl in recs['lines']]
             self.bl_regions = recs['regions']
@@ -114,7 +114,7 @@ class TestSerializations(unittest.TestCase):
 
         fp.write(serialization.serialize(self.box_records, image_name='foo.png', template='abbyyxml'))
         doc = etree.fromstring(fp.getvalue().encode('utf-8'))
-        with open(os.path.join(resources, 'FineReader10-schema-v1.xml')) as schema_fp:
+        with open(resources / 'FineReader10-schema-v1.xml') as schema_fp:
             abbyy_schema = etree.XMLSchema(etree.parse(schema_fp))
             abbyy_schema.assertValid(doc)
 
@@ -145,7 +145,7 @@ class TestSerializations(unittest.TestCase):
 
         fp.write(serialization.serialize(self.bl_records, image_name='foo.png', template='abbyyxml'))
         doc = etree.fromstring(fp.getvalue().encode('utf-8'))
-        with open(os.path.join(resources, 'FineReader10-schema-v1.xml')) as schema_fp:
+        with open(resources / 'FineReader10-schema-v1.xml') as schema_fp:
             abbyy_schema = etree.XMLSchema(etree.parse(schema_fp))
             abbyy_schema.assertValid(doc)
 
@@ -177,7 +177,7 @@ class TestSerializations(unittest.TestCase):
 
         fp.write(serialization.serialize(self.bl_records, image_name='foo.png', template='abbyyxml', regions=self.bl_regions))
         doc = etree.fromstring(fp.getvalue().encode('utf-8'))
-        with open(os.path.join(resources, 'FineReader10-schema-v1.xml')) as schema_fp:
+        with open(resources / 'FineReader10-schema-v1.xml') as schema_fp:
             abbyy_schema = etree.XMLSchema(etree.parse(schema_fp))
             abbyy_schema.assertValid(doc)
 
@@ -208,7 +208,7 @@ class TestSerializations(unittest.TestCase):
 
         fp.write(serialization.serialize([], image_name='foo.png', template='abbyyxml', regions=self.bl_regions))
         doc = etree.fromstring(fp.getvalue().encode('utf-8'))
-        with open(os.path.join(resources, 'FineReader10-schema-v1.xml')) as schema_fp:
+        with open(resources / 'FineReader10-schema-v1.xml') as schema_fp:
             abbyy_schema = etree.XMLSchema(etree.parse(schema_fp))
             abbyy_schema.assertValid(doc)
 

@@ -18,7 +18,7 @@ def cli(files):
     from kraken.lib import dataset, segmentation, vgsl
 
     batch, channels, height, width = 1, 3, 1200, 0
-    transforms = dataset.generate_input_transforms(batch, height, width, channels, 0, valid_norm=False)
+    transforms = dataset.ImageInputTransforms(batch, height, width, channels, 0, valid_norm=False)
 
     torch.set_num_threads(1)
 

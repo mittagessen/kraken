@@ -33,7 +33,7 @@ from kraken.lib import models, vgsl, segmentation, default_specs
 from kraken.lib.util import make_printable
 from kraken.lib.codec import PytorchCodec
 from kraken.lib.dataset import (BaselineSet, GroundTruthDataset,
-                                PolygonGTDataset, generate_input_transforms,
+                                PolygonGTDataset, ImageInputTransforms,
                                 preparse_xml_data, InfiniteDataLoader,
                                 compute_error, collate_sequences)
 from kraken.lib.models import validate_hyper_parameters
@@ -646,13 +646,13 @@ class KrakenTrainer(object):
         else:
             batch, channels, height, width = nn.input
 
-        transforms = generate_input_transforms(batch,
-                                               height,
-                                               width,
-                                               channels,
-                                               hyper_params['pad'],
-                                               valid_norm,
-                                               force_binarization)
+        transforms = ImageInputTransforms(batch,
+                                          height,
+                                          width,
+                                          channels,
+                                          hyper_params['pad'],
+                                          valid_norm,
+                                          force_binarization)
 
         if len(training_data) > 2500 and not preload:
             logger.info('Disabling preloading for large (>2500) training data set. Enable by setting --preload parameter')
@@ -1006,7 +1006,7 @@ class KrakenTrainer(object):
 
         hyper_params = hyper_params_
 
-        transforms = generate_input_transforms(batch, height, width, channels, 0, valid_norm=False)
+        transforms = ImageInputTransforms(batch, height, width, channels, 0, valid_norm=False)
 
         # set multiprocessing tensor sharing strategy
         if 'file_system' in torch.multiprocessing.get_all_sharing_strategies():

@@ -2,27 +2,26 @@
 
 import unittest
 import json
-import os
 
 import kraken
 
-from os import path
+from pathlib import Path
 
 from kraken.lib import xml
 from kraken.lib.train import KrakenTrainer
 
-thisfile = os.path.abspath(os.path.dirname(__file__))
-resources = os.path.abspath(os.path.join(thisfile, 'resources'))
+thisfile = Path(__file__).resolve().parent
+resources = thisfile / 'resources'
 
 class TestKrakenTrainer(unittest.TestCase):
     """
     Tests for KrakenTrainer class
     """
     def setUp(self):
-        self.xml = path.join(resources, '170025120000003,0074.xml')
+        self.xml = resources / '170025120000003,0074.xml'
         self.bls = xml.parse_page(self.xml)
-        self.box_lines = [path.join(resources, '000236.png')]
-        self.model = path.join(resources, 'model_small.mlmodel')
+        self.box_lines = [resources / '000236.png']
+        self.model = resources / 'model_small.mlmodel'
 
     def test_krakentrainer_rec_box_load(self):
         training_data = self.box_lines
@@ -100,8 +99,8 @@ class TestKrakenTrainer(unittest.TestCase):
         """
         Tests recognition trainer constructor with dictionary style training data.
         """
-        training_data = [{'image': path.join(resources, 'bw.png'), 'text': 'foo', 'baseline': [[10, 10], [300, 10]], 'boundary': [[10, 5], [300, 5], [300, 15], [10, 15]]}]
-        evaluation_data = [{'image': path.join(resources, 'bw.png'), 'text': 'foo', 'baseline': [[10, 10], [300, 10]], 'boundary': [[10, 5], [300, 5], [300, 15], [10, 15]]}]
+        training_data = [{'image': resources / 'bw.png', 'text': 'foo', 'baseline': [[10, 10], [300, 10]], 'boundary': [[10, 5], [300, 5], [300, 15], [10, 15]]}]
+        evaluation_data = [{'image': resources / 'bw.png', 'text': 'foo', 'baseline': [[10, 10], [300, 10]], 'boundary': [[10, 5], [300, 5], [300, 15], [10, 15]]}]
         trainer = KrakenTrainer.recognition_train_gen(format_type=None,
                                                       training_data=training_data,
                                                       evaluation_data=evaluation_data)
