@@ -723,7 +723,7 @@ class KrakenTrainer(object):
                     logger.warning(str(e))
                 bar()
 
-        if len(gt_set._images) == 0:
+        if len(gt_set) == 0:
             logger.error('No valid training data was provided to the train command. Please add valid XML or line data.')
             return None
 
