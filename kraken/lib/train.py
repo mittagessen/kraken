@@ -708,7 +708,7 @@ class KrakenTrainer(object):
 
         bar = progress_callback('Building validation set', len(evaluation_data))
 
-        if (threads and threads > 1) or format_type is not 'binary':
+        if (threads and threads > 1) and format_type is not 'binary':
             with Pool(processes=threads) as pool:
                 for im in pool.imap_unordered(partial(_star_fun, val_set.parse), evaluation_data, 5):
                     logger.debug(f'Adding line {im} to validation set')
