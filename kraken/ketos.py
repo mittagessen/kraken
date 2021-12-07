@@ -1154,5 +1154,46 @@ def publish(ctx, metadata, access_token, model):
     message('\nmodel PID: {}'.format(oid))
 
 
+@cli.command('compile')
+@click.pass_context
+@click.option('-o', '--output', show_default=True, type=click.Path(), default='model', help='Output model file')
+@click.option('--threads', show_default=True, default=1, help='Number of OpenMP threads and workers when running on CPU.')
+@click.option('-f', '--format-type', type=click.Choice(['path', 'xml', 'alto', 'page']), default='xml',
+              help='Sets the training data format. In ALTO and PageXML mode all '
+              'data is extracted from xml files containing both baselines and a '
+              'link to source images. In `path` mode arguments are image files '
+              'sharing a prefix up to the last extension with JSON `.path` files '
+              'containing the baseline information.')
+@click.option('--save-splits/--ignore-splits', show_default=True, default=True,
+              help='Whether to serialize explicit splits contained in XML '
+                   'files. Is ignored in `path` mode.')
+@click.option('--recordbatch-size', show_default=True, default=100,
+              help='Number of records per RecordBatch written to the output '
+                   'file. Larger batches require more transient memory but '
+                   'slightly improve reading performance.')
+@click.argument('ground_truth', nargs=-1, type=click.Path(exists=True, dir_okay=False))
+def compile(ctx, output, threads, format_type, save_splits, recordbatch_size, ground_truth):
+    """
+    Precompiles a binary dataset from a collection of XML files.
+    """
+    from kraken.lib import arrow_dataset
+
+    def _init_progressbar(progress, length):
+        if 'bar' not in ctx.meta:
+            ctx.meta['bar'] = log.progressbar(label='Extracting lines', length=length, show_pos=True)
+            ctx.meta['bar'].__enter__()
+        ctx.meta['bar'].update(progress)
+
+    arrow_dataset.build_binary_dataset(ground_truth,
+                                       output,
+                                       format_type,
+                                       threads,
+                                       save_splits,
+                                       recordbatch_size,
+                                       _init_progressbar)
+
+    ctx.meta['bar'].__exit__(None, None, None)
+    message(f'Output file written to {output}')
+
 if __name__ == '__main__':
     cli()
