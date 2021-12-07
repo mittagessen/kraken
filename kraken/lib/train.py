@@ -20,6 +20,7 @@ import re
 import abc
 import math
 import torch
+import pathlib
 import logging
 import numpy as np
 import torch.nn.functional as F
@@ -27,7 +28,7 @@ import torch.nn.functional as F
 from itertools import cycle
 from functools import partial
 from torch.multiprocessing import Pool
-from typing import cast, Callable, Dict, Optional, Sequence, Union
+from typing import cast, Callable, Dict, Optional, Sequence, Union, Any
 
 from kraken.lib import models, vgsl, segmentation, default_specs
 from kraken.lib.xml import preparse_xml_data
@@ -535,11 +536,11 @@ class KrakenTrainer(object):
                               output: str = 'model',
                               spec: str = default_specs.RECOGNITION_SPEC,
                               append: Optional[int] = None,
-                              load: Optional[Union[str, pathlib.Path]] = None,
+                              load: Optional[Union[pathlib.Path, str]] = None,
                               device: str = 'cpu',
                               reorder: Union[bool, str] = True,
-                              training_data: Union[Sequence[Union[[pathlib.Path, str]]], Sequence[Dict[str, Any]] = None,
-                              evaluation_data: Union[Sequence[Union[[pathlib.Path, str]]], Sequence[Dict[str, Any]] = None,
+                              training_data: Union[Sequence[Union[pathlib.Path, str]], Sequence[Dict[str, Any]]] = None,
+                              evaluation_data: Union[Sequence[Union[pathlib.Path, str]], Sequence[Dict[str, Any]]] = None,
                               preload: Optional[bool] = None,
                               threads: int = 1,
                               load_hyper_parameters: bool = False,
@@ -940,8 +941,8 @@ class KrakenTrainer(object):
                                spec: str = default_specs.SEGMENTATION_SPEC,
                                load: Optional[str] = None,
                                device: str = 'cpu',
-                               training_data: Sequence[Dict] = None,
-                               evaluation_data: Sequence[Dict] = None,
+                               training_data: Union[Sequence[Union[pathlib.Path, str]], Sequence[Dict[str, Any]]] = None,
+                               evaluation_data: Union[Sequence[Union[pathlib.Path, str]], Sequence[Dict[str, Any]]] = None,
                                threads: int = 1,
                                force_binarization: bool = False,
                                format_type: str = 'path',
