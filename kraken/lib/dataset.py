@@ -485,6 +485,7 @@ class ArrowIPCRecognitionDataset(Dataset):
         self.split_filter = None
         self._num_lines = 0
         self.arrow_table = None
+        self.codec = None
 
         self.seg_type = 'baselines'
         # built text transformations
