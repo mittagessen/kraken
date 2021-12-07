@@ -85,7 +85,7 @@ def preparse_xml_data(filenames: Sequence[Union[str, pathlib.Path]],
     elif format_type == 'page':
         parse_fn = parse_page
     else:
-        raise Exception(f'invalid format {format_type} for preparse_xml_data')
+        raise ValueError(f'invalid format {format_type} for preparse_xml_data')
 
     for fn in filenames:
         try:
