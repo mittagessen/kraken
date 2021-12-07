@@ -77,9 +77,10 @@ def build_binary_dataset(files: Optional[List[Union[str, pathlib.Path]]] = None,
         ignore_splits: Switch to disable serialization of the explicit
                        train/validation/test splits contained in the source
                        files.
-        recordbatch_size: Number of records per RecordBatch written to the
-                          output file. Larger batches require more transient
-                          memory but slightly improve reading performance.
+        recordbatch_size: Minimum number of records per RecordBatch written to
+                          the output file. Larger batches require more
+                          transient memory but slightly improve reading
+                          performance.
         callback: Function called everytime a new recordbatch is flushed into
                   the Arrow IPC file.
     """
