@@ -581,7 +581,7 @@ class ArrowIPCRecognitionDataset(Dataset):
             im = im.permute((1, 2, 0)).numpy()
             o = self.aug(image=im)
             im = torch.tensor(o['image'].transpose(2, 0, 1))
-        return {'image': im, 'target': self.codec.encode(sample['text'])}
+        return {'image': im, 'target': self.codec.encode(sample['text']) if self.codec is not None else sample['text']}
 
     def __len__(self) -> int:
         return self._num_lines
