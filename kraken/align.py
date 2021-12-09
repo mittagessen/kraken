@@ -118,6 +118,8 @@ def fst_from_text(line, codec):
     state = f.add_state()
     f.set_start(state)
 
+    codec.strict = True
+
     def _detect_char(graph, one, start_state, char, codec):
         # Empty char loop
         graph.add_arc(start_state, _get_arc(1, 0, one, start_state))
