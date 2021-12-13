@@ -288,13 +288,6 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
 
     np.random.shuffle(ground_truth)
 
-    training_files = ground_truth[:int(len(ground_truth) * partition)]
-    if evaluation_files:
-        logger.debug(f'Using {len(evaluation_files)} lines/files from explicit eval set')
-    else:
-        evaluation_files = ground_truth[int(len(ground_truth) * partition):]
-        logger.debug(f'Taking {len(evaluation_files)} lines/files from training set for evaluation')
-
     def _init_progressbar(label, length):
         if 'bar' in ctx.meta:
             ctx.meta['bar'].__exit__(None, None, None)
@@ -315,6 +308,7 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
                                                    device=device,
                                                    training_data=training_files,
                                                    evaluation_data=evaluation_files,
+                                                   partition=partition,
                                                    threads=threads,
                                                    load_hyper_parameters=load_hyper_parameters,
                                                    force_binarization=force_binarization,
@@ -549,12 +543,6 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
         reorder = base_dir
 
     np.random.shuffle(ground_truth)
-    training_files = ground_truth[:int(len(ground_truth) * partition)]
-    if evaluation_files:
-        logger.debug(f'Using {len(evaluation_files)} lines/files from explicit eval set')
-    else:
-        evaluation_files = ground_truth[int(len(ground_truth) * partition):]
-        logger.debug(f'Taking {len(evaluation_files)} lines/files from training set for evaluation')
 
     if codec:
         logger.debug(f'Loading codec file from {codec}')
@@ -576,8 +564,9 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
                                                   load=load,
                                                   device=device,
                                                   reorder=reorder,
-                                                  training_data=training_files,
+                                                  training_data=ground_truth,
                                                   evaluation_data=evaluation_files,
+                                                  partition=partition,
                                                   preload=preload,
                                                   threads=threads,
                                                   load_hyper_parameters=load_hyper_parameters,

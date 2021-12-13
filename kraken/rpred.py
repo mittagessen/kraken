@@ -171,13 +171,13 @@ class mm_rpred(object):
                                         the Unicode bidirectional algorithm for
                                         correct display. Set to L|R to
                                         override default text direction.
-            script_ignore (list): List of scripts to ignore during recognition
+            tag_ignore (list): List of tags to ignore during recognition
         Yields:
             An ocr_record containing the recognized text, absolute character
             positions, and confidence values for each character.
 
         Raises:
-            KrakenInputException if the mapping between segmentation scripts and
+            KrakenInputException if the mapping between segmentation tags and
             networks is incomplete.
         """
         seg_types = set(recognizer.seg_type for recognizer in nets.values())
@@ -200,21 +200,23 @@ class mm_rpred(object):
             self.seg_key = 'lines'
             self.next_iter = self._recognize_baseline_line
             self.line_iter = iter(bounds['lines'])
-            scripts = [x['script'] for x in bounds['lines']]
+            tags = []
+            for x in bounds['lines']:
+                tags.extend(x['tags'])
         else:
             valid_norm = True
             self.len = len(bounds['boxes'])
             self.seg_key = 'boxes'
             self.next_iter = self._recognize_box_line
             self.line_iter = iter(bounds['boxes'])
-            scripts = [x[0] for line in bounds['boxes'] for x in line]
+            tags= [x[0] for line in bounds['boxes'] for x in line]
 
         im_str = get_im_str(im)
         logger.info('Running {} multi-script recognizers on {} with {} lines'.format(len(nets), im_str, self.len))
 
         miss = [script for script in scripts if not nets.get(script)]
         if miss and not isinstance(nets, defaultdict):
-            raise KrakenInputException('Missing models for scripts {}'.format(set(miss)))
+            raise KrakenInputException('Missing models for tags {}'.format(set(miss)))
 
         # build dictionary for line preprocessing
         self.ts = {}

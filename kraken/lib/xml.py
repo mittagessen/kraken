@@ -32,7 +32,7 @@ from kraken.lib.exceptions import KrakenInputException
 
 logger = logging.getLogger(__name__)
 
-__all__ = ['parse_xml', 'parse_page', 'parse_alto']
+__all__ = ['parse_xml', 'parse_page', 'parse_alto', 'preparse_xml_data']
 
 # fallback mapping between PAGE region types and tags
 page_regions = {'TextRegion': 'text',
@@ -137,9 +137,9 @@ def parse_xml(filename: Union[str, pathlib.Path]) -> Dict[str, Any]:
 
     Returns:
         A dict {'image': impath, lines: [{'boundary': [[x0, y0], ...],
-        'baseline': [[x0, y0], ...]}, {...], 'text': 'apdjfqpf', 'script':
-        'script_type'}, regions: {'region_type_0': [[[x0, y0], ...], ...],
-        ...}, 'base_dir': None}
+        'baseline': [[x0, y0], ...]}, {...], 'text': 'apdjfqpf', 'tags':
+        ['script_type_0', 'script_type_1']}, regions: {'region_type_0': [[[x0,
+        y0], ...], ...], ...}}
     """
     with open(filename, 'rb') as fp:
         try:
@@ -164,9 +164,9 @@ def parse_page(filename: Union[str, pathlib.Path]) -> Dict[str, Any]:
 
     Returns:
         A dict {'image': impath, lines: [{'boundary': [[x0, y0], ...],
-        'baseline': [[x0, y0], ...]}, {...], 'text': 'apdjfqpf', 'script':
-        'script_type'}, regions: {'region_type_0': [[[x0, y0], ...], ...],
-        ...}}
+        'baseline': [[x0, y0], ...]}, {...], 'text': 'apdjfqpf', 'tags':
+        ['script_type_0', 'script_type_1']}, regions: {'region_type_0': [[[x0,
+        y0], ...], ...], ...}}
     """
     def _parse_page_custom(s):
         o = {}
@@ -245,7 +245,7 @@ def parse_page(filename: Union[str, pathlib.Path]) -> Dict[str, Any]:
         data['regions'] = region_data
 
         # parse line information
-        scripts = set(('default',))
+        tags = set(('default',))
         for line in lines:
             pol = line.find('./{*}Coords')
             boundary = None
@@ -287,9 +287,13 @@ def parse_page(filename: Union[str, pathlib.Path]) -> Dict[str, Any]:
                 # retrieve data split if encoded in custom string.
                 if 'split' in cs and 'type' in cs['split'] and cs['split']['type'] in ['train', 'validation', 'test']:
                     split_type = cs['split']['type']
-            scripts.add(l_type)
-            data['lines'].append({'baseline': baseline, 'boundary': boundary, 'text': text, 'script': l_type, 'split': split_type})
-        if len(scripts) > 1:
+            tags.add(l_type)
+            data['lines'].append({'baseline': baseline,
+                                  'boundary': boundary,
+                                  'text': text,
+                                  'split': split_type,
+                                  'tags': [l_type, split_type]})
+        if len(tags) > 1:
             data['script_detection'] = True
         else:
             data['script_detection'] = False
@@ -306,9 +310,9 @@ def parse_alto(filename: Union[str, pathlib.Path]) -> Dict[str, Any]:
 
     Returns:
         A dict {'image': impath, lines: [{'boundary': [[x0, y0], ...],
-        'baseline': [[x0, y0], ...]}, {...], 'text': 'apdjfqpf', 'script':
-        'script_type'}, regions: {'region_type_0': [[[x0, y0], ...], ...],
-        ...}, 'base_dir': None}
+        'baseline': [[x0, y0], ...]}, {...], 'text': 'apdjfqpf', 'tags':
+        ['script_type_0', 'script_type_1']}, regions: {'region_type_0': [[[x0,
+        y0], ...], ...], ...}}
     """
     with open(filename, 'rb') as fp:
         base_dir = dirname(filename)
@@ -385,7 +389,7 @@ def parse_alto(filename: Union[str, pathlib.Path]) -> Dict[str, Any]:
             region_data[rtype].append(boundary)
         data['regions'] = region_data
 
-        scripts = set(('default',))
+        tags = set(('default',))
         for line in lines:
             if line.get('BASELINE') is None:
                 logger.info('TextLine {} without baseline'.format(line.get('ID')))
@@ -415,21 +419,23 @@ def parse_alto(filename: Union[str, pathlib.Path]) -> Dict[str, Any]:
                 text += el.get('CONTENT') if el.get('CONTENT') else ' '
             # find line type
             ltype = None
+            split_type = None
             tagrefs = line.get('TAGREFS')
             if tagrefs is not None:
                 for tagref in tagrefs.split():
                     ltype = cls_map.get(tagref, None)
                     if ltype is not None:
-                        scripts.add(ltype)
-                        break
+                        tags.add(ltype)
+                    if ltype in ['train', 'validation', 'test']:
+                        split_type = ltype
             data['lines'].append({'baseline': baseline,
                                   'boundary': boundary,
                                   'text': text,
-                                  'script': ltype if ltype is not None else 'default',
-                                  'split': None, })
+                                  'tags': tags,
+                                  'split': split_type, })
 
-        if len(scripts) > 1:
-            data['script_detection'] = True
+        if len(tags) > 1:
+            data['tags'] = True
         else:
-            data['script_detection'] = False
+            data['tags'] = False
         return data
