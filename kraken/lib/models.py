@@ -12,7 +12,7 @@ import numpy as np
 import kraken.lib.lineest
 import kraken.lib.ctc_decoder
 
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 from kraken.lib.vgsl import TorchVGSLModel
 from kraken.lib.exceptions import KrakenInvalidModelException, KrakenInputException
@@ -28,16 +28,18 @@ class TorchSeqRecognizer(object):
     """
     A class wrapping a TorchVGSLModel with a more comfortable recognition interface.
     """
-    def __init__(self, nn, decoder=kraken.lib.ctc_decoder.greedy_decoder, train: bool = False, device: str = 'cpu') -> None:
+    def __init__(self, nn, decoder=kraken.lib.ctc_decoder.greedy_decoder, train: bool = False, device: Optional[str] = 'cpu') -> None:
         """
         Constructs a sequence recognizer from a VGSL model and a decoder.
 
         Args:
-            nn (kraken.lib.vgsl.TorchVGSLModel): neural network used for recognition
-            decoder (func): Decoder function used for mapping softmax
-                            activations to labels and positions
-            train (bool): Enables or disables gradient calculation
-            device (torch.Device): Device to run model on
+            nn: neural network used for recognition
+            decoder: Decoder function used for mapping softmax activations to
+                     labels and positions.
+            train: Enables or disables gradient calculation
+            device: Device to run model on. If `None` will be ignored and the
+                    user has to ensure that model and input tensor location
+                    matches.
         """
         self.nn = nn
         self.kind = ''
@@ -50,10 +52,11 @@ class TorchSeqRecognizer(object):
         self.train = train
         self.device = device
         if nn.model_type not in [None, 'recognition']:
-            raise ValueError('Models of type {} are not supported by TorchSeqRecognizer'.format(nn.model_type))
+            raise ValueError(f'Models of type {nn.model_type} are not supported by TorchSeqRecognizer')
         self.one_channel_mode = nn.one_channel_mode
         self.seg_type = nn.seg_type
-        self.nn.to(device)
+        if self.device:
+            self.nn.to(device)
 
     def to(self, device):
         """
@@ -75,7 +78,8 @@ class TorchSeqRecognizer(object):
             Tuple with (N, W, C) shaped numpy array and final output sequence
             lengths.
         """
-        line = line.to(self.device)
+        if self.device:
+            line = line.to(self.device)
         o, olens = self.nn.nn(line, lens)
         if o.size(2) != 1:
             raise KrakenInputException('Expected dimension 3 to be 1, actual {}'.format(o.size()))
