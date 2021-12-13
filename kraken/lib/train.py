@@ -732,7 +732,7 @@ class RecognitionModel(pl.LightningModule):
             if 'seg_type' not in self.nn.user_metadata:
                 self.nn.user_metadata['seg_type'] = self.train_set.dataset.seg_type
 
-            self.rec_nn = models.TorchSeqRecognizer(self.nn, device=self.device)
+            self.rec_nn = models.TorchSeqRecognizer(self.nn, device=None)
             self.net = self.nn.nn
 
     def train_dataloader(self):
