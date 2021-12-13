@@ -386,7 +386,7 @@ def compute_confusions(algn1: Sequence[str], algn2: Sequence[str]):
     return counts, scripts, ins, dels, subs
 
 
-def compute_error(model: TorchSeqRecognizer, sample: Dict[str, torch.Tensor]) -> Tuple[int, int]:
+def compute_error(model: TorchSeqRecognizer, batch: Dict[str, torch.Tensor]) -> Tuple[int, int]:
     """
     Computes error report from a model and a list of line image-text pairs.
 
@@ -398,11 +398,14 @@ def compute_error(model: TorchSeqRecognizer, sample: Dict[str, torch.Tensor]) ->
         A tuple with total number of characters and edit distance across the
         whole validation set.
     """
-    pred = model.predict_string(sample['image'], sample['seq_lens'])
-    text = sample['target']
-    if isinstance(text, torch.Tensor):
-        text = ''.join(x[0] for x in model.codec.decode([(x, 0, 0, 0) for x in text]))
-    return int(sample['target_lens'].sum()), _fast_levenshtein(pred, text)
+    preds = model.predict_string(batch['image'], batch['seq_lens'])
+    idx = 0
+    error = 0
+    for pred, offset in zip(preds, batch['target_lens']):
+        text = ''.join(x[0] for x in model.codec.decode([(x, 0, 0, 0) for x in batch['target'][idx:idx+offset]]))
+        idx += offset
+        error += _fast_levenshtein(pred, text)
+    return int(batch['target_lens'].sum()), error
 
 
 def collate_sequences(batch):
