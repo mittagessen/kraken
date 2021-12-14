@@ -28,7 +28,7 @@ class TorchSeqRecognizer(object):
     """
     A class wrapping a TorchVGSLModel with a more comfortable recognition interface.
     """
-    def __init__(self, nn, decoder=kraken.lib.ctc_decoder.greedy_decoder, train: bool = False, device: Optional[str] = 'cpu') -> None:
+    def __init__(self, nn, decoder=kraken.lib.ctc_decoder.greedy_decoder, train: Optional[bool] = False, device: Optional[str] = 'cpu') -> None:
         """
         Constructs a sequence recognizer from a VGSL model and a decoder.
 
@@ -36,16 +36,17 @@ class TorchSeqRecognizer(object):
             nn: neural network used for recognition
             decoder: Decoder function used for mapping softmax activations to
                      labels and positions.
-            train: Enables or disables gradient calculation
+            train: Enables or disables gradient calculation. If `None` will be
+                   ignored and the model remains in the state that is given.
             device: Device to run model on. If `None` will be ignored and the
                     user has to ensure that model and input tensor location
                     matches.
         """
         self.nn = nn
         self.kind = ''
-        if train:
+        if train is True:
             self.nn.train()
-        else:
+        elif train is False:
             self.nn.eval()
         self.codec = self.nn.codec
         self.decoder = decoder

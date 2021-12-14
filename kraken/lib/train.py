@@ -16,6 +16,7 @@
 """
 Training loop interception helpers
 """
+import os
 import re
 import abc
 import math
@@ -30,6 +31,7 @@ from itertools import cycle
 from functools import partial
 from torch.multiprocessing import Pool
 from typing import cast, Callable, Dict, Optional, Sequence, Union, Any
+from pytorch_lightning.callbacks import EarlyStopping
 
 from kraken.lib import models, vgsl, segmentation, default_specs
 from kraken.lib.xml import preparse_xml_data
@@ -56,292 +58,6 @@ def _star_fun(fun, kwargs):
     except KrakenInputException as e:
         logger.warning(str(e))
     return None
-
-
-class TrainStopper(object):
-
-    def __init__(self):
-        self.best_loss = -math.inf
-        self.best_epoch = 0
-        self.epochs = -1
-        self.epoch = 0
-
-    @abc.abstractmethod
-    def update(self, val_loss: torch.float) -> None:
-        """
-        Updates the internal state of the train stopper.
-        """
-        pass
-
-    @abc.abstractmethod
-    def trigger(self) -> bool:
-        """
-        Function that raises a KrakenStopTrainingException after if the abort
-        condition is fulfilled.
-        """
-        pass
-
-
-class annealing_step(object):
-    def __init__(self, optimizer, step_size, gamma=0.1):
-        self.scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size, gamma)
-
-    def __call__(self, *args, **kwargs):
-        self.scheduler.step()
-
-    @property
-    def call_frequency(self):
-        return 'epoch'
-
-
-class annealing_const(object):
-    def __init__(self, *args, **kwargs):
-        pass
-
-    def __call__(self, *args, **kwargs):
-        pass
-
-    @property
-    def call_frequency(self):
-        return 'epoch'
-
-
-class annealing_exponential(object):
-    def __init__(self, optimizer, step_size, gamma=0.1):
-        self.scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma)
-        self.step_size = step_size
-        self.step = 0
-
-    def __call__(self, *args, **kwargs):
-        self.step += 1
-        if not self.step % self.step_size:
-            logger.info('Reducing learning rate exponentially.')
-            self.scheduler.step()
-
-    @property
-    def call_frequency(self):
-        return 'epoch'
-
-
-class annealing_reduceonplateau(object):
-    def __init__(self, optimizer, patience=5, factor=0.1, mode='max', min_lr=1e-7):
-        self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,
-                                                                    mode=mode,
-                                                                    factor=factor,
-                                                                    patience=patience,
-                                                                    min_lr=min_lr)
-
-    def __call__(self, *args, **kwargs):
-        self.scheduler.step(kwargs['val_loss'])
-
-    @property
-    def call_frequency(self):
-        return 'epoch'
-
-
-class annealing_cosine(object):
-    def __init__(self, optimizer, t_max=50, eta_min=1e-7):
-        self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, t_max, eta_min)
-
-    def __call__(self, *args, **kwargs):
-        self.scheduler.step()
-
-    @property
-    def call_frequency(self):
-        return 'epoch'
-
-
-class annealing_onecycle(object):
-    def __init__(self, optimizer, max_lr=1e-3, epochs=50, steps_per_epoch=None):
-        self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer,
-                                                                    max_lr=max_lr,
-                                                                    epochs=epochs,
-                                                                    steps_per_epoch=steps_per_epoch)
-
-    def __call__(self, *args, **kwargs):
-        self.scheduler.step()
-
-    @property
-    def call_frequency(self):
-        return 'batch'
-
-
-class TrainScheduler(object):
-    """
-    Implements learning rate scheduling.
-    """
-
-    def __init__(self, optimizer: torch.optim.Optimizer) -> None:
-        self.steps = []
-        self.lengths = []
-        self.optimizer = optimizer
-        self.iterations = 0
-        self.epoch_iterations = 0
-        self.t_steps = 0
-        self.lr_sched = None
-        self.cycle = False
-
-    def add_phase(self,
-                  steps: int,
-                  annealing_fn: Callable = None) -> None:
-        """
-        Adds a new phase to the scheduler.
-
-        Args:
-            steps (int): Number of step for this scheduler. Can be epochs or
-                         iteration depending on the scheduler.
-            max_lr (float): Peak learning rate
-            annealing_fn (Callable): LR change function.
-        """
-        self.lengths.append(steps)
-        self.steps.append(annealing_fn(self.optimizer))
-
-    def batch_step(self, loss: torch.float = None) -> None:
-        """
-        Performs an optimization step.
-        """
-        if not self.cycle:
-            logger.debug('First call to lr scheduler')
-            self.lengths = cycle(self.lengths)
-            self.steps = cycle(self.steps)
-            self.cycle = True
-
-        if self.lr_sched is None:
-            self.t_steps = next(self.lengths)
-            self.lr_sched = next(self.steps)
-
-        self.iterations += 1
-        if self.lr_sched.call_frequency == 'batch':
-            logger.debug('Adjusting learning rate (batch)')
-            self.lr_sched(loss=loss)
-            if self.iterations == self.t_steps:
-                logger.debug('Switching to next lr scheduler')
-                self.iterations = 0
-                self.t_steps = next(self.lengths)
-                self.lr_sched = next(self.steps)
-
-    def epoch_step(self, val_loss: torch.float = None) -> None:
-        """
-        Performs an optimization step.
-        """
-        if not self.cycle:
-            logger.debug('First call to lr scheduler')
-            self.lengths = cycle(self.lengths)
-            self.steps = cycle(self.steps)
-            self.cycle = True
-
-        if self.lr_sched is None:
-            self.t_steps = next(self.lengths)
-            self.lr_sched = next(self.steps)
-
-        self.epoch_iterations += 1
-        if self.lr_sched.call_frequency == 'epoch':
-            logger.debug('Adjusting learning rate (epoch)')
-            self.lr_sched(val_loss=val_loss)
-            if self.epoch_iterations == self.t_steps:
-                logger.debug('Switching to next lr scheduler')
-                self.epoch_iterations = 0
-                self.t_steps = next(self.lengths)
-                self.lr_sched = next(self.steps)
-
-
-class EarlyStopping(TrainStopper):
-    """
-    Early stopping to terminate training when validation loss doesn't improve
-    over a certain time.
-    """
-
-    def __init__(self, min_delta: float = None, lag: int = 1000) -> None:
-        """
-        Args:
-            it (torch.utils.data.DataLoader): training data loader
-            min_delta (float): minimum change in validation loss to qualify as
-                               improvement. If `None` then linear auto-scaling
-                               of the delta is used with
-                               min_delta = (1 - val_loss)/20.
-            lag (int): Number of iterations to wait for improvement before
-                       terminating.
-        """
-        super().__init__()
-        self.min_delta = min_delta
-        self.auto_delta = False if min_delta else True
-        self.best_sig_loss = self.best_loss
-        self.lag = lag
-        self.wait = -1
-
-    def update(self, val_loss: torch.float) -> None:
-        """
-        Updates the internal validation loss state and increases counter by
-        one.
-        """
-        self.epoch += 1
-        self.wait += 1
-
-        if self.auto_delta:
-            self.min_delta = (1 - self.best_loss) / 20
-            logger.debug('Rescaling early stopping loss to {}'.format(self.min_delta))
-        if np.isclose(1., val_loss.cpu().numpy()):
-            logger.debug('Validation loss is close to perfect. Triggering early stopping.')
-            self.wait = self.lag
-        elif (val_loss - self.best_sig_loss) >= self.min_delta:
-            logger.debug('Resetting early stopping counter')
-            self.wait = 0
-            self.best_sig_loss = val_loss
-        # keep track of best absolute loss
-        if val_loss > self.best_loss:
-            self.best_loss = val_loss
-            self.best_epoch = self.epoch
-
-    def trigger(self) -> bool:
-        return not self.wait >= self.lag
-
-
-class EpochStopping(TrainStopper):
-    """
-    Dumb stopping after a fixed number of iterations.
-    """
-
-    def __init__(self, epochs: int) -> None:
-        """
-        Args:
-            epochs (int): Number of epochs to train for
-        """
-        super().__init__()
-        self.epochs = epochs
-
-    def update(self, val_loss: torch.float) -> None:
-        """
-        Only update internal best iteration
-        """
-        if val_loss > self.best_loss:
-            self.best_loss = val_loss
-            self.best_epoch = self.epoch
-        self.epoch += 1
-
-    def trigger(self) -> bool:
-        return self.epoch < self.epochs
-
-
-class NoStopping(TrainStopper):
-    """
-    Never stops training.
-    """
-
-    def __init__(self) -> None:
-        super().__init__()
-
-    def update(self, val_loss: torch.float) -> None:
-        """
-        Only update internal best iteration
-        """
-        if val_loss > self.best_loss:
-            self.best_loss = val_loss
-            self.best_epoch = self.epoch
-        self.epoch += 1
-
-    def trigger(self) -> bool:
-        return True
-
 
 class SegmentationModel(pl.LightningModule):
     def __init__(self, model: vgsl.TorchVGSLModel, hyper_params):
@@ -473,6 +189,7 @@ class RecognitionModel(pl.LightningModule):
         self.num_workers = num_workers
         self.resize = resize
         self.format_type = format_type
+        self.output = output
 
         DatasetClass = GroundTruthDataset
         valid_norm = True
@@ -656,7 +373,7 @@ class RecognitionModel(pl.LightningModule):
         chars = torch.stack([x['chars'] for x in outputs]).sum()
         error = torch.stack([x['error'] for x in outputs]).sum()
         accuracy = (chars - error) / (chars + torch.finfo(torch.float).eps)
-        self.log("val_metric", accuracy)
+        self.log("val_accuracy", accuracy, prog_bar=True)
 
     def configure_optimizers(self):
         logger.debug(f'Constructing {self.hparams.optimizer} optimizer (lr: {self.hparams.lrate}, momentum: {self.hparams.momentum})')
@@ -732,7 +449,7 @@ class RecognitionModel(pl.LightningModule):
             if 'seg_type' not in self.nn.user_metadata:
                 self.nn.user_metadata['seg_type'] = self.train_set.dataset.seg_type
 
-            self.rec_nn = models.TorchSeqRecognizer(self.nn, device=None)
+            self.rec_nn = models.TorchSeqRecognizer(self.nn, train=None, device=None)
             self.net = self.nn.nn
 
     def train_dataloader(self):
@@ -750,7 +467,17 @@ class RecognitionModel(pl.LightningModule):
                           pin_memory=True,
                           collate_fn=collate_sequences)
 
+    def configure_callbacks(self):
+        callbacks = []
+        if self.hparams.quit == 'early':
+            callbacks.append(EarlyStopping(monitor='val_accuracy',
+                                           mode='max',
+                                           patience=self.hparams.lag,
+                                           stopping_threshold=1.0))
+        return callbacks
 
+    def on_validation_end(self):
+        self.nn.save_model(f'{self.output}_{self.current_epoch}.mlmodel')
 
 #class KrakenTrainer(object):
 #    """
