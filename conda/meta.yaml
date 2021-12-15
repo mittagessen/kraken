@@ -23,7 +23,7 @@ requirements:
      - protobuf>=3.0
      - jinja2
      - conda-forge::torchvision
-     - conda-forge::pytorch>=1.5.0,<1.11
+     - conda-forge::pytorch>=1.7.1,<1.11
      - cudatoolkit>=9.2
      - jsonschema
      - scikit-image>=0.17.0
