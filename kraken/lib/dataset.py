@@ -457,7 +457,6 @@ class ArrowIPCRecognitionDataset(Dataset):
                  reorder: Union[bool, str] = True,
                  im_transforms: Callable[[Any], torch.Tensor] = transforms.Compose([]),
                  augmentation: bool = False,
-                 preload: bool = False,
                  split_filter: Optional[str] = None) -> None:
         """
         Creates a dataset for a polygonal (baseline) transcription model.
@@ -470,8 +469,7 @@ class ArrowIPCRecognitionDataset(Dataset):
                      Set to L|R to change the default text direction.
             im_transforms: Function taking an PIL.Image and returning a tensor
                            suitable for forward passes.
-            augmentation: Enables preloading and preprocessing of image files.
-            preload: Ignored.
+            augmentation: Enables augmentation.
             split_filter: Enables filtering of the dataset according to mask
                           values in the set split. If set to `None` all rows
                           are sampled, if set to `train`, `validation`, or
@@ -597,7 +595,6 @@ class PolygonGTDataset(Dataset):
                  whitespace_normalization: bool = True,
                  reorder: Union[bool, str] = True,
                  im_transforms: Callable[[Any], torch.Tensor] = transforms.Compose([]),
-                 preload: bool = False,
                  augmentation: bool = False) -> None:
         """
         Creates a dataset for a polygonal (baseline) transcription model.
@@ -611,7 +608,6 @@ class PolygonGTDataset(Dataset):
                                 direction.
             im_transforms (func): Function taking an PIL.Image and returning a
                                   tensor suitable for forward passes.
-            preload (bool): Enables preloading and preprocessing of image files.
             augmentation (bool): Enables augmentation.
         """
         self._images = []  # type:  Union[List[Image], List[torch.Tensor]]
@@ -619,11 +615,6 @@ class PolygonGTDataset(Dataset):
         self.alphabet = Counter()  # type: Counter
         self.text_transforms = []  # type: List[Callable[[str], str]]
         self.transforms = im_transforms
-        if preload:
-            warnings.warn('Preloading is deprecated and will be removed in the '
-                          'next major release of kraken. Use precompiled datasets '
-                          'instead.', PendingDeprecationWarning, stacklevel=2)
-        self.preload = preload
         self.aug = None
 
         self.seg_type = 'baselines'
@@ -671,13 +662,7 @@ class PolygonGTDataset(Dataset):
         """
         if 'preparse' not in kwargs or not kwargs['preparse']:
             kwargs = self.parse(*args, **kwargs)
-        if kwargs['preload']:
-            if kwargs['im_mode'] > self.im_mode:
-                logger.info(f'Upgrading "im_mode" from {self.im_mode} to {kwargs["im_mode"]}.')
-                self.im_mode = kwargs['im_mode']
-            self._images.append(kwargs['image'])
-        else:
-            self._images.append((kwargs['image'], kwargs['baseline'], kwargs['boundary']))
+        self._images.append((kwargs['image'], kwargs['baseline'], kwargs['boundary']))
         self._gt.append(kwargs['text'])
         self.alphabet.update(kwargs['text'])
 
@@ -708,39 +693,11 @@ class PolygonGTDataset(Dataset):
             raise KrakenInputException('No baseline given for line')
         if not boundary:
             raise KrakenInputException('No boundary given for line')
-        if self.preload:
-            if not isinstance(image, Image.Image):
-                im = Image.open(image)
-            try:
-                im, _ = next(extract_polygons(im, {'type': 'baselines',
-                                                   'lines': [{'baseline': baseline, 'boundary': boundary}]}))
-            except IndexError:
-                raise KrakenInputException('Patch extraction failed for baseline')
-            try:
-                im = self.transforms(im)
-                if im.shape[0] == 3:
-                    im_mode = 'RGB'
-                elif im.shape[0] == 1:
-                    im_mode = 'L'
-                if is_bitonal(im):
-                    im_mode = '1'
-            except ValueError:
-                raise KrakenInputException(f'Image transforms failed on {image}')
-
-            return {'text': text,
-                    'image': im,
-                    'baseline': baseline,
-                    'boundary': boundary,
-                    'im_mode': im_mode,
-                    'preload': True,
-                    'preparse': True}
-        else:
-            return {'text': text,
-                    'image': image,
-                    'baseline': baseline,
-                    'boundary': boundary,
-                    'preload': False,
-                    'preparse': True}
+        return {'text': text,
+                'image': image,
+                'baseline': baseline,
+                'boundary': boundary,
+                'preparse': True}
 
     def encode(self, codec: Optional[PytorchCodec] = None) -> None:
         """
@@ -765,43 +722,35 @@ class PolygonGTDataset(Dataset):
             self.training_set.append((im, gt))
 
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor]:
-        if self.preload:
-            x, y = self.training_set[index]
-            if self.aug:
-                x = x.permute((1, 2, 0)).numpy()
-                o = self.aug(image=x)
-                x = torch.tensor(o['image'].transpose(2, 0, 1))
-            return {'image': x, 'target': y}
-        else:
-            item = self.training_set[index]
-            try:
-                logger.debug(f'Attempting to load {item[0]}')
-                im = item[0][0]
-                if not isinstance(im, Image.Image):
-                    im = Image.open(im)
-                im, _ = next(extract_polygons(im, {'type': 'baselines',
-                                                   'lines': [{'baseline': item[0][1], 'boundary': item[0][2]}]}))
-                im = self.transforms(im)
-                if im.shape[0] == 3:
-                    im_mode = 'RGB'
-                elif im.shape[0] == 1:
-                    im_mode = 'L'
-                if is_bitonal(im):
-                    im_mode = '1'
+        item = self.training_set[index]
+        try:
+            logger.debug(f'Attempting to load {item[0]}')
+            im = item[0][0]
+            if not isinstance(im, Image.Image):
+                im = Image.open(im)
+            im, _ = next(extract_polygons(im, {'type': 'baselines',
+                                               'lines': [{'baseline': item[0][1], 'boundary': item[0][2]}]}))
+            im = self.transforms(im)
+            if im.shape[0] == 3:
+                im_mode = 'RGB'
+            elif im.shape[0] == 1:
+                im_mode = 'L'
+            if is_bitonal(im):
+                im_mode = '1'
 
-                if im_mode > self.im_mode:
-                    logger.info(f'Upgrading "im_mode" from {self.im_mode} to {im_mode}')
-                    self.im_mode = im_mode
-                if self.aug:
-                    im = im.permute((1, 2, 0)).numpy()
-                    o = self.aug(image=im)
-                    im = torch.tensor(o['image'].transpose(2, 0, 1))
-                return {'image': im, 'target': item[1]}
-            except Exception:
-                idx = np.random.randint(0, len(self.training_set))
-                logger.debug(traceback.format_exc())
-                logger.info(f'Failed. Replacing with sample {idx}')
-                return self[np.random.randint(0, len(self.training_set))]
+            if im_mode > self.im_mode:
+                logger.info(f'Upgrading "im_mode" from {self.im_mode} to {im_mode}')
+                self.im_mode = im_mode
+            if self.aug:
+                im = im.permute((1, 2, 0)).numpy()
+                o = self.aug(image=im)
+                im = torch.tensor(o['image'].transpose(2, 0, 1))
+            return {'image': im, 'target': item[1]}
+        except Exception:
+            idx = np.random.randint(0, len(self.training_set))
+            logger.debug(traceback.format_exc())
+            logger.info(f'Failed. Replacing with sample {idx}')
+            return self[np.random.randint(0, len(self.training_set))]
 
     def __len__(self) -> int:
         return len(self._images)
@@ -819,7 +768,6 @@ class GroundTruthDataset(Dataset):
                  whitespace_normalization: bool = True,
                  reorder: Union[bool, str] = True,
                  im_transforms: Callable[[Any], torch.Tensor] = transforms.Compose([]),
-                 preload: bool = True,
                  augmentation: bool = False) -> None:
         """
         Reads a list of image-text pairs and creates a ground truth set.
@@ -844,7 +792,6 @@ class GroundTruthDataset(Dataset):
                                 direction.
             im_transforms (func): Function taking an PIL.Image and returning a
                                   tensor suitable for forward passes.
-            preload (bool): Enables preloading and preprocessing of image files.
             augmentation (bool): Enables augmentation.
         """
         self.suffix = suffix
@@ -855,12 +802,6 @@ class GroundTruthDataset(Dataset):
         self.text_transforms = []  # type: List[Callable[[str], str]]
         self.transforms = im_transforms
         self.aug = None
-
-        self.preload = preload
-        if preload:
-            warnings.warn('Preloading is deprecated and will be removed in the '
-                          'next major release of kraken. Use precompiled datasets '
-                          'instead.', PendingDeprecationWarning, stacklevel=2)
 
         self.seg_type = 'bbox'
         # built text transformations
@@ -904,9 +845,6 @@ class GroundTruthDataset(Dataset):
         """
         if 'preparse' not in kwargs or not kwargs['preparse']:
             kwargs = self.parse(*args, **kwargs)
-        if kwargs['preload'] and kwargs['im_mode'] > self.im_mode:
-            logger.info(f'upgrading "im_mode" from {self.im_mode} to {kwargs["im_mode"]}.')
-            self.im_mode = kwargs['im_mode']
         self._images.append(kwargs['image'])
         self._gt.append(kwargs['text'])
         self.alphabet.update(kwargs['text'])
@@ -926,21 +864,7 @@ class GroundTruthDataset(Dataset):
                 gt = func(gt)
             if not gt:
                 raise KrakenInputException(f'Text line is empty ({fp.name})')
-        if self.preload:
-            try:
-                im = Image.open(image)
-                im = self.transforms(im)
-                if im.shape[0] == 3:
-                    im_mode = 'RGB'
-                elif im.shape[0] == 1:
-                    im_mode = 'L'
-                if is_bitonal(im):
-                    im_mode = '1'
-            except ValueError:
-                raise KrakenInputException(f'Image transforms failed on {image}')
-            return {'image': im, 'text': gt, 'im_mode': im_mode, 'preload': True, 'preparse': True}
-        else:
-            return {'image': image, 'text': gt, 'preload': False, 'preparse': True}
+        return {'image': image, 'text': gt, 'preparse': True}
 
     def encode(self, codec: Optional[PytorchCodec] = None) -> None:
         """
@@ -965,41 +889,32 @@ class GroundTruthDataset(Dataset):
             self.training_set.append((im, gt))
 
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor]:
-        if self.preload:
-            x, y = self.training_set[index]
+        item = self.training_set[index]
+        try:
+            logger.debug(f'Attempting to load {item[0]}')
+            im = item[0]
+            if not isinstance(im, Image.Image):
+                im = Image.open(im)
+            im = self.transforms(im)
+            if im.shape[0] == 3:
+                im_mode = 'RGB'
+            elif im.shape[0] == 1:
+                im_mode = 'L'
+            if is_bitonal(im):
+                im_mode = '1'
+            if im_mode > self.im_mode:
+                logger.info(f'Upgrading "im_mode" from {self.im_mode} to {im_mode}')
+                self.im_mode = im_mode
             if self.aug:
-                im = x.permute((1, 2, 0)).numpy()
+                im = im.permute((1, 2, 0)).numpy()
                 o = self.aug(image=im)
                 im = torch.tensor(o['image'].transpose(2, 0, 1))
-                return {'image': im, 'target': y}
-            return {'image': x, 'target': y}
-        else:
-            item = self.training_set[index]
-            try:
-                logger.debug(f'Attempting to load {item[0]}')
-                im = item[0]
-                if not isinstance(im, Image.Image):
-                    im = Image.open(im)
-                im = self.transforms(im)
-                if im.shape[0] == 3:
-                    im_mode = 'RGB'
-                elif im.shape[0] == 1:
-                    im_mode = 'L'
-                if is_bitonal(im):
-                    im_mode = '1'
-                if im_mode > self.im_mode:
-                    logger.info(f'Upgrading "im_mode" from {self.im_mode} to {im_mode}')
-                    self.im_mode = im_mode
-                if self.aug:
-                    im = im.permute((1, 2, 0)).numpy()
-                    o = self.aug(image=im)
-                    im = torch.tensor(o['image'].transpose(2, 0, 1))
-                return {'image': im, 'target': item[1]}
-            except Exception:
-                idx = np.random.randint(0, len(self.training_set))
-                logger.debug(traceback.format_exc())
-                logger.info(f'Failed. Replacing with sample {idx}')
-                return self[np.random.randint(0, len(self.training_set))]
+            return {'image': im, 'target': item[1]}
+        except Exception:
+            idx = np.random.randint(0, len(self.training_set))
+            logger.debug(traceback.format_exc())
+            logger.info(f'Failed. Replacing with sample {idx}')
+            return self[np.random.randint(0, len(self.training_set))]
 
     def __len__(self) -> int:
         return len(self._images)

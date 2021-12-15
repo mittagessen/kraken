@@ -181,7 +181,7 @@ def _validate_merging(ctx, param, value):
 @click.option('-e', '--evaluation-files', show_default=True, default=None, multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
-@click.option('--threads', show_default=True, default=1, help='Number of OpenMP threads and workers when running on CPU.')
+@click.option('--workers', show_default=True, default=1, help='Number of OpenMP threads and workers when running on CPU.')
 @click.option('--load-hyper-parameters/--no-load-hyper-parameters', show_default=True, default=False,
               help='When loading an existing model, retrieve hyper-parameters from the model')
 @click.option('--force-binarization/--no-binarization', show_default=True,
@@ -238,7 +238,7 @@ def _validate_merging(ctx, param, value):
 def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
              lag, min_delta, device, optimizer, lrate, momentum, weight_decay,
              schedule, gamma, step_size, sched_patience, cos_max, partition,
-             training_files, evaluation_files, threads, load_hyper_parameters,
+             training_files, evaluation_files, workers, load_hyper_parameters,
              force_binarization, format_type, suppress_regions,
              suppress_baselines, valid_regions, valid_baselines, merge_regions,
              merge_baselines, bounding_regions, augment, resize, topline, ground_truth):
@@ -459,9 +459,7 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
 @click.option('-e', '--evaluation-files', show_default=True, default=None, multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
-@click.option('--preload/--no-preload', show_default=True, default=None,
-              help='Hard enable/disable for training data preloading')
-@click.option('--threads', show_default=True, default=1, help='Number of OpenMP threads and workers when running on CPU.')
+@click.option('--workers', show_default=True, default=1, help='Number of OpenMP threads and workers when running on CPU.')
 @click.option('--load-hyper-parameters/--no-load-hyper-parameters', show_default=True, default=False,
               help='When loading an existing model, retrieve hyperparameters from the model')
 @click.option('--repolygonize/--no-repolygonize', show_default=True,
@@ -493,7 +491,7 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
           min_epochs, lag, min_delta, device, optimizer, lrate, momentum,
           weight_decay, schedule, gamma, step_size, sched_patience, cos_max,
           partition, normalization, normalize_whitespace, codec, resize, reorder,
-          base_dir, training_files, evaluation_files, preload, threads,
+          base_dir, training_files, evaluation_files, workers,
           load_hyper_parameters, repolygonize, force_binarization, format_type,
           augment, ground_truth):
     """
@@ -565,7 +563,7 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
                              training_data=ground_truth,
                              evaluation_data=evaluation_files,
                              partition=partition,
-                             num_workers=threads,
+                             num_workers=workers,
                              load_hyper_parameters=load_hyper_parameters,
                              repolygonize=repolygonize,
                              force_binarization=force_binarization,
@@ -597,7 +595,7 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
 @click.option('-d', '--device', show_default=True, default='cpu', help='Select device to use (cpu, cuda:0, cuda:1, ...)')
 @click.option('--pad', show_default=True, type=click.INT, default=16, help='Left and right '
               'padding around lines')
-@click.option('--threads', show_default=True, default=1, help='Number of OpenMP threads when running on CPU.')
+@click.option('--workers', show_default=True, default=1, help='Number of OpenMP threads when running on CPU.')
 @click.option('--reorder/--no-reorder', show_default=True, default=True, help='Reordering of code points to display order')
 @click.option('--base-dir', show_default=True, default='auto',
               type=click.Choice(['L', 'R', 'auto']), help='Set base text '
@@ -629,7 +627,7 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
               'containing the baseline information. In `binary` mode files are '
               'collections of pre-extracted text line images.')
 @click.argument('test_set', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
-def test(ctx, batch_size, model, evaluation_files, device, pad, threads,
+def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
          reorder, base_dir, normalization, normalize_whitespace, repolygonize,
          force_binarization, format_type, test_set):
     """
@@ -706,8 +704,7 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, threads,
         ds = DatasetClass(normalization=normalization,
                           whitespace_normalization=normalize_whitespace,
                           reorder=reorder,
-                          im_transforms=ts,
-                          preload=False)
+                          im_transforms=ts)
         for line in test_set:
             try:
                 ds.add(**line)
@@ -717,7 +714,7 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, threads,
         ds.no_encode()
         ds_loader = DataLoader(ds,
                                batch_size=batch_size,
-                               num_workers=threads,
+                               num_workers=workers,
                                pin_memory=True,
                                collate_fn=collate_sequences)
 
@@ -1130,7 +1127,7 @@ def publish(ctx, metadata, access_token, model):
 @cli.command('compile')
 @click.pass_context
 @click.option('-o', '--output', show_default=True, type=click.Path(), default='model', help='Output model file')
-@click.option('--threads', show_default=True, default=1, help='Number of OpenMP threads and workers when running on CPU.')
+@click.option('--workers', show_default=True, default=1, help='Number of OpenMP threads and workers when running on CPU.')
 @click.option('-f', '--format-type', type=click.Choice(['path', 'xml', 'alto', 'page']), default='xml',
               help='Sets the training data format. In ALTO and PageXML mode all '
               'data is extracted from xml files containing both baselines and a '
@@ -1145,7 +1142,7 @@ def publish(ctx, metadata, access_token, model):
                    'output file. Larger batches require more transient memory '
                    'but slightly improve reading performance.')
 @click.argument('ground_truth', nargs=-1, type=click.Path(exists=True, dir_okay=False))
-def compile(ctx, output, threads, format_type, save_splits, recordbatch_size, ground_truth):
+def compile(ctx, output, workers, format_type, save_splits, recordbatch_size, ground_truth):
     """
     Precompiles a binary dataset from a collection of XML files.
     """
@@ -1160,7 +1157,7 @@ def compile(ctx, output, threads, format_type, save_splits, recordbatch_size, gr
     arrow_dataset.build_binary_dataset(ground_truth,
                                        output,
                                        format_type,
-                                       threads,
+                                       workers,
                                        save_splits,
                                        recordbatch_size,
                                        _init_progressbar)
