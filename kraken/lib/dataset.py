@@ -597,7 +597,7 @@ class PolygonGTDataset(Dataset):
                  whitespace_normalization: bool = True,
                  reorder: Union[bool, str] = True,
                  im_transforms: Callable[[Any], torch.Tensor] = transforms.Compose([]),
-                 preload: bool = True,
+                 preload: bool = False,
                  augmentation: bool = False) -> None:
         """
         Creates a dataset for a polygonal (baseline) transcription model.

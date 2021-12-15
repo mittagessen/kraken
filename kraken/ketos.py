@@ -381,6 +381,10 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
               show_default=True,
               default=RECOGNITION_HYPER_PARAMS['epochs'],
               help='Number of epochs to train for')
+@click.option('--min-epochs',
+              show_default=True,
+              default=RECOGNITION_HYPER_PARAMS['min_epochs'],
+              help='Minimal number of epochs to train for when using early stopping.')
 @click.option('--lag',
               show_default=True,
               default=RECOGNITION_HYPER_PARAMS['lag'],
@@ -486,9 +490,9 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
               help='Enable image augmentation')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
-          lag, min_delta, device, optimizer, lrate, momentum, weight_decay,
-          schedule, gamma, step_size, sched_patience, cos_max, partition,
-          normalization, normalize_whitespace, codec, resize, reorder,
+          min_epochs, lag, min_delta, device, optimizer, lrate, momentum,
+          weight_decay, schedule, gamma, step_size, sched_patience, cos_max,
+          partition, normalization, normalize_whitespace, codec, resize, reorder,
           base_dir, training_files, evaluation_files, preload, threads,
           load_hyper_parameters, repolygonize, force_binarization, format_type,
           augment, ground_truth):
@@ -504,7 +508,7 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
     import json
     import shutil
     import numpy as np
-    from kraken.lib.train import KrakenTrainer
+    from kraken.lib.train import RecognitionModel, KrakenTrainer
 
     hyper_params = RECOGNITION_HYPER_PARAMS.copy()
     hyper_params.update({'freq': freq,
@@ -512,6 +516,7 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
                          'batch_size': batch_size,
                          'quit': quit,
                          'epochs': epochs,
+                         'min_epochs': min_epochs,
                          'lag': lag,
                          'min_delta': min_delta,
                          'optimizer': optimizer,
@@ -542,63 +547,37 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
     if reorder and base_dir != 'auto':
         reorder = base_dir
 
-    np.random.shuffle(ground_truth)
-
     if codec:
         logger.debug(f'Loading codec file from {codec}')
         codec = json.load(codec)
 
-    def _init_progressbar(label, length):
-        if 'bar' in ctx.meta:
-            ctx.meta['bar'].__exit__(None, None, None)
-        ctx.meta['bar'] = log.progressbar(label=label, length=length, show_pos=True)
-        ctx.meta['bar'].__enter__()
-        return lambda: ctx.meta['bar'].update(1)
+    model = RecognitionModel(hyper_params=hyper_params,
+                             output=output,
+                             spec=spec,
+                             append=append,
+                             model=load,
+                             reorder=reorder,
+                             training_data=ground_truth,
+                             evaluation_data=evaluation_files,
+                             partition=partition,
+                             num_workers=threads,
+                             load_hyper_parameters=load_hyper_parameters,
+                             repolygonize=repolygonize,
+                             force_binarization=force_binarization,
+                             format_type=format_type,
+                             codec=codec,
+                             resize=resize,
+                             augment=augment)
 
-    trainer = KrakenTrainer.recognition_train_gen(hyper_params,
-                                                  message=message,
-                                                  progress_callback=_init_progressbar,
-                                                  output=output,
-                                                  spec=spec,
-                                                  append=append,
-                                                  load=load,
-                                                  device=device,
-                                                  reorder=reorder,
-                                                  training_data=ground_truth,
-                                                  evaluation_data=evaluation_files,
-                                                  partition=partition,
-                                                  preload=preload,
-                                                  threads=threads,
-                                                  load_hyper_parameters=load_hyper_parameters,
-                                                  repolygonize=repolygonize,
-                                                  force_binarization=force_binarization,
-                                                  format_type=format_type,
-                                                  codec=codec,
-                                                  resize=resize,
-                                                  augment=augment)
-
-    with log.progressbar(label='stage {}/{}'.format(1, trainer.stopper.epochs if trainer.stopper.epochs > 0 else '∞'),
-                         length=trainer.event_it, show_pos=True) as bar:
-
-        def _draw_progressbar():
-            bar.update(1)
-
-        def _print_eval(epoch, accuracy, chars, error, **kwargs):
-            message('Accuracy report ({}) {:0.4f} {} {}'.format(epoch, accuracy, chars, error))
-            # reset progress bar
-            bar.label = 'stage {}/{}'.format(epoch + 1, trainer.stopper.epochs if trainer.stopper.epochs > 0 else '∞')
-            bar.pos = 0
-            bar.finished = False
-            bar.start = bar.last_eta = time.time()
-
-        trainer.run(_print_eval, _draw_progressbar)
+    trainer = KrakenTrainer(max_epochs=hyper_params['epochs'] if hyper_params['quit'] == 'dumb' else -1)
+    trainer.fit(model)
 
     if quit == 'early':
         message('Moving best model {0}_{1}.mlmodel ({2}) to {0}_best.mlmodel'.format(
-            output, trainer.stopper.best_epoch, trainer.stopper.best_loss))
+            output, model.best_epoch, model.best_metric))
         logger.info('Moving best model {0}_{1}.mlmodel ({2}) to {0}_best.mlmodel'.format(
-            output, trainer.stopper.best_epoch, trainer.stopper.best_loss))
-        shutil.copy(f'{output}_{trainer.stopper.best_epoch}.mlmodel', f'{output}_best.mlmodel')
+            output, model.best_epoch, model.best_metric))
+        shutil.copy(f'{output}_{model.best_epoch}.mlmodel', f'{output}_best.mlmodel')
 
 
 @cli.command('test')

@@ -19,7 +19,7 @@ Training loop interception helpers
 import os
 import re
 import abc
-import math
+import sys
 import torch
 import pathlib
 import logging
@@ -29,9 +29,11 @@ import pytorch_lightning as pl
 
 from itertools import cycle
 from functools import partial
+from tqdm import tqdm as _tqdm
 from torch.multiprocessing import Pool
-from typing import cast, Callable, Dict, Optional, Sequence, Union, Any
-from pytorch_lightning.callbacks import EarlyStopping
+from typing import cast, Callable, Dict, Optional, Sequence, Union, Any, List
+from pytorch_lightning.callbacks import EarlyStopping, Callback
+from pytorch_lightning.callbacks.progress.tqdm_progress import Tqdm
 
 from kraken.lib import models, vgsl, segmentation, default_specs
 from kraken.lib.xml import preparse_xml_data
@@ -44,7 +46,7 @@ from kraken.lib.dataset import (ArrowIPCRecognitionDataset, BaselineSet,
 from kraken.lib.models import validate_hyper_parameters
 from kraken.lib.exceptions import KrakenInputException, KrakenEncodeException
 
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader, random_split, Subset
 
 
 logger = logging.getLogger(__name__)
@@ -59,78 +61,108 @@ def _star_fun(fun, kwargs):
         logger.warning(str(e))
     return None
 
-class SegmentationModel(pl.LightningModule):
-    def __init__(self, model: vgsl.TorchVGSLModel, hyper_params):
-        super().__init__()
-        self.nn = model
-        self.save_hyperparameters()
 
-    def forward(self, x):
-        return self.nn(x)
+class KrakenTrainer(pl.Trainer):
+    def __init__(self,
+                 callbacks: Optional[Union[List[Callback], Callback]] = None,
+                 enable_progress_bar: bool = True,
+                 min_epochs=5,
+                 max_epochs=100,
+                 *args,
+                 **kwargs):
+        kwargs['logger'] = False
+        kwargs['checkpoint_callback'] = False
+        kwargs['enable_progress_bar'] = enable_progress_bar
+        kwargs['min_epochs'] = min_epochs
+        kwargs['max_epochs'] = max_epochs
+        if enable_progress_bar:
+            progress_bar_cb = KrakenProgressBar()
+            if 'callbacks' in kwargs:
+                if isinstance(kwargs['callbacks'], list):
+                    kwargs['callbacks'].append(progress_bar_cb)
+                else:
+                    kwargs['callbacks'] = list(kwargs['callbacks'], progress_bar_cb)
+            else:
+                kwargs['callbacks'] = progress_bar_cb
+        super().__init__(*args, **kwargs)
 
-    def training_step(self, batch, batch_idx):
-        input, target = batch['image'], batch['target']
-        output, _ = self.model.nn(input)
-        output = F.interpolate(output, size=(target.size(2), target.size(3)))
-        loss = criterion(output, target)
-        return loss
+    def on_validation_end(self):
+        if not self.sanity_checking:
+            # fill one_channel_mode after 1 iteration over training data set
+            if self.current_epoch == 0 and self.model.nn.model_type == 'recognition':
+                im_mode = self.model.train_set.dataset.im_mode
+                if im_mode in ['1', 'L']:
+                    logger.info(f'Setting model one_channel_mode to {im_mode}.')
+                    self.model.nn.one_channel_mode = im_mode
+            self.model.nn.hyper_params['completed_epochs'] += 1
+            self.model.nn.user_metadata['accuracy'].append(((self.current_epoch+1)*len(self.model.train_set),
+                                                             {k: float(v) for k, v in  self.logged_metrics.items()}))
 
-    def validation_step(self, batch, batch_idx):
-        smooth = torch.finfo(torch.float).eps
-        val_set = val_loader.dataset
-        corrects = torch.zeros(val_set.num_classes, dtype=torch.double).to(device)
-        all_n = torch.zeros(val_set.num_classes, dtype=torch.double).to(device)
-        intersections = torch.zeros(val_set.num_classes, dtype=torch.double).to(device)
-        unions = torch.zeros(val_set.num_classes, dtype=torch.double).to(device)
-        cls_cnt = torch.zeros(val_set.num_classes, dtype=torch.double).to(device)
-        model.eval()
+            logger.info('Saving to {}_{}'.format(self.model.output, self.current_epoch))
+            self.model.nn.save_model(f'{self.model.output}_{self.current_epoch}.mlmodel')
 
-        with torch.no_grad():
-            for batch in val_loader:
-                x, y = batch['image'], batch['target']
-                x = x.to(device)
-                y = y.to(device)
-                pred, _ = model.nn(x)
-                # scale target to output size
-                y = F.interpolate(y, size=(pred.size(2), pred.size(3))).squeeze(0).bool()
-                pred = segmentation.denoising_hysteresis_thresh(pred.detach().squeeze().cpu().numpy(), 0.2, 0.3, 0)
-                pred = torch.from_numpy(pred.astype('bool')).to(device)
-                pred = pred.view(pred.size(0), -1)
-                y = y.view(y.size(0), -1)
-                intersections += (y & pred).sum(dim=1, dtype=torch.double)
-                unions += (y | pred).sum(dim=1, dtype=torch.double)
-                corrects += torch.eq(y, pred).sum(dim=1, dtype=torch.double)
-                cls_cnt += y.sum(dim=1, dtype=torch.double)
-                all_n += y.size(1)
-        model.train()
-        # all_positives = tp + fp
-        # actual_positives = tp + fn
-        # true_positivies = tp
-        pixel_accuracy = corrects.sum() / all_n.sum()
-        mean_accuracy = torch.mean(corrects / all_n)
-        iu = (intersections + smooth) / (unions + smooth)
-        mean_iu = torch.mean(iu)
-        freq_iu = torch.sum(cls_cnt / cls_cnt.sum() * iu)
-        return {'accuracy': pixel_accuracy,
-                'mean_acc': mean_accuracy,
-                'mean_iu': mean_iu,
-                'freq_iu': freq_iu,
-                'val_metric': mean_iu}
 
-    def validation_epoch_end(self, validation_step_outputs):
-        pass
+class KrakenProgressBar(pl.callbacks.TQDMProgressBar):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.bar_format = '{l_bar}{bar}|{n_fmt}/{total_fmt} [{elapsed}<{remaining}{postfix}]'
 
-    def test_step(self, batch, batch_idx):
-        pass
+    def on_validation_start(self, trainer, pl_module):
+        if not trainer.sanity_checking:
+            print()
+        super().on_validation_epoch_start(trainer, pl_module)
 
-    def configure_optimizers(self):
-        if self.hparams.optimizer == 'Adam':
-            optim = torch.optim.Adam(self.nn.nn.parameters(), lr=self.hparams.lrate, weight_decay=self.hparams.weight_decay)
-        else:
-            optim = getattr(torch.optim, self.hparams.optimizer)(self.nn.nn.parameters(),
-                                                                 lr=self.hparams.lrate,
-                                                                 momentum=self.hparams.momentum,
-                                                                 weight_decay=self.hparams.weight_decay)
+    def on_train_epoch_start(self, trainer, pl_module):
+        print()
+        super().on_train_epoch_start(trainer, pl_module)
+
+    def on_train_epoch_start(self, trainer, pl_module):
+        super().on_train_epoch_start(trainer, pl_module)
+        self.main_progress_bar.reset(total=self.total_train_batches)
+        self.main_progress_bar.n = self.train_batch_idx
+        self.main_progress_bar.set_description(f"stage {trainer.current_epoch}/{trainer.max_epochs if pl_module.hparams.quit == 'dumb' else '∞'}")
+
+    def get_metrics(self, trainer, model):
+        # don't show the version number
+        items = super().get_metrics(trainer, model)
+        items.pop('v_num', None)
+        items.pop('loss', None)
+        items.pop('val_metric', None)
+        return items
+
+    def init_train_tqdm(self):
+        bar = Tqdm(desc="Training",
+                   initial=self.train_batch_idx,
+                   disable=self.is_disabled,
+                   position=(2 * self.process_position),
+                   leave=True,
+                   dynamic_ncols=True,
+                   file=sys.stdout,
+                   smoothing=0,
+                   bar_format=self.bar_format)
+        return bar
+
+    def init_validation_tqdm(self):
+        # The main progress bar doesn't exist in `trainer.validate()`
+        bar = Tqdm(desc="validating",
+                   disable=self.is_disabled,
+                   position=(2 * self.process_position),
+                   leave=True,
+                   dynamic_ncols=True,
+                   file=sys.stdout,
+                   bar_format=self.bar_format)
+        return bar
+
+    def init_sanity_tqdm(self):
+        bar = Tqdm(desc="validation sanity check",
+                   disable=self.is_disabled,
+                   position=(2 * self.process_position),
+                   leave=True,
+                   dynamic_ncols=True,
+                   file=sys.stdout,
+                   bar_format=self.bar_format)
+        return bar
+
 
 class RecognitionModel(pl.LightningModule):
     def __init__(self,
@@ -191,6 +223,9 @@ class RecognitionModel(pl.LightningModule):
         self.format_type = format_type
         self.output = output
 
+        self.best_epoch = 0
+        self.best_metric = 0.0
+
         DatasetClass = GroundTruthDataset
         valid_norm = True
         if format_type in ['xml', 'page', 'alto']:
@@ -250,7 +285,7 @@ class RecognitionModel(pl.LightningModule):
             batch, height, width, channels = [int(x) for x in m.groups()]
             self.spec = spec
         else:
-            batch, channels, height, width = nn.input
+            batch, channels, height, width = self.nn.input
 
         self.transforms = ImageInputTransforms(batch,
                                                height,
@@ -373,7 +408,10 @@ class RecognitionModel(pl.LightningModule):
         chars = torch.stack([x['chars'] for x in outputs]).sum()
         error = torch.stack([x['error'] for x in outputs]).sum()
         accuracy = (chars - error) / (chars + torch.finfo(torch.float).eps)
-        self.log("val_accuracy", accuracy, prog_bar=True)
+        if accuracy > self.best_metric:
+            self.best_epoch = self.current_epoch
+            self.best_metric = accuracy
+        self.log_dict({'val_accuracy': accuracy, 'val_metric': accuracy}, prog_bar=True)
 
     def configure_optimizers(self):
         logger.debug(f'Constructing {self.hparams.optimizer} optimizer (lr: {self.hparams.lrate}, momentum: {self.hparams.momentum})')
@@ -436,6 +474,8 @@ class RecognitionModel(pl.LightningModule):
                 self.nn.init_weights()
                 self.nn.add_codec(self.train_set.dataset.codec)
 
+            self.val_set.dataset.encode(self.nn.codec)
+
             if self.nn.one_channel_mode and self.train_set.dataset.im_mode != self.nn.one_channel_mode:
                 logger.warning(f'Neural network has been trained on mode {nn.one_channel_mode} images, '
                                f'training set contains mode {self.train_set.dataset.im_mode} data. Consider setting `force_binarization`')
@@ -472,12 +512,85 @@ class RecognitionModel(pl.LightningModule):
         if self.hparams.quit == 'early':
             callbacks.append(EarlyStopping(monitor='val_accuracy',
                                            mode='max',
+                                           verbose=True,
                                            patience=self.hparams.lag,
                                            stopping_threshold=1.0))
         return callbacks
 
-    def on_validation_end(self):
-        self.nn.save_model(f'{self.output}_{self.current_epoch}.mlmodel')
+
+class SegmentationModel(pl.LightningModule):
+    def __init__(self, model: vgsl.TorchVGSLModel, hyper_params):
+        super().__init__()
+        self.nn = model
+        self.save_hyperparameters()
+
+    def forward(self, x):
+        return self.nn(x)
+
+    def training_step(self, batch, batch_idx):
+        input, target = batch['image'], batch['target']
+        output, _ = self.model.nn(input)
+        output = F.interpolate(output, size=(target.size(2), target.size(3)))
+        loss = criterion(output, target)
+        return loss
+
+    def validation_step(self, batch, batch_idx):
+        smooth = torch.finfo(torch.float).eps
+        val_set = val_loader.dataset
+        corrects = torch.zeros(val_set.num_classes, dtype=torch.double).to(device)
+        all_n = torch.zeros(val_set.num_classes, dtype=torch.double).to(device)
+        intersections = torch.zeros(val_set.num_classes, dtype=torch.double).to(device)
+        unions = torch.zeros(val_set.num_classes, dtype=torch.double).to(device)
+        cls_cnt = torch.zeros(val_set.num_classes, dtype=torch.double).to(device)
+        model.eval()
+
+        with torch.no_grad():
+            for batch in val_loader:
+                x, y = batch['image'], batch['target']
+                x = x.to(device)
+                y = y.to(device)
+                pred, _ = model.nn(x)
+                # scale target to output size
+                y = F.interpolate(y, size=(pred.size(2), pred.size(3))).squeeze(0).bool()
+                pred = segmentation.denoising_hysteresis_thresh(pred.detach().squeeze().cpu().numpy(), 0.2, 0.3, 0)
+                pred = torch.from_numpy(pred.astype('bool')).to(device)
+                pred = pred.view(pred.size(0), -1)
+                y = y.view(y.size(0), -1)
+                intersections += (y & pred).sum(dim=1, dtype=torch.double)
+                unions += (y | pred).sum(dim=1, dtype=torch.double)
+                corrects += torch.eq(y, pred).sum(dim=1, dtype=torch.double)
+                cls_cnt += y.sum(dim=1, dtype=torch.double)
+                all_n += y.size(1)
+        model.train()
+        # all_positives = tp + fp
+        # actual_positives = tp + fn
+        # true_positivies = tp
+        pixel_accuracy = corrects.sum() / all_n.sum()
+        mean_accuracy = torch.mean(corrects / all_n)
+        iu = (intersections + smooth) / (unions + smooth)
+        mean_iu = torch.mean(iu)
+        freq_iu = torch.sum(cls_cnt / cls_cnt.sum() * iu)
+        return {'accuracy': pixel_accuracy,
+                'mean_acc': mean_accuracy,
+                'mean_iu': mean_iu,
+                'freq_iu': freq_iu,
+                'val_metric': mean_iu}
+
+    def validation_epoch_end(self, validation_step_outputs):
+        pass
+
+    def test_step(self, batch, batch_idx):
+        pass
+
+    def configure_optimizers(self):
+        if self.hparams.optimizer == 'Adam':
+            optim = torch.optim.Adam(self.nn.nn.parameters(), lr=self.hparams.lrate, weight_decay=self.hparams.weight_decay)
+        else:
+            optim = getattr(torch.optim, self.hparams.optimizer)(self.nn.nn.parameters(),
+                                                                 lr=self.hparams.lrate,
+                                                                 momentum=self.hparams.momentum,
+                                                                 weight_decay=self.hparams.weight_decay)
+
 
 #class KrakenTrainer(object):
 #    """
