@@ -987,9 +987,11 @@ class BaselineSet(Dataset):
                     im_paths.append(data['image'])
                     lines = defaultdict(list)
                     for line in data['lines']:
-                        if valid_baselines is None or line['script'] in valid_baselines:
-                            lines[self.mbl_dict.get(line['script'], line['script'])].append(line['baseline'])
-                            self.class_stats['baselines'][self.mbl_dict.get(line['script'], line['script'])] += 1
+                        if valid_baselines is None or line['tags'].intersection(valid_baselines):
+                            tags = line['tags'].intersection(valid_baselines) if valid_baselines else line['tags']
+                            for tag in tags:
+                                lines[self.mbl_dict.get(tag, tag)].append(line['baseline'])
+                                self.class_stats['baselines'][self.mbl_dict.get(tag, tag)] += 1
                     regions = defaultdict(list)
                     for k, v in data['regions'].items():
                         if valid_regions is None or k in valid_regions:
@@ -1064,8 +1066,8 @@ class BaselineSet(Dataset):
         Args:
             im (path): Path to the whole page image
             baseline (dict): A list containing dicts with a list of coordinates
-                             and script types [{'baseline': [[x0, y0], ...,
-                             [xn, yn]], 'script': 'script_type'}, ...]
+                             and tags [{'baseline': [[x0, y0], ...,
+                             [xn, yn]], 'tags': ('script_type',)}, ...]
             regions (dict): A dict containing list of lists of coordinates
                             {'region_type_0': [[x0, y0], ..., [xn, yn]]],
                             'region_type_1': ...}.
@@ -1074,14 +1076,16 @@ class BaselineSet(Dataset):
             raise Exception(f'The `add` method is incompatible with dataset mode {self.mode}')
         baselines_ = defaultdict(list)
         for line in baselines:
-            line_type = self.mbl_dict.get(line['script'], line['script'])
-            if self.valid_baselines is None or line['script'] in self.valid_baselines:
-                baselines_[line_type].append(line['baseline'])
-                self.class_stats['baselines'][line_type] += 1
+            line_type = self.mbl_dict.get(line['tags'][0], line['tags'][0])
+            if self.valid_baselines is None or line['tags'] in self.valid_baselines:
+                tags = line['tags'].intersection(valid_baselines) if valid_baselines else line['tags']
+                for tag in tags:
+                    baselines_[tag].append(line['baseline'])
+                    self.class_stats['baselines'][tag] += 1
 
-                if line_type not in self.class_mapping['baselines']:
-                    self.num_classes += 1
-                    self.class_mapping['baselines'][line_type] = self.num_classes - 1
+                    if tag not in self.class_mapping['baselines']:
+                        self.num_classes += 1
+                        self.class_mapping['baselines'][tag] = self.num_classes - 1
 
         regions_ = defaultdict(list)
         for k, v in regions.items():
