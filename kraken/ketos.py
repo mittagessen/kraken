@@ -551,6 +551,11 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
         logger.debug(f'Loading codec file from {codec}')
         codec = json.load(codec)
 
+    if device == 'cpu':
+        device = None
+    elif device.startswith('cuda'):
+        device = [int(device.split(':')[-1])]
+
     model = RecognitionModel(hyper_params=hyper_params,
                              output=output,
                              spec=spec,
@@ -569,7 +574,7 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
                              resize=resize,
                              augment=augment)
 
-    trainer = KrakenTrainer(max_epochs=hyper_params['epochs'] if hyper_params['quit'] == 'dumb' else -1)
+    trainer = KrakenTrainer(gpus=device, max_epochs=hyper_params['epochs'] if hyper_params['quit'] == 'dumb' else -1)
     trainer.fit(model)
 
     if quit == 'early':
