@@ -71,7 +71,7 @@ class KrakenTrainer(pl.Trainer):
                  *args,
                  **kwargs):
         kwargs['logger'] = False
-        kwargs['checkpoint_callback'] = False
+        kwargs['enable_checkpointing'] = False
         kwargs['enable_progress_bar'] = enable_progress_bar
         kwargs['min_epochs'] = min_epochs
         kwargs['max_epochs'] = max_epochs
