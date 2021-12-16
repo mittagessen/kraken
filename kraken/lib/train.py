@@ -839,7 +839,7 @@ class SegmentationModel(pl.LightningModule):
             self.nn.user_metadata['class_mapping'] = self.val_set.dataset.class_mapping
 
             # for model size/trainable parameter output
-            self.net = self.nn
+            self.net = self.nn.nn
 
             torch.set_num_threads(max(self.num_workers, 1))
 
