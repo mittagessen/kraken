@@ -16,9 +16,7 @@
 """
 Training loop interception helpers
 """
-import os
 import re
-import abc
 import sys
 import torch
 import pathlib
@@ -27,22 +25,20 @@ import numpy as np
 import torch.nn.functional as F
 import pytorch_lightning as pl
 
-from itertools import cycle
 from functools import partial
-from tqdm import tqdm as _tqdm
 from torch.multiprocessing import Pool
-from typing import cast, Callable, Dict, Optional, Sequence, Union, Any, List
+from typing import Callable, Dict, Optional, Sequence, Union, Any, List
 from pytorch_lightning.callbacks import EarlyStopping, Callback
 from pytorch_lightning.callbacks.progress.tqdm_progress import Tqdm
 
-from kraken.lib import models, vgsl, segmentation, default_specs
+from kraken.lib import models, vgsl, default_specs
 from kraken.lib.xml import preparse_xml_data
 from kraken.lib.util import make_printable
 from kraken.lib.codec import PytorchCodec
 from kraken.lib.dataset import (ArrowIPCRecognitionDataset, BaselineSet,
                                 GroundTruthDataset, PolygonGTDataset,
-                                ImageInputTransforms, InfiniteDataLoader,
-                                compute_error, collate_sequences)
+                                ImageInputTransforms, compute_error,
+                                collate_sequences)
 from kraken.lib.models import validate_hyper_parameters
 from kraken.lib.exceptions import KrakenInputException, KrakenEncodeException
 
@@ -84,6 +80,7 @@ class KrakenTrainer(pl.Trainer):
                     kwargs['callbacks'] = list(kwargs['callbacks'], progress_bar_cb)
             else:
                 kwargs['callbacks'] = progress_bar_cb
+
         super().__init__(*args, **kwargs)
 
     def on_validation_end(self):
@@ -96,7 +93,7 @@ class KrakenTrainer(pl.Trainer):
                     self.model.nn.one_channel_mode = im_mode
             self.model.nn.hyper_params['completed_epochs'] += 1
             self.model.nn.user_metadata['accuracy'].append(((self.current_epoch+1)*len(self.model.train_set),
-                                                             {k: float(v) for k, v in  self.logged_metrics.items()}))
+                                                            {k: float(v) for k, v in self.logged_metrics.items()}))
 
             logger.info('Saving to {}_{}'.format(self.model.output, self.current_epoch))
             self.model.nn.save_model(f'{self.model.output}_{self.current_epoch}.mlmodel')
@@ -114,9 +111,6 @@ class KrakenProgressBar(pl.callbacks.TQDMProgressBar):
 
     def on_train_epoch_start(self, trainer, pl_module):
         print()
-        super().on_train_epoch_start(trainer, pl_module)
-
-    def on_train_epoch_start(self, trainer, pl_module):
         super().on_train_epoch_start(trainer, pl_module)
         self.main_progress_bar.reset(total=self.total_train_batches)
         self.main_progress_bar.n = self.train_batch_idx
@@ -308,7 +302,7 @@ class RecognitionModel(pl.LightningModule):
             val_len = len(train_set) - train_len
             logger.info(f'No explicit validation data provided. Splitting off '
                         f'{val_len} (of {len(train_set)}) samples to validation '
-                         'set. (Will disable alphabet mismatch detection.)')
+                        'set. (Will disable alphabet mismatch detection.)')
             self.train_set, self.val_set = random_split(train_set, (train_len, val_len))
 
         if len(self.train_set) == 0 or len(self.val_set) == 0:
@@ -421,7 +415,7 @@ class RecognitionModel(pl.LightningModule):
                                                                  lr=self.hparams.lrate,
                                                                  momentum=self.hparams.momentum,
                                                                  weight_decay=self.hparams.weight_decay)
-        return {'optimizer': optim,}
+        return {'optimizer': optim, }
 
     def setup(self, stage: Optional[str] = None):
         # finalize models in case of appending/loading
@@ -429,9 +423,9 @@ class RecognitionModel(pl.LightningModule):
             if self.append:
                 self.train_set.dataset.encode(self.codec)
                 # now we can create a new model
-                spec = '[{} O1c{}]'.format(spec[1:-1], self.train_set.dataset.codec.max_label + 1)
+                self.spec = '[{} O1c{}]'.format(self.spec[1:-1], self.train_set.dataset.codec.max_label + 1)
                 logger.info(f'Appending {self.spec} to existing model {self.nn.spec} after {self.append}')
-                self.nn.append(self.append, spec)
+                self.nn.append(self.append, self.spec)
                 self.nn.add_codec(self.train_set.dataset.codec)
                 logger.info(f'Assembled model spec: {self.nn.spec}')
             elif self.model:
@@ -452,7 +446,7 @@ class RecognitionModel(pl.LightningModule):
                         self.nn.add_codec(codec)
                         logger.info(f'Resizing last layer in network to {codec.max_label+1} outputs')
                         self.nn.resize_output(codec.max_label + 1)
-                        self.train_set.dataset.encode(nn.codec)
+                        self.train_set.dataset.encode(self.nn.codec)
                     elif self.resize == 'both':
                         logger.info(f'Resizing network or given codec to {self.train_set.dataset.alphabet} code sequences')
                         self.train_set.dataset.encode(None)
@@ -476,7 +470,7 @@ class RecognitionModel(pl.LightningModule):
             self.val_set.dataset.encode(self.nn.codec)
 
             if self.nn.one_channel_mode and self.train_set.dataset.im_mode != self.nn.one_channel_mode:
-                logger.warning(f'Neural network has been trained on mode {nn.one_channel_mode} images, '
+                logger.warning(f'Neural network has been trained on mode {self.nn.one_channel_mode} images, '
                                f'training set contains mode {self.train_set.dataset.im_mode} data. Consider setting `force_binarization`')
 
             if self.format_type != 'path' and self.nn.seg_type == 'bbox':
@@ -490,6 +484,8 @@ class RecognitionModel(pl.LightningModule):
 
             self.rec_nn = models.TorchSeqRecognizer(self.nn, train=None, device=None)
             self.net = self.nn.nn
+
+            torch.set_num_threads(max(self.num_workers, 1))
 
     def train_dataloader(self):
         return DataLoader(self.train_set,
@@ -541,6 +537,21 @@ class SegmentationModel(pl.LightningModule):
                  bounding_regions: Optional[Sequence[str]] = None,
                  resize: str = 'fail',
                  topline: Union[bool, None] = False):
+        """
+        A LightningModule encapsulating the training setup for a page
+        segmentation model.
+
+        Setup parameters (load, training_data, evaluation_data, ....) are
+        named, model hyperparameters (everything in
+        `kraken.lib.default_specs.SEGMENTATION_HYPER_PARAMS`) are in in the
+        `hyper_params` argument.
+
+        Args:
+            hyper_params (dict): Hyperparameter dictionary containing all fields
+                                 from
+                                 kraken.lib.default_specs.SEGMENTATION_HYPER_PARAMS
+            **kwargs: Setup parameters, i.e. CLI parameters of the segtrain() command.
+        """
 
         super().__init__()
 
@@ -565,7 +576,7 @@ class SegmentationModel(pl.LightningModule):
             else:
                 hp = {}
             hyper_params_.update(hp)
-            batch, channels, height, width = nn.input
+            batch, channels, height, width = self.nn.input
         else:
             self.nn = None
 
@@ -586,7 +597,7 @@ class SegmentationModel(pl.LightningModule):
         self.save_hyperparameters(hyper_params_)
 
         if not training_data:
-            raise ValueError(f'No training data provided. Please add some.')
+            raise ValueError('No training data provided. Please add some.')
 
         transforms = ImageInputTransforms(batch, height, width, channels, 0, valid_norm=False, force_binarization=force_binarization)
 
@@ -640,17 +651,17 @@ class SegmentationModel(pl.LightningModule):
             val_set = Subset(val_set, range(len(val_set)))
         else:
             train_len = int(len(train_set)*partition)
-            val_len = len(len(train_set)) - train_len
+            val_len = len(train_set) - train_len
             logger.info(f'No explicit validation data provided. Splitting off '
                         f'{val_len} (of {len(train_set)}) samples to validation '
-                         'set.')
+                        'set.')
             train_set, val_set = random_split(train_set, (train_len, val_len))
 
         if len(train_set) == 0:
-            raise ValueError(f'No valid training data provided. Please add some.')
+            raise ValueError('No valid training data provided. Please add some.')
 
         if len(val_set) == 0:
-            raise ValueError(f'No valid validation data provided. Please add some.')
+            raise ValueError('No valid validation data provided. Please add some.')
 
         # overwrite class mapping in validation set
         val_set.dataset.num_classes = train_set.dataset.num_classes
@@ -732,9 +743,9 @@ class SegmentationModel(pl.LightningModule):
                     regions_diff = set(self.train_set.dataset.class_mapping['regions'].keys()).symmetric_difference(
                         set(self.nn.user_metadata['class_mapping']['regions'].keys()))
 
-                    if resize == 'fail':
+                    if self.resize == 'fail':
                         raise ValueError(f'Training data and model class mapping differ (bl: {bl_diff}, regions: {regions_diff}')
-                    elif resize == 'add':
+                    elif self.resize == 'add':
                         new_bls = self.train_set.dataset.class_mapping['baselines'].keys() - self.nn.user_metadata['class_mapping']['baselines'].keys()
                         new_regions = self.train_set.dataset.class_mapping['regions'].keys() - self.nn.user_metadata['class_mapping']['regions'].keys()
                         cls_idx = max(max(self.nn.user_metadata['class_mapping']['baselines'].values()) if self.nn.user_metadata['class_mapping']['baselines'] else -1,
@@ -747,7 +758,7 @@ class SegmentationModel(pl.LightningModule):
                         for c in new_regions:
                             cls_idx += 1
                             self.nn.user_metadata['class_mapping']['regions'][c] = cls_idx
-                    elif resize == 'both':
+                    elif self.resize == 'both':
                         logger.info('Fitting network exactly to training set.')
                         new_bls = self.train_set.dataset.class_mapping['baselines'].keys() - self.nn.user_metadata['class_mapping']['baselines'].keys()
                         new_regions = self.train_set.dataset.class_mapping['regions'].keys() - self.nn.user_metadata['class_mapping']['regions'].keys()
@@ -792,7 +803,7 @@ class SegmentationModel(pl.LightningModule):
                             cls_idx += 1
                             self.nn.user_metadata['class_mapping']['regions'][c] = cls_idx
                     else:
-                        raise ValueError(f'invalid resize parameter value {resize}')
+                        raise ValueError(f'invalid resize parameter value {self.resize}')
                 # backfill train_set/val_set mapping if key-equal as the actual
                 # numbering in the train_set might be different
                 self.train_set.dataset.class_mapping = self.nn.user_metadata['class_mapping']
@@ -827,7 +838,13 @@ class SegmentationModel(pl.LightningModule):
             self.nn.model_type = 'segmentation'
             self.nn.user_metadata['class_mapping'] = self.val_set.dataset.class_mapping
 
+            # for model size/trainable parameter output
+            self.net = self.nn
+
+            torch.set_num_threads(max(self.num_workers, 1))
+
     def configure_optimizers(self):
+        logger.debug(f'Constructing {self.hparams.optimizer} optimizer (lr: {self.hparams.lrate}, momentum: {self.hparams.momentum})')
         if self.hparams.optimizer == 'Adam':
             optim = torch.optim.Adam(self.nn.nn.parameters(), lr=self.hparams.lrate, weight_decay=self.hparams.weight_decay)
         else:
@@ -835,6 +852,8 @@ class SegmentationModel(pl.LightningModule):
                                                                  lr=self.hparams.lrate,
                                                                  momentum=self.hparams.momentum,
                                                                  weight_decay=self.hparams.weight_decay)
+        return {'optimizer': optim, }
+
     def train_dataloader(self):
         return DataLoader(self.train_set,
                           batch_size=1,
@@ -848,130 +867,12 @@ class SegmentationModel(pl.LightningModule):
                           num_workers=self.num_workers,
                           pin_memory=True)
 
-#    @classmethod
-#    def segmentation_train_gen(cls,
-#                               hyper_params: Dict = None,
-#                               load_hyper_parameters: bool = False,
-#                               progress_callback: Callable[[str, int], Callable[[None], None]] = lambda string, length: lambda: None,
-#                               message: Callable[[str], None] = lambda *args, **kwargs: None,
-#                               output: str = 'model',
-#                               spec: str = default_specs.SEGMENTATION_SPEC,
-#                               load: Optional[str] = None,
-#                               device: str = 'cpu',
-#                               training_data: Union[Sequence[Union[pathlib.Path, str]], Sequence[Dict[str, Any]]] = None,
-#                               evaluation_data: Optional[Union[Sequence[Union[pathlib.Path, str]], Sequence[Dict[str, Any]]]] = None,
-#                               partition: Optional[float] = None,
-#                               threads: int = 1,
-#                               force_binarization: bool = False,
-#                               format_type: str = 'path',
-#                               suppress_regions: bool = False,
-#                               suppress_baselines: bool = False,
-#                               valid_regions: Optional[Sequence[str]] = None,
-#                               valid_baselines: Optional[Sequence[str]] = None,
-#                               merge_regions: Optional[Dict[str, str]] = None,
-#                               merge_baselines: Optional[Dict[str, str]] = None,
-#                               bounding_regions: Optional[Sequence[str]] = None,
-#                               resize: str = 'fail',
-#                               augment: bool = False,
-#                               topline: Union[bool, None] = False):
-#        """
-#        This is an ugly constructor that takes all the arguments from the command
-#        line driver, finagles the datasets, models, and hyperparameters correctly
-#        and returns a KrakenTrainer object.
-#
-#        Setup parameters (load, training_data, evaluation_data, ....) are named,
-#        model hyperparameters (everything in
-#        kraken.lib.default_specs.SEGMENTATION_HYPER_PARAMS) are in in the
-#        `hyper_params` argument.
-#
-#        Args:
-#            hyper_params (dict): Hyperparameter dictionary containing all fields
-#                                 from
-#                                 kraken.lib.default_specs.SEGMENTATION_HYPER_PARAMS
-#            progress_callback (Callable): Callback for progress reports on various
-#                                          computationally expensive processes. A
-#                                          human readable string and the process
-#                                          length is supplied. The callback has to
-#                                          return another function which will be
-#                                          executed after each step.
-#            message (Callable): Messaging printing method for above log but below
-#                                warning level output, i.e. infos that should
-#                                generally be shown to users.
-#            **kwargs: Setup parameters, i.e. CLI parameters of the train() command.
-#
-#        Returns:
-#            A KrakenTrainer object.
-#        """
-#        # load model if given. if a new model has to be created we need to do that
-#        # after data set initialization, otherwise to output size is still unknown.
-#        # set mode to training
-#        nn.train()
-#
-#        logger.debug(f'Set OpenMP threads to {threads}')
-#        nn.set_num_threads(threads)
-#
-#        if hyper_params['optimizer'] == 'Adam':
-#            optim = torch.optim.Adam(nn.nn.parameters(), lr=hyper_params['lrate'], weight_decay=hyper_params['weight_decay'])
-#        else:
-#            optim = getattr(torch.optim, hyper_params['optimizer'])(nn.nn.parameters(),
-#                                                                    lr=hyper_params['lrate'],
-#                                                                    momentum=hyper_params['momentum'],
-#                                                                    weight_decay=hyper_params['weight_decay'])
-#
-#        tr_it = TrainScheduler(optim)
-#        if hyper_params['schedule'] == '1cycle':
-#            annealing_one = partial(annealing_onecycle,
-#                                    max_lr=hyper_params['lrate'],
-#                                    epochs=hyper_params['epochs'],
-#                                    steps_per_epoch=len(gt_set))
-#            tr_it.add_phase(int(len(gt_set) * hyper_params['epochs']),
-#                            annealing_one)
-#        elif hyper_params['schedule'] == 'exponential':
-#            annealing_exp = partial(annealing_exponential,
-#                                    step_size=hyper_params['step_size'],
-#                                    gamma=hyper_params['gamma'])
-#            tr_it.add_phase(int(len(gt_set) * hyper_params['epochs']),
-#                            annealing_exp)
-#        elif hyper_params['schedule'] == 'step':
-#            annealing_step_p = partial(annealing_step,
-#                                       step_size=hyper_params['step_size'],
-#                                       gamma=hyper_params['gamma'])
-#            tr_it.add_phase(int(len(gt_set) * hyper_params['epochs']),
-#                            annealing_step_p)
-#        elif hyper_params['schedule'] == 'reduceonplateau':
-#            annealing_red = partial(annealing_reduceonplateau,
-#                                    patience=hyper_params['rop_patience'],
-#                                    factor=hyper_params['gamma'])
-#            tr_it.add_phase(int(len(gt_set) * hyper_params['epochs']),
-#                            annealing_red)
-#        elif hyper_params['schedule'] == 'cosine':
-#            annealing_cos = partial(annealing_cosine, t_max=hyper_params['cos_t_max'])
-#            tr_it.add_phase(int(len(gt_set) * hyper_params['epochs']),
-#                            annealing_cos)
-#        else:
-#            # constant learning rate scheduler
-#            tr_it.add_phase(int(len(gt_set) * hyper_params['epochs']),
-#                            annealing_const)
-#
-#        if hyper_params['quit'] == 'early':
-#            st_it = EarlyStopping(hyper_params['min_delta'], hyper_params['lag'])
-#        elif hyper_params['quit'] == 'dumb':
-#            st_it = EpochStopping(hyper_params['epochs'] - hyper_params['completed_epochs'])
-#        else:
-#            logger.error(f'Invalid training interruption scheme {quit}')
-#            return None
-#
-#        trainer = cls(model=nn,
-#                      optimizer=optim,
-#                      device=device,
-#                      filename_prefix=output,
-#                      event_frequency=hyper_params['freq'],
-#                      train_set=train_loader,
-#                      val_set=val_loader,
-#                      stopper=st_it,
-#                      loss_fn=baseline_label_loss_fn,
-#                      evaluator=baseline_label_evaluator_fn)
-#
-#        trainer.add_lr_scheduler(tr_it)
-#
-#        return trainer
+    def configure_callbacks(self):
+        callbacks = []
+        if self.hparams.quit == 'early':
+            callbacks.append(EarlyStopping(monitor='val_mean_iu',
+                                           mode='max',
+                                           verbose=True,
+                                           patience=self.hparams.lag,
+                                           stopping_threshold=1.0))
+        return callbacks

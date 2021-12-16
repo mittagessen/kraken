@@ -246,9 +246,8 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
     Trains a baseline labeling model for layout analysis
     """
     import shutil
-    import numpy as np
 
-    from kraken.lib.train import KrakenTrainer
+    from kraken.lib.train import SegmentationModel, KrakenTrainer
 
     if resize != 'fail' and not load:
         raise click.BadOptionUsage('resize', 'resize option requires loading an existing model')
@@ -286,65 +285,38 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
     if len(ground_truth) == 0:
         raise click.UsageError('No training data was provided to the train command. Use `-t` or the `ground_truth` argument.')
 
-    np.random.shuffle(ground_truth)
-
-    def _init_progressbar(label, length):
-        if 'bar' in ctx.meta:
-            ctx.meta['bar'].__exit__(None, None, None)
-        ctx.meta['bar'] = log.progressbar(label=label, length=length, show_pos=True)
-        ctx.meta['bar'].__enter__()
-        return lambda: ctx.meta['bar'].update(1)
-
     topline = {'topline': True,
                'baseline': False,
                'centerline': None}[topline]
 
-    trainer = KrakenTrainer.segmentation_train_gen(hyper_params,
-                                                   message=message,
-                                                   progress_callback=_init_progressbar,
-                                                   output=output,
-                                                   spec=spec,
-                                                   load=load,
-                                                   device=device,
-                                                   training_data=training_files,
-                                                   evaluation_data=evaluation_files,
-                                                   partition=partition,
-                                                   threads=threads,
-                                                   load_hyper_parameters=load_hyper_parameters,
-                                                   force_binarization=force_binarization,
-                                                   format_type=format_type,
-                                                   suppress_regions=suppress_regions,
-                                                   suppress_baselines=suppress_baselines,
-                                                   valid_regions=valid_regions,
-                                                   valid_baselines=valid_baselines,
-                                                   merge_regions=merge_regions,
-                                                   merge_baselines=merge_baselines,
-                                                   bounding_regions=bounding_regions,
-                                                   augment=augment,
-                                                   resize=resize,
-                                                   topline=topline)
+    if device == 'cpu':
+        device = None
+    elif device.startswith('cuda'):
+        device = [int(device.split(':')[-1])]
 
-    with log.progressbar(label='stage {}/{}'.format(1, trainer.stopper.epochs if trainer.stopper.epochs > 0 else '∞'),
-                         length=trainer.event_it, show_pos=True) as bar:
+    model = SegmentationModel(hyper_params,
+                             output=output,
+                             spec=spec,
+                             model=load,
+                             training_data=ground_truth,
+                             evaluation_data=evaluation_files,
+                             partition=partition,
+                             num_workers=workers,
+                             load_hyper_parameters=load_hyper_parameters,
+                             force_binarization=force_binarization,
+                             format_type=format_type,
+                             suppress_regions=suppress_regions,
+                             suppress_baselines=suppress_baselines,
+                             valid_regions=valid_regions,
+                             valid_baselines=valid_baselines,
+                             merge_regions=merge_regions,
+                             merge_baselines=merge_baselines,
+                             bounding_regions=bounding_regions,
+                             resize=resize,
+                             topline=topline)
 
-        def _draw_progressbar():
-            bar.update(1)
-
-        def _print_eval(epoch, accuracy, mean_acc, mean_iu, freq_iu, **kwargs):
-            message(
-                'Accuracy report ({}) mean_iu: {:0.4f} freq_iu: {:0.4f} mean_acc: {:0.4f} accuracy: {:0.4f}'.format(
-                    epoch,
-                    mean_iu,
-                    freq_iu,
-                    mean_acc,
-                    accuracy))
-            # reset progress bar
-            bar.label = 'stage {}/{}'.format(epoch + 1, trainer.stopper.epochs if trainer.stopper.epochs > 0 else '∞')
-            bar.pos = 0
-            bar.finished = False
-            bar.start = bar.last_eta = time.time()
-
-        trainer.run(_print_eval, _draw_progressbar)
+    trainer = KrakenTrainer(gpus=device, max_epochs=hyper_params['epochs'] if hyper_params['quit'] == 'dumb' else -1)
+    trainer.fit(model)
 
     if quit == 'early':
         message('Moving best model {0}_{1}.mlmodel ({2}) to {0}_best.mlmodel'.format(
@@ -569,8 +541,7 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
                              force_binarization=force_binarization,
                              format_type=format_type,
                              codec=codec,
-                             resize=resize,
-                             augment=augment)
+                             resize=resize)
 
     trainer = KrakenTrainer(gpus=device, max_epochs=hyper_params['epochs'] if hyper_params['quit'] == 'dumb' else -1)
     trainer.fit(model)

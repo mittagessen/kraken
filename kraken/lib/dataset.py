@@ -20,7 +20,6 @@ import io
 import json
 import torch
 import pathlib
-import warnings
 import traceback
 import numpy as np
 import pyarrow as pa
@@ -36,7 +35,7 @@ from itertools import groupby
 from torchvision import transforms
 from collections import Counter, defaultdict
 from torch.utils.data import Dataset, DataLoader
-from typing import Dict, List, Tuple, Iterable, Sequence, Callable, Optional, Any, Union
+from typing import Dict, List, Tuple, Sequence, Callable, Optional, Any, Union
 
 from skimage.draw import polygon
 
@@ -1076,9 +1075,8 @@ class BaselineSet(Dataset):
             raise Exception(f'The `add` method is incompatible with dataset mode {self.mode}')
         baselines_ = defaultdict(list)
         for line in baselines:
-            line_type = self.mbl_dict.get(line['tags'][0], line['tags'][0])
-            if self.valid_baselines is None or line['tags'] in self.valid_baselines:
-                tags = line['tags'].intersection(valid_baselines) if valid_baselines else line['tags']
+            if self.valid_baselines is None or line['tags'].intersection(self.valid_baselines):
+                tags = line['tags'].intersection(self.valid_baselines) if self.valid_baselines else line['tags']
                 for tag in tags:
                     baselines_[tag].append(line['baseline'])
                     self.class_stats['baselines'][tag] += 1
