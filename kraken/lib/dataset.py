@@ -484,7 +484,7 @@ class ArrowIPCRecognitionDataset(Dataset):
         self.arrow_table = None
         self.codec = None
 
-        self.seg_type = 'baselines'
+        self.seg_type = None
         # built text transformations
         if normalization:
             self.text_transforms.append(partial(F_t.text_normalize, normalization=normalization))
@@ -535,7 +535,17 @@ class ArrowIPCRecognitionDataset(Dataset):
             if not raw_metadata or b'lines' not in raw_metadata:
                 raise ValueError(f'{file} does not contain a valid metadata record.')
             metadata = json.loads(raw_metadata[b'lines'])
-        if metadata['type'] != 'kraken_recognition_baseline':
+        if metadata['type'] == 'kraken_recognition_baseline':
+            if not self.seg_type:
+                self.seg_type = 'baselines'
+            if self.seg_type != 'baselines':
+                raise ValueError(f'File {file} has incompatible type {metadata["type"]} for dataset with type {self.seg_type}.')
+        elif metadata['type'] == 'kraken_recognition_bbox':
+            if not self.seg_type:
+                self.seg_type = 'bbox'
+            if self.seg_type != 'bbox':
+                raise ValueError(f'File {file} has incompatible type {metadata["type"]} for dataset with type {self.seg_type}.')
+        else:
             raise ValueError(f'Unknown type {metadata["type"]} of dataset.')
         if self.split_filter and metadata['counts'][self.split_filter] == 0:
             logger.warning(f'No explicit split for "{self.split_filter}" in dataset {file} (with splits {metadata["counts"].items()}).')
@@ -543,6 +553,10 @@ class ArrowIPCRecognitionDataset(Dataset):
         if metadata['im_mode'] > self.im_mode and self.transforms.mode >= metadata['im_mode']:
             logger.info(f'Upgrading "im_mode" from {self.im_mode} to {metadata["im_mode"]}.')
             self.im_mode = metadata['im_mode']
+        # centerline normalize raw bbox dataset
+        if self.seg_type == 'bbox' and self.im_mode in ['1', 'L'] and metadata['image_type'] == 'raw':
+            self.transforms.valid_norm = True
+
         self.alphabet.update(metadata['alphabet'])
         num_lines = metadata['counts'][self.split_filter] if self.split_filter else metadata['counts']['all']
         if not self.arrow_table:

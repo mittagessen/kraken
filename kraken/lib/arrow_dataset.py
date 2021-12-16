@@ -28,9 +28,11 @@ from PIL import Image
 from collections import Counter
 from typing import Optional, List, Union, Callable
 from multiprocessing import Pool
+from kraken.lib import functional_im_transforms as F_t
 from kraken.lib.segmentation import extract_polygons
 from kraken.lib.xml import parse_xml, parse_alto, parse_page
 from kraken.lib.util import is_bitonal, make_printable
+from kraken.lib.exceptions import KrakenInputException
 
 import logging
 
@@ -57,6 +59,27 @@ def _extract_line(xml_record):
     return lines, im.mode, dict(line_counts)
 
 
+def _extract_path_line(xml_record):
+    try:
+        im = Image.open(xml_record['image'])
+    except FileNotFoundError:
+        return lines, None, None
+    if is_bitonal(im):
+        im = im.convert('1')
+    fp = io.BytesIO()
+    im.save(fp, format='png')
+    line = {'text': xml_record['lines'][0]['text'], 'im': fp.getvalue()}
+    return [line], im.mode, {'all': 1, 'train': 0, 'validation': 0, 'test': 0}
+
+
+def parse_path(path: Union[str, pathlib.Path], suffix: str = '.gt.txt', split=F_t.default_split):
+    with open(F_t.suffix_split(path, split=split, suffix=suffix), 'r', encoding='utf-8') as fp:
+        gt = fp.read().strip('\n\r')
+        if not gt:
+            raise KrakenInputException(f'No text for ground truth line {path}.')
+    return {'image': path, 'lines': [{'text': gt}]}
+
+
 def build_binary_dataset(files: Optional[List[Union[str, pathlib.Path]]] = None,
                          output_file: Union[str, pathlib.Path] = None,
                          format_type: str = 'xml',
@@ -71,7 +94,7 @@ def build_binary_dataset(files: Optional[List[Union[str, pathlib.Path]]] = None,
     Args:
         files: List of XML input files.
         output_file: Path to the output file.
-        format_type: One of `xml`, `alto`, or `page`.
+        format_type: One of `xml`, `alto`, `page`, or `path`.
         num_workers: Number of workers for parallelized extraction of line
                      images. Set to `0` to disable parallelism.
         ignore_splits: Switch to disable serialization of the explicit
@@ -86,18 +109,26 @@ def build_binary_dataset(files: Optional[List[Union[str, pathlib.Path]]] = None,
     """
 
     logger.info('Parsing XML files')
+    extract_fn = _extract_line
     if format_type == 'xml':
         parse_fn = parse_xml
     elif format_type == 'alto':
         parse_fn = parse_alto
     elif format_type == 'page':
         parse_fn = parse_page
+    elif format_type == 'path':
+        parse_fn = parse_path
+        extract_fn = _extract_path_line
     else:
-        raise ValueError(f'invalid format {format_type} for preparse_xml_data')
+        raise ValueError(f'invalid format {format_type} for parse_(xml,alto,page,path)')
 
     docs = []
     for doc in files:
-        data = parse_fn(doc)
+        try:
+            data = parse_fn(doc)
+        except KrakenInputException as e:
+            logger.warning(f'Invalid input file {doc}')
+            continue
         try:
             with open(data['image'], 'rb') as fp:
                 Image.open(fp)
@@ -105,7 +136,7 @@ def build_binary_dataset(files: Optional[List[Union[str, pathlib.Path]]] = None,
             logger.warning(f'Could not open file {e.filename} in {doc}')
             continue
         docs.append(data)
-    logger.info(f'Parsed {len(docs)} XML files.')
+    logger.info(f'Parsed {len(docs)} files.')
 
     logger.info('Assembling dataset alphabet.')
     alphabet = Counter()
@@ -121,7 +152,7 @@ def build_binary_dataset(files: Optional[List[Union[str, pathlib.Path]]] = None,
             char = '\t' + char
         logger.info(f'{char}\t{v}')
 
-    metadata = {'lines': {'type': 'kraken_recognition_baseline',
+    metadata = {'lines': {'type': 'kraken_recognition_baseline' if format_type != 'path' else 'kraken_recognition_bbox',
                           'alphabet': alphabet,
                           'text_type': 'raw',
                           'image_type': 'raw',
@@ -139,7 +170,7 @@ def build_binary_dataset(files: Optional[List[Union[str, pathlib.Path]]] = None,
     ty = pa.struct([('text', pa.string()), ('im', pa.binary())])
     schema = pa.schema([('lines', ty), ('train', pa.bool_()), ('validation', pa.bool_()), ('test', pa.bool_())])
 
-    def _make_record_batch(parsed_lines):
+    def _make_record_batch(line_cache):
         ar = pa.array(line_cache, type=ty)
         train_mask = pa.array([False] * len(line_cache), type=pa.bool_())
         val_mask = pa.array([False] * len(line_cache), type=pa.bool_())
@@ -157,7 +188,7 @@ def build_binary_dataset(files: Optional[List[Union[str, pathlib.Path]]] = None,
                 if num_workers and num_workers > 1:
                     logger.info(f'Spinning up processing pool with {num_workers} workers.')
                     with Pool(num_workers) as pool:
-                        for page_lines, im_mode, line_counts in pool.imap_unordered(_extract_line, docs):
+                        for page_lines, im_mode, line_counts in pool.imap_unordered(extract_fn, docs):
                             if page_lines:
                                 line_cache.extend(page_lines)
                                 # comparison RGB(A) > L > 1
@@ -172,7 +203,7 @@ def build_binary_dataset(files: Optional[List[Union[str, pathlib.Path]]] = None,
                                 callback(len(line_cache), num_lines)
                                 line_cache = []
                 else:
-                    for page_lines, im_mode, line_counts in map(_extract_line, docs):
+                    for page_lines, im_mode, line_counts in map(extract_fn, docs):
                         if page_lines:
                             line_cache.extend(page_lines)
                             # comparison RGB(A) > L > 1
