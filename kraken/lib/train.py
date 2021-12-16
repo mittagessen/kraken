@@ -21,6 +21,7 @@ import sys
 import torch
 import pathlib
 import logging
+import warnings
 import numpy as np
 import torch.nn.functional as F
 import pytorch_lightning as pl
@@ -31,7 +32,7 @@ from typing import Callable, Dict, Optional, Sequence, Union, Any, List
 from pytorch_lightning.callbacks import EarlyStopping, Callback
 from pytorch_lightning.callbacks.progress.tqdm_progress import Tqdm
 
-from kraken.lib import models, vgsl, default_specs
+from kraken.lib import models, vgsl, default_specs, log
 from kraken.lib.xml import preparse_xml_data
 from kraken.lib.util import make_printable
 from kraken.lib.codec import PytorchCodec
@@ -71,15 +72,13 @@ class KrakenTrainer(pl.Trainer):
         kwargs['enable_progress_bar'] = enable_progress_bar
         kwargs['min_epochs'] = min_epochs
         kwargs['max_epochs'] = max_epochs
+        kwargs['callbacks'] = ([] if 'callbacks' not in kwargs else kwargs['callbacks'])
+        if not isinstance(kwargs['callbacks'], list):
+            kwargs['callbacks'] = [kwargs['callbacks']]
+
         if enable_progress_bar:
             progress_bar_cb = KrakenProgressBar()
-            if 'callbacks' in kwargs:
-                if isinstance(kwargs['callbacks'], list):
-                    kwargs['callbacks'].append(progress_bar_cb)
-                else:
-                    kwargs['callbacks'] = list(kwargs['callbacks'], progress_bar_cb)
-            else:
-                kwargs['callbacks'] = progress_bar_cb
+            kwargs['callbacks'].append(progress_bar_cb)
 
         super().__init__(*args, **kwargs)
 
@@ -98,64 +97,73 @@ class KrakenTrainer(pl.Trainer):
             logger.info('Saving to {}_{}'.format(self.model.output, self.current_epoch))
             self.model.nn.save_model(f'{self.model.output}_{self.current_epoch}.mlmodel')
 
+    def fit(self, *args, **kwargs):
+        with warnings.catch_warnings():
+            warnings.filterwarnings(action='ignore', category=UserWarning,
+                                    message='The dataloader,')
+            super().fit(*args, **kwargs)
 
-class KrakenProgressBar(pl.callbacks.TQDMProgressBar):
+class KrakenProgressBar(pl.callbacks.progress.base.ProgressBarBase):
+
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.bar_format = '{l_bar}{bar}|{n_fmt}/{total_fmt} [{elapsed}<{remaining}{postfix}]'
+        """
+        Creates a progress bar using click's progress indicators.
 
-    def on_validation_start(self, trainer, pl_module):
-        if not trainer.sanity_checking:
-            print()
-        super().on_validation_epoch_start(trainer, pl_module)
+        Args:
+            refresh_rate: Determines at which rate (in number of batches) the
+                          progress bars get updated.  Set it to ``0`` to
+                          disable the display.
+            leave: Leaves the finished progress bar in the terminal at the end
+                   of the epoch. Default: False
+        """
+        super().__init__()
+        self.bar = None
+        self.enable = True
 
     def on_train_epoch_start(self, trainer, pl_module):
-        print()
-        super().on_train_epoch_start(trainer, pl_module)
-        self.main_progress_bar.reset(total=self.total_train_batches)
-        self.main_progress_bar.n = self.train_batch_idx
-        self.main_progress_bar.set_description(f"stage {trainer.current_epoch}/{trainer.max_epochs if pl_module.hparams.quit == 'dumb' else '∞'}")
+        if self.bar:
+            print()
+        self.bar = log.progressbar(label=f"stage {trainer.current_epoch}/{trainer.max_epochs if pl_module.hparams.quit == 'dumb' else '∞'}",
+                                   length=self.total_train_batches,
+                                   show_pos=True)
+        self.bar.__enter__()
 
-    def get_metrics(self, trainer, model):
-        # don't show the version number
-        items = super().get_metrics(trainer, model)
-        items.pop('v_num', None)
-        items.pop('loss', None)
-        items.pop('val_metric', None)
-        return items
+    def on_validation_epoch_start(self, trainer, pl_module):
+        if trainer.sanity_checking:
+            return
+        if self.bar:
+            print()
+        self.bar = log.progressbar(label='validating',
+                                   length=self.total_val_batches,
+                                   show_pos=True)
+        self.bar.__enter__()
 
-    def init_train_tqdm(self):
-        bar = Tqdm(desc="Training",
-                   initial=self.train_batch_idx,
-                   disable=self.is_disabled,
-                   position=(2 * self.process_position),
-                   leave=True,
-                   dynamic_ncols=True,
-                   file=sys.stdout,
-                   smoothing=0,
-                   bar_format=self.bar_format)
-        return bar
+    def on_sanity_check_start(self, trainer, pl_module):
+        if self.bar:
+            print()
+        self.bar = log.progressbar(label='val check',
+                                   length=sum(trainer.num_sanity_val_batches),
+                                   show_pos=True)
+        self.bar.__enter__()
 
-    def init_validation_tqdm(self):
-        # The main progress bar doesn't exist in `trainer.validate()`
-        bar = Tqdm(desc="validating",
-                   disable=self.is_disabled,
-                   position=(2 * self.process_position),
-                   leave=True,
-                   dynamic_ncols=True,
-                   file=sys.stdout,
-                   bar_format=self.bar_format)
-        return bar
+    def disable(self):
+        self.enable = False
 
-    def init_sanity_tqdm(self):
-        bar = Tqdm(desc="validation sanity check",
-                   disable=self.is_disabled,
-                   position=(2 * self.process_position),
-                   leave=True,
-                   dynamic_ncols=True,
-                   file=sys.stdout,
-                   bar_format=self.bar_format)
-        return bar
+    def enable(self):
+        self.enable = True
+
+    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
+        super().on_train_batch_end(trainer, pl_module, outputs, batch, batch_idx)
+        self.bar.update(1)
+
+    def on_validation_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx):
+        super().on_validation_batch_end(trainer, pl_module, outputs, batch, batch_idx, dataloader_idx)
+        self.bar.update(1)
+
+    def on_validation_epoch_end(self, trainer, pl_module):
+        super().on_validation_epoch_end(trainer, pl_module)
+        if not trainer.sanity_checking:
+            print(self.get_metrics(trainer, pl_module), end='')
 
 
 class RecognitionModel(pl.LightningModule):
