@@ -196,6 +196,10 @@ class RecognitionModel(pl.LightningModule):
         if model:
             logger.info(f'Loading existing model from {model} ')
             self.nn = vgsl.TorchVGSLModel.load_model(model)
+
+            if self.nn.model_type not in [None, 'recognition']:
+                raise ValueError(f'Model {model} is of type {self.nn.model_type} while `recognition` is expected.')
+
             if load_hyper_parameters:
                 hp = self.nn.hyper_params
             else:
@@ -571,6 +575,10 @@ class SegmentationModel(pl.LightningModule):
         if model:
             logger.info(f'Loading existing model from {model}')
             self.nn = vgsl.TorchVGSLModel.load_model(model)
+
+            if self.nn.model_type not in [None, 'segmentation']:
+                raise ValueError(f'Model {model} is of type {self.nn.model_type} while `segmentation` is expected.')
+
             if load_hyper_parameters:
                 hp = self.nn.hyper_params
             else:
