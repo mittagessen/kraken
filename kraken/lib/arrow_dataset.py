@@ -63,7 +63,7 @@ def _extract_path_line(xml_record):
     try:
         im = Image.open(xml_record['image'])
     except FileNotFoundError:
-        return lines, None, None
+        return [], None, None
     if is_bitonal(im):
         im = im.convert('1')
     fp = io.BytesIO()
