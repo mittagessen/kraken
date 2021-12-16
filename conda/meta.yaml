@@ -33,6 +33,7 @@ requirements:
      - coremltools>=3.3
      - libffi # [osx]
      - pyarrow
+     - conda-forge::pytorch-lightning
 about:
   home: http://kraken.re
   license: Apache License

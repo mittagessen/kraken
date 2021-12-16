@@ -24,6 +24,7 @@ dependencies:
   - imagemagick>=7.1.0
   - coremltools>=3.3
   - pyarrow
+  - conda-forge::pytorch-lightning
   - pip
   - pip:
     - file:.
