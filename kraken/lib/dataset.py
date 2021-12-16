@@ -554,7 +554,7 @@ class ArrowIPCRecognitionDataset(Dataset):
             logger.info(f'Upgrading "im_mode" from {self.im_mode} to {metadata["im_mode"]}.')
             self.im_mode = metadata['im_mode']
         # centerline normalize raw bbox dataset
-        if self.seg_type == 'bbox' and self.im_mode in ['1', 'L'] and metadata['image_type'] == 'raw':
+        if self.seg_type == 'bbox' and metadata['image_type'] == 'raw':
             self.transforms.valid_norm = True
 
         self.alphabet.update(metadata['alphabet'])
