@@ -477,7 +477,6 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
 
     import json
     import shutil
-    import numpy as np
     from kraken.lib.train import RecognitionModel, KrakenTrainer
 
     hyper_params = RECOGNITION_HYPER_PARAMS.copy()
@@ -613,7 +612,11 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
     from kraken.serialization import render_report
     from kraken.lib import models
     from kraken.lib.xml import preparse_xml_data
-    from kraken.lib.dataset import global_align, compute_confusions, PolygonGTDataset, GroundTruthDataset, ImageInputTransforms, collate_sequences
+    from kraken.lib.dataset import (global_align, compute_confusions,
+                                    PolygonGTDataset, GroundTruthDataset,
+                                    ImageInputTransforms,
+                                    ArrowIPCRecognitionDataset,
+                                    collate_sequences)
 
     logger.info('Building test set from {} line images'.format(len(test_set) + len(evaluation_files)))
 
@@ -1135,6 +1138,7 @@ def compile(ctx, output, workers, format_type, save_splits, recordbatch_size, gr
 
     ctx.meta['bar'].__exit__(None, None, None)
     message(f'Output file written to {output}')
+
 
 if __name__ == '__main__':
     cli()
