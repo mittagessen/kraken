@@ -42,6 +42,7 @@ RECOGNITION_HYPER_PARAMS = {'pad': 16,
                             'step_size': 10,
                             'gamma': 0.1,
                             # reduce on plateau
+                            'rop_factor': 0.1,
                             'rop_patience': 5,
                             # cosine
                             'cos_t_max': 50,
@@ -66,6 +67,7 @@ SEGMENTATION_HYPER_PARAMS = {'line_width': 8,
                              'step_size': 10,
                              'gamma': 0.1,
                              # reduce on plateau
+                             'rop_factor': 0.1,
                              'rop_patience': 5,
                              # cosine
                              'cos_t_max': 50,

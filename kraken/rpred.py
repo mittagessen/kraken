@@ -209,7 +209,7 @@ class mm_rpred(object):
             self.seg_key = 'boxes'
             self.next_iter = self._recognize_box_line
             self.line_iter = iter(bounds['boxes'])
-            tags= [x[0] for line in bounds['boxes'] for x in line]
+            tags = [x[0] for line in bounds['boxes'] for x in line]
 
         im_str = get_im_str(im)
         logger.info('Running {} multi-script recognizers on {} with {} lines'.format(len(nets), im_str, self.len))
