@@ -1102,7 +1102,7 @@ def publish(ctx, metadata, access_token, model):
 @click.pass_context
 @click.option('-o', '--output', show_default=True, type=click.Path(), default='model', help='Output model file')
 @click.option('--workers', show_default=True, default=1, help='Number of OpenMP threads and workers when running on CPU.')
-@click.option('-f', '--format-type', type=click.Choice(['path', 'xml', 'alto', 'page']), default='xml',
+@click.option('-f', '--format-type', type=click.Choice(['path', 'xml', 'alto', 'page']), default='xml', show_default=True,
               help='Sets the training data format. In ALTO and PageXML mode all '
               'data is extracted from xml files containing both baselines and a '
               'link to source images. In `path` mode arguments are image files '
