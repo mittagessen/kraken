@@ -413,7 +413,7 @@ It is also possible to recognize more than one file at a time by just chaining
 
         $ kraken -i input_1 output_1 -i input_2 output_2 ...
 
-Finally, there is an central repository containing freely available models.
+Finally, there is a central repository containing freely available models.
 Getting a list of all available models:
 
 .. code-block:: console
