@@ -174,7 +174,7 @@ take a look at each part of the output.
 shows the progress of loading the training and validation set into memory. This
 might take a while as preprocessing the whole set and putting it into memory is
 computationally intensive. Loading can be made faster without preloading at the
-cost of performing preprocessing repeatedlyduring the training process. 
+cost of performing preprocessing repeatedly during the training process.
 
 .. code-block:: console
 
