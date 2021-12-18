@@ -115,7 +115,7 @@ different algorithms available, each with strengths and weaknesses. For most
 material the kraken-provided binarization should be sufficient, though. This
 does not mean that a segmentation model trained on RGB images will have equal
 accuracy for B/W, grayscale, and RGB inputs. Nevertheless the drop in quality
-will often be modest or non-existent in for color models while non-binarized
+will often be modest or non-existent for color models while non-binarized
 inputs to a binary model will cause severe degradation (and a warning to that
 notion).
 
