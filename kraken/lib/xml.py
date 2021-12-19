@@ -106,8 +106,8 @@ def parse_page(filename):
                 tag_vals = {}
                 vals = [val.strip() for val in vals.split(';') if val.strip()]
                 for val in vals:
-                    key, val = val.split(':')
-                    tag_vals[key] = val
+                    key, *val = val.split(':')
+                    tag_vals[key] = ":".join(val)
                 o[tag.strip()] = tag_vals
         return o
 
