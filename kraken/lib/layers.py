@@ -30,6 +30,22 @@ class MultiParamSequential(Sequential):
         return inputs
 
 
+class MultiParamParallel(Module):
+    """
+    Parallel module.
+    """
+    def forward(self, *inputs):
+        outputs = []
+        seq_lens = None
+        for module in self._modules.values():
+            if type(inputs) == tuple:
+                output, seq_lens = module(*inputs)
+                outputs.append(output)
+            else:
+                outputs.append(module(inputs))
+        return torch.cat(outputs, dim=1), seq_lens
+
+
 def PeepholeLSTMCell(input: torch.Tensor,
                      hidden: Tuple[torch.Tensor, torch.Tensor],
                      w_ih: torch.Tensor,
@@ -142,6 +158,45 @@ class PeepholeBidiLSTM(Module):
     @property
     def all_weights(self):
         return [[getattr(self, weight) for weight in weights] for weights in self._all_weights]
+
+
+class Identity(Module):
+    """
+    A placeholder identity operator.
+    """
+    def __init__(self) -> None:
+        """
+        A placeholder identity operator (mostly used for residual connections and similar).
+
+        Shape:
+             - Inputs: :math:`(N, C, H, W)` where `N` batches, `C` channels, `H`
+              height, and `W` width.
+            - Outputs output :math:`(N, C, H, W)`
+        """
+        super().__init__()
+
+    def forward(self, inputs: torch.Tensor, seq_len: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+        return inputs, seq_len
+
+    def get_shape(self, input: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
+        self.output_shape = input
+        return input
+
+    def deserialize(self, name, spec):
+        """
+        Noop for deserialization
+        """
+        pass
+
+    def serialize(self, name, input, builder):
+        params = NeuralNetwork_pb2.CustomLayerParams()
+        params.className = 'identity'
+        params.description = 'An identity layer'
+        builder.add_custom(name,
+                           input_names=[input],
+                           output_names=[name],
+                           custom_proto_spec=params)
+        return name
 
 
 class Reshape(Module):
