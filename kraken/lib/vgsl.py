@@ -481,6 +481,7 @@ class TorchVGSLModel(object):
         input = 'input'
         prev_device = next(self.nn.parameters()).device
         try:
+            self.nn.to('cpu')
             def _serialize_layer(net, input, net_builder):
                 for name, l in net.named_children():
                     logger.debug(f'Serializing layer {name} with type {type(l)}')
