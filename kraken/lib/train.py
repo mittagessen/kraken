@@ -163,7 +163,11 @@ class KrakenProgressBar(pl.callbacks.progress.base.ProgressBarBase):
     def on_validation_epoch_end(self, trainer, pl_module):
         super().on_validation_epoch_end(trainer, pl_module)
         if not trainer.sanity_checking:
-            print(self.get_metrics(trainer, pl_module), end='')
+            metrics = self.get_metrics(trainer, pl_module)
+            metrics.pop('loss')
+            metrics.pop('val_metric')
+            for k, v in metrics.items():
+                print(f'{k}: {v:.3f} ', end='')
 
 
 class RecognitionModel(pl.LightningModule):
