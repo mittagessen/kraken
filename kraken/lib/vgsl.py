@@ -166,6 +166,7 @@ class TorchVGSLModel(object):
         else:
             nn = layers.MultiParamParallel()
             prev_oshape = None
+            channels = 0
         idx = 0
         while idx < len(blocks):
             oshape = None
@@ -182,12 +183,16 @@ class TorchVGSLModel(object):
                         raise ValueError('Output shape in parallel block not equal!')
                     else:
                         prev_oshape = oshape
+                        channels += oshape[1]
                 named_spec.extend(name)  # type: ignore
                 idx += len(name)
                 nn.add_module(' '.join(n.name for n in name), layer)
             else:
                 raise ValueError('{} invalid layer definition'.format(blocks[idx]))
-        return named_spec, nn, oshape
+        if parallel:
+            return named_spec, nn, (oshape[0], channels, *oshape[2:])
+        else:
+            return named_spec, nn, oshape
 
     def append(self, idx: int, spec: str) -> None:
         """
