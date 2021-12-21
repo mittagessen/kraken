@@ -45,6 +45,8 @@ def _extract_line(xml_record):
         im = Image.open(xml_record['image'])
     except FileNotFoundError:
         return lines, None, None
+    if not line['text']:
+        return lines, None, None
     if is_bitonal(im):
         im = im.convert('1')
     line_counts = Counter({'all': 0, 'train': 0, 'validation': 0, 'test': 0})
@@ -63,6 +65,8 @@ def _extract_path_line(xml_record):
     try:
         im = Image.open(xml_record['image'])
     except FileNotFoundError:
+        return [], None, None
+    if not xml_record['lines'][0]['text']:
         return [], None, None
     if is_bitonal(im):
         im = im.convert('1')
