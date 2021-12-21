@@ -581,19 +581,32 @@ class ArrowIPCRecognitionDataset(Dataset):
         pass
 
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor]:
-        if self.split_filter:
-            table = self.arrow_table.filter(self.arrow_table.column(self.split_filter))
-        else:
-            table = self.arrow_table
-        sample = table.column('lines')[index].as_py()
-        logger.debug(f'Loading sample {index}')
-        im = Image.open(io.BytesIO(sample['im']))
-        im = self.transforms(im)
-        if self.aug:
-            im = im.permute((1, 2, 0)).numpy()
-            o = self.aug(image=im)
-            im = torch.tensor(o['image'].transpose(2, 0, 1))
-        return {'image': im, 'target': self.codec.encode(sample['text']) if self.codec is not None else sample['text']}
+        try:
+            if self.split_filter:
+                table = self.arrow_table.filter(self.arrow_table.column(self.split_filter))
+            else:
+                table = self.arrow_table
+            sample = table.column('lines')[index].as_py()
+            logger.debug(f'Loading sample {index}')
+            im = Image.open(io.BytesIO(sample['im']))
+            im = self.transforms(im)
+            if self.aug:
+                im = im.permute((1, 2, 0)).numpy()
+                o = self.aug(image=im)
+                im = torch.tensor(o['image'].transpose(2, 0, 1))
+            text = sample['text']
+            for func in self.text_transforms:
+                text = func(text)
+            if not text:
+                logger.debug(f'Text line "{orig_text}" is empty after transformations')
+                raise Exception('empty text line')
+        except Exception:
+            idx = np.random.randint(0, len(self))
+            logger.debug(traceback.format_exc())
+            logger.info(f'Failed. Replacing with sample {idx}')
+            return self[idx]
+
+        return {'image': im, 'target': self.codec.encode(text) if self.codec is not None else text}
 
     def __len__(self) -> int:
         return self._num_lines
@@ -763,7 +776,7 @@ class PolygonGTDataset(Dataset):
             idx = np.random.randint(0, len(self.training_set))
             logger.debug(traceback.format_exc())
             logger.info(f'Failed. Replacing with sample {idx}')
-            return self[np.random.randint(0, len(self.training_set))]
+            return self[idx]
 
     def __len__(self) -> int:
         return len(self._images)
@@ -927,7 +940,7 @@ class GroundTruthDataset(Dataset):
             idx = np.random.randint(0, len(self.training_set))
             logger.debug(traceback.format_exc())
             logger.info(f'Failed. Replacing with sample {idx}')
-            return self[np.random.randint(0, len(self.training_set))]
+            return self[idx]
 
     def __len__(self) -> int:
         return len(self._images)
@@ -1129,7 +1142,7 @@ class BaselineSet(Dataset):
                 idx = np.random.randint(0, len(self.imgs))
                 logger.debug(traceback.format_exc())
                 logger.info(f'Failed. Replacing with sample {idx}')
-                return self[np.random.randint(0, len(self.imgs))]
+                return self[idx]
         im, target = self.transform(im, target)
         return {'image': im, 'target': target}
 
