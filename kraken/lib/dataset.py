@@ -598,7 +598,7 @@ class ArrowIPCRecognitionDataset(Dataset):
             for func in self.text_transforms:
                 text = func(text)
             if not text:
-                logger.debug(f'Text line "{orig_text}" is empty after transformations')
+                logger.debug(f'Text line "{sample["text"]}" is empty after transformations')
                 raise Exception('empty text line')
         except Exception:
             idx = np.random.randint(0, len(self))
