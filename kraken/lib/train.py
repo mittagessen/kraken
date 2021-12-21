@@ -167,7 +167,7 @@ class KrakenProgressBar(pl.callbacks.progress.base.ProgressBarBase):
             metrics.pop('loss')
             metrics.pop('val_metric')
             for k, v in metrics.items():
-                print(f'{k}: {v:.3f} ', end='')
+                print(f'{k}: {v:.5f} ', end='')
 
 
 class RecognitionModel(pl.LightningModule):
