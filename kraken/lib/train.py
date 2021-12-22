@@ -346,7 +346,7 @@ class RecognitionModel(pl.LightningModule):
         if codec:
             logger.info('Instantiating codec')
             self.codec = PytorchCodec(codec)
-            for k, v in codec.c2l.items():
+            for k, v in self.codec.c2l.items():
                 char = make_printable(k)
                 if char == k:
                     char = '\t' + char
