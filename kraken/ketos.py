@@ -139,7 +139,8 @@ def _validate_merging(ctx, param, value):
               default=SEGMENTATION_HYPER_PARAMS['optimizer'],
               type=click.Choice(['Adam',
                                  'SGD',
-                                 'RMSprop']),
+                                 'RMSprop',
+                                 'Lamb']),
               help='Select optimizer')
 @click.option('-r', '--lrate', show_default=True, default=SEGMENTATION_HYPER_PARAMS['lrate'], help='Learning rate')
 @click.option('-m', '--momentum', show_default=True, default=SEGMENTATION_HYPER_PARAMS['momentum'], help='Momentum')
@@ -372,7 +373,8 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
               default=RECOGNITION_HYPER_PARAMS['optimizer'],
               type=click.Choice(['Adam',
                                  'SGD',
-                                 'RMSprop']),
+                                 'RMSprop',
+                                 'Lamb']),
               help='Select optimizer')
 @click.option('-r', '--lrate', show_default=True, default=RECOGNITION_HYPER_PARAMS['lrate'], help='Learning rate')
 @click.option('-m', '--momentum', show_default=True, default=RECOGNITION_HYPER_PARAMS['momentum'], help='Momentum')
