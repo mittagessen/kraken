@@ -51,9 +51,9 @@ class PytorchCodec(object):
         dictionaries are/should be 1-indexed.
 
         Args:
-            charset (unicode, list, dict): Input character set.
-            strict (bool): Flag indicating if encoding/decoding errors should
-                           be ignored.
+            charset: Input character set.
+            strict: Flag indicating if encoding/decoding errors should be
+                    ignored.
         """
         if isinstance(charset, dict):
             self.c2l = charset
