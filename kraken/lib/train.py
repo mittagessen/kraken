@@ -28,8 +28,8 @@ import pytorch_lightning as pl
 from functools import partial
 from torch.multiprocessing import Pool
 from torch.optim import lr_scheduler
-from typing import Callable, Dict, Optional, Sequence, Union, Any, List
-from pytorch_lightning.callbacks import EarlyStopping, Callback
+from typing import Callable, Dict, Optional, Sequence, Union, Any, List, Tuple
+from pytorch_lightning.callbacks import Callback, EarlyStopping
 
 from kraken.lib import models, vgsl, default_specs, log
 from kraken.lib.xml import preparse_xml_data
@@ -170,6 +170,7 @@ class KrakenProgressBar(pl.callbacks.progress.base.ProgressBarBase):
                 print(f'{k}: {v:.5f} ', end='')
             if trainer.early_stopping_callback:
                 print(f'early_stopping: {trainer.early_stopping_callback.wait_count}/{trainer.early_stopping_callback.patience} {trainer.early_stopping_callback.best_score:.5f}', end='')
+
 
 class RecognitionModel(pl.LightningModule):
     def __init__(self,
@@ -553,7 +554,8 @@ class RecognitionModel(pl.LightningModule):
             callbacks.append(EarlyStopping(monitor='val_accuracy',
                                            mode='max',
                                            patience=self.hparams.lag,
-                                           stopping_threshold=1.0))
+                                           stopping_threshold=1.0,
+                                           check_on_train_epoch_end=True))
         return callbacks
 
 
@@ -949,7 +951,8 @@ class SegmentationModel(pl.LightningModule):
         if self.hparams.quit == 'early':
             callbacks.append(EarlyStopping(monitor='val_mean_iu',
                                            mode='max',
-                                           verbose=True,
                                            patience=self.hparams.lag,
-                                           stopping_threshold=1.0))
+                                           stopping_threshold=1.0,
+                                           check_on_train_epoch_end=True))
+
         return callbacks
