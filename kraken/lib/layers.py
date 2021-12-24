@@ -160,6 +160,54 @@ class PeepholeBidiLSTM(Module):
         return [[getattr(self, weight) for weight in weights] for weights in self._all_weights]
 
 
+class Add(Module):
+    """
+    An addition module
+    """
+    def __init__(self, dim: int, chunk_size: int) -> None:
+        """
+        An addition module
+
+        Shape:
+             - Inputs: :math:`(N, C, H, W)` where `N` batches, `C` channels, `H`
+              height, and `W` width.
+            - Outputs output :math:`(N, C, H, W)`
+        """
+        self.dim = dim
+        self.chunk_size = chunk_size
+        super().__init__()
+
+    def forward(self, inputs: torch.Tensor, seq_len: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+        chunks = torch.split(inputs, self.chunk_size, self.dim)
+        out = chunks[0]
+        for chunk in chunks[1:]:
+            out += chunk
+        return chunk, seq_len
+
+    def get_shape(self, input: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
+        input[self.dim] = self.chunk_size
+        self.output_shape = input
+        return input
+
+    def deserialize(self, name, spec):
+        """
+        Noop for deserialization
+        """
+        pass
+
+    def serialize(self, name, input, builder):
+        params = NeuralNetwork_pb2.CustomLayerParams()
+        params.className = 'addition'
+        params.description = 'An addition layer'
+        params.parameters['dim'].intValue = self.dim
+        params.parameters['chunk_size'].intValue = self.chunk_size
+
+        builder.add_custom(name,
+                           input_names=[input],
+                           output_names=[name],
+                           custom_proto_spec=params)
+        return name
+
 class Identity(Module):
     """
     A placeholder identity operator.

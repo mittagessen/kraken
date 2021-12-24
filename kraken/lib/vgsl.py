@@ -126,10 +126,11 @@ class TorchVGSLModel(object):
         """
         self.spec = spec
         self.named_spec = []  # type:  List[str]
-        self.ops = [self.build_identity, self.build_rnn, self.build_dropout,
-                    self.build_maxpool, self.build_conv, self.build_output,
-                    self.build_reshape, self.build_groupnorm,
-                    self.build_series, self.build_parallel]
+        self.ops = [self.build_addition, self.build_identity, self.build_rnn,
+                    self.build_dropout, self.build_maxpool, self.build_conv,
+                    self.build_output, self.build_reshape,
+                    self.build_groupnorm, self.build_series,
+                    self.build_parallel]
         self.codec = None  # type: Optional[PytorchCodec]
         self.criterion = None  # type: Any
         self.nn = layers.MultiParamSequential()
@@ -599,6 +600,23 @@ class TorchVGSLModel(object):
         fn = layers.Dropout(prob, dim)
         self.idx += 1
         logger.debug('{}\t\tdropout\tprobability {} dims {}'.format(self.idx, prob, dim))
+        return fn.get_shape(input), [VGSLBlock(blocks[idx], m.group('type'), m.group('name'), self.idx)], fn
+
+    def build_addition(self,
+                       input: Tuple[int, int, int, int],
+                       blocks: List[str],
+                       idx: int) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
+        pattern = re.compile(r'(?P<type>A)(?P<name>{\w+})?(?P<dim>\d+),(?P<chunk_size>\d+)')
+        m = pattern.match(blocks[idx])
+        if not m:
+            return None, None, None
+        dim = int(m.group('dim'))
+        chunk_size = int(m.group('chunk_size'))
+        if dim > 3:
+            raise ValueError(f'Invalid dimension {dim} in addition block')
+        fn = layers.Addition(dim=dim, chunk_size=chunk_size)
+        self.idx += 1
+        logger.debug(f'{self.idx}\t\taddition dim: {dim} chunk: {chunk_size}')
         return fn.get_shape(input), [VGSLBlock(blocks[idx], m.group('type'), m.group('name'), self.idx)], fn
 
     def build_identity(self,
