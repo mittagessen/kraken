@@ -185,9 +185,10 @@ class Addition(Module):
         return chunk, seq_len
 
     def get_shape(self, input: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
+        input = list(input)
         input[self.dim] = self.chunk_size
-        self.output_shape = input
-        return input
+        self.output_shape = tuple(input)
+        return self.output_shape
 
     def deserialize(self, name, spec):
         """
