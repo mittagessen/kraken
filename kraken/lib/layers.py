@@ -13,7 +13,7 @@ from coremltools.proto import NeuralNetwork_pb2
 # all tensors are ordered NCHW, the "feature" dimension is C, so the output of
 # an LSTM will be put into C same as the filters of a CNN.
 
-__all__ = ['MaxPool', 'Reshape', 'Dropout', 'TransposedSummarizingRNN', 'LinSoftmax', 'ActConv2D']
+__all__ = ['Addition', 'MaxPool', 'Reshape', 'Dropout', 'TransposedSummarizingRNN', 'LinSoftmax', 'ActConv2D']
 
 
 class MultiParamSequential(Sequential):
@@ -160,7 +160,7 @@ class PeepholeBidiLSTM(Module):
         return [[getattr(self, weight) for weight in weights] for weights in self._all_weights]
 
 
-class Add(Module):
+class Addition(Module):
     """
     An addition module
     """
