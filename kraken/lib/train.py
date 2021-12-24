@@ -168,6 +168,7 @@ class KrakenProgressBar(pl.callbacks.progress.base.ProgressBarBase):
             metrics.pop('val_metric')
             for k, v in metrics.items():
                 print(f'{k}: {v:.5f} ', end='')
+            print(f'lr: {trainer.lr_schedulers[0]["scheduler"].get_last_lr()}', end='')
 
 
 class RecognitionModel(pl.LightningModule):
@@ -435,6 +436,7 @@ class RecognitionModel(pl.LightningModule):
                                                                  momentum=self.hparams.momentum,
                                                                  weight_decay=self.hparams.weight_decay)
         lr_sched = {}
+        print(self.hparams.schedule)
         if self.hparams.schedule == 'exponential':
             lr_sched['scheduler'] = lr_scheduler.ExponentialLR(optim, self.hparams.gamma)
         elif self.hparams.schedule == 'cosine':
@@ -459,6 +461,8 @@ class RecognitionModel(pl.LightningModule):
         if lr_sched:
             lr_sched['monitor'] = 'val_metric'
 
+        print(lr_sched)
+        print(optim)
         return [optim], lr_sched if lr_sched else []
 
     def setup(self, stage: Optional[str] = None):
