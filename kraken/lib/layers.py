@@ -179,11 +179,14 @@ class Addition(Module):
 
     def forward(self, inputs: torch.Tensor, seq_len: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         out = inputs.unfold(self.dim, self.chunk_size, self.chunk_size)
-        out = out.sum(self.dim)
-        out = out.transpose(-1, self.dim)
+        out = out.sum(self.dim, keepdim=True)
+        out = out.transpose(-1, self.dim).squeeze(-1)
         return out, seq_len
 
     def get_shape(self, input: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
+        """
+        Calculates the output shape from input 4D tuple NCHW.
+        """
         input = list(input)
         input[self.dim] = self.chunk_size
         self.output_shape = tuple(input)
