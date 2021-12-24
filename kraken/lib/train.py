@@ -168,7 +168,8 @@ class KrakenProgressBar(pl.callbacks.progress.base.ProgressBarBase):
             metrics.pop('val_metric')
             for k, v in metrics.items():
                 print(f'{k}: {v:.5f} ', end='')
-
+            if trainer.early_stopping_callback:
+                print(f'early_stopping: {trainer.early_stopping_callback.wait_count}/{trainer.early_stopping_callback.patience} {trainer.early_stopping_callback.best_score:.5f}', end='')
 
 class RecognitionModel(pl.LightningModule):
     def __init__(self,
@@ -551,7 +552,6 @@ class RecognitionModel(pl.LightningModule):
         if self.hparams.quit == 'early':
             callbacks.append(EarlyStopping(monitor='val_accuracy',
                                            mode='max',
-                                           verbose=True,
                                            patience=self.hparams.lag,
                                            stopping_threshold=1.0))
         return callbacks
