@@ -610,10 +610,12 @@ class TorchVGSLModel(object):
         m = pattern.match(blocks[idx])
         if not m:
             return None, None, None
+        dim_map = {0: 0, 1: 2, 2: 3, 3: 1}
         dim = int(m.group('dim'))
         chunk_size = int(m.group('chunk_size'))
         if dim > 3:
             raise ValueError(f'Invalid dimension {dim} in addition block')
+        dim = dim_map[dim]
         fn = layers.Addition(dim=dim, chunk_size=chunk_size)
         self.idx += 1
         logger.debug(f'{self.idx}\t\taddition dim: {dim} chunk: {chunk_size}')
