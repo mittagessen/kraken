@@ -178,11 +178,10 @@ class Addition(Module):
         super().__init__()
 
     def forward(self, inputs: torch.Tensor, seq_len: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
-        chunks = torch.split(inputs, self.chunk_size, self.dim)
-        out = chunks[0]
-        for chunk in chunks[1:]:
-            out += chunk
-        return chunk, seq_len
+        out = torch.unfold(inputs, self.chunk_size, self.dim)
+        out = out.sum(self.dim)
+        out = out.transpose(-1, self.dim)
+        return out, seq_len
 
     def get_shape(self, input: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
         input = list(input)
