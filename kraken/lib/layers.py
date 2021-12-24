@@ -178,7 +178,7 @@ class Addition(Module):
         super().__init__()
 
     def forward(self, inputs: torch.Tensor, seq_len: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
-        out = inputs.unfold(self.chunk_size, self.dim)
+        out = inputs.unfold(self.dim, self.chunk_size, self.chunk_size)
         out = out.sum(self.dim)
         out = out.transpose(-1, self.dim)
         return out, seq_len
