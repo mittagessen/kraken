@@ -89,6 +89,7 @@ def build_binary_dataset(files: Optional[List[Union[str, pathlib.Path]]] = None,
                          format_type: str = 'xml',
                          num_workers: int = 0,
                          ignore_splits: bool = False,
+                         force_type: Optional[str] = None,
                          recordbatch_size: int = 100,
                          callback: Callable[[int, int], None] = lambda chunk, lines: None) -> None:
     """
@@ -104,6 +105,8 @@ def build_binary_dataset(files: Optional[List[Union[str, pathlib.Path]]] = None,
         ignore_splits: Switch to disable serialization of the explicit
                        train/validation/test splits contained in the source
                        files.
+        force_type: Forces a dataset type. Can be `kraken_recognition_baseline`
+                    or `kraken_recognition_bbox`.
         recordbatch_size: Minimum number of records per RecordBatch written to
                           the output file. Larger batches require more
                           transient memory but slightly improve reading
@@ -125,6 +128,9 @@ def build_binary_dataset(files: Optional[List[Union[str, pathlib.Path]]] = None,
         extract_fn = _extract_path_line
     else:
         raise ValueError(f'invalid format {format_type} for parse_(xml,alto,page,path)')
+
+    if force_type and force_type not in ['kraken_recognition_baseline', 'kraken_recognition_bbox']:
+        raise ValueError(f'force_type set to invalid value {force_type}')
 
     docs = []
     for doc in files:
@@ -156,7 +162,12 @@ def build_binary_dataset(files: Optional[List[Union[str, pathlib.Path]]] = None,
             char = '\t' + char
         logger.info(f'{char}\t{v}')
 
-    metadata = {'lines': {'type': 'kraken_recognition_baseline' if format_type != 'path' else 'kraken_recognition_bbox',
+    if force_type:
+        ds_type = force_type
+    else:
+        ds_type = 'kraken_recognition_baseline' if format_type != 'path' else 'kraken_recognition_bbox'
+
+    metadata = {'lines': {'type': ds_type,
                           'alphabet': alphabet,
                           'text_type': 'raw',
                           'image_type': 'raw',

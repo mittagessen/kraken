@@ -1110,6 +1110,10 @@ def publish(ctx, metadata, access_token, model):
               'link to source images. In `path` mode arguments are image files '
               'sharing a prefix up to the last extension with JSON `.path` files '
               'containing the baseline information.')
+@click.option('--force-type', type=click.Choice(['bbox', 'baseline']), default=None, show_default=True,
+              help='Forces the dataset type to a specific value. Can be used to '
+                   '"convert" a line strip-type collection to a baseline-style '
+                   'dataset, e.g. to disable centerline normalization.')
 @click.option('--save-splits/--ignore-splits', show_default=True, default=True,
               help='Whether to serialize explicit splits contained in XML '
                    'files. Is ignored in `path` mode.')
@@ -1118,7 +1122,7 @@ def publish(ctx, metadata, access_token, model):
                    'output file. Larger batches require more transient memory '
                    'but slightly improve reading performance.')
 @click.argument('ground_truth', nargs=-1, type=click.Path(exists=True, dir_okay=False))
-def compile(ctx, output, workers, format_type, save_splits, recordbatch_size, ground_truth):
+def compile(ctx, output, workers, format_type, force_type, save_splits, recordbatch_size, ground_truth):
     """
     Precompiles a binary dataset from a collection of XML files.
     """
@@ -1130,11 +1134,16 @@ def compile(ctx, output, workers, format_type, save_splits, recordbatch_size, gr
             ctx.meta['bar'].__enter__()
         ctx.meta['bar'].update(progress)
 
+    force_type = {'bbox': 'kraken_recognition_bbox',
+                  'baseline': 'kraken_recognition_baseline',
+                  None: None}[force_type]
+
     arrow_dataset.build_binary_dataset(ground_truth,
                                        output,
                                        format_type,
                                        workers,
                                        save_splits,
+                                       force_type,
                                        recordbatch_size,
                                        _init_progressbar)
 
