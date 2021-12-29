@@ -21,12 +21,13 @@ __all__ = ['build_binary_dataset']
 import io
 import json
 import pathlib
+import numpy as np
 import pyarrow as pa
 import tempfile
 
 from PIL import Image
 from collections import Counter
-from typing import Optional, List, Union, Callable
+from typing import Optional, List, Union, Callable, Tuple
 from multiprocessing import Pool
 from kraken.lib import functional_im_transforms as F_t
 from kraken.lib.segmentation import extract_polygons
@@ -45,12 +46,12 @@ def _extract_line(xml_record):
         im = Image.open(xml_record['image'])
     except FileNotFoundError:
         return lines, None, None
-    if not line['text']:
-        return lines, None, None
     if is_bitonal(im):
         im = im.convert('1')
     line_counts = Counter({'all': 0, 'train': 0, 'validation': 0, 'test': 0})
     for line_im, line in extract_polygons(im, xml_record):
+        if not line['text']:
+            continue
         fp = io.BytesIO()
         line_im.save(fp, format='png')
         if line['split']:
@@ -58,7 +59,7 @@ def _extract_line(xml_record):
         else:
             line_counts['all'] += 1
         lines.append({'text': line['text'], 'im': fp.getvalue()})
-    return lines, im.mode, dict(line_counts)
+    return lines, im.mode
 
 
 def _extract_path_line(xml_record):
@@ -89,6 +90,7 @@ def build_binary_dataset(files: Optional[List[Union[str, pathlib.Path]]] = None,
                          format_type: str = 'xml',
                          num_workers: int = 0,
                          ignore_splits: bool = False,
+                         random_split: Optional[Tuple[float, float, float]] = None,
                          force_type: Optional[str] = None,
                          recordbatch_size: int = 100,
                          callback: Callable[[int, int], None] = lambda chunk, lines: None) -> None:
@@ -105,6 +107,8 @@ def build_binary_dataset(files: Optional[List[Union[str, pathlib.Path]]] = None,
         ignore_splits: Switch to disable serialization of the explicit
                        train/validation/test splits contained in the source
                        files.
+        random_split: Serializes a random split into the dataset with the
+                       proportions (train, val, test).
         force_type: Forces a dataset type. Can be `kraken_recognition_baseline`
                     or `kraken_recognition_bbox`.
         recordbatch_size: Minimum number of records per RecordBatch written to
@@ -187,11 +191,22 @@ def build_binary_dataset(files: Optional[List[Union[str, pathlib.Path]]] = None,
 
     def _make_record_batch(line_cache):
         ar = pa.array(line_cache, type=ty)
-        train_mask = pa.array([False] * len(line_cache), type=pa.bool_())
-        val_mask = pa.array([False] * len(line_cache), type=pa.bool_())
-        test_mask = pa.array([False] * len(line_cache), type=pa.bool_())
+        if random_split:
+            indices = np.random.choice(3, len(line_cache), p=random_split)
+        else:
+            indices = np.zeros(len(line_cache))
+        tr_ind = np.zeros(len(line_cache), dtype=bool)
+        tr_ind[indices == 0] = True
+        val_ind = np.zeros(len(line_cache), dtype=bool)
+        val_ind[indices == 1] = True
+        test_ind = np.zeros(len(line_cache), dtype=bool)
+        test_ind[indices == 2] = True
+
+        train_mask = pa.array(tr_ind)
+        val_mask = pa.array(val_ind)
+        test_mask = pa.array(test_ind)
         rbatch = pa.RecordBatch.from_arrays([ar, train_mask, val_mask, test_mask], schema=schema)
-        return rbatch
+        return rbatch, (len(line_cache), int(sum(indices == 0)), int(sum(indices == 1)), int(sum(indices == 2)))
 
     line_cache = []
     logger.info('Writing lines to temporary file.')
@@ -203,39 +218,49 @@ def build_binary_dataset(files: Optional[List[Union[str, pathlib.Path]]] = None,
                 if num_workers and num_workers > 1:
                     logger.info(f'Spinning up processing pool with {num_workers} workers.')
                     with Pool(num_workers) as pool:
-                        for page_lines, im_mode, line_counts in pool.imap_unordered(extract_fn, docs):
+                        for page_lines, im_mode in pool.imap_unordered(extract_fn, docs):
                             if page_lines:
                                 line_cache.extend(page_lines)
                                 # comparison RGB(A) > L > 1
                                 if im_mode > metadata['lines']['im_mode']:
                                     metadata['lines']['im_mode'] = im_mode
-                                metadata['lines']['counts'].update(line_counts)
 
                             if len(line_cache) >= recordbatch_size:
                                 logger.info(f'Flushing {len(line_cache)} lines into {tmp_file}.')
-                                rbatch = _make_record_batch(line_cache)
+                                rbatch, counts = _make_record_batch(line_cache)
+                                metadata['lines']['counts'].update({'all': counts[0],
+                                                                    'train': counts[1],
+                                                                    'validation': counts[2],
+                                                                    'test': counts[3]})
                                 writer.write(rbatch)
                                 callback(len(line_cache), num_lines)
                                 line_cache = []
                 else:
-                    for page_lines, im_mode, line_counts in map(extract_fn, docs):
+                    for page_lines, im_mode in map(extract_fn, docs):
                         if page_lines:
                             line_cache.extend(page_lines)
                             # comparison RGB(A) > L > 1
                             if im_mode > metadata['lines']['im_mode']:
                                 metadata['lines']['im_mode'] = im_mode
-                            metadata['lines']['counts'].update(line_counts)
 
                         if len(line_cache) >= recordbatch_size:
                             logger.info(f'Flushing {len(line_cache)} lines into {tmp_file}.')
-                            rbatch = _make_record_batch(line_cache)
+                            rbatch, counts = _make_record_batch(line_cache)
+                            metadata['lines']['counts'].update({'all': counts[0],
+                                                                'train': counts[1],
+                                                                'validation': counts[2],
+                                                                'test': counts[3]})
                             writer.write(rbatch)
                             callback(len(line_cache), num_lines)
                             line_cache = []
 
                 if line_cache:
                     logger.info(f'Flushing last {len(line_cache)} lines into {tmp_file}.')
-                    rbatch = _make_record_batch(line_cache)
+                    rbatch, counts = _make_record_batch(line_cache)
+                    metadata['lines']['counts'].update({'all': counts[0],
+                                                        'train': counts[1],
+                                                        'validation': counts[2],
+                                                        'test': counts[3]})
                     writer.write(rbatch)
                     callback(len(line_cache), num_lines)
 

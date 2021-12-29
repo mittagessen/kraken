@@ -1110,6 +1110,9 @@ def publish(ctx, metadata, access_token, model):
               'link to source images. In `path` mode arguments are image files '
               'sharing a prefix up to the last extension with JSON `.path` files '
               'containing the baseline information.')
+@click.option('--random-split', type=float, nargs=3, default=None, show_default=True,
+              help='Creates a fixed random split of the input data with the '
+              'proportions (train, validation, test). Overrides the save split option.')
 @click.option('--force-type', type=click.Choice(['bbox', 'baseline']), default=None, show_default=True,
               help='Forces the dataset type to a specific value. Can be used to '
                    '"convert" a line strip-type collection to a baseline-style '
@@ -1122,7 +1125,7 @@ def publish(ctx, metadata, access_token, model):
                    'output file. Larger batches require more transient memory '
                    'but slightly improve reading performance.')
 @click.argument('ground_truth', nargs=-1, type=click.Path(exists=True, dir_okay=False))
-def compile(ctx, output, workers, format_type, force_type, save_splits, recordbatch_size, ground_truth):
+def compile(ctx, output, workers, format_type, random_split, force_type, save_splits, recordbatch_size, ground_truth):
     """
     Precompiles a binary dataset from a collection of XML files.
     """
@@ -1143,6 +1146,7 @@ def compile(ctx, output, workers, format_type, force_type, save_splits, recordba
                                        format_type,
                                        workers,
                                        save_splits,
+                                       random_split,
                                        force_type,
                                        recordbatch_size,
                                        _init_progressbar)
