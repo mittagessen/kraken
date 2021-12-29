@@ -559,6 +559,8 @@ class ArrowIPCRecognitionDataset(Dataset):
 
         self.alphabet.update(metadata['alphabet'])
         num_lines = metadata['counts'][self.split_filter] if self.split_filter else metadata['counts']['all']
+        if self.split_filter:
+            ds_table = ds_table.filter(ds_table.column(self.split_filter))
         if not self.arrow_table:
             self.arrow_table = ds_table
         else:
@@ -582,11 +584,7 @@ class ArrowIPCRecognitionDataset(Dataset):
 
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor]:
         try:
-            if self.split_filter:
-                table = self.arrow_table.filter(self.arrow_table.column(self.split_filter))
-            else:
-                table = self.arrow_table
-            sample = table.column('lines')[index].as_py()
+            sample = self.arrow_table.column('lines')[index].as_py()
             logger.debug(f'Loading sample {index}')
             im = Image.open(io.BytesIO(sample['im']))
             im = self.transforms(im)
