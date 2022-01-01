@@ -479,7 +479,7 @@ class ArrowIPCRecognitionDataset(Dataset):
         self.text_transforms = []  # type: List[Callable[[str], str]]
         self.transforms = im_transforms
         self.aug = None
-        self.split_filter = None
+        self._split_filter = split_filter
         self._num_lines = 0
         self.arrow_table = None
         self.codec = None
@@ -514,11 +514,7 @@ class ArrowIPCRecognitionDataset(Dataset):
                                     ElasticTransform(p=0.1),
                                 ], p=0.2),
                                ], p=0.5)
-        if split_filter:
-            if split_filter in ['train', 'validation', 'test']:
-                self.split_filter = split_filter
-            else:
-                raise ValueError(f'split_filter has to be one of [train, validation, test] (is {split_filter}).')
+
         self.im_mode = self.transforms.mode
 
     def add(self, file: Union[str, pathlib.Path]) -> None:
@@ -547,8 +543,8 @@ class ArrowIPCRecognitionDataset(Dataset):
                 raise ValueError(f'File {file} has incompatible type {metadata["type"]} for dataset with type {self.seg_type}.')
         else:
             raise ValueError(f'Unknown type {metadata["type"]} of dataset.')
-        if self.split_filter and metadata['counts'][self.split_filter] == 0:
-            logger.warning(f'No explicit split for "{self.split_filter}" in dataset {file} (with splits {metadata["counts"].items()}).')
+        if self._split_filter and metadata['counts'][self._split_filter] == 0:
+            logger.warning(f'No explicit split for "{self._split_filter}" in dataset {file} (with splits {metadata["counts"].items()}).')
             return
         if metadata['im_mode'] > self.im_mode and self.transforms.mode >= metadata['im_mode']:
             logger.info(f'Upgrading "im_mode" from {self.im_mode} to {metadata["im_mode"]}.')
@@ -558,9 +554,9 @@ class ArrowIPCRecognitionDataset(Dataset):
             self.transforms.valid_norm = True
 
         self.alphabet.update(metadata['alphabet'])
-        num_lines = metadata['counts'][self.split_filter] if self.split_filter else metadata['counts']['all']
-        if self.split_filter:
-            ds_table = ds_table.filter(ds_table.column(self.split_filter))
+        num_lines = metadata['counts'][self._split_filter] if self._split_filter else metadata['counts']['all']
+        if self._split_filter:
+            ds_table = ds_table.filter(ds_table.column(self._split_filter))
         if not self.arrow_table:
             self.arrow_table = ds_table
         else:

@@ -410,6 +410,8 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
               help='Epoch of minimal learning rate for cosine LR scheduler.')
 @click.option('-p', '--partition', show_default=True, default=0.9,
               help='Ground truth data partition ratio between train/validation set')
+@click.option('--fixed-splits/--ignore-fixed-split', show_default=True, default=True,
+              help='Whether to honor fixed splits in binary datasets.')
 @click.option('-u', '--normalization', show_default=True, type=click.Choice(['NFD', 'NFKD', 'NFC', 'NFKC']),
               default=RECOGNITION_HYPER_PARAMS['normalization'], help='Ground truth normalization')
 @click.option('-n', '--normalize-whitespace/--no-normalize-whitespace', show_default=True,
@@ -464,8 +466,8 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
 def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
           min_epochs, lag, min_delta, device, optimizer, lrate, momentum,
           weight_decay, schedule, gamma, step_size, sched_patience, cos_max,
-          partition, normalization, normalize_whitespace, codec, resize, reorder,
-          base_dir, training_files, evaluation_files, workers,
+          partition, fixed_splits, normalization, normalize_whitespace, codec,
+          resize, reorder, base_dir, training_files, evaluation_files, workers,
           load_hyper_parameters, repolygonize, force_binarization, format_type,
           augment, ground_truth):
     """
@@ -536,6 +538,7 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
                              training_data=ground_truth,
                              evaluation_data=evaluation_files,
                              partition=partition,
+                             binary_dataset_split=fixed_splits,
                              num_workers=workers,
                              load_hyper_parameters=load_hyper_parameters,
                              repolygonize=repolygonize,

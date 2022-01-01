@@ -183,6 +183,7 @@ class RecognitionModel(pl.LightningModule):
                  training_data: Union[Sequence[Union[pathlib.Path, str]], Sequence[Dict[str, Any]]] = None,
                  evaluation_data: Optional[Union[Sequence[Union[pathlib.Path, str]], Sequence[Dict[str, Any]]]] = None,
                  partition: Optional[float] = 0.9,
+                 binary_dataset_split: bool = False,
                  num_workers: int = 1,
                  load_hyper_parameters: bool = False,
                  repolygonize: bool = False,
@@ -245,6 +246,9 @@ class RecognitionModel(pl.LightningModule):
             if evaluation_data:
                 logger.info(f'Parsing {len(evaluation_data)} XML files for validation data')
                 evaluation_data = preparse_xml_data(evaluation_data, format_type, repolygonize)
+            if binary_dataset_split:
+                logger.warning('Internal binary dataset splits are enabled but using non-binary dataset files. Will be ignored.')
+                binary_dataset_split = False
             DatasetClass = PolygonGTDataset
             valid_norm = False
         elif format_type == 'binary':
@@ -263,6 +267,9 @@ class RecognitionModel(pl.LightningModule):
                 force_binarization = False
             if repolygonize:
                 logger.warning('Repolygonization enabled in `path` mode. Will be ignored.')
+            if binary_dataset_split:
+                logger.warning('Internal binary dataset splits are enabled but using non-binary dataset files. Will be ignored.')
+                binary_dataset_split = False
             logger.info(f'Got {len(training_data)} line strip images for training data')
             training_data = [{'image': im} for im in training_data]
             if evaluation_data:
@@ -280,6 +287,9 @@ class RecognitionModel(pl.LightningModule):
                     force_binarization = False
                 if repolygonize:
                     logger.warning('Repolygonization enabled with box lines. Will be ignored.')
+                if binary_dataset_split:
+                    logger.warning('Internal binary dataset splits are enabled but using non-binary dataset files. Will be ignored.')
+                    binary_dataset_split = False
         else:
             raise ValueError(f'format_type {format_type} not in [alto, page, xml, path, binary].')
 
@@ -310,12 +320,19 @@ class RecognitionModel(pl.LightningModule):
             logger.debug('Setting multiprocessing tensor sharing strategy to file_system')
             torch.multiprocessing.set_sharing_strategy('file_system')
 
-        train_set = self._build_dataset(DatasetClass, training_data)
         if evaluation_data:
+            train_set = self._build_dataset(DatasetClass, training_data)
             self.train_set = Subset(train_set, range(len(train_set)))
             val_set = self._build_dataset(DatasetClass, evaluation_data)
             self.val_set = Subset(val_set, range(len(val_set)))
+        elif binary_dataset_split:
+            train_set = self._build_dataset(DatasetClass, training_data, split_filter='train')
+            self.train_set = Subset(train_set, range(len(train_set)))
+            val_set = self._build_dataset(DatasetClass, training_data, split_filter='validation')
+            self.val_set = Subset(val_set, range(len(val_set)))
+            logger.info(f'Found {len(self.train_set)} (train) / {len(self.val_set)} (val) samples in pre-encoded dataset')
         else:
+            train_set = self._build_dataset(DatasetClass, training_data)
             train_len = int(len(train_set)*partition)
             val_len = len(train_set) - train_len
             logger.info(f'No explicit validation data provided. Splitting off '
@@ -360,12 +377,14 @@ class RecognitionModel(pl.LightningModule):
 
     def _build_dataset(self,
                        DatasetClass,
-                       training_data):
+                       training_data,
+                       **kwargs):
         dataset = DatasetClass(normalization=self.hparams.normalization,
                                whitespace_normalization=self.hparams.normalize_whitespace,
                                reorder=self.reorder,
                                im_transforms=self.transforms,
-                               augmentation=self.hparams.augment)
+                               augmentation=self.hparams.augment,
+                               **kwargs)
 
         if (self.num_workers and self.num_workers > 1) and self.format_type != 'binary':
             with Pool(processes=self.num_workers) as pool:
@@ -538,6 +557,7 @@ class RecognitionModel(pl.LightningModule):
                           batch_size=self.hparams.batch_size,
                           num_workers=self.num_workers,
                           pin_memory=True,
+                          shuffle=True,
                           collate_fn=collate_sequences)
 
     def val_dataloader(self):
@@ -937,6 +957,7 @@ class SegmentationModel(pl.LightningModule):
         return DataLoader(self.train_set,
                           batch_size=1,
                           num_workers=self.num_workers,
+                          shuffle=True,
                           pin_memory=True)
 
     def val_dataloader(self):
