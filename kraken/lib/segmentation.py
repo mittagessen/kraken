@@ -860,9 +860,9 @@ def compute_polygon_section(baseline, boundary, dist1, dist2):
     """
     # find baseline segments the points are in
     if dist1 == 0:
-        dist1 = np.finfo(np.float).eps
+        dist1 = np.finfo(float).eps
     if dist2 == 0:
-        dist2 = np.finfo(np.float).eps
+        dist2 = np.finfo(float).eps
     boundary_pol = geom.Polygon(boundary)
     bl = np.array(baseline)
     # extend first/last segment of baseline if not on polygon boundary
@@ -883,8 +883,8 @@ def compute_polygon_section(baseline, boundary, dist1, dist2):
             bl[-1] = np.array(nearest_points(geom.Point(bl[-1]), boundary_pol)[1], 'int')
         else:
             bl[-1] = np.array(r_point, 'int')
-    dist1 = min(geom.LineString(bl).length - np.finfo(np.float).eps, dist1)
-    dist2 = min(geom.LineString(bl).length - np.finfo(np.float).eps, dist2)
+    dist1 = min(geom.LineString(bl).length - np.finfo(float).eps, dist1)
+    dist2 = min(geom.LineString(bl).length - np.finfo(float).eps, dist2)
     dists = np.cumsum(np.diag(np.roll(squareform(pdist(bl)), 1)))
     segs_idx = np.searchsorted(dists, [dist1, dist2])
     segs = np.dstack((bl[segs_idx-1], bl[segs_idx]))
@@ -943,7 +943,7 @@ def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image.Image:
 
             # fast path for straight baselines requiring only rotation
             if len(baseline) == 2:
-                baseline = baseline.astype(np.float)
+                baseline = baseline.astype(float)
                 # calculate direction vector
                 lengths = np.linalg.norm(np.diff(baseline.T), axis=0)
                 p_dir = np.mean(np.diff(baseline.T) * lengths/lengths.sum(), axis=1)
