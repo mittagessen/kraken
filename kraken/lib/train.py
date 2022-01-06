@@ -29,7 +29,7 @@ from functools import partial
 from torch.multiprocessing import Pool
 from torch.optim import lr_scheduler
 from typing import Callable, Dict, Optional, Sequence, Union, Any, List, Tuple
-from pytorch_lightning.callbacks import Callback, EarlyStopping
+from pytorch_lightning.callbacks import Callback, EarlyStopping, ModelSummary
 
 from kraken.lib import models, vgsl, default_specs, log
 from kraken.lib.xml import preparse_xml_data
@@ -62,6 +62,7 @@ class KrakenTrainer(pl.Trainer):
     def __init__(self,
                  callbacks: Optional[Union[List[Callback], Callback]] = None,
                  enable_progress_bar: bool = True,
+                 enable_summary: bool = True,
                  min_epochs=5,
                  max_epochs=100,
                  *args,
@@ -78,6 +79,12 @@ class KrakenTrainer(pl.Trainer):
         if enable_progress_bar:
             progress_bar_cb = KrakenProgressBar()
             kwargs['callbacks'].append(progress_bar_cb)
+
+        if enable_summary:
+            summary_cb = ModelSummary(max_depth=2)
+            kwargs['callbacks'].append(summary_cb)
+        else:
+            kwargs['enable_model_summary'] = False
 
         super().__init__(*args, **kwargs)
 
