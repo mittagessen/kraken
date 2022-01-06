@@ -316,7 +316,10 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
                              resize=resize,
                              topline=topline)
 
-    trainer = KrakenTrainer(gpus=device, max_epochs=hyper_params['epochs'] if hyper_params['quit'] == 'dumb' else -1)
+    trainer = KrakenTrainer(gpus=device,
+                            max_epochs=hyper_params['epochs'] if hyper_params['quit'] == 'dumb' else -1,
+                            min_epochs=hyper_params['min_epochs'])
+
     trainer.fit(model)
 
     if quit == 'early':
@@ -489,7 +492,6 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
                          'batch_size': batch_size,
                          'quit': quit,
                          'epochs': epochs,
-                         'min_epochs': min_epochs,
                          'lag': lag,
                          'min_delta': min_delta,
                          'optimizer': optimizer,
@@ -547,7 +549,9 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
                              codec=codec,
                              resize=resize)
 
-    trainer = KrakenTrainer(gpus=device, max_epochs=hyper_params['epochs'] if hyper_params['quit'] == 'dumb' else -1)
+    trainer = KrakenTrainer(gpus=device,
+                            max_epochs=hyper_params['epochs'] if hyper_params['quit'] == 'dumb' else -1,
+                            min_epochs=hyper_params['min_epochs'])
     trainer.fit(model)
 
     if quit == 'early':
