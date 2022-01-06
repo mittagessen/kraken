@@ -192,21 +192,21 @@ def build_binary_dataset(files: Optional[List[Union[str, pathlib.Path]]] = None,
     def _make_record_batch(line_cache):
         ar = pa.array(line_cache, type=ty)
         if random_split:
-            indices = np.random.choice(3, len(line_cache), p=random_split)
+            indices = np.random.choice(4, len(line_cache), p=(0.0,) + random_split)
         else:
             indices = np.zeros(len(line_cache))
         tr_ind = np.zeros(len(line_cache), dtype=bool)
-        tr_ind[indices == 0] = True
+        tr_ind[indices == 1] = True
         val_ind = np.zeros(len(line_cache), dtype=bool)
-        val_ind[indices == 1] = True
+        val_ind[indices == 2] = True
         test_ind = np.zeros(len(line_cache), dtype=bool)
-        test_ind[indices == 2] = True
+        test_ind[indices == 3] = True
 
         train_mask = pa.array(tr_ind)
         val_mask = pa.array(val_ind)
         test_mask = pa.array(test_ind)
         rbatch = pa.RecordBatch.from_arrays([ar, train_mask, val_mask, test_mask], schema=schema)
-        return rbatch, (len(line_cache), int(sum(indices == 0)), int(sum(indices == 1)), int(sum(indices == 2)))
+        return rbatch, (len(line_cache), int(sum(indices == 1)), int(sum(indices == 2)), int(sum(indices == 3)))
 
     line_cache = []
     logger.info('Writing lines to temporary file.')

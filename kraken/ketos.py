@@ -410,7 +410,7 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
               help='Epoch of minimal learning rate for cosine LR scheduler.')
 @click.option('-p', '--partition', show_default=True, default=0.9,
               help='Ground truth data partition ratio between train/validation set')
-@click.option('--fixed-splits/--ignore-fixed-split', show_default=True, default=True,
+@click.option('--fixed-splits/--ignore-fixed-split', show_default=True, default=False,
               help='Whether to honor fixed splits in binary datasets.')
 @click.option('-u', '--normalization', show_default=True, type=click.Choice(['NFD', 'NFKD', 'NFC', 'NFKC']),
               default=RECOGNITION_HYPER_PARAMS['normalization'], help='Ground truth normalization')
