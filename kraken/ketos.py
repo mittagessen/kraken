@@ -1138,6 +1138,9 @@ def compile(ctx, output, workers, format_type, random_split, force_type, save_sp
     """
     Precompiles a binary dataset from a collection of XML files.
     """
+    if not ground_truth:
+        raise click.UsageError('No training data was provided to the compile command. Use the `ground_truth` argument.')
+
     from kraken.lib import arrow_dataset
 
     def _init_progressbar(progress, length):
