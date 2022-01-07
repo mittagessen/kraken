@@ -128,6 +128,8 @@ def build_binary_dataset(files: Optional[List[Union[str, pathlib.Path]]] = None,
     elif format_type == 'page':
         parse_fn = parse_page
     elif format_type == 'path':
+        if not ignore_splits:
+            logger.warning(f'ignore_splits is False and format_type is path. Will not serialize splits.')
         parse_fn = parse_path
         extract_fn = _extract_path_line
     else:
