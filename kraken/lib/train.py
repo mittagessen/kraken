@@ -551,8 +551,9 @@ class RecognitionModel(pl.LightningModule):
             self.nn.hyper_params = self.hparams
             self.nn.model_type = 'recognition'
 
-            if 'seg_type' not in self.nn.user_metadata:
-                self.nn.user_metadata['seg_type'] = self.train_set.dataset.seg_type
+            if not self.nn.seg_type:
+                logger.info(f'Setting seg_type to {self.train_set.dataset.seg_type}.')
+                self.nn.seg_type = self.train_set.dataset.seg_type
 
             self.rec_nn = models.TorchSeqRecognizer(self.nn, train=None, device=None)
             self.net = self.nn.nn
