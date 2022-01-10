@@ -149,7 +149,7 @@ class mm_rpred(object):
                  bounds: dict,
                  pad: int = 16,
                  bidi_reordering: Union[bool, str] = True,
-                 script_ignore: Optional[List[str]] = None) -> Generator[ocr_record, None, None]:
+                 tag_ignore: Optional[List[str]] = None) -> Generator[ocr_record, None, None]:
         """
         Multi-model version of kraken.rpred.rpred.
 
@@ -158,7 +158,7 @@ class mm_rpred(object):
         these lines.
 
         Args:
-            nets (dict): A dict mapping ISO15924 identifiers to TorchSegRecognizer
+            nets (dict): A dict mapping tag values to TorchSegRecognizer
                          objects. Recommended to be an defaultdict.
             im (PIL.Image.Image): Image to extract text from
             bounds (dict): A dictionary containing a 'boxes' entry
@@ -171,7 +171,7 @@ class mm_rpred(object):
                                         the Unicode bidirectional algorithm for
                                         correct display. Set to L|R to
                                         override default text direction.
-            tag_ignore (list): List of tags to ignore during recognition
+            tag_ignore (list): List of tag values to ignore during recognition
         Yields:
             An ocr_record containing the recognized text, absolute character
             positions, and confidence values for each character.
@@ -200,31 +200,31 @@ class mm_rpred(object):
             self.seg_key = 'lines'
             self.next_iter = self._recognize_baseline_line
             self.line_iter = iter(bounds['lines'])
-            tags = []
+            tags = set()
             for x in bounds['lines']:
-                tags.extend(x['tags'])
+                tags.update(x['tags'].values())
         else:
             valid_norm = True
             self.len = len(bounds['boxes'])
             self.seg_key = 'boxes'
             self.next_iter = self._recognize_box_line
             self.line_iter = iter(bounds['boxes'])
-            tags = [x[0] for line in bounds['boxes'] for x in line]
+            tags = set(x[0] for line in bounds['boxes'] for x in line)
 
         im_str = get_im_str(im)
         logger.info('Running {} multi-script recognizers on {} with {} lines'.format(len(nets), im_str, self.len))
 
-        miss = [script for script in scripts if not nets.get(script)]
+        miss = [tag for tag in tags if not nets.get(tag)]
         if miss and not isinstance(nets, defaultdict):
             raise KrakenInputException('Missing models for tags {}'.format(set(miss)))
 
         # build dictionary for line preprocessing
         self.ts = {}
-        for script in scripts:
-            logger.debug('Loading line transforms for {}'.format(script))
-            network = nets[script]
+        for tag in tags:
+            logger.debug('Loading line transforms for {}'.format(tag))
+            network = nets[tag]
             batch, channels, height, width = network.nn.input
-            self.ts[script] = ImageInputTransforms(batch, height, width, channels, pad, valid_norm)
+            self.ts[tag] = ImageInputTransforms(batch, height, width, channels, pad, valid_norm)
 
         self.im = im
         self.nets = nets
@@ -238,24 +238,24 @@ class mm_rpred(object):
         xmin, xmax = min(flat_box[::2]), max(flat_box[::2])
         ymin, ymax = min(flat_box[1::2]), max(flat_box[1::2])
         rec = ocr_record('', [], [], [[xmin, ymin], [xmin, ymax], [xmax, ymax], [xmax, ymin]])
-        for script, (box, coords) in zip(map(lambda x: x[0], line['boxes'][0]),
-                                         extract_polygons(self.im, {'text_direction': line['text_direction'],
-                                                                    'boxes': map(lambda x: x[1], line['boxes'][0])})):
+        for tag, (box, coords) in zip(map(lambda x: x[0], line['boxes'][0]),
+                                      extract_polygons(self.im, {'text_direction': line['text_direction'],
+                                                                 'boxes': map(lambda x: x[1], line['boxes'][0])})):
             self.box = box
-            # skip if script is set to ignore
-            if self.script_ignore is not None and script in self.script_ignore:
-                logger.info('Ignoring {} line segment.'.format(script))
+            # skip if tag is set to ignore
+            if self.tags_ignore is not None and tag in self.tags_ignore:
+                logger.info(f'Ignoring {tag} line segment.')
                 continue
             # check if boxes are non-zero in any dimension
             if 0 in box.size:
-                logger.warning('bbox {} with zero dimension. Emitting empty record.'.format(coords))
+                logger.warning(f'bbox {coords} with zero dimension. Emitting empty record.')
                 continue
             # try conversion into tensor
             try:
                 logger.debug('Preparing run.')
-                line = self.ts[script](box)
+                line = self.ts[tag](box)
             except Exception:
-                logger.warning('Conversion of line {} failed. Skipping.'.format(coords))
+                logger.warning(f'Conversion of line {coords} failed. Skipping.')
                 continue
 
             # check if line is non-zero
@@ -263,14 +263,14 @@ class mm_rpred(object):
                 logger.warning('Empty run. Skipping.')
                 continue
 
-            logger.debug('Forward pass with model {}'.format(script))
-            preds = self.nets[script].predict(line.unsqueeze(0))[0]
+            logger.debug(f'Forward pass with model {tag}.')
+            preds = self.nets[tag].predict(line.unsqueeze(0))[0]
 
             # calculate recognized LSTM locations of characters
             logger.debug('Convert to absolute coordinates')
             # calculate recognized LSTM locations of characters
             # scale between network output and network input
-            self.net_scale = line.shape[2]/self.nets[script].outputs.shape[2]
+            self.net_scale = line.shape[2]/self.nets[tag].outputs.shape[2]
             # scale between network input and original line
             self.in_scale = box.size[0]/(line.shape[2]-2*self.pad)
 
@@ -307,21 +307,21 @@ class mm_rpred(object):
 
         self.box = box
 
-        script = coords['script']
+        tags = coords['tags']
         # check if boxes are non-zero in any dimension
         if 0 in box.size:
-            logger.warning('bbox {} with zero dimension. Emitting empty record.'.format(coords))
+            logger.warning(f'bbox {coords} with zero dimension. Emitting empty record.')
             return ocr_record('', [], [], coords)
         # try conversion into tensor
         try:
-            line = self.ts[script](box)
+            line = self.ts[tag](box)
         except Exception:
             return ocr_record('', [], [], coords)
         # check if line is non-zero
         if line.max() == line.min():
             return ocr_record('', [], [], coords)
 
-        preds = self.nets[script].predict(line.unsqueeze(0))[0]
+        preds = self.nets[tag].predict(line.unsqueeze(0))[0]
         # calculate recognized LSTM locations of characters
         # scale between network output and network input
         self.net_scale = line.shape[2]/self.nets[script].outputs.shape[2]

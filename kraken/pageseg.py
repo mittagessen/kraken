@@ -18,7 +18,7 @@
 kraken.pageseg
 ~~~~~~~~~~~~~~
 
-Layout analysis and script detection methods.
+Layout analysis methods.
 """
 import logging
 import numpy as np

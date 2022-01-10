@@ -161,8 +161,8 @@ def serialize(records: Sequence[ocr_record],
                 'boundary': [list(x) for x in record.line],
                 'type': 'line'
                 }
-        if record.script is not None:
-            line['script'] = record.script
+        if record.tags is not None:
+            line['tags'] = record.tags
         if record.type == 'baselines':
             line['baseline'] = [list(x) for x in record.baseline]
         splits = regex.split(r'(\s+)', record.prediction)

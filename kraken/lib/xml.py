@@ -165,8 +165,8 @@ def parse_page(filename: Union[str, pathlib.Path]) -> Dict[str, Any]:
     Returns:
         A dict {'image': impath, lines: [{'boundary': [[x0, y0], ...],
         'baseline': [[x0, y0], ...]}, {...], 'text': 'apdjfqpf', 'tags':
-        ['script_type_0', 'script_type_1']}, regions: {'region_type_0': [[[x0,
-        y0], ...], ...], ...}}
+        {'script': 'script_type', 'split': 'train', 'type': 'type_1']},
+        regions: {'region_type_0': [[[x0, y0], ...], ...], ...}}
     """
     def _parse_page_custom(s):
         o = {}
@@ -245,7 +245,7 @@ def parse_page(filename: Union[str, pathlib.Path]) -> Dict[str, Any]:
         data['regions'] = region_data
 
         # parse line information
-        tags = set(('default',))
+        tag_set = set(('default',))
         for line in lines:
             pol = line.find('./{*}Coords')
             boundary = None
@@ -276,24 +276,25 @@ def parse_page(filename: Union[str, pathlib.Path]) -> Dict[str, Any]:
             for el in transcription.findall('.//{*}Unicode'):
                 if el.text:
                     text += el.text
-            # retrieve line tag if custom string is set and contains
-            l_type = 'default'
+            # retrieve line tags if custom string is set and contains
+            tags = {'type': 'default'}
             split_type = None
             custom_str = line.get('custom')
             if custom_str:
                 cs = _parse_page_custom(custom_str)
                 if 'structure' in cs and 'type' in cs['structure']:
-                    l_type = cs['structure']['type']
+                    tags['type'] =  cs['structure']['type']
                 # retrieve data split if encoded in custom string.
                 if 'split' in cs and 'type' in cs['split'] and cs['split']['type'] in ['train', 'validation', 'test']:
                     split_type = cs['split']['type']
-            tags.add(l_type)
+                    tags['split'] = split_type
+            tag_set.add(l_type)
             data['lines'].append({'baseline': baseline,
                                   'boundary': boundary,
                                   'text': text,
                                   'split': split_type,
-                                  'tags': [l_type, split_type]})
-        if len(tags) > 1:
+                                  'tags': tags})
+        if len(tag_set) > 1:
             data['script_detection'] = True
         else:
             data['script_detection'] = False
@@ -311,8 +312,8 @@ def parse_alto(filename: Union[str, pathlib.Path]) -> Dict[str, Any]:
     Returns:
         A dict {'image': impath, lines: [{'boundary': [[x0, y0], ...],
         'baseline': [[x0, y0], ...]}, {...], 'text': 'apdjfqpf', 'tags':
-        ['script_type_0', 'script_type_1']}, regions: {'region_type_0': [[[x0,
-        y0], ...], ...], ...}}
+        {'script': 'script_type', 'split': 'train', 'type': 'type_1']},
+        regions: {'region_type_0': [[[x0, y0], ...], ...], ...}}
     """
     with open(filename, 'rb') as fp:
         base_dir = dirname(filename)
@@ -350,7 +351,7 @@ def parse_alto(filename: Union[str, pathlib.Path]) -> Dict[str, Any]:
         if tags is not None:
             for x in ['StructureTag', 'LayoutTag', 'OtherTag']:
                 for tag in tags.findall('./{{*}}{}'.format(x)):
-                    cls_map[tag.get('ID')] = tag.get('LABEL')
+                    cls_map[tag.get('ID')] = (x[:-3].lower(), tag.get('LABEL'))
         # parse region type and coords
         region_data = defaultdict(list)
         for region in regions:
@@ -378,8 +379,8 @@ def parse_alto(filename: Union[str, pathlib.Path]) -> Dict[str, Any]:
             tagrefs = region.get('TAGREFS')
             if tagrefs is not None and rtype is None:
                 for tagref in tagrefs.split():
-                    rtype = cls_map.get(tagref, None)
-                    if rtype is not None:
+                    ttype, rtype = cls_map.get(tagref, (None, None))
+                    if rtype is not None and ttype :
                         break
             if rtype is None:
                 rtype = alto_regions[region.tag.split('}')[-1]]
@@ -389,7 +390,7 @@ def parse_alto(filename: Union[str, pathlib.Path]) -> Dict[str, Any]:
             region_data[rtype].append(boundary)
         data['regions'] = region_data
 
-        tags = set(('default',))
+        tag_set = set(('default',))
         for line in lines:
             if line.get('BASELINE') is None:
                 logger.info('TextLine {} without baseline'.format(line.get('ID')))
@@ -418,21 +419,25 @@ def parse_alto(filename: Union[str, pathlib.Path]) -> Dict[str, Any]:
             for el in line.xpath(".//*[local-name() = 'String'] | .//*[local-name() = 'SP']"):
                 text += el.get('CONTENT') if el.get('CONTENT') else ' '
             # find line type
-            ltype = None
+            tags = {'type': 'default'}
             split_type = None
             tagrefs = line.get('TAGREFS')
             if tagrefs is not None:
                 for tagref in tagrefs.split():
-                    ltype = cls_map.get(tagref, None)
+                    ttype, ltype = cls_map.get(tagref, (None, None))
                     if ltype is not None:
-                        tags.add(ltype)
+                        tag_set.add(ltype)
+                        if ttype == 'other':
+                            tags['type'] = ltype
+                        else:
+                            tags[ttype] = ltype
                     if ltype in ['train', 'validation', 'test']:
                         split_type = ltype
             data['lines'].append({'baseline': baseline,
                                   'boundary': boundary,
                                   'text': text,
                                   'tags': tags,
-                                  'split': split_type, })
+                                  'split': split_type})
 
         if len(tags) > 1:
             data['tags'] = True

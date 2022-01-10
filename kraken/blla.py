@@ -158,7 +158,7 @@ def vec_lines(heatmap: torch.Tensor,
     lines = list(zip([x[0] for x in lines], [x[0] for x in sc], [x[1] for x in sc]))
     logger.debug('Reordering baselines')
     lines = reading_order_fn(lines=lines, regions=regions, text_direction=text_direction[-2:])
-    return [{'script': bl_type, 'baseline': bl, 'boundary': pl} for bl_type, bl, pl in lines]
+    return [{'tags': {'type': bl_type}, 'baseline': bl, 'boundary': pl} for bl_type, bl, pl in lines]
 
 
 def segment(im,

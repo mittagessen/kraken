@@ -178,7 +178,7 @@ def segmenter(legacy, model, text_direction, scale, maxcolseps, black_colseps,
     message('\u2713', fg='green')
 
 
-def recognizer(model, pad, no_segmentation, bidi_reordering, script_ignore, input, output) -> None:
+def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore, input, output) -> None:
 
     import json
 
@@ -221,12 +221,12 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, script_ignore, inpu
     elif no_segmentation:
         logger.warning('no_segmentation mode enabled but segmentation defined. Ignoring --no-segmentation option.')
 
-    scripts = set()
+    tags = set()
     # script detection
     if 'script_detection' in bounds and bounds['script_detection']:
         it = rpred.mm_rpred(model, im, bounds, pad,
                             bidi_reordering=bidi_reordering,
-                            script_ignore=script_ignore)
+                            tags_ignore=tags_ignore)
     else:
         it = rpred.rpred(model['default'], im, bounds, pad,
                          bidi_reordering=bidi_reordering)
@@ -247,7 +247,7 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, script_ignore, inpu
             fp.write(serialization.serialize(preds, ctx.meta['base_image'],
                                              Image.open(ctx.meta['base_image']).size,
                                              ctx.meta['text_direction'],
-                                             scripts,
+                                             tags,
                                              bounds['regions'] if 'regions' in bounds else None,
                                              ctx.meta['output_mode']))
         else:
@@ -474,7 +474,7 @@ def _validate_mm(ctx, param, value):
             else:
                 model_dict[k] = os.path.expanduser(v)
     except Exception:
-        raise click.BadParameter('Mappings must be in format script:model')
+        raise click.BadParameter('Mappings must be in format tag:model')
     return model_dict
 
 
@@ -483,9 +483,9 @@ def _validate_mm(ctx, param, value):
 @click.option('-m', '--model', default=DEFAULT_MODEL, multiple=True,
               show_default=True, callback=_validate_mm,
               help='Path to an recognition model or mapping of the form '
-              '$script1:$model1. Add multiple mappings to run multi-model '
-              'recognition based on detected scripts. Use the default keyword '
-              'for adding a catch-all model. Recognition on scripts can be '
+              '$tag1:$model1. Add multiple mappings to run multi-model '
+              'recognition based on detected tags. Use the default keyword '
+              'for adding a catch-all model. Recognition on tags can be '
               'ignored with the model value ignore.')
 @click.option('-p', '--pad', show_default=True, type=click.INT, default=16, help='Left and right '
               'padding around lines')
@@ -519,7 +519,7 @@ def ocr(ctx, model, pad, reorder, base_dir, no_segmentation, text_direction, thr
     # first we try to find the model in the absolue path, then ~/.kraken, then
     # LEGACY_MODEL_DIR
     nm = {}  # type: Dict[str, models.TorchSeqRecognizer]
-    ign_scripts = model.pop('ignore')
+    ign_tags = model.pop('ignore')
     for k, v in model.items():
         search = [v,
                   os.path.join(click.get_app_dir(APP_NAME), v),
@@ -556,7 +556,7 @@ def ocr(ctx, model, pad, reorder, base_dir, no_segmentation, text_direction, thr
                    pad=pad,
                    no_segmentation=no_segmentation,
                    bidi_reordering=reorder,
-                   script_ignore=ign_scripts)
+                   tags_ignore=ign_tags)
 
 
 @cli.command('show')
