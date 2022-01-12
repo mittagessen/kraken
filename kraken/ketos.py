@@ -124,6 +124,10 @@ def _validate_merging(ctx, param, value):
               show_default=True,
               default=SEGMENTATION_HYPER_PARAMS['epochs'],
               help='Number of epochs to train for')
+@click.option('--min-epochs',
+              show_default=True,
+              default=SEGMENTATION_HYPER_PARAMS['min_epochs'],
+              help='Minimal number of epochs to train for when using early stopping.')
 @click.option('--lag',
               show_default=True,
               default=SEGMENTATION_HYPER_PARAMS['lag'],
@@ -236,7 +240,7 @@ def _validate_merging(ctx, param, value):
 @click.option('-cl', '--centerline', 'topline', flag_value='centerline')
 @click.option('-bl', '--baseline', 'topline', flag_value='baseline', default='baseline')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
-def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
+def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs, min_epochs,
              lag, min_delta, device, optimizer, lrate, momentum, weight_decay,
              schedule, gamma, step_size, sched_patience, cos_max, partition,
              training_files, evaluation_files, workers, load_hyper_parameters,

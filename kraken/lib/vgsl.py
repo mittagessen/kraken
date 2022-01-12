@@ -248,7 +248,7 @@ class TorchVGSLModel(object):
         torch.set_num_threads(num)
 
     @classmethod
-    def load_pronn_model(cls, path: str):
+    def load_pronn_model(cls, path: Union[str, pathlib.Path):
         """
         Loads an pronn model to VGSL.
         """
@@ -309,7 +309,7 @@ class TorchVGSLModel(object):
         return nn
 
     @classmethod
-    def load_clstm_model(cls, path: str):
+    def load_clstm_model(cls, path: Union[str, pathlib.Path):
         """
         Loads an CLSTM model to VGSL.
         """
@@ -384,12 +384,12 @@ class TorchVGSLModel(object):
         return nn
 
     @classmethod
-    def load_model(cls, path: str):
+    def load_model(cls, path: Union[str, pathlib.Path]):
         """
         Deserializes a VGSL model from a CoreML file.
 
         Args:
-            path (str): CoreML file
+            path: CoreML file
 
         Returns:
             A TorchVGSLModel instance.
@@ -399,6 +399,8 @@ class TorchVGSLModel(object):
             string, protobuf file, or without appropriate metadata).
             FileNotFoundError if the path doesn't point to a file.
         """
+        if isinstance(path, pathlib.Path):
+            path = path.as_posix()
         try:
             mlmodel = MLModel(path)
         except TypeError as e:
