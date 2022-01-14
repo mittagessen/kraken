@@ -324,7 +324,7 @@ class mm_rpred(object):
         preds = self.nets[tag].predict(line.unsqueeze(0))[0]
         # calculate recognized LSTM locations of characters
         # scale between network output and network input
-        self.net_scale = line.shape[2]/self.nets[script].outputs.shape[2]
+        self.net_scale = line.shape[2]/self.nets[tag].outputs.shape[2]
         # scale between network input and original line
         self.in_scale = box.size[0]/(line.shape[2]-2*self.pad)
 

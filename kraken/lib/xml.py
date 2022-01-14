@@ -284,11 +284,13 @@ def parse_page(filename: Union[str, pathlib.Path]) -> Dict[str, Any]:
                 cs = _parse_page_custom(custom_str)
                 if 'structure' in cs and 'type' in cs['structure']:
                     tags['type'] =  cs['structure']['type']
+                    tag_set.add(tags['type'])
                 # retrieve data split if encoded in custom string.
                 if 'split' in cs and 'type' in cs['split'] and cs['split']['type'] in ['train', 'validation', 'test']:
                     split_type = cs['split']['type']
                     tags['split'] = split_type
-            tag_set.add(l_type)
+                    tag_set.add(split_type)
+
             data['lines'].append({'baseline': baseline,
                                   'boundary': boundary,
                                   'text': text,
