@@ -5,6 +5,7 @@ import re
 import json
 import torch
 import logging
+import pathlib
 
 from torch import nn
 from typing import Sequence, List, Tuple, Union, Optional, Iterable, Callable, Dict, Any
@@ -248,7 +249,7 @@ class TorchVGSLModel(object):
         torch.set_num_threads(num)
 
     @classmethod
-    def load_pronn_model(cls, path: Union[str, pathlib.Path):
+    def load_pronn_model(cls, path: Union[str, pathlib.Path]):
         """
         Loads an pronn model to VGSL.
         """
@@ -309,7 +310,7 @@ class TorchVGSLModel(object):
         return nn
 
     @classmethod
-    def load_clstm_model(cls, path: Union[str, pathlib.Path):
+    def load_clstm_model(cls, path: Union[str, pathlib.Path]):
         """
         Loads an CLSTM model to VGSL.
         """
