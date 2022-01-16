@@ -291,9 +291,11 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs, min_epochs
     if len(ground_truth) == 0:
         raise click.UsageError('No training data was provided to the train command. Use `-t` or the `ground_truth` argument.')
 
-    topline = {'topline': True,
-               'baseline': False,
-               'centerline': None}[topline]
+    loc = {'topline': True,
+           'baseline': False,
+           'centerline': None}
+
+    topline = loc[topline]
 
     if device == 'cpu':
         device = None
@@ -320,6 +322,16 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs, min_epochs
                              bounding_regions=bounding_regions,
                              resize=resize,
                              topline=topline)
+
+    message('Training line types:')
+    for k, v in model.train_set.dataset.class_mapping['baselines'].items():
+        message(f'  {k}\t{v}\t{model.train_set.dataset.class_stats["baselines"][k]}')
+    message('Training region types:')
+    for k, v in model.train_set.dataset.class_mapping['regions'].items():
+        message(f'  {k}\t{v}\t{model.train_set.dataset.class_stats["regions"][k]}')
+
+    if len(model.train_set) == 0:
+        raise click.UsageError('No valid training data was provided to the train command. Use `-t` or the `ground_truth` argument.')
 
     trainer = KrakenTrainer(gpus=device,
                             max_epochs=hyper_params['epochs'] if hyper_params['quit'] == 'dumb' else -1,
