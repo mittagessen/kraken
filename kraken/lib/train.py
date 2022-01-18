@@ -364,7 +364,7 @@ def recognition_loss_fn(criterion, output, target):
 def baseline_label_loss_fn(criterion, output, target):
     output, _ = output
     output = F.interpolate(output, size=(target.size(2), target.size(3)))
-    loss = criterion(output, target)
+    loss = criterion(output.squeeze(0), target.squeeze(0))
     return loss
 
 
@@ -1197,7 +1197,6 @@ class KrakenTrainer(object):
                                                                     weight_decay=hyper_params['weight_decay'])
 
         tr_it = TrainScheduler(optim)
-        tr_it = TrainScheduler(optim)
         if hyper_params['schedule'] == '1cycle':
             annealing_one = partial(annealing_onecycle,
                                     max_lr=hyper_params['lrate'],
@@ -1239,6 +1238,20 @@ class KrakenTrainer(object):
         else:
             logger.error(f'Invalid training interruption scheme {quit}')
             return None
+
+        # XXX
+        from torch.nn import BCELoss
+        numel = gt_set.class_stats['_start_sep'] + gt_set.class_stats['_end_sep'] + sum(gt_set.class_stats['baselines'].values()) + sum(gt_set.class_stats['regions'].values())
+        weights = [0] * gt_set.num_classes
+        weights[0] = numel/np.sqrt(gt_set.class_stats['_start_sep'] + 1)
+        weights[1] = numel/np.sqrt(gt_set.class_stats['_end_sep'] + 1)
+        for k, v in gt_set.class_mapping['baselines'].items():
+            weights[v] = numel/np.sqrt(gt_set.class_stats['baselines'][k])
+        for k, v in gt_set.class_mapping['regions'].items():
+            weights[v] = numel/np.sqrt(gt_set.class_stats['regions'][k])
+        weights = torch.Tensor(weights).unsqueeze(1).unsqueeze(1)
+        print(f'Loss weights: {weights}')
+        nn.criterion = BCELoss(weight=torch.Tensor(weights))
 
         trainer = cls(model=nn,
                       optimizer=optim,

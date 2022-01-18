@@ -832,7 +832,7 @@ class BaselineSet(Dataset):
         self.targets = []
         # n-th entry contains semantic of n-th class
         self.class_mapping = {'aux': {'_start_separator': 0, '_end_separator': 1}, 'baselines': {}, 'regions': {}}
-        self.class_stats = {'baselines': defaultdict(int), 'regions': defaultdict(int)}
+        self.class_stats = {'_start_sep': 0, '_end_sep': 0, 'baselines': defaultdict(int), 'regions': defaultdict(int)}
         self.num_classes = 2
         self.mbl_dict = merge_baselines if merge_baselines is not None else {}
         self.mreg_dict = merge_regions if merge_regions is not None else {}
@@ -856,6 +856,8 @@ class BaselineSet(Dataset):
                         if valid_baselines is None or line['script'] in valid_baselines:
                             lines[self.mbl_dict.get(line['script'], line['script'])].append(line['baseline'])
                             self.class_stats['baselines'][self.mbl_dict.get(line['script'], line['script'])] += 1
+                            self.class_stats['_start_sep'] += 1
+                            self.class_stats['_end_sep'] += 1
                     regions = defaultdict(list)
                     for k, v in data['regions'].items():
                         if valid_regions is None or k in valid_regions:
@@ -947,6 +949,8 @@ class BaselineSet(Dataset):
             if self.valid_baselines is None or line['script'] in self.valid_baselines:
                 baselines_[line_type].append(line['baseline'])
                 self.class_stats['baselines'][line_type] += 1
+                self.class_stats['_start_sep'] += 1
+                self.class_stats['_end_sep'] += 1
 
                 if line_type not in self.class_mapping['baselines']:
                     self.num_classes += 1
