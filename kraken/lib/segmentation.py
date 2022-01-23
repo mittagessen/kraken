@@ -945,14 +945,9 @@ def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image.Image:
             if len(baseline) == 2:
                 baseline = baseline.astype(np.float)
                 # calculate direction vector
-                with warnings.catch_warnings():
-                    warnings.simplefilter('ignore', RuntimeWarning)
-                    slope, _, _, _, _ = linregress(baseline[:, 0], baseline[:, 1])
-                if np.isnan(slope):
-                    p_dir = np.array([0., np.sign(np.diff(baseline[(0, -1), 1])).item()*1.])
-                else:
-                    p_dir = np.array([1, np.sign(np.diff(baseline[(0, -1), 0])).item()*slope])
-                    p_dir = (p_dir.T / np.sqrt(np.sum(p_dir**2, axis=-1)))
+                lengths = np.linalg.norm(np.diff(baseline.T), axis=0)
+                p_dir = np.mean(np.diff(baseline.T) * lengths/lengths.sum(), axis=1)
+                p_dir = (p_dir.T / np.sqrt(np.sum(p_dir**2, axis=-1)))
                 angle = np.arctan2(p_dir[1], p_dir[0])
                 patch = im[r_min:r_max+1, c_min:c_max+1].copy()
                 offset_polygon = pl - (c_min, r_min)
