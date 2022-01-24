@@ -36,6 +36,7 @@ class VGSLBlock(object):
             name = name[1:-1]
         else:
             name = '{}_{}'.format(re.sub(r'\W+', '_', layer), idx)
+        block = re.sub(r'\{.+\}', '', block)
         lsplits = re.split(r'(^[^\d]+)', block)
         lsplits.insert(-1, '{{{}}}'.format(name))
         self._block = ''.join(lsplits)
@@ -557,6 +558,7 @@ class TorchVGSLModel(object):
         self.nn[-1].resize(output_size, del_indices)
         pattern = re.compile(r'(O)(?P<name>{\w+})?(?P<dim>2|1|0)(?P<type>l|s|c)(?P<aug>a)?(?P<out>\d+)')
         m = pattern.match(self.named_spec[-1])
+        print(self.named_spec)
         if not m:
             raise ValueError('Output specification is not parsable')
         aug = m.group('aug') if m.group('aug') else ''
