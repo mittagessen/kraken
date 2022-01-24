@@ -570,7 +570,13 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
     trainer = KrakenTrainer(gpus=device,
                             max_epochs=hyper_params['epochs'] if hyper_params['quit'] == 'dumb' else -1,
                             min_epochs=hyper_params['min_epochs'])
-    trainer.fit(model)
+    try:
+        trainer.fit(model)
+    except KrakenInputException as e:
+        if e.args[0].startswith('Training data and model codec alphabets mismatch') and resize == 'fail':
+            raise click.BadOptionUsage('resize', 'Mismatched training data for loaded model. Set option `--resize` to `add` or `both`')
+        else:
+            raise e
 
     if quit == 'early':
         message('Moving best model {0}_{1}.mlmodel ({2}) to {0}_best.mlmodel'.format(

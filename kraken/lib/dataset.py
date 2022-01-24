@@ -45,7 +45,7 @@ from kraken.lib.util import is_bitonal
 from kraken.lib.codec import PytorchCodec
 from kraken.lib.models import TorchSeqRecognizer
 from kraken.lib.segmentation import extract_polygons
-from kraken.lib.exceptions import KrakenInputException
+from kraken.lib.exceptions import KrakenInputException, KrakenEncodeException
 from kraken.lib.lineest import CenterNormalizer
 
 from kraken.lib import functional_im_transforms as F_t
@@ -565,10 +565,21 @@ class ArrowIPCRecognitionDataset(Dataset):
 
     def encode(self, codec: Optional[PytorchCodec] = None) -> None:
         """
-        Adds a codec to the dataset (but does NOT actually encode the text!).
+        Adds a codec to the dataset.
         """
         if codec:
             self.codec = codec
+            logger.info(f'Trying to encode dataset with codec {codec}')
+            for index in range(self._num_lines):
+                try:
+                    text = self.arrow_table.column('lines')[index].as_py()['text']
+                    for func in self.text_transforms:
+                        text = func(text)
+                    self.codec.encode(text)
+                except KrakenEncodeException as e:
+                    raise e
+                except Exception:
+                    pass
         else:
             self.codec = PytorchCodec(''.join(self.alphabet.keys()))
 
