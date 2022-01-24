@@ -212,7 +212,7 @@ def build_binary_dataset(files: Optional[List[Union[str, pathlib.Path]]] = None,
 
     line_cache = []
     logger.info('Writing lines to temporary file.')
-    with tempfile.TemporaryDirectory() as tmp_output_dir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_output_dir:
         tmp_file = tmp_output_dir + '/dataset.arrow'
         with pa.OSFile(tmp_file, 'wb') as sink:
             with pa.ipc.new_file(sink, schema) as writer:
