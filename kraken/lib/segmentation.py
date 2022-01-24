@@ -972,9 +972,10 @@ def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image.Image:
                 # distance of intercept from start point and number of line segment
                 control_pts = []
                 for point in pl.geoms:
-                    npoint = np.array(point)
+                    npoint = np.array(point.coords)[0]
+
                     line_idx, dist, intercept = min(((idx, line.project(point),
-                                                      np.array(line.interpolate(line.project(point)))) for idx, line in enumerate(bl)),
+                                                      np.array(line.interpolate(line.project(point)).coords)) for idx, line in enumerate(bl)),
                                                     key=lambda x: np.linalg.norm(npoint-x[2]))
                     # absolute distance from start of line
                     line_dist = cum_lens[line_idx] + dist
