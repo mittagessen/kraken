@@ -86,7 +86,7 @@ def compute_segmentation_map(im,
         logger.debug('Running network forward pass')
         o, _ = model.nn(tensor_im.unsqueeze(0).to(device))
     logger.debug('Upsampling network output')
-    o = F.interpolate(o, size=scal_im.size[::-1])
+    o = F.interpolate(o, size=scal_im.shape)
     o = o.squeeze().cpu().numpy()
     scale = np.divide(im.size, o.shape[:0:-1])
     bounding_regions = model.user_metadata['bounding_regions'] if 'bounding_regions' in model.user_metadata else None
