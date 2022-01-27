@@ -26,7 +26,7 @@ requirements:
      - conda-forge::pytorch>=1.5.0,<1.11
      - cudatoolkit>=9.2
      - jsonschema
-     - scikit-image>=0.17.0
+     - scikit-image>=0.17.0,<=0.19.1
      - shapely
      - pyvips
      - imagemagick>=7.1.0
