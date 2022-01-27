@@ -69,7 +69,7 @@ def compute_segmentation_map(im,
     transforms = dataset.ImageInputTransforms(batch, height, width, channels, 0, valid_norm=False)
     tf_idx, _ = next(filter(lambda x: isinstance(x[1], tf.ToTensor), enumerate(transforms.transforms)))
     res_tf = tf.Compose(transforms.transforms[:tf_idx])
-    scal_im = res_tf(im).convert('L')
+    scal_im = np.array(res_tf(im).convert('L'))
 
     tensor_im = transforms(im)
     if mask:
@@ -87,7 +87,7 @@ def compute_segmentation_map(im,
         logger.debug('Running network forward pass')
         o, _ = model.nn(tensor_im.unsqueeze(0).to(device))
     logger.debug('Upsampling network output')
-    o = F.interpolate(o, size=scal_im.size[::-1])
+    o = F.interpolate(o, size=scal_im.shape)
     o = o.squeeze().cpu().numpy()
     scale = np.divide(im.size, o.shape[:0:-1])
     bounding_regions = model.user_metadata['bounding_regions'] if 'bounding_regions' in model.user_metadata else None
