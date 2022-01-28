@@ -47,7 +47,7 @@ class ocr_record(object):
         self.prediction = prediction
         self.cuts = cuts
         self.confidences = confidences
-        self.script = None if 'script' not in line else line['script']
+        self.tags = None if 'tags' not in line else line['tags']
         self.type = 'baselines' if 'baseline' in line else 'box'
         self.base_dir = None
         if self.type == 'baselines':
@@ -134,7 +134,7 @@ def bidi_record(record: ocr_record, base_dir=None) -> ocr_record:
     else:
         line = record.line
     rec = ocr_record(prediction, cuts, confidences, line)
-    rec.script = record.script
+    rec.tags = record.tags
     rec.base_dir = base_dir
     return rec
 
@@ -149,7 +149,7 @@ class mm_rpred(object):
                  bounds: dict,
                  pad: int = 16,
                  bidi_reordering: Union[bool, str] = True,
-                 tag_ignore: Optional[List[str]] = None) -> Generator[ocr_record, None, None]:
+                 tags_ignore: Optional[List[str]] = None) -> Generator[ocr_record, None, None]:
         """
         Multi-model version of kraken.rpred.rpred.
 
@@ -171,7 +171,7 @@ class mm_rpred(object):
                                         the Unicode bidirectional algorithm for
                                         correct display. Set to L|R to
                                         override default text direction.
-            tag_ignore (list): List of tag values to ignore during recognition
+            tags_ignore (list): List of tag values to ignore during recognition
         Yields:
             An ocr_record containing the recognized text, absolute character
             positions, and confidence values for each character.
@@ -231,7 +231,7 @@ class mm_rpred(object):
         self.bidi_reordering = bidi_reordering
         self.pad = pad
         self.bounds = bounds
-        self.script_ignore = script_ignore
+        self.tags_ignore = tags_ignore
 
     def _recognize_box_line(self, line):
         flat_box = [point for box in line['boxes'][0] for point in box[1]]
