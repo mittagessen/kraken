@@ -150,10 +150,10 @@ class annealing_cosine(object):
 
 class annealing_onecycle(object):
     def __init__(self, optimizer, max_lr=1e-3, epochs=50, steps_per_epoch=None):
-        self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer,
-                                                                    max_lr=max_lr,
-                                                                    epochs=epochs,
-                                                                    steps_per_epoch=steps_per_epoch)
+        self.scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer,
+                                                             max_lr=max_lr,
+                                                             epochs=epochs,
+                                                             steps_per_epoch=steps_per_epoch)
 
     def __call__(self, *args, **kwargs):
         self.scheduler.step()
