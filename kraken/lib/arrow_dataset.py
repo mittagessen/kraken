@@ -55,7 +55,7 @@ def _extract_line(xml_record):
         try:
             line_im, line = next(extract_polygons(im, {**xml_record, seg_key: [rec]}))
         except KrakenInputException:
-            logger.warning('Invalid line {idx} in {im.filename}')
+            logger.warning(f'Invalid line {idx} in {im.filename}')
             continue
         if not line['text']:
             continue
