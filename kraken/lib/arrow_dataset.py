@@ -49,7 +49,14 @@ def _extract_line(xml_record):
     if is_bitonal(im):
         im = im.convert('1')
     line_counts = Counter({'all': 0, 'train': 0, 'validation': 0, 'test': 0})
-    for line_im, line in extract_polygons(im, xml_record):
+    seg_key = 'lines' if 'lines' in xml_record else 'boxes'
+    recs = xml_record.pop(seg_key)
+    for idx, rec in enumerate(recs):
+        try:
+            line_im, line = next(extract_polygons(im, {**xml_record, seg_key: [rec]}))
+        except KrakenInputException:
+            logger.warning('Invalid line {idx} in {im.filename}')
+            continue
         if not line['text']:
             continue
         fp = io.BytesIO()
