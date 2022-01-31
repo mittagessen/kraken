@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Copyright 2019 Benjamin Kiessling
 #
@@ -914,7 +913,7 @@ def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image.Image:
 
     Args:
         im (PIL.Image.Image): Input image
-        bounds (list): A list of tuples (x1, y1, x2, y2)
+        bounds (list): A list of dicts {
 
     Yields:
         (PIL.Image.Image) the extracted subimage

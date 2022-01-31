@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Copyright 2014 Google Inc. All rights reserved.
 # Copyright 2015 Benjamin Kiessling

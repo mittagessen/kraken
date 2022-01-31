@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Copyright 2021 Teklia
 # Copyright 2021 Benjamin Kiessling
