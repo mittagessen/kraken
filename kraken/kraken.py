@@ -105,8 +105,10 @@ def binarizer(threshold, zoom, escale, border, perc, range, low, high, input, ou
             res.save(output, format=form)
         ctx.meta['base_image'] = output
     except Exception:
+        if ctx.meta['raise_failed']:
+            raise
         message('\u2717', fg='red')
-        raise
+        ctx.exit(1)
     message('\u2713', fg='green')
 
 
@@ -150,8 +152,10 @@ def segmenter(legacy, model, text_direction, scale, maxcolseps, black_colseps,
         else:
             res = blla.segment(im, text_direction, mask=mask, model=model, device=device)
     except Exception:
+        if ctx.meta['raise_failed']:
+            raise
         message('\u2717', fg='red')
-        raise
+        ctx.exit(1)
     if ctx.meta['last_process'] and ctx.meta['output_mode'] != 'native':
         with click.open_file(output, 'w', encoding='utf-8') as fp:
             fp = cast(IO[Any], fp)
@@ -380,7 +384,7 @@ def process_pipeline(subcommands, input, batch_input, suffix, verbose, format_ty
                 task(input=input, output=output)
         except Exception as e:
             logger.error(f'Failed processing {io_pair[0]}: {str(e)}')
-            if ctx.meta['raise_failed'] is True:
+            if ctx.meta['raise_failed']:
                 raise
         finally:
             for f in fc[1:-1]:
@@ -449,6 +453,8 @@ def segment(ctx, model, boxes, text_direction, scale, maxcolseps,
             model = TorchVGSLModel.load_model(model)
             model.to(ctx.meta['device'])
         except Exception:
+            if ctx.meta['raise_failed']:
+                raise
             message('\u2717', fg='red')
             ctx.exit(1)
         message('\u2713', fg='green')
@@ -536,6 +542,8 @@ def ocr(ctx, model, pad, reorder, base_dir, no_segmentation, text_direction, thr
             rnn = models.load_any(location, device=ctx.meta['device'])
             nm[k] = rnn
         except Exception:
+            if ctx.meta['raise_failed']:
+                raise
             message('\u2717', fg='red')
             ctx.exit(1)
         message('\u2713', fg='green')
