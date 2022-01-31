@@ -303,6 +303,15 @@ def cli(input, batch_input, suffix, verbose, format_type, pdf_format, serializer
     is set on all subcommands with the `-v` switch.
     """
     ctx = click.get_current_context()
+    if device != 'cpu':
+        import torch
+        try:
+            torch.ones(1, device=device)
+        except AssertionError as e:
+            if raise_on_error:
+                raise
+            logger.error(f'Device {device} not available: {e.args[0]}.')
+            ctx.exit(1)
     ctx.meta['device'] = device
     ctx.meta['input_format_type'] = format_type if format_type != 'pdf' else 'image'
     ctx.meta['raise_failed'] = raise_on_error
