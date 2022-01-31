@@ -8,7 +8,7 @@ import kraken
 from pathlib import Path
 
 from kraken.lib import xml
-from kraken.lib.train import KrakenTrainer
+from kraken.lib.train import KrakenTrainer, RecognitionModel, SegmentationModel
 
 thisfile = Path(__file__).resolve().parent
 resources = thisfile / 'resources'
@@ -26,48 +26,56 @@ class TestKrakenTrainer(unittest.TestCase):
     def test_krakentrainer_rec_box_load(self):
         training_data = self.box_lines
         evaluation_data = self.box_lines
-        trainer = KrakenTrainer.recognition_train_gen(format_type='path',
-                                                      load=self.model,
-                                                      training_data=training_data,
-                                                      evaluation_data=evaluation_data)
-        self.assertEqual(trainer.model.seg_type, 'bbox')
+        module = RecognitionModel(format_type='path',
+                                  model=self.model,
+                                  training_data=training_data,
+                                  evaluation_data=evaluation_data)
+        module.setup()
+        self.assertEqual(module.nn.seg_type, 'bbox')
         self.assertIsInstance(trainer.train_set.dataset, kraken.lib.dataset.GroundTruthDataset)
+        trainer = KrakenTrainer(max_steps=1)
 
     def test_krakentrainer_rec_box_append(self):
         training_data = self.box_lines
         evaluation_data = self.box_lines
-        trainer = KrakenTrainer.recognition_train_gen(format_type='path',
-                                                      load=self.model,
-                                                      append=1,
-                                                      spec='[Cr4,4,32]',
-                                                      training_data=training_data,
-                                                      evaluation_data=evaluation_data)
-        self.assertEqual(trainer.model.seg_type, 'bbox')
-        self.assertIsInstance(trainer.train_set.dataset, kraken.lib.dataset.GroundTruthDataset)
-        self.assertTrue(trainer.model.spec.startswith('[1,48,0,1 Cr{C_0}4,2,1,4,2 Cr{C_1}4,4,32 O{O_2}'))
+        module = RecognitionModel(format_type='path',
+                                  model=self.model,
+                                  append=1,
+                                  spec='[Cr4,4,32]',
+                                  training_data=training_data,
+                                  evaluation_data=evaluation_data)
+        module.setup()
+        self.assertEqual(module.nn.seg_type, 'bbox')
+        self.assertIsInstance(module.train_set.dataset, kraken.lib.dataset.GroundTruthDataset)
+        self.assertTrue(module.nn.spec.startswith('[1,48,0,1 Cr{C_0}4,2,1,4,2 Cr{C_1}4,4,32 O{O_2}'))
+        trainer = KrakenTrainer(max_steps=1)
 
     def test_krakentrainer_rec_bl_load(self):
         training_data = [self.xml]
         evaluation_data = [self.xml]
-        trainer = KrakenTrainer.recognition_train_gen(format_type='xml',
-                                                      load=self.model,
-                                                      training_data=training_data,
-                                                      evaluation_data=evaluation_data)
-        self.assertEqual(trainer.model.seg_type, 'baselines')
-        self.assertIsInstance(trainer.train_set.dataset, kraken.lib.dataset.PolygonGTDataset)
+        module = RecognitionModel(format_type='xml',
+                                  model=self.model,
+                                  training_data=training_data,
+                                  evaluation_data=evaluation_data)
+        module.setup()
+        self.assertEqual(module.nn.seg_type, 'baselines')
+        self.assertIsInstance(module.train_set.dataset, kraken.lib.dataset.PolygonGTDataset)
+        trainer = KrakenTrainer(max_steps=1)
 
     def test_krakentrainer_rec_bl_append(self):
         training_data = [self.xml]
         evaluation_data = [self.xml]
-        trainer = KrakenTrainer.recognition_train_gen(format_type='xml',
-                                                      load=self.model,
-                                                      append=1,
-                                                      spec='[Cr4,4,32]',
-                                                      training_data=training_data,
-                                                      evaluation_data=evaluation_data)
-        self.assertEqual(trainer.model.seg_type, 'baselines')
-        self.assertIsInstance(trainer.train_set.dataset, kraken.lib.dataset.PolygonGTDataset)
-        self.assertTrue(trainer.model.spec.startswith('[1,48,0,1 Cr{C_0}4,2,1,4,2 Cr{C_1}4,4,32 O{O_2}'))
+        module = RecognitionModel(format_type='xml',
+                                  model=self.model,
+                                  append=1,
+                                  spec='[Cr4,4,32]',
+                                  training_data=training_data,
+                                  evaluation_data=evaluation_data)
+        module.setup()
+        self.assertEqual(module.nn.seg_type, 'baselines')
+        self.assertIsInstance(module.train_set.dataset, kraken.lib.dataset.PolygonGTDataset)
+        self.assertTrue(module.nn.spec.startswith('[1,48,0,1 Cr{C_0}4,2,1,4,2 Cr{C_1}4,4,32 O{O_2}'))
+        trainer = KrakenTrainer(max_steps=1)
 
     def test_krakentrainer_rec_box_path(self):
         """
@@ -75,11 +83,13 @@ class TestKrakenTrainer(unittest.TestCase):
         """
         training_data = self.box_lines
         evaluation_data = self.box_lines
-        trainer = KrakenTrainer.recognition_train_gen(format_type='path',
-                                                      training_data=training_data,
-                                                      evaluation_data=evaluation_data)
-        self.assertEqual(trainer.model.seg_type, 'bbox')
-        self.assertIsInstance(trainer.train_set.dataset, kraken.lib.dataset.GroundTruthDataset)
+        module = RecognitionModel(format_type='path',
+                                  training_data=training_data,
+                                  evaluation_data=evaluation_data)
+        module.setup()
+        self.assertEqual(module.nn.seg_type, 'bbox')
+        self.assertIsInstance(module.train_set.dataset, kraken.lib.dataset.GroundTruthDataset)
+        trainer = KrakenTrainer(max_steps=1)
 
     def test_krakentrainer_rec_bl_xml(self):
         """
@@ -87,13 +97,15 @@ class TestKrakenTrainer(unittest.TestCase):
         """
         training_data = [self.xml]
         evaluation_data = [self.xml]
-        trainer = KrakenTrainer.recognition_train_gen(format_type='xml',
-                                                      training_data=training_data,
-                                                      evaluation_data=evaluation_data)
-        self.assertEqual(trainer.model.seg_type, 'baselines')
-        self.assertIsInstance(trainer.train_set.dataset, kraken.lib.dataset.PolygonGTDataset)
-        self.assertEqual(len(trainer.train_set.dataset), 44)
-        self.assertEqual(len(trainer.val_set.dataset), 44)
+        module = RecognitionModel(format_type='xml',
+                                  training_data=training_data,
+                                  evaluation_data=evaluation_data)
+        module.setup()
+        self.assertEqual(module.nn.seg_type, 'baselines')
+        self.assertIsInstance(module.train_set.dataset, kraken.lib.dataset.PolygonGTDataset)
+        self.assertEqual(len(module.train_set.dataset), 44)
+        self.assertEqual(len(module.val_set.dataset), 44)
+        trainer = KrakenTrainer(max_steps=1)
 
     def test_krakentrainer_rec_bl_dict(self):
         """
@@ -101,8 +113,10 @@ class TestKrakenTrainer(unittest.TestCase):
         """
         training_data = [{'image': resources / 'bw.png', 'text': 'foo', 'baseline': [[10, 10], [300, 10]], 'boundary': [[10, 5], [300, 5], [300, 15], [10, 15]]}]
         evaluation_data = [{'image': resources / 'bw.png', 'text': 'foo', 'baseline': [[10, 10], [300, 10]], 'boundary': [[10, 5], [300, 5], [300, 15], [10, 15]]}]
-        trainer = KrakenTrainer.recognition_train_gen(format_type=None,
-                                                      training_data=training_data,
-                                                      evaluation_data=evaluation_data)
-        self.assertEqual(trainer.model.seg_type, 'baselines')
-        self.assertIsInstance(trainer.train_set.dataset, kraken.lib.dataset.PolygonGTDataset)
+        module = RecognitionModel(format_type=None,
+                                  training_data=training_data,
+                                  evaluation_data=evaluation_data)
+        module.setup()
+        self.assertEqual(module.nn.seg_type, 'baselines')
+        self.assertIsInstance(module.train_set.dataset, kraken.lib.dataset.PolygonGTDataset)
+        trainer = KrakenTrainer(max_steps=1)

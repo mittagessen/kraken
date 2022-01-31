@@ -74,3 +74,9 @@ class TestVGSL(unittest.TestCase):
         """
         with raises(ValueError):
             net = vgsl.TorchVGSLModel('[1,48,0,1 Cr4,2,1,4,2 [Cr4,2,1,1,1 (Cr4,2,1,4,2 Cr3,3,2,1,1) S1(1x0)1,3 Lbx2 Do0.5] Lbx2]')
+
+    def test_complex_serialization(self):
+        """
+        Test proper serialization and deserialization of a complex model.
+        """
+        net = vgsl.TorchVGSLModel('[1,48,0,1 Cr4,2,1,4,2 ([Cr4,2,1,1,1 Do Cr3,3,2,1,1] [Cr4,2,1,1,1 Cr3,3,2,1,1 Do]) S1(1x0)1,3 Lbx2 Do0.5 Lbx2]')

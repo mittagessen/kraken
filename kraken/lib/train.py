@@ -313,6 +313,7 @@ class RecognitionModel(pl.LightningModule):
             self.spec = spec
         else:
             batch, channels, height, width = self.nn.input
+            self.spec = self.nn.spec
 
         self.transforms = ImageInputTransforms(batch,
                                                height,
