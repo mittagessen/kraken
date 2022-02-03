@@ -68,7 +68,7 @@ def compute_segmentation_map(im,
     batch, channels, height, width = model.input
     transforms = dataset.generate_input_transforms(batch, height, width, channels, 0, valid_norm=False)
     res_tf = tf.Compose(transforms.transforms[:3])
-    scal_im = res_tf(im).convert('L')
+    scal_im = np.array(res_tf(im).convert('L'))
 
     tensor_im = transforms(im)
     if mask:
