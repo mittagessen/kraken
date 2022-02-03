@@ -28,6 +28,7 @@ dependencies:
   - coremltools>=3.3
   - pyarrow
   - pytorch-lightning
+  - albumentations
   - pip
   - pip:
     - git+https://github.com/mittagessen/kraken.git@master
