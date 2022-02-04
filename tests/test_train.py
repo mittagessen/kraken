@@ -5,10 +5,12 @@ import json
 
 import kraken
 
+from pytest import raises
 from pathlib import Path
 
 from kraken.lib import xml
 from kraken.lib.train import KrakenTrainer, RecognitionModel, SegmentationModel
+from kraken.lib.exceptions import KrakenInputException
 
 thisfile = Path(__file__).resolve().parent
 resources = thisfile / 'resources'
@@ -23,16 +25,52 @@ class TestKrakenTrainer(unittest.TestCase):
         self.box_lines = [resources / '000236.png']
         self.model = resources / 'model_small.mlmodel'
 
-    def test_krakentrainer_rec_box_load(self):
+    def test_krakentrainer_rec_box_load_fail(self):
         training_data = self.box_lines
         evaluation_data = self.box_lines
         module = RecognitionModel(format_type='path',
                                   model=self.model,
                                   training_data=training_data,
-                                  evaluation_data=evaluation_data)
+                                  evaluation_data=evaluation_data,
+                                  resize='fail')
+        with raises(KrakenInputException):
+            module.setup()
+
+    def test_krakentrainer_rec_bl_load_fail(self):
+        training_data = [self.xml]
+        evaluation_data = [self.xml]
+        module = RecognitionModel(format_type='xml',
+                                  model=self.model,
+                                  training_data=training_data,
+                                  evaluation_data=evaluation_data,
+                                  resize='fail')
+        with raises(KrakenInputException):
+            module.setup()
+
+    def test_krakentrainer_rec_box_load_add(self):
+        training_data = self.box_lines
+        evaluation_data = self.box_lines
+        module = RecognitionModel(format_type='path',
+                                  model=self.model,
+                                  training_data=training_data,
+                                  evaluation_data=evaluation_data,
+                                  resize='add')
         module.setup()
         self.assertEqual(module.nn.seg_type, 'bbox')
-        self.assertIsInstance(trainer.train_set.dataset, kraken.lib.dataset.GroundTruthDataset)
+        self.assertIsInstance(module.train_set.dataset, kraken.lib.dataset.GroundTruthDataset)
+        trainer = KrakenTrainer(max_steps=1)
+
+    def test_krakentrainer_rec_box_load_both(self):
+        training_data = self.box_lines
+        evaluation_data = self.box_lines
+        module = RecognitionModel(format_type='path',
+                                  model=self.model,
+                                  training_data=training_data,
+                                  evaluation_data=evaluation_data,
+                                  resize='both')
+        module.setup()
+        self.assertEqual(module.nn.seg_type, 'bbox')
+        self.assertIsInstance(module.train_set.dataset, kraken.lib.dataset.GroundTruthDataset)
         trainer = KrakenTrainer(max_steps=1)
 
     def test_krakentrainer_rec_box_append(self):

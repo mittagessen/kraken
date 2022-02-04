@@ -299,21 +299,20 @@ class RecognitionModel(pl.LightningModule):
         else:
             raise ValueError(f'format_type {format_type} not in [alto, page, xml, path, binary].')
 
+        spec = spec.strip()
+        if spec[0] != '[' or spec[-1] != ']':
+            raise ValueError(f'VGSL spec {spec} not bracketed')
+        self.spec = spec
         # preparse input sizes from vgsl string to seed ground truth data set
         # sizes and dimension ordering.
         if not self.nn:
-            spec = spec.strip()
-            if spec[0] != '[' or spec[-1] != ']':
-                raise ValueError(f'VGSL spec {spec} not bracketed')
             blocks = spec[1:-1].split(' ')
             m = re.match(r'(\d+),(\d+),(\d+),(\d+)', blocks[0])
             if not m:
                 raise ValueError(f'Invalid input spec {blocks[0]}')
             batch, height, width, channels = [int(x) for x in m.groups()]
-            self.spec = spec
         else:
             batch, channels, height, width = self.nn.input
-            self.spec = self.nn.spec
 
         self.transforms = ImageInputTransforms(batch,
                                                height,
@@ -501,6 +500,8 @@ class RecognitionModel(pl.LightningModule):
                 self.nn.add_codec(self.train_set.dataset.codec)
                 logger.info(f'Assembled model spec: {self.nn.spec}')
             elif self.model:
+                self.spec = self.nn.spec
+
                 # prefer explicitly given codec over network codec if mode is 'both'
                 codec = self.codec if (self.codec and self.resize == 'both') else self.nn.codec
 
