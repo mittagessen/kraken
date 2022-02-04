@@ -37,6 +37,9 @@ class TestKrakenTrainer(unittest.TestCase):
             module.setup()
 
     def test_krakentrainer_rec_bl_load_fail(self):
+        """
+        Tests that the proper exception is raised when loading model not fitting the dataset.
+        """
         training_data = [self.xml]
         evaluation_data = [self.xml]
         module = RecognitionModel(format_type='xml',
@@ -48,6 +51,9 @@ class TestKrakenTrainer(unittest.TestCase):
             module.setup()
 
     def test_krakentrainer_rec_box_load_add(self):
+        """
+        Tests that adaptation works in add mode.
+        """
         training_data = self.box_lines
         evaluation_data = self.box_lines
         module = RecognitionModel(format_type='path',
@@ -59,8 +65,12 @@ class TestKrakenTrainer(unittest.TestCase):
         self.assertEqual(module.nn.seg_type, 'bbox')
         self.assertIsInstance(module.train_set.dataset, kraken.lib.dataset.GroundTruthDataset)
         trainer = KrakenTrainer(max_steps=1)
+        self.assertEqual(module.nn.named_spec[-1].split("c")[-1], '19')
 
     def test_krakentrainer_rec_box_load_both(self):
+        """
+        Tests that adaptation works in both mode.
+        """
         training_data = self.box_lines
         evaluation_data = self.box_lines
         module = RecognitionModel(format_type='path',
@@ -72,8 +82,12 @@ class TestKrakenTrainer(unittest.TestCase):
         self.assertEqual(module.nn.seg_type, 'bbox')
         self.assertIsInstance(module.train_set.dataset, kraken.lib.dataset.GroundTruthDataset)
         trainer = KrakenTrainer(max_steps=1)
+        self.assertEqual(module.nn.named_spec[-1].split("c")[-1], '16')
 
     def test_krakentrainer_rec_box_append(self):
+        """
+        Tests that appending new layers onto a loaded model works.
+        """
         training_data = self.box_lines
         evaluation_data = self.box_lines
         module = RecognitionModel(format_type='path',
@@ -94,11 +108,38 @@ class TestKrakenTrainer(unittest.TestCase):
         module = RecognitionModel(format_type='xml',
                                   model=self.model,
                                   training_data=training_data,
-                                  evaluation_data=evaluation_data)
+                                  evaluation_data=evaluation_data,
+                                  resize='fail')
+        with raises(KrakenInputException):
+            module.setup()
+
+    def test_krakentrainer_rec_bl_load_add(self):
+        training_data = [self.xml]
+        evaluation_data = [self.xml]
+        module = RecognitionModel(format_type='xml',
+                                  model=self.model,
+                                  training_data=training_data,
+                                  evaluation_data=evaluation_data,
+                                  resize='add')
         module.setup()
         self.assertEqual(module.nn.seg_type, 'baselines')
         self.assertIsInstance(module.train_set.dataset, kraken.lib.dataset.PolygonGTDataset)
         trainer = KrakenTrainer(max_steps=1)
+        self.assertEqual(module.nn.named_spec[-1].split("c")[-1], '60')
+
+    def test_krakentrainer_rec_bl_load_both(self):
+        training_data = [self.xml]
+        evaluation_data = [self.xml]
+        module = RecognitionModel(format_type='xml',
+                                  model=self.model,
+                                  training_data=training_data,
+                                  evaluation_data=evaluation_data,
+                                  resize='both')
+        module.setup()
+        self.assertEqual(module.nn.seg_type, 'baselines')
+        self.assertIsInstance(module.train_set.dataset, kraken.lib.dataset.PolygonGTDataset)
+        trainer = KrakenTrainer(max_steps=1)
+        self.assertEqual(module.nn.named_spec[-1].split("c")[-1], '60')
 
     def test_krakentrainer_rec_bl_append(self):
         training_data = [self.xml]
