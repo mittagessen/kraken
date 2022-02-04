@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 
 class VGSLBlock(object):
-    def __init__(self, block: str, layer: str, name: str, idx):
+    def __init__(self, block: str, layer: str, name: str, idx: int):
         if name:
             name = name[1:-1]
         else:
@@ -214,7 +214,10 @@ class TorchVGSLModel(object):
         spec = spec[1:-1]
         blocks = spec.split(' ')
         self.named_spec = self.named_spec[:idx+1]
-        self._parse(self.nn[-1].output_shape, blocks)
+        named_spec, nn, self.output = self._parse(self.nn[-1].output_shape, blocks)
+        self.named_spec.extend(str(x) for x in named_spec)
+        for module in nn.named_children():
+            self.nn.add_module(*module)
         self.spec = '[' + ' '.join(self.named_spec) + ']'
         self.init_weights(slice(idx, -1))
 
