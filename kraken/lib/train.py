@@ -583,8 +583,7 @@ class RecognitionModel(pl.LightningModule):
             callbacks.append(EarlyStopping(monitor='val_accuracy',
                                            mode='max',
                                            patience=self.hparams.lag,
-                                           stopping_threshold=1.0,
-                                           check_on_train_epoch_end=True))
+                                           stopping_threshold=1.0))
         return callbacks
 
 
@@ -982,7 +981,6 @@ class SegmentationModel(pl.LightningModule):
             callbacks.append(EarlyStopping(monitor='val_mean_iu',
                                            mode='max',
                                            patience=self.hparams.lag,
-                                           stopping_threshold=1.0,
-                                           check_on_train_epoch_end=True))
+                                           stopping_threshold=1.0))
 
         return callbacks

@@ -110,7 +110,9 @@ def _validate_merging(ctx, param, value):
 @click.option('-i', '--load', show_default=True, type=click.Path(exists=True,
               readable=True), help='Load existing file to continue training')
 @click.option('-F', '--freq', show_default=True, default=SEGMENTATION_HYPER_PARAMS['freq'], type=click.FLOAT,
-              help='Model saving and report generation frequency in epochs during training')
+              help='Model saving and report generation frequency in epochs '
+                   'during training. If frequency is >1 it must be an integer, '
+                   'i.e. running validation every n-th epoch.')
 @click.option('-q',
               '--quit',
               show_default=True,
@@ -256,6 +258,9 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs, min_epochs
     if resize != 'fail' and not load:
         raise click.BadOptionUsage('resize', 'resize option requires loading an existing model')
 
+    if not (0 <= freq <= 1) and freq % 1.0 != 0:
+        raise click.BadOptionUsage('freq', 'freq needs to be either in the interval [0,1.0] or a positive integer.')
+
     logger.info('Building ground truth set from {} document images'.format(len(ground_truth) + len(training_files)))
 
     # populate hyperparameters from command line args
@@ -301,6 +306,11 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs, min_epochs
     elif device.startswith('cuda'):
         device = [int(device.split(':')[-1])]
 
+    if hyper_params['freq'] > 1:
+        val_check_interval = {'check_val_every_n_epoch': int(hyper_params['freq'])}
+    else:
+        val_check_interval = {'val_check_interval': hyper_params['freq']}
+
     model = SegmentationModel(hyper_params,
                              output=output,
                              spec=spec,
@@ -334,7 +344,8 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs, min_epochs
 
     trainer = KrakenTrainer(gpus=device,
                             max_epochs=hyper_params['epochs'] if hyper_params['quit'] == 'dumb' else -1,
-                            min_epochs=hyper_params['min_epochs'])
+                            min_epochs=hyper_params['min_epochs'],
+                            **val_check_interval)
 
     trainer.fit(model)
 
@@ -360,7 +371,9 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs, min_epochs
 @click.option('-i', '--load', show_default=True, type=click.Path(exists=True,
               readable=True), help='Load existing file to continue training')
 @click.option('-F', '--freq', show_default=True, default=RECOGNITION_HYPER_PARAMS['freq'], type=click.FLOAT,
-              help='Model saving and report generation frequency in epochs during training')
+              help='Model saving and report generation frequency in epochs '
+                   'during training. If frequency is >1 it must be an integer, '
+                   'i.e. running validation every n-th epoch.')
 @click.option('-q',
               '--quit',
               show_default=True,
@@ -498,6 +511,9 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
     if resize != 'fail' and not load:
         raise click.BadOptionUsage('resize', 'resize option requires loading an existing model')
 
+    if not (0 <= freq <= 1) and freq % 1.0 != 0:
+        raise click.BadOptionUsage('freq', 'freq needs to be either in the interval [0,1.0] or a positive integer.')
+
     import json
     import shutil
     from kraken.lib.train import RecognitionModel, KrakenTrainer
@@ -548,6 +564,11 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
     elif device.startswith('cuda'):
         device = [int(device.split(':')[-1])]
 
+    if hyper_params['freq'] > 1:
+        val_check_interval = {'check_val_every_n_epoch': int(hyper_params['freq'])}
+    else:
+        val_check_interval = {'val_check_interval': hyper_params['freq']}
+
     model = RecognitionModel(hyper_params=hyper_params,
                              output=output,
                              spec=spec,
@@ -568,7 +589,8 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
 
     trainer = KrakenTrainer(gpus=device,
                             max_epochs=hyper_params['epochs'] if hyper_params['quit'] == 'dumb' else -1,
-                            min_epochs=hyper_params['min_epochs'])
+                            min_epochs=hyper_params['min_epochs'],
+                            **val_check_interval)
     try:
         trainer.fit(model)
     except KrakenInputException as e:
