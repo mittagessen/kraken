@@ -910,11 +910,23 @@ def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image.Image:
     with baselines preserving order.
 
     Args:
-        im (PIL.Image.Image): Input image
-        bounds (list): A list of dicts {
+        im: Input image
+        bounds: A list of dicts in baseline:
+            ```
+            {'type': 'baselines',
+             'lines': [{'baseline': [[x_0, y_0], ... [x_n, y_n]],
+                        'boundary': [[x_0, y_0], ... [x_n, y_n]]},
+                       ....]
+            }
+            ```
+            or bounding box format:
+            ```
+            {'boxes': [[x_0, y_0, x_1, y_1], ...],
+             'text_direction': 'horizontal-lr'}
+            ```
 
     Yields:
-        (PIL.Image.Image) the extracted subimage
+        The extracted subimage
     """
     if 'type' in bounds and bounds['type'] == 'baselines':
         # select proper interpolation scheme depending on shape
