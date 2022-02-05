@@ -17,14 +17,12 @@ Processing for baseline segmenter output
 """
 import PIL
 import logging
-import warnings
 import numpy as np
 import shapely.geometry as geom
 from collections import defaultdict
 
 from PIL import Image
 
-from scipy.stats import linregress
 from scipy.ndimage import maximum_filter, binary_erosion
 from scipy.ndimage.morphology import distance_transform_cdt
 from scipy.spatial.distance import pdist, squareform

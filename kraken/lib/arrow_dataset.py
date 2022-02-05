@@ -135,7 +135,7 @@ def build_binary_dataset(files: Optional[List[Union[str, pathlib.Path]]] = None,
         parse_fn = parse_page
     elif format_type == 'path':
         if not ignore_splits:
-            logger.warning(f'ignore_splits is False and format_type is path. Will not serialize splits.')
+            logger.warning('ignore_splits is False and format_type is path. Will not serialize splits.')
         parse_fn = parse_path
         extract_fn = _extract_path_line
     else:
@@ -148,7 +148,7 @@ def build_binary_dataset(files: Optional[List[Union[str, pathlib.Path]]] = None,
     for doc in files:
         try:
             data = parse_fn(doc)
-        except KrakenInputException as e:
+        except KrakenInputException:
             logger.warning(f'Invalid input file {doc}')
             continue
         try:

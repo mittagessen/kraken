@@ -491,10 +491,11 @@ class TorchVGSLModel(object):
         prev_device = next(self.nn.parameters()).device
         try:
             self.nn.to('cpu')
+
             def _serialize_layer(net, input, net_builder):
                 for name, l in net.named_children():
                     logger.debug(f'Serializing layer {name} with type {type(l)}')
-                    if type(l) in  (layers.MultiParamParallel, layers.MultiParamSequential):
+                    if type(l) in (layers.MultiParamParallel, layers.MultiParamSequential):
                         _serialize_layer(l, input, net_builder)
                     else:
                         l.serialize(name, input, net_builder)
@@ -629,9 +630,9 @@ class TorchVGSLModel(object):
         return fn.get_shape(input), [VGSLBlock(blocks[idx], m.group('type'), m.group('name'), self.idx)], fn
 
     def build_identity(self,
-                      input: Tuple[int, int, int, int],
-                      blocks: List[str],
-                      idx: int) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
+                       input: Tuple[int, int, int, int],
+                       blocks: List[str],
+                       idx: int) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
         pattern = re.compile(r'(?P<type>I)(?P<name>{\w+})?')
         m = pattern.match(blocks[idx])
         if not m:
@@ -830,4 +831,3 @@ class TorchVGSLModel(object):
         named_spec[0]._block = '(' + named_spec[0]._block
         named_spec[-1]._block = named_spec[-1]._block + ')'
         return oshape, named_spec, nn
-

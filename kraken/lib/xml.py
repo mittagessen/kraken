@@ -282,7 +282,7 @@ def parse_page(filename: Union[str, pathlib.Path]) -> Dict[str, Any]:
             if custom_str:
                 cs = _parse_page_custom(custom_str)
                 if 'structure' in cs and 'type' in cs['structure']:
-                    tags['type'] =  cs['structure']['type']
+                    tags['type'] = cs['structure']['type']
                     tag_set.add(tags['type'])
                 # retrieve data split if encoded in custom string.
                 if 'split' in cs and 'type' in cs['split'] and cs['split']['type'] in ['train', 'validation', 'test']:
@@ -381,7 +381,7 @@ def parse_alto(filename: Union[str, pathlib.Path]) -> Dict[str, Any]:
             if tagrefs is not None and rtype is None:
                 for tagref in tagrefs.split():
                     ttype, rtype = cls_map.get(tagref, (None, None))
-                    if rtype is not None and ttype :
+                    if rtype is not None and ttype:
                         break
             if rtype is None:
                 rtype = alto_regions[region.tag.split('}')[-1]]
