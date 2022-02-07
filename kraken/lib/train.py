@@ -27,7 +27,7 @@ import pytorch_lightning as pl
 from functools import partial
 from torch.multiprocessing import Pool
 from torch.optim import lr_scheduler
-from typing import Callable, Dict, Optional, Sequence, Union, Any, List, Tuple
+from typing import Callable, Dict, Optional, Sequence, Union, Any, List
 from pytorch_lightning.callbacks import Callback, EarlyStopping, ModelSummary
 
 from kraken.lib import models, vgsl, default_specs, log

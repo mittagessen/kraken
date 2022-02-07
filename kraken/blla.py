@@ -33,7 +33,7 @@ from scipy.ndimage.filters import gaussian_filter
 from skimage.filters import sobel
 
 from kraken.lib import vgsl, dataset
-from kraken.lib.util import pil2array, is_bitonal, get_im_str
+from kraken.lib.util import is_bitonal, get_im_str
 from kraken.lib.exceptions import KrakenInputException, KrakenInvalidModelException
 from kraken.lib.segmentation import (polygonal_reading_order,
                                      vectorize_lines, vectorize_regions,

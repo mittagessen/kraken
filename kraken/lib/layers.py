@@ -211,6 +211,7 @@ class Addition(Module):
                            custom_proto_spec=params)
         return name
 
+
 class Identity(Module):
     """
     A placeholder identity operator.

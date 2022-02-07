@@ -13,7 +13,6 @@
 # or implied. See the License for the specific language governing
 # permissions and limitations under the License.
 import os
-import time
 import glob
 import uuid
 import click
@@ -40,6 +39,7 @@ logger = logging.getLogger('kraken')
 
 # raise default max image size to 20k * 20k pixels
 Image.MAX_IMAGE_PIXELS = 20000 ** 2
+
 
 def message(msg, **styles):
     if logger.getEffectiveLevel() >= 30:
@@ -312,25 +312,25 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs, min_epochs
         val_check_interval = {'val_check_interval': hyper_params['freq']}
 
     model = SegmentationModel(hyper_params,
-                             output=output,
-                             spec=spec,
-                             model=load,
-                             training_data=ground_truth,
-                             evaluation_data=evaluation_files,
-                             partition=partition,
-                             num_workers=workers,
-                             load_hyper_parameters=load_hyper_parameters,
-                             force_binarization=force_binarization,
-                             format_type=format_type,
-                             suppress_regions=suppress_regions,
-                             suppress_baselines=suppress_baselines,
-                             valid_regions=valid_regions,
-                             valid_baselines=valid_baselines,
-                             merge_regions=merge_regions,
-                             merge_baselines=merge_baselines,
-                             bounding_regions=bounding_regions,
-                             resize=resize,
-                             topline=topline)
+                              output=output,
+                              spec=spec,
+                              model=load,
+                              training_data=ground_truth,
+                              evaluation_data=evaluation_files,
+                              partition=partition,
+                              num_workers=workers,
+                              load_hyper_parameters=load_hyper_parameters,
+                              force_binarization=force_binarization,
+                              format_type=format_type,
+                              suppress_regions=suppress_regions,
+                              suppress_baselines=suppress_baselines,
+                              valid_regions=valid_regions,
+                              valid_baselines=valid_baselines,
+                              merge_regions=merge_regions,
+                              merge_baselines=merge_baselines,
+                              bounding_regions=bounding_regions,
+                              resize=resize,
+                              topline=topline)
 
     message('Training line types:')
     for k, v in model.train_set.dataset.class_mapping['baselines'].items():
