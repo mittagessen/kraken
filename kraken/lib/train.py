@@ -96,8 +96,7 @@ class KrakenTrainer(pl.Trainer):
                     logger.info(f'Setting model one_channel_mode to {im_mode}.')
                     self.model.nn.one_channel_mode = im_mode
             self.model.nn.hyper_params['completed_epochs'] += 1
-            self.model.nn.user_metadata['accuracy'].append(((self.current_epoch+1)*len(self.model.train_set),
-                                                            {k: float(v) for k, v in self.logged_metrics.items()}))
+            self.model.nn.user_metadata['accuracy'].append(((self.current_epoch+1)*len(self.model.train_set), self.logged_metrics['val_metric']))
 
             logger.info('Saving to {}_{}'.format(self.model.output, self.current_epoch))
             self.model.nn.save_model(f'{self.model.output}_{self.current_epoch}.mlmodel')
