@@ -22,8 +22,9 @@ import logging
 import bidi.algorithm as bd
 
 from PIL import Image
+from functools import partial
 from collections import defaultdict
-from typing import List, Tuple, Optional, Generator, Union, Dict
+from typing import List, Tuple, Optional, Generator, Union, Dict, Sequence
 
 from kraken.lib.util import get_im_str, is_bitonal
 from kraken.lib.models import TorchSeqRecognizer
@@ -182,6 +183,10 @@ class mm_rpred(object):
         seg_types = set(recognizer.seg_type for recognizer in nets.values())
         if isinstance(nets, defaultdict):
             seg_types.add(nets.default_factory().seg_type)
+            self._resolve_tags_to_model = partial(_resolve_tags_to_model, default=nets.default_factory())
+        else:
+            self._resolve_tags_to_model = _resolve_tags_to_model
+
         if ('type' in bounds and bounds['type'] not in seg_types) or len(seg_types) > 1:
             logger.warning(f'Recognizers with segmentation types {seg_types} will be '
                            f'applied to segmentation of type {bounds["type"] if "type" in bounds else None}. '
@@ -262,14 +267,16 @@ class mm_rpred(object):
                 logger.warning('Empty run. Skipping.')
                 continue
 
+            tag, net = self._resolve_tags_to_model([tag], self.nets)
+
             logger.debug(f'Forward pass with model {tag}.')
-            preds = self.nets[tag].predict(line.unsqueeze(0))[0]
+            preds = net.predict(line.unsqueeze(0))[0]
 
             # calculate recognized LSTM locations of characters
             logger.debug('Convert to absolute coordinates')
             # calculate recognized LSTM locations of characters
             # scale between network output and network input
-            self.net_scale = line.shape[2]/self.nets[tag].outputs.shape[2]
+            self.net_scale = line.shape[2]/net.outputs.shape[2]
             # scale between network input and original line
             self.in_scale = box.size[0]/(line.shape[2]-2*self.pad)
 
@@ -298,6 +305,11 @@ class mm_rpred(object):
             return rec
 
     def _recognize_baseline_line(self, line):
+        if self.tags_ignore is not None:
+            for tag in line['tags'].values():
+                if tag in self.tags_ignore:
+                    logger.info(f'Ignoring line segment with tags {line["tags"]} based on {tag}.')
+                    continue
         try:
             box, coords = next(extract_polygons(self.im, line))
         except KrakenInputException as e:
@@ -306,7 +318,7 @@ class mm_rpred(object):
 
         self.box = box
 
-        tags = coords['tags']
+        tag, net = self._resolve_tags_to_model(coords['tags'], self.nets)
         # check if boxes are non-zero in any dimension
         if 0 in box.size:
             logger.warning(f'bbox {coords} with zero dimension. Emitting empty record.')
@@ -320,10 +332,10 @@ class mm_rpred(object):
         if line.max() == line.min():
             return ocr_record('', [], [], coords)
 
-        preds = self.nets[tag].predict(line.unsqueeze(0))[0]
+        preds = net.predict(line.unsqueeze(0))[0]
         # calculate recognized LSTM locations of characters
         # scale between network output and network input
-        self.net_scale = line.shape[2]/self.nets[tag].outputs.shape[2]
+        self.net_scale = line.shape[2]/net.outputs.shape[2]
         # scale between network input and original line
         self.in_scale = box.size[0]/(line.shape[2]-2*self.pad)
 
@@ -397,3 +409,17 @@ def rpred(network: TorchSeqRecognizer,
         bounds['boxes'] = rewrite_boxes
         bounds['script_detection'] = True
     return mm_rpred(defaultdict(lambda: network), im, bounds, pad, bidi_reordering)
+
+
+def _resolve_tags_to_model(tags: Sequence[Dict[str, str]],
+                           model_map: Dict[str, TorchSeqRecognizer],
+                           default: Optional[TorchSeqRecognizer] = None) -> TorchSeqRecognizer:
+    """
+    Resolves a sequence of tags
+    """
+    for tag in tags.values():
+        if tag in model_map:
+            return model_map[tag]
+    if default:
+        return default
+    raise KrakenInputException('No model for tags {}'.format(tags))
