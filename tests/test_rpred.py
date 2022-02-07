@@ -8,7 +8,7 @@ from pytest import raises
 from pathlib import Path
 
 from kraken.lib.models import load_any
-from kraken.rpred import rpred
+from kraken.rpred import rpred, mm_rpred
 from kraken.lib.exceptions import KrakenInputException
 
 thisfile = Path(__file__).resolve().parent
@@ -68,11 +68,31 @@ class TestRecognition(unittest.TestCase):
         """
         Test that mm_rpred fails when tags are missing
         """
+        with raises(KrakenInputException):
+            pred = mm_rpred({'default': self.model},
+                            self.overfit_line,
+                            {'boxes': [[('default', [0, 0, 2544, 156])],
+                                       [('foobar', [0, 0, 2544, 156])]],
+                             'text_direction': 'horizontal',
+                             'script_detection': True},
+                            True)
 
     def test_mm_rpred_bl_missing_tags(self):
         """
         Test that mm_rpred fails when tags are missing
         """
+        with raises(KrakenInputException):
+            pred = mm_rpred({'default': self.model},
+                            self.overfit_line,
+                            {'lines': [{'tags': {'type': 'default'},
+                                        'baseline': [[0,0], [10000, 0]],
+                                        'boundary': [[-1, -1], [-1, 10000], [10000, 10000], [10000, -1]]},
+                                        {'tags': {'type': 'foobar'},
+                                        'baseline': [[0,0], [10000, 0]],
+                                        'boundary': [[-1, -1], [-1, 10000], [10000, 10000], [10000, -1]]}],
+                             'text_direction': 'horizontal',
+                             'type': 'baselines'},
+                            True)
 
     def test_rpred_ignore_tags(self):
         """
