@@ -267,7 +267,7 @@ class mm_rpred(object):
                 logger.warning('Empty run. Skipping.')
                 continue
 
-            tag, net = self._resolve_tags_to_model([tag], self.nets)
+            _, net = self._resolve_tags_to_model({'type': tag}, self.nets)
 
             logger.debug(f'Forward pass with model {tag}.')
             preds = net.predict(line.unsqueeze(0))[0]
@@ -419,7 +419,7 @@ def _resolve_tags_to_model(tags: Sequence[Dict[str, str]],
     """
     for tag in tags.values():
         if tag in model_map:
-            return model_map[tag]
+            return tag, model_map[tag]
     if default:
-        return default
+        return next(tags.values()), default
     raise KrakenInputException('No model for tags {}'.format(tags))
