@@ -187,6 +187,9 @@ class mm_rpred(object):
         else:
             self._resolve_tags_to_model = _resolve_tags_to_model
 
+        if not tags_ignore:
+            tags_ignore = []
+
         if ('type' in bounds and bounds['type'] not in seg_types) or len(seg_types) > 1:
             logger.warning(f'Recognizers with segmentation types {seg_types} will be '
                            f'applied to segmentation of type {bounds["type"] if "type" in bounds else None}. '
@@ -218,8 +221,16 @@ class mm_rpred(object):
         im_str = get_im_str(im)
         logger.info('Running {} multi-script recognizers on {} with {} lines'.format(len(nets), im_str, self.len))
 
-        miss = [tag for tag in tags if not nets.get(tag)]
-        if miss and not isinstance(nets, defaultdict):
+        filtered_tags = []
+        miss = []
+        for tag in tags:
+            if not isinstance(nets, defaultdict) and (not nets.get(tag) and tag not in tags_ignore):
+                miss.append(tag)
+            elif tag not in tags_ignore:
+                filtered_tags.append(tag)
+        tags = filtered_tags
+
+        if miss:
             raise KrakenInputException('Missing models for tags {}'.format(set(miss)))
 
         # build dictionary for line preprocessing
@@ -248,7 +259,7 @@ class mm_rpred(object):
             self.box = box
             # skip if tag is set to ignore
             if self.tags_ignore is not None and tag in self.tags_ignore:
-                logger.info(f'Ignoring {tag} line segment.')
+                logger.warning(f'Ignoring {tag} line segment.')
                 continue
             # check if boxes are non-zero in any dimension
             if 0 in box.size:
@@ -306,10 +317,11 @@ class mm_rpred(object):
 
     def _recognize_baseline_line(self, line):
         if self.tags_ignore is not None:
-            for tag in line['tags'].values():
+            for tag in line['lines'][0]['tags'].values():
                 if tag in self.tags_ignore:
-                    logger.info(f'Ignoring line segment with tags {line["tags"]} based on {tag}.')
-                    continue
+                    logger.info(f'Ignoring line segment with tags {line["lines"][0]["tags"]} based on {tag}.')
+                    return ocr_record('', [], [], line['lines'][0])
+
         try:
             box, coords = next(extract_polygons(self.im, line))
         except KrakenInputException as e:
@@ -360,8 +372,7 @@ class mm_rpred(object):
     def __next__(self):
         bound = self.bounds
         bound[self.seg_key] = [next(self.line_iter)]
-        o = self.next_iter(bound)
-        return o
+        return self.next_iter(bound)
 
     def __iter__(self):
         return self

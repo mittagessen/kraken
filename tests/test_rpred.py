@@ -6,6 +6,7 @@ import unittest
 from PIL import Image
 from pytest import raises
 from pathlib import Path
+from collections import defaultdict
 
 from kraken.lib.models import load_any
 from kraken.rpred import rpred, mm_rpred
@@ -94,14 +95,105 @@ class TestRecognition(unittest.TestCase):
                              'type': 'baselines'},
                             True)
 
-    def test_rpred_ignore_tags(self):
+    def test_mm_rpred_bbox_ignore_tags(self):
         """
-        Tests simple recognition with ignore tags.
+        Tests mm_rpred recognition with ignore tags.
         """
-        pass
+        pred = mm_rpred({'default': self.model},
+                        self.overfit_line,
+                        {'boxes': [[('foobar', [0, 0, 2544, 156])],
+                                   [('default', [0, 0, 2544, 156])]],
+                         'text_direction': 'horizontal',
+                         'script_detection': True},
+                        True,
+                        tags_ignore=['foobar'])
+        record = next(pred)
+        self.assertEqual(record.prediction, '')
+        record = next(pred)
+        self.assertEqual(record.prediction, 'ܡ ܘܡ ܗ ܡܕܐ ܐ ܐܐ ܡ ܗܗܐܐܐܕ')
 
-    def test_rpred_default_tags(self):
+    def test_mm_rpred_bbox_default_tags(self):
         """
         Tests recognition with default tag.
         """
-        pass
+        pred = mm_rpred(defaultdict(lambda: self.model),
+                        self.overfit_line,
+                        {'boxes': [[('foobar', [0, 0, 2544, 156])],
+                                   [('default', [0, 0, 2544, 156])]],
+                         'text_direction': 'horizontal',
+                         'script_detection': True},
+                        True)
+        record = next(pred)
+        self.assertEqual(record.prediction, 'ܡ ܘܡ ܗ ܡܕܐ ܐ ܐܐ ܡ ܗܗܐܐܐܕ')
+        record = next(pred)
+        self.assertEqual(record.prediction, 'ܡ ܘܡ ܗ ܡܕܐ ܐ ܐܐ ܡ ܗܗܐܐܐܕ')
+
+    def test_mm_rpred_bl_ignore_tags(self):
+        """
+        Tests baseline recognition with ignore tags.
+        """
+        pred = mm_rpred({'default': self.model},
+                        self.overfit_line,
+                        {'lines': [{'tags': {'type': 'foobar'},
+                                    'baseline': [[0, 10], [2543, 10]],
+                                    'boundary': [[0, 0], [2543, 0], [2543, 155], [0, 155]]},
+                                   {'tags': {'type': 'default'},
+                                    'baseline': [[0, 10], [2543, 10]],
+                                    'boundary': [[0, 0], [2543, 0], [2543, 155], [0, 155]]}],
+                         'script_detection': True,
+                         'type': 'baselines'},
+                        True,
+                        tags_ignore=['foobar'])
+        record = next(pred)
+        self.assertEqual(record.prediction, '')
+        record = next(pred)
+        self.assertEqual(record.prediction, '.ܗ ܣܗܐ  ܕ ܣ   ܗ ܕܗܗ ܟܕܗܣ    ܠ  ܐ .ܣܕܐܣ. ܗ ')
+
+    def test_mm_rpred_bl_default_tags(self):
+        """
+        Tests baseline recognition with default tag.
+        """
+        pred = mm_rpred(defaultdict(lambda: self.model),
+                        self.overfit_line,
+                        {'lines': [{'tags': {'type': 'foobar'},
+                                    'baseline': [[0, 10], [2543, 10]],
+                                    'boundary': [[0, 0], [2543, 0], [2543, 155], [0, 155]]},
+                                   {'tags': {'type': 'default'},
+                                    'baseline': [[0, 10], [2543, 10]],
+                                    'boundary': [[0, 0], [2543, 0], [2543, 155], [0, 155]]}],
+                         'script_detection': True,
+                         'type': 'baselines'},
+                        True)
+        record = next(pred)
+        self.assertEqual(record.prediction, '.ܗ ܣܗܐ  ܕ ܣ   ܗ ܕܗܗ ܟܕܗܣ    ܠ  ܐ .ܣܕܐܣ. ܗ ')
+        record = next(pred)
+        self.assertEqual(record.prediction, '.ܗ ܣܗܐ  ܕ ܣ   ܗ ܕܗܗ ܟܕܗܣ    ܠ  ܐ .ܣܕܐܣ. ܗ ')
+
+    def test_mm_rpred_bl_nobidi(self):
+        """
+        Tests baseline recognition without bidi reordering.
+        """
+        pred = mm_rpred(defaultdict(lambda: self.model),
+                        self.overfit_line,
+                        {'lines': [{'tags': {'type': 'default'},
+                                    'baseline': [[0, 10], [2543, 10]],
+                                    'boundary': [[0, 0], [2543, 0], [2543, 155], [0, 155]]}],
+                         'script_detection': True,
+                         'type': 'baselines'},
+                        bidi_reordering=False)
+        record = next(pred)
+        self.assertEqual(record.prediction, 'ܕܗ .ܣܐܗܗ.ܐ ܗܣ ܕ   ܗܣ ܗ.ܗܝܣܗ ܣ ܗܢ ܪܗܗܕ ܐ   ܗܠ')
+
+    def test_mm_rpred_bbox_nobidi(self):
+        """
+        Tests bbox recognition without bidi reordering.
+        """
+        pred = mm_rpred(defaultdict(lambda: self.model),
+                        self.overfit_line,
+                        {'boxes': [[('foobar', [0, 0, 2544, 156])],
+                                   [('default', [0, 0, 2544, 156])]],
+                         'text_direction': 'horizontal',
+                         'script_detection': True},
+                        bidi_reordering=False)
+        record = next(pred)
+        self.assertEqual(record.prediction,  'ܕܗܣܐܕ ܪܝ .ܡܡ ܐܠܠ ܗܠ ܐܘܗ ܟܘܗܢ ܡܡ ܐܠ')
