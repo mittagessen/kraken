@@ -96,7 +96,7 @@ class KrakenTrainer(pl.Trainer):
                     logger.info(f'Setting model one_channel_mode to {im_mode}.')
                     self.model.nn.one_channel_mode = im_mode
             self.model.nn.hyper_params['completed_epochs'] += 1
-            self.model.nn.user_metadata['accuracy'].append(((self.current_epoch+1)*len(self.model.train_set), self.logged_metrics['val_metric']))
+            self.model.nn.user_metadata['accuracy'].append(((self.current_epoch+1)*len(self.model.train_set), float(self.logged_metrics['val_metric'])))
 
             logger.info('Saving to {}_{}'.format(self.model.output, self.current_epoch))
             self.model.nn.save_model(f'{self.model.output}_{self.current_epoch}.mlmodel')
@@ -174,7 +174,10 @@ class KrakenProgressBar(pl.callbacks.progress.base.ProgressBarBase):
             for k, v in metrics.items():
                 print(f'{k}: {v:.5f} ', end='')
             if trainer.early_stopping_callback:
-                print(f'early_stopping: {trainer.early_stopping_callback.wait_count}/{trainer.early_stopping_callback.patience} {trainer.early_stopping_callback.best_score:.5f}', end='')
+                print(f'early_stopping: '
+                      f'{trainer.early_stopping_callback.wait_count}/{trainer.early_stopping_callback.patience} '
+                      f'{trainer.early_stopping_callback.best_score:.5f}',
+                      end='')
 
 
 class RecognitionModel(pl.LightningModule):
