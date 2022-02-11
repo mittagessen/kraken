@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Copyright 2015 Benjamin Kiessling
 #           2014 Thomas M. Breuel
@@ -18,7 +17,7 @@
 kraken.pageseg
 ~~~~~~~~~~~~~~
 
-Layout analysis and script detection methods.
+Layout analysis methods.
 """
 import logging
 import numpy as np

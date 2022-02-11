@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Copyright 2015 Benjamin Kiessling
 #
@@ -14,7 +13,6 @@
 # or implied. See the License for the specific language governing
 # permissions and limitations under the License.
 import os
-import time
 import glob
 import uuid
 import click
@@ -41,6 +39,7 @@ logger = logging.getLogger('kraken')
 
 # raise default max image size to 20k * 20k pixels
 Image.MAX_IMAGE_PIXELS = 20000 ** 2
+
 
 def message(msg, **styles):
     if logger.getEffectiveLevel() >= 30:
@@ -111,7 +110,9 @@ def _validate_merging(ctx, param, value):
 @click.option('-i', '--load', show_default=True, type=click.Path(exists=True,
               readable=True), help='Load existing file to continue training')
 @click.option('-F', '--freq', show_default=True, default=SEGMENTATION_HYPER_PARAMS['freq'], type=click.FLOAT,
-              help='Model saving and report generation frequency in epochs during training')
+              help='Model saving and report generation frequency in epochs '
+                   'during training. If frequency is >1 it must be an integer, '
+                   'i.e. running validation every n-th epoch.')
 @click.option('-q',
               '--quit',
               show_default=True,
@@ -124,6 +125,10 @@ def _validate_merging(ctx, param, value):
               show_default=True,
               default=SEGMENTATION_HYPER_PARAMS['epochs'],
               help='Number of epochs to train for')
+@click.option('--min-epochs',
+              show_default=True,
+              default=SEGMENTATION_HYPER_PARAMS['min_epochs'],
+              help='Minimal number of epochs to train for when using early stopping.')
 @click.option('--lag',
               show_default=True,
               default=SEGMENTATION_HYPER_PARAMS['lag'],
@@ -139,7 +144,8 @@ def _validate_merging(ctx, param, value):
               default=SEGMENTATION_HYPER_PARAMS['optimizer'],
               type=click.Choice(['Adam',
                                  'SGD',
-                                 'RMSprop']),
+                                 'RMSprop',
+                                 'Lamb']),
               help='Select optimizer')
 @click.option('-r', '--lrate', show_default=True, default=SEGMENTATION_HYPER_PARAMS['lrate'], help='Learning rate')
 @click.option('-m', '--momentum', show_default=True, default=SEGMENTATION_HYPER_PARAMS['momentum'], help='Momentum')
@@ -181,7 +187,7 @@ def _validate_merging(ctx, param, value):
 @click.option('-e', '--evaluation-files', show_default=True, default=None, multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
-@click.option('--threads', show_default=True, default=1, help='Number of OpenMP threads and workers when running on CPU.')
+@click.option('--workers', show_default=True, default=1, help='Number of OpenMP threads and workers when running on CPU.')
 @click.option('--load-hyper-parameters/--no-load-hyper-parameters', show_default=True, default=False,
               help='When loading an existing model, retrieve hyper-parameters from the model')
 @click.option('--force-binarization/--no-binarization', show_default=True,
@@ -235,10 +241,10 @@ def _validate_merging(ctx, param, value):
 @click.option('-cl', '--centerline', 'topline', flag_value='centerline')
 @click.option('-bl', '--baseline', 'topline', flag_value='baseline', default='baseline')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
-def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
+def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs, min_epochs,
              lag, min_delta, device, optimizer, lrate, momentum, weight_decay,
              schedule, gamma, step_size, sched_patience, cos_max, partition,
-             training_files, evaluation_files, threads, load_hyper_parameters,
+             training_files, evaluation_files, workers, load_hyper_parameters,
              force_binarization, format_type, suppress_regions,
              suppress_baselines, valid_regions, valid_baselines, merge_regions,
              merge_baselines, bounding_regions, augment, resize, topline, ground_truth):
@@ -246,12 +252,14 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
     Trains a baseline labeling model for layout analysis
     """
     import shutil
-    import numpy as np
 
-    from kraken.lib.train import KrakenTrainer
+    from kraken.lib.train import SegmentationModel, KrakenTrainer
 
     if resize != 'fail' and not load:
         raise click.BadOptionUsage('resize', 'resize option requires loading an existing model')
+
+    if not (0 <= freq <= 1) and freq % 1.0 != 0:
+        raise click.BadOptionUsage('freq', 'freq needs to be either in the interval [0,1.0] or a positive integer.')
 
     logger.info('Building ground truth set from {} document images'.format(len(ground_truth) + len(training_files)))
 
@@ -261,6 +269,7 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
                          'freq': freq,
                          'quit': quit,
                          'epochs': epochs,
+                         'min_epochs': min_epochs,
                          'lag': lag,
                          'min_delta': min_delta,
                          'optimizer': optimizer,
@@ -286,71 +295,59 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
     if len(ground_truth) == 0:
         raise click.UsageError('No training data was provided to the train command. Use `-t` or the `ground_truth` argument.')
 
-    np.random.shuffle(ground_truth)
+    loc = {'topline': True,
+           'baseline': False,
+           'centerline': None}
 
-    training_files = ground_truth[:int(len(ground_truth) * partition)]
-    if evaluation_files:
-        logger.debug(f'Using {len(evaluation_files)} lines/files from explicit eval set')
+    topline = loc[topline]
+
+    if device == 'cpu':
+        device = None
+    elif device.startswith('cuda'):
+        device = [int(device.split(':')[-1])]
+
+    if hyper_params['freq'] > 1:
+        val_check_interval = {'check_val_every_n_epoch': int(hyper_params['freq'])}
     else:
-        evaluation_files = ground_truth[int(len(ground_truth) * partition):]
-        logger.debug(f'Taking {len(evaluation_files)} lines/files from training set for evaluation')
+        val_check_interval = {'val_check_interval': hyper_params['freq']}
 
-    def _init_progressbar(label, length):
-        if 'bar' in ctx.meta:
-            ctx.meta['bar'].__exit__(None, None, None)
-        ctx.meta['bar'] = log.progressbar(label=label, length=length, show_pos=True)
-        ctx.meta['bar'].__enter__()
-        return lambda: ctx.meta['bar'].update(1)
+    model = SegmentationModel(hyper_params,
+                              output=output,
+                              spec=spec,
+                              model=load,
+                              training_data=ground_truth,
+                              evaluation_data=evaluation_files,
+                              partition=partition,
+                              num_workers=workers,
+                              load_hyper_parameters=load_hyper_parameters,
+                              force_binarization=force_binarization,
+                              format_type=format_type,
+                              suppress_regions=suppress_regions,
+                              suppress_baselines=suppress_baselines,
+                              valid_regions=valid_regions,
+                              valid_baselines=valid_baselines,
+                              merge_regions=merge_regions,
+                              merge_baselines=merge_baselines,
+                              bounding_regions=bounding_regions,
+                              resize=resize,
+                              topline=topline)
 
-    topline = {'topline': True,
-               'baseline': False,
-               'centerline': None}[topline]
+    message('Training line types:')
+    for k, v in model.train_set.dataset.class_mapping['baselines'].items():
+        message(f'  {k}\t{v}\t{model.train_set.dataset.class_stats["baselines"][k]}')
+    message('Training region types:')
+    for k, v in model.train_set.dataset.class_mapping['regions'].items():
+        message(f'  {k}\t{v}\t{model.train_set.dataset.class_stats["regions"][k]}')
 
-    trainer = KrakenTrainer.segmentation_train_gen(hyper_params,
-                                                   message=message,
-                                                   progress_callback=_init_progressbar,
-                                                   output=output,
-                                                   spec=spec,
-                                                   load=load,
-                                                   device=device,
-                                                   training_data=training_files,
-                                                   evaluation_data=evaluation_files,
-                                                   threads=threads,
-                                                   load_hyper_parameters=load_hyper_parameters,
-                                                   force_binarization=force_binarization,
-                                                   format_type=format_type,
-                                                   suppress_regions=suppress_regions,
-                                                   suppress_baselines=suppress_baselines,
-                                                   valid_regions=valid_regions,
-                                                   valid_baselines=valid_baselines,
-                                                   merge_regions=merge_regions,
-                                                   merge_baselines=merge_baselines,
-                                                   bounding_regions=bounding_regions,
-                                                   augment=augment,
-                                                   resize=resize,
-                                                   topline=topline)
+    if len(model.train_set) == 0:
+        raise click.UsageError('No valid training data was provided to the train command. Use `-t` or the `ground_truth` argument.')
 
-    with log.progressbar(label='stage {}/{}'.format(1, trainer.stopper.epochs if trainer.stopper.epochs > 0 else '∞'),
-                         length=trainer.event_it, show_pos=True) as bar:
+    trainer = KrakenTrainer(gpus=device,
+                            max_epochs=hyper_params['epochs'] if hyper_params['quit'] == 'dumb' else -1,
+                            min_epochs=hyper_params['min_epochs'],
+                            **val_check_interval)
 
-        def _draw_progressbar():
-            bar.update(1)
-
-        def _print_eval(epoch, accuracy, mean_acc, mean_iu, freq_iu, **kwargs):
-            message(
-                'Accuracy report ({}) mean_iu: {:0.4f} freq_iu: {:0.4f} mean_acc: {:0.4f} accuracy: {:0.4f}'.format(
-                    epoch,
-                    mean_iu,
-                    freq_iu,
-                    mean_acc,
-                    accuracy))
-            # reset progress bar
-            bar.label = 'stage {}/{}'.format(epoch + 1, trainer.stopper.epochs if trainer.stopper.epochs > 0 else '∞')
-            bar.pos = 0
-            bar.finished = False
-            bar.start = bar.last_eta = time.time()
-
-        trainer.run(_print_eval, _draw_progressbar)
+    trainer.fit(model)
 
     if quit == 'early':
         message('Moving best model {0}_{1}.mlmodel ({2}) to {0}_best.mlmodel'.format(
@@ -374,7 +371,9 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
 @click.option('-i', '--load', show_default=True, type=click.Path(exists=True,
               readable=True), help='Load existing file to continue training')
 @click.option('-F', '--freq', show_default=True, default=RECOGNITION_HYPER_PARAMS['freq'], type=click.FLOAT,
-              help='Model saving and report generation frequency in epochs during training')
+              help='Model saving and report generation frequency in epochs '
+                   'during training. If frequency is >1 it must be an integer, '
+                   'i.e. running validation every n-th epoch.')
 @click.option('-q',
               '--quit',
               show_default=True,
@@ -387,6 +386,10 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
               show_default=True,
               default=RECOGNITION_HYPER_PARAMS['epochs'],
               help='Number of epochs to train for')
+@click.option('--min-epochs',
+              show_default=True,
+              default=RECOGNITION_HYPER_PARAMS['min_epochs'],
+              help='Minimal number of epochs to train for when using early stopping.')
 @click.option('--lag',
               show_default=True,
               default=RECOGNITION_HYPER_PARAMS['lag'],
@@ -402,7 +405,8 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
               default=RECOGNITION_HYPER_PARAMS['optimizer'],
               type=click.Choice(['Adam',
                                  'SGD',
-                                 'RMSprop']),
+                                 'RMSprop',
+                                 'Lamb']),
               help='Select optimizer')
 @click.option('-r', '--lrate', show_default=True, default=RECOGNITION_HYPER_PARAMS['lrate'], help='Learning rate')
 @click.option('-m', '--momentum', show_default=True, default=RECOGNITION_HYPER_PARAMS['momentum'], help='Momentum')
@@ -438,6 +442,8 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
               help='Epoch of minimal learning rate for cosine LR scheduler.')
 @click.option('-p', '--partition', show_default=True, default=0.9,
               help='Ground truth data partition ratio between train/validation set')
+@click.option('--fixed-splits/--ignore-fixed-split', show_default=True, default=False,
+              help='Whether to honor fixed splits in binary datasets.')
 @click.option('-u', '--normalization', show_default=True, type=click.Choice(['NFD', 'NFKD', 'NFC', 'NFKC']),
               default=RECOGNITION_HYPER_PARAMS['normalization'], help='Ground truth normalization')
 @click.option('-n', '--normalize-whitespace/--no-normalize-whitespace', show_default=True,
@@ -461,9 +467,7 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
 @click.option('-e', '--evaluation-files', show_default=True, default=None, multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
-@click.option('--preload/--no-preload', show_default=True, default=None,
-              help='Hard enable/disable for training data preloading')
-@click.option('--threads', show_default=True, default=1, help='Number of OpenMP threads and workers when running on CPU.')
+@click.option('--workers', show_default=True, default=1, help='Number of OpenMP threads and workers when running on CPU.')
 @click.option('--load-hyper-parameters/--no-load-hyper-parameters', show_default=True, default=False,
               help='When loading an existing model, retrieve hyperparameters from the model')
 @click.option('--repolygonize/--no-repolygonize', show_default=True,
@@ -479,22 +483,23 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs,
               default=False, help='Forces input images to be binary, otherwise '
               'the appropriate color format will be auto-determined through the '
               'network specification. Will be ignored in `path` mode.')
-@click.option('-f', '--format-type', type=click.Choice(['path', 'xml', 'alto', 'page']), default='path',
+@click.option('-f', '--format-type', type=click.Choice(['path', 'xml', 'alto', 'page', 'binary']), default='path',
               help='Sets the training data format. In ALTO and PageXML mode all '
               'data is extracted from xml files containing both line definitions and a '
               'link to source images. In `path` mode arguments are image files '
               'sharing a prefix up to the last extension with `.gt.txt` text files '
-              'containing the transcription.')
+              'containing the transcription. In binary mode files are datasets '
+              'files containing pre-extracted text lines.')
 @click.option('--augment/--no-augment',
               show_default=True,
               default=RECOGNITION_HYPER_PARAMS['augment'],
               help='Enable image augmentation')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
-          lag, min_delta, device, optimizer, lrate, momentum, weight_decay,
-          schedule, gamma, step_size, sched_patience, cos_max, partition,
-          normalization, normalize_whitespace, codec, resize, reorder,
-          base_dir, training_files, evaluation_files, preload, threads,
+          min_epochs, lag, min_delta, device, optimizer, lrate, momentum,
+          weight_decay, schedule, gamma, step_size, sched_patience, cos_max,
+          partition, fixed_splits, normalization, normalize_whitespace, codec,
+          resize, reorder, base_dir, training_files, evaluation_files, workers,
           load_hyper_parameters, repolygonize, force_binarization, format_type,
           augment, ground_truth):
     """
@@ -506,10 +511,12 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
     if resize != 'fail' and not load:
         raise click.BadOptionUsage('resize', 'resize option requires loading an existing model')
 
+    if not (0 <= freq <= 1) and freq % 1.0 != 0:
+        raise click.BadOptionUsage('freq', 'freq needs to be either in the interval [0,1.0] or a positive integer.')
+
     import json
     import shutil
-    import numpy as np
-    from kraken.lib.train import KrakenTrainer
+    from kraken.lib.train import RecognitionModel, KrakenTrainer
 
     hyper_params = RECOGNITION_HYPER_PARAMS.copy()
     hyper_params.update({'freq': freq,
@@ -517,6 +524,7 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
                          'batch_size': batch_size,
                          'quit': quit,
                          'epochs': epochs,
+                         'min_epochs': min_epochs,
                          'lag': lag,
                          'min_delta': min_delta,
                          'optimizer': optimizer,
@@ -547,68 +555,56 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
     if reorder and base_dir != 'auto':
         reorder = base_dir
 
-    np.random.shuffle(ground_truth)
-    training_files = ground_truth[:int(len(ground_truth) * partition)]
-    if evaluation_files:
-        logger.debug(f'Using {len(evaluation_files)} lines/files from explicit eval set')
-    else:
-        evaluation_files = ground_truth[int(len(ground_truth) * partition):]
-        logger.debug(f'Taking {len(evaluation_files)} lines/files from training set for evaluation')
-
     if codec:
         logger.debug(f'Loading codec file from {codec}')
         codec = json.load(codec)
 
-    def _init_progressbar(label, length):
-        if 'bar' in ctx.meta:
-            ctx.meta['bar'].__exit__(None, None, None)
-        ctx.meta['bar'] = log.progressbar(label=label, length=length, show_pos=True)
-        ctx.meta['bar'].__enter__()
-        return lambda: ctx.meta['bar'].update(1)
+    if device == 'cpu':
+        device = None
+    elif device.startswith('cuda'):
+        device = [int(device.split(':')[-1])]
 
-    trainer = KrakenTrainer.recognition_train_gen(hyper_params,
-                                                  message=message,
-                                                  progress_callback=_init_progressbar,
-                                                  output=output,
-                                                  spec=spec,
-                                                  append=append,
-                                                  load=load,
-                                                  device=device,
-                                                  reorder=reorder,
-                                                  training_data=training_files,
-                                                  evaluation_data=evaluation_files,
-                                                  preload=preload,
-                                                  threads=threads,
-                                                  load_hyper_parameters=load_hyper_parameters,
-                                                  repolygonize=repolygonize,
-                                                  force_binarization=force_binarization,
-                                                  format_type=format_type,
-                                                  codec=codec,
-                                                  resize=resize,
-                                                  augment=augment)
+    if hyper_params['freq'] > 1:
+        val_check_interval = {'check_val_every_n_epoch': int(hyper_params['freq'])}
+    else:
+        val_check_interval = {'val_check_interval': hyper_params['freq']}
 
-    with log.progressbar(label='stage {}/{}'.format(1, trainer.stopper.epochs if trainer.stopper.epochs > 0 else '∞'),
-                         length=trainer.event_it, show_pos=True) as bar:
+    model = RecognitionModel(hyper_params=hyper_params,
+                             output=output,
+                             spec=spec,
+                             append=append,
+                             model=load,
+                             reorder=reorder,
+                             training_data=ground_truth,
+                             evaluation_data=evaluation_files,
+                             partition=partition,
+                             binary_dataset_split=fixed_splits,
+                             num_workers=workers,
+                             load_hyper_parameters=load_hyper_parameters,
+                             repolygonize=repolygonize,
+                             force_binarization=force_binarization,
+                             format_type=format_type,
+                             codec=codec,
+                             resize=resize)
 
-        def _draw_progressbar():
-            bar.update(1)
-
-        def _print_eval(epoch, accuracy, chars, error, **kwargs):
-            message('Accuracy report ({}) {:0.4f} {} {}'.format(epoch, accuracy, chars, error))
-            # reset progress bar
-            bar.label = 'stage {}/{}'.format(epoch + 1, trainer.stopper.epochs if trainer.stopper.epochs > 0 else '∞')
-            bar.pos = 0
-            bar.finished = False
-            bar.start = bar.last_eta = time.time()
-
-        trainer.run(_print_eval, _draw_progressbar)
+    trainer = KrakenTrainer(gpus=device,
+                            max_epochs=hyper_params['epochs'] if hyper_params['quit'] == 'dumb' else -1,
+                            min_epochs=hyper_params['min_epochs'],
+                            **val_check_interval)
+    try:
+        trainer.fit(model)
+    except KrakenInputException as e:
+        if e.args[0].startswith('Training data and model codec alphabets mismatch') and resize == 'fail':
+            raise click.BadOptionUsage('resize', 'Mismatched training data for loaded model. Set option `--resize` to `add` or `both`')
+        else:
+            raise e
 
     if quit == 'early':
         message('Moving best model {0}_{1}.mlmodel ({2}) to {0}_best.mlmodel'.format(
-            output, trainer.stopper.best_epoch, trainer.stopper.best_loss))
+            output, model.best_epoch, model.best_metric))
         logger.info('Moving best model {0}_{1}.mlmodel ({2}) to {0}_best.mlmodel'.format(
-            output, trainer.stopper.best_epoch, trainer.stopper.best_loss))
-        shutil.copy(f'{output}_{trainer.stopper.best_epoch}.mlmodel', f'{output}_best.mlmodel')
+            output, model.best_epoch, model.best_metric))
+        shutil.copy(f'{output}_{model.best_epoch}.mlmodel', f'{output}_best.mlmodel')
 
 
 @cli.command('test')
@@ -623,7 +619,7 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
 @click.option('-d', '--device', show_default=True, default='cpu', help='Select device to use (cpu, cuda:0, cuda:1, ...)')
 @click.option('--pad', show_default=True, type=click.INT, default=16, help='Left and right '
               'padding around lines')
-@click.option('--threads', show_default=True, default=1, help='Number of OpenMP threads when running on CPU.')
+@click.option('--workers', show_default=True, default=1, help='Number of OpenMP threads when running on CPU.')
 @click.option('--reorder/--no-reorder', show_default=True, default=True, help='Reordering of code points to display order')
 @click.option('--base-dir', show_default=True, default='auto',
               type=click.Choice(['L', 'R', 'auto']), help='Set base text '
@@ -647,14 +643,15 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
               default=False, help='Forces input images to be binary, otherwise '
               'the appropriate color format will be auto-determined through the '
               'network specification. Will be ignored in `path` mode.')
-@click.option('-f', '--format-type', type=click.Choice(['path', 'xml', 'alto', 'page']), default='path',
+@click.option('-f', '--format-type', type=click.Choice(['path', 'xml', 'alto', 'page', 'binary']), default='path',
               help='Sets the training data format. In ALTO and PageXML mode all '
               'data is extracted from xml files containing both baselines and a '
               'link to source images. In `path` mode arguments are image files '
               'sharing a prefix up to the last extension with JSON `.path` files '
-              'containing the baseline information.')
+              'containing the baseline information. In `binary` mode files are '
+              'collections of pre-extracted text line images.')
 @click.argument('test_set', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
-def test(ctx, batch_size, model, evaluation_files, device, pad, threads,
+def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
          reorder, base_dir, normalization, normalize_whitespace, repolygonize,
          force_binarization, format_type, test_set):
     """
@@ -668,7 +665,12 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, threads,
 
     from kraken.serialization import render_report
     from kraken.lib import models
-    from kraken.lib.dataset import global_align, compute_confusions, preparse_xml_data, PolygonGTDataset, GroundTruthDataset, generate_input_transforms, collate_sequences
+    from kraken.lib.xml import preparse_xml_data
+    from kraken.lib.dataset import (global_align, compute_confusions,
+                                    PolygonGTDataset, GroundTruthDataset,
+                                    ImageInputTransforms,
+                                    ArrowIPCRecognitionDataset,
+                                    collate_sequences)
 
     logger.info('Building test set from {} line images'.format(len(test_set) + len(evaluation_files)))
 
@@ -689,12 +691,18 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, threads,
     if len(test_set) == 0:
         raise click.UsageError('No evaluation data was provided to the test command. Use `-e` or the `test_set` argument.')
 
-    if format_type != 'path':
+    if format_type in ['xml', 'page', 'alto']:
         if repolygonize:
             message('Repolygonizing data')
         test_set = preparse_xml_data(test_set, format_type, repolygonize)
         valid_norm = False
         DatasetClass = PolygonGTDataset
+    elif format_type == 'binary':
+        DatasetClass = ArrowIPCRecognitionDataset
+        if repolygonize:
+            logger.warning('Repolygonization enabled in `binary` mode. Will be ignored.')
+        test_set = [{'file': file} for file in test_set]
+        valid_norm = False
     else:
         DatasetClass = GroundTruthDataset
         if force_binarization:
@@ -720,12 +728,11 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, threads,
         message('Evaluating {}'.format(p))
         logger.info('Evaluating {}'.format(p))
         batch, channels, height, width = net.nn.input
-        ts = generate_input_transforms(batch, height, width, channels, pad, valid_norm, force_binarization)
+        ts = ImageInputTransforms(batch, height, width, channels, pad, valid_norm, force_binarization)
         ds = DatasetClass(normalization=normalization,
                           whitespace_normalization=normalize_whitespace,
                           reorder=reorder,
-                          im_transforms=ts,
-                          preload=False)
+                          im_transforms=ts)
         for line in test_set:
             try:
                 ds.add(**line)
@@ -735,7 +742,7 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, threads,
         ds.no_encode()
         ds_loader = DataLoader(ds,
                                batch_size=batch_size,
-                               num_workers=threads,
+                               num_workers=workers,
                                pin_memory=True,
                                collate_fn=collate_sequences)
 
@@ -1143,6 +1150,64 @@ def publish(ctx, metadata, access_token, model):
     metadata['graphemes'] = [char for char in ''.join(nn.codec.c2l.keys())]
     oid = repo.publish_model(model, metadata, access_token, partial(message, '.', nl=False))
     message('\nmodel PID: {}'.format(oid))
+
+
+@cli.command('compile')
+@click.pass_context
+@click.option('-o', '--output', show_default=True, type=click.Path(), default='model', help='Output model file')
+@click.option('--workers', show_default=True, default=1, help='Number of OpenMP threads and workers when running on CPU.')
+@click.option('-f', '--format-type', type=click.Choice(['path', 'xml', 'alto', 'page']), default='xml', show_default=True,
+              help='Sets the training data format. In ALTO and PageXML mode all '
+              'data is extracted from xml files containing both baselines and a '
+              'link to source images. In `path` mode arguments are image files '
+              'sharing a prefix up to the last extension with JSON `.path` files '
+              'containing the baseline information.')
+@click.option('--random-split', type=float, nargs=3, default=None, show_default=True,
+              help='Creates a fixed random split of the input data with the '
+              'proportions (train, validation, test). Overrides the save split option.')
+@click.option('--force-type', type=click.Choice(['bbox', 'baseline']), default=None, show_default=True,
+              help='Forces the dataset type to a specific value. Can be used to '
+                   '"convert" a line strip-type collection to a baseline-style '
+                   'dataset, e.g. to disable centerline normalization.')
+@click.option('--save-splits/--ignore-splits', show_default=True, default=True,
+              help='Whether to serialize explicit splits contained in XML '
+                   'files. Is ignored in `path` mode.')
+@click.option('--recordbatch-size', show_default=True, default=100,
+              help='Minimum number of records per RecordBatch written to the '
+                   'output file. Larger batches require more transient memory '
+                   'but slightly improve reading performance.')
+@click.argument('ground_truth', nargs=-1, type=click.Path(exists=True, dir_okay=False))
+def compile(ctx, output, workers, format_type, random_split, force_type, save_splits, recordbatch_size, ground_truth):
+    """
+    Precompiles a binary dataset from a collection of XML files.
+    """
+    if not ground_truth:
+        raise click.UsageError('No training data was provided to the compile command. Use the `ground_truth` argument.')
+
+    from kraken.lib import arrow_dataset
+
+    def _init_progressbar(progress, length):
+        if 'bar' not in ctx.meta:
+            ctx.meta['bar'] = log.progressbar(label='Extracting lines', length=length, show_pos=True)
+            ctx.meta['bar'].__enter__()
+        ctx.meta['bar'].update(progress)
+
+    force_type = {'bbox': 'kraken_recognition_bbox',
+                  'baseline': 'kraken_recognition_baseline',
+                  None: None}[force_type]
+
+    arrow_dataset.build_binary_dataset(ground_truth,
+                                       output,
+                                       format_type,
+                                       workers,
+                                       save_splits,
+                                       random_split,
+                                       force_type,
+                                       recordbatch_size,
+                                       _init_progressbar)
+
+    ctx.meta['bar'].__exit__(None, None, None)
+    message(f'Output file written to {output}')
 
 
 if __name__ == '__main__':

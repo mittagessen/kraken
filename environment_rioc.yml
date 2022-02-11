@@ -6,7 +6,7 @@ channels:
   - defaults
   - conda-forge
 dependencies:
-  - python>=3.6
+  - python>=3.7
   - python-bidi
   - lxml
   - regex
@@ -26,5 +26,8 @@ dependencies:
   - pyvips
   - imagemagick<7.0.9
   - coremltools>=3.3
+  - pyarrow
+  - pytorch-lightning
+  - pip
   - pip:
     - git+https://github.com/mittagessen/kraken.git@master

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Copyright 2019 Benjamin Kiessling
 #
@@ -34,7 +33,7 @@ from scipy.ndimage.filters import gaussian_filter
 from skimage.filters import sobel
 
 from kraken.lib import vgsl, dataset
-from kraken.lib.util import pil2array, is_bitonal, get_im_str
+from kraken.lib.util import is_bitonal, get_im_str
 from kraken.lib.exceptions import KrakenInputException, KrakenInvalidModelException
 from kraken.lib.segmentation import (polygonal_reading_order,
                                      vectorize_lines, vectorize_regions,
@@ -66,8 +65,9 @@ def compute_segmentation_map(im,
     model.to(device)
 
     batch, channels, height, width = model.input
-    transforms = dataset.generate_input_transforms(batch, height, width, channels, 0, valid_norm=False)
-    res_tf = tf.Compose(transforms.transforms[:3])
+    transforms = dataset.ImageInputTransforms(batch, height, width, channels, 0, valid_norm=False)
+    tf_idx, _ = next(filter(lambda x: isinstance(x[1], tf.ToTensor), enumerate(transforms.transforms)))
+    res_tf = tf.Compose(transforms.transforms[:tf_idx])
     scal_im = np.array(res_tf(im).convert('L'))
 
     tensor_im = transforms(im)
@@ -158,7 +158,7 @@ def vec_lines(heatmap: torch.Tensor,
     lines = list(zip([x[0] for x in lines], [x[0] for x in sc], [x[1] for x in sc]))
     logger.debug('Reordering baselines')
     lines = reading_order_fn(lines=lines, regions=regions, text_direction=text_direction[-2:])
-    return [{'script': bl_type, 'baseline': bl, 'boundary': pl} for bl_type, bl, pl in lines]
+    return [{'tags': {'type': bl_type}, 'baseline': bl, 'boundary': pl} for bl_type, bl, pl in lines]
 
 
 def segment(im,

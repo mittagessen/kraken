@@ -32,12 +32,12 @@ def cli(format_type, model, repolygonize, files):
     from PIL import Image
     from os.path import splitext
     from kraken import blla
-    from kraken.lib import dataset, segmentation, vgsl
+    from kraken.lib import dataset, segmentation, vgsl, xml
 
     if model is None:
         for doc in files:
             click.echo(f'Processing {doc} ', nl=False)
-            data = dataset.preparse_xml_data([doc], format_type, repolygonize=repolygonize)
+            data = xml.preparse_xml_data([doc], format_type, repolygonize=repolygonize)
             if len(data) > 0:
                 bounds = {'type': 'baselines', 'lines': [{'boundary': t['boundary'], 'baseline': t['baseline'], 'text': t['text']} for t in data]}
                 for idx, (im, box) in enumerate(segmentation.extract_polygons(Image.open(data[0]['image']), bounds)):

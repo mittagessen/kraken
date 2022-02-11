@@ -24,10 +24,7 @@ same datasets easily.
 ALTO
 ~~~~
 
-Kraken parses and produces files according to the upcoming version of the ALTO
-standard: 4.2. It validates against version 4.1 with the exception of the
-`redefinition <https://github.com/altoxml/schema/issues/32>`_ of the `BASELINE`
-attribute to accommodate polygonal chain baselines. An example showing the
+Kraken parses and produces files according to ALTO 4.2. An example showing the
 attributes necessary for segmentation and recognition training follows:
 
 .. literalinclude:: alto.xml
@@ -50,6 +47,26 @@ of a variety of tools.
 .. literalinclude:: pagexml.xml
    :language: xml
    :force:
+
+Binary Datasets
+~~~~~~~~~~~~~~~
+
+.. _binary_datasets:
+
+In addition to training recognition models directly from XML and image files, a
+binary dataset format offering a couple of advantages is supported. Binary
+datasets drastically improve loading performance allowing the saturation of
+most GPUs with minimal computational overhead while also allowing training with
+datasets that are larger than the systems main memory. A minor drawback is a
+~30% increase in dataset size in comparison to the raw images + XML approach.
+
+To realize this speedup the dataset has to be compiled first:
+
+.. code-block:: console
+
+   $ ketos compile -f xml -o dataset.arrow file_1.xml file_2.xml ...
+
+
 
 Recognition training
 --------------------
@@ -349,3 +366,5 @@ adding a number of image files as the final argument:
 The report(s) contains character accuracy measured per script and a detailed
 list of confusions. When evaluating multiple models the last line of the output
 will the average accuracy and the standard deviation across all of them.
+
+

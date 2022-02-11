@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Copyright 2020 Benjamin Kiessling
 #
@@ -25,6 +24,7 @@ RECOGNITION_HYPER_PARAMS = {'pad': 16,
                             'batch_size': 1,
                             'quit': 'early',
                             'epochs': -1,
+                            'min_epochs': 5,
                             'lag': 5,
                             'min_delta': None,
                             'optimizer': 'Adam',
@@ -41,6 +41,7 @@ RECOGNITION_HYPER_PARAMS = {'pad': 16,
                             'step_size': 10,
                             'gamma': 0.1,
                             # reduce on plateau
+                            'rop_factor': 0.1,
                             'rop_patience': 5,
                             # cosine
                             'cos_t_max': 50,
@@ -50,6 +51,7 @@ SEGMENTATION_HYPER_PARAMS = {'line_width': 8,
                              'freq': 1.0,
                              'quit': 'dumb',
                              'epochs': 50,
+                             'min_epochs': 5,
                              'lag': 10,
                              'min_delta': None,
                              'optimizer': 'Adam',
@@ -64,6 +66,7 @@ SEGMENTATION_HYPER_PARAMS = {'line_width': 8,
                              'step_size': 10,
                              'gamma': 0.1,
                              # reduce on plateau
+                             'rop_factor': 0.1,
                              'rop_patience': 5,
                              # cosine
                              'cos_t_max': 50,

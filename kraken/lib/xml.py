@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Copyright 2019 Benjamin Kiessling
 #
@@ -16,20 +15,23 @@
 """
 ALTO/Page data loaders for segmentation training
 """
-
 import os.path
+import pathlib
 import logging
 
 from itertools import groupby
 from lxml import etree
 from os.path import dirname
+from PIL import Image
+from typing import Union, Dict, Any, Sequence
 
 from collections import defaultdict
+from kraken.lib.segmentation import calculate_polygonal_environment
 from kraken.lib.exceptions import KrakenInputException
 
 logger = logging.getLogger(__name__)
 
-__all__ = ['parse_xml', 'parse_page', 'parse_alto']
+__all__ = ['parse_xml', 'parse_page', 'parse_alto', 'preparse_xml_data']
 
 # fallback mapping between PAGE region types and tags
 page_regions = {'TextRegion': 'text',
@@ -55,19 +57,88 @@ alto_regions = {'TextBlock': 'text',
                 'ComposedBlock': 'composed'}
 
 
-def parse_xml(filename):
+def preparse_xml_data(filenames: Sequence[Union[str, pathlib.Path]],
+                      format_type: str = 'xml',
+                      repolygonize: bool = False) -> Dict[str, Any]:
+    """
+    Loads training data from a set of xml files.
+
+    Extracts line information from Page/ALTO xml files for training of
+    recognition models.
+
+    Args:
+        filenames: List of XML files.
+        format_type: Either `page`, `alto` or `xml` for autodetermination.
+        repolygonize: (Re-)calculates polygon information using the kraken
+                      algorithm.
+
+    Returns:
+        A list of dicts {'text': text, 'baseline': [[x0, y0], ...], 'boundary':
+        [[x0, y0], ...], 'image': PIL.Image}.
+    """
+    training_pairs = []
+    if format_type == 'xml':
+        parse_fn = parse_xml
+    elif format_type == 'alto':
+        parse_fn = parse_alto
+    elif format_type == 'page':
+        parse_fn = parse_page
+    else:
+        raise ValueError(f'invalid format {format_type} for preparse_xml_data')
+
+    for fn in filenames:
+        try:
+            data = parse_fn(fn)
+        except KrakenInputException as e:
+            logger.warning(e)
+            continue
+        try:
+            with open(data['image'], 'rb') as fp:
+                Image.open(fp)
+        except FileNotFoundError as e:
+            logger.warning(f'Could not open file {e.filename} in {fn}')
+            continue
+        if repolygonize:
+            logger.info('repolygonizing {} lines in {}'.format(len(data['lines']), data['image']))
+            data['lines'] = _repolygonize(data['image'], data['lines'])
+        for line in data['lines']:
+            training_pairs.append({'image': data['image'], **line})
+    return training_pairs
+
+
+def _repolygonize(im: Image.Image, lines: Sequence[Dict[str, Any]]):
+    """
+    Helper function taking an output of the lib.xml parse_* functions and
+    recalculating the contained polygonization.
+
+    Args:
+        im (Image.Image): Input image
+        lines (list): List of dicts [{'boundary': [[x0, y0], ...], 'baseline': [[x0, y0], ...], 'text': 'abcvsd'}, {...]
+
+    Returns:
+        A data structure `lines` with a changed polygonization.
+    """
+    im = Image.open(im).convert('L')
+    polygons = calculate_polygonal_environment(im, [x['baseline'] for x in lines])
+    return [{'boundary': polygon,
+             'baseline': orig['baseline'],
+             'text': orig['text'],
+             'script': orig['script']} for orig, polygon in zip(lines, polygons)]
+
+
+def parse_xml(filename: Union[str, pathlib.Path]) -> Dict[str, Any]:
     """
     Parses either a PageXML or ALTO file with autodetermination of the file
     format.
 
     Args:
-        filename (str): path to an XML file.
+        filename: path to an XML file.
 
     Returns:
         A dict {'image': impath, lines: [{'boundary': [[x0, y0], ...],
-        'baseline': [[x0, y0], ...]}, {...], 'text': 'apdjfqpf', 'script':
-        'script_type'}, regions: {'region_type_0': [[[x0, y0], ...], ...],
-        ...}, 'base_dir': None}
+        'baseline': [[x0, y0], ...]}, {...], 'text': 'apdjfqpf', 'tags':
+        ['script_type_0', 'script_type_1']}, regions: {'region_type_0': [[[x0,
+        y0], ...], ...], ...}}
     """
     with open(filename, 'rb') as fp:
         try:
@@ -82,19 +153,19 @@ def parse_xml(filename):
         raise KrakenInputException(f'Unknown XML format in {filename}')
 
 
-def parse_page(filename):
+def parse_page(filename: Union[str, pathlib.Path]) -> Dict[str, Any]:
     """
     Parses a PageXML file, returns the baselines defined in it, and loads the
     referenced image.
 
     Args:
-        filename (str): path to a PageXML file.
+        filename: path to a PageXML file.
 
     Returns:
         A dict {'image': impath, lines: [{'boundary': [[x0, y0], ...],
-        'baseline': [[x0, y0], ...]}, {...], 'text': 'apdjfqpf', 'script':
-        'script_type'}, regions: {'region_type_0': [[[x0, y0], ...], ...],
-        ...}}
+        'baseline': [[x0, y0], ...]}, {...], 'text': 'apdjfqpf', 'tags':
+        {'script': 'script_type', 'split': 'train', 'type': 'type_1']},
+        regions: {'region_type_0': [[[x0, y0], ...], ...], ...}}
     """
     def _parse_page_custom(s):
         o = {}
@@ -173,7 +244,7 @@ def parse_page(filename):
         data['regions'] = region_data
 
         # parse line information
-        scripts = set(('default',))
+        tag_set = set(('default',))
         for line in lines:
             pol = line.find('./{*}Coords')
             boundary = None
@@ -204,35 +275,46 @@ def parse_page(filename):
             for el in transcription.findall('.//{*}Unicode'):
                 if el.text:
                     text += el.text
-            # retrieve line tag if custom string is set and contains
-            l_type = 'default'
+            # retrieve line tags if custom string is set and contains
+            tags = {'type': 'default'}
+            split_type = None
             custom_str = line.get('custom')
             if custom_str:
                 cs = _parse_page_custom(custom_str)
                 if 'structure' in cs and 'type' in cs['structure']:
-                    l_type = cs['structure']['type']
-            scripts.add(l_type)
-            data['lines'].append({'baseline': baseline, 'boundary': boundary, 'text': text, 'script': l_type})
-        if len(scripts) > 1:
+                    tags['type'] = cs['structure']['type']
+                    tag_set.add(tags['type'])
+                # retrieve data split if encoded in custom string.
+                if 'split' in cs and 'type' in cs['split'] and cs['split']['type'] in ['train', 'validation', 'test']:
+                    split_type = cs['split']['type']
+                    tags['split'] = split_type
+                    tag_set.add(split_type)
+
+            data['lines'].append({'baseline': baseline,
+                                  'boundary': boundary,
+                                  'text': text,
+                                  'split': split_type,
+                                  'tags': tags})
+        if len(tag_set) > 1:
             data['script_detection'] = True
         else:
             data['script_detection'] = False
         return data
 
 
-def parse_alto(filename):
+def parse_alto(filename: Union[str, pathlib.Path]) -> Dict[str, Any]:
     """
     Parses an ALTO file, returns the baselines defined in it, and loads the
     referenced image.
 
     Args:
-        filename (str): path to an ALTO file.
+        filename: path to an ALTO file.
 
     Returns:
         A dict {'image': impath, lines: [{'boundary': [[x0, y0], ...],
-        'baseline': [[x0, y0], ...]}, {...], 'text': 'apdjfqpf', 'script':
-        'script_type'}, regions: {'region_type_0': [[[x0, y0], ...], ...],
-        ...}, 'base_dir': None}
+        'baseline': [[x0, y0], ...]}, {...], 'text': 'apdjfqpf', 'tags':
+        {'script': 'script_type', 'split': 'train', 'type': 'type_1']},
+        regions: {'region_type_0': [[[x0, y0], ...], ...], ...}}
     """
     with open(filename, 'rb') as fp:
         base_dir = dirname(filename)
@@ -270,7 +352,7 @@ def parse_alto(filename):
         if tags is not None:
             for x in ['StructureTag', 'LayoutTag', 'OtherTag']:
                 for tag in tags.findall('./{{*}}{}'.format(x)):
-                    cls_map[tag.get('ID')] = tag.get('LABEL')
+                    cls_map[tag.get('ID')] = (x[:-3].lower(), tag.get('LABEL'))
         # parse region type and coords
         region_data = defaultdict(list)
         for region in regions:
@@ -298,8 +380,8 @@ def parse_alto(filename):
             tagrefs = region.get('TAGREFS')
             if tagrefs is not None and rtype is None:
                 for tagref in tagrefs.split():
-                    rtype = cls_map.get(tagref, None)
-                    if rtype is not None:
+                    ttype, rtype = cls_map.get(tagref, (None, None))
+                    if rtype is not None and ttype:
                         break
             if rtype is None:
                 rtype = alto_regions[region.tag.split('}')[-1]]
@@ -309,7 +391,7 @@ def parse_alto(filename):
             region_data[rtype].append(boundary)
         data['regions'] = region_data
 
-        scripts = set(('default',))
+        tag_set = set(('default',))
         for line in lines:
             if line.get('BASELINE') is None:
                 logger.info('TextLine {} without baseline'.format(line.get('ID')))
@@ -338,21 +420,28 @@ def parse_alto(filename):
             for el in line.xpath(".//*[local-name() = 'String'] | .//*[local-name() = 'SP']"):
                 text += el.get('CONTENT') if el.get('CONTENT') else ' '
             # find line type
-            ltype = None
+            tags = {'type': 'default'}
+            split_type = None
             tagrefs = line.get('TAGREFS')
             if tagrefs is not None:
                 for tagref in tagrefs.split():
-                    ltype = cls_map.get(tagref, None)
+                    ttype, ltype = cls_map.get(tagref, (None, None))
                     if ltype is not None:
-                        scripts.add(ltype)
-                        break
+                        tag_set.add(ltype)
+                        if ttype == 'other':
+                            tags['type'] = ltype
+                        else:
+                            tags[ttype] = ltype
+                    if ltype in ['train', 'validation', 'test']:
+                        split_type = ltype
             data['lines'].append({'baseline': baseline,
                                   'boundary': boundary,
                                   'text': text,
-                                  'script': ltype if ltype is not None else 'default'})
+                                  'tags': tags,
+                                  'split': split_type})
 
-        if len(scripts) > 1:
-            data['script_detection'] = True
+        if len(tags) > 1:
+            data['tags'] = True
         else:
-            data['script_detection'] = False
+            data['tags'] = False
         return data

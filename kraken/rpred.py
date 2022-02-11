@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Copyright 2015 Benjamin Kiessling
 #
@@ -23,14 +22,15 @@ import logging
 import bidi.algorithm as bd
 
 from PIL import Image
+from functools import partial
 from collections import defaultdict
-from typing import List, Tuple, Optional, Generator, Union, Dict
+from typing import List, Tuple, Optional, Generator, Union, Dict, Sequence
 
 from kraken.lib.util import get_im_str, is_bitonal
 from kraken.lib.models import TorchSeqRecognizer
 from kraken.lib.segmentation import extract_polygons, compute_polygon_section
 from kraken.lib.exceptions import KrakenInputException
-from kraken.lib.dataset import generate_input_transforms
+from kraken.lib.dataset import ImageInputTransforms
 
 import copy
 
@@ -47,7 +47,7 @@ class ocr_record(object):
         self.prediction = prediction
         self.cuts = cuts
         self.confidences = confidences
-        self.script = None if 'script' not in line else line['script']
+        self.tags = None if 'tags' not in line else line['tags']
         self.type = 'baselines' if 'baseline' in line else 'box'
         self.base_dir = None
         if self.type == 'baselines':
@@ -134,7 +134,7 @@ def bidi_record(record: ocr_record, base_dir=None) -> ocr_record:
     else:
         line = record.line
     rec = ocr_record(prediction, cuts, confidences, line)
-    rec.script = record.script
+    rec.tags = record.tags
     rec.base_dir = base_dir
     return rec
 
@@ -149,7 +149,7 @@ class mm_rpred(object):
                  bounds: dict,
                  pad: int = 16,
                  bidi_reordering: Union[bool, str] = True,
-                 script_ignore: Optional[List[str]] = None) -> Generator[ocr_record, None, None]:
+                 tags_ignore: Optional[List[str]] = None) -> Generator[ocr_record, None, None]:
         """
         Multi-model version of kraken.rpred.rpred.
 
@@ -158,7 +158,7 @@ class mm_rpred(object):
         these lines.
 
         Args:
-            nets (dict): A dict mapping ISO15924 identifiers to TorchSegRecognizer
+            nets (dict): A dict mapping tag values to TorchSegRecognizer
                          objects. Recommended to be an defaultdict.
             im (PIL.Image.Image): Image to extract text from
             bounds (dict): A dictionary containing a 'boxes' entry
@@ -171,18 +171,25 @@ class mm_rpred(object):
                                         the Unicode bidirectional algorithm for
                                         correct display. Set to L|R to
                                         override default text direction.
-            script_ignore (list): List of scripts to ignore during recognition
+            tags_ignore (list): List of tag values to ignore during recognition
         Yields:
             An ocr_record containing the recognized text, absolute character
             positions, and confidence values for each character.
 
         Raises:
-            KrakenInputException if the mapping between segmentation scripts and
+            KrakenInputException if the mapping between segmentation tags and
             networks is incomplete.
         """
         seg_types = set(recognizer.seg_type for recognizer in nets.values())
         if isinstance(nets, defaultdict):
             seg_types.add(nets.default_factory().seg_type)
+            self._resolve_tags_to_model = partial(_resolve_tags_to_model, default=nets.default_factory())
+        else:
+            self._resolve_tags_to_model = _resolve_tags_to_model
+
+        if not tags_ignore:
+            tags_ignore = []
+
         if ('type' in bounds and bounds['type'] not in seg_types) or len(seg_types) > 1:
             logger.warning(f'Recognizers with segmentation types {seg_types} will be '
                            f'applied to segmentation of type {bounds["type"] if "type" in bounds else None}. '
@@ -200,60 +207,70 @@ class mm_rpred(object):
             self.seg_key = 'lines'
             self.next_iter = self._recognize_baseline_line
             self.line_iter = iter(bounds['lines'])
-            scripts = [x['script'] for x in bounds['lines']]
+            tags = set()
+            for x in bounds['lines']:
+                tags.update(x['tags'].values())
         else:
             valid_norm = True
             self.len = len(bounds['boxes'])
             self.seg_key = 'boxes'
             self.next_iter = self._recognize_box_line
             self.line_iter = iter(bounds['boxes'])
-            scripts = [x[0] for line in bounds['boxes'] for x in line]
+            tags = set(x[0] for line in bounds['boxes'] for x in line)
 
         im_str = get_im_str(im)
         logger.info('Running {} multi-script recognizers on {} with {} lines'.format(len(nets), im_str, self.len))
 
-        miss = [script for script in scripts if not nets.get(script)]
-        if miss and not isinstance(nets, defaultdict):
-            raise KrakenInputException('Missing models for scripts {}'.format(set(miss)))
+        filtered_tags = []
+        miss = []
+        for tag in tags:
+            if not isinstance(nets, defaultdict) and (not nets.get(tag) and tag not in tags_ignore):
+                miss.append(tag)
+            elif tag not in tags_ignore:
+                filtered_tags.append(tag)
+        tags = filtered_tags
+
+        if miss:
+            raise KrakenInputException('Missing models for tags {}'.format(set(miss)))
 
         # build dictionary for line preprocessing
         self.ts = {}
-        for script in scripts:
-            logger.debug('Loading line transforms for {}'.format(script))
-            network = nets[script]
+        for tag in tags:
+            logger.debug('Loading line transforms for {}'.format(tag))
+            network = nets[tag]
             batch, channels, height, width = network.nn.input
-            self.ts[script] = generate_input_transforms(batch, height, width, channels, pad, valid_norm)
+            self.ts[tag] = ImageInputTransforms(batch, height, width, channels, pad, valid_norm)
 
         self.im = im
         self.nets = nets
         self.bidi_reordering = bidi_reordering
         self.pad = pad
         self.bounds = bounds
-        self.script_ignore = script_ignore
+        self.tags_ignore = tags_ignore
 
     def _recognize_box_line(self, line):
         flat_box = [point for box in line['boxes'][0] for point in box[1]]
         xmin, xmax = min(flat_box[::2]), max(flat_box[::2])
         ymin, ymax = min(flat_box[1::2]), max(flat_box[1::2])
         rec = ocr_record('', [], [], [[xmin, ymin], [xmin, ymax], [xmax, ymax], [xmax, ymin]])
-        for script, (box, coords) in zip(map(lambda x: x[0], line['boxes'][0]),
-                                         extract_polygons(self.im, {'text_direction': line['text_direction'],
-                                                                    'boxes': map(lambda x: x[1], line['boxes'][0])})):
+        for tag, (box, coords) in zip(map(lambda x: x[0], line['boxes'][0]),
+                                      extract_polygons(self.im, {'text_direction': line['text_direction'],
+                                                                 'boxes': map(lambda x: x[1], line['boxes'][0])})):
             self.box = box
-            # skip if script is set to ignore
-            if self.script_ignore is not None and script in self.script_ignore:
-                logger.info('Ignoring {} line segment.'.format(script))
+            # skip if tag is set to ignore
+            if self.tags_ignore is not None and tag in self.tags_ignore:
+                logger.warning(f'Ignoring {tag} line segment.')
                 continue
             # check if boxes are non-zero in any dimension
             if 0 in box.size:
-                logger.warning('bbox {} with zero dimension. Emitting empty record.'.format(coords))
+                logger.warning(f'bbox {coords} with zero dimension. Emitting empty record.')
                 continue
             # try conversion into tensor
             try:
                 logger.debug('Preparing run.')
-                line = self.ts[script](box)
+                line = self.ts[tag](box)
             except Exception:
-                logger.warning('Conversion of line {} failed. Skipping.'.format(coords))
+                logger.warning(f'Conversion of line {coords} failed. Skipping.')
                 continue
 
             # check if line is non-zero
@@ -261,14 +278,16 @@ class mm_rpred(object):
                 logger.warning('Empty run. Skipping.')
                 continue
 
-            logger.debug('Forward pass with model {}'.format(script))
-            preds = self.nets[script].predict(line.unsqueeze(0))[0]
+            _, net = self._resolve_tags_to_model({'type': tag}, self.nets)
+
+            logger.debug(f'Forward pass with model {tag}.')
+            preds = net.predict(line.unsqueeze(0))[0]
 
             # calculate recognized LSTM locations of characters
             logger.debug('Convert to absolute coordinates')
             # calculate recognized LSTM locations of characters
             # scale between network output and network input
-            self.net_scale = line.shape[2]/self.nets[script].outputs.shape[2]
+            self.net_scale = line.shape[2]/net.outputs.shape[2]
             # scale between network input and original line
             self.in_scale = box.size[0]/(line.shape[2]-2*self.pad)
 
@@ -297,6 +316,12 @@ class mm_rpred(object):
             return rec
 
     def _recognize_baseline_line(self, line):
+        if self.tags_ignore is not None:
+            for tag in line['lines'][0]['tags'].values():
+                if tag in self.tags_ignore:
+                    logger.info(f'Ignoring line segment with tags {line["lines"][0]["tags"]} based on {tag}.')
+                    return ocr_record('', [], [], line['lines'][0])
+
         try:
             box, coords = next(extract_polygons(self.im, line))
         except KrakenInputException as e:
@@ -305,24 +330,24 @@ class mm_rpred(object):
 
         self.box = box
 
-        script = coords['script']
+        tag, net = self._resolve_tags_to_model(coords['tags'], self.nets)
         # check if boxes are non-zero in any dimension
         if 0 in box.size:
-            logger.warning('bbox {} with zero dimension. Emitting empty record.'.format(coords))
+            logger.warning(f'bbox {coords} with zero dimension. Emitting empty record.')
             return ocr_record('', [], [], coords)
         # try conversion into tensor
         try:
-            line = self.ts[script](box)
+            line = self.ts[tag](box)
         except Exception:
             return ocr_record('', [], [], coords)
         # check if line is non-zero
         if line.max() == line.min():
             return ocr_record('', [], [], coords)
 
-        preds = self.nets[script].predict(line.unsqueeze(0))[0]
+        preds = net.predict(line.unsqueeze(0))[0]
         # calculate recognized LSTM locations of characters
         # scale between network output and network input
-        self.net_scale = line.shape[2]/self.nets[script].outputs.shape[2]
+        self.net_scale = line.shape[2]/net.outputs.shape[2]
         # scale between network input and original line
         self.in_scale = box.size[0]/(line.shape[2]-2*self.pad)
 
@@ -347,8 +372,7 @@ class mm_rpred(object):
     def __next__(self):
         bound = self.bounds
         bound[self.seg_key] = [next(self.line_iter)]
-        o = self.next_iter(bound)
-        return o
+        return self.next_iter(bound)
 
     def __iter__(self):
         return self
@@ -396,3 +420,17 @@ def rpred(network: TorchSeqRecognizer,
         bounds['boxes'] = rewrite_boxes
         bounds['script_detection'] = True
     return mm_rpred(defaultdict(lambda: network), im, bounds, pad, bidi_reordering)
+
+
+def _resolve_tags_to_model(tags: Sequence[Dict[str, str]],
+                           model_map: Dict[str, TorchSeqRecognizer],
+                           default: Optional[TorchSeqRecognizer] = None) -> TorchSeqRecognizer:
+    """
+    Resolves a sequence of tags
+    """
+    for tag in tags.values():
+        if tag in model_map:
+            return tag, model_map[tag]
+    if default:
+        return next(tags.values()), default
+    raise KrakenInputException('No model for tags {}'.format(tags))

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Copyright 2015 Benjamin Kiessling
 #
@@ -123,7 +122,7 @@ def serialize(records: Sequence[ocr_record],
                 idx += 1
 
     # build region and line type dict
-    page['types'] = list(set(line.script for line in records if line.script is not None))
+    page['types'] = list(set(line.tags.values() for line in records if line.tags is not None))
     if regions is not None:
         page['types'].extend(list(regions.keys()))
 
@@ -161,8 +160,8 @@ def serialize(records: Sequence[ocr_record],
                 'boundary': [list(x) for x in record.line],
                 'type': 'line'
                 }
-        if record.script is not None:
-            line['script'] = record.script
+        if record.tags is not None:
+            line['tags'] = record.tags
         if record.type == 'baselines':
             line['baseline'] = [list(x) for x in record.baseline]
         splits = regex.split(r'(\s+)', record.prediction)

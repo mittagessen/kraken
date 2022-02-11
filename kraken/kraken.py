@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Copyright 2015 Benjamin Kiessling
 #
@@ -105,8 +104,10 @@ def binarizer(threshold, zoom, escale, border, perc, range, low, high, input, ou
             res.save(output, format=form)
         ctx.meta['base_image'] = output
     except Exception:
+        if ctx.meta['raise_failed']:
+            raise
         message('\u2717', fg='red')
-        raise
+        ctx.exit(1)
     message('\u2713', fg='green')
 
 
@@ -150,8 +151,10 @@ def segmenter(legacy, model, text_direction, scale, maxcolseps, black_colseps,
         else:
             res = blla.segment(im, text_direction, mask=mask, model=model, device=device)
     except Exception:
+        if ctx.meta['raise_failed']:
+            raise
         message('\u2717', fg='red')
-        raise
+        ctx.exit(1)
     if ctx.meta['last_process'] and ctx.meta['output_mode'] != 'native':
         with click.open_file(output, 'w', encoding='utf-8') as fp:
             fp = cast(IO[Any], fp)
@@ -178,7 +181,7 @@ def segmenter(legacy, model, text_direction, scale, maxcolseps, black_colseps,
     message('\u2713', fg='green')
 
 
-def recognizer(model, pad, no_segmentation, bidi_reordering, script_ignore, input, output) -> None:
+def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore, input, output) -> None:
 
     import json
 
@@ -221,12 +224,12 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, script_ignore, inpu
     elif no_segmentation:
         logger.warning('no_segmentation mode enabled but segmentation defined. Ignoring --no-segmentation option.')
 
-    scripts = set()
+    tags = set()
     # script detection
     if 'script_detection' in bounds and bounds['script_detection']:
         it = rpred.mm_rpred(model, im, bounds, pad,
                             bidi_reordering=bidi_reordering,
-                            script_ignore=script_ignore)
+                            tags_ignore=tags_ignore)
     else:
         it = rpred.rpred(model['default'], im, bounds, pad,
                          bidi_reordering=bidi_reordering)
@@ -247,7 +250,7 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, script_ignore, inpu
             fp.write(serialization.serialize(preds, ctx.meta['base_image'],
                                              Image.open(ctx.meta['base_image']).size,
                                              ctx.meta['text_direction'],
-                                             scripts,
+                                             tags,
                                              bounds['regions'] if 'regions' in bounds else None,
                                              ctx.meta['output_mode']))
         else:
@@ -300,6 +303,15 @@ def cli(input, batch_input, suffix, verbose, format_type, pdf_format, serializer
     is set on all subcommands with the `-v` switch.
     """
     ctx = click.get_current_context()
+    if device != 'cpu':
+        import torch
+        try:
+            torch.ones(1, device=device)
+        except AssertionError as e:
+            if raise_on_error:
+                raise
+            logger.error(f'Device {device} not available: {e.args[0]}.')
+            ctx.exit(1)
     ctx.meta['device'] = device
     ctx.meta['input_format_type'] = format_type if format_type != 'pdf' else 'image'
     ctx.meta['raise_failed'] = raise_on_error
@@ -380,7 +392,7 @@ def process_pipeline(subcommands, input, batch_input, suffix, verbose, format_ty
                 task(input=input, output=output)
         except Exception as e:
             logger.error(f'Failed processing {io_pair[0]}: {str(e)}')
-            if ctx.meta['raise_failed'] is True:
+            if ctx.meta['raise_failed']:
                 raise
         finally:
             for f in fc[1:-1]:
@@ -449,6 +461,8 @@ def segment(ctx, model, boxes, text_direction, scale, maxcolseps,
             model = TorchVGSLModel.load_model(model)
             model.to(ctx.meta['device'])
         except Exception:
+            if ctx.meta['raise_failed']:
+                raise
             message('\u2717', fg='red')
             ctx.exit(1)
         message('\u2713', fg='green')
@@ -474,7 +488,7 @@ def _validate_mm(ctx, param, value):
             else:
                 model_dict[k] = os.path.expanduser(v)
     except Exception:
-        raise click.BadParameter('Mappings must be in format script:model')
+        raise click.BadParameter('Mappings must be in format tag:model')
     return model_dict
 
 
@@ -483,9 +497,9 @@ def _validate_mm(ctx, param, value):
 @click.option('-m', '--model', default=DEFAULT_MODEL, multiple=True,
               show_default=True, callback=_validate_mm,
               help='Path to an recognition model or mapping of the form '
-              '$script1:$model1. Add multiple mappings to run multi-model '
-              'recognition based on detected scripts. Use the default keyword '
-              'for adding a catch-all model. Recognition on scripts can be '
+              '$tag1:$model1. Add multiple mappings to run multi-model '
+              'recognition based on detected tags. Use the default keyword '
+              'for adding a catch-all model. Recognition on tags can be '
               'ignored with the model value ignore.')
 @click.option('-p', '--pad', show_default=True, type=click.INT, default=16, help='Left and right '
               'padding around lines')
@@ -519,7 +533,7 @@ def ocr(ctx, model, pad, reorder, base_dir, no_segmentation, text_direction, thr
     # first we try to find the model in the absolue path, then ~/.kraken, then
     # LEGACY_MODEL_DIR
     nm = {}  # type: Dict[str, models.TorchSeqRecognizer]
-    ign_scripts = model.pop('ignore')
+    ign_tags = model.pop('ignore')
     for k, v in model.items():
         search = [v,
                   os.path.join(click.get_app_dir(APP_NAME), v),
@@ -536,6 +550,8 @@ def ocr(ctx, model, pad, reorder, base_dir, no_segmentation, text_direction, thr
             rnn = models.load_any(location, device=ctx.meta['device'])
             nm[k] = rnn
         except Exception:
+            if ctx.meta['raise_failed']:
+                raise
             message('\u2717', fg='red')
             ctx.exit(1)
         message('\u2713', fg='green')
@@ -556,7 +572,7 @@ def ocr(ctx, model, pad, reorder, base_dir, no_segmentation, text_direction, thr
                    pad=pad,
                    no_segmentation=no_segmentation,
                    bidi_reordering=reorder,
-                   script_ignore=ign_scripts)
+                   tags_ignore=ign_tags)
 
 
 @cli.command('show')

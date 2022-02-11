@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Copyright 2017 Benjamin Kiessling
 #
@@ -30,6 +29,7 @@ __all__ = ['PytorchCodec']
 
 logger = logging.getLogger(__name__)
 
+
 class PytorchCodec(object):
     """
     Translates between labels and graphemes.
@@ -50,9 +50,9 @@ class PytorchCodec(object):
         dictionaries are/should be 1-indexed.
 
         Args:
-            charset (unicode, list, dict): Input character set.
-            strict (bool): Flag indicating if encoding/decoding errors should
-                           be ignored.
+            charset: Input character set.
+            strict: Flag indicating if encoding/decoding errors should be
+                    ignored.
         """
         if isinstance(charset, dict):
             self.c2l = charset
@@ -81,7 +81,7 @@ class PytorchCodec(object):
         """
         # quick test for non-singularity
         if len(self.l2c.keys()) != len(self.c2l.keys()):
-                return False
+            return False
 
         for i, code_1 in enumerate(sorted(self.l2c.keys())):
             for j, code_2 in enumerate(sorted(self.l2c.keys())):

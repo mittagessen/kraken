@@ -1,18 +1,19 @@
 # -*- coding: utf-8 -*-
-import unittest
-import click
 import os
+import click
+import unittest
 import tempfile
 import numpy as np
 
 from PIL import Image
+from pathlib import Path
 from click.testing import CliRunner
 from kraken.kraken import cli
 
 from pytest import raises
 
-thisfile = os.path.abspath(os.path.dirname(__file__))
-resources = os.path.abspath(os.path.join(thisfile, 'resources'))
+thisfile = Path(__file__).resolve().parent
+resources = thisfile / 'resources'
 
 class TestCLI(unittest.TestCase):
     """
@@ -22,8 +23,8 @@ class TestCLI(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.NamedTemporaryFile(delete=False)
         self.runner = CliRunner()
-        self.color_img = os.path.join(resources, 'input.tif')
-        self.bw_img = os.path.join(resources, 'bw.png')
+        self.color_img = resources / 'input.tif'
+        self.bw_img = resources / 'bw.png'
 
     def tearDown(self):
         self.temp.close()

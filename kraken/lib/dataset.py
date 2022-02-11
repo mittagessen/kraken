@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Copyright 2015 Benjamin Kiessling
 #
@@ -16,10 +15,13 @@
 """
 Utility functions for data loading and training of VGSL networks.
 """
+import io
 import json
 import torch
+import pathlib
 import traceback
 import numpy as np
+import pyarrow as pa
 import pkg_resources
 import shapely.geometry as geom
 import torch.nn.functional as F
@@ -32,26 +34,27 @@ from itertools import groupby
 from torchvision import transforms
 from collections import Counter, defaultdict
 from torch.utils.data import Dataset, DataLoader
-from typing import Dict, List, Tuple, Iterable, Sequence, Callable, Optional, Any, Union
+from typing import Dict, List, Tuple, Sequence, Callable, Optional, Any, Union
 
 from skimage.draw import polygon
 
-from kraken.lib.xml import parse_alto, parse_page, parse_xml
+from kraken.lib.xml import parse_alto, parse_page, parse_xml, preparse_xml_data
 
 from kraken.lib.util import is_bitonal
 from kraken.lib.codec import PytorchCodec
 from kraken.lib.models import TorchSeqRecognizer
-from kraken.lib.segmentation import extract_polygons, calculate_polygonal_environment
-from kraken.lib.exceptions import KrakenInputException
+from kraken.lib.segmentation import extract_polygons
+from kraken.lib.exceptions import KrakenInputException, KrakenEncodeException
 from kraken.lib.lineest import CenterNormalizer
 
 from kraken.lib import functional_im_transforms as F_t
 
-__all__ = ['BaselineSet',
+__all__ = ['ArrowIPCRecognitionDataset',
+           'BaselineSet',
            'PolygonGTDataset',
            'GroundTruthDataset',
+           'ImageInputTransforms',
            'compute_error',
-           'generate_input_transforms',
            'preparse_xml_data']
 
 import logging
@@ -59,88 +62,222 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def generate_input_transforms(batch: int,
-                              height: int,
-                              width: int,
-                              channels: int,
-                              pad: int,
-                              valid_norm: bool = True,
-                              force_binarization=False) -> transforms.Compose:
-    """
-    Generates a torchvision transformation converting a PIL.Image into a
-    tensor usable in a network forward pass.
+class ImageInputTransforms(transforms.Compose):
+    def __init__(self,
+                 batch: int,
+                 height: int,
+                 width: int,
+                 channels: int,
+                 pad: int,
+                 valid_norm: bool = True,
+                 force_binarization: bool = False) -> None:
+        """
+        Container for image input transforms for recognition and segmentation
+        networks.
 
-    Args:
-        batch (int): mini-batch size
-        height (int): height of input image in pixels
-        width (int): width of input image in pixels
-        channels (int): color channels of input
-        pad (int): Amount of padding on horizontal ends of image
-        valid_norm (bool): Enables/disables baseline normalization as a valid
-                           preprocessing step. If disabled we will fall back to
-                           standard scaling.
-        force_binarization (bool): Forces binarization of input images using
-                                   the nlbin algorithm.
+        Args:
+            batch: mini-batch size
+            height: height of input image in pixels
+            width: width of input image in pixels
+            channels: color channels of input
+            pad: Amount of padding on horizontal ends of image
+            valid_norm: Enables/disables baseline normalization as a valid
+                        preprocessing step. If disabled we will fall back to
+                        standard scaling.
+            force_binarization: Forces binarization of input images using the
+                                nlbin algorithm.
 
-    Returns:
-        A torchvision transformation composition converting the input image to
-        the appropriate tensor.
-    """
-    scale = (height, width)  # type: Tuple[int, int]
-    center_norm = False
-    mode = 'RGB' if channels == 3 else 'L'
-    if height == 1 and width == 0 and channels > 3:
-        perm = (1, 0, 2)
-        scale = (channels, 0)
-        if valid_norm:
-            center_norm = True
-        mode = 'L'
-    elif height > 1 and width == 0 and channels in (1, 3):
-        perm = (0, 1, 2)
-        if valid_norm and channels == 1:
-            center_norm = True
-    elif height == 0 and width > 1 and channels in (1, 3):
-        perm = (0, 1, 2)
-    # fixed height and width image => bicubic scaling of the input image, disable padding
-    elif height > 0 and width > 0 and channels in (1, 3):
-        perm = (0, 1, 2)
-        pad = 0
-    elif height == 0 and width == 0 and channels in (1, 3):
-        perm = (0, 1, 2)
-        pad = 0
-    else:
-        raise KrakenInputException(f'Invalid input spec {batch}, {height}, {width}, {channels}, {pad}.')
+        """
+        super().__init__(None)
 
-    if mode != 'L' and force_binarization:
-        raise KrakenInputException(f'Invalid input spec {batch}, {height}, {width}, {channels}, {pad} in '
-                                   'combination with forced binarization.')
+        self._scale = (height, width)  # type: Tuple[int, int]
+        self._pad = pad
+        self._valid_norm = valid_norm
+        self._force_binarization = force_binarization
+        self._batch = batch
+        self._channels = channels
 
-    out_transforms = []
-    out_transforms.append(transforms.Lambda(partial(F_t.pil_to_mode, mode=mode)))
+        self._create_transforms()
 
-    if force_binarization:
-        out_transforms.append(transforms.Lambda(F_t.pil_to_bin))
-    # dummy transforms to ensure we can determine color mode of input material
-    # from first two transforms. It's stupid but it works.
-    out_transforms.append(transforms.Lambda(F_t.dummy))
-    if scale != (0, 0):
-        if center_norm:
-            lnorm = CenterNormalizer(scale[0])
-            out_transforms.append(transforms.Lambda(partial(F_t.pil_dewarp, lnorm=lnorm)))
-            out_transforms.append(transforms.Lambda(partial(F_t.pil_to_mode, mode=mode)))
+    def _create_transforms(self) -> None:
+        height = self._scale[0]
+        width = self._scale[1]
+        self._center_norm = False
+        self._mode = 'RGB' if self._channels == 3 else 'L'
+        if height == 1 and width == 0 and self._channels > 3:
+            perm = (1, 0, 2)
+            self._scale = (self._channels, 0)
+            if self._valid_norm:
+                self._center_norm = True
+            self._mode = 'L'
+        elif height > 1 and width == 0 and self._channels in (1, 3):
+            perm = (0, 1, 2)
+            if self._valid_norm and self._channels == 1:
+                self._center_norm = True
+        elif height == 0 and width > 1 and self._channels in (1, 3):
+            perm = (0, 1, 2)
+        # fixed height and width image => bicubic scaling of the input image, disable padding
+        elif height > 0 and width > 0 and self._channels in (1, 3):
+            perm = (0, 1, 2)
+            self._pad = 0
+        elif height == 0 and width == 0 and self._channels in (1, 3):
+            perm = (0, 1, 2)
+            self._pad = 0
         else:
-            out_transforms.append(transforms.Lambda(partial(F_t.pil_fixed_resize, scale=scale)))
-    if pad:
-        out_transforms.append(transforms.Pad((pad, 0), fill=255))
-    out_transforms.append(transforms.ToTensor())
-    # invert
-    out_transforms.append(transforms.Lambda(F_t.tensor_invert))
-    out_transforms.append(transforms.Lambda(partial(F_t.tensor_permute, perm=perm)))
-    return transforms.Compose(out_transforms)
+            raise KrakenInputException(f'Invalid input spec {self._batch}, {height}, {width}, {self._channels}, {self._pad}.')
+
+        if self._mode != 'L' and self._force_binarization:
+            raise KrakenInputException(f'Invalid input spec {self._batch}, {height}, {width}, {self._channels}, {self._pad} in '
+                                       'combination with forced binarization.')
+
+        self.transforms = []
+        self.transforms.append(transforms.Lambda(partial(F_t.pil_to_mode, mode=self._mode)))
+
+        if self._force_binarization:
+            self.transforms.append(transforms.Lambda(F_t.pil_to_bin))
+        if self._scale != (0, 0):
+            if self._center_norm:
+                lnorm = CenterNormalizer(self._scale[0])
+                self.transforms.append(transforms.Lambda(partial(F_t.pil_dewarp, lnorm=lnorm)))
+                self.transforms.append(transforms.Lambda(partial(F_t.pil_to_mode, mode=self._mode)))
+            else:
+                self.transforms.append(transforms.Lambda(partial(F_t.pil_fixed_resize, scale=self._scale)))
+        if self._pad:
+            self.transforms.append(transforms.Pad((self._pad, 0), fill=255))
+        self.transforms.append(transforms.ToTensor())
+        # invert
+        self.transforms.append(transforms.Lambda(F_t.tensor_invert))
+        self.transforms.append(transforms.Lambda(partial(F_t.tensor_permute, perm=perm)))
+
+    @property
+    def batch(self) -> int:
+        """
+        Batch size attribute. Ignored.
+        """
+        return self._batch
+
+    @batch.setter
+    def batch(self, batch: int) -> None:
+        self._batch = batch
+
+    @property
+    def channels(self) -> int:
+        """
+        Channels attribute. Can be either 1 (binary/grayscale), 3 (RGB).
+        """
+        if self._channels not in [1, 3] and self._scale[0] == self._channels:
+            return 1
+        else:
+            return self._channels
+
+    @channels.setter
+    def channels(self, channels: int) -> None:
+        self._channels = channels
+        self._create_transforms()
+
+    @property
+    def height(self) -> int:
+        """
+        Desired output image height. If set to 0, image will be rescaled
+        proportionally with width, if 1 and `channels` is larger than 3 output
+        will be grayscale and of the height set with the channels attribute.
+        """
+        if self._scale == (1, 0) and self.channels > 3:
+            return self._channels
+        else:
+            return self._scale[0]
+
+    @height.setter
+    def height(self, height: int) -> None:
+        self._scale = (height, self.scale[1])
+        self._create_transforms()
+
+    @property
+    def width(self) -> int:
+        """
+        Desired output image width. If set to 0, image will be rescaled
+        proportionally with height.
+        """
+        return self._scale[1]
+
+    @width.setter
+    def width(self, width: int) -> None:
+        self._scale = (self._scale[0], width)
+        self._create_transforms()
+
+    @property
+    def mode(self) -> str:
+        """
+        Imaginary PIL.Image.Image mode of the output tensor. Possible values
+        are RGB, L, and 1.
+        """
+        return self._mode if not self.force_binarization else '1'
+
+    @property
+    def scale(self) -> Tuple[int, int]:
+        """
+        Desired output shape (height, width) of the image. If any value is set
+        to 0, image will be rescaled proportionally with height, width, if 1
+        and `channels` is larger than 3 output will be grayscale and of the
+        height set with the channels attribute.
+        """
+        if self._scale == (1, 0) and self.channels > 3:
+            return (self._channels, self._scale[1])
+        else:
+            return self._scale
+
+    @scale.setter
+    def scale(self, scale: Tuple[int, int]) -> None:
+        self._scale = scale
+        self._create_transforms()
+
+    @property
+    def pad(self) -> int:
+        """
+        Amount of padding around left/right end of image.
+        """
+        return self._pad
+
+    @pad.setter
+    def pad(self, pad: int) -> None:
+        self._pad = pad
+        self._create_transforms()
+
+    @property
+    def valid_norm(self) -> bool:
+        """
+        Switch allowing/disallowing centerline normalization. Even if enabled
+        won't be applied to 3-channel images.
+        """
+        return self._valid_norm
+
+    @valid_norm.setter
+    def valid_norm(self, valid_norm: bool) -> None:
+        self._valid_norm = valid_norm
+        self._create_transforms()
+
+    @property
+    def centerline_norm(self) -> bool:
+        """
+        Attribute indicating if centerline normalization will be applied to
+        input images.
+        """
+        return self._center_norm
+
+    @property
+    def force_binarization(self) -> bool:
+        """
+        Switch enabling/disabling forced binarization.
+        """
+        return self._force_binarization
+
+    @force_binarization.setter
+    def force_binarization(self, force_binarization: bool) -> None:
+        self._force_binarization = force_binarization
+        self._create_transforms()
 
 
 def _fast_levenshtein(seq1: Sequence[Any], seq2: Sequence[Any]) -> int:
-
     oneago = None
     thisrow = list(range(1, len(seq2) + 1)) + [0]
     rows = [thisrow]
@@ -247,7 +384,7 @@ def compute_confusions(algn1: Sequence[str], algn2: Sequence[str]):
     return counts, scripts, ins, dels, subs
 
 
-def compute_error(model: TorchSeqRecognizer, validation_set: Iterable[Dict[str, torch.Tensor]]) -> Tuple[int, int]:
+def compute_error(model: TorchSeqRecognizer, batch: Dict[str, torch.Tensor]) -> Tuple[int, int]:
     """
     Computes error report from a model and a list of line image-text pairs.
 
@@ -259,82 +396,14 @@ def compute_error(model: TorchSeqRecognizer, validation_set: Iterable[Dict[str, 
         A tuple with total number of characters and edit distance across the
         whole validation set.
     """
-    total_chars = 0
+    preds = model.predict_string(batch['image'], batch['seq_lens'])
+    idx = 0
     error = 0
-    for batch in validation_set:
-        preds = model.predict_string(batch['image'], batch['seq_lens'])
-        total_chars += int(batch['target_lens'].sum())
-        for pred, text in zip(preds, batch['target']):
-            error += _fast_levenshtein(pred, text)
-    return total_chars, error
-
-
-def preparse_xml_data(filenames, format_type='xml', repolygonize=False):
-    """
-    Loads training data from a set of xml files.
-
-    Extracts line information from Page/ALTO xml files for training of
-    recognition models.
-
-    Args:
-        filenames (list): List of XML files.
-        format_type (str): Either `page`, `alto` or `xml` for
-                           autodetermination.
-        repolygonize (bool): (Re-)calculates polygon information using the
-                             kraken algorithm.
-
-    Returns:
-        A list of dicts {'text': text, 'baseline': [[x0, y0], ...], 'boundary':
-        [[x0, y0], ...], 'image': PIL.Image}.
-    """
-    training_pairs = []
-    if format_type == 'xml':
-        parse_fn = parse_xml
-    elif format_type == 'alto':
-        parse_fn = parse_alto
-    elif format_type == 'page':
-        parse_fn = parse_page
-    else:
-        raise Exception(f'invalid format {format_type} for preparse_xml_data')
-
-    for fn in filenames:
-        try:
-            data = parse_fn(fn)
-        except KrakenInputException as e:
-            logger.warning(e)
-            continue
-        try:
-            with open(data['image'], 'rb') as fp:
-                Image.open(fp)
-        except FileNotFoundError as e:
-            logger.warning(f'Could not open file {e.filename} in {fn}')
-            continue
-        if repolygonize:
-            logger.info('repolygonizing {} lines in {}'.format(len(data['lines']), data['image']))
-            data['lines'] = _repolygonize(data['image'], data['lines'])
-        for line in data['lines']:
-            training_pairs.append({'image': data['image'], **line})
-    return training_pairs
-
-
-def _repolygonize(im: Image.Image, lines):
-    """
-    Helper function taking an output of the lib.xml parse_* functions and
-    recalculating the contained polygonization.
-
-    Args:
-        im (Image.Image): Input image
-        lines (list): List of dicts [{'boundary': [[x0, y0], ...], 'baseline': [[x0, y0], ...], 'text': 'abcvsd'}, {...]
-
-    Returns:
-        A data structure `lines` with a changed polygonization.
-    """
-    im = Image.open(im).convert('L')
-    polygons = calculate_polygonal_environment(im, [x['baseline'] for x in lines])
-    return [{'boundary': polygon,
-             'baseline': orig['baseline'],
-             'text': orig['text'],
-             'script': orig['script']} for orig, polygon in zip(lines, polygons)]
+    for pred, offset in zip(preds, batch['target_lens']):
+        text = ''.join(x[0] for x in model.codec.decode([(x, 0, 0, 0) for x in batch['target'][idx:idx+offset]]))
+        idx += offset
+        error += _fast_levenshtein(pred, text)
+    return int(batch['target_lens'].sum()), error
 
 
 def collate_sequences(batch):
@@ -375,6 +444,178 @@ class InfiniteDataLoader(DataLoader):
         return sample
 
 
+class ArrowIPCRecognitionDataset(Dataset):
+    """
+    Dataset for training a recognition model from a precompiled dataset in
+    Arrow IPC format.
+    """
+    def __init__(self,
+                 normalization: Optional[str] = None,
+                 whitespace_normalization: bool = True,
+                 reorder: Union[bool, str] = True,
+                 im_transforms: Callable[[Any], torch.Tensor] = transforms.Compose([]),
+                 augmentation: bool = False,
+                 split_filter: Optional[str] = None) -> None:
+        """
+        Creates a dataset for a polygonal (baseline) transcription model.
+
+        Args:
+            normalization: Unicode normalization for gt
+            whitespace_normalization: Normalizes unicode whitespace and strips
+                                      whitespace.
+            reorder: Whether to rearrange code points in "display"/LTR order.
+                     Set to L|R to change the default text direction.
+            im_transforms: Function taking an PIL.Image and returning a tensor
+                           suitable for forward passes.
+            augmentation: Enables augmentation.
+            split_filter: Enables filtering of the dataset according to mask
+                          values in the set split. If set to `None` all rows
+                          are sampled, if set to `train`, `validation`, or
+                          `test` only rows with the appropriate flag set in the
+                          file will be considered.
+        """
+        self.alphabet = Counter()  # type: Counter
+        self.text_transforms = []  # type: List[Callable[[str], str]]
+        self.transforms = im_transforms
+        self.aug = None
+        self._split_filter = split_filter
+        self._num_lines = 0
+        self.arrow_table = None
+        self.codec = None
+
+        self.seg_type = None
+        # built text transformations
+        if normalization:
+            self.text_transforms.append(partial(F_t.text_normalize, normalization=normalization))
+        if whitespace_normalization:
+            self.text_transforms.append(F_t.text_whitespace_normalize)
+        if reorder:
+            if reorder in ('L', 'R'):
+                self.text_transforms.append(partial(F_t.text_reorder, base_dir=reorder))
+            else:
+                self.text_transforms.append(F_t.text_reorder)
+        if augmentation:
+            from albumentations import (
+                Compose, ToFloat, OneOf, MotionBlur, MedianBlur, Blur,
+                ShiftScaleRotate, OpticalDistortion, ElasticTransform,
+                )
+
+            self.aug = Compose([
+                                ToFloat(),
+                                OneOf([
+                                    MotionBlur(p=0.2),
+                                    MedianBlur(blur_limit=3, p=0.1),
+                                    Blur(blur_limit=3, p=0.1),
+                                ], p=0.2),
+                                ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.2, rotate_limit=3, p=0.2),
+                                OneOf([
+                                    OpticalDistortion(p=0.3),
+                                    ElasticTransform(p=0.1),
+                                ], p=0.2),
+                               ], p=0.5)
+
+        self.im_mode = self.transforms.mode
+
+    def add(self, file: Union[str, pathlib.Path]) -> None:
+        """
+        Adds an Arrow IPC file to the dataset.
+
+        Args:
+            file: Location of the precompiled dataset file.
+        """
+        # extract metadata and update alphabet
+        with pa.memory_map(file, 'rb') as source:
+            ds_table = pa.ipc.open_file(source).read_all()
+            raw_metadata = ds_table.schema.metadata
+            if not raw_metadata or b'lines' not in raw_metadata:
+                raise ValueError(f'{file} does not contain a valid metadata record.')
+            metadata = json.loads(raw_metadata[b'lines'])
+        if metadata['type'] == 'kraken_recognition_baseline':
+            if not self.seg_type:
+                self.seg_type = 'baselines'
+            if self.seg_type != 'baselines':
+                raise ValueError(f'File {file} has incompatible type {metadata["type"]} for dataset with type {self.seg_type}.')
+        elif metadata['type'] == 'kraken_recognition_bbox':
+            if not self.seg_type:
+                self.seg_type = 'bbox'
+            if self.seg_type != 'bbox':
+                raise ValueError(f'File {file} has incompatible type {metadata["type"]} for dataset with type {self.seg_type}.')
+        else:
+            raise ValueError(f'Unknown type {metadata["type"]} of dataset.')
+        if self._split_filter and metadata['counts'][self._split_filter] == 0:
+            logger.warning(f'No explicit split for "{self._split_filter}" in dataset {file} (with splits {metadata["counts"].items()}).')
+            return
+        if metadata['im_mode'] > self.im_mode and self.transforms.mode >= metadata['im_mode']:
+            logger.info(f'Upgrading "im_mode" from {self.im_mode} to {metadata["im_mode"]}.')
+            self.im_mode = metadata['im_mode']
+        # centerline normalize raw bbox dataset
+        if self.seg_type == 'bbox' and metadata['image_type'] == 'raw':
+            self.transforms.valid_norm = True
+
+        self.alphabet.update(metadata['alphabet'])
+        num_lines = metadata['counts'][self._split_filter] if self._split_filter else metadata['counts']['all']
+        if self._split_filter:
+            ds_table = ds_table.filter(ds_table.column(self._split_filter))
+        if not self.arrow_table:
+            self.arrow_table = ds_table
+        else:
+            self.arrow_table = pa.concat_tables([self.arrow_table, ds_table])
+        self._num_lines += num_lines
+
+    def encode(self, codec: Optional[PytorchCodec] = None) -> None:
+        """
+        Adds a codec to the dataset.
+        """
+        if codec:
+            self.codec = codec
+            logger.info(f'Trying to encode dataset with codec {codec}')
+            for index in range(self._num_lines):
+                try:
+                    text = self.arrow_table.column('lines')[index].as_py()['text']
+                    for func in self.text_transforms:
+                        text = func(text)
+                    self.codec.encode(text)
+                except KrakenEncodeException as e:
+                    raise e
+                except Exception:
+                    pass
+        else:
+            self.codec = PytorchCodec(''.join(self.alphabet.keys()))
+
+    def no_encode(self) -> None:
+        """
+        Creates an unencoded dataset.
+        """
+        pass
+
+    def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor]:
+        try:
+            sample = self.arrow_table.column('lines')[index].as_py()
+            logger.debug(f'Loading sample {index}')
+            im = Image.open(io.BytesIO(sample['im']))
+            im = self.transforms(im)
+            if self.aug:
+                im = im.permute((1, 2, 0)).numpy()
+                o = self.aug(image=im)
+                im = torch.tensor(o['image'].transpose(2, 0, 1))
+            text = sample['text']
+            for func in self.text_transforms:
+                text = func(text)
+            if not text:
+                logger.debug(f'Text line "{sample["text"]}" is empty after transformations')
+                raise Exception('empty text line')
+        except Exception:
+            idx = np.random.randint(0, len(self))
+            logger.debug(traceback.format_exc())
+            logger.info(f'Failed. Replacing with sample {idx}')
+            return self[idx]
+
+        return {'image': im, 'target': self.codec.encode(text) if self.codec is not None else text}
+
+    def __len__(self) -> int:
+        return self._num_lines
+
+
 class PolygonGTDataset(Dataset):
     """
     Dataset for training a line recognition model from polygonal/baseline data.
@@ -384,7 +625,6 @@ class PolygonGTDataset(Dataset):
                  whitespace_normalization: bool = True,
                  reorder: Union[bool, str] = True,
                  im_transforms: Callable[[Any], torch.Tensor] = transforms.Compose([]),
-                 preload: bool = True,
                  augmentation: bool = False) -> None:
         """
         Creates a dataset for a polygonal (baseline) transcription model.
@@ -398,18 +638,13 @@ class PolygonGTDataset(Dataset):
                                 direction.
             im_transforms (func): Function taking an PIL.Image and returning a
                                   tensor suitable for forward passes.
-            preload (bool): Enables preloading and preprocessing of image files.
+            augmentation (bool): Enables augmentation.
         """
         self._images = []  # type:  Union[List[Image], List[torch.Tensor]]
         self._gt = []  # type:  List[str]
         self.alphabet = Counter()  # type: Counter
         self.text_transforms = []  # type: List[Callable[[str], str]]
-        # split image transforms into two. one part giving the final PIL image
-        # before conversion to a tensor and the actual tensor conversion part.
-        self.head_transforms = transforms.Compose(im_transforms.transforms[:2])
-        self.tail_transforms = transforms.Compose(im_transforms.transforms[2:])
         self.transforms = im_transforms
-        self.preload = preload
         self.aug = None
 
         self.seg_type = 'baselines'
@@ -457,11 +692,7 @@ class PolygonGTDataset(Dataset):
         """
         if 'preparse' not in kwargs or not kwargs['preparse']:
             kwargs = self.parse(*args, **kwargs)
-        if kwargs['preload']:
-            self.im_mode = kwargs['im_mode']
-            self._images.append(kwargs['image'])
-        else:
-            self._images.append((kwargs['image'], kwargs['baseline'], kwargs['boundary']))
+        self._images.append((kwargs['image'], kwargs['baseline'], kwargs['boundary']))
         self._gt.append(kwargs['text'])
         self.alphabet.update(kwargs['text'])
 
@@ -492,34 +723,11 @@ class PolygonGTDataset(Dataset):
             raise KrakenInputException('No baseline given for line')
         if not boundary:
             raise KrakenInputException('No boundary given for line')
-        if self.preload:
-            if not isinstance(image, Image.Image):
-                im = Image.open(image)
-            try:
-                im, _ = next(extract_polygons(im, {'type': 'baselines',
-                                                   'lines': [{'baseline': baseline, 'boundary': boundary}]}))
-            except IndexError:
-                raise KrakenInputException('Patch extraction failed for baseline')
-            try:
-                im = self.head_transforms(im)
-                im = self.tail_transforms(im)
-            except ValueError:
-                raise KrakenInputException(f'Image transforms failed on {image}')
-            
-            return {'text': text,
-                    'image': im,
-                    'baseline': baseline,
-                    'boundary': boundary,
-                    'im_mode': im.mode,
-                    'preload': True,
-                    'preparse': True}
-        else:
-            return {'text': text,
-                    'image': image,
-                    'baseline': baseline,
-                    'boundary': boundary,
-                    'preload': False,
-                    'preparse': True}
+        return {'text': text,
+                'image': image,
+                'baseline': baseline,
+                'boundary': boundary,
+                'preparse': True}
 
     def encode(self, codec: Optional[PytorchCodec] = None) -> None:
         """
@@ -544,39 +752,38 @@ class PolygonGTDataset(Dataset):
             self.training_set.append((im, gt))
 
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor]:
-        if self.preload:
-            x, y = self.training_set[index]
+        item = self.training_set[index]
+        try:
+            logger.debug(f'Attempting to load {item[0]}')
+            im = item[0][0]
+            if not isinstance(im, Image.Image):
+                im = Image.open(im)
+            im, _ = next(extract_polygons(im, {'type': 'baselines',
+                                               'lines': [{'baseline': item[0][1], 'boundary': item[0][2]}]}))
+            im = self.transforms(im)
+            if im.shape[0] == 3:
+                im_mode = 'RGB'
+            elif im.shape[0] == 1:
+                im_mode = 'L'
+            if is_bitonal(im):
+                im_mode = '1'
+
+            if im_mode > self.im_mode:
+                logger.info(f'Upgrading "im_mode" from {self.im_mode} to {im_mode}')
+                self.im_mode = im_mode
             if self.aug:
-                x = x.permute((1, 2, 0)).numpy()
-                o = self.aug(image=x)
-                x = torch.tensor(o['image'].transpose(2, 0, 1))
-            return {'image': x, 'target': y}
-        else:
-            item = self.training_set[index]
-            try:
-                logger.debug(f'Attempting to load {item[0]}')
-                im = item[0][0]
-                if not isinstance(im, Image.Image):
-                    im = Image.open(im)
-                im, _ = next(extract_polygons(im, {'type': 'baselines',
-                                                   'lines': [{'baseline': item[0][1], 'boundary': item[0][2]}]}))
-                im = self.head_transforms(im)
-                if not is_bitonal(im):
-                    self.im_mode = im.mode
-                im = self.tail_transforms(im)
-                if self.aug:
-                    im = im.permute((1, 2, 0)).numpy()
-                    o = self.aug(image=im)
-                    im = torch.tensor(o['image'].transpose(2, 0, 1))
-                return {'image': im, 'target': item[1]}
-            except Exception:
-                idx = np.random.randint(0, len(self.training_set))
-                logger.debug(traceback.format_exc())
-                logger.info(f'Failed. Replacing with sample {idx}')
-                return self[np.random.randint(0, len(self.training_set))]
+                im = im.permute((1, 2, 0)).numpy()
+                o = self.aug(image=im)
+                im = torch.tensor(o['image'].transpose(2, 0, 1))
+            return {'image': im, 'target': item[1]}
+        except Exception:
+            idx = np.random.randint(0, len(self.training_set))
+            logger.debug(traceback.format_exc())
+            logger.info(f'Failed. Replacing with sample {idx}')
+            return self[idx]
 
     def __len__(self) -> int:
-        return len(self.training_set)
+        return len(self._images)
 
 
 class GroundTruthDataset(Dataset):
@@ -591,7 +798,6 @@ class GroundTruthDataset(Dataset):
                  whitespace_normalization: bool = True,
                  reorder: Union[bool, str] = True,
                  im_transforms: Callable[[Any], torch.Tensor] = transforms.Compose([]),
-                 preload: bool = True,
                  augmentation: bool = False) -> None:
         """
         Reads a list of image-text pairs and creates a ground truth set.
@@ -616,7 +822,7 @@ class GroundTruthDataset(Dataset):
                                 direction.
             im_transforms (func): Function taking an PIL.Image and returning a
                                   tensor suitable for forward passes.
-            preload (bool): Enables preloading and preprocessing of image files.
+            augmentation (bool): Enables augmentation.
         """
         self.suffix = suffix
         self.split = partial(F_t.suffix_split, split=split, suffix=suffix)
@@ -624,13 +830,9 @@ class GroundTruthDataset(Dataset):
         self._gt = []  # type:  List[str]
         self.alphabet = Counter()  # type: Counter
         self.text_transforms = []  # type: List[Callable[[str], str]]
-        # split image transforms into two. one part giving the final PIL image
-        # before conversion to a tensor and the actual tensor conversion part.
-        self.head_transforms = transforms.Compose(im_transforms.transforms[:2])
-        self.tail_transforms = transforms.Compose(im_transforms.transforms[2:])
+        self.transforms = im_transforms
         self.aug = None
 
-        self.preload = preload
         self.seg_type = 'bbox'
         # built text transformations
         if normalization:
@@ -673,8 +875,6 @@ class GroundTruthDataset(Dataset):
         """
         if 'preparse' not in kwargs or not kwargs['preparse']:
             kwargs = self.parse(*args, **kwargs)
-        if kwargs['preload']:
-            self.im_mode = kwargs['im_mode']
         self._images.append(kwargs['image'])
         self._gt.append(kwargs['text'])
         self.alphabet.update(kwargs['text'])
@@ -694,40 +894,7 @@ class GroundTruthDataset(Dataset):
                 gt = func(gt)
             if not gt:
                 raise KrakenInputException(f'Text line is empty ({fp.name})')
-        if self.preload:
-            try:
-                im = Image.open(image)
-                im = self.head_transforms(im)
-                im = self.tail_transforms(im)
-            except ValueError:
-                raise KrakenInputException(f'Image transforms failed on {image}')
-            return {'image': im, 'text': gt, 'im_mode': im.mode, 'preload': True, 'preparse': True}
-        else:
-            return {'image': image, 'text': gt, 'preload': False, 'preparse': True}
-
-    def add_loaded(self, image: Image.Image, gt: str) -> None:
-        """
-        Adds an already loaded line-image-text pair to the dataset.
-
-        Args:
-            image (PIL.Image.Image): Line image
-            gt (str): Text contained in the line image
-        """
-        if self.preload:
-            try:
-                im = self.head_transforms(image)
-                if not is_bitonal(im):
-                    self.im_mode = im.mode
-                im = self.tail_transforms(im)
-            except ValueError:
-                raise KrakenInputException(f'Image transforms failed on {image}')
-            self._images.append(im)
-        else:
-            self._images.append(image)
-        for func in self.text_transforms:
-            gt = func(gt)
-        self._gt.append(gt)
-        self.alphabet.update(gt)
+        return {'image': image, 'text': gt, 'preparse': True}
 
     def encode(self, codec: Optional[PytorchCodec] = None) -> None:
         """
@@ -752,38 +919,35 @@ class GroundTruthDataset(Dataset):
             self.training_set.append((im, gt))
 
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor]:
-        if self.preload:
-            x, y = self.training_set[index]
+        item = self.training_set[index]
+        try:
+            logger.debug(f'Attempting to load {item[0]}')
+            im = item[0]
+            if not isinstance(im, Image.Image):
+                im = Image.open(im)
+            im = self.transforms(im)
+            if im.shape[0] == 3:
+                im_mode = 'RGB'
+            elif im.shape[0] == 1:
+                im_mode = 'L'
+            if is_bitonal(im):
+                im_mode = '1'
+            if im_mode > self.im_mode:
+                logger.info(f'Upgrading "im_mode" from {self.im_mode} to {im_mode}')
+                self.im_mode = im_mode
             if self.aug:
-                im = x.permute((1, 2, 0)).numpy()
+                im = im.permute((1, 2, 0)).numpy()
                 o = self.aug(image=im)
                 im = torch.tensor(o['image'].transpose(2, 0, 1))
-                return {'image': im, 'target': y}
-            return {'image': x, 'target': y}
-        else:
-            item = self.training_set[index]
-            try:
-                logger.debug(f'Attempting to load {item[0]}')
-                im = item[0]
-                if not isinstance(im, Image.Image):
-                    im = Image.open(im)
-                im = self.head_transforms(im)
-                if not is_bitonal(im):
-                    self.im_mode = im.mode
-                im = self.tail_transforms(im)
-                if self.aug:
-                    im = im.permute((1, 2, 0)).numpy()
-                    o = self.aug(image=im)
-                    im = torch.tensor(o['image'].transpose(2, 0, 1))
-                return {'image': im, 'target': item[1]}
-            except Exception:
-                idx = np.random.randint(0, len(self.training_set))
-                logger.debug(traceback.format_exc())
-                logger.info(f'Failed. Replacing with sample {idx}')
-                return self[np.random.randint(0, len(self.training_set))]
+            return {'image': im, 'target': item[1]}
+        except Exception:
+            idx = np.random.randint(0, len(self.training_set))
+            logger.debug(traceback.format_exc())
+            logger.info(f'Failed. Replacing with sample {idx}')
+            return self[idx]
 
     def __len__(self) -> int:
-        return len(self.training_set)
+        return len(self._images)
 
 
 class BaselineSet(Dataset):
@@ -853,9 +1017,11 @@ class BaselineSet(Dataset):
                     im_paths.append(data['image'])
                     lines = defaultdict(list)
                     for line in data['lines']:
-                        if valid_baselines is None or line['script'] in valid_baselines:
-                            lines[self.mbl_dict.get(line['script'], line['script'])].append(line['baseline'])
-                            self.class_stats['baselines'][self.mbl_dict.get(line['script'], line['script'])] += 1
+                        if valid_baselines is None or line['tags'].intersection(valid_baselines):
+                            tags = line['tags'].intersection(valid_baselines) if valid_baselines else line['tags']
+                            for tag in tags:
+                                lines[self.mbl_dict.get(tag, tag)].append(line['baseline'])
+                                self.class_stats['baselines'][self.mbl_dict.get(tag, tag)] += 1
                     regions = defaultdict(list)
                     for k, v in data['regions'].items():
                         if valid_regions is None or k in valid_regions:
@@ -915,10 +1081,7 @@ class BaselineSet(Dataset):
                                ], p=0.5)
         self.imgs = imgs
         self.line_width = line_width
-        # split image transforms into two. one part giving the final PIL image
-        # before conversion to a tensor and the actual tensor conversion part.
-        self.head_transforms = transforms.Compose(im_transforms.transforms[:2])
-        self.tail_transforms = transforms.Compose(im_transforms.transforms[2:])
+        self.transforms = im_transforms
         self.seg_type = None
 
     def add(self,
@@ -933,8 +1096,8 @@ class BaselineSet(Dataset):
         Args:
             im (path): Path to the whole page image
             baseline (dict): A list containing dicts with a list of coordinates
-                             and script types [{'baseline': [[x0, y0], ...,
-                             [xn, yn]], 'script': 'script_type'}, ...]
+                             and tags [{'baseline': [[x0, y0], ...,
+                             [xn, yn]], 'tags': ('script_type',)}, ...]
             regions (dict): A dict containing list of lists of coordinates
                             {'region_type_0': [[x0, y0], ..., [xn, yn]]],
                             'region_type_1': ...}.
@@ -943,14 +1106,15 @@ class BaselineSet(Dataset):
             raise Exception(f'The `add` method is incompatible with dataset mode {self.mode}')
         baselines_ = defaultdict(list)
         for line in baselines:
-            line_type = self.mbl_dict.get(line['script'], line['script'])
-            if self.valid_baselines is None or line['script'] in self.valid_baselines:
-                baselines_[line_type].append(line['baseline'])
-                self.class_stats['baselines'][line_type] += 1
+            if self.valid_baselines is None or line['tags'].intersection(self.valid_baselines):
+                tags = line['tags'].intersection(self.valid_baselines) if self.valid_baselines else line['tags']
+                for tag in tags:
+                    baselines_[tag].append(line['baseline'])
+                    self.class_stats['baselines'][tag] += 1
 
-                if line_type not in self.class_mapping['baselines']:
-                    self.num_classes += 1
-                    self.class_mapping['baselines'][line_type] = self.num_classes - 1
+                    if tag not in self.class_mapping['baselines']:
+                        self.num_classes += 1
+                        self.class_mapping['baselines'][tag] = self.num_classes - 1
 
         regions_ = defaultdict(list)
         for k, v in regions.items():
@@ -982,7 +1146,7 @@ class BaselineSet(Dataset):
                 idx = np.random.randint(0, len(self.imgs))
                 logger.debug(traceback.format_exc())
                 logger.info(f'Failed. Replacing with sample {idx}')
-                return self[np.random.randint(0, len(self.imgs))]
+                return self[idx]
         im, target = self.transform(im, target)
         return {'image': im, 'target': target}
 
@@ -1001,10 +1165,7 @@ class BaselineSet(Dataset):
 
     def transform(self, image, target):
         orig_size = image.size
-        image = self.head_transforms(image)
-        if not is_bitonal(image):
-            self.im_mode = image.mode
-        image = self.tail_transforms(image)
+        image = self.transforms(image)
         scale = image.shape[2]/orig_size[0]
         t = torch.zeros((self.num_classes,) + image.shape[1:])
         start_sep_cls = self.class_mapping['aux']['_start_separator']

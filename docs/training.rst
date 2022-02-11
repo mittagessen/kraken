@@ -86,8 +86,15 @@ training and inference, `Aletheia
 <https://www.primaresearch.org/tools/Aletheia>`_ is a powerful desktop
 application that can create fine grained annotations.
 
+Dataset Compilation
+-------------------
+
+.. _compilation:
+
 Training
 --------
+
+.. _training_step:
 
 The training data, e.g. a collection of PAGE XML documents, obtained through
 annotation and transcription may now be used to train segmentation and/or

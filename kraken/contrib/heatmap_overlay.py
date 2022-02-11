@@ -22,7 +22,7 @@ def cli(model, files):
     model.eval()
     batch, channels, height, width = model.input
 
-    transforms = dataset.generate_input_transforms(batch, height, width, channels, 0, valid_norm=False)
+    transforms = dataset.ImageInputTransforms(batch, height, width, channels, 0, valid_norm=False)
 
     torch.set_num_threads(1)
 

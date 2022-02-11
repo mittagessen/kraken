@@ -4,12 +4,14 @@ import json
 import unittest
 
 from PIL import Image
-from lxml import etree
 from io import BytesIO
+from lxml import etree
+from pathlib import Path
+
 from kraken.transcribe import TranscriptionInterface
 
-thisfile = os.path.abspath(os.path.dirname(__file__))
-resources = os.path.abspath(os.path.join(thisfile, 'resources'))
+thisfile = Path(__file__).resolve().parent
+resources = thisfile / 'resources'
 
 class TestTranscriptionInterface(unittest.TestCase):
 
@@ -22,9 +24,9 @@ class TestTranscriptionInterface(unittest.TestCase):
         Tests creation of transcription interfaces with segmentation.
         """
         tr = TranscriptionInterface()
-        with open(os.path.join(resources, 'segmentation.json')) as fp:
+        with open(resources / 'segmentation.json') as fp:
             seg = json.load(fp)
-        with Image.open(os.path.join(resources, 'input.jpg')) as im:
+        with Image.open(resources / 'input.jpg') as im:
             tr.add_page(im, seg)
         fp = BytesIO()
         tr.write(fp)

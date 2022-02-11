@@ -1,6 +1,4 @@
 # -*- coding: utf-8 -*-
-
-import os
 import pytest
 import unittest
 from typing import Sequence, Tuple
@@ -9,9 +7,6 @@ import shapely.geometry as geom
 import numpy as np
 
 from kraken.lib.segmentation import is_in_region, reading_order, topsort
-
-thisfile = os.path.abspath(os.path.dirname(__file__))
-resources = os.path.abspath(os.path.join(thisfile, 'resources'))
 
 
 def polygon_slices(polygon: Sequence[Tuple[int, int]]) -> Tuple[slice, slice]:

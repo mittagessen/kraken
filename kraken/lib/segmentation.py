@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Copyright 2019 Benjamin Kiessling
 #
@@ -18,14 +17,12 @@ Processing for baseline segmenter output
 """
 import PIL
 import logging
-import warnings
 import numpy as np
 import shapely.geometry as geom
 from collections import defaultdict
 
 from PIL import Image
 
-from scipy.stats import linregress
 from scipy.ndimage import maximum_filter, binary_erosion
 from scipy.ndimage.morphology import distance_transform_cdt
 from scipy.spatial.distance import pdist, squareform
@@ -860,9 +857,9 @@ def compute_polygon_section(baseline, boundary, dist1, dist2):
     """
     # find baseline segments the points are in
     if dist1 == 0:
-        dist1 = np.finfo(np.float).eps
+        dist1 = np.finfo(float).eps
     if dist2 == 0:
-        dist2 = np.finfo(np.float).eps
+        dist2 = np.finfo(float).eps
     boundary_pol = geom.Polygon(boundary)
     bl = np.array(baseline)
     # extend first/last segment of baseline if not on polygon boundary
@@ -883,8 +880,8 @@ def compute_polygon_section(baseline, boundary, dist1, dist2):
             bl[-1] = np.array(nearest_points(geom.Point(bl[-1]), boundary_pol)[1], 'int')
         else:
             bl[-1] = np.array(r_point, 'int')
-    dist1 = min(geom.LineString(bl).length - np.finfo(np.float).eps, dist1)
-    dist2 = min(geom.LineString(bl).length - np.finfo(np.float).eps, dist2)
+    dist1 = min(geom.LineString(bl).length - np.finfo(float).eps, dist1)
+    dist2 = min(geom.LineString(bl).length - np.finfo(float).eps, dist2)
     dists = np.cumsum(np.diag(np.roll(squareform(pdist(bl)), 1)))
     segs_idx = np.searchsorted(dists, [dist1, dist2])
     segs = np.dstack((bl[segs_idx-1], bl[segs_idx]))
@@ -913,11 +910,23 @@ def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image.Image:
     with baselines preserving order.
 
     Args:
-        im (PIL.Image.Image): Input image
-        bounds (list): A list of tuples (x1, y1, x2, y2)
+        im: Input image
+        bounds: A list of dicts in baseline:
+            ```
+            {'type': 'baselines',
+             'lines': [{'baseline': [[x_0, y_0], ... [x_n, y_n]],
+                        'boundary': [[x_0, y_0], ... [x_n, y_n]]},
+                       ....]
+            }
+            ```
+            or bounding box format:
+            ```
+            {'boxes': [[x_0, y_0, x_1, y_1], ...],
+             'text_direction': 'horizontal-lr'}
+            ```
 
     Yields:
-        (PIL.Image.Image) the extracted subimage
+        The extracted subimage
     """
     if 'type' in bounds and bounds['type'] == 'baselines':
         # select proper interpolation scheme depending on shape
@@ -943,7 +952,7 @@ def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image.Image:
 
             # fast path for straight baselines requiring only rotation
             if len(baseline) == 2:
-                baseline = baseline.astype(np.float)
+                baseline = baseline.astype(float)
                 # calculate direction vector
                 lengths = np.linalg.norm(np.diff(baseline.T), axis=0)
                 p_dir = np.mean(np.diff(baseline.T) * lengths/lengths.sum(), axis=1)
@@ -973,7 +982,6 @@ def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image.Image:
                 control_pts = []
                 for point in pl.geoms:
                     npoint = np.array(point.coords)[0]
-
                     line_idx, dist, intercept = min(((idx, line.project(point),
                                                       np.array(line.interpolate(line.project(point)).coords)) for idx, line in enumerate(bl)),
                                                     key=lambda x: np.linalg.norm(npoint-x[2]))

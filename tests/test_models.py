@@ -1,18 +1,19 @@
 # -*- coding: utf-8 -*-
-import unittest
 import os
-import tempfile
 import pickle
+import unittest
+import tempfile
 
 from pytest import raises
+from pathlib import Path
 
 import kraken.lib.lstm
 
 from kraken.lib import models
 from kraken.lib.exceptions import KrakenInvalidModelException
 
-thisfile = os.path.abspath(os.path.dirname(__file__))
-resources = os.path.abspath(os.path.join(thisfile, 'resources'))
+thisfile = Path(__file__).resolve().parent
+resources = thisfile / 'resources'
 
 class TestModels(unittest.TestCase):
     """
@@ -37,7 +38,7 @@ class TestModels(unittest.TestCase):
         """
         Tests loading of valid clstm files.
         """
-        rnn = models.load_any(os.path.join(resources, 'toy.clstm').encode('utf-8'))
+        rnn = models.load_any(resources / 'toy.clstm')
         self.assertIsInstance(rnn, models.TorchSeqRecognizer)
 
     def test_load_pyrnn_no_seqrecognizer(self):
@@ -54,11 +55,11 @@ class TestModels(unittest.TestCase):
         Test load_any doesn't load pickled models on python 3
         """
         with raises(KrakenInvalidModelException):
-            rnn = models.load_any(os.path.join(resources, 'model.pyrnn.gz'))
+            rnn = models.load_any(resources / 'model.pyrnn.gz')
 
     def test_load_any_proto(self):
         """
         Test load_any loads protobuf models.
         """
-        rnn = models.load_any(os.path.join(resources, 'model.pronn'))
+        rnn = models.load_any(resources / 'model.pronn')
         self.assertIsInstance(rnn, kraken.lib.models.TorchSeqRecognizer)
