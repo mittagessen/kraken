@@ -15,11 +15,10 @@ Training data formats
 ---------------------
 
 The training tools accept a variety of training data formats, usually some kind
-of custom low level format, and the XML-based formats that are commony used for
-archival of annotation and transcription data. It is recommended to use the XML
-formats as they are interchangeable with other tools, do not incur
-transformation losses, and allow training all components of kraken from the
-same datasets easily.
+of custom low level format, the XML-based formats that are commony used for
+archival of annotation and transcription data, and in the case of recognizer
+training a precompiled binary format. It is recommended to use the XML formats
+for segmentation training and the binary format for recognition training.
 
 ALTO
 ~~~~
@@ -66,18 +65,45 @@ To realize this speedup the dataset has to be compiled first:
 
    $ ketos compile -f xml -o dataset.arrow file_1.xml file_2.xml ...
 
+if there are a lot of individual lines containing many lines this process can
+take a long time. It can easily be parallelized by specifying the number of
+separate parsing workers with the `--workers` option:
 
+.. code-block:: console
+
+   $ ketos compile --workers 8 -f xml ...
+
+In addition, binary datasets can contain fixed splits which allow
+reproducibility and comparability between training and evaluation runs.
+Training, validation, and test splits can be pre-defined from multiple sources.
+Per default they are sourced from tags defined in the source XML files unless
+the option telling kraken to ignore them is set:
+
+.. code-block:: console
+
+   $ ketos compile --ignore-splits -f xml ...
+
+Alternatively fixed-proportion random splits can be created ad-hoc during
+compile time:
+
+.. code-block:: console
+
+   $ ketos compile --random-split 0.8 0.1 0.1 ...
+
+The above line splits assigns 80% of the source lines to the training set, 10%
+to the validation set, and 10% to the test set. The training and validation
+sets in the dataset file are used automatically by `ketos train` (unless told
+otherwise) while the remaining 10% of the test set is selected by `ketos test`.
 
 Recognition training
 --------------------
 
 The training utility allows training of :ref:`VGSL <vgsl>` specified models
-both from scratch and from existing models. Here are its command line options:
+both from scratch and from existing models. Here are its most important command line options:
 
 ======================================================= ======
 option                                                  action
 ======================================================= ======
---pad                                                   Left and right padding around lines
 -o, --output                                            Output model file prefix. Defaults to model.
 -s, --spec                                              VGSL spec of the network to train. CTC layer
                                                         will be added automatically. default:
@@ -89,22 +115,20 @@ option                                                  action
 -i, --load                                              Load existing file to continue training
 -F, --savefreq                                          Model save frequency in epochs during
                                                         training
--R, --report                                            Report creation frequency in epochs
 -q, --quit                                              Stop condition for training. Set to `early`
                                                         for early stopping (default) or `dumb` for fixed
                                                         number of epochs.
--N, --epochs                                            Number of epochs to train for. Set to -1 for indefinite training.
+-N, --epochs                                            Number of epochs to train for.
+--min-epochs                                            Minimum number of epochs to train for when using early stopping.
 --lag                                                   Number of epochs to wait before stopping
                                                         training without improvement. Only used when using early stopping.
---min-delta                                             Minimum improvement between epochs to reset
-                                                        early stopping. Defaults to 0.005.
 -d, --device                                            Select device to use (cpu, cuda:0, cuda:1,...). GPU acceleration requires CUDA.
 --optimizer                                             Select optimizer (Adam, SGD, RMSprop).
 -r, --lrate                                             Learning rate  [default: 0.001]
 -m, --momentum                                          Momentum used with SGD optimizer. Ignored otherwise.
 -w, --weight-decay                                      Weight decay.
---schedule                                              Sets the learning rate scheduler. May be either constant or 1cycle. For 1cycle 
-                                                        the cycle length is determined by the `--epoch` option.
+--schedule                                              Sets the learning rate scheduler. May be either constant, 1cycle, exponential, cosine, step, or
+                                                        reduceonplateau. For 1cycle the cycle length is determined by the `--epoch` option.
 -p, --partition                                         Ground truth data partition ratio between train/validation set
 -u, --normalization                                     Ground truth Unicode normalization. One of NFC, NFKC, NFD, NFKD.
 -c, --codec                                             Load a codec JSON definition (invalid if loading existing model)
@@ -119,28 +143,29 @@ option                                                  action
                                                         training sets with more lines than the command line can process. Can be used more than once.
 -e, --evaluation-files                                  File(s) with paths to evaluation data. Overrides the `-p` parameter.
 -f, --format-type                                       Sets the training and evaluation data format.
-                                                        Valid choices are 'path', 'xml' (default), 'alto' and 'page'.
-                                                        In `alto` and `page` XML mode all data is extracted from XML files
+                                                        Valid choices are 'path', 'xml' (default), 'alto', 'page', or binary.
+                                                        In `alto`, `page`, and xml mode all data is extracted from XML files
                                                         containing both baselines and a link to source images.
                                                         In `path` mode arguments are image files sharing a prefix up to the last
                                                         extension with JSON `.path` files containing the baseline information.
---preload / --no-preload                                Hard enable/disable for training data preloading. Preloading 
-                                                        training data into memory is enabled per default for sets with less than 2500 lines.
---threads                                               Number of OpenMP threads when running on CPU. Defaults to min(4, #cores).
+                                                        In `binary` mode arguments are precompiled binary dataset files.
+--augment / --no-augment                                Enables/disables data augmentation.
+--workers                                               Number of OpenMP threads and workers used to perform neural network passes and load samples from the dataset.
 ======================================================= ======
 
 From Scratch
 ~~~~~~~~~~~~
 
 The absolute minimal example to train a new recognition model from a number of
-PAGE XML documents is similar to the segmentation training:
+ALTO or PAGE XML documents is similar to the segmentation training:
 
 .. code-block:: console
 
-        $ ketos train training_data/*.png
+        $ ketos train -f xml training_data/*.xml
 
 Training will continue until the error does not improve anymore and the best
-model (among intermediate results) will be saved in the current directory.
+model (among intermediate results) will be saved in the current directory; this
+approach is called early stopping.
 
 In some cases, such as color inputs, changing the network architecture might be
 useful:
@@ -172,6 +197,24 @@ It is possible to resume training from a previously saved model:
 
         $ ketos train -i model_25.mlmodel syr/*.png
 
+A good configuration for a small precompiled print dataset and GPU acceleration
+would be:
+
+.. code-block:: console
+
+        $ ketos train -d cuda -f binary dataset.arrow
+
+A better configuration for large and complicated datasets such as handwritten texts:
+
+.. code-block:: console 
+
+        $ ketos train --augment --workers 4 -d cuda -f binary --min-epochs 20 -w 0 -s '[1,120,0,1 Cr3,13,32 Do0.1,2 Mp2,2 Cr3,13,32 Do0.1,2 Mp2,2 Cr3,9,64 Do0.1,2 Mp2,2 Cr3,9,64 Do0.1,2 S1(1x0)1,3 Lbx200 Do0.1,2 Lbx200 Do.1,2 Lbx200 Do]' -r 0.0001 dataset_large.arrow
+
+This configuration is slower to train and often requires a couple of epochs to
+output any sensible text at all. Therefore we tell ketos to train for at least
+20 epochs so the early stopping algorithm doesn't prematurely interrupt the
+training process.
+
 Fine Tuning
 ~~~~~~~~~~~
 
@@ -187,7 +230,7 @@ an exact match. Otherwise an error will be raised:
 
 .. code-block:: console
 
-        $ ketos train -i model_5.mlmodel --no-preload kamil/*.png
+        $ ketos train -i model_5.mlmodel kamil/*.png
         Building training set  [####################################]  100%
         Building validation set  [####################################]  100%
         [0.8616] alphabet mismatch {'~', '»', '8', '9', 'ـ'} 
@@ -224,7 +267,6 @@ recognize 52 different characters after sufficient additional training.
         ...
 
 In ``both`` mode 2 of the original characters were removed and 3 new ones were added.
-
 
 Slicing
 ~~~~~~~
@@ -270,11 +312,131 @@ lot faster.
 Segmentation training
 ---------------------
 
-Training a segmentation model is very similar to training one for 
+Training a segmentation model is very similar to training models for text
+recognition. The basic invocation is:
 
+.. code-block:: console
 
-Testing
--------
+        $ ketos segtrain -f xml training_data/*.xml
+        Training line types:
+          default 2	53980
+          foo     8     134
+        Training region types:
+          graphic	3	135
+          text	4	1128
+          separator	5	5431
+          paragraph	6	10218
+          table	7	16
+        val check  [------------------------------------]  0/0
+
+This takes all text lines and regions encoded in the XML files and trains a
+model to recognize them.
+
+Most other options available in transcription training are also available in
+segmentation training. CUDA acceleration:
+
+.. code-block:: console
+
+        $ ketos segtrain -d cuda -f xml training_data/*.xml
+
+Defining custom architectures:
+
+.. code-block:: console
+
+        $ ketos segtrain -d cuda -s '[1,1200,0,3 Cr7,7,64,2,2 Gn32 Cr3,3,128,2,2 Gn32 Cr3,3,128 Gn32 Cr3,3,256 Gn32]' -f xml training_data/*.xml
+
+Fine tuning/transfer learning with last layer adaptation and slicing:
+
+.. code-block:: console
+
+        $ ketos segtrain --resize both -i segmodel_best.mlmodel training_data/*.xml
+        $ ketos segtrain -i segmodel_best.mlmodel --append 7 -s '[Cr3,3,64 Do0.1]' training_data/*.xml
+
+In addition there are a couple of specific options that allow filtering of
+baseline and region types. Datasets are often annotated to a level that is too
+detailled or contains undesirable types, e.g. when combining segmentation data
+from different sources. The most basic option is the suppression of *all* of
+either baseline or region data contained in the dataset:
+
+.. code-block:: console
+
+        $ ketos segtrain --suppress-baselines -f xml training_data/*.xml
+        Training line types:
+        Training region types:
+          graphic	3	135
+          text	4	1128
+          separator	5	5431
+          paragraph	6	10218
+          table	7	16
+        ...
+        $ ketos segtrain --suppress-regions -f xml training-data/*.xml
+        Training line types:
+          default 2	53980
+          foo     8     134
+        ...
+
+It is also possible to filter out baselines/regions selectively:
+
+.. code-block:: console
+
+        $ ketos segtrain -f xml --valid-baselines default training_data/*.xml
+        Training line types:
+          default 2	53980
+        Training region types:
+          graphic	3	135
+          text	4	1128
+          separator	5	5431
+          paragraph	6	10218
+          table	7	16
+        $ ketos segtrain -f xml --valid-regions graphic --valid-regions paragraph training_data/*.xml
+        Training line types:
+          default 2	53980
+         Training region types:
+          graphic	3	135
+          paragraph	6	10218
+
+Finally, we can merge baselines and regions into each other:
+
+.. code-block:: console 
+
+        $ ketos segtrain -f xml --merge-baselines default:foo training_data/*.xml
+        Training line types:
+          default 2	54114
+        ...
+        $ ketos segtrain -f xml --merge-regions text:paragraph --merge-regions graphic:table training_data/*.xml
+        ...
+        Training region types:
+          graphic	3	151
+          text	4	11346
+          separator	5	5431
+        ...
+
+These options are combinable to massage the dataset into any typology you want.
+
+Then there are some options that set metadata fields controlling the
+postprocessing. When computing the bounding polygons the recognized baselines
+are offset slightly to ensure overlap with the line corpus. This offset is per
+default upwards for baselines but as it is possible to annotate toplines (for
+scripts like Hebrew) and centerlines (for baseline-free scripts like Chinese)
+the appropriate offset can be selected with an option:
+
+.. code-block:: console
+
+        $ ketos segtrain --topline -f xml hebrew_training_data/*.xml
+        $ ketos segtrain --centerline -f xml chinese_training_data/*.xml
+        $ ketos segtrain --baseline -f xml latin_training_data/*.xml
+
+Lastly, there are some regions that are absolute boundaries for text line
+content. When these regions are marked as such the polygonization can sometimes
+be improved:
+
+.. code-block:: console
+
+        $ ketos segtrain --bounding-regions paragraph -f xml training_data/*.xml
+        ...
+
+Recognition Testing
+-------------------
 
 Picking a particular model from a pool or getting a more detailed look on the
 recognition accuracy can be done with the `test` command. It uses transcribed
@@ -285,11 +447,17 @@ differences from the ground truth for each of them.
 ======================================================= ======
 option                                                  action
 ======================================================= ======
+-f, --format-type                                       Sets the test set data format.
+                                                        Valid choices are 'path', 'xml' (default), 'alto', 'page', or binary.
+                                                        In `alto`, `page`, and xml mode all data is extracted from XML files
+                                                        containing both baselines and a link to source images.
+                                                        In `path` mode arguments are image files sharing a prefix up to the last
+                                                        extension with JSON `.path` files containing the baseline information.
+                                                        In `binary` mode arguments are precompiled binary dataset files.
 -m, --model                                             Model(s) to evaluate.
 -e, --evaluation-files                                  File(s) with paths to evaluation data.
 -d, --device                                            Select device to use.
 --pad                                                   Left and right padding around lines.
-
 
 Transcriptions are handed to the command in the same way as for the `train`
 command, either through a manifest with `-e/--evaluation-files` or by just
