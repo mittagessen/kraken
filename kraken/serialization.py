@@ -109,7 +109,7 @@ def serialize(records: Sequence[ocr_record],
             'name': image_name,
             'writing_mode': writing_mode,
             'scripts': scripts,
-            'date': datetime.datetime.now().isoformat(),
+            'date': datetime.datetime.utcnow().isoformat() + 'Z',
             'base_dir': [rec.base_dir for rec in records][0] if len(records) else None}  # type: dict
     seg_idx = 0
     char_idx = 0
