@@ -309,6 +309,80 @@ layers we define a network stub and index for appending:
 The new model will behave exactly like a new one, except potentially training a
 lot faster.
 
+Text Normalization and Unicode
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. note:
+
+   The description of the different behaviors of Unicode text below are highly
+   abbreviated. If confusion arrises it is recommended to take a look at the
+   linked documents which are more exhaustive and include visual examples.
+
+Text can be encoded in multiple different ways when using Unicode. For many
+scripts characters with diacritics can be encoded either as a single code point
+or a base character and the diacritic, `different types of whitespace
+<https://jkorpela.fi/chars/spaces.html>`_ exist, and mixed bidirectional text
+can be written differently depending on the `base line direction
+<https://www.w3.org/International/articles/inline-bidi-markup/uba-basics#context>`_.
+
+Ketos provides options to largely normalize input into normalized forms that
+make processing of data from multiple sources possible. Principally, two
+options are available: one for `Unicode normalization
+<https://unicode.org/reports/tr15/>`_ and one for whitespace normalization. The
+Unicode normalization (disabled per default) switch allows one to select one of
+the 4 normalization forms:
+
+.. code-block:: console
+
+   $ ketos train --normalization NFD -f xml training_data/*.xml
+   $ ketos train --normalization NFC -f xml training_data/*.xml
+   $ ketos train --normalization NFKD -f xml training_data/*.xml
+   $ ketos train --normalization NFKC -f xml training_data/*.xml
+
+Whitespace normalization is enabled per default and converts all Unicode
+whitespace characters into a simple space. It is highly recommended to leave
+this function enabled as the variation of space width, resulting either from
+text justification or the irregularity of handwriting, is difficult for a
+recognition model to accurately model and map onto the different space code
+points. Nevertheless it can be disabled through:
+
+.. code-block:: console
+
+   $ ketos train --no-normalize-whitespace -f xml training_data/*.xml
+
+Further the behavior of the `BiDi algorithm
+<https://unicode.org/reports/tr9/>`_ can be influenced through two options. The
+configuration of the algorithm is important as the recognition network is
+trained to output characters (or rather labels which are mapped to code points
+by a :ref:`codec <codecs>`) in the order a line is fed into the network, i.e.
+left-to-right also called display order. Unicode text is encoded as a stream of
+code points in logical order, i.e. the order the characters in a line are read
+in by a human reader, for example (mostly) right-to-left for a text in Hebrew.
+The BiDi algorithm resolves this logical order to the display order expected by
+the network and vice versa. The primary parameter of the algorithm is the base
+direction which is just the default direction of the input fields of the user
+when the ground truth was initially transcribed. Base direction will be
+automatically determined by kraken when using PAGE XML or ALTO files that
+contain it, otherwise it will have to be supplied if it differs from the
+default when training a model:
+
+.. code-block:: console
+
+   $ ketos train --base-dir R -f xml rtl_training_data/*.xml
+
+It is also possible to disable BiDi processing completely, e.g. when the text
+has been brought into display order already:
+
+.. code-block:: console
+
+   $ ketos train --no-reorder -f xml rtl_display_data/*.xml
+
+Codecs
+~~~~~~
+
+.. _codecs:
+
+
 Segmentation training
 ---------------------
 
