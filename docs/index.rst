@@ -210,17 +210,34 @@ Funding
 
 kraken is developed at the `École Pratique des Hautes Études <http://ephe.fr>`_, `Université PSL <http://www.psl.eu>`_.
 
-This project was partially funded through the RESILIENCE project, funded from
-the European Union’s Horizon 2020 Framework Programme for Research and
-Innovation.
 
-.. image:: https://ec.europa.eu/regional_policy/sources/information/logos_downloadcenter/eu_funded_en.jpg
-  :alt: Co-financed by the European Union
+.. container:: twocol
 
-Ce travail a bénéficié d’une aide de l’État gérée par l’Agence Nationale de la
-Recherche au titre du Programme d’Investissements d’Avenir portant la référence
-ANR-21-ESRE-0005.
+   .. container:: leftside
 
-.. image:: https://www.gouvernement.fr/sites/default/files/styles/illustration-centre/public/contenu/illustration/2018/10/logo_investirlavenir_rvb.png
-   :alt: Received funding from the Programme d’investissements d’Avenir
+        .. image:: https://ec.europa.eu/regional_policy/images/information/logos/eu_flag.jpg
+          :width: 100
+          :alt: Co-financed by the European Union
+
+   .. container:: rightside
+
+        This project was partially funded through the RESILIENCE project, funded from
+        the European Union’s Horizon 2020 Framework Programme for Research and
+        Innovation.
+
+
+.. container:: twocol
+
+   .. container:: leftside
+
+      .. image:: https://www.gouvernement.fr/sites/default/files/styles/illustration-centre/public/contenu/illustration/2018/10/logo_investirlavenir_rvb.png
+         :width: 100
+         :alt: Received funding from the Programme d’investissements d’Avenir
+
+   .. container:: rightside
+
+        Ce travail a bénéficié d’une aide de l’État gérée par l’Agence Nationale de la
+        Recherche au titre du Programme d’Investissements d’Avenir portant la référence
+        ANR-21-ESRE-0005.
+
 
