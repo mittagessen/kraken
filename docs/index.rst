@@ -216,3 +216,11 @@ Innovation.
 
 .. image:: https://ec.europa.eu/regional_policy/sources/information/logos_downloadcenter/eu_funded_en.jpg
   :alt: Co-financed by the European Union
+
+Ce travail a bénéficié d’une aide de l’État gérée par l’Agence Nationale de la
+Recherche au titre du Programme d’Investissements d’Avenir portant la référence
+ANR-21-ESRE-0005.
+
+.. image:: https://www.gouvernement.fr/sites/default/files/styles/illustration-centre/public/contenu/illustration/2018/10/logo_investirlavenir_rvb.png
+   :alt: Received funding from the Programme d’investissements d’Avenir
+
