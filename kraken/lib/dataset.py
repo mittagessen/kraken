@@ -86,7 +86,6 @@ class ImageInputTransforms(transforms.Compose):
                         standard scaling.
             force_binarization: Forces binarization of input images using the
                                 nlbin algorithm.
-
         """
         super().__init__(None)
 
@@ -389,8 +388,8 @@ def compute_error(model: TorchSeqRecognizer, batch: Dict[str, torch.Tensor]) -> 
     Computes error report from a model and a list of line image-text pairs.
 
     Args:
-        model (kraken.lib.models.TorchSeqRecognizer): Model used for recognition
-        validation_set (list): List of tuples (image, text) for validation
+        model: Model used for recognition
+        validation_set: List of tuples (image, text) for validation
 
     Returns:
         A tuple with total number of characters and edit distance across the

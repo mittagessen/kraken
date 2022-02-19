@@ -532,6 +532,7 @@ option                                                  action
 -e, --evaluation-files                                  File(s) with paths to evaluation data.
 -d, --device                                            Select device to use.
 --pad                                                   Left and right padding around lines.
+======================================================= ======
 
 Transcriptions are handed to the command in the same way as for the `train`
 command, either through a manifest with `-e/--evaluation-files` or by just

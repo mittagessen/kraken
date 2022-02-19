@@ -22,7 +22,7 @@ Layout analysis methods.
 import logging
 import numpy as np
 
-from typing import Tuple, List, Callable, Optional, Dict, Any
+from typing import Tuple, List, Callable, Optional, Dict, Any, Union
 from scipy.ndimage.filters import (gaussian_filter, uniform_filter,
                                    maximum_filter)
 
@@ -133,13 +133,14 @@ def compute_separators_morph(binary: np.ndarray, scale: float, sepwiden: int = 1
 
 def compute_colseps_conv(binary: np.ndarray, scale: float = 1.0,
                          minheight: int = 10, maxcolseps: int = 2) -> np.ndarray:
-    """Find column separators by convolution and thresholding.
+    """
+    Find column separators by convolution and thresholding.
 
     Args:
-        binary (numpy.ndarray):
-        scale (float):
-        minheight (int):
-        maxcolseps (int):
+        binary:
+        scale:
+        minheight:
+        maxcolseps:
 
     Returns:
         Separators
@@ -167,8 +168,9 @@ def compute_black_colseps(binary: np.ndarray, scale: float, maxcolseps: int) -> 
     Computes column separators from vertical black lines.
 
     Args:
-        binary (numpy.ndarray): Numpy array of the binary image
-        scale (float):
+        binary: Numpy array of the binary image
+        scale:
+        maxcolseps:
 
     Returns:
         (colseps, binary):
@@ -185,8 +187,8 @@ def compute_white_colseps(binary: np.ndarray, scale: float, maxcolseps: int) -> 
     Computes column separators either from vertical black lines or whitespace.
 
     Args:
-        binary (numpy.ndarray): Numpy array of the binary image
-        scale (float):
+        binary: Numpy array of the binary image
+        scale:
 
     Returns:
         colseps:
@@ -206,9 +208,9 @@ def compute_gradmaps(binary: np.ndarray, scale: float, gauss: bool = False):
     Use gradient filtering to find baselines
 
     Args:
-        binary (numpy.ndarray):
-        scale (float):
-        gauss (bool): Use gaussian instead of uniform filtering
+        binary:
+        scale:
+        gauss: Use gaussian instead of uniform filtering
 
     Returns:
         (bottom, top, boxmap)
@@ -267,9 +269,9 @@ def remove_hlines(binary: np.ndarray, scale: float, maxsize: int = 10) -> np.nda
     Removes horizontal black lines that only interfere with page segmentation.
 
         Args:
-            binary (numpy.ndarray):
-            scale (float):
-            maxsize (int): maximum size of removed lines
+            binary:
+            scale:
+            maxsize: maximum size of removed lines
 
         Returns:
             numpy.ndarray containing the filtered image.
@@ -304,7 +306,7 @@ def segment(im, text_direction: str = 'horizontal-lr',
             maxcolseps: float = 2,
             black_colseps: bool = False,
             no_hlines: bool = True,
-            pad: int = 0,
+            pad: Union[int, Tuple[int, int]] = 0,
             mask: Optional[np.ndarray] = None,
             reading_order_fn: Callable = reading_order) -> Dict[str, Any]:
     """
@@ -314,32 +316,35 @@ def segment(im, text_direction: str = 'horizontal-lr',
     each line in reading order.
 
     Args:
-        im (PIL.Image): A bi-level page of mode '1' or 'L'
-        text_direction (str): Principal direction of the text
-                              (horizontal-lr/rl/vertical-lr/rl)
-        scale (float): Scale of the image
-        maxcolseps (int): Maximum number of whitespace column separators
-        black_colseps (bool): Whether column separators are assumed to be
-                              vertical black lines or not
-        no_hlines (bool): Switch for horizontal line removal
-        pad (int or tuple): Padding to add to line bounding boxes. If int the
-                            same padding is used both left and right. If a
-                            2-tuple, uses (padding_left, padding_right).
-        mask (PIL.Image): A bi-level mask image of the same size as `im` where
-                          0-valued regions are ignored for segmentation
-                          purposes. Disables column detection.
-        reading_order_fn (Callable): Function to call to order line output.
-                                     Callable accepting a list of slices (y, x)
-                                     and a text direction in (`rl`, `lr`).
+        im: A bi-level page of mode '1' or 'L'
+        text_direction: Principal direction of the text
+                        (horizontal-lr/rl/vertical-lr/rl)
+        scale: Scale of the image. Will be auto-determined if set to `None`.
+        maxcolseps: Maximum number of whitespace column separators
+        black_colseps: Whether column separators are assumed to be vertical
+                       black lines or not
+        no_hlines: Switch for small horizontal line removal.
+        pad: Padding to add to line bounding boxes. If int the same padding is
+             used both left and right. If a 2-tuple, uses (padding_left,
+             padding_right).
+        mask: A bi-level mask image of the same size as `im` where 0-valued
+              regions are ignored for segmentation purposes. Disables column
+              detection.
+        reading_order_fn: Function to call to order line output. Callable
+                          accepting a list of slices (y, x) and a text
+                          direction in (`rl`, `lr`).
 
     Returns:
-        {'text_direction': '$dir', 'boxes': [(x1, y1, x2, y2),...]}: A
-        dictionary containing the text direction and a list of reading order
-        sorted bounding boxes under the key 'boxes'.
+        A dictionary containing the text direction and a list of reading order
+        sorted bounding boxes under the key 'boxes':
+
+        .. code-block::
+
+            {'text_direction': '$dir', 'boxes': [(x1, y1, x2, y2),...]}
 
     Raises:
-        KrakenInputException if the input image is not binarized or the text
-        direction is invalid.
+        KrakenInputException: if the input image is not binarized or the text
+                              direction is invalid.
     """
     im_str = get_im_str(im)
     logger.info(f'Segmenting {im_str}')

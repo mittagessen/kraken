@@ -12,7 +12,7 @@ import numpy as np
 import kraken.lib.lineest
 import kraken.lib.ctc_decoder
 
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Union
 
 from kraken.lib.vgsl import TorchVGSLModel
 from kraken.lib.exceptions import KrakenInvalidModelException, KrakenInputException
@@ -29,19 +29,33 @@ class TorchSeqRecognizer(object):
     A class wrapping a TorchVGSLModel with a more comfortable recognition interface.
     """
     def __init__(self, nn, decoder=kraken.lib.ctc_decoder.greedy_decoder, train: Optional[bool] = False, device: Optional[str] = 'cpu') -> None:
-        """
-        Constructs a sequence recognizer from a VGSL model and a decoder.
+    """
+    Constructs a sequence recognizer from a VGSL model and a decoder.
 
-        Args:
-            nn: neural network used for recognition
-            decoder: Decoder function used for mapping softmax activations to
-                     labels and positions.
-            train: Enables or disables gradient calculation. If `None` will be
-                   ignored and the model remains in the state that is given.
-            device: Device to run model on. If `None` will be ignored and the
-                    user has to ensure that model and input tensor location
-                    matches.
-        """
+    Args:
+        nn: Neural network used for recognition.
+        decoder: Decoder function used for mapping softmax activations to
+                 labels and positions.
+        train: Enables or disables gradient calculation and dropout.
+        device: Device to run model on.
+
+    Attributes:
+        nn: Neural network used for recognition.
+        codec: PytorchCodec extracted from the recognition model.
+
+        decoder: Decoder function used for mapping softmax activations to
+                 labels and positions.
+        train: Enables or disables gradient calculation and dropout.
+        device: Device to run model on.
+        one_channel_mode: flag indicating if the model expects binary or
+                          grayscale input images.
+        seg_type: flag indicating if the model expects baseline- or bounding
+                  box-derived text line images.
+
+    Raises:
+        ValueError: Is raised when the model type is not a sequence recognizer.
+    """
+    def __init__(self, nn: TorchVGSLModel, decoder=kraken.lib.ctc_decoder.greedy_decoder, train: bool = False, device: str = 'cpu'):
         self.nn = nn
         self.kind = ''
         if train is True:
@@ -66,18 +80,22 @@ class TorchSeqRecognizer(object):
         self.device = device
         self.nn.to(device)
 
-    def forward(self, line: torch.Tensor, lens: torch.Tensor = None) -> np.ndarray:
+    def forward(self, line: torch.Tensor, lens: torch.Tensor = None) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
         """
         Performs a forward pass on a torch tensor of one or more lines with
         shape (N, C, H, W) and returns a numpy array (N, W, C).
 
         Args:
-            line (torch.Tensor): NCHW line tensor
-            lens (torch.Tensor): Optional tensor containing sequence lengths if N > 1
+            line: NCHW line tensor
+            lens: Optional tensor containing sequence lengths if N > 1
 
         Returns:
             Tuple with (N, W, C) shaped numpy array and final output sequence
             lengths.
+
+        Raises:
+            KrakenInputException: Is raised if the channel dimension isn't of
+                                  size 1 in the network output.
         """
         if self.device:
             line = line.to(self.device)
@@ -89,15 +107,15 @@ class TorchSeqRecognizer(object):
             olens = olens.cpu().numpy()
         return self.outputs, olens
 
-    def predict(self, line: torch.Tensor, lens: torch.Tensor = None) -> List[List[Tuple[str, int, int, float]]]:
+    def predict(self, line: torch.Tensor, lens: Optional[torch.Tensor] = None) -> List[List[Tuple[str, int, int, float]]]:
         """
         Performs a forward pass on a torch tensor of a line with shape (N, C, H, W)
         and returns the decoding as a list of tuples (string, start, end,
         confidence).
 
         Args:
-            line (torch.Tensor): NCHW line tensor
-            lens (torch.Tensor): Optional tensor containing sequence lengths if N > 1
+            line: NCHW line tensor
+            lens: Optional tensor containing sequence lengths if N > 1
 
         Returns:
             List of decoded sequences.
@@ -113,10 +131,14 @@ class TorchSeqRecognizer(object):
             dec_seqs.append(self.codec.decode(locs))
         return dec_seqs
 
-    def predict_string(self, line: torch.Tensor, lens: torch.Tensor = None) -> List[str]:
+    def predict_string(self, line: torch.Tensor, lens: Optional[torch.Tensor] = None) -> List[str]:
         """
         Performs a forward pass on a torch tensor of a line with shape (N, C, H, W)
         and returns a string of the results.
+
+        Args:
+            line: NCHW line tensor
+            lens: Optional tensor
         """
         o, olens = self.forward(line, lens)
         dec_strs = []
@@ -153,9 +175,11 @@ def load_any(fname: str, train: bool = False, device: str = 'cpu') -> TorchSeqRe
 
     Currently it recognizes the following kinds of models:
 
-        * pyrnn models containing BIDILSTMs
-        * protobuf models containing converted python BIDILSTMs
-        * protobuf models containing CLSTM networks
+        * protobuf models containing converted python BIDILSTMs (recognition
+          only)
+        * protobuf models containing CLSTM networks (recognition only)
+        * protobuf models containing VGSL segmentation and recognitino
+          networks.
 
     Additionally an attribute 'kind' will be added to the SeqRecognizer
     containing a string representation of the source kind. Current known values
@@ -163,14 +187,18 @@ def load_any(fname: str, train: bool = False, device: str = 'cpu') -> TorchSeqRe
 
         * pyrnn for pickled BIDILSTMs
         * clstm for protobuf models generated by clstm
+        * vgsl for VGSL models
 
     Args:
-        fname (str): Path to the model
-        train (bool): Enables gradient calculation and dropout layers in model.
-        device (str): Target device
+        fname: Path to the model
+        train: Enables gradient calculation and dropout layers in model.
+        device: Target device
 
     Returns:
         A kraken.lib.models.TorchSeqRecognizer object.
+
+    Raises:
+        KrakenInvalidModelException: if the model is not loadable by any parser.
     """
     nn = None
     kind = ''

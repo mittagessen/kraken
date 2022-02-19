@@ -15,3 +15,10 @@ CoreML
 Core ML allows arbitrary network architectures in a compact serialization with
 metadata. This is the default format in pytorch-based kraken.
 
+Segmentation Models
+-------------------
+
+Recognition Models
+------------------
+
+

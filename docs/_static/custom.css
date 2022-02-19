@@ -1,0 +1,10 @@
+pre {
+    white-space: pre-wrap;
+}
+svg {
+    width: 100%;
+}
+.highlight .err {
+    border: inherit;
+    box-sizing: inherit;
+}

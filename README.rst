@@ -122,6 +122,17 @@ Documentation
 
 Have a look at the `docs <http://kraken.re>`_
 
+Related Software
+================
+
+These days kraken is quite closely linked to the `escriptorium
+<https://escriptorium.fr>`_ project developed in the same eScripta research
+group. eScriptorium provides a user-friendly interface for annotating data,
+training models, and inference (but also much more). There is a `gitter channel
+<https://gitter.im/escripta/escriptorium>`_ that is mostly intended for
+coordinating technical development but is also a spot to find people with
+experience on applying kraken on a wide variety of material.
+
 Funding
 =======
 

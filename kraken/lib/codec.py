@@ -14,7 +14,7 @@
 # permissions and limitations under the License.
 
 """
-pytorch compatible codec with many-to-many mapping between labels and
+Pytorch compatible codec with many-to-many mapping between labels and
 graphemes.
 """
 import logging
@@ -32,28 +32,30 @@ logger = logging.getLogger(__name__)
 
 class PytorchCodec(object):
     """
-    Translates between labels and graphemes.
+    Builds a codec converting between graphemes/code points and integer
+    label sequences.
+
+    charset may either be a string, a list or a dict. In the first case
+    each code point will be assigned a label, in the second case each
+    string in the list will be assigned a label, and in the final case each
+    key string will be mapped to the value sequence of integers. In the
+    first two cases labels will be assigned automatically. When a mapping
+    is manually provided the label codes need to be a prefix-free code.
+
+    As 0 is the blank label in a CTC output layer, output labels and input
+    dictionaries are/should be 1-indexed.
+
+    Args:
+        charset: Input character set.
+        strict: Flag indicating if encoding/decoding errors should be ignored
+                or cause an exception.
+
+    Raises:
+        KrakenCodecException: If the character set contains duplicate
+                              entries or the mapping is non-singular or
+                              non-prefix-free.
     """
-    def __init__(self, charset: Union[Dict[str, Sequence[int]], Sequence[str], str], strict=False) -> None:
-        """
-        Builds a codec converting between graphemes/code points and integer
-        label sequences.
-
-        charset may either be a string, a list or a dict. In the first case
-        each code point will be assigned a label, in the second case each
-        string in the list will be assigned a label, and in the final case each
-        key string will be mapped to the value sequence of integers. In the
-        first two cases labels will be assigned automatically. When a mapping
-        is manually provided the label codes need to be a prefix-free code.
-
-        As 0 is the blank label in a CTC output layer, output labels and input
-        dictionaries are/should be 1-indexed.
-
-        Args:
-            charset: Input character set.
-            strict: Flag indicating if encoding/decoding errors should be
-                    ignored.
-        """
+    def __init__(self, charset: Union[Dict[str, Sequence[int]], Sequence[str], str], strict=False):
         if isinstance(charset, dict):
             self.c2l = charset
         else:
@@ -104,13 +106,14 @@ class PytorchCodec(object):
         If the code is non-singular we greedily encode the longest sequence first.
 
         Args:
-            s (str): Input unicode string
+            s: Input unicode string
 
         Returns:
-            (torch.IntTensor) encoded label sequence
+            Ecoded label sequence
 
         Raises:
-
+            KrakenEncodeException: if the a subsequence is not encodable and the
+                                   codec is set to strict mode.
         """
         labels = []  # type: List[int]
         idx = 0
@@ -140,11 +143,11 @@ class PytorchCodec(object):
         cuts are min/max, confidences are averaged.
 
         Args:
-            labels (list): Input containing tuples (label, start, end,
+            labels: Input containing tuples (label, start, end,
                            confidence).
 
         Returns:
-            list: A list of tuples (code point, start, end, confidence)
+            A list of tuples (code point, start, end, confidence)
         """
         start = [x for _, x, _, _ in labels]
         end = [x for _, _, x, _ in labels]
@@ -183,7 +186,7 @@ class PytorchCodec(object):
         added as separate labels.
 
         Args:
-            codec (kraken.lib.codec.PytorchCodec):
+            codec: PytorchCodec to merge with
 
         Returns:
             A merged codec and a list of labels that were removed from the
@@ -229,7 +232,7 @@ class PytorchCodec(object):
         dictionaries are/should be 1-indexed.
 
         Args:
-            charset (unicode, list, dict): Input character set.
+            charset: Input character set.
         """
         if isinstance(charset, dict):
             c2l = self.c2l.copy()

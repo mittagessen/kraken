@@ -262,3 +262,37 @@ for each character in the ``x_conf`` attribute.
 
 Paragraph detection has been removed as it was deemed to be unduly dependent on
 certain typographic features which may not be valid for your input.
+
+Codecs
+^^^^^^
+.. _codecs:
+
+Codecs map between the label decoded from the raw network output and Unicode
+code points (see :ref:`this <recognition_steps>` diagram for the precise steps
+involved in text line recognition). Codecs are attached to a recognition model
+and are usually defined once at initial training time, although they can be
+adapted either explicitly (with the API) or implicitly through domain adaptation.
+
+The default behavior of kraken is to auto-infer this mapping from all the
+characters in the training set and map each code point to one separate label.
+This is usually sufficient for alphabetic scripts, abjads, and abugidas apart
+from very specialised use cases.  Logographic writing systems with a very large
+number of different graphemes, such as all the variants of Han characters or
+Cuneiform, can be more problematic as their large inventory makes recognition
+both slow and error-prone. In such cases it can be advantageous to decompose
+each code point into multiple labels to reduce the output dimensionality of the
+network. During decoding valid sequences of labels will be mapped to their
+respective code points as usual.
+
+There are multiple approaches one could follow constructing a custom codec:
+*randomized block codes*, i.e. producing random fixed-length labels for each code
+point, *Huffmann coding*, i.e. variable length label sequences depending on the
+frequency of each code point in some text (not necessarily the training set),
+or *structural decomposition*, i.e. describing each code point through a
+sequence of labels that describe the shape of the grapheme similar to how some
+input systems for Chinese characters function.
+
+While the system is functional it is not well-tested in practice and it is
+unclear which approach works best for which kinds of inputs.
+
+

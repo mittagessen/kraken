@@ -14,11 +14,13 @@
 # permissions and limitations under the License.
 """
 kraken.blla
-~~~~~~~~~~~~~~
+~~~~~~~~~~~
 
-Trainable baseline layout analysis tools for kraken
+Trainable layout analysis tools for kraken for line and region detection. The
+line recognizer uses the baseline paradigm.
 """
 
+import PIL
 import torch
 import logging
 import numpy as np
@@ -27,7 +29,7 @@ import shapely.geometry as geom
 import torch.nn.functional as F
 import torchvision.transforms as tf
 
-from typing import Optional, Dict, Callable, Union, List
+from typing import Optional, Dict, Callable, Union, List, Any, Tuple
 
 from scipy.ndimage.filters import gaussian_filter
 from skimage.filters import sobel
@@ -46,12 +48,28 @@ __all__ = ['segment']
 logger = logging.getLogger(__name__)
 
 
-def compute_segmentation_map(im,
+def compute_segmentation_map(im: PIL.Image.Image,
                              mask: Optional[np.ndarray] = None,
-                             model=None,
-                             device: str = 'cpu'):
+                             model: vgsl.TorchVGSLModel = None,
+                             device: str = 'cpu') -> Dict[str, Any]:
     """
+    Args:
+        im: Input image
+        mask: A bi-level mask array of the same size as `im` where 0-valued
+              regions are ignored for segmentation purposes. Disables column
+              detection.
+        model: A TorchVGSLModel containing a segmentation model.
+        device: The target device to run the neural network on.
 
+    Returns:
+        A dictionary containing the heatmaps ('heatmap', torch.Tensor), class
+        map ('cls_map', Dict[str, Dict[str, int]]), the bounding regions for
+        polygonization purposes ('bounding_regions', List[str]), the scale
+        between the input image and the network output ('scale', float), and
+        the scaled input image to the network ('scal_im', PIL.Image.Image).
+
+    Raises:
+        KrakenInputException: When given an invalid mask.
     """
     im_str = get_im_str(im)
     logger.info(f'Segmenting {im_str}')
@@ -97,10 +115,20 @@ def compute_segmentation_map(im,
             'scal_im': scal_im}
 
 
-def vec_regions(heatmap: torch.Tensor, cls_map: Dict, scale: float, **kwargs):
+def vec_regions(heatmap: torch.Tensor, cls_map: Dict, scale: float, **kwargs) -> Dict[str, List[List[Tuple[int, int]]]]:
     """
     Computes regions from a stack of heatmaps, a class mapping, and scaling
     factor.
+
+    Args:
+        heatmap: A stack of heatmaps of shape `NxHxW` output from the network.
+        cls_map: Dictionary mapping string identifiers to indices on the stack
+                 of heatmaps.
+        scale: Scaling factor between heatmap and unscaled input image.
+
+    Returns:
+        A dictionary containing a key for each region type with a list of
+        regions inside.
     """
     logger.info('Vectorizing regions')
     regions = {}
@@ -113,18 +141,48 @@ def vec_regions(heatmap: torch.Tensor, cls_map: Dict, scale: float, **kwargs):
 
 
 def vec_lines(heatmap: torch.Tensor,
-              cls_map: Dict,
+              cls_map: Dict[str, Dict[str, int]],
               scale: float,
               text_direction: str = 'horizontal-lr',
               reading_order_fn: Callable = polygonal_reading_order,
-              regions: List = None,
+              regions: List[np.ndarray] = None,
               scal_im: np.ndarray = None,
-              suppl_obj: List = None,
-              topline: bool = False,
-              **kwargs):
-    """
+              suppl_obj: List[np.ndarray] = None,
+              topline: Optional[bool] = False,
+              **kwargs) -> List[Dict[str, Any]]:
+    r"""
     Computes lines from a stack of heatmaps, a class mapping, and scaling
     factor.
+
+    Args:
+        heatmap: A stack of heatmaps of shape `NxHxW` output from the network.
+        cls_map: Dictionary mapping string identifiers to indices on the stack
+                 of heatmaps.
+        scale: Scaling factor between heatmap and unscaled input image.
+        text_direction: Text directions used as hints in the reading order
+                        algorithm.
+        reading_order_fn: Reading order calculation function.
+        regions: Regions to be used as boundaries during polygonization and
+                 atomic blocks during reading order determination for lines
+                 contained within.
+        scal_im: A numpy array containing the scaled input image.
+        suppl_obj: Supplementary objects which are used as boundaries during
+                   polygonization.
+        topline: True for a topline, False for baseline, or None for a
+                 centerline.
+
+    Returns:
+        A list of dictionaries containing the baselines, bounding polygons, and
+        line type in reading order:
+
+        .. code-block::
+           :force:
+
+            [{'script': '$baseline_type', baseline': [[x0, y0], [x1, y1], ..., [x_n, y_n]], 'boundary': [[x0, y0, x1, y1], ... [x_m, y_m]]},
+             {'script': '$baseline_type', baseline': [[x0, ...]], 'boundary': [[x0, ...]]},
+             {'script': '$baseline_type', baseline': [[x0, ...]], 'boundary': [[x0, ...]]},
+             ...
+            ]
     """
     st_sep = cls_map['aux']['_start_separator']
     end_sep = cls_map['aux']['_end_separator']
@@ -161,55 +219,59 @@ def vec_lines(heatmap: torch.Tensor,
     return [{'tags': {'type': bl_type}, 'baseline': bl, 'boundary': pl} for bl_type, bl, pl in lines]
 
 
-def segment(im,
+def segment(im: PIL.Image.Image,
             text_direction: str = 'horizontal-lr',
             mask: Optional[np.ndarray] = None,
             reading_order_fn: Callable = polygonal_reading_order,
             model: Union[List[vgsl.TorchVGSLModel], vgsl.TorchVGSLModel] = None,
-            device: str = 'cpu'):
-    """
+            device: str = 'cpu') -> Dict[str, Any]:
+    r"""
     Segments a page into text lines using the baseline segmenter.
 
     Segments a page into text lines and returns the polyline formed by each
     baseline and their estimated environment.
 
     Args:
-        im (PIL.Image): An RGB image.
-        text_direction (str): Ignored by the segmenter but kept for
-                              serialization.
-        mask (PIL.Image): A bi-level mask image of the same size as `im` where
-                          0-valued regions are ignored for segmentation
-                          purposes. Disables column detection.
-        reading_order_fn (function): Function to determine the reading order.
-                                     Has to accept a list of tuples (baselines,
-                                     polygon) and a text direction (`lr` or
-                                     `rl`).
-        model (vgsl.TorchVGSLModel or list): One or more TorchVGSLModel
-                                             containing a segmentation model.
-                                             If none is given a default model
-                                             will be loaded.
-        device (str or torch.Device): The target device to run the neural
-                                      network on.
+        im: Input image. The mode can generally be anything but it is possible
+            to supply a binarized-input-only model which requires accordingly
+            treated images.
+        text_direction: Passed-through value for serialization.serialize.
+        mask: A bi-level mask image of the same size as `im` where 0-valued
+              regions are ignored for segmentation purposes. Disables column
+              detection.
+        reading_order_fn: Function to determine the reading order.  Has to
+                          accept a list of tuples (baselines, polygon) and a
+                          text direction (`lr` or `rl`).
+        model: One or more TorchVGSLModel containing a segmentation model. If
+               none is given a default model will be loaded.
+        device: The target device to run the neural network on.
 
     Returns:
-        {'text_direction': '$dir',
-         'type': 'baseline',
-         'lines': [
-            {'baseline': [[x0, y0], [x1, y1], ..., [x_n, y_n]], 'boundary': [[x0, y0, x1, y1], ... [x_m, y_m]]},
-            {'baseline': [[x0, ...]], 'boundary': [[x0, ...]]}
-          ]
-          'regions': [
-            {'region': [[x0, y0], [x1, y1], ..., [x_n, y_n]], 'type': 'image'},
-            {'region': [[x0, ...]], 'type': 'text'}
-          ]
-        }: A dictionary containing the text direction and under the key 'lines'
-        a list of reading order sorted baselines (polylines) and their
-        respective polygonal boundaries. The last and first point of each
-        boundary polygon is connected.
+        A dictionary containing the text direction and under the key 'lines' a
+        list of reading order sorted baselines (polylines) and their respective
+        polygonal boundaries. The last and first point of each boundary polygon
+        are connected.
+
+        .. code-block::
+           :force:
+
+            {'text_direction': '$dir',
+             'type': 'baseline',
+             'lines': [
+                {'baseline': [[x0, y0], [x1, y1], ..., [x_n, y_n]], 'boundary': [[x0, y0, x1, y1], ... [x_m, y_m]]},
+                {'baseline': [[x0, ...]], 'boundary': [[x0, ...]]}
+              ]
+              'regions': [
+                {'region': [[x0, y0], [x1, y1], ..., [x_n, y_n]], 'type': 'image'},
+                {'region': [[x0, ...]], 'type': 'text'}
+              ]
+            }
 
     Raises:
-        KrakenInputException if the input image is not binarized or the text
-        direction is invalid.
+        KrakenInvalidModelException: if the given model is not a valid
+                                     segmentation model.
+        KrakenInputException: if the mask is not bitonal or does not match the
+                              image size.
     """
     if model is None:
         logger.info('No segmentation model given. Loading default model.')

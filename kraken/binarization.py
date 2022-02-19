@@ -47,21 +47,21 @@ def nlbin(im: Image.Image,
     Performs binarization using non-linear processing.
 
     Args:
-        im (PIL.Image.Image):
-        threshold (float):
-        zoom (float): Zoom for background page estimation
-        escale (float): Scale for estimating a mask over the text region
-        border (float): Ignore this much of the border
-        perc (int): Percentage for filters
-        range (int): Range for filters
-        low (int): Percentile for black estimation
-        high (int): Percentile for white estimation
+        im: Input image
+        threshold:
+        zoom: Zoom for background page estimation
+        escale: Scale for estimating a mask over the text region
+        border: Ignore this much of the border
+        perc: Percentage for filters
+        range: Range for filters
+        low: Percentile for black estimation
+        high: Percentile for white estimation
 
     Returns:
         PIL.Image.Image containing the binarized image
 
     Raises:
-        KrakenInputException when trying to binarize an empty image.
+        KrakenInputException: When trying to binarize an empty image.
     """
     im_str = get_im_str(im)
     logger.info(f'Binarizing {im_str}')

@@ -354,7 +354,7 @@ def vectorize_regions(im: np.ndarray, threshold: float = 0.5):
         boundaries = [boundaries.boundary]
     else:
         boundaries = [x.boundary for x in unary_union(boundaries)]
-    return [np.array(x, dtype=np.uint)[:, [1, 0]].tolist() for x in boundaries]
+    return [np.array(x.coords, dtype=np.uint)[:, [1, 0]].tolist() for x in boundaries]
 
 
 def _rotate(image, angle, center, scale, cval=0):
@@ -576,7 +576,7 @@ def _calc_roi(line, bounds, baselines, suppl_obj, p_dir):
     def _find_closest_point(pt, intersects):
         spt = geom.Point(pt)
         if intersects.type == 'MultiPoint':
-            return min([p for p in intersects], key=lambda x: spt.distance(x))
+            return min([p for p in intersects.geoms], key=lambda x: spt.distance(x))
         elif intersects.type == 'Point':
             return intersects
         elif intersects.type == 'GeometryCollection' and len(intersects) > 0:
@@ -771,10 +771,10 @@ def is_in_region(line, region) -> bool:
 
     Args:
         line (geom.LineString): line to test
-        region (geom.Polygon):
+        region (geom.Polygon): region to test against
 
     Returns:
-        False if line is not inside region, True otherwise
+        False if line is not inside region, True otherwise.
     """
     l_obj = line.interpolate(0.5, normalized=True)
     return region.contains(l_obj)
@@ -835,7 +835,10 @@ def _test_intersect(bp, uv, bs):
     return np.array(points)
 
 
-def compute_polygon_section(baseline, boundary, dist1, dist2):
+def compute_polygon_section(baseline: Sequence[Tuple[int, int]],
+                            boundary: Sequence[Tuple[int, int]],
+                            dist1: int,
+                            dist2: int) -> List[Tuple[int, int]]:
     """
     Given a baseline, polygonal boundary, and two points on the baseline return
     the rectangle formed by the orthogonal cuts on that baseline segment. The

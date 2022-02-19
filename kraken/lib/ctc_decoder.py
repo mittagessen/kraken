@@ -14,6 +14,13 @@
 # permissions and limitations under the License.
 """
 Decoders for softmax outputs of CTC trained networks.
+
+Decoders extract label sequences out of the raw output matrix of the line
+recognition network. There are multiple different approaches implemented here,
+from a simple greedy decoder, to the legacy ocropy thresholding decoder, and a
+more complex beam search decoder.
+
+Extracted label sequences are converted into the code point domain using kraken.lib.codec.PytorchCodec.
 """
 
 import collections
@@ -38,7 +45,8 @@ def beam_decoder(outputs: np.ndarray, beam_size: int = 3) -> List[Tuple[int, int
     arXiv:1408.2873 (2014).
 
     Args:
-        output (numpy.array): (C, W) shaped softmax output tensor
+        output: (C, W) shaped softmax output tensor
+        beam_size: Size of the beam
 
     Returns:
         A list with tuples (class, start, end, prob). max is the maximum value
@@ -101,7 +109,7 @@ def greedy_decoder(outputs: np.ndarray) -> List[Tuple[int, int, int, float]]:
     the 23rd international conference on Machine learning. ACM, 2006.
 
     Args:
-        output (numpy.array): (C, W) shaped softmax output tensor
+        output: (C, W) shaped softmax output tensor
 
     Returns:
         A list with tuples (class, start, end, max). max is the maximum value
@@ -127,9 +135,9 @@ def blank_threshold_decoder(outputs: np.ndarray, threshold: float = 0.5) -> List
     region.
 
     Args:
-        output (numpy.array): (C, W) shaped softmax output tensor
-        threshold (float): Threshold for 0 class when determining possible
-                           label locations.
+        output: (C, W) shaped softmax output tensor
+        threshold: Threshold for 0 class when determining possible label
+                   locations.
 
     Returns:
         A list with tuples (class, start, end, max). max is the maximum value

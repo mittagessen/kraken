@@ -3,7 +3,7 @@ API Quickstart
 
 Kraken provides routines which are usable by third party tools to access all
 functionality of the OCR engine. Most functional blocks, binarization,
-segmentation, recognition, and serialization  are encapsulated in one high
+segmentation, recognition, and serialization are encapsulated in one high
 level method each. 
 
 Simple use cases of the API which are mostly useful for debugging purposes are
@@ -127,8 +127,30 @@ modest though.
 Recognition
 -----------
 
-The character recognizer is equally based on a neural network which has to be
-loaded first. 
+Recognition itself is a multi-step process with a neural network producing a
+matrix with a confidence value for possible outputs at each time step. This
+matrix is decoded into a sequence of integer labels (*label domain*) which are
+subsequently mapped into Unicode code points using a codec. Labels and code
+points usually correspond one-to-one, i.e. each label is mapped to exactly one
+Unicode code point, but if desired more complex codecs can map single labels to
+multiple code points, multiple labels to single code points, or multiple labels
+to multiple code points (see the :ref:`Codec <codecs>` section for further
+information).
+
+.. _recognition_steps:
+
+.. raw:: html
+    :file: _static/kraken_recognition.svg
+
+As the customization of this two-stage decoding process is usually reserved
+for specialized use cases, sensible defaults are chosen by default: codecs are
+part of the model file and do not have to be supplied manually; the preferred
+CTC decoder is an optional parameter of the recognition model object.
+
+To perform text line recognition a neural network has to be loaded first. A
+:class:`kraken.lib.models.TorchSeqRecognizer` is returned which is a wrapper
+around the :class:`kraken.lib.vgsl.TorchVGSLModel` class seen above for
+segmentation model loading.
 
 .. code-block:: python
 
@@ -140,8 +162,8 @@ loaded first.
 Afterwards, given an image, a segmentation and the model one can perform text
 recognition. The code is identical for both legacy and baseline segmentations.
 Like for segmentation input images are auto-converted to the correct color
-mode, except in the case of binary models and a warning will be raised if there
-is a mismatch for binary input models.
+mode, except in the case of binary models for which a warning will be raised if
+there is a mismatch for binary input models.
 
 There are two methods for recognition, a basic single model call
 :func:`kraken.rpred.rpred` and a multi-model recognizer
@@ -157,8 +179,9 @@ a document.
         >>> for record in pred_it:
                 print(record)
 
-The output isn't just a sequence of characters but a record object containing
-the character prediction, cuts (approximate locations), and confidences.
+The output isn't just a sequence of characters but an
+:class:`kraken.rpred.ocr_record` record object containing the character
+prediction, cuts (approximate locations), and confidences.
 
 .. code-block:: python
 
@@ -184,11 +207,12 @@ it is also possible to access the original line information:
         >>> record.script
 
 Sometimes the undecoded raw output of the network is required. The :math:`C
-\times W` softmax output matrix is accessible as an attribute on the
-:class:`kraken.lib.models.TorchSeqRecognizer` after each step of the :func:`kraken.rpred.rpred` iterator. To get a mapping
-from the label space :math:`C` the network operates in to Unicode code points a
-codec is used. An arbitrary sequence of labels can generate an arbitrary number
-of Unicode code points although usually the relation is one-to-one.
+\times W` softmax output matrix is accessible as the `outputs` attribute on the
+:class:`kraken.lib.models.TorchSeqRecognizer` after each step of the
+:func:`kraken.rpred.rpred` iterator. To get a mapping from the label space
+:math:`C` the network operates in to Unicode code points a codec is used. An
+arbitrary sequence of labels can generate an arbitrary number of Unicode code
+points although usually the relation is one-to-one.
 
 .. code-block:: python
 

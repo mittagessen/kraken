@@ -85,7 +85,6 @@ Again PDF/multi-page TIFF/JPEG2000 support requires some additional dependencies
 
 The git repository contains some environment files that aid in setting up the latest development version:
 
-
 .. code-block:: console
 
   $ git clone git://github.com/mittagessen/kraken.git 
@@ -140,8 +139,19 @@ Model metadata can be extracted using:
 Quickstart
 ==========
 
+The structure of an OCR software consists of multiple steps, primarily
+preprocessing, segmentation, and recognition, each of which takes the output of
+the previous step and sometimes additional files such as models and templates
+that define how a particular transformation is to be performed.
+
+In kraken these are separated into different subcommands that can be chained or
+ran separately:
+
+.. raw:: html
+    :file: _static/kraken_workflow.svg
+
 Recognizing text on an image using the default parameters including the
-prerequisite steps of binarization and page segmentation:
+prerequisite step of page segmentation:
 
 .. code-block:: console
 
@@ -149,23 +159,24 @@ prerequisite steps of binarization and page segmentation:
   Loading RNN     ✓
   Processing      ⣻
 
-To binarize a single image using the nlbin algorithm (usually not required with the baseline segmenter):
-
-.. code-block:: console
-
-  $ kraken -i image.tif bw.tif binarize
-
-To segment a binarized image into reading-order sorted baselines and regions:
+To segment an image into reading-order sorted baselines and regions:
 
 .. code-block:: console
 
   $ kraken -i bw.tif lines.json segment -bl
 
-To OCR an image using the default RNN:
+To OCR an image using the default model:
 
 .. code-block:: console
 
   $ kraken -i bw.tif image.txt segment -bl ocr
+
+To OCR an image using the default model and serialize the output using the ALTO
+template:
+
+.. code-block:: console
+
+  $ kraken -a -i bw.tif image.txt segment -bl ocr
 
 All commands and their parameters are documented, just add the standard
 ``--help`` flag for further information.
@@ -174,6 +185,17 @@ Training Tutorial
 =================
 
 There is a training tutorial at :doc:`training`.
+
+Related Software
+================
+
+These days kraken is quite closely linked to the `escriptorium
+<https://escriptorium.fr>`_ project developed in the same eScripta research
+group. eScriptorium provides a user-friendly interface for annotating data,
+training models, and inference (but also much more). There is a `gitter channel
+<https://gitter.im/escripta/escriptorium>`_ that is mostly intended for
+coordinating technical development but is also a spot to find people with
+experience on applying kraken on a wide variety of material.
 
 .. _license:
 
@@ -194,4 +216,3 @@ Innovation.
 
 .. image:: https://ec.europa.eu/regional_policy/sources/information/logos_downloadcenter/eu_funded_en.jpg
   :alt: Co-financed by the European Union
-
