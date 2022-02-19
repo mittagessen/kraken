@@ -26,36 +26,35 @@ logger = logging.getLogger(__name__)
 
 class TorchSeqRecognizer(object):
     """
-    A class wrapping a TorchVGSLModel with a more comfortable recognition interface.
-    """
-    def __init__(self, nn, decoder=kraken.lib.ctc_decoder.greedy_decoder, train: Optional[bool] = False, device: Optional[str] = 'cpu') -> None:
-    """
-    Constructs a sequence recognizer from a VGSL model and a decoder.
-
-    Args:
-        nn: Neural network used for recognition.
-        decoder: Decoder function used for mapping softmax activations to
-                 labels and positions.
-        train: Enables or disables gradient calculation and dropout.
-        device: Device to run model on.
-
-    Attributes:
-        nn: Neural network used for recognition.
-        codec: PytorchCodec extracted from the recognition model.
-
-        decoder: Decoder function used for mapping softmax activations to
-                 labels and positions.
-        train: Enables or disables gradient calculation and dropout.
-        device: Device to run model on.
-        one_channel_mode: flag indicating if the model expects binary or
-                          grayscale input images.
-        seg_type: flag indicating if the model expects baseline- or bounding
-                  box-derived text line images.
-
-    Raises:
-        ValueError: Is raised when the model type is not a sequence recognizer.
+    A wrapper class around a TorchVGSLModel for text recognition.
     """
     def __init__(self, nn: TorchVGSLModel, decoder=kraken.lib.ctc_decoder.greedy_decoder, train: bool = False, device: str = 'cpu'):
+        """
+        Constructs a sequence recognizer from a VGSL model and a decoder.
+
+        Args:
+            nn: Neural network used for recognition.
+            decoder: Decoder function used for mapping softmax activations to
+                     labels and positions.
+            train: Enables or disables gradient calculation and dropout.
+            device: Device to run model on.
+
+        Attributes:
+            nn: Neural network used for recognition.
+            codec: PytorchCodec extracted from the recognition model.
+
+            decoder: Decoder function used for mapping softmax activations to
+                     labels and positions.
+            train: Enables or disables gradient calculation and dropout.
+            device: Device to run model on.
+            one_channel_mode: flag indicating if the model expects binary or
+                              grayscale input images.
+            seg_type: flag indicating if the model expects baseline- or bounding
+                      box-derived text line images.
+
+        Raises:
+            ValueError: Is raised when the model type is not a sequence recognizer.
+        """
         self.nn = nn
         self.kind = ''
         if train is True:
