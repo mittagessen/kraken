@@ -382,6 +382,50 @@ Codecs
 
 .. _codecs:
 
+Codecs map between the label decoded from the raw network output and Unicode
+code points (see :ref:`this <recognition_steps>` diagram for the precise steps
+involved in text line recognition). Codecs are attached to a recognition model
+and are usually defined once at initial training time, although they can be
+adapted either explicitly (with the API) or implicitly through domain adaptation.
+
+The default behavior of kraken is to auto-infer this mapping from all the
+characters in the training set and map each code point to one separate label.
+This is usually sufficient for alphabetic scripts, abjads, and abugidas apart
+from very specialised use cases. Logographic writing systems with a very large
+number of different graphemes, such as all the variants of Han characters or
+Cuneiform, can be more problematic as their large inventory makes recognition
+both slow and error-prone. In such cases it can be advantageous to decompose
+each code point into multiple labels to reduce the output dimensionality of the
+network. During decoding valid sequences of labels will be mapped to their
+respective code points as usual.
+
+There are multiple approaches one could follow constructing a custom codec:
+*randomized block codes*, i.e. producing random fixed-length labels for each code
+point, *Huffmann coding*, i.e. variable length label sequences depending on the
+frequency of each code point in some text (not necessarily the training set),
+or *structural decomposition*, i.e. describing each code point through a
+sequence of labels that describe the shape of the grapheme similar to how some
+input systems for Chinese characters function.
+
+While the system is functional it is not well-tested in practice and it is
+unclear which approach works best for which kinds of inputs.
+
+Custom codecs can be supplied as simple JSON files that contain a dictionary
+mapping between strings and integer sequences, e.g.:
+
+.. code-block:: console
+
+   $ ketos train -c sample.codec -f xml training_data/*.xml
+
+with `sample.codec` containing:
+
+.. code-block:: json
+
+   {"S": [50, 53, 74, 23],
+    "A": [95, 60, 19, 95],
+    "B": [2, 96, 28, 29],
+    ...
+    "\u1f05": [91, 14, 95, 90]}
 
 Segmentation training
 ---------------------
