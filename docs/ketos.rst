@@ -424,7 +424,6 @@ with `sample.codec` containing:
    {"S": [50, 53, 74, 23],
     "A": [95, 60, 19, 95],
     "B": [2, 96, 28, 29],
-    ...
     "\u1f05": [91, 14, 95, 90]}
 
 Segmentation training

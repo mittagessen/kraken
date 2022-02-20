@@ -85,7 +85,14 @@ it has to be loaded first:
 
         >>> model_path = 'path/to/model/file'
         >>> model = vgsl.TorchVGSLModel.load_model(model_path)
-               
+
+A segmentation model contains a basic neural network and associated metadata
+defining the available line and region types, bounding regions, and an
+auxiliary baseline location flag for the polygonizer:
+
+.. raw:: html
+    :file: _static/kraken_segmodel.svg
+
 Afterwards they can be fed into the segmentation method
 :func:`kraken.blla.segment` with image objects:
 
@@ -124,6 +131,22 @@ can be run on a GPU with the `device` argument. As the vast majority of the
 processing required is postprocessing the performance gain will most likely
 modest though.
 
+The above API is the most simple way to perform a complete segmentation. The
+process consists of multiple steps such as pixel labelling, separate region and
+baseline vectorization, and bounding polygon calculation:
+
+.. raw:: html
+    :file: _static/kraken_segmentation.svg
+
+It is possible to only run a subset of the functionality depending on one's
+needs by calling the respective functions in :mod:`kraken.lib.segmentation`. As
+part of the sub-library the API is not guaranteed to be stable but it generally
+does not change much. Examples of more fine-grained use of the segmentation API
+can be found in `contrib/repolygonize.py
+<https://github.com/mittagessen/kraken/blob/master/kraken/contrib/repolygonize.py>`_
+and `contrib/segmentation_overlay.py
+<https://github.com/mittagessen/kraken/blob/master/kraken/contrib/segmentation_overlay.py>`_.
+
 Recognition
 -----------
 
@@ -158,7 +181,15 @@ segmentation model loading.
 
         >>> rec_model_path = '/path/to/recognition/model'
         >>> model = models.load_any(rec_model_path)
-        
+
+The sequence recognizer wrapper combines the neural network itself, a
+:ref:`codec <codecs>`, metadata such as the if the input is supposed to be
+grayscale or binarized, and an instance of a CTC decoder that performs the
+conversion of the raw output tensor of the network into a sequence of labels:
+
+.. raw:: html
+    :file: _static/kraken_torchseqrecognizer.svg
+
 Afterwards, given an image, a segmentation and the model one can perform text
 recognition. The code is identical for both legacy and baseline segmentations.
 Like for segmentation input images are auto-converted to the correct color
