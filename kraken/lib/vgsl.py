@@ -73,7 +73,7 @@ class TorchVGSLModel(object):
         input (tuple): Expected input tensor as a 4-tuple.
         nn (torch.nn.Sequential): Stack of layers parsed from the spec.
         criterion (torch.nn.Module): Fully parametrized loss function.
-        user_metdata (dict): dict with user defined metadata. Is flushed into
+        user_metadata (dict): dict with user defined metadata. Is flushed into
                              model file during saving/overwritten by loading
                              operations.
         one_channel_mode (str): Field indicating the image type used during
