@@ -53,19 +53,6 @@ class LogFormatter(logging.Formatter):
             return msg
         return logging.Formatter.format(self, record)
 
-
-def progressbar(*args, **kwargs):
-    """
-    Slight extension to click's progressbar disabling output on when log level
-    is set below 30.
-    """
-    logger = logging.getLogger(__name__)
-    bar = click.progressbar(*args, **kwargs)
-    if logger.getEffectiveLevel() < 30:
-        bar.is_hidden = True  # type: ignore
-    return bar
-
-
 def set_logger(logger=None, level=logging.ERROR):
     handler = LogHandler()
     handler.setFormatter(LogFormatter())
