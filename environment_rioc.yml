@@ -29,5 +29,6 @@ dependencies:
   - pyarrow
   - pytorch-lightning
   - pip
+  - albumentations
   - pip:
     - git+https://github.com/mittagessen/kraken.git@master

@@ -34,6 +34,7 @@ requirements:
      - libffi # [osx]
      - pyarrow
      - conda-forge::pytorch-lightning
+     - albumentations
 about:
   home: http://kraken.re
   license: Apache License

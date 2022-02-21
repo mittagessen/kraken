@@ -26,5 +26,6 @@ dependencies:
   - pyarrow
   - conda-forge::pytorch-lightning
   - pip
+  - albumentations
   - pip:
     - file:.
