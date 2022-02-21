@@ -24,6 +24,7 @@ import logging
 import pkg_resources
 
 from typing import Dict, Union, List, cast, Any, IO, Callable
+from rich.progress import track, Progress
 from functools import partial
 from PIL import Image
 
@@ -236,9 +237,8 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore, input,
 
     preds = []
 
-    with log.progressbar(it, label='Processing') as bar:
-        for pred in bar:
-            preds.append(pred)
+    for pred in track(it, description='Processing'):
+        preds.append(pred)
 
     ctx = click.get_current_context()
     with click.open_file(output, 'w', encoding='utf-8') as fp:
@@ -349,7 +349,8 @@ def process_pipeline(subcommands, input, batch_input, suffix, verbose, format_ty
             if 'n-pages' in doc.get_fields():
                 num_pages += doc.get('n-pages')
 
-        with log.progressbar(length=num_pages, label='Extracting PDF pages') as bar:
+        with Progress() as progress:
+            pdf_parse_task = progress.add_task('Extracting PDF pages', total=num_pages)
             for (fpath, _) in input:
                 try:
                     doc = pyvips.Image.new_from_file(fpath, dpi=300, n=-1, access="sequential")
@@ -368,7 +369,7 @@ def process_pipeline(subcommands, input, batch_input, suffix, verbose, format_ty
                         logger.info(f'Saving temporary image {fpath}:{dest_dict["idx"]} to {filename}')
                         doc.write_to_file(filename)
                         new_input.append((filename, pdf_format.format(**dest_dict) + suffix))
-                        bar.update(1)
+                        progress.update(pdf_parse_task, advance=1)
                 except pyvips.error.Error:
                     logger.warning(f'{fpath} is not a PDF file. Skipping.')
         input = new_input
