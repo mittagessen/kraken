@@ -1,3 +1,4 @@
+# Copyright Benjamin Kiessling
 # Copyright The PyTorch Lightning team.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -11,65 +12,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import math
-from dataclasses import dataclass
 from typing import Any, Dict, Optional, Union
 
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks.progress.base import ProgressBarBase
 
 from rich.console import Console, RenderableType
-from rich.progress import BarColumn, Progress, ProgressColumn, Task, TaskID, TextColumn, TimeRemainingColumn, TimeElapsedColumn
+from rich.progress import BarColumn, Progress, ProgressColumn, Task, TextColumn, TimeRemainingColumn, TimeElapsedColumn
 from rich.text import Text
-
-
-@dataclass
-class CustomInfiniteTask(Task):
-    """Overrides ``Task`` to define an infinite task.
-
-    This is useful for datasets that do not define a size (infinite size) such as ``IterableDataset``.
-    """
-
-    @property
-    def time_remaining(self) -> Optional[float]:
-        return None
-
-
-class CustomProgress(Progress):
-    """Overrides ``Progress`` to support adding tasks that have an infinite total size."""
-
-    def add_task(
-        self,
-        description: str,
-        start: bool = True,
-        total: float = 100.0,
-        completed: int = 0,
-        visible: bool = True,
-        **fields: Any,
-    ) -> TaskID:
-        if not math.isfinite(total):
-            task = CustomInfiniteTask(
-                self._task_index,
-                description,
-                total,
-                completed,
-                visible=visible,
-                fields=fields,
-                _get_time=self.get_time,
-                _lock=self._lock,
-            )
-            return self.add_custom_task(task)
-        return super().add_task(description, start, total, completed, visible, **fields)
-
-    def add_custom_task(self, task: CustomInfiniteTask, start: bool = True):
-        with self._lock:
-            self._tasks[self._task_index] = task
-            if start:
-                self.start_task(self._task_index)
-            new_task_index = self._task_index
-            self._task_index = TaskID(int(self._task_index) + 1)
-        self.refresh()
-        return new_task_index
 
 
 class BatchesProcessedColumn(ProgressColumn):
@@ -149,43 +99,19 @@ class MetricsTextColumn(ProgressColumn):
 
 
 class KrakenTrainProgressBar(ProgressBarBase):
-    """Create a progress bar with `rich text formatting <https://github.com/willmcgugan/rich>`_.
-
-    Install it with pip:
-
-    .. code-block:: bash
-
-        pip install rich
-
-    .. code-block:: python
-
-        from pytorch_lightning import Trainer
-        from pytorch_lightning.callbacks import RichProgressBar
-
-        trainer = Trainer(callbacks=RichProgressBar())
+    """
+    Adaptation of the default ptl rich progress bar to fit with kraken output.
 
     Args:
         refresh_rate: Determines at which rate (in number of batches) the progress bars get updated.
             Set it to ``0`` to disable the display.
         leave: Leaves the finished progress bar in the terminal at the end of the epoch. Default: False
         console_kwargs: Args for constructing a `Console`
-
-    Raises:
-        ModuleNotFoundError:
-            If required `rich` package is not installed on the device.
-
-    Note:
-        PyCharm users will need to enable “emulate terminal” in output console option in
-        run/debug configuration to see styled output.
-        Reference: https://rich.readthedocs.io/en/latest/introduction.html#requirements
     """
-
-    def __init__(
-        self,
-        refresh_rate: int = 1,
-        leave: bool = True,
-        console_kwargs: Optional[Dict[str, Any]] = None,
-    ) -> None:
+    def __init__(self,
+                 refresh_rate: int = 1,
+                 leave: bool = True,
+                 console_kwargs: Optional[Dict[str, Any]] = None) -> None:
         super().__init__()
         self._refresh_rate: int = refresh_rate
         self._leave: bool = leave
@@ -240,12 +166,10 @@ class KrakenTrainProgressBar(ProgressBarBase):
                 self._early_stopping_component = EarlyStoppingColumn(trainer)
                 columns.append(self._early_stopping_component)
 
-            self.progress = CustomProgress(
-                *columns,
-                auto_refresh=False,
-                disable=self.is_disabled,
-                console=self._console,
-            )
+            self.progress = Progress(*columns,
+                                     auto_refresh=False,
+                                     disable=self.is_disabled,
+                                     console=self._console)
             self.progress.start()
             # progress has started
             self._progress_stopped = False

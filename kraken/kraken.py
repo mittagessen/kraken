@@ -25,6 +25,7 @@ import pkg_resources
 
 from typing import Dict, Union, List, cast, Any, IO, Callable
 from rich.progress import track, Progress
+from rich.traceback import install
 from functools import partial
 from PIL import Image
 
@@ -36,6 +37,9 @@ warnings.simplefilter('ignore', UserWarning)
 
 logging.captureWarnings(True)
 logger = logging.getLogger('kraken')
+
+# install rich traceback handler
+install(suppress=[click])
 
 APP_NAME = 'kraken'
 SEGMENTATION_DEFAULT_MODEL = pkg_resources.resource_filename(__name__, 'blla.mlmodel')

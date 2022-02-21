@@ -20,6 +20,8 @@ import logging
 import unicodedata
 
 from PIL import Image
+from rich.progress import track
+from rich.traceback import install
 from bidi.algorithm import get_display
 
 from typing import cast, Set, List, IO, Any, Dict
@@ -36,6 +38,9 @@ APP_NAME = 'kraken'
 
 logging.captureWarnings(True)
 logger = logging.getLogger('kraken')
+
+# install rich traceback handler
+install(suppress=[click])
 
 # raise default max image size to 20k * 20k pixels
 Image.MAX_IMAGE_PIXELS = 20000 ** 2
@@ -746,23 +751,22 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
                                pin_memory=True,
                                collate_fn=collate_sequences)
 
-        with log.progressbar(ds_loader, label='Evaluating') as bar:
-            for batch in bar:
-                im = batch['image']
-                text = batch['target']
-                lens = batch['seq_lens']
-                try:
-                    pred = net.predict_string(im, lens)
-                    for x, y in zip(pred, text):
-                        chars += len(y)
-                        c, algn1, algn2 = global_align(y, x)
-                        algn_gt.extend(algn1)
-                        algn_pred.extend(algn2)
-                        error += c
-                except FileNotFoundError as e:
-                    logger.warning('{} {}. Skipping.'.format(e.strerror, e.filename))
-                except KrakenInputException as e:
-                    logger.warning(str(e))
+        for batch in track(ds_loader, description="Evaluating"):
+            im = batch['image']
+            text = batch['target']
+            lens = batch['seq_lens']
+            try:
+                pred = net.predict_string(im, lens)
+                for x, y in zip(pred, text):
+                    chars += len(y)
+                    c, algn1, algn2 = global_align(y, x)
+                    algn_gt.extend(algn1)
+                    algn_pred.extend(algn2)
+                    error += c
+            except FileNotFoundError as e:
+                logger.warning('{} {}. Skipping.'.format(e.strerror, e.filename))
+            except KrakenInputException as e:
+                logger.warning(str(e))
         acc_list.append((chars - error) / chars)
         confusions, scripts, ins, dels, subs = compute_confusions(algn_gt, algn_pred)
         rep = render_report(p, chars, error, confusions, scripts, ins, dels, subs)
@@ -822,44 +826,44 @@ def extract(ctx, binarize, normalization, normalize_whitespace, reorder,
 
     idx = 0
     manifest = []
-    with log.progressbar(transcriptions, label='Reading transcriptions') as bar:
-        for fp in bar:
-            logger.info('Reading {}'.format(fp.name))
-            doc = html.parse(fp)
-            etree.strip_tags(doc, etree.Comment)
-            td = doc.find(".//meta[@itemprop='text_direction']")
-            if td is None:
-                td = 'horizontal-lr'
-            else:
-                td = td.attrib['content']
 
-            im = None
-            dest_dict = {'output': output, 'idx': 0, 'src': fp.name, 'uuid': str(uuid.uuid4())}
-            for section in doc.xpath('//section'):
-                img = section.xpath('.//img')[0].get('src')
-                fd = BytesIO(base64.b64decode(img.split(',')[1]))
-                im = Image.open(fd)
-                if not im:
-                    logger.info('Skipping {} because image not found'.format(fp.name))
-                    break
-                if binarize:
-                    im = binarization.nlbin(im)
-                for line in section.iter('li'):
-                    if line.get('contenteditable') and (not u''.join(line.itertext()).isspace() and u''.join(line.itertext())):
-                        dest_dict['idx'] = idx
-                        dest_dict['uuid'] = str(uuid.uuid4())
-                        logger.debug('Writing line {:06d}'.format(idx))
-                        l_img = im.crop([int(x) for x in line.get('data-bbox').split(',')])
-                        if rotate and td.startswith('vertical'):
-                            im.rotate(90, expand=True)
-                        l_img.save(('{output}/' + format + '.png').format(**dest_dict))
-                        manifest.append((format + '.png').format(**dest_dict))
-                        text = u''.join(line.itertext()).strip()
-                        for func in text_transforms:
-                            text = func(text)
-                        with open(('{output}/' + format + '.gt.txt').format(**dest_dict), 'wb') as t:
-                            t.write(text.encode('utf-8'))
-                        idx += 1
+    for fp in track(transcriptions, description='Reading transcriptions'):
+        logger.info('Reading {}'.format(fp.name))
+        doc = html.parse(fp)
+        etree.strip_tags(doc, etree.Comment)
+        td = doc.find(".//meta[@itemprop='text_direction']")
+        if td is None:
+            td = 'horizontal-lr'
+        else:
+            td = td.attrib['content']
+
+        im = None
+        dest_dict = {'output': output, 'idx': 0, 'src': fp.name, 'uuid': str(uuid.uuid4())}
+        for section in doc.xpath('//section'):
+            img = section.xpath('.//img')[0].get('src')
+            fd = BytesIO(base64.b64decode(img.split(',')[1]))
+            im = Image.open(fd)
+            if not im:
+                logger.info('Skipping {} because image not found'.format(fp.name))
+                break
+            if binarize:
+                im = binarization.nlbin(im)
+            for line in section.iter('li'):
+                if line.get('contenteditable') and (not u''.join(line.itertext()).isspace() and u''.join(line.itertext())):
+                    dest_dict['idx'] = idx
+                    dest_dict['uuid'] = str(uuid.uuid4())
+                    logger.debug('Writing line {:06d}'.format(idx))
+                    l_img = im.crop([int(x) for x in line.get('data-bbox').split(',')])
+                    if rotate and td.startswith('vertical'):
+                        im.rotate(90, expand=True)
+                    l_img.save(('{output}/' + format + '.png').format(**dest_dict))
+                    manifest.append((format + '.png').format(**dest_dict))
+                    text = u''.join(line.itertext()).strip()
+                    for func in text_transforms:
+                        text = func(text)
+                    with open(('{output}/' + format + '.gt.txt').format(**dest_dict), 'wb') as t:
+                        t.write(text.encode('utf-8'))
+                    idx += 1
     logger.info('Extracted {} lines'.format(idx))
     with open('{}/manifest.txt'.format(output), 'w') as fp:
         fp.write('\n'.join(manifest))
@@ -916,39 +920,38 @@ def transcription(ctx, text_direction, scale, bw, maxcolseps,
         prefill = models.load_any(prefill)
         message('\u2713', fg='green')
 
-    with log.progressbar(images, label='Reading images') as bar:
-        for fp in bar:
-            logger.info('Reading {}'.format(fp.name))
-            im = Image.open(fp)
-            if im.mode not in ['1', 'L', 'P', 'RGB']:
-                logger.warning('Input {} is in {} color mode. Converting to RGB'.format(fp.name, im.mode))
-                im = im.convert('RGB')
-            logger.info('Binarizing page')
-            im_bin = binarization.nlbin(im)
-            im_bin = im_bin.convert('1')
-            logger.info('Segmenting page')
-            if not lines:
-                res = pageseg.segment(im_bin, text_direction, scale, maxcolseps, black_colseps, pad=pad)
-            else:
-                with click.open_file(lines, 'r') as fp:
-                    try:
-                        fp = cast(IO[Any], fp)
-                        res = json.load(fp)
-                    except ValueError as e:
-                        raise click.UsageError('{} invalid segmentation: {}'.format(lines, str(e)))
-            if prefill:
-                it = rpred.rpred(prefill, im_bin, res.copy())
-                preds = []
-                logger.info('Recognizing')
-                for pred in it:
-                    logger.debug('{}'.format(pred.prediction))
-                    preds.append(pred)
-                ti.add_page(im, res, records=preds)
-            else:
-                ti.add_page(im, res)
-            fp.close()
+    for fp in track(images, description='Reading images'):
+        logger.info('Reading {}'.format(fp.name))
+        im = Image.open(fp)
+        if im.mode not in ['1', 'L', 'P', 'RGB']:
+            logger.warning('Input {} is in {} color mode. Converting to RGB'.format(fp.name, im.mode))
+            im = im.convert('RGB')
+        logger.info('Binarizing page')
+        im_bin = binarization.nlbin(im)
+        im_bin = im_bin.convert('1')
+        logger.info('Segmenting page')
+        if not lines:
+            res = pageseg.segment(im_bin, text_direction, scale, maxcolseps, black_colseps, pad=pad)
+        else:
+            with click.open_file(lines, 'r') as fp:
+                try:
+                    fp = cast(IO[Any], fp)
+                    res = json.load(fp)
+                except ValueError as e:
+                    raise click.UsageError('{} invalid segmentation: {}'.format(lines, str(e)))
+        if prefill:
+            it = rpred.rpred(prefill, im_bin, res.copy())
+            preds = []
+            logger.info('Recognizing')
+            for pred in it:
+                logger.debug('{}'.format(pred.prediction))
+                preds.append(pred)
+            ti.add_page(im, res, records=preds)
+        else:
+            ti.add_page(im, res)
+        fp.close()
     logger.info('Writing transcription to {}'.format(output.name))
-    message('Writing output', nl=False)
+    message('Writing output ', nl=False)
     ti.write(output)
     message('\u2713', fg='green')
 
@@ -1010,12 +1013,11 @@ def line_generator(ctx, font, maxlines, encoding, normalization, renormalize,
     lines: Set[str] = set()
     if not text:
         return
-    with log.progressbar(text, label='Reading texts') as bar:
-        for t in text:
-            with click.open_file(t, encoding=encoding) as fp:
-                logger.info('Reading {}'.format(t))
-                for line in fp:
-                    lines.add(line.rstrip('\r\n'))
+    for t in track(text, label='Reading texts'):
+        with click.open_file(t, encoding=encoding) as fp:
+            logger.info('Reading {}'.format(t))
+            for line in fp:
+                lines.add(line.rstrip('\r\n'))
     if normalization:
         lines = set([unicodedata.normalize(normalization, line) for line in lines])
     if strip:
@@ -1052,28 +1054,27 @@ def line_generator(ctx, font, maxlines, encoding, normalization, renormalize,
     if combining:
         message('Combining Characters: {}'.format(', '.join(combining)))
     lg = linegen.LineGenerator(font, font_size, font_weight, language)
-    with log.progressbar(lines, label='Writing images') as bar:
-        for idx, line in enumerate(bar):
-            logger.info(line)
-            try:
-                if renormalize:
-                    im = lg.render_line(unicodedata.normalize(renormalize, line))
-                else:
-                    im = lg.render_line(line)
-            except KrakenCairoSurfaceException as e:
-                logger.info('{}: {} {}'.format(e.message, e.width, e.height))
-                continue
-            if not disable_degradation and not legacy:
-                im = linegen.degrade_line(im, alpha=alpha, beta=beta)
-                im = linegen.distort_line(im, abs(np.random.normal(distort)), abs(np.random.normal(distortion_sigma)))
-            elif legacy:
-                im = linegen.ocropy_degrade(im)
-            im.save('{}/{:06d}.png'.format(output, idx))
-            with open('{}/{:06d}.gt.txt'.format(output, idx), 'wb') as fp:
-                if reorder:
-                    fp.write(get_display(line).encode('utf-8'))
-                else:
-                    fp.write(line.encode('utf-8'))
+    for idx, line in track(enumerate(lines), description='Writing images'):
+        logger.info(line)
+        try:
+            if renormalize:
+                im = lg.render_line(unicodedata.normalize(renormalize, line))
+            else:
+                im = lg.render_line(line)
+        except KrakenCairoSurfaceException as e:
+            logger.info('{}: {} {}'.format(e.message, e.width, e.height))
+            continue
+        if not disable_degradation and not legacy:
+            im = linegen.degrade_line(im, alpha=alpha, beta=beta)
+            im = linegen.distort_line(im, abs(np.random.normal(distort)), abs(np.random.normal(distortion_sigma)))
+        elif legacy:
+            im = linegen.ocropy_degrade(im)
+        im.save('{}/{:06d}.png'.format(output, idx))
+        with open('{}/{:06d}.gt.txt'.format(output, idx), 'wb') as fp:
+            if reorder:
+                fp.write(get_display(line).encode('utf-8'))
+            else:
+                fp.write(line.encode('utf-8'))
 
 
 @cli.command('publish')
