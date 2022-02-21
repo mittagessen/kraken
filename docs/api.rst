@@ -340,94 +340,62 @@ the :func:`kraken.serialization.serialize` function.
 Training
 --------
 
-There are catch-all constructors for quickly setting up
-:class:`kraken.lib.train.KrakenTrainer` instances for all training needs. They
-largely map the command line utils `ketos train` and `ketos segtrain` to a
-programmatic interface. The arguments are identical, apart from a
-differentiation between general arguments (data sources and setup, file names,
-devices, ...) and hyperparameters (optimizers, learning rate schedules,
-augmentation.
+Training is largely implemented with the `pytorch lightning
+<https://www.pytorchlightning.ai/>`_ framework. There are separate
+`LightningModule`s for recognition and segmentation training and a small
+wrapper around the lightning's `Trainer` class that mainly sets up model
+handling and verbosity options for the CLI.
 
-Training a recognition model from a number of xml files in ALTO or PAGE XML:
 
 .. code-block:: python
 
-        >>> from kraken.lib.train import KrakenTrainer
+        >>> from kraken.lib.train import RecognitionModel, KrakenTrainer 
         >>> ground_truth = glob.glob('training/*.xml')
         >>> training_files = ground_truth[:250] # training data is shuffled internally
         >>> evaluation_files = ground_truth[250:]
-        >>> trainer = KrakenTrainer.recognition_train_gen(training_data=training_files, evaluation_data=evaluation_files, format_type='xml', augment=True)
-        >>> trainer.run()
+        >>> model = RecognitionModel(training_data=training_files, evaluation_data=evaluation_files, format_type='xml', augment=True)
+        >>> trainer = KrakenTrainer()
+        >>> trainer.fit(model)
 
 Likewise for a baseline and region segmentation model:
 
 .. code-block:: python
 
-        >>> from kraken.lib.train import KrakenTrainer
+        >>> from kraken.lib.train import SegmentationModel, KrakenTrainer
         >>> ground_truth = glob.glob('training/*.xml')
         >>> training_files = ground_truth[:250] # training data is shuffled internally
         >>> evaluation_files = ground_truth[250:]
-        >>> trainer = KrakenTrainer.segmentation_train_gen(training_data=training_files, evaluation_data=evaluation_files, format_type='xml', augment=True)
-        >>> trainer.run()
+        >>> model = SegmentationModel(training_data=training_files, evaluation_data=evaluation_files, format_type='xml', augment=True)
+        >>> trainer = KrakenTrainer()
+        >>> trainer.fit(model)
 
-Both constructing the trainer object and the training itself can take quite a
-bit of time. The constructor provides a callback for each iterative process
-during object initialization that is intended to set up a progress bar:
-
-.. code-block:: python
-
-        >>> from kraken.lib.train import KrakenTrainer
-
-        >>> def progress_callback(string, length):
-                print(f'starting process "{string}" of length {length}')
-                return lambda: print('.', end='')
-        >>> ground_truth = glob.glob('training/*.xml')
-        >>> training_files = ground_truth[:25] # training data is shuffled internally
-        >>> evaluation_files = ground_truth[25:95]
-        >>> trainer = KrakenTrainer.segmentation_train_gen(training_data=training_files, evaluation_data=evaluation_files, format_type='xml', progress_callback=progress_callback, augment=True)
-        starting process "Building training set" of length 25
-        .........................
-        starting process "Building validation set" of length 70
-        ......................................................................      
-        >>> trainer.run()
-
-Executing the trainer object has two callbacks as arguments, one called after
-each iteration and one returning the evaluation metrics after the end of each
-epoch:
+When the `fit()` method is called the dataset is initialized and the training
+commences. Both can take quite a bit of time. To get insight into what exactly
+is happening the standard `lightning callbacks
+<https://pytorch-lightning.readthedocs.io/en/latest/common/trainer.html#callbacks>`_
+can be attached to the trainer object:
 
 .. code-block:: python
 
-        >>> from kraken.lib.train import KrakenTrainer
+        >>> from pytorch_lightning.callbacks import Callback
+        >>> from kraken.lib.train import RecognitionModel, KrakenTrainer 
+        >>> class MyPrintingCallback(Callback):
+            def on_init_start(self, trainer):
+                print("Starting to init trainer!")
+        
+            def on_init_end(self, trainer):
+                print("trainer is init now")
+        
+            def on_train_end(self, trainer, pl_module):
+                print("do something when training ends")
         >>> ground_truth = glob.glob('training/*.xml')
         >>> training_files = ground_truth[:250] # training data is shuffled internally
         >>> evaluation_files = ground_truth[250:]
-        >>> trainer = KrakenTrainer.segmentation_train_gen(training_data=training_files, evaluation_data=evaluation_files, format_type='xml', augment=True)
-        >>> def _update_progress():
-                print('.', end='')
-        >>> def _print_eval(epoch, accuracy, **kwargs):
-                print(accuracy)
-        >>> trainer.run(_print_eval, _update_progress)
-        .........................0.0
-        .........................0.0
-        .........................0.0
-        .........................0.0
-        .........................0.0
-        ...
-
-The metrics differ for recognition
-(:func:`kraken.lib.train.recognition_evaluator_fn`) and segmentation
-(:func:`kraken.lib.train.baseline_label_evaluator_fn`).
-
-Depending on the stopping method chosen the last model file might not be the
-one with the best accuracy. Per default early stopping is used which aborts
-training after a certain number of epochs without improvement. In that case the
-best model and evaluation loss can be determined through:
-
-.. code-block:: python
-
-        >>> trainer.stopper.best_epoch
-        >>> trainer.stopper.best_loss
-        >>> best_model_path = f'{trainer.filename_prefix}_{trainer.stopper.best_epoch}.mlmodel'
+        >>> model = RecognitionModel(training_data=training_files, evaluation_data=evaluation_files, format_type='xml', augment=True)
+        >>> trainer = KrakenTrainer(enable_progress_bar=False, callbacks=[MyPrintingCallback])
+        >>> trainer.fit(model)
+        Starting to init trainer!
+        trainer is init now
 
 This is only a small subset of the training functionality. It is suggested to
 have a closer look at the command line parameters for features as transfer
