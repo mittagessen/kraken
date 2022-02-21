@@ -28,9 +28,9 @@ from functools import partial
 from torch.multiprocessing import Pool
 from torch.optim import lr_scheduler
 from typing import Callable, Dict, Optional, Sequence, Union, Any, List
-from pytorch_lightning.callbacks import Callback, EarlyStopping, ModelSummary
+from pytorch_lightning.callbacks import Callback, EarlyStopping
 
-from kraken.lib import models, vgsl, default_specs, log
+from kraken.lib import models, vgsl, default_specs, log, progress
 from kraken.lib.xml import preparse_xml_data
 from kraken.lib.util import make_printable
 from kraken.lib.codec import PytorchCodec
@@ -76,11 +76,12 @@ class KrakenTrainer(pl.Trainer):
             kwargs['callbacks'] = [kwargs['callbacks']]
 
         if enable_progress_bar:
-            progress_bar_cb = KrakenProgressBar()
+            progress_bar_cb = progress.KrakenTrainProgressBar()
             kwargs['callbacks'].append(progress_bar_cb)
 
         if enable_summary:
-            summary_cb = ModelSummary(max_depth=2)
+            from pytorch_lightning.callbacks import RichModelSummary
+            summary_cb = RichModelSummary(max_depth=2)
             kwargs['callbacks'].append(summary_cb)
         else:
             kwargs['enable_model_summary'] = False
@@ -106,78 +107,6 @@ class KrakenTrainer(pl.Trainer):
             warnings.filterwarnings(action='ignore', category=UserWarning,
                                     message='The dataloader,')
             super().fit(*args, **kwargs)
-
-
-class KrakenProgressBar(pl.callbacks.progress.base.ProgressBarBase):
-
-    def __init__(self, *args, **kwargs):
-        """
-        Creates a progress bar using click's progress indicators.
-
-        Args:
-            refresh_rate: Determines at which rate (in number of batches) the
-                          progress bars get updated.  Set it to ``0`` to
-                          disable the display.
-            leave: Leaves the finished progress bar in the terminal at the end
-                   of the epoch. Default: False
-        """
-        super().__init__()
-        self.bar = None
-        self.enable = True
-
-    def on_train_epoch_start(self, trainer, pl_module):
-        if self.bar:
-            print()
-        self.bar = log.progressbar(label=f"stage {trainer.current_epoch}/{trainer.max_epochs if pl_module.hparams.quit == 'dumb' else '∞'}",
-                                   length=self.total_train_batches,
-                                   show_pos=True)
-        self.bar.__enter__()
-
-    def on_validation_epoch_start(self, trainer, pl_module):
-        if trainer.sanity_checking:
-            return
-        if self.bar:
-            print()
-        self.bar = log.progressbar(label='validating',
-                                   length=self.total_val_batches,
-                                   show_pos=True)
-        self.bar.__enter__()
-
-    def on_sanity_check_start(self, trainer, pl_module):
-        if self.bar:
-            print()
-        self.bar = log.progressbar(label='val check',
-                                   length=sum(trainer.num_sanity_val_batches),
-                                   show_pos=True)
-        self.bar.__enter__()
-
-    def disable(self):
-        self.enable = False
-
-    def enable(self):
-        self.enable = True
-
-    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
-        super().on_train_batch_end(trainer, pl_module, outputs, batch, batch_idx)
-        self.bar.update(1)
-
-    def on_validation_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx):
-        super().on_validation_batch_end(trainer, pl_module, outputs, batch, batch_idx, dataloader_idx)
-        self.bar.update(1)
-
-    def on_validation_epoch_end(self, trainer, pl_module):
-        super().on_validation_epoch_end(trainer, pl_module)
-        if not trainer.sanity_checking:
-            metrics = self.get_metrics(trainer, pl_module)
-            metrics.pop('loss')
-            metrics.pop('val_metric')
-            for k, v in metrics.items():
-                print(f'{k}: {v:.5f} ', end='')
-            if trainer.early_stopping_callback:
-                print(f'early_stopping: '
-                      f'{trainer.early_stopping_callback.wait_count}/{trainer.early_stopping_callback.patience} '
-                      f'{trainer.early_stopping_callback.best_score:.5f}',
-                      end='')
 
 
 class RecognitionModel(pl.LightningModule):
