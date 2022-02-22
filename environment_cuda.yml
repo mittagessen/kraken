@@ -27,5 +27,6 @@ dependencies:
   - conda-forge::pytorch-lightning
   - pip
   - albumentations
+  - rich
   - pip:
     - file:.

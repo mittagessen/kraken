@@ -35,6 +35,7 @@ requirements:
      - pyarrow
      - conda-forge::pytorch-lightning
      - albumentations
+     - rich
 about:
   home: http://kraken.re
   license: Apache License

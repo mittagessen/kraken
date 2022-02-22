@@ -30,5 +30,6 @@ dependencies:
   - pytorch-lightning
   - pip
   - albumentations
+  - rich
   - pip:
     - git+https://github.com/mittagessen/kraken.git@master
