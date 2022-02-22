@@ -24,6 +24,7 @@ from rich.console import Console, RenderableType
 from rich.progress import BarColumn, Progress, ProgressColumn, Task, TextColumn, TimeRemainingColumn, TimeElapsedColumn, DownloadColumn
 from rich.text import Text
 
+__all__ = ['KrakenProgressBar', 'KrakenDownloadProgressBar', 'KrakenTrainProgressBar']
 
 class BatchesProcessedColumn(ProgressColumn):
     def __init__(self):
@@ -117,7 +118,7 @@ class KrakenProgressBar(Progress):
         kwargs['refresh_per_second'] = 1
         super().__init__(*columns, *args, **kwargs)
 
-class KrakenDownloadBar(Progress):
+class KrakenDownloadProgressBar(Progress):
     """
     Adaptation of the default rich progress bar to fit with kraken/ketos download output.
     """

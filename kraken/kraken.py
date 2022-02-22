@@ -31,7 +31,7 @@ from PIL import Image
 import click
 
 from kraken.lib import log
-from kraken.lib.progress import KrakenProgressBar, KrakenDownloadBar
+from kraken.lib.progress import KrakenProgressBar, KrakenDownloadProgressBar
 
 warnings.simplefilter('ignore', UserWarning)
 
@@ -643,7 +643,7 @@ def get(ctx, model_id):
     except OSError:
         pass
 
-    with KrakenDownloadBar() as progress:
+    with KrakenDownloadProgressBar() as progress:
         download_task = progress.add_task('Processing', total=0, visible=True if not ctx.meta['verbose'] else False)
         filename = repo.get_model(model_id, click.get_app_dir(APP_NAME),
                                   lambda total, advance: progress.update(download_task, total=total, advance=advance))
