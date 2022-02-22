@@ -12,13 +12,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""
+Handlers for rich-based progress bars.
+"""
 from typing import Any, Dict, Optional, Union
 
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks.progress.base import ProgressBarBase
 
 from rich.console import Console, RenderableType
-from rich.progress import BarColumn, Progress, ProgressColumn, Task, TextColumn, TimeRemainingColumn, TimeElapsedColumn
+from rich.progress import BarColumn, Progress, ProgressColumn, Task, TextColumn, TimeRemainingColumn, TimeElapsedColumn, DownloadColumn
 from rich.text import Text
 
 
@@ -32,7 +35,9 @@ class BatchesProcessedColumn(ProgressColumn):
 
 
 class EarlyStoppingColumn(ProgressColumn):
-    """A column containing text."""
+    """
+    A column containing text.
+    """
 
     def __init__(self, trainer):
         self._trainer = trainer
@@ -107,6 +112,20 @@ class KrakenProgressBar(Progress):
                    BarColumn(),
                    TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
                    BatchesProcessedColumn(),
+                   TimeRemainingColumn(),
+                   TimeElapsedColumn()]
+        kwargs['refresh_per_second'] = 1
+        super().__init__(*columns, *args, **kwargs)
+
+class KrakenDownloadBar(Progress):
+    """
+    Adaptation of the default rich progress bar to fit with kraken/ketos download output.
+    """
+    def __init__(self, *args, **kwargs):
+        columns = [TextColumn("[progress.description]{task.description}"),
+                   BarColumn(),
+                   TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+                   DownloadColumn(),
                    TimeRemainingColumn(),
                    TimeElapsedColumn()]
         kwargs['refresh_per_second'] = 1
