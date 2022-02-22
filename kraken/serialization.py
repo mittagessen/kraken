@@ -235,7 +235,7 @@ def serialize(records: Sequence[ocr_record],
     return tmpl.render(page=page)
 
 
-def serialize_segmentation(res: Dict[str, Any],
+def serialize_segmentation(segresult: Dict[str, Any],
                            image_name: str = None,
                            image_size: Tuple[int, int] = (0, 0),
                            template: str = 'hocr') -> str:
@@ -243,7 +243,7 @@ def serialize_segmentation(res: Dict[str, Any],
     Serializes a segmentation result into an output document.
 
     Args:
-        res: Result of blla.segment
+        segresult: Result of blla.segment
         image_name (str): Name of the source image
         image_size (tuple): Dimensions of the source image
         template (str): Selector for the serialization format. May be
@@ -252,18 +252,18 @@ def serialize_segmentation(res: Dict[str, Any],
     Returns:
             (str) rendered template.
     """
-    if 'type' in res and res['type'] == 'baselines':
-        records = [ocr_record('', '', '', bl) for bl in res['lines']]
+    if 'type' in segresult and segresult['type'] == 'baselines':
+        records = [ocr_record('', '', '', bl) for bl in segresult['lines']]
     else:
         records = []
-        for line in res['boxes']:
+        for line in segresult['boxes']:
             xmin, xmax = min(line[::2]), max(line[::2])
             ymin, ymax = min(line[1::2]), max(line[1::2])
             records.append(ocr_record('', [], [], [[xmin, ymin], [xmin, ymax], [xmax, ymax], [xmax, ymin]]))
     return serialize(records,
                      image_name=image_name,
                      image_size=image_size,
-                     regions=res['regions'] if 'regions' in res else None,
+                     regions=segresult['regions'] if 'regions' in segresult else None,
                      template=template)
 
 

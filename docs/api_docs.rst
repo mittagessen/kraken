@@ -45,6 +45,8 @@ kraken.serialization module
 
 .. autoapifunction:: kraken.serialization.serialize
 
+.. autoapifunction:: kraken.serialization.serialize_segmentation
+
 kraken.lib.models module
 ========================
 
