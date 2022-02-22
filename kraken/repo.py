@@ -15,16 +15,17 @@
 """
 Accessors to the model repository on zenodo.
 """
-from typing import Callable, Any, BinaryIO
+from typing import Callable, Any
 from contextlib import closing
 
 from kraken.lib.exceptions import KrakenRepoException
 
-import urllib
-import requests
-import json
 import os
+import json
+import urllib
+import pathlib
 import logging
+import requests
 
 __all__ = ['get_model', 'get_description', 'get_listing', 'publish_model']
 
@@ -34,25 +35,27 @@ MODEL_REPO = 'https://zenodo.org/api/'
 SUPPORTED_MODELS = set(['kraken_pytorch'])
 
 
-def publish_model(model_file: BinaryIO = None,
+def publish_model(model_file: [str, pathlib.Path] = None,
                   metadata: dict = None,
                   access_token: str = None,
-                  callback: Callable[..., Any] = lambda: None) -> str:
+                  callback: Callable[[int, int], Any] = lambda: None) -> str:
     """
     Publishes a model to the repository.
 
     Args:
-        model_file (file): I/O stream to read model from.
-        metadata (dict):
-        access_token (str):
-        callback (func): Function called for every 1024 octet chunk uploaded.
+        model_file: Path to read model from.
+        metadata: Metadata dictionary
+        access_token: Zenodo API access token
+        callback: Function called for every 1024 octet chunk uploaded.
     """
+    fp = open(model_fle, 'rb')
+    total = len(model_file) + 4
     headers = {"Content-Type": "application/json"}
     r = requests.post(f'{MODEL_REPO}deposit/depositions',
                       params={'access_token': access_token}, json={},
                       headers=headers)
     r.raise_for_status()
-    callback()
+    callback(total, 1)
     deposition_id = r.json()['id']
     data = {'filename': 'metadata.json'}
     files = {'file': ('metadata.json', json.dumps(metadata))}
@@ -60,14 +63,14 @@ def publish_model(model_file: BinaryIO = None,
                       params={'access_token': access_token}, data=data,
                       files=files)
     r.raise_for_status()
-    callback()
+    callback(total, 1)
     data = {'filename': metadata['name']}
     files = {'file': open(model_file, 'rb')}
     r = requests.post(f'{MODEL_REPO}deposit/depositions/{deposition_id}/files',
                       params={'access_token': access_token}, data=data,
                       files=files)
     r.raise_for_status()
-    callback()
+    callback(total, 1)
     # fill zenodo metadata
     data = {'metadata': {
                         'title': metadata['summary'],
@@ -89,15 +92,15 @@ def publish_model(model_file: BinaryIO = None,
                      data=json.dumps(data),
                      headers=headers)
     r.raise_for_status()
-    callback()
+    callback(total, 1)
     r = requests.post(f'{MODEL_REPO}deposit/depositions/{deposition_id}/actions/publish',
                       params={'access_token': access_token})
     r.raise_for_status()
-    callback()
+    callback(total, len(model_file))
     return r.json()['doi']
 
 
-def get_model(model_id: str, path: str, callback: Callable[..., Any] = lambda: None) -> str:
+def get_model(model_id: str, path: str, callback: Callable[[int, int], Any] = lambda total, advance: None) -> str:
     """
     Retrieves a model and saves it to a path.
 
@@ -113,7 +116,7 @@ def get_model(model_id: str, path: str, callback: Callable[..., Any] = lambda: N
     logger.info(f'Saving model {model_id} to {path}')
     r = requests.get(f'{MODEL_REPO}records', params={'q': f'doi:"{model_id}"'})
     r.raise_for_status()
-    callback()
+    callback(0, 0)
     resp = r.json()
     if resp['hits']['total'] != 1:
         logger.error(f'Found {resp["hits"]["total"]} models when querying for id \'{model_id}\'')
@@ -126,9 +129,10 @@ def get_model(model_id: str, path: str, callback: Callable[..., Any] = lambda: N
     spath = os.path.join(path, nat_id)
     logger.debug(f'downloading model file {model_url} to {spath}')
     with closing(requests.get(model_url, stream=True)) as r:
+        file_size = int(r.headers['Content-length'])
         with open(spath, 'wb') as f:
             for chunk in r.iter_content(chunk_size=1024):
-                callback()
+                callback(file_size, len(chunk))
                 f.write(chunk)
     return nat_id
 
@@ -189,7 +193,7 @@ def get_description(model_id: str, callback: Callable[..., Any] = lambda: None) 
     return metadata
 
 
-def get_listing(callback: Callable[..., Any] = lambda: None) -> dict:
+def get_listing(callback: Callable[[int, int], Any] = lambda total, advance: None) -> dict:
     """
     Fetches a listing of all kraken models from the zenodo repository.
 
@@ -203,12 +207,14 @@ def get_listing(callback: Callable[..., Any] = lambda: None) -> dict:
     records = []
     r = requests.get('{}{}'.format(MODEL_REPO, 'records'), params={'communities': 'ocr_models'})
     r.raise_for_status()
-    callback()
+    callback(1, 1)
     resp = r.json()
     if not resp['hits']['total']:
         logger.error('No models found in community \'ocr_models\'')
         raise KrakenRepoException('No models found in repository \'ocr_models\'')
     logger.debug('Total of {} records in repository'.format(resp['hits']['total']))
+    total = resp['hits']['total']
+    callback(total, 0)
     records.extend(resp['hits']['hits'])
     while 'next' in resp['links']:
         logger.debug('Fetching next page')
@@ -228,7 +234,7 @@ def get_listing(callback: Callable[..., Any] = lambda: None) -> dict:
             continue
         for file in record['files']:
             if file['key'] == 'metadata.json':
-                callback()
+                callback(total, 1)
                 r = requests.get(file['links']['self'])
                 r.raise_for_status()
                 try:
