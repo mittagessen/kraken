@@ -65,7 +65,7 @@ def publish_model(model_file: [str, pathlib.Path] = None,
     r.raise_for_status()
     callback(total, 1)
     data = {'filename': metadata['name']}
-    files = {'file': open(model_file, 'rb')}
+    files = {'file': fp}
     r = requests.post(f'{MODEL_REPO}deposit/depositions/{deposition_id}/files',
                       params={'access_token': access_token}, data=data,
                       files=files)

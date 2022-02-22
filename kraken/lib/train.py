@@ -30,7 +30,7 @@ from torch.optim import lr_scheduler
 from typing import Callable, Dict, Optional, Sequence, Union, Any, List
 from pytorch_lightning.callbacks import Callback, EarlyStopping
 
-from kraken.lib import models, vgsl, default_specs, log, progress
+from kraken.lib import models, vgsl, default_specs, progress
 from kraken.lib.xml import preparse_xml_data
 from kraken.lib.util import make_printable
 from kraken.lib.codec import PytorchCodec

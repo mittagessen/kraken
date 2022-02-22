@@ -26,6 +26,7 @@ from rich.text import Text
 
 __all__ = ['KrakenProgressBar', 'KrakenDownloadProgressBar', 'KrakenTrainProgressBar']
 
+
 class BatchesProcessedColumn(ProgressColumn):
     def __init__(self):
         super().__init__()
@@ -117,6 +118,7 @@ class KrakenProgressBar(Progress):
                    TimeElapsedColumn()]
         kwargs['refresh_per_second'] = 1
         super().__init__(*columns, *args, **kwargs)
+
 
 class KrakenDownloadProgressBar(Progress):
     """
@@ -362,8 +364,7 @@ class KrakenTrainProgressBar(ProgressBarBase):
 
     def configure_columns(self, trainer) -> list:
         return [TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
-            BatchesProcessedColumn(),
-            TimeRemainingColumn(),
-            TimeElapsedColumn(),
-        ]
+                BarColumn(),
+                BatchesProcessedColumn(),
+                TimeRemainingColumn(),
+                TimeElapsedColumn()]

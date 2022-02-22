@@ -22,7 +22,7 @@ import logging
 
 from rich.logging import RichHandler
 
+
 def set_logger(logger=None, level=logging.ERROR):
     logger.addHandler(RichHandler(rich_tracebacks=True))
     logger.setLevel(level)
-
