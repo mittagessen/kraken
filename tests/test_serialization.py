@@ -48,7 +48,8 @@ def validate_page(self, fp):
 
     ids = [x.get('id') for x in doc.findall('.//*[@id]')]
     counts = Counter(ids)
-    self.assertEqual(counts.most_common(1)[0][1], 1, msg='Duplicate IDs in PageXML output')
+    if len(counts):
+        self.assertEqual(counts.most_common(1)[0][1], 1, msg='Duplicate IDs in PageXML output')
 
     with open(resources / 'pagecontent.xsd') as schema_fp:
         page_schema = etree.XMLSchema(etree.parse(schema_fp))
@@ -219,4 +220,22 @@ class TestSerializations(unittest.TestCase):
         fp = StringIO()
 
         fp.write(serialization.serialize([], image_name='foo.png', template='pagexml', regions=self.bl_regions))
+        validate_page(self, fp)
+
+    def test_serialize_segmentation_alto(self):
+        """
+        Validates output of `serialize_segmentation` against ALTO schema
+        """
+        fp = StringIO()
+
+        fp.write(serialization.serialize_segmentation({'boxes': []}, image_name='foo.png', template='alto'))
+        validate_alto(self, fp)
+
+    def test_serialize_segmentation_pagexml(self):
+        """
+        Validates output of `serialize_segmentation` against ALTO schema
+        """
+        fp = StringIO()
+
+        fp.write(serialization.serialize_segmentation({'boxes': []}, image_name='foo.png', template='pagexml'))
         validate_page(self, fp)

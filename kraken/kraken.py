@@ -166,19 +166,10 @@ def segmenter(legacy, model, text_direction, scale, maxcolseps, black_colseps,
             logger.info('Serializing as {} into {}'.format(ctx.meta['output_mode'], output))
             from kraken import serialization
             from kraken.rpred import ocr_record
-            if 'type' in res and res['type'] == 'baselines':
-                records = [ocr_record('', '', '', bl) for bl in res['lines']]
-            else:
-                records = []
-                for line in res['boxes']:
-                    xmin, xmax = min(line[::2]), max(line[::2])
-                    ymin, ymax = min(line[1::2]), max(line[1::2])
-                    records.append(ocr_record('', [], [], [[xmin, ymin], [xmin, ymax], [xmax, ymax], [xmax, ymin]]))
-            fp.write(serialization.serialize(records,
-                                             image_name=ctx.meta['base_image'],
-                                             image_size=im.size,
-                                             regions=res['regions'] if 'regions' in res else None,
-                                             template=ctx.meta['output_mode']))
+            fp.write(serialization.serialize_segmentation(res,
+                                                          image_name=ctx.meta['base_image'],
+                                                          image_size=im.size,
+                                                          template=ctx.meta['output_mode']))
     else:
         with click.open_file(output, 'w') as fp:
             fp = cast(IO[Any], fp)

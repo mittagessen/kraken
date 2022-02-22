@@ -27,7 +27,7 @@ from kraken.rpred import ocr_record
 from kraken.lib.util import make_printable
 from kraken.lib.segmentation import is_in_region
 
-from typing import List, Tuple, Iterable, Optional, Sequence, Dict
+from typing import List, Tuple, Iterable, Optional, Sequence, Dict, Any
 
 logger = logging.getLogger(__name__)
 
@@ -233,6 +233,38 @@ def serialize(records: Sequence[ocr_record],
     tmpl = env.get_template(template)
     logger.debug('Rendering data.')
     return tmpl.render(page=page)
+
+
+def serialize_segmentation(segresult: Dict[str, Any],
+                           image_name: str = None,
+                           image_size: Tuple[int, int] = (0, 0),
+                           template: str = 'hocr') -> str:
+    """
+    Serializes a segmentation result into an output document.
+
+    Args:
+        segresult: Result of blla.segment
+        image_name (str): Name of the source image
+        image_size (tuple): Dimensions of the source image
+        template (str): Selector for the serialization format. May be
+                        'hocr' or 'alto'.
+
+    Returns:
+            (str) rendered template.
+    """
+    if 'type' in segresult and segresult['type'] == 'baselines':
+        records = [ocr_record('', '', '', bl) for bl in segresult['lines']]
+    else:
+        records = []
+        for line in segresult['boxes']:
+            xmin, xmax = min(line[::2]), max(line[::2])
+            ymin, ymax = min(line[1::2]), max(line[1::2])
+            records.append(ocr_record('', [], [], [[xmin, ymin], [xmin, ymax], [xmax, ymax], [xmax, ymin]]))
+    return serialize(records,
+                     image_name=image_name,
+                     image_size=image_size,
+                     regions=segresult['regions'] if 'regions' in segresult else None,
+                     template=template)
 
 
 def render_report(model: str,

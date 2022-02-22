@@ -99,6 +99,7 @@ Afterwards they can be fed into the segmentation method
 .. code-block:: python
 
         >>> from kraken import blla
+        >>> from kraken import serialization
 
         >>> baseline_seg = blla.segment(im, model=model)
         >>> baseline_seg
@@ -112,6 +113,9 @@ Afterwards they can be fed into the segmentation method
          'regions': {'$tip':[[[536, 1716], ... [522, 1708], [524, 1716], [536, 1716], ...]
                      '$par': ...
                      '$nop':  ...}}
+        >>> alto = serialization.serialize_segmentation(baseline_seg, image_name=im.filename, image_size=im.size, template='alto')
+        >>> with open('segmentation_output.xml', 'w') as fp:
+                fp.write(alto)
 
 Optional parameters are largely the same as for the legacy segmenter, i.e. text
 direction and masking.
