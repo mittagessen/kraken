@@ -24,7 +24,6 @@ import logging
 import pkg_resources
 
 from typing import Dict, Union, List, cast, Any, IO, Callable
-from rich.progress import track, Progress
 from rich.traceback import install
 from functools import partial
 from PIL import Image
@@ -32,6 +31,7 @@ from PIL import Image
 import click
 
 from kraken.lib import log
+from kraken.lib.progress import KrakenProgressBar
 
 warnings.simplefilter('ignore', UserWarning)
 
@@ -241,8 +241,11 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore, input,
 
     preds = []
 
-    for pred in track(it, description='Processing'):
-        preds.append(pred)
+    with KrakenProgressBar() as progress:
+        pred_task = progress.add_task('Processing', total=len(it), visible=True if not ctx.meta['verbose'] else False)
+        for pred in it:
+            preds.append(pred)
+            progress.update(pred_task, advance=1)
 
     ctx = click.get_current_context()
     with click.open_file(output, 'w', encoding='utf-8') as fp:
@@ -320,6 +323,7 @@ def cli(input, batch_input, suffix, verbose, format_type, pdf_format, serializer
     ctx.meta['input_format_type'] = format_type if format_type != 'pdf' else 'image'
     ctx.meta['raise_failed'] = raise_on_error
     ctx.meta['output_mode'] = serializer
+    ctx.meta['verbose'] = verbose
     log.set_logger(logger, level=30 - min(10 * verbose, 20))
 
 
@@ -332,6 +336,8 @@ def process_pipeline(subcommands, input, batch_input, suffix, verbose, format_ty
     import glob
     import uuid
     import tempfile
+
+    ctx = click.get_current_context()
 
     input = list(input)
     # expand batch inputs
@@ -353,8 +359,8 @@ def process_pipeline(subcommands, input, batch_input, suffix, verbose, format_ty
             if 'n-pages' in doc.get_fields():
                 num_pages += doc.get('n-pages')
 
-        with Progress() as progress:
-            pdf_parse_task = progress.add_task('Extracting PDF pages', total=num_pages)
+        with KrakenProgressBar() as progress:
+            pdf_parse_task = progress.add_task('Extracting PDF pages', total=num_pages, visible=True if not ctx.meta['verbose'] else False)
             for (fpath, _) in input:
                 try:
                     doc = pyvips.Image.new_from_file(fpath, dpi=300, n=-1, access="sequential")
@@ -375,10 +381,10 @@ def process_pipeline(subcommands, input, batch_input, suffix, verbose, format_ty
                         new_input.append((filename, pdf_format.format(**dest_dict) + suffix))
                         progress.update(pdf_parse_task, advance=1)
                 except pyvips.error.Error:
+                    num_pages -= n_pages
+                    progress.update(pdf_parse_task, total=num_pages)
                     logger.warning(f'{fpath} is not a PDF file. Skipping.')
         input = new_input
-
-    ctx = click.get_current_context()
 
     for io_pair in input:
         ctx.meta['first_process'] = True
@@ -615,10 +621,9 @@ def list_models(ctx):
     """
     from kraken import repo
 
-    message('Retrieving model list ', nl=False)
-    model_list = repo.get_listing(partial(message, '.', nl=False))
-    message('\b\u2713', fg='green', nl=False)
-    message('\033[?25h\n', nl=False)
+    with KrakenProgressBar() as progress:
+        download_task = progress.add_task('Retrieving model list', total=0, visible=True if not ctx.meta['verbose'] else False)
+        model_list = repo.get_listing(lambda total, advance: progress.update(download_task, total=total, advance=advance))
     for id, metadata in model_list.items():
         message('{} ({}) - {}'.format(id, ', '.join(metadata['type']), metadata['summary']))
     ctx.exit(0)
@@ -638,11 +643,10 @@ def get(ctx, model_id):
     except OSError:
         pass
 
-    message('Retrieving model ', nl=False)
-    filename = repo.get_model(model_id, click.get_app_dir(APP_NAME),
-                              partial(message, '.', nl=False))
-    message('\b\u2713', fg='green', nl=False)
-    message('\033[?25h')
+    with KrakenProgressBar() as progress:
+        download_task = progress.add_task('Processing', total=0, visible=True if not ctx.meta['verbose'] else False)
+        filename = repo.get_model(model_id, click.get_app_dir(APP_NAME),
+                                  lambda total, advance: progress.update(download_task, total=total, advance=advance))
     message(f'Model name: {filename}')
     ctx.exit(0)
 

@@ -168,6 +168,8 @@ def build_binary_dataset(files: Optional[List[Union[str, pathlib.Path]]] = None,
             num_lines += 1
             alphabet.update(line['text'])
 
+    callback(0, num_lines)
+
     for k, v in sorted(alphabet.items(), key=lambda x: x[1], reverse=True):
         char = make_printable(k)
         if char == k:

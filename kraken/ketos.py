@@ -20,13 +20,13 @@ import logging
 import unicodedata
 
 from PIL import Image
-from rich.progress import track
 from rich.traceback import install
 from bidi.algorithm import get_display
 
 from typing import cast, Set, List, IO, Any, Dict
 
 from kraken.lib import log
+from kraken.lib.progress import KrakenProgressBar
 from kraken.lib.exceptions import KrakenCairoSurfaceException
 from kraken.lib.exceptions import KrakenInputException
 from kraken.lib.default_specs import (SEGMENTATION_HYPER_PARAMS,
@@ -53,17 +53,19 @@ def message(msg, **styles):
 
 @click.group()
 @click.version_option()
+@click.pass_context
 @click.option('-v', '--verbose', default=0, count=True)
 @click.option('-s', '--seed', default=None, type=click.INT,
               help='Seed for numpy\'s and torch\'s RNG. Set to a fixed value to '
                    'ensure reproducible random splits of data')
-def cli(verbose, seed):
+def cli(ctx, verbose, seed):
     if seed:
         import numpy.random
         numpy.random.seed(seed)
         from torch import manual_seed
         manual_seed(seed)
 
+    ctx.meta['verbose'] = verbose
     log.set_logger(logger, level=30 - min(10 * verbose, 20))
 
 
@@ -350,6 +352,7 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs, min_epochs
     trainer = KrakenTrainer(gpus=device,
                             max_epochs=hyper_params['epochs'] if hyper_params['quit'] == 'dumb' else -1,
                             min_epochs=hyper_params['min_epochs'],
+                            enable_progress_bar=True if not ctx.meta['verbose'] else False,
                             **val_check_interval)
 
     trainer.fit(model)
@@ -595,6 +598,7 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
     trainer = KrakenTrainer(gpus=device,
                             max_epochs=hyper_params['epochs'] if hyper_params['quit'] == 'dumb' else -1,
                             min_epochs=hyper_params['min_epochs'],
+                            enable_progress_bar=True if not ctx.meta['verbose'] else False,
                             **val_check_interval)
     try:
         trainer.fit(model)
@@ -751,22 +755,32 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
                                pin_memory=True,
                                collate_fn=collate_sequences)
 
-        for batch in track(ds_loader, description="Evaluating"):
-            im = batch['image']
-            text = batch['target']
-            lens = batch['seq_lens']
-            try:
-                pred = net.predict_string(im, lens)
-                for x, y in zip(pred, text):
-                    chars += len(y)
-                    c, algn1, algn2 = global_align(y, x)
-                    algn_gt.extend(algn1)
-                    algn_pred.extend(algn2)
-                    error += c
-            except FileNotFoundError as e:
-                logger.warning('{} {}. Skipping.'.format(e.strerror, e.filename))
-            except KrakenInputException as e:
-                logger.warning(str(e))
+        with KrakenProgressBar() as progress:
+            batches = len(ds_loader)
+            pred_task = progress.add_task('Evaluating', total=batches, visible=True if not ctx.meta['verbose'] else False)
+
+            for batch in ds_loader:
+                im = batch['image']
+                text = batch['target']
+                lens = batch['seq_lens']
+                try:
+                    pred = net.predict_string(im, lens)
+                    for x, y in zip(pred, text):
+                        chars += len(y)
+                        c, algn1, algn2 = global_align(y, x)
+                        algn_gt.extend(algn1)
+                        algn_pred.extend(algn2)
+                        error += c
+                except FileNotFoundError as e:
+                    batches -= 1
+                    pred.update(total=batches)
+                    logger.warning('{} {}. Skipping.'.format(e.strerror, e.filename))
+                except KrakenInputException as e:
+                    batches -= 1
+                    pred.update(total=batches)
+                    logger.warning(str(e))
+                pred.update(pred_task, advance=1)
+
         acc_list.append((chars - error) / chars)
         confusions, scripts, ins, dels, subs = compute_confusions(algn_gt, algn_pred)
         rep = render_report(p, chars, error, confusions, scripts, ins, dels, subs)
@@ -827,43 +841,49 @@ def extract(ctx, binarize, normalization, normalize_whitespace, reorder,
     idx = 0
     manifest = []
 
-    for fp in track(transcriptions, description='Reading transcriptions'):
-        logger.info('Reading {}'.format(fp.name))
-        doc = html.parse(fp)
-        etree.strip_tags(doc, etree.Comment)
-        td = doc.find(".//meta[@itemprop='text_direction']")
-        if td is None:
-            td = 'horizontal-lr'
-        else:
-            td = td.attrib['content']
+    with KrakenProgressBar() as progress:
+        read_task = progress.add_task('Reading transcriptions', total=len(transcriptions), visible=True if not ctx.meta['verbose'] else False)
 
-        im = None
-        dest_dict = {'output': output, 'idx': 0, 'src': fp.name, 'uuid': str(uuid.uuid4())}
-        for section in doc.xpath('//section'):
-            img = section.xpath('.//img')[0].get('src')
-            fd = BytesIO(base64.b64decode(img.split(',')[1]))
-            im = Image.open(fd)
-            if not im:
-                logger.info('Skipping {} because image not found'.format(fp.name))
-                break
-            if binarize:
-                im = binarization.nlbin(im)
-            for line in section.iter('li'):
-                if line.get('contenteditable') and (not u''.join(line.itertext()).isspace() and u''.join(line.itertext())):
-                    dest_dict['idx'] = idx
-                    dest_dict['uuid'] = str(uuid.uuid4())
-                    logger.debug('Writing line {:06d}'.format(idx))
-                    l_img = im.crop([int(x) for x in line.get('data-bbox').split(',')])
-                    if rotate and td.startswith('vertical'):
-                        im.rotate(90, expand=True)
-                    l_img.save(('{output}/' + format + '.png').format(**dest_dict))
-                    manifest.append((format + '.png').format(**dest_dict))
-                    text = u''.join(line.itertext()).strip()
-                    for func in text_transforms:
-                        text = func(text)
-                    with open(('{output}/' + format + '.gt.txt').format(**dest_dict), 'wb') as t:
-                        t.write(text.encode('utf-8'))
-                    idx += 1
+        for fp in transcriptions:
+            logger.info('Reading {}'.format(fp.name))
+            doc = html.parse(fp)
+            etree.strip_tags(doc, etree.Comment)
+            td = doc.find(".//meta[@itemprop='text_direction']")
+            if td is None:
+                td = 'horizontal-lr'
+            else:
+                td = td.attrib['content']
+
+            im = None
+            dest_dict = {'output': output, 'idx': 0, 'src': fp.name, 'uuid': str(uuid.uuid4())}
+            for section in doc.xpath('//section'):
+                img = section.xpath('.//img')[0].get('src')
+                fd = BytesIO(base64.b64decode(img.split(',')[1]))
+                im = Image.open(fd)
+                if not im:
+                    logger.info('Skipping {} because image not found'.format(fp.name))
+                    break
+                if binarize:
+                    im = binarization.nlbin(im)
+                for line in section.iter('li'):
+                    if line.get('contenteditable') and (not u''.join(line.itertext()).isspace() and u''.join(line.itertext())):
+                        dest_dict['idx'] = idx
+                        dest_dict['uuid'] = str(uuid.uuid4())
+                        logger.debug('Writing line {:06d}'.format(idx))
+                        l_img = im.crop([int(x) for x in line.get('data-bbox').split(',')])
+                        if rotate and td.startswith('vertical'):
+                            im.rotate(90, expand=True)
+                        l_img.save(('{output}/' + format + '.png').format(**dest_dict))
+                        manifest.append((format + '.png').format(**dest_dict))
+                        text = u''.join(line.itertext()).strip()
+                        for func in text_transforms:
+                            text = func(text)
+                        with open(('{output}/' + format + '.gt.txt').format(**dest_dict), 'wb') as t:
+                            t.write(text.encode('utf-8'))
+                        idx += 1
+
+            progress.update(read_task, advance=1)
+
     logger.info('Extracted {} lines'.format(idx))
     with open('{}/manifest.txt'.format(output), 'w') as fp:
         fp.write('\n'.join(manifest))
@@ -920,36 +940,40 @@ def transcription(ctx, text_direction, scale, bw, maxcolseps,
         prefill = models.load_any(prefill)
         message('\u2713', fg='green')
 
-    for fp in track(images, description='Reading images'):
-        logger.info('Reading {}'.format(fp.name))
-        im = Image.open(fp)
-        if im.mode not in ['1', 'L', 'P', 'RGB']:
-            logger.warning('Input {} is in {} color mode. Converting to RGB'.format(fp.name, im.mode))
-            im = im.convert('RGB')
-        logger.info('Binarizing page')
-        im_bin = binarization.nlbin(im)
-        im_bin = im_bin.convert('1')
-        logger.info('Segmenting page')
-        if not lines:
-            res = pageseg.segment(im_bin, text_direction, scale, maxcolseps, black_colseps, pad=pad)
-        else:
-            with click.open_file(lines, 'r') as fp:
-                try:
-                    fp = cast(IO[Any], fp)
-                    res = json.load(fp)
-                except ValueError as e:
-                    raise click.UsageError('{} invalid segmentation: {}'.format(lines, str(e)))
-        if prefill:
-            it = rpred.rpred(prefill, im_bin, res.copy())
-            preds = []
-            logger.info('Recognizing')
-            for pred in it:
-                logger.debug('{}'.format(pred.prediction))
-                preds.append(pred)
-            ti.add_page(im, res, records=preds)
-        else:
-            ti.add_page(im, res)
-        fp.close()
+    with KrakenProgressBar() as progress:
+        read_task = progress.add_task('Reading images', total=len(images), visible=True if not ctx.meta['verbose'] else False)
+        for fp in images:
+            logger.info('Reading {}'.format(fp.name))
+            im = Image.open(fp)
+            if im.mode not in ['1', 'L', 'P', 'RGB']:
+                logger.warning('Input {} is in {} color mode. Converting to RGB'.format(fp.name, im.mode))
+                im = im.convert('RGB')
+            logger.info('Binarizing page')
+            im_bin = binarization.nlbin(im)
+            im_bin = im_bin.convert('1')
+            logger.info('Segmenting page')
+            if not lines:
+                res = pageseg.segment(im_bin, text_direction, scale, maxcolseps, black_colseps, pad=pad)
+            else:
+                with click.open_file(lines, 'r') as fp:
+                    try:
+                        fp = cast(IO[Any], fp)
+                        res = json.load(fp)
+                    except ValueError as e:
+                        raise click.UsageError('{} invalid segmentation: {}'.format(lines, str(e)))
+            if prefill:
+                it = rpred.rpred(prefill, im_bin, res.copy())
+                preds = []
+                logger.info('Recognizing')
+                for pred in it:
+                    logger.debug('{}'.format(pred.prediction))
+                    preds.append(pred)
+                ti.add_page(im, res, records=preds)
+            else:
+                ti.add_page(im, res)
+            fp.close()
+            progress.update(read_task, advance=1)
+
     logger.info('Writing transcription to {}'.format(output.name))
     message('Writing output ', nl=False)
     ti.write(output)
@@ -1013,11 +1037,15 @@ def line_generator(ctx, font, maxlines, encoding, normalization, renormalize,
     lines: Set[str] = set()
     if not text:
         return
-    for t in track(text, label='Reading texts'):
-        with click.open_file(t, encoding=encoding) as fp:
-            logger.info('Reading {}'.format(t))
-            for line in fp:
-                lines.add(line.rstrip('\r\n'))
+    with KrakenProgressBar() as progress:
+        read_task = progress.add_task('Reading texts', total=len(text), visible=True if not ctx.meta['verbose'] else False)
+        for t in text:
+            with click.open_file(t, encoding=encoding) as fp:
+                logger.info('Reading {}'.format(t))
+                for line in fp:
+                    lines.add(line.rstrip('\r\n'))
+            progress.update(read_task, advance=1)
+
     if normalization:
         lines = set([unicodedata.normalize(normalization, line) for line in lines])
     if strip:
@@ -1054,28 +1082,30 @@ def line_generator(ctx, font, maxlines, encoding, normalization, renormalize,
     if combining:
         message('Combining Characters: {}'.format(', '.join(combining)))
     lg = linegen.LineGenerator(font, font_size, font_weight, language)
-    for idx, line in track(enumerate(lines), description='Writing images'):
-        logger.info(line)
-        try:
-            if renormalize:
-                im = lg.render_line(unicodedata.normalize(renormalize, line))
-            else:
-                im = lg.render_line(line)
-        except KrakenCairoSurfaceException as e:
-            logger.info('{}: {} {}'.format(e.message, e.width, e.height))
-            continue
-        if not disable_degradation and not legacy:
-            im = linegen.degrade_line(im, alpha=alpha, beta=beta)
-            im = linegen.distort_line(im, abs(np.random.normal(distort)), abs(np.random.normal(distortion_sigma)))
-        elif legacy:
-            im = linegen.ocropy_degrade(im)
-        im.save('{}/{:06d}.png'.format(output, idx))
-        with open('{}/{:06d}.gt.txt'.format(output, idx), 'wb') as fp:
-            if reorder:
-                fp.write(get_display(line).encode('utf-8'))
-            else:
-                fp.write(line.encode('utf-8'))
-
+    with KrakenProgressBar() as progress:
+        gen_task = progress.add_task('Writing images', total=len(lines), visible=True if not ctx.meta['verbose'] else False)
+        for idx, line in enumerate(lines):
+            logger.info(line)
+            try:
+                if renormalize:
+                    im = lg.render_line(unicodedata.normalize(renormalize, line))
+                else:
+                    im = lg.render_line(line)
+            except KrakenCairoSurfaceException as e:
+                logger.info('{}: {} {}'.format(e.message, e.width, e.height))
+                continue
+            if not disable_degradation and not legacy:
+                im = linegen.degrade_line(im, alpha=alpha, beta=beta)
+                im = linegen.distort_line(im, abs(np.random.normal(distort)), abs(np.random.normal(distortion_sigma)))
+            elif legacy:
+                im = linegen.ocropy_degrade(im)
+            im.save('{}/{:06d}.png'.format(output, idx))
+            with open('{}/{:06d}.gt.txt'.format(output, idx), 'wb') as fp:
+                if reorder:
+                    fp.write(get_display(line).encode('utf-8'))
+                else:
+                    fp.write(line.encode('utf-8'))
+            progress.update(gen_task, advance=1)
 
 @cli.command('publish')
 @click.pass_context
@@ -1187,27 +1217,23 @@ def compile(ctx, output, workers, format_type, random_split, force_type, save_sp
 
     from kraken.lib import arrow_dataset
 
-    def _init_progressbar(progress, length):
-        if 'bar' not in ctx.meta:
-            ctx.meta['bar'] = log.progressbar(label='Extracting lines', length=length, show_pos=True)
-            ctx.meta['bar'].__enter__()
-        ctx.meta['bar'].update(progress)
-
     force_type = {'bbox': 'kraken_recognition_bbox',
                   'baseline': 'kraken_recognition_baseline',
                   None: None}[force_type]
 
-    arrow_dataset.build_binary_dataset(ground_truth,
-                                       output,
-                                       format_type,
-                                       workers,
-                                       save_splits,
-                                       random_split,
-                                       force_type,
-                                       recordbatch_size,
-                                       _init_progressbar)
+    with KrakenProgressBar() as progress:
+        extract_task = progress.add_task('Extracting lines', total=0, start=False, visible=True if not ctx.meta['verbose'] else False)
 
-    ctx.meta['bar'].__exit__(None, None, None)
+        arrow_dataset.build_binary_dataset(ground_truth,
+                                           output,
+                                           format_type,
+                                           workers,
+                                           save_splits,
+                                           random_split,
+                                           force_type,
+                                           recordbatch_size,
+                                           lambda advance, total: progress.update(extract_task, total=total, advance=advance))
+
     message(f'Output file written to {output}')
 
 

@@ -98,9 +98,24 @@ class MetricsTextColumn(ProgressColumn):
         return Text(text, justify="left")
 
 
+class KrakenProgressBar(Progress):
+    """
+    Adaptation of the default rich progress bar to fit with kraken/ketos output.
+    """
+    def __init__(self, *args, **kwargs):
+        columns = [TextColumn("[progress.description]{task.description}"),
+                   BarColumn(),
+                   TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+                   BatchesProcessedColumn(),
+                   TimeRemainingColumn(),
+                   TimeElapsedColumn()]
+        kwargs['refresh_per_second'] = 1
+        super().__init__(*columns, *args, **kwargs)
+
+
 class KrakenTrainProgressBar(ProgressBarBase):
     """
-    Adaptation of the default ptl rich progress bar to fit with kraken output.
+    Adaptation of the default ptl rich progress bar to fit with kraken (segtrain, train) output.
 
     Args:
         refresh_rate: Determines at which rate (in number of batches) the progress bars get updated.

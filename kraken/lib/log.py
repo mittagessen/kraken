@@ -18,43 +18,11 @@ kraken.lib.log
 
 Handlers and formatters for logging.
 """
-import time
-import click
 import logging
 
-
-class LogHandler(logging.Handler):
-    def emit(self, record):
-        msg = self.format(record)
-        level = record.levelname.lower()
-        err = level in ('warning', 'error', 'exception', 'critical')
-        click.echo(msg, err=err)
-
-
-class LogFormatter(logging.Formatter):
-    colors = {
-        'error': dict(fg='red'),
-        'exception': dict(fg='red'),
-        'critical': dict(fg='red'),
-        'warning': dict(fg='yellow'),
-    }
-
-    st_time = time.time()
-
-    def format(self, record):
-        if not record.exc_info:
-            level = record.levelname.lower()
-            msg = record.msg
-            if level in self.colors:
-                style = self.colors[level]
-            else:
-                style = {}
-            msg = click.style('[{:2.4f}] {} '.format(time.time() - self.st_time, str(msg)), **style)
-            return msg
-        return logging.Formatter.format(self, record)
+from rich.logging import RichHandler
 
 def set_logger(logger=None, level=logging.ERROR):
-    handler = LogHandler()
-    handler.setFormatter(LogFormatter())
-    logger.addHandler(handler)
+    logger.addHandler(RichHandler(rich_tracebacks=True))
     logger.setLevel(level)
+
