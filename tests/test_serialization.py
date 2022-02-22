@@ -220,3 +220,12 @@ class TestSerializations(unittest.TestCase):
 
         fp.write(serialization.serialize([], image_name='foo.png', template='pagexml', regions=self.bl_regions))
         validate_page(self, fp)
+
+    def test_serialize_segementation_alto(self):
+        """
+        Validates output of `serialize_segmentation` against ALTO schema
+        """
+        fp = StringIO()
+
+        fp.write(serialization.serialize_segmentation({'boxes': []}, image_name='foo.png', template='alto'))
+        validate_alto(self, fp)
