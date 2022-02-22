@@ -48,7 +48,7 @@ def publish_model(model_file: [str, pathlib.Path] = None,
         access_token: Zenodo API access token
         callback: Function called for every 1024 octet chunk uploaded.
     """
-    fp = open(model_fle, 'rb')
+    fp = open(model_file, 'rb')
     total = len(model_file) + 4
     headers = {"Content-Type": "application/json"}
     r = requests.post(f'{MODEL_REPO}deposit/depositions',
