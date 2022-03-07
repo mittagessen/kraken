@@ -773,13 +773,13 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
                         error += c
                 except FileNotFoundError as e:
                     batches -= 1
-                    pred.update(total=batches)
+                    progress.update(pred_task, total=batches)
                     logger.warning('{} {}. Skipping.'.format(e.strerror, e.filename))
                 except KrakenInputException as e:
                     batches -= 1
-                    pred.update(total=batches)
+                    progress.update(pred_task, total=batches)
                     logger.warning(str(e))
-                pred.update(pred_task, advance=1)
+                progress.update(pred_task, advance=1)
 
         acc_list.append((chars - error) / chars)
         confusions, scripts, ins, dels, subs = compute_confusions(algn_gt, algn_pred)
