@@ -540,6 +540,13 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
                          'normalize_whitespace': normalize_whitespace,
                          'augment': augment})
 
+    if augment:
+        try:
+            import albumentations
+        except ImportError:
+            print('Option --augment specified, but module \'albumentations\' is not installed.')
+            exit(1)
+
     # disable automatic partition when given evaluation set explicitly
     if evaluation_files:
         partition = 1
