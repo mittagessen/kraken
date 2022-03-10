@@ -152,6 +152,7 @@ pangocairo.pango_layout_iter_get_line.argtypes  = [ctypes.POINTER(PangoLayoutIte
 pangocairo.pango_layout_iter_get_line.restype = ctypes.POINTER(PangoLayoutLine)
 
 pangocairo.pango_layout_line_get_start_index.argtypes  = [ctypes.POINTER(PangoLayoutLine)]
+pangocairo.pango_layout_line_get_length.artypes = [ctypes.POINTER(PangoLayoutLine)]
 
 pango.pango_language_from_string.argtypes = [ensureBytes]  # type: ignore
 pango.pango_language_from_string.restype = ctypes.POINTER(PangoLanguage)
@@ -172,6 +173,10 @@ pango.pango_layout_get_context.restype = ctypes.POINTER(PangoContext)
 pango.pango_layout_get_pixel_extents.argtypes = [ctypes.POINTER(PangoLayout),
                                                  ctypes.POINTER(PangoRectangle),
                                                  ctypes.POINTER(PangoRectangle)]
+
+pango.pango_layout_line_get_pixel_extents.argtypes = [ctypes.POINTER(PangoLayoutLine),
+                                                      ctypes.POINTER(PangoRectangle),
+                                                      ctypes.POINTER(PangoRectangle)]
 
 pango.pango_units_to_double.argtypes = [ctypes.c_int]
 pango.pango_units_to_double.restype = ctypes.c_double
@@ -270,8 +275,9 @@ class PageGenerator(object):
     """
     Produces degraded page images and alto using a single collection of font families.
     """
-    def __init__(self, family='Sans', font_size=32, font_weight=400, language=None, page_width=1240, page_height=1748):
+    def __init__(self, family='Sans', font_size=32, font_weight=400, language=None, encoding='utf-8', page_width=1240, page_height=1748):
 
+        self.encoding = encoding
         self.language = language
         self.font = pango.pango_font_description_new()
 
@@ -336,33 +342,44 @@ class PageGenerator(object):
         )
 
         lines = []
-        start_ind = 0
         line = 1
+        btext = text.encode(self.encoding)
         while line != 0:
 
             layout_line = pangocairo.pango_layout_iter_get_line(iterator)
 
+            start_ind = pangocairo.pango_layout_line_get_start_index(layout_line)
+            end_ind = start_ind + pangocairo.pango_layout_line_get_length(layout_line)
+
             baseline = pangocairo.pango_layout_iter_get_baseline(iterator)
             baseline_y = pango.pango_units_to_double(baseline)
-            baseline = (
-                (region_bbox[0], baseline_y), (region_bbox[2], baseline_y)
-            )
+
+            ink_rect = PangoRectangle()
+            logical_rect = PangoRectangle()
             
-            lines.append({
+            pango.pango_layout_line_get_pixel_extents(
+                layout_line,
+                ctypes.byref(ink_rect),
+                ctypes.byref(logical_rect)
+            )
+
+            baseline_x0 = float(max(1, min(ink_rect.x, logical_rect.x)))
+            baseline_x1 = float(max(ink_rect.width, logical_rect.width))
+
+            baseline = (
+                (baseline_x0, baseline_y), (baseline_x1, baseline_y)
+            )
+
+            new_line = {
                 "baseline": baseline,
-                "boundary": calculate_polygonal_environment(im, [baseline])[0]
-            })
+                "boundary": calculate_polygonal_environment(im, [baseline])[0],
+                "text": btext[start_ind:end_ind].decode(self.encoding)
+            }
+            if len(new_line['text']) > 0:
+                lines.append(new_line)
 
             line = pangocairo.pango_layout_iter_next_line(iterator)
-            if line != 0:
-                next_start_ind = pangocairo.pango_layout_line_get_start_index(layout_line)
-            else:
-                next_start_ind = len(text)+1
-            
-            lines[-1]['text'] = text[start_ind:next_start_ind]
-            start_ind = next_start_ind
-        
-        
+                    
         regions = [{
             "bbox": region_bbox,
             "lines": lines
