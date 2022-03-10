@@ -47,6 +47,7 @@ import numpy as np
 
 from kraken.lib.exceptions import KrakenCairoSurfaceException
 from kraken.lib.util import pil2array, array2pil
+from kraken.lib.segmentation import calculate_polygonal_environment
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +85,12 @@ class PangoLanguage(ctypes.Structure):
 
 
 class PangoLayout(ctypes.Structure):
+    pass
+
+class PangoLayoutLine(ctypes.Structure):
+    pass
+
+class PangoLayoutIter(ctypes.Structure):
     pass
 
 
@@ -134,6 +141,18 @@ pangocairo.pango_cairo_create_context.restype = ctypes.POINTER(PangoContext)
 pangocairo.pango_cairo_update_layout.argtypes = [ctypes.POINTER(CairoContext), ctypes.POINTER(PangoLayout)]
 pangocairo.pango_cairo_show_layout.argtypes = [ctypes.POINTER(CairoContext), ctypes.POINTER(PangoLayout)]
 
+pangocairo.pango_layout_get_iter.argtypes = [ctypes.POINTER(PangoLayout)]
+pangocairo.pango_layout_get_iter.restype = ctypes.POINTER(PangoLayoutIter)
+
+pangocairo.pango_layout_iter_next_line.argtypes = [ctypes.POINTER(PangoLayoutIter)]
+
+pangocairo.pango_layout_iter_get_baseline.argtypes  = [ctypes.POINTER(PangoLayoutIter)]
+
+pangocairo.pango_layout_iter_get_line.argtypes  = [ctypes.POINTER(PangoLayoutIter)]
+pangocairo.pango_layout_iter_get_line.restype = ctypes.POINTER(PangoLayoutLine)
+
+pangocairo.pango_layout_line_get_start_index.argtypes  = [ctypes.POINTER(PangoLayoutLine)]
+
 pango.pango_language_from_string.argtypes = [ensureBytes]  # type: ignore
 pango.pango_language_from_string.restype = ctypes.POINTER(PangoLanguage)
 
@@ -154,6 +173,8 @@ pango.pango_layout_get_pixel_extents.argtypes = [ctypes.POINTER(PangoLayout),
                                                  ctypes.POINTER(PangoRectangle),
                                                  ctypes.POINTER(PangoRectangle)]
 
+pango.pango_units_to_double.argtypes = [ctypes.c_int]
+pango.pango_units_to_double.restype = ctypes.c_double
 
 class LineGenerator(object):
     """
@@ -186,14 +207,14 @@ class LineGenerator(object):
         logger.info('Rendering line \'{}\''.format(text))
         logger.debug('Creating temporary cairo surface')
         temp_surface = cairo.cairo_image_surface_create(0, 0, 0)
-        width, height = _draw_on_surface(temp_surface, self.font, self.language, text)
+        width, height = _draw_line_on_surface(temp_surface, self.font, self.language, text)
         cairo.cairo_surface_destroy(temp_surface)
         if width == 0 or height == 0:
             logger.error('Surface for \'{}\' zero pixels in at least one dimension'.format(text))
             raise KrakenCairoSurfaceException('Surface zero pixels in at least one dimension', width, height)
         logger.debug('Creating sized cairo surface')
         real_surface = cairo.cairo_image_surface_create(0, width, height)
-        _draw_on_surface(real_surface, self.font, self.language, text)
+        _draw_line_on_surface(real_surface, self.font, self.language, text)
         logger.debug('Extracing data from real surface')
         data = cairo.cairo_image_surface_get_data(real_surface)
         size = int(4 * width * height)
@@ -207,8 +228,7 @@ class LineGenerator(object):
         im = ImageOps.expand(im, 5, 255)
         return im
 
-
-def _draw_on_surface(surface, font, language, text):
+def _draw_line_on_surface(surface, font, language, text):
 
     logger.debug('Creating cairo and pangocairo contexts')
     cr = cairo.cairo_create(surface)
@@ -246,6 +266,150 @@ def _draw_on_surface(surface, font, language, text):
 
     return max(ink_rect.width, logical_rect.width), max(ink_rect.height, logical_rect.height)
 
+class PageGenerator(object):
+    """
+    Produces degraded page images and alto using a single collection of font families.
+    """
+    def __init__(self, family='Sans', font_size=32, font_weight=400, language=None, page_width=1240, page_height=1748):
+
+        self.language = language
+        self.font = pango.pango_font_description_new()
+
+        self.page_width = page_width
+        self.page_height = page_height
+
+        # XXX: get PANGO_SCALE programmatically from somewhere
+        logger.debug('Setting font {}, size {}, weight {}'.format(family, font_size, font_weight))
+        pango.pango_font_description_set_size(self.font, font_size * 1024)
+        pango.pango_font_description_set_family(self.font, family)
+        pango.pango_font_description_set_weight(self.font, font_weight)
+
+    def _get_image_from_surface(self, surface):
+
+        logger.debug('Extracing data from real surface')
+        data = cairo.cairo_image_surface_get_data(surface)
+        size = int(4 * self.page_width * self.page_height)
+        buffer = ctypes.create_string_buffer(size)
+        ctypes.memmove(buffer, data, size)
+        logger.debug('Loading data into PIL image')
+        im = Image.frombuffer("RGBA", (self.page_width, self.page_height), buffer, "raw", "BGRA", 0, 1)
+        cairo.cairo_surface_destroy(surface)
+        logger.debug('Expand and grayscale image')
+        im = im.convert('L')
+        im = ImageOps.expand(im, 5, 255)
+
+        return im
+
+    def _get_layout(self, cr, pangocairo_ctx):
+
+        layout = pango.pango_layout_new(pangocairo_ctx)
+
+        pango_ctx = pango.pango_layout_get_context(layout)
+        if self.language is not None:
+            logger.debug('Setting language {} on context'.format(self.language))
+            pango_language = pango.pango_language_from_string(self.language)
+            pango.pango_context_set_language(pango_ctx, pango_language)
+
+        logger.debug('Setting font description on layout')
+        pango.pango_layout_set_font_description(layout, self.font)
+
+        logger.debug('Filling background of surface')
+        cairo.cairo_set_source_rgb(cr, 1.0, 1.0, 1.0)
+        cairo.cairo_paint(cr)
+
+        return layout
+
+    def _get_regions(self, im, layout, text):
+        iterator = pangocairo.pango_layout_get_iter(layout)
+        
+        ink_rect = PangoRectangle()
+        
+        logical_rect = PangoRectangle()
+
+        pango.pango_layout_get_pixel_extents(layout, ctypes.byref(ink_rect), ctypes.byref(logical_rect))
+        
+        region_bbox = (
+            max(1, min(ink_rect.x, logical_rect.x)), 
+            max(1, min(ink_rect.y, logical_rect.y)),
+            max(ink_rect.width, logical_rect.width),
+            max(ink_rect.height, logical_rect.height)
+        )
+
+        lines = []
+        start_ind = 0
+        line = 1
+        while line != 0:
+
+            layout_line = pangocairo.pango_layout_iter_get_line(iterator)
+
+            baseline = pangocairo.pango_layout_iter_get_baseline(iterator)
+            baseline_y = pango.pango_units_to_double(baseline)
+            baseline = (
+                (region_bbox[0], baseline_y), (region_bbox[2], baseline_y)
+            )
+            
+            lines.append({
+                "baseline": baseline,
+                "boundary": calculate_polygonal_environment(im, [baseline])[0]
+            })
+
+            line = pangocairo.pango_layout_iter_next_line(iterator)
+            if line != 0:
+                next_start_ind = pangocairo.pango_layout_line_get_start_index(layout_line)
+            else:
+                next_start_ind = len(text)+1
+            
+            lines[-1]['text'] = text[start_ind:next_start_ind]
+            start_ind = next_start_ind
+        
+        
+        regions = [{
+            "bbox": region_bbox,
+            "lines": lines
+        }]
+
+        return regions
+
+    def _draw_text(self, cr, layout, text):
+        logger.debug('Typsetting text')
+        pango.pango_layout_set_markup(layout, text, -1)
+
+        logger.debug('Drawing text')
+        cairo.cairo_set_source_rgb(cr, 0.0, 0.0, 0.0)
+        pangocairo.pango_cairo_update_layout(cr, layout)
+        pangocairo.pango_cairo_show_layout(cr, layout)
+    
+    def render(self, text):
+        """
+        TODO
+
+        Args:
+            text (unicode): A string which will be rendered as a page.
+
+        Returns:
+            (PIL.Image of mode 'L'., ALTO XML)
+
+        """
+        logger.info('Rendering page \'{}\''.format(text))
+        
+        logger.debug('Creating sized cairo surface')
+        surface = cairo.cairo_image_surface_create(0, self.page_width, self.page_height)
+        
+        logger.debug('Creating cairo and pangocairo contexts')
+        cr = cairo.cairo_create(surface)
+        pangocairo_ctx = pangocairo.pango_cairo_create_context(cr)
+        
+        logger.debug('Creating pangocairo layout')
+        layout = self._get_layout(cr, pangocairo_ctx)
+
+        self._draw_text(cr, layout, text)
+
+        im = self._get_image_from_surface(surface)
+        
+        regions = self._get_regions(im, layout, text)
+        
+        return (im, regions)
+    
 
 def ocropy_degrade(im, distort=1.0, dsigma=20.0, eps=0.03, delta=0.3, degradations=((0.5, 0.0, 0.5, 0.0),)):
     """

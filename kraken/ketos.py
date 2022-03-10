@@ -19,6 +19,8 @@ import click
 import logging
 import unicodedata
 
+from pathlib import Path
+
 from PIL import Image
 from rich.traceback import install
 from bidi.algorithm import get_display
@@ -978,6 +980,122 @@ def transcription(ctx, text_direction, scale, bw, maxcolseps,
     message('Writing output ', nl=False)
     ti.write(output)
     message('\u2713', fg='green')
+
+
+@cli.command('pagegen')
+@click.pass_context
+@click.option('-f', '--font', default='sans',
+                help='Font family to use')
+@click.option('-e', '--encoding', default='utf-8',
+              help='Decode text files with given codec.')
+@click.option('-fs', '--font-size', type=click.INT, default=32,
+              help='Font size to render texts in.')
+@click.option('-fw', '--font-weight', type=click.INT, default=400,
+              help='Font weight to render texts in.')
+@click.option('-l', '--language',
+              help='RFC-3066 language tag for language-dependent font shaping')
+@click.option('-o', '--output', type=click.Path(),
+                default='training_data', help='Output directory')
+@click.argument('text', nargs=-1, type=click.Path(exists=True))
+def pagegen(ctx, font, encoding, font_size, font_weight, language, output, text):
+    """
+    Generates training data for a single page: (alto, image) pair.
+    """
+    from kraken import linegen
+    import datetime
+    from kraken.serialization import max_bbox, _rescale
+    
+    from jinja2 import Environment, PackageLoader
+
+    def serialize(regions, image_name, image_size, writing_mode, base_dir=None):
+
+        page = {
+            'entities': [],
+            'size': image_size,
+            'name': image_name,
+            'writing_mode': writing_mode,
+            'scripts': None, # TODO
+            'date': datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            'base_dir': base_dir,
+            'seg_type': 'baselines',
+        }
+
+        for region in regions:
+            
+            bbox = region['bbox']
+            boundary = (list(bbox[:2]), list(bbox[2:]))
+
+            page['entities'].append({
+                'type': 'region',
+                'bbox': bbox,
+                'boundary': boundary,
+                'lines': [],
+            })
+
+            for idx, line_rec in enumerate(region['lines']):
+                line_bbox = max_bbox([line_rec['boundary']])
+                line = {
+                    'index': idx,
+                    'recognition': [],
+                    'boundary': [list(x) for x in line_rec['boundary']],
+                    'type': 'line',
+                    'recognition': [{
+                        'text': line_rec['text'],
+                        'bbox': line_bbox,
+                        'confidences': [1.0]
+                    }],
+                    'bbox': line_bbox
+                }
+
+                line['baseline'] = [list(x) for x in line_rec['baseline']]
+
+                page["entities"][0]["lines"].append(line)
+
+        logger.debug('Initializing jinja environment.')
+        
+        env = Environment(loader=PackageLoader('kraken', 'templates'),
+                        trim_blocks=True,
+                        lstrip_blocks=False,
+                        autoescape=True)
+
+        env.tests['whitespace'] = str.isspace
+        env.filters['rescale'] = _rescale
+        
+        logger.debug('Retrieving template.')
+        
+        tmpl = env.get_template('alto')
+        logger.debug('Rendering data.')
+        
+        return tmpl.render(page=page)
+
+    merged_text = ''
+    for t in text:
+        with click.open_file(t, encoding=encoding) as fp:
+            logger.info('Reading {}'.format(t))
+            merged_text += fp.read()
+    
+    lg = linegen.PageGenerator(font, font_size, font_weight, language)
+
+    im, regions = lg.render(merged_text)
+
+    base_fn = "{0:08d}".format(0)
+    image_fp = Path(output) / (base_fn + '.png')
+
+    alto_str = serialize(
+        regions=regions,
+        image_name=image_fp.name,
+        image_size=im.size,
+        writing_mode="horizontal-lr",
+        base_dir=output
+    )
+    
+    
+    alto_fp = Path(output) / (base_fn + '.xml')
+
+    with open(alto_fp, 'w') as fp:
+        fp.write(alto_str)
+    
+    im.save(image_fp)
 
 
 @cli.command('linegen')
