@@ -15,9 +15,9 @@ dependencies:
   - protobuf>=3.0
   - jinja2
   - conda-forge::torchvision-cpu>=0.5.0
-  - conda-forge::pytorch-cpu>=1.7.1,<1.11
+  - conda-forge::pytorch-cpu>=1.7.1,<=1.11
   - jsonschema
-  - scikit-image>=0.17.0,<=0.19.1
+  - scikit-image>=0.17.0,<=0.19.2
   - shapely
   - pyvips
   - imagemagick>=7.1.0
