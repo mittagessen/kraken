@@ -195,8 +195,14 @@ def parse_page(filename: Union[str, pathlib.Path]) -> Dict[str, Any]:
         except etree.XMLSyntaxError as e:
             raise KrakenInputException('Parsing {} failed: {}'.format(filename, e))
         image = doc.find('.//{*}Page')
+
         if image is None or image.get('imageFilename') is None:
             raise KrakenInputException('No valid image filename found in PageXML file {}'.format(filename))
+        
+        image_size = None
+        if image is not None and 'imageHeight' in image.attrib and 'imageWidth' in image.attrib:
+            image_size = (int(image.attrib['imageWidth']), int(image.attrib['imageHeight']))
+
         try:
             base_direction = {'left-to-right': 'L',
                               'right-to-left': 'R',
@@ -208,6 +214,7 @@ def parse_page(filename: Union[str, pathlib.Path]) -> Dict[str, Any]:
             base_direction = None
         lines = doc.findall('.//{*}TextLine')
         data = {'image': os.path.join(base_dir, image.get('imageFilename')),
+                'image_size': image_size,
                 'lines': [],
                 'type': 'baselines',
                 'base_dir': base_direction,
@@ -323,10 +330,18 @@ def parse_alto(filename: Union[str, pathlib.Path]) -> Dict[str, Any]:
         except etree.XMLSyntaxError as e:
             raise KrakenInputException('Parsing {} failed: {}'.format(filename, e))
         image = doc.find('.//{*}fileName')
+        
         if image is None or not image.text:
             raise KrakenInputException('No valid filename found in ALTO file')
+        
+        image_size = None
+        page = doc.find(".//{*}Page")
+        if page is not None and 'WIDTH' in page.attrib and 'HEIGHT' in page.attrib:
+            image_size = (int(page.attrib['WIDTH']), int(page.attrib['HEIGHT']))
+
         lines = doc.findall('.//{*}TextLine')
         data = {'image': os.path.join(base_dir, image.text),
+                'image_size': image_size,
                 'lines': [],
                 'type': 'baselines',
                 'base_dir': None,

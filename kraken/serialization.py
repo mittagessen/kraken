@@ -164,49 +164,53 @@ def serialize(records: Sequence[ocr_record],
             line['tags'] = record.tags
         if record.type == 'baselines':
             line['baseline'] = [list(x) for x in record.baseline]
-        splits = regex.split(r'(\s+)', record.prediction)
-        line_offset = 0
-        logger.debug(f'Record contains {len(splits)} segments')
-        for segment in splits:
-            if len(segment) == 0:
-                continue
-            seg_bbox = max_bbox(record.cuts[line_offset:line_offset + len(segment)])
-            seg_struct = {'bbox': seg_bbox,
-                          'confidences': record.confidences[line_offset:line_offset + len(segment)],
-                          'cuts': record.cuts[line_offset:line_offset + len(segment)],
-                          'text': segment,
-                          'recognition': [{'bbox': max_bbox([cut]),
-                                           'boundary': cut,
-                                           'confidence': conf,
-                                           'text': char,
-                                           'index': cid}
-                                          for conf, cut, char, cid in
-                                          zip(record.confidences[line_offset:line_offset + len(segment)],
-                                              record.cuts[line_offset:line_offset + len(segment)],
-                                              segment,
-                                              range(char_idx, char_idx + len(segment)))],
-                          'index': seg_idx}
-            # compute convex hull of all characters in segment
-            if record.type == 'baselines':
-                pols = []
-                for x in record.cuts[line_offset:line_offset + len(segment)]:
-                    try:
-                        pol = geom.Polygon(x)
-                    except ValueError:
-                        pol = geom.LineString(x).buffer(0.5, cap_style=2)
-                    if pol.area == 0.0:
-                        pol = pol.buffer(0.5)
-                    # if area is still 0 it's probably a point
-                    if pol.area == 0.0:
-                        pol = geom.Point(x[0]).buffer(0.5)
-                    pols.append(pol)
-                pols = unary_union(pols)
-                coords = np.array(pols.convex_hull.exterior.coords, dtype=np.uint).tolist()
-                seg_struct['boundary'] = coords
-            line['recognition'].append(seg_struct)
-            char_idx += len(segment)
-            seg_idx += 1
-            line_offset += len(segment)
+
+        if len(record.cuts) == 0:
+            line['recognition'] = record.prediction
+        else: 
+            splits = regex.split(r'(\s+)', record.prediction)
+            line_offset = 0
+            logger.debug(f'Record contains {len(splits)} segments')
+            for segment in splits:
+                if len(segment) == 0:
+                    continue
+                seg_bbox = max_bbox(record.cuts[line_offset:line_offset + len(segment)])
+                seg_struct = {'bbox': seg_bbox,
+                            'confidences': record.confidences[line_offset:line_offset + len(segment)],
+                            'cuts': record.cuts[line_offset:line_offset + len(segment)],
+                            'text': segment,
+                            'recognition': [{'bbox': max_bbox([cut]),
+                                            'boundary': cut,
+                                            'confidence': conf,
+                                            'text': char,
+                                            'index': cid}
+                                            for conf, cut, char, cid in
+                                            zip(record.confidences[line_offset:line_offset + len(segment)],
+                                                record.cuts[line_offset:line_offset + len(segment)],
+                                                segment,
+                                                range(char_idx, char_idx + len(segment)))],
+                            'index': seg_idx}
+                # compute convex hull of all characters in segment
+                if record.type == 'baselines':
+                    pols = []
+                    for x in record.cuts[line_offset:line_offset + len(segment)]:
+                        try:
+                            pol = geom.Polygon(x)
+                        except ValueError:
+                            pol = geom.LineString(x).buffer(0.5, cap_style=2)
+                        if pol.area == 0.0:
+                            pol = pol.buffer(0.5)
+                        # if area is still 0 it's probably a point
+                        if pol.area == 0.0:
+                            pol = geom.Point(x[0]).buffer(0.5)
+                        pols.append(pol)
+                    pols = unary_union(pols)
+                    coords = np.array(pols.convex_hull.exterior.coords, dtype=np.uint).tolist()
+                    seg_struct['boundary'] = coords
+                line['recognition'].append(seg_struct)
+                char_idx += len(segment)
+                seg_idx += 1
+                line_offset += len(segment)
         cur_ent.append(line)
 
     # No records but there are regions -> serialize all regions

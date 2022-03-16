@@ -994,107 +994,147 @@ def transcription(ctx, text_direction, scale, bw, maxcolseps,
               help='Font weight to render texts in.')
 @click.option('-l', '--language',
               help='RFC-3066 language tag for language-dependent font shaping')
+@click.option('-t', '--template', type=click.Path(), help='Path to template file')              
 @click.option('-o', '--output', type=click.Path(),
                 default='training_data', help='Output directory')
-@click.argument('text', nargs=-1, type=click.Path(exists=True))
-def pagegen(ctx, font, encoding, font_size, font_weight, language, output, text):
+@click.argument('text', nargs=1, type=click.Path(exists=True))
+def pagegen(ctx, font, encoding, font_size, font_weight, language, template, output, text):
     """
     Generates training data for a single page: (alto, image) pair.
     """
     from kraken import linegen
-    import datetime
-    from kraken.serialization import max_bbox, _rescale
-    
-    from jinja2 import Environment, PackageLoader
+    import json
+    import numpy as np
+    from kraken.serialization import serialize
+    from kraken.lib.xml import parse_xml
+    import shapely.geometry as geom
+    from kraken.rpred import ocr_record
 
-    def serialize(regions, image_name, image_size, writing_mode, base_dir=None):
+    def get_simple_template():
+        image_size = (2007, 2881)
 
-        page = {
-            'entities': [],
-            'size': image_size,
-            'name': image_name,
-            'writing_mode': writing_mode,
-            'scripts': None, # TODO
-            'date': datetime.datetime.now(datetime.timezone.utc).isoformat(),
-            'base_dir': base_dir,
-            'seg_type': 'baselines',
+        bounds_text_area = [[
+            [int(.1*image_size[0]), int(.1*image_size[1])],
+            [int(.9*image_size[0]), int(.1*image_size[1])],
+            [int(.9*image_size[0]), int(.9*image_size[1])],
+            [int(.1*image_size[0]), int(.9*image_size[1])],
+            [int(.1*image_size[0]), int(.1*image_size[1])],
+        ]]
+
+        return {
+            'image': None, 
+            'image_size': image_size,
+            'lines': [], 
+            'type': 'baselines', 
+            'base_dir': None, 
+            'regions':{   
+                'main': bounds_text_area
+            }, 
+            'tags': True
         }
 
-        for region in regions:
+    def offset_lines(lines, region_offset):
+        for line in lines:
+            line['boundary'] += region_offset
+            line['baseline'] = tuple(map(tuple,np.array(line['baseline']) + region_offset))
+        return lines
+
+    template = parse_xml(template) if template else get_simple_template()
+    image_size = template['image_size']
+
+    with click.open_file(text, encoding=encoding) as fp:
+
+        logger.info('Reading {}'.format(text))
+        with KrakenProgressBar() as progress:
+            raw_lines = fp.readlines()
             
-            bbox = region['bbox']
-            boundary = (list(bbox[:2]), list(bbox[2:]))
+            gen_task = progress.add_task(
+                'Render images',
+                total=len(raw_lines),
+                visible=True if not ctx.meta['verbose'] else False
+            )
 
-            page['entities'].append({
-                'type': 'region',
-                'bbox': bbox,
-                'boundary': boundary,
-                'lines': [],
-            })
+            for iline, line in enumerate(raw_lines):
+                
+                if text.endswith('.jsonl'):
+                    text_region_dict = json.loads(line)
+                elif text.endswith('.txt'):
+                    # in txt files, there is only one region - this will be 'main'. If a template is given it should contain a 'main' region
+                    text_region_dict = {'main': line}
 
-            for idx, line_rec in enumerate(region['lines']):
-                line_bbox = max_bbox([line_rec['boundary']])
-                line = {
-                    'index': idx,
-                    'recognition': [],
-                    'boundary': [list(x) for x in line_rec['boundary']],
-                    'type': 'line',
-                    'recognition': [{
-                        'text': line_rec['text'],
-                        'bbox': line_bbox,
-                        'confidences': [1.0]
-                    }],
-                    'bbox': line_bbox
+                region_text_iterator = {
+                    k: (template['regions'][k], text_region_dict[k]) for k in template['regions']
                 }
 
-                line['baseline'] = [list(x) for x in line_rec['baseline']]
+                # create white background canvas to place all regions on
+                canvas_image = Image.new('RGB', image_size, (255, 255, 255))
 
-                page["entities"][0]["lines"].append(line)
+                line_regions = []
 
-        logger.debug('Initializing jinja environment.')
-        
-        env = Environment(loader=PackageLoader('kraken', 'templates'),
-                        trim_blocks=True,
-                        lstrip_blocks=False,
-                        autoescape=True)
+                for _, (region_coords, region_text) in region_text_iterator.items():
+                    region_pol = geom.Polygon(region_coords[0])
 
-        env.tests['whitespace'] = str.isspace
-        env.filters['rescale'] = _rescale
-        
-        logger.debug('Retrieving template.')
-        
-        tmpl = env.get_template('alto')
-        logger.debug('Rendering data.')
-        
-        return tmpl.render(page=page)
+                    (minx, miny, maxx, maxy) = region_pol.bounds
 
+                    region_offset = (int(minx), int(miny))
 
-    for it, t in enumerate(text):
-        with click.open_file(t, encoding=encoding) as fp:
-            logger.info('Reading {}'.format(t))
-            text_ = fp.read()
-    
-        lg = linegen.PageGenerator(font, font_size, font_weight, language, encoding)
+                    lg = linegen.ParagraphGenerator(
+                        font,
+                        font_size,
+                        font_weight,
+                        language,
+                        encoding,
+                        page_width=int(maxx-minx),
+                        page_height=int(maxy-miny),
+                    )
 
-        im, regions = lg.render(text_)
+                    (region_im, region_line_region) = lg.render(region_text)
+                    
+                    region_line_region['lines'] = offset_lines(
+                        region_line_region['lines'],
+                        region_offset
+                    )
 
-        base_fn = "{0:08d}".format(it)
-        image_fp = Path(output) / (base_fn + '.png')
+                    line_regions += region_line_region['lines']
 
-        alto_str = serialize(
-            regions=regions,
-            image_name=image_fp.name,
-            image_size=im.size,
-            writing_mode="horizontal-lr",
-            base_dir=output
-        )
-        
-        alto_fp = Path(output) / (base_fn + '.xml')
+                    canvas_image.paste(region_im, region_offset)
 
-        with open(alto_fp, 'w') as fp:
-            fp.write(alto_str)
-        
-        im.save(image_fp)
+                # TODO: image distortion
+
+                base_fn = "{0:08d}".format(iline)
+                image_fp = Path(output) / (base_fn + '.png')
+
+                
+                records = []
+                for line in line_regions:
+
+                    records.append(
+                        ocr_record(
+                            prediction=line['text'],
+                            cuts=[], 
+                            confidences=[],
+                            line=line
+                        )
+                    )
+
+                alto_str = serialize(
+                    records=records,
+                    image_name=image_fp.name,
+                    image_size=image_size,
+                    writing_mode="horizontal-lr",
+                    scripts=["Latn"],
+                    regions=template['regions'],
+                    template='alto'
+                )
+                
+                alto_fp = Path(output) / (base_fn + '.xml')
+
+                with open(alto_fp, 'w') as fp:
+                    fp.write(alto_str)
+                
+                canvas_image.save(image_fp)
+
+                progress.update(gen_task, advance=1)
 
 
 @cli.command('linegen')
