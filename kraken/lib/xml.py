@@ -440,7 +440,7 @@ def parse_alto(filename: Union[str, pathlib.Path]) -> Dict[str, Any]:
                                   'tags': tags,
                                   'split': split_type})
 
-        if len(tags) > 1:
+        if len(tag_set) > 1:
             data['tags'] = True
         else:
             data['tags'] = False
