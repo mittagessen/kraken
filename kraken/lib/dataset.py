@@ -1106,7 +1106,7 @@ class BaselineSet(Dataset):
         baselines_ = defaultdict(list)
         for line in baselines:
             if self.valid_baselines is None or set(line['tags'].values()).intersection(self.valid_baselines):
-                tags = set(line['tags'].values()).intersection(valid_baselines) if valid_baselines else line['tags'].values()
+                tags = set(line['tags'].values()).intersection(self.valid_baselines) if self.valid_baselines else line['tags'].values()
                 for tag in tags:
                     baselines_[tag].append(line['baseline'])
                     self.class_stats['baselines'][tag] += 1
