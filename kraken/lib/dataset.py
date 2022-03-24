@@ -1016,8 +1016,8 @@ class BaselineSet(Dataset):
                     im_paths.append(data['image'])
                     lines = defaultdict(list)
                     for line in data['lines']:
-                        if valid_baselines is None or line['tags'].intersection(valid_baselines):
-                            tags = line['tags'].intersection(valid_baselines) if valid_baselines else line['tags']
+                        if valid_baselines is None or set(line['tags'].values()).intersection(valid_baselines):
+                            tags = set(line['tags'].values()).intersection(valid_baselines) if valid_baselines else line['tags'].values()
                             for tag in tags:
                                 lines[self.mbl_dict.get(tag, tag)].append(line['baseline'])
                                 self.class_stats['baselines'][self.mbl_dict.get(tag, tag)] += 1
@@ -1105,8 +1105,8 @@ class BaselineSet(Dataset):
             raise Exception(f'The `add` method is incompatible with dataset mode {self.mode}')
         baselines_ = defaultdict(list)
         for line in baselines:
-            if self.valid_baselines is None or line['tags'].intersection(self.valid_baselines):
-                tags = line['tags'].intersection(self.valid_baselines) if self.valid_baselines else line['tags']
+            if self.valid_baselines is None or set(line['tags'].values()).intersection(self.valid_baselines):
+                tags = set(line['tags'].values()).intersection(valid_baselines) if valid_baselines else line['tags'].values()
                 for tag in tags:
                     baselines_[tag].append(line['baseline'])
                     self.class_stats['baselines'][tag] += 1
