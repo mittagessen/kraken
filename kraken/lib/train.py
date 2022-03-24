@@ -101,6 +101,7 @@ class KrakenTrainer(pl.Trainer):
 
             logger.info('Saving to {}_{}'.format(self.model.output, self.current_epoch))
             self.model.nn.save_model(f'{self.model.output}_{self.current_epoch}.mlmodel')
+        super().on_validation_end()
 
     def fit(self, *args, **kwargs):
         with warnings.catch_warnings():
