@@ -27,7 +27,7 @@ from scipy.ndimage import maximum_filter, binary_erosion
 from scipy.ndimage.morphology import distance_transform_cdt
 from scipy.spatial.distance import pdist, squareform
 
-from shapely.ops import nearest_points, unary_union
+from shapely.ops import nearest_points, unary_union, clip_by_rect
 
 from skimage import draw, filters
 from skimage.graph import MCP_Connect
@@ -508,7 +508,7 @@ def _calc_seam(baseline, polygon, angle, im_feats, bias=150):
     return seam
 
 
-def _extract_patch(env_up, env_bottom, baseline, offset_baseline, end_points, dir_vec, topline, offset, im_feats):
+def _extract_patch(env_up, env_bottom, baseline, offset_baseline, end_points, dir_vec, topline, offset, im_feats, bounds):
     """
     Calculate a line image patch from a ROI and the original baseline.
     """
@@ -537,7 +537,9 @@ def _extract_patch(env_up, env_bottom, baseline, offset_baseline, end_points, di
     else:
         bottom_seam = np.array(bottom_seam.parallel_offset(offset//2, side='left'), dtype=int)
 
+    # offsetting might produce bounds outside the image. Clip it to the image bounds.
     polygon = np.concatenate(([end_points[0]], upper_seam, [end_points[-1]], bottom_seam[::-1]))
+    polygon = np.array(clip_by_rect(geom.Polygon(polygon), 0, 0, *tuple(bounds)).boundary.coords, dtype=int)
     return polygon
 
 
@@ -693,7 +695,8 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
                                            p_dir,
                                            topline,
                                            offset,
-                                           im_feats))
+                                           im_feats,
+                                           bounds))
         except Exception as e:
             logger.warning(f'Polygonizer failed on line {idx}: {e}')
             polygons.append(None)

@@ -19,7 +19,7 @@ dependencies:
   - cudatoolkit>=9.2
   - jsonschema
   - scikit-image>=0.17.0,<=0.19.2
-  - shapely
+  - shapely>=1.7
   - pyvips
   - imagemagick>=7.1.0
   - coremltools>=3.3
