@@ -135,10 +135,16 @@ def parse_xml(filename: Union[str, pathlib.Path]) -> Dict[str, Any]:
         filename: path to an XML file.
 
     Returns:
-        A dict {'image': impath, lines: [{'boundary': [[x0, y0], ...],
-        'baseline': [[x0, y0], ...]}, {...], 'text': 'apdjfqpf', 'tags':
-        ['script_type_0', 'script_type_1']}, regions: {'region_type_0': [[[x0,
-        y0], ...], ...], ...}}
+        A dict::
+
+            {'image': impath,
+             'lines': [{'boundary': [[x0, y0], ...],
+                        'baseline': [[x0, y0], ...],
+                        'text': apdjfqpf',
+                        'tags': {'type': 'default', ...}},
+                       ...
+                       {...}],
+             'regions': {'region_type_0': [[[x0, y0], ...], ...], ...}}
     """
     with open(filename, 'rb') as fp:
         try:
@@ -162,10 +168,16 @@ def parse_page(filename: Union[str, pathlib.Path]) -> Dict[str, Any]:
         filename: path to a PageXML file.
 
     Returns:
-        A dict {'image': impath, lines: [{'boundary': [[x0, y0], ...],
-        'baseline': [[x0, y0], ...]}, {...], 'text': 'apdjfqpf', 'tags':
-        {'script': 'script_type', 'split': 'train', 'type': 'type_1']},
-        regions: {'region_type_0': [[[x0, y0], ...], ...], ...}}
+        A dict::
+
+            {'image': impath,
+             'lines': [{'boundary': [[x0, y0], ...],
+                        'baseline': [[x0, y0], ...],
+                        'text': apdjfqpf',
+                        'tags': {'type': 'default', ...}},
+                       ...
+                       {...}],
+             'regions': {'region_type_0': [[[x0, y0], ...], ...], ...}}
     """
     def _parse_page_custom(s):
         o = {}
@@ -311,10 +323,16 @@ def parse_alto(filename: Union[str, pathlib.Path]) -> Dict[str, Any]:
         filename: path to an ALTO file.
 
     Returns:
-        A dict {'image': impath, lines: [{'boundary': [[x0, y0], ...],
-        'baseline': [[x0, y0], ...]}, {...], 'text': 'apdjfqpf', 'tags':
-        {'script': 'script_type', 'split': 'train', 'type': 'type_1']},
-        regions: {'region_type_0': [[[x0, y0], ...], ...], ...}}
+        A dict::
+
+            {'image': impath,
+             'lines': [{'boundary': [[x0, y0], ...],
+                        'baseline': [[x0, y0], ...],
+                        'text': apdjfqpf',
+                        'tags': {'type': 'default', ...}},
+                       ...
+                       {...}],
+             'regions': {'region_type_0': [[[x0, y0], ...], ...], ...}}
     """
     with open(filename, 'rb') as fp:
         base_dir = dirname(filename)

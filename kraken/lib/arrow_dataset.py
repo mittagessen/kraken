@@ -26,7 +26,7 @@ import tempfile
 
 from PIL import Image
 from collections import Counter
-from typing import Optional, List, Union, Callable, Tuple
+from typing import Optional, List, Union, Callable, Tuple, Dict
 from multiprocessing import Pool
 from kraken.lib import functional_im_transforms as F_t
 from kraken.lib.segmentation import extract_polygons
@@ -91,7 +91,7 @@ def parse_path(path: Union[str, pathlib.Path], suffix: str = '.gt.txt', split=F_
     return {'image': path, 'lines': [{'text': gt}]}
 
 
-def build_binary_dataset(files: Optional[List[Union[str, pathlib.Path]]] = None,
+def build_binary_dataset(files: Optional[List[Union[str, pathlib.Path, Dict]]] = None,
                          output_file: Union[str, pathlib.Path] = None,
                          format_type: str = 'xml',
                          num_workers: int = 0,
@@ -107,7 +107,10 @@ def build_binary_dataset(files: Optional[List[Union[str, pathlib.Path]]] = None,
     Args:
         files: List of XML input files.
         output_file: Path to the output file.
-        format_type: One of `xml`, `alto`, `page`, or `path`.
+        format_type: One of `xml`, `alto`, `page`, `path`, or None. In `None`
+                     mode, the files argument is expected to be a list of
+                     dictionaries in the output format of the
+                     `kraken.lib.xml.parse_{alto,page,xml}` functions.
         num_workers: Number of workers for parallelized extraction of line
                      images. Set to `0` to disable parallelism.
         ignore_splits: Switch to disable serialization of the explicit
@@ -127,6 +130,7 @@ def build_binary_dataset(files: Optional[List[Union[str, pathlib.Path]]] = None,
 
     logger.info('Parsing XML files')
     extract_fn = _extract_line
+    parse_fn = None
     if format_type == 'xml':
         parse_fn = parse_xml
     elif format_type == 'alto':
@@ -138,6 +142,8 @@ def build_binary_dataset(files: Optional[List[Union[str, pathlib.Path]]] = None,
             logger.warning('ignore_splits is False and format_type is path. Will not serialize splits.')
         parse_fn = parse_path
         extract_fn = _extract_path_line
+    elif format_type is None:
+        pass
     else:
         raise ValueError(f'invalid format {format_type} for parse_(xml,alto,page,path)')
 
@@ -145,20 +151,24 @@ def build_binary_dataset(files: Optional[List[Union[str, pathlib.Path]]] = None,
         raise ValueError(f'force_type set to invalid value {force_type}')
 
     docs = []
-    for doc in files:
-        try:
-            data = parse_fn(doc)
-        except KrakenInputException:
-            logger.warning(f'Invalid input file {doc}')
-            continue
-        try:
-            with open(data['image'], 'rb') as fp:
-                Image.open(fp)
-        except FileNotFoundError as e:
-            logger.warning(f'Could not open file {e.filename} in {doc}')
-            continue
-        docs.append(data)
-    logger.info(f'Parsed {len(docs)} files.')
+    if parse_fn:
+        for doc in files:
+            try:
+                data = parse_fn(doc)
+            except KrakenInputException:
+                logger.warning(f'Invalid input file {doc}')
+                continue
+            try:
+                with open(data['image'], 'rb') as fp:
+                    Image.open(fp)
+            except FileNotFoundError as e:
+                logger.warning(f'Could not open file {e.filename} in {doc}')
+                continue
+            docs.append(data)
+        logger.info(f'Parsed {len(docs)} files.')
+    else:
+        docs = files.copy()
+        logger.info(f'Got {len(docs)} preparsed files.')
 
     logger.info('Assembling dataset alphabet.')
     alphabet = Counter()
