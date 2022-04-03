@@ -47,7 +47,6 @@ def _extract_line(xml_record):
         return lines, None, None
     if is_bitonal(im):
         im = im.convert('1')
-    line_counts = Counter({'all': 0, 'train': 0, 'validation': 0, 'test': 0})
     seg_key = 'lines' if 'lines' in xml_record else 'boxes'
     recs = xml_record.pop(seg_key)
     for idx, rec in enumerate(recs):
@@ -60,10 +59,6 @@ def _extract_line(xml_record):
             continue
         fp = io.BytesIO()
         line_im.save(fp, format='png')
-        if line['split']:
-            line_counts[line['split']] += 1
-        else:
-            line_counts['all'] += 1
         lines.append({'text': line['text'], 'im': fp.getvalue()})
     return lines, im.mode
 
@@ -80,7 +75,7 @@ def _extract_path_line(xml_record):
     fp = io.BytesIO()
     im.save(fp, format='png')
     line = {'text': xml_record['lines'][0]['text'], 'im': fp.getvalue()}
-    return [line], im.mode, {'all': 1, 'train': 0, 'validation': 0, 'test': 0}
+    return [line], im.mode
 
 
 def parse_path(path: Union[str, pathlib.Path], suffix: str = '.gt.txt', split=F_t.default_split):
