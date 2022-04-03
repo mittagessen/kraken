@@ -336,6 +336,9 @@ class RecognitionModel(pl.LightningModule):
                     dataset.add(**im)
                 except KrakenInputException as e:
                     logger.warning(str(e))
+            if self.format_type == 'binary' and self.hparams.normalization:
+                logger.debug(f'Rebuilding dataset using unicode normalization')
+                dataset.rebuild_alphabet()
         return dataset
 
     def forward(self, x, seq_lens):
