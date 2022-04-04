@@ -268,6 +268,12 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs, min_epochs
     if not (0 <= freq <= 1) and freq % 1.0 != 0:
         raise click.BadOptionUsage('freq', 'freq needs to be either in the interval [0,1.0] or a positive integer.')
 
+    if augment:
+        try:
+            import albumentations
+        except ImportError:
+            raise click.BadOptionUsage('augment', 'augmentation needs the `albumentations` package installed.')
+
     logger.info('Building ground truth set from {} document images'.format(len(ground_truth) + len(training_files)))
 
     # populate hyperparameters from command line args
@@ -521,6 +527,12 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
 
     if not (0 <= freq <= 1) and freq % 1.0 != 0:
         raise click.BadOptionUsage('freq', 'freq needs to be either in the interval [0,1.0] or a positive integer.')
+
+    if augment:
+        try:
+            import albumentations
+        except ImportError:
+            raise click.BadOptionUsage('augment', 'augmentation needs the `albumentations` package installed.')
 
     import json
     import shutil
