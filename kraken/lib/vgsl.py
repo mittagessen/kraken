@@ -261,8 +261,8 @@ class TorchVGSLModel(object):
             net = pyrnn_pb2.pyrnn()
             try:
                 net.ParseFromString(fp.read())
-            except Exception:
-                raise KrakenInvalidModelException('File does not contain valid proto msg')
+            except Exception as e:
+                raise KrakenInvalidModelException('File does not contain valid proto msg') from e
             if not net.IsInitialized():
                 raise KrakenInvalidModelException('Model incomplete')
 
@@ -322,8 +322,8 @@ class TorchVGSLModel(object):
         with open(path, 'rb') as fp:
             try:
                 net.ParseFromString(fp.read())
-            except Exception:
-                raise KrakenInvalidModelException('File does not contain valid proto msg')
+            except Exception as e:
+                raise KrakenInvalidModelException('File does not contain valid proto msg') from e
             if not net.IsInitialized():
                 raise KrakenInvalidModelException('Model incomplete')
 
@@ -409,9 +409,9 @@ class TorchVGSLModel(object):
         try:
             mlmodel = MLModel(path)
         except TypeError as e:
-            raise KrakenInvalidModelException(str(e))
+            raise KrakenInvalidModelException(str(e)) from e
         except DecodeError as e:
-            raise KrakenInvalidModelException('Failure parsing model protobuf: {}'.format(str(e)))
+            raise KrakenInvalidModelException('Failure parsing model protobuf: {}'.format(str(e))) from e
         if 'vgsl' not in mlmodel.user_defined_metadata:
             raise KrakenInvalidModelException('No VGSL spec in model metadata')
         vgsl_spec = mlmodel.user_defined_metadata['vgsl']
@@ -425,7 +425,10 @@ class TorchVGSLModel(object):
             else:
                 layer.deserialize(name, mlmodel.get_spec())
 
-        _deserialize_layers('', nn.nn)
+        try:
+            _deserialize_layers('', nn.nn)
+        except Exception as exc:
+            raise KrakenInvalidModelException('Failed parsing out layers from model weights') from exc
 
         if 'codec' in mlmodel.user_defined_metadata:
             nn.add_codec(PytorchCodec(json.loads(mlmodel.user_defined_metadata['codec'])))
