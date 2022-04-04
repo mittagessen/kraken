@@ -86,28 +86,41 @@ class KrakenTrainer(pl.Trainer):
         else:
             kwargs['enable_model_summary'] = False
 
+        kwargs['callbacks'].extend([KrakenSetOneChannelMode(), KrakenSaveModel()])
         super().__init__(*args, **kwargs)
-
-    def on_validation_end(self):
-        if not self.sanity_checking:
-            # fill one_channel_mode after 1 iteration over training data set
-            if self.current_epoch == 0 and self.model.nn.model_type == 'recognition':
-                im_mode = self.model.train_set.dataset.im_mode
-                if im_mode in ['1', 'L']:
-                    logger.info(f'Setting model one_channel_mode to {im_mode}.')
-                    self.model.nn.one_channel_mode = im_mode
-            self.model.nn.hyper_params['completed_epochs'] += 1
-            self.model.nn.user_metadata['accuracy'].append(((self.current_epoch+1)*len(self.model.train_set), float(self.logged_metrics['val_metric'])))
-
-            logger.info('Saving to {}_{}'.format(self.model.output, self.current_epoch))
-            self.model.nn.save_model(f'{self.model.output}_{self.current_epoch}.mlmodel')
-        super().on_validation_end()
 
     def fit(self, *args, **kwargs):
         with warnings.catch_warnings():
             warnings.filterwarnings(action='ignore', category=UserWarning,
                                     message='The dataloader,')
             super().fit(*args, **kwargs)
+
+
+class KrakenSetOneChannelMode(Callback):
+    """
+    Callback that sets the one_channel_mode of the model after the first epoch.
+    """
+    def on_train_epoch_end(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule") -> None:
+        # fill one_channel_mode after 1 iteration over training data set
+        if not trainer.sanity_checking and trainer.current_epoch == 0 and trainer.model.nn.model_type == 'recognition':
+            im_mode = trainer.model.train_set.dataset.im_mode
+            if im_mode in ['1', 'L']:
+                logger.info(f'Setting model one_channel_mode to {im_mode}.')
+                trainer.model.nn.one_channel_mode = im_mode
+
+
+class KrakenSaveModel(Callback):
+    """
+    Kraken's own serialization callback instead of pytorch's.
+    """
+    def on_validation_end(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule") -> None:
+        if not trainer.sanity_checking:
+            trainer.model.nn.hyper_params['completed_epochs'] += 1
+            trainer.model.nn.user_metadata['accuracy'].append(
+                ((trainer.current_epoch + 1) * len(trainer.model.train_set), float(trainer.logged_metrics['val_metric'])))
+
+            logger.info('Saving to {}_{}'.format(trainer.model.output, trainer.current_epoch))
+            trainer.model.nn.save_model(f'{trainer.model.output}_{trainer.current_epoch}.mlmodel')
 
 
 class RecognitionModel(pl.LightningModule):
