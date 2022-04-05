@@ -11,7 +11,7 @@ dependencies:
   - lxml
   - regex
   - requests
-  - click>=7.0
+  - click>=8.0
   - numpy
   - pillow==6.1
   - scipy

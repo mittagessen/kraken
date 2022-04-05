@@ -318,7 +318,7 @@ def cli(input, batch_input, suffix, verbose, format_type, pdf_format, serializer
     log.set_logger(logger, level=30 - min(10 * verbose, 20))
 
 
-@cli.resultcallback()
+@cli.result_callback()
 def process_pipeline(subcommands, input, batch_input, suffix, verbose, format_type, pdf_format, **args):
     """
     Helper function calling the partials returned by each subcommand and

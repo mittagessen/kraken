@@ -16,7 +16,7 @@ requirements:
      - lxml==4.8.0
      - regex==2021.11.2
      - requests==2.27.1
-     - click>=7.0
+     - click>=8.0
      - numpy==1.19.5
      - pillow>=6.2.2
      - scipy==1.7.3
