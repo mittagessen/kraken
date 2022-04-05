@@ -56,7 +56,7 @@ master branch as well:
 
 ::
 
-  $ git clone git://github.com/mittagessen/kraken.git 
+  $ git clone https://github.com/mittagessen/kraken.git 
   $ cd kraken
   $ conda env create -f environment.yml
 
@@ -64,7 +64,7 @@ or:
 
 ::
 
-  $ git clone git://github.com/mittagessen/kraken.git 
+  $ git clone https://github.com/mittagessen/kraken.git 
   $ cd kraken
   $ conda env create -f environment_cuda.yml
 
