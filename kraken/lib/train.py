@@ -404,6 +404,12 @@ class RecognitionModel(pl.LightningModule):
         elif self.hparams.optimizer == 'Lamb':
             from pytorch_lamb import Lamb
             optim = Lamb(self.nn.nn.parameters(), lr=self.hparams.lrate, weight_decay=self.hparams.weight_decay)
+        elif self.hparams.optimizer == 'Ranger21':
+            from ranger21 import Ranger21
+            optim = Ranger21(self.nn.nn.parameters(),
+                             lr=self.hparams.lrate,
+                             num_epochs=self.hparams.epochs,
+                             num_batches_per_epoch=len(self.train_set)//self.hparams.batch_size)
         else:
             optim = getattr(torch.optim, self.hparams.optimizer)(self.nn.nn.parameters(),
                                                                  lr=self.hparams.lrate,
@@ -426,13 +432,19 @@ class RecognitionModel(pl.LightningModule):
                 raise ValueError('1cycle learning rate scheduler selected but '
                                  'number of epochs is less than 0 '
                                  f'({self.hparams.epochs}).')
-            lr_sched['scheduler'] = lr_scheduler.OneCycleLR(optim, max_lr=1.0, epochs=self.hparams.epochs, steps_per_epoch=len(self.train_set))
+            lr_sched['scheduler'] = lr_scheduler.OneCycleLR(optim,
+                                                            max_lr=1.0,
+                                                            epochs=self.hparams.epochs,
+                                                            steps_per_epoch=len(self.train_set)//self.hparams.batch_size)
             lr_sched['interval'] = 'step'
         elif self.hparams.schedule != 'constant':
             raise ValueError(f'Unsupported learning rate scheduler {self.hparams.schedule}.')
 
         if lr_sched:
             lr_sched['monitor'] = 'val_metric'
+
+        if self.hparams.optimizer == 'Ranger21':
+            lr_sched = {}
 
         return [optim], lr_sched if lr_sched else []
 
@@ -876,12 +888,17 @@ class SegmentationModel(pl.LightningModule):
         elif self.hparams.optimizer == 'Lamb':
             from pytorch_lamb import Lamb
             optim = Lamb(self.nn.nn.parameters(), lr=self.hparams.lrate, weight_decay=self.hparams.weight_decay)
+        elif self.hparams.optimizer == 'Ranger21':
+            from ranger21 import Ranger21
+            optim = Ranger21(self.nn.nn.parameters(),
+                             lr=self.hparams.lrate,
+                             num_epochs=self.hparams.epochs,
+                             num_batches_per_epoch=len(self.train_set))
         else:
             optim = getattr(torch.optim, self.hparams.optimizer)(self.nn.nn.parameters(),
                                                                  lr=self.hparams.lrate,
                                                                  momentum=self.hparams.momentum,
                                                                  weight_decay=self.hparams.weight_decay)
-
         lr_sched = {}
         if self.hparams.schedule == 'exponential':
             lr_sched['scheduler'] = lr_scheduler.ExponentialLR(optim, self.hparams.gamma)
@@ -899,13 +916,19 @@ class SegmentationModel(pl.LightningModule):
                 raise ValueError('1cycle learning rate scheduler selected but '
                                  'number of epochs is less than 0 '
                                  f'({self.hparams.epochs}).')
-            lr_sched['scheduler'] = lr_scheduler.OneCycleLR(optim, max_lr=1.0, epochs=self.hparams.epochs, steps_per_epoch=len(self.train_set))
+            lr_sched['scheduler'] = lr_scheduler.OneCycleLR(optim,
+                                                            max_lr=1.0,
+                                                            epochs=self.hparams.epochs,
+                                                            steps_per_epoch=len(self.train_set))
             lr_sched['interval'] = 'step'
         elif self.hparams.schedule != 'constant':
             raise ValueError(f'Unsupported learning rate scheduler {self.hparams.schedule}.')
 
         if lr_sched:
             lr_sched['monitor'] = 'val_metric'
+
+        if self.hparams.optimizer == 'Ranger21':
+            lr_sched = {}
 
         return [optim], lr_sched if lr_sched else []
 
