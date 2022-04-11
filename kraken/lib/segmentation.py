@@ -461,7 +461,7 @@ def _calc_seam(baseline, polygon, angle, im_feats, bias=150):
     mask = np.ones_like(patch, dtype=bool)
     mask[r-r_min, c-c_min] = False
     # dilate mask to compensate for aliasing during rotation
-    mask = binary_erosion(mask, iterations=2)
+    mask = binary_erosion(mask, border_value=True, iterations=2)
     # combine weights with features
     patch[mask] = MASK_VAL
     patch += (dist_bias*(np.mean(patch[patch != MASK_VAL])/bias))
@@ -518,28 +518,33 @@ def _extract_patch(env_up, env_bottom, baseline, offset_baseline, end_points, di
     bottom_offset_polygon = np.concatenate((offset_baseline, env_bottom[::-1]))
 
     angle = np.arctan2(dir_vec[1], dir_vec[0])
+    roi_polygon = unary_union([geom.Polygon(upper_polygon), geom.Polygon(bottom_polygon)])
 
     if topline:
-        upper_seam = geom.LineString(_calc_seam(baseline, upper_polygon, angle, im_feats)).simplify(5)
-        bottom_seam = geom.LineString(_calc_seam(offset_baseline, bottom_offset_polygon, angle, im_feats)).simplify(5)
+        upper_seam = _calc_seam(baseline, upper_polygon, angle, im_feats)
+        bottom_seam = _calc_seam(offset_baseline, bottom_offset_polygon, angle, im_feats)
     else:
-        upper_seam = geom.LineString(_calc_seam(offset_baseline, upper_offset_polygon, angle, im_feats)).simplify(5)
-        bottom_seam = geom.LineString(_calc_seam(baseline, bottom_polygon, angle, im_feats)).simplify(5)
+        upper_seam = _calc_seam(offset_baseline, upper_offset_polygon, angle, im_feats)
+        bottom_seam = _calc_seam(baseline, bottom_polygon, angle, im_feats)
+
+    upper_seam = geom.LineString(upper_seam).simplify(5)
+    bottom_seam = geom.LineString(bottom_seam).simplify(5)
 
     # ugly workaround against GEOM parallel_offset bug creating a
     # MultiLineString out of offset LineString
     if upper_seam.parallel_offset(offset//2, side='right').type == 'MultiLineString' or offset == 0:
-        upper_seam = np.array(upper_seam, dtype=int)
+        upper_seam = np.array(upper_seam.coords, dtype=int)
     else:
-        upper_seam = np.array(upper_seam.parallel_offset(offset//2, side='right'), dtype=int)[::-1]
+        upper_seam = np.array(upper_seam.parallel_offset(offset//2, side='right').coords, dtype=int)[::-1]
     if bottom_seam.parallel_offset(offset//2, side='left').type == 'MultiLineString' or offset == 0:
-        bottom_seam = np.array(bottom_seam, dtype=int)
+        bottom_seam = np.array(bottom_seam.coords, dtype=int)
     else:
-        bottom_seam = np.array(bottom_seam.parallel_offset(offset//2, side='left'), dtype=int)
+        bottom_seam = np.array(bottom_seam.parallel_offset(offset//2, side='left').coords, dtype=int)
 
     # offsetting might produce bounds outside the image. Clip it to the image bounds.
     polygon = np.concatenate(([end_points[0]], upper_seam, [end_points[-1]], bottom_seam[::-1]))
-    polygon = np.array(clip_by_rect(geom.Polygon(polygon), 0, 0, *tuple(bounds)).boundary.coords, dtype=int)
+    polygon = geom.Polygon(polygon)
+    polygon = np.array(roi_polygon.intersection(polygon).boundary.coords, dtype=int)
     return polygon
 
 
