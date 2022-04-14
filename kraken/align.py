@@ -38,7 +38,7 @@ try:
     import pywrapfst as fst
 
     _get_fst = lambda: fst.VectorFst() # NOQA
-    _get_best_weight = lambda x: fst.Weight.one(fst.weight_type()) # NOQA
+    _get_best_weight = lambda x: fst.Weight.one(x.weight_type()) # NOQA
 except ImportError:
     logger.info('pywrapfst not available. Falling back to openfst_python.')
     try:
