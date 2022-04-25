@@ -128,9 +128,9 @@ class TorchVGSLModel(object):
         """
         self.spec = spec
         self.named_spec = []  # type:  List[str]
-        self.ops = [self.build_addition, self.build_identity, self.build_rnn,
-                    self.build_dropout, self.build_maxpool, self.build_conv,
-                    self.build_output, self.build_reshape,
+        self.ops = [self.build_mix, self.build_addition, self.build_identity,
+                    self.build_rnn, self.build_dropout, self.build_maxpool,
+                    self.build_conv, self.build_output, self.build_reshape,
                     self.build_groupnorm, self.build_series,
                     self.build_parallel]
         self.codec = None  # type: Optional[PytorchCodec]
@@ -679,6 +679,23 @@ class TorchVGSLModel(object):
         self.idx += 1
         logger.debug(f'{self.idx}\t\tconv\tkernel {kernel_size[0]} x {kernel_size[1]} '
                      f'filters {filters} stride {stride} activation {nl}')
+        return fn.get_shape(input), [VGSLBlock(blocks[idx], m.group('type'), m.group('name'), self.idx)], fn
+
+    def build_mix(self,
+                  input: Tuple[int, int, int, int],
+                  blocks: List[str],
+                  idx: int) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
+        """
+        Builds a mix vision transformer layer.
+        """
+        pattern = re.compile(r'(?P<type>Mit)(?P<name>{\w+})?b(?P<size>[0-5])(,(?P<embedding_dim>\d+))?')
+        m = pattern.match(blocks[idx])
+        if not m:
+            return None, None, None
+        embedding_dim = int(m.group('embedding_dim')) if m.group('embedding_dim') else 256
+        fn = layers.MixVisionTransformer(input[1], embedding_dim, f'mit_b{m.group("size")}')
+        self.idx += 1
+        logger.debug(f'{self.idx}\t\tmit\tb{m.group("size")}')
         return fn.get_shape(input), [VGSLBlock(blocks[idx], m.group('type'), m.group('name'), self.idx)], fn
 
     def build_maxpool(self,

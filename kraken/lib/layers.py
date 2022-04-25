@@ -10,6 +10,8 @@ from torch.nn import functional as F
 from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
 from coremltools.proto import NeuralNetwork_pb2
 
+from kraken.lib import mix_transformer
+
 # all tensors are ordered NCHW, the "feature" dimension is C, so the output of
 # an LSTM will be put into C same as the filters of a CNN.
 
@@ -740,7 +742,6 @@ class ActConv2D(Module):
     A wrapper for convolution + activation with automatic padding ensuring no
     dropped columns.
     """
-
     def __init__(self, in_channels: int, out_channels: int, kernel_size: Tuple[int, int], stride: Tuple[int, int], nl: str = 'l') -> None:
         super().__init__()
         self.in_channels = in_channels
@@ -894,3 +895,141 @@ class GroupNorm(Module):
                            output_names=[name],
                            custom_proto_spec=params)
         return name
+
+
+class _MLP(Module):
+    """
+    Linear Embedding
+    """
+    def __init__(self, input_dim=2048, embed_dim=768):
+        super().__init__()
+        self.proj = torch.nn.Linear(input_dim, embed_dim)
+
+    def forward(self, x):
+        x = x.flatten(2).transpose(1, 2)
+        x = self.proj(x)
+        return x
+
+
+class MixVisionTransformer(Module):
+    """
+    A mix vision transformer
+    """
+    def __init__(self, in_channels: int, embedding_dim: int, model_type: str) -> None:
+        super().__init__()
+        self.in_channels = in_channels
+        self.model_type = model_type
+        self.embedding_dim = embedding_dim
+
+        self.transformer = getattr(mix_transformer, model_type)(pretrained=True)
+
+        for p in self.transformer.parameters():
+            p.requires_grad_(False)
+
+        c1_in_channels, c2_in_channels, c3_in_channels, c4_in_channels = self.transformer.embed_dims
+
+        self.linear_c4 = _MLP(input_dim=c4_in_channels, embed_dim=embedding_dim)
+        self.linear_c3 = _MLP(input_dim=c3_in_channels, embed_dim=embedding_dim)
+        self.linear_c2 = _MLP(input_dim=c2_in_channels, embed_dim=embedding_dim)
+        self.linear_c1 = _MLP(input_dim=c1_in_channels, embed_dim=embedding_dim)
+
+        self.conv = torch.nn.Conv2d(embedding_dim*4, embedding_dim, kernel_size=(1, 1), stride=(1, 1), bias=False)
+
+    def forward(self, inputs, seq_len: torch.Tensor) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+        features = self.transformer(inputs)
+
+        c1, c2, c3, c4 = features
+
+        n, _, h, w = c4.shape
+
+        _c4 = self.linear_c4(c4).permute(0,2,1).reshape(n, -1, c4.shape[2], c4.shape[3])
+        _c4 = F.interpolate(_c4, size=c1.size()[2:], mode='bilinear', align_corners=False)
+
+        _c3 = self.linear_c3(c3).permute(0,2,1).reshape(n, -1, c3.shape[2], c3.shape[3])
+        _c3 = F.interpolate(_c3, size=c1.size()[2:], mode='bilinear', align_corners=False)
+
+        _c2 = self.linear_c2(c2).permute(0,2,1).reshape(n, -1, c2.shape[2], c2.shape[3])
+        _c2 = F.interpolate(_c2, size=c1.size()[2:], mode='bilinear', align_corners=False)
+
+        _c1 = self.linear_c1(c1).permute(0,2,1).reshape(n, -1, c1.shape[2], c1.shape[3])
+
+        x = self.conv(torch.cat([_c4, _c3, _c2, _c1], dim=1))
+
+        if seq_len is not None:
+            seq_len = torch.floor(seq_len/4).int()
+        return F.relu(x), seq_len
+
+    def get_shape(self, input: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
+        self.output_shape = (input[0], self.embedding_dim, input[2]//4, input[3]//4)
+        return self.output_shape
+
+    def deserialize(self, name: str, spec) -> None:
+        """
+        Sets the weight of an initialized model from a CoreML protobuf spec.
+        """
+        conv = [x for x in spec.neuralNetwork.layers if x.name == '{}_conv'.format(name)][0].convolution
+        self.conv.weight = torch.nn.Parameter(torch.Tensor(conv.weights.floatValue).view(self.embedding_dim*4,
+                                                                                         self.embedding_dim,
+                                                                                         1))
+        self.conv.bias = torch.nn.Parameter(torch.Tensor(conv.bias.floatValue))
+        for layer, suffix in zip((self.linear_c4, self.linear_c3, self.linear_c2, self.linear_c1),
+                                 ('lin_c4', 'lin_c3', 'lin_c2', 'lin_c1')):
+            lin = [x for x in spec.neuralNetwork.layers if x.name == f'{name}_{suffix}'][0].innerProduct
+            weights = torch.Tensor(lin.weights.floatValue).resize_as_(layer.weight.data)
+            bias = torch.Tensor(lin.bias.floatValue)
+            layer.weight = torch.nn.Parameter(weights)
+            layer.bias = torch.nn.Parameter(bias)
+
+    def serialize(self, name: str, input: str, builder) -> str:
+        """
+        Serializes the module using a NeuralNetworkBuilder.
+        """
+        params = NeuralNetwork_pb2.CustomLayerParams()
+        params.className = 'mix'
+        params.description = 'A mix vision transformer'
+        params.parameters['model_type'].intValue = self.model_type
+        params.parameters['embedding_dim'].intValue = self.embedding_dim
+
+        lin_name = '{}_lin_c4'.format(name)
+        builder.add_inner_product(lin_name, self.linear_c4.proj.weight.data.numpy(),
+                                  self.linear_c4.proj.bias.data.numpy(),
+                                  self.input_size, self.output_size,
+                                  has_bias=True, input_name=input, output_name=lin_name)
+        lin_name = '{}_lin_c3'.format(name)
+        builder.add_inner_product(lin_name, self.linear_c3.proj.weight.data.numpy(),
+                                  self.linear_c3.proj.bias.data.numpy(),
+                                  self.input_size, self.output_size,
+                                  has_bias=True, input_name=input, output_name=lin_name)
+        lin_name = '{}_lin_c2'.format(name)
+        builder.add_inner_product(lin_name, self.linear_c2.proj.weight.data.numpy(),
+                                  self.linear_c2.proj.bias.data.numpy(),
+                                  self.input_size, self.output_size,
+                                  has_bias=True, input_name=input, output_name=lin_name)
+        lin_name = '{}_lin_c1'.format(name)
+        builder.add_inner_product(lin_name, self.linear_c1.proj.weight.data.numpy(),
+                                  self.linear_c1.proj.bias.data.numpy(),
+                                  self.input_size, self.output_size,
+                                  has_bias=True, input_name=input, output_name=lin_name)
+
+        conv_name = '{}_conv'.format(name)
+        builder.add_convolution(name=conv_name,
+                                kernel_channels=self.embedding_dim*4,
+                                output_channels=self.embedding_dim,
+                                height=1,
+                                width=1,
+                                stride_height=1,
+                                stride_width=1,
+                                border_mode='same',
+                                groups=1,
+                                W=self.conv.weight.permute(2, 3, 1, 0).data.numpy(),
+                                b=self.conv.bias.data.numpy(),
+                                has_bias=True,
+                                input_name=input,
+                                output_name=conv_name)
+
+        builder.add_custom(name,
+                           input_names=[input],
+                           output_names=[name],
+                           custom_proto_spec=params)
+        return name
+
