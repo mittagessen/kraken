@@ -471,6 +471,7 @@ class TransposedSummarizingRNN(Module):
                                        bias=False if legacy else True)
 
     def forward(self, inputs: torch.Tensor, seq_len: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+        print('initial: {inputs.shape}')
         # NCHW -> HNWC
         inputs = inputs.permute(2, 0, 3, 1)
         if self.transpose:
@@ -482,6 +483,7 @@ class TransposedSummarizingRNN(Module):
         # HNWC -> (H*N)WC
         siz = inputs.size()
         inputs = inputs.contiguous().view(-1, siz[2], siz[3])
+        print(f'{inputs.shape}')
         if not self.transpose and seq_len is not None:
             if inputs.shape[0] != len(seq_len):
                 raise Exception(f'Height has to be 1 (not f{inputs.shape[0]} for batching/multi-sequences.')
@@ -491,6 +493,7 @@ class TransposedSummarizingRNN(Module):
         o, _ = self.layer(inputs)
         if not self.transpose and seq_len is not None:
             o, seq_len = pad_packed_sequence(o, batch_first=True)
+        print(f'{o.shape} {self.output_size}')
         # resize to HNWO
         o = o.view(siz[0], siz[1], siz[2], self.output_size)
         if self.summarize:
@@ -971,7 +974,7 @@ class MixVisionTransformer(Module):
         self.conv.weight = torch.nn.Parameter(torch.Tensor(conv.weights.floatValue).view(self.embedding_dim*4,
                                                                                          self.embedding_dim,
                                                                                          1))
-        self.conv.bias = torch.nn.Parameter(torch.Tensor(conv.bias.floatValue))
+
         for layer, suffix in zip((self.linear_c4, self.linear_c3, self.linear_c2, self.linear_c1),
                                  ('lin_c4', 'lin_c3', 'lin_c2', 'lin_c1')):
             lin = [x for x in spec.neuralNetwork.layers if x.name == f'{name}_{suffix}'][0].innerProduct
@@ -993,22 +996,22 @@ class MixVisionTransformer(Module):
         lin_name = '{}_lin_c4'.format(name)
         builder.add_inner_product(lin_name, self.linear_c4.proj.weight.data.numpy(),
                                   self.linear_c4.proj.bias.data.numpy(),
-                                  self.input_size, self.output_size,
+                                  self.transformer.embed_dims[3], self.embedding_dim,
                                   has_bias=True, input_name=input, output_name=lin_name)
         lin_name = '{}_lin_c3'.format(name)
         builder.add_inner_product(lin_name, self.linear_c3.proj.weight.data.numpy(),
                                   self.linear_c3.proj.bias.data.numpy(),
-                                  self.input_size, self.output_size,
+                                  self.transformer.embed_dims[2], self.embedding_dim,
                                   has_bias=True, input_name=input, output_name=lin_name)
         lin_name = '{}_lin_c2'.format(name)
         builder.add_inner_product(lin_name, self.linear_c2.proj.weight.data.numpy(),
                                   self.linear_c2.proj.bias.data.numpy(),
-                                  self.input_size, self.output_size,
+                                  self.transformer.embed_dims[1], self.embedding_dim,
                                   has_bias=True, input_name=input, output_name=lin_name)
         lin_name = '{}_lin_c1'.format(name)
         builder.add_inner_product(lin_name, self.linear_c1.proj.weight.data.numpy(),
                                   self.linear_c1.proj.bias.data.numpy(),
-                                  self.input_size, self.output_size,
+                                  self.transformer.embed_dims[0], self.embedding_dim,
                                   has_bias=True, input_name=input, output_name=lin_name)
 
         conv_name = '{}_conv'.format(name)
@@ -1022,8 +1025,7 @@ class MixVisionTransformer(Module):
                                 border_mode='same',
                                 groups=1,
                                 W=self.conv.weight.permute(2, 3, 1, 0).data.numpy(),
-                                b=self.conv.bias.data.numpy(),
-                                has_bias=True,
+                                has_bias=False,
                                 input_name=input,
                                 output_name=conv_name)
 
