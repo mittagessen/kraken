@@ -956,7 +956,7 @@ class MixVisionTransformer(Module):
         x = self.conv(torch.cat([_c4, _c3, _c2, _c1], dim=1))
 
         if seq_len is not None:
-            seq_len = torch.floor(seq_len/4).int()
+            seq_len = seq_len//4
         return F.relu(x), seq_len
 
     def get_shape(self, input: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
@@ -987,7 +987,7 @@ class MixVisionTransformer(Module):
         params = NeuralNetwork_pb2.CustomLayerParams()
         params.className = 'mix'
         params.description = 'A mix vision transformer'
-        params.parameters['model_type'].intValue = self.model_type
+        params.parameters['model_type'].stringValue = self.model_type
         params.parameters['embedding_dim'].intValue = self.embedding_dim
 
         lin_name = '{}_lin_c4'.format(name)
