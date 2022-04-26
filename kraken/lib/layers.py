@@ -1022,6 +1022,7 @@ class MixVisionTransformer(Module):
                                 border_mode='same',
                                 groups=1,
                                 W=self.conv.weight.permute(2, 3, 1, 0).data.numpy(),
+                                b=None,
                                 has_bias=False,
                                 input_name=input,
                                 output_name=conv_name)
