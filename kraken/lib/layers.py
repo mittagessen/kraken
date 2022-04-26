@@ -471,7 +471,6 @@ class TransposedSummarizingRNN(Module):
                                        bias=False if legacy else True)
 
     def forward(self, inputs: torch.Tensor, seq_len: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
-        print('initial: {inputs.shape}')
         # NCHW -> HNWC
         inputs = inputs.permute(2, 0, 3, 1)
         if self.transpose:
@@ -483,7 +482,6 @@ class TransposedSummarizingRNN(Module):
         # HNWC -> (H*N)WC
         siz = inputs.size()
         inputs = inputs.contiguous().view(-1, siz[2], siz[3])
-        print(f'{inputs.shape}')
         if not self.transpose and seq_len is not None:
             if inputs.shape[0] != len(seq_len):
                 raise Exception(f'Height has to be 1 (not f{inputs.shape[0]} for batching/multi-sequences.')
@@ -492,8 +490,7 @@ class TransposedSummarizingRNN(Module):
         # (H*N)WO
         o, _ = self.layer(inputs)
         if not self.transpose and seq_len is not None:
-            o, seq_len = pad_packed_sequence(o, batch_first=True)
-        print(f'{o.shape} {self.output_size}')
+            o, seq_len = pad_packed_sequence(o, batch_first=True, total_length=siz[2])
         # resize to HNWO
         o = o.view(siz[0], siz[1], siz[2], self.output_size)
         if self.summarize:
