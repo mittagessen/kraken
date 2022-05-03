@@ -760,6 +760,9 @@ class ActConv2D(Module):
         elif nl == 'r':
             self.nl = torch.relu
             self.nl_name = 'RELU'
+        elif nl == 'lr':
+            self.nl = torch.nn.LeakyReLU()
+            self.nl_name = 'LEAKYRELU'
         else:
             self.nl_name = 'LINEAR'
             self.nl = lambda x: x
@@ -813,7 +816,7 @@ class ActConv2D(Module):
                                 input_name=input,
                                 output_name=conv_name)
         if self.nl_name != 'SOFTMAX':
-            builder.add_activation(act_name, self.nl_name, conv_name, name)
+            builder.add_activation(act_name, self.nl_name, conv_name, name, params=None if self.nl_name != 'LEAKYRELU' else [self.nl.negative_slope])
         else:
             builder.add_softmax(act_name, conv_name, name)
         return name

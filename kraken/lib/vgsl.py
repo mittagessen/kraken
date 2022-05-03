@@ -88,13 +88,14 @@ class TorchVGSLModel(object):
         Args:
             spec (str): Model definition similar to tesseract as follows:
                         ============ FUNCTIONAL OPS ============
-                        C(s|t|r|l|m)[{name}]<y>,<x>,<d>[,<y_stride>,<x_stride>]
+                        C(s|t|r|l|rl|m)[{name}]<y>,<x>,<d>[,<y_stride>,<x_stride>]
                           Convolves using a y,x window, with no shrinkage, SAME
                           infill, d outputs, with s|t|r|l|m non-linear layer.
                           (s|t|r|l|m) specifies the type of non-linearity:
                           s = sigmoid
                           t = tanh
                           r = relu
+                          lr = leaky relu
                           l = linear (i.e., None)
                           m = softmax
                         L(f|r|b)(x|y)[s][{name}]<n> LSTM cell with n outputs.
@@ -666,7 +667,7 @@ class TorchVGSLModel(object):
         """
         Builds a 2D convolution layer.
         """
-        pattern = re.compile(r'(?P<type>C)(?P<nl>s|t|r|l|m)(?P<name>{\w+})?(\d+),'
+        pattern = re.compile(r'(?P<type>C)(?P<nl>s|t|r|l|lr|m)(?P<name>{\w+})?(\d+),'
                              r'(\d+),(?P<out>\d+)(,(?P<stride_y>\d+),(?P<stride_x>\d+))?')
         m = pattern.match(blocks[idx])
         if not m:
