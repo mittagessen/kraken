@@ -1375,22 +1375,20 @@ def segtest(
         for classDict in test_set.class_mapping.values()
     ])
 
-    if list(sorted(test_set.class_mapping["baselines"].keys())) != list(sorted(test_set.class_stats["baselines"].keys())):
+    baselines_diff = set(test_set.class_stats["baselines"].keys()).difference(
+        test_set.class_mapping["baselines"].keys()
+    )
+    regions_diff = set(test_set.class_stats["regions"].keys()).difference(
+        test_set.class_mapping["regions"].keys()
+    )
+    if baselines_diff:
         message("Unknown baseline type by the model in the test set: %s" % ", ".join(
-            sorted(list(
-                set(test_set.class_stats["baselines"].keys()).difference(
-                    test_set.class_mapping["baselines"].keys()
-                 )
-            ))
+            sorted(list(baselines_diff))
         ))
 
-    if list(sorted(test_set.class_mapping["regions"].keys())) != list(sorted(test_set.class_stats["regions"].keys())):
+    if regions_diff:
         message("Unknown regions type by the model in the test set: %s" % ", ".join(
-            sorted(list(
-                set(test_set.class_stats["regions"].keys()).difference(
-                    test_set.class_mapping["regions"].keys()
-                 )
-            ))
+            sorted(list(regions_diff))
         ))
 
     if device == 'cpu':
@@ -1415,6 +1413,9 @@ def segtest(
     nn.set_num_threads(1)
     pages = []
 
+    lines_idx = list(test_set.class_mapping["baselines"].values())
+    regions_idx = list(test_set.class_mapping["regions"].values())
+
     with KrakenProgressBar() as progress:
         batches = len(ds_loader)
         pred_task = progress.add_task('Evaluating', total=batches, visible=True if not ctx.meta['verbose'] else False)
@@ -1435,6 +1436,20 @@ def segtest(
                     'cls_cnt': y.sum(dim=1, dtype=torch.double),
                     'all_n': torch.tensor(y.size(1), dtype=torch.double, device=device)
                 })
+                if lines_idx:
+                    y_baselines = y[lines_idx].sum(dim=0, dtype=torch.bool)
+                    pred_baselines = pred[lines_idx].sum(dim=0, dtype=torch.bool)
+                    pages[-1]["baselines"] = {
+                        'intersections': (y_baselines & pred_baselines).sum(dim=0, dtype=torch.double),
+                        'unions': (y_baselines | pred_baselines).sum(dim=0, dtype=torch.double),
+                    }
+                if regions_idx:
+                    y_regions_idx = y[regions_idx].sum(dim=0, dtype=torch.bool)
+                    pred_regions_idx = pred[regions_idx].sum(dim=0, dtype=torch.bool)
+                    pages[-1]["regions"] = {
+                        'intersections': (y_regions_idx & pred_regions_idx).sum(dim=0, dtype=torch.double),
+                        'unions': (y_regions_idx | pred_regions_idx).sum(dim=0, dtype=torch.double),
+                    }
 
             except FileNotFoundError as e:
                 batches -= 1
@@ -1480,6 +1495,22 @@ def segtest(
         out.append({"Category": cat, "Class name": class_name,
                     "Pixel Accuracy": f"{pix_acc:.3f}", "Intersection / Union": f"{iu:.3f}",
                     "Support": test_set.class_stats[cat][class_name] if cat != "aux" else "N/A"})
+
+    # Region accuracies
+    if lines_idx:
+        line_intersections = torch.stack([x["baselines"]['intersections'] for x in pages]).sum()
+        line_unions = torch.stack([x["baselines"]['unions'] for x in pages]).sum()
+        smooth = torch.finfo(torch.float).eps
+        line_iu = (line_intersections + smooth) / (line_unions + smooth)
+        message(f"Class-independent baselines Intersection / Union: {line_iu.item():.3f}")
+
+    # Region accuracies
+    if regions_idx:
+        region_intersections = torch.stack([x["regions"]['intersections'] for x in pages]).sum()
+        region_unions = torch.stack([x["regions"]['unions'] for x in pages]).sum()
+        smooth = torch.finfo(torch.float).eps
+        region_iu = (region_intersections + smooth) / (region_unions + smooth)
+        message(f"Class-independent regions Intersection / Union: {region_iu.item():.3f}")
 
     import tabulate
     message(tabulate.tabulate(out, headers="keys", tablefmt="markdown"))
