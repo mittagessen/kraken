@@ -1292,9 +1292,11 @@ def compile(ctx, output, workers, format_type, random_split, force_type, save_sp
               callback=_validate_merging)
 @click.option('-br', '--bounding-regions', show_default=True, default=None, multiple=True,
               help='Regions treated as boundaries for polygonization purposes. May be used multiple times.')
+@click.option("--threshold", type=click.FloatRange(.01, .99), default=.3, show_default=True,
+              help="Threshold for heatmap binarization. Training threshold is .3, prediction is .5")
 @click.argument('test_set', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def segtest(
-    ctx, model, evaluation_files, device, workers,
+    ctx, model, evaluation_files, device, workers, threshold,
     force_binarization, format_type, test_set,
     suppress_regions, suppress_baselines,
     valid_regions, valid_baselines,
@@ -1426,7 +1428,7 @@ def segtest(
                 pred, _ = nn.nn(x)
                 # scale target to output size
                 y = F.interpolate(y, size=(pred.size(2), pred.size(3))).squeeze(0).bool()
-                pred = pred.squeeze() > 0.3
+                pred = pred.squeeze() > threshold
                 pred = pred.view(pred.size(0), -1)
                 y = y.view(y.size(0), -1)
                 pages.append({
