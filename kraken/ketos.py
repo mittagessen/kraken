@@ -1295,14 +1295,10 @@ def compile(ctx, output, workers, format_type, random_split, force_type, save_sp
 @click.option("--threshold", type=click.FloatRange(.01, .99), default=.3, show_default=True,
               help="Threshold for heatmap binarization. Training threshold is .3, prediction is .5")
 @click.argument('test_set', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
-def segtest(
-    ctx, model, evaluation_files, device, workers, threshold,
-    force_binarization, format_type, test_set,
-    suppress_regions, suppress_baselines,
-    valid_regions, valid_baselines,
-    merge_regions, merge_baselines,
-    bounding_regions
-):
+def segtest(ctx, model, evaluation_files, device, workers, threshold,
+            force_binarization, format_type, test_set, suppress_regions,
+            suppress_baselines, valid_regions, valid_baselines, merge_regions,
+            merge_baselines, bounding_regions):
     """
     Evaluate on a test set.
     """
@@ -1317,7 +1313,7 @@ def segtest(
     from kraken.lib.train import BaselineSet, ImageInputTransforms, Subset
     from kraken.lib.vgsl import TorchVGSLModel
 
-    logger.info('Building test set from {} line images'.format(len(test_set) + len(evaluation_files)))
+    logger.info('Building test set from {} documents'.format(len(test_set) + len(evaluation_files)))
 
     message('Loading model {}\t'.format(model), nl=False)
     nn = TorchVGSLModel.load_model(model)
@@ -1328,11 +1324,7 @@ def segtest(
         test_set.extend(evaluation_files)
 
     if len(test_set) == 0:
-        raise click.UsageError(
-            'No evaluation data was provided to the test command. Use `-e` or the `test_set` argument.'
-        )
-    # set number of OpenMP threads
-    # next(iter(nn.values())).nn.set_num_threads(1)
+        raise click.UsageError('No evaluation data was provided to the test command. Use `-e` or the `test_set` argument.')
 
     _batch, _channels, _height, _width = nn.input
     transforms = ImageInputTransforms(
@@ -1356,42 +1348,30 @@ def segtest(
         valid_baselines = []
         merge_baselines = None
 
-    test_set = BaselineSet(
-        test_set,
-        line_width=nn.user_metadata["hyper_params"]["line_width"],
-        im_transforms=transforms,
-        mode=format_type,
-        augmentation=False,
-        valid_baselines=valid_baselines,
-        merge_baselines=merge_baselines,
-        valid_regions=valid_regions,
-        merge_regions=merge_regions
-    )
+    test_set = BaselineSet(test_set,
+                           line_width=nn.user_metadata["hyper_params"]["line_width"],
+                           im_transforms=transforms,
+                           mode=format_type,
+                           augmentation=False,
+                           valid_baselines=valid_baselines,
+                           merge_baselines=merge_baselines,
+                           valid_regions=valid_regions,
+                           merge_regions=merge_regions)
 
     # test_set.num_classes = len(nn.user_metadata["class_mapping"]["baselines"])
     #test_set.class_mapping = len(nn.user_metadata["class_mapping"]["regions"])
 
     test_set.class_mapping = nn.user_metadata["class_mapping"]
-    test_set.num_classes = sum([
-        len(classDict)
-        for classDict in test_set.class_mapping.values()
-    ])
+    test_set.num_classes = sum([len(classDict) for classDict in test_set.class_mapping.values()])
 
-    baselines_diff = set(test_set.class_stats["baselines"].keys()).difference(
-        test_set.class_mapping["baselines"].keys()
-    )
-    regions_diff = set(test_set.class_stats["regions"].keys()).difference(
-        test_set.class_mapping["regions"].keys()
-    )
+    baselines_diff = set(test_set.class_stats["baselines"].keys()).difference(test_set.class_mapping["baselines"].keys())
+    regions_diff = set(test_set.class_stats["regions"].keys()).difference(test_set.class_mapping["regions"].keys())
+
     if baselines_diff:
-        message("Unknown baseline type by the model in the test set: %s" % ", ".join(
-            sorted(list(baselines_diff))
-        ))
+        message(f'Model baseline types missing in test set: {", ".join(sorted(list(baselines_diff)))}')
 
     if regions_diff:
-        message("Unknown regions type by the model in the test set: %s" % ", ".join(
-            sorted(list(regions_diff))
-        ))
+        message(f'Model region types missing in the test set: {", ".join(sorted(list(regions_diff)))}')
 
     if device == 'cpu':
         device = None
@@ -1401,14 +1381,7 @@ def segtest(
     if len(test_set) == 0:
         raise click.UsageError('No evaluation data was provided to the test command. Use `-e` or the `test_set` argument.')
 
-    message('Evaluating {}'.format(model))
-    logger.info('Evaluating {}'.format(model))
-    ds_loader = DataLoader(
-        test_set,
-        batch_size=1,
-        num_workers=workers,
-        pin_memory=True
-    )
+    ds_loader = DataLoader(test_set, batch_size=1, num_workers=workers, pin_memory=True)
 
     nn.to(device)
     nn.eval()
@@ -1424,7 +1397,6 @@ def segtest(
         for batch in ds_loader:
             x, y = batch['image'], batch['target']
             try:
-                # [BatchSize, NumClasses, Width, Height ?]
                 pred, _ = nn.nn(x)
                 # scale target to output size
                 y = F.interpolate(y, size=(pred.size(2), pred.size(3))).squeeze(0).bool()
@@ -1467,10 +1439,7 @@ def segtest(
     corrects = torch.stack([x['corrects'] for x in pages], -1).sum(dim=-1)
     all_n = torch.stack([x['all_n'] for x in pages]).sum()  # Number of pixel for all pages
 
-    # Pixel Accuracy / Class
     class_pixel_accuracy = corrects / all_n
-    # Global Mean Accuracy
-    #    Macro, not per page. Which means small pages are less counted ?
     mean_accuracy = torch.mean(class_pixel_accuracy)
 
     intersections = torch.stack([x['intersections'] for x in pages], -1).sum(dim=-1)
@@ -1482,9 +1451,30 @@ def segtest(
     cls_cnt = torch.stack([x['cls_cnt'] for x in pages]).sum()
     freq_iu = torch.sum(cls_cnt / cls_cnt.sum() * class_iu.sum())
 
-    message(f"Mean accuracy: {mean_accuracy.item():.3f}")
-    message(f"Mean Intersection / Union: {mean_iu.item():.3f}")
-    message(f"Freq Intersection / Union: {freq_iu.item():.3f}")
+    message(f"Mean Accuracy: {mean_accuracy.item():.3f}")
+    message(f"Mean IOU: {mean_iu.item():.3f}")
+    message(f"Frequency-weighted IOU: {freq_iu.item():.3f}")
+
+    # Region accuracies
+    if lines_idx:
+        line_intersections = torch.stack([x["baselines"]['intersections'] for x in pages]).sum()
+        line_unions = torch.stack([x["baselines"]['unions'] for x in pages]).sum()
+        smooth = torch.finfo(torch.float).eps
+        line_iu = (line_intersections + smooth) / (line_unions + smooth)
+        message(f"Class-independent Baseline IOU: {line_iu.item():.3f}")
+
+    # Region accuracies
+    if regions_idx:
+        region_intersections = torch.stack([x["regions"]['intersections'] for x in pages]).sum()
+        region_unions = torch.stack([x["regions"]['unions'] for x in pages]).sum()
+        smooth = torch.finfo(torch.float).eps
+        region_iu = (region_intersections + smooth) / (region_unions + smooth)
+        message(f"Class-independent Region IOU: {region_iu.item():.3f}")
+
+    from rich.console import Console
+    from rich.table import Table
+
+    table = Table('Category', 'Class Name', 'Pixel Accuracy', 'IOU', 'Object Count')
 
     class_iu = class_iu.tolist()
     class_pixel_accuracy = class_pixel_accuracy.tolist()
@@ -1494,28 +1484,10 @@ def segtest(
         class_iu,
         class_pixel_accuracy
     ):
-        out.append({"Category": cat, "Class name": class_name,
-                    "Pixel Accuracy": f"{pix_acc:.3f}", "Intersection / Union": f"{iu:.3f}",
-                    "Support": test_set.class_stats[cat][class_name] if cat != "aux" else "N/A"})
+        table.add_row(cat, class_name, f'{pix_acc:.3f}', f'{iu:.3f}', f'{test_set.class_stats[cat][class_name]}' if cat != "aux" else 'N/A')
 
-    # Region accuracies
-    if lines_idx:
-        line_intersections = torch.stack([x["baselines"]['intersections'] for x in pages]).sum()
-        line_unions = torch.stack([x["baselines"]['unions'] for x in pages]).sum()
-        smooth = torch.finfo(torch.float).eps
-        line_iu = (line_intersections + smooth) / (line_unions + smooth)
-        message(f"Class-independent baselines Intersection / Union: {line_iu.item():.3f}")
-
-    # Region accuracies
-    if regions_idx:
-        region_intersections = torch.stack([x["regions"]['intersections'] for x in pages]).sum()
-        region_unions = torch.stack([x["regions"]['unions'] for x in pages]).sum()
-        smooth = torch.finfo(torch.float).eps
-        region_iu = (region_intersections + smooth) / (region_unions + smooth)
-        message(f"Class-independent regions Intersection / Union: {region_iu.item():.3f}")
-
-    import tabulate
-    message(tabulate.tabulate(out, headers="keys", tablefmt="markdown"))
+    console = Console()
+    console.print(table)
 
 if __name__ == '__main__':
     cli()
