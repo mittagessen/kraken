@@ -479,6 +479,9 @@ class RecognitionModel(pl.LightningModule):
                         self.nn.resize_output(ncodec.max_label + 1, del_labels)
                     else:
                         raise ValueError(f'invalid resize parameter value {self.resize}')
+                        
+                codec.strict = False
+                
             else:
                 self.train_set.dataset.encode(self.codec)
                 logger.info(f'Creating new model {self.spec} with {self.train_set.dataset.codec.max_label+1} outputs')
