@@ -1,4 +1,4 @@
-<document xmlns="http://www.abbyy.com/FineReader_xml/FineReader10-schema-v1.xml" version="1.0" producer="kraken">
+<document xmlns="http://www.abbyy.com/FineReader_xml/FineReader10-schema-v1.xml" version="1.0" producer="kraken {{ metadata.version}}">
 	<page width="{{ page.size[0] }}" height="{{ page.size[1] }}" resolution="0" originalCoords="1">
 		<block blockType="Text">
 			<text>

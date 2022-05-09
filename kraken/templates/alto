@@ -73,13 +73,19 @@
 		<sourceImageInformation>
 			<fileName>{{ page.name }}</fileName>
 		</sourceImageInformation>
-		<OCRProcessing ID="OCR_0">
-			<ocrProcessingStep>
+		<Processing ID="OCR_0">
+			{% for step in metadata.processing_steps -%}
+			<ProcessingStep>
+				<processingStepDescription>{{ step.description }}</processingStepDescription>
+				<processingCategory>{{ step.category }}</processingCategory>
+				<processingStepSettings>{% for k, v in step.settings.items() %}{{k}}: {{v}}; {% endfor %}</processingStepSettings>
 				<processingSoftware>
 					<softwareName>kraken</softwareName>
+					<softwareVersion>{{ metadata.version }}</softwareName>
 				</processingSoftware>
-			</ocrProcessingStep>
-		</OCRProcessing>
+			</ProcessingStep>
+			{% endfor %}
+		</Processing>
 	</Description>
 	<Tags>
 	{% for reg_type in page.types %}
