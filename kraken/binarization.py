@@ -25,7 +25,7 @@ import numpy as np
 
 from PIL import Image
 from kraken.lib.util import pil2array, array2pil, is_bitonal, get_im_str
-from scipy.ndimage import filters, interpolation, morphology, affine_transform
+from scipy.ndimage import affine_transforms, percentile_filter, gaussian_filter, zoom, binary_dilation
 
 from kraken.lib.exceptions import KrakenInputException
 
@@ -85,9 +85,9 @@ def nlbin(im: Image.Image,
     logger.debug('Interpolation and percentile filtering')
     with warnings.catch_warnings():
         warnings.simplefilter('ignore', UserWarning)
-        m = interpolation.zoom(image, zoom)
-        m = filters.percentile_filter(m, perc, size=(range, 2))
-        m = filters.percentile_filter(m, perc, size=(2, range))
+        m = zoom(image, zoom)
+        m = percentile_filter(m, perc, size=(range, 2))
+        m = percentile_filter(m, perc, size=(2, range))
         mh, mw = m.shape
         oh, ow = image.shape
         scale = np.diag([mh * 1.0/oh, mw * 1.0/ow])
@@ -104,11 +104,11 @@ def nlbin(im: Image.Image,
     # significant variance; this makes the percentile
     # based low and high estimates more reliable
     logger.debug('Refine estimates')
-    v = est-filters.gaussian_filter(est, escale*20.0)
-    v = filters.gaussian_filter(v**2, escale*20.0)**0.5
+    v = est-gaussian_filter(est, escale*20.0)
+    v = gaussian_filter(v**2, escale*20.0)**0.5
     v = (v > 0.3*np.amax(v))
-    v = morphology.binary_dilation(v, structure=np.ones((int(escale * 50), 1)))
-    v = morphology.binary_dilation(v, structure=np.ones((1, int(escale * 50))))
+    v = binary_dilation(v, structure=np.ones((int(escale * 50), 1)))
+    v = binary_dilation(v, structure=np.ones((1, int(escale * 50))))
     est = est[v]
     lo = np.percentile(est.ravel(), low)
     hi = np.percentile(est.ravel(), high)

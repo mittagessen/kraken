@@ -42,7 +42,7 @@ from kraken.lib import default_specs
 from kraken.lib.exceptions import KrakenInputException
 
 from scipy.signal import convolve2d
-from scipy.ndimage.filters import gaussian_filter
+from scipy.ndimage import gaussian_filter
 
 
 logger = logging.getLogger('kraken')
