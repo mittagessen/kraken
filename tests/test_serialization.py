@@ -62,7 +62,7 @@ def validate_alto(self, fp):
     counts = Counter(ids)
     self.assertEqual(counts.most_common(1)[0][1], 1, msg='Duplicate IDs in ALTO output')
 
-    with open(resources / 'alto-4-2.xsd') as schema_fp:
+    with open(resources / 'alto-4-3.xsd') as schema_fp:
         alto_schema = etree.XMLSchema(etree.parse(schema_fp))
         alto_schema.assertValid(doc)
 
@@ -79,6 +79,18 @@ class TestSerializations(unittest.TestCase):
             recs = json.load(fp)
             self.bl_records = [rpred.ocr_record(**bl) for bl in recs['lines']]
             self.bl_regions = recs['regions']
+
+        self.metadata_steps = [{'category': 'preprocessing', 'description': 'PDF image extraction', 'settings': {}},
+                               {'category': 'processing',
+                                'description': 'Baseline and region segmentation',
+                                'settings': {'model': 'foo.mlmodel', 'text_direction': 'horizontal-lr'}},
+                               {'category': 'processing',
+                                'description': 'Text line recognition',
+                                'settings': {'text_direction': 'horizontal-lr',
+                                             'models': 'bar.mlmodel',
+                                             'pad': 16,
+                                             'bidi_reordering': True}}]
+
 
     def test_box_vertical_hocr_serialization(self):
         """
@@ -239,3 +251,54 @@ class TestSerializations(unittest.TestCase):
 
         fp.write(serialization.serialize_segmentation({'boxes': []}, image_name='foo.png', template='pagexml'))
         validate_page(self, fp)
+
+    def test_serialize_segmentation_alto_steps(self):
+        """
+        Validates output of `serialize_segmentation` with processing steps against ALTO schema
+        """
+        fp = StringIO()
+
+        fp.write(serialization.serialize_segmentation({'boxes': []}, image_name='foo.png', template='alto', processing_steps=self.metadata_steps))
+        validate_alto(self, fp)
+
+    def test_serialize_segmentation_pagexml(self):
+        """
+        Validates output of `serialize_segmentation` with processing steps against PageXML schema
+        """
+        fp = StringIO()
+
+        fp.write(serialization.serialize_segmentation({'boxes': []}, image_name='foo.png', template='pagexml', processing_steps=self.metadata_steps))
+        validate_page(self, fp)
+
+    def test_bl_region_alto_serialization_validation_steps(self):
+        """
+        Validates output with processing steps against ALTO schema
+        """
+        fp = StringIO()
+
+        fp.write(serialization.serialize(self.bl_records, image_name='foo.png', template='alto', regions=self.bl_regions, processing_steps=self.metadata_steps))
+        validate_alto(self, fp)
+        roundtrip(self, self.bl_records, fp)
+
+    def test_bl_region_abbyyxml_serialization_validation_steps(self):
+        """
+        Validates output with processing steps against abbyyXML schema
+        """
+        fp = StringIO()
+
+        fp.write(serialization.serialize(self.bl_records, image_name='foo.png', template='abbyyxml', regions=self.bl_regions, processing_steps=self.metadata_steps))
+        doc = etree.fromstring(fp.getvalue().encode('utf-8'))
+        with open(resources / 'FineReader10-schema-v1.xml') as schema_fp:
+            abbyy_schema = etree.XMLSchema(etree.parse(schema_fp))
+            abbyy_schema.assertValid(doc)
+
+    def test_bl_region_pagexml_serialization_validation_steps(self):
+        """
+        Validates output with processing steps against PageXML schema
+        """
+        fp = StringIO()
+
+        fp.write(serialization.serialize(self.bl_records, image_name='foo.png', template='pagexml', regions=self.bl_regions, processing_steps=self.metadata_steps))
+        validate_page(self, fp)
+        roundtrip(self, self.bl_records, fp)
+

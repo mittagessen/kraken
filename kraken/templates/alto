@@ -71,36 +71,34 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <alto xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xmlns="http://www.loc.gov/standards/alto/ns-v4#"
-	xsi:schemaLocation="http://www.loc.gov/standards/alto/ns-v4# http://www.loc.gov/standards/alto/v4/alto-4-2.xsd">
+	xsi:schemaLocation="http://www.loc.gov/standards/alto/ns-v4# http://www.loc.gov/standards/alto/v4/alto-4-3.xsd">
 	<Description>
 		<MeasurementUnit>pixel</MeasurementUnit>
 		<sourceImageInformation>
 			<fileName>{{ page.name }}</fileName>
 		</sourceImageInformation>
-		<Processing ID="OCR_0">
-			{% if metadata.processing_steps %}
-			{% for step in metadata.processing_steps -%}
-			<ProcessingStep>
-				<processingStepDescription>{{ step.description }}</processingStepDescription>
-				<processingCategory>{{ proc_type_table[step.category] }}</processingCategory>
-				<processingStepSettings>{% for k, v in step.settings.items() %}{{k}}: {{v}}; {% endfor %}</processingStepSettings>
-				<processingSoftware>
-					<softwareName>kraken</softwareName>
-					<softwareVersion>{{ metadata.version }}</softwareName>
-				</processingSoftware>
-			</ProcessingStep>
-			{% endfor %}
-			{% else -%}
-			<ProcessingStep>
-				<processingStepDescription>unknown</processingStepDescription>
-				<processingCategory>other</processingCategory>
-				<processingSoftware>
-					<softwareName>kraken</softwareName>
-					<softwareVersion>{{ metadata.version }}</softwareName>
-				</processingSoftware>
-			</ProcessingStep>
-			{% endif %}
+		{% if metadata.processing_steps %}
+		{% for step in metadata.processing_steps -%}
+		<Processing ID="OCR_{{ loop.index }}">
+			<processingCategory>{{ proc_type_table[step.category] }}</processingCategory>
+			<processingStepDescription>{{ step.description }}</processingStepDescription>
+			<processingStepSettings>{% for k, v in step.settings.items() %}{{k}}: {{v}}; {% endfor %}</processingStepSettings>
+			<processingSoftware>
+				<softwareName>kraken</softwareName>
+				<softwareVersion>{{ metadata.version }}</softwareVersion>
+			</processingSoftware>
 		</Processing>
+		{% endfor %}
+		{% else -%}
+		<Processing ID="OCR_0">
+			<processingCategory>other</processingCategory>
+			<processingStepDescription>unknown</processingStepDescription>
+			<processingSoftware>
+				<softwareName>kraken</softwareName>
+				<softwareVersion>{{ metadata.version }}</softwareVersion>
+			</processingSoftware>
+		</Processing>
+		{% endif %}
 	</Description>
 	<Tags>
 	{% for reg_type in page.types %}
