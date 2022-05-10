@@ -26,6 +26,7 @@ import numpy as np
 from PIL import Image
 from kraken.lib.util import pil2array, array2pil, is_bitonal, get_im_str
 from scipy.ndimage import affine_transform, percentile_filter, gaussian_filter, zoom, binary_dilation
+from scipy.ndimage import zoom as _zoom
 
 from kraken.lib.exceptions import KrakenInputException
 
@@ -85,7 +86,7 @@ def nlbin(im: Image.Image,
     logger.debug('Interpolation and percentile filtering')
     with warnings.catch_warnings():
         warnings.simplefilter('ignore', UserWarning)
-        m = zoom(image, zoom)
+        m = _zoom(image, zoom)
         m = percentile_filter(m, perc, size=(range, 2))
         m = percentile_filter(m, perc, size=(2, range))
         mh, mw = m.shape
