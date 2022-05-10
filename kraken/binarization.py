@@ -25,7 +25,7 @@ import numpy as np
 
 from PIL import Image
 from kraken.lib.util import pil2array, array2pil, is_bitonal, get_im_str
-from scipy.ndimage import affine_transforms, percentile_filter, gaussian_filter, zoom, binary_dilation
+from scipy.ndimage import affine_transform, percentile_filter, gaussian_filter, zoom, binary_dilation
 
 from kraken.lib.exceptions import KrakenInputException
 
