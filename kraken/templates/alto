@@ -1,3 +1,7 @@
+{% set proc_type_table = {'processing': 'contentGeneration',
+			  'preprocessing': 'preOperation',
+			  'postprocessing': 'postOperation'}
+%}
 {% macro render_line(page, line) -%}
 <TextLine ID="line_{{ line.index }}"
 	  HPOS="{{ line.bbox[0] }}"
@@ -74,10 +78,11 @@
 			<fileName>{{ page.name }}</fileName>
 		</sourceImageInformation>
 		<Processing ID="OCR_0">
+			{% if metadata.processing_steps %}
 			{% for step in metadata.processing_steps -%}
 			<ProcessingStep>
 				<processingStepDescription>{{ step.description }}</processingStepDescription>
-				<processingCategory>{{ step.category }}</processingCategory>
+				<processingCategory>{{ proc_type_table[step.category] }}</processingCategory>
 				<processingStepSettings>{% for k, v in step.settings.items() %}{{k}}: {{v}}; {% endfor %}</processingStepSettings>
 				<processingSoftware>
 					<softwareName>kraken</softwareName>
@@ -85,6 +90,16 @@
 				</processingSoftware>
 			</ProcessingStep>
 			{% endfor %}
+			{% else -%}
+			<ProcessingStep>
+				<processingStepDescription>unknown</processingStepDescription>
+				<processingCategory>other</processingCategory>
+				<processingSoftware>
+					<softwareName>kraken</softwareName>
+					<softwareVersion>{{ metadata.version }}</softwareName>
+				</processingSoftware>
+			</ProcessingStep>
+			{% endif %}
 		</Processing>
 	</Description>
 	<Tags>
