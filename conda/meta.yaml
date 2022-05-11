@@ -19,7 +19,6 @@ requirements:
      - numpy=1.21.5
      - pillow=9.0.1
      - scipy=1.7.3
-     - protobuf
      - jinja2=3.0.3
      - conda-forge::torchvision=0.12.0
      - conda-forge::pytorch=1.11.0
