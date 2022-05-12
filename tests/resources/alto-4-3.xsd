@@ -8,7 +8,7 @@ For the full text see https://creativecommons.org/licenses/by-sa/4.0/legalcode. 
 <!-- Originally created during the EU-funded Project METAe, the Metadata Engine Project (2001 - 2003), by Alexander Egger (1), Birgit Stehno (2) and Gregor Retti (2), (1) University of Graz and (2) University of Innsbruck, Austria with contributions of Ralph Tiede, CCS GmbH, Germany -->
 <!-- Prepared for the Library of Congress by Ralph Tiede, CCS GmbH, with the assistance of Justin Littman (Library of Congress). -->
 
-<!-- Version 4.2 -->
+<!-- Version 4.3 -->
 
 <!-- Change History -->
 <!-- June 22, 2004: Version finalized for docWORKS/METAe -->
@@ -105,7 +105,11 @@ For the full text see https://creativecommons.org/licenses/by-sa/4.0/legalcode. 
 	2. Make FONTSIZE optional. 
 	3. Add "strikethrough" to list of allowed values for FONTSTYLE.
 -->
-<xsd:schema xmlns="http://www.loc.gov/standards/alto/ns-v4#" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xlink="http://www.w3.org/1999/xlink" targetNamespace="http://www.loc.gov/standards/alto/ns-v4#" elementFormDefault="qualified" attributeFormDefault="unqualified" version="4.2">
+<!-- May 2022, version 4.3
+	1. Add BASEDIRECTION attribute defining base direction and line orientation to TextLine and BlockType.
+	2. Add support for explicit reading order definitions with "ReadingOrder" element containing "UnorderedGroup"s, "OrderedGroup"s, and "ElementRef"s. 
+-->
+<xsd:schema xmlns="http://www.loc.gov/standards/alto/ns-v4#" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xlink="http://www.w3.org/1999/xlink" targetNamespace="http://www.loc.gov/standards/alto/ns-v4#" elementFormDefault="qualified" attributeFormDefault="unqualified" version="4.3">
 	<xsd:import namespace="http://www.w3.org/1999/xlink" schemaLocation="http://www.loc.gov/standards/xlink/xlink.xsd"/>
 	<xsd:element name="alto" type="altoType">
 		<xsd:annotation>
@@ -134,6 +138,15 @@ For the full text see https://creativecommons.org/licenses/by-sa/4.0/legalcode. 
 					<xsd:documentation>
 						Tag define properties of additional characteristic. The tags are referenced from related content element on Block or String element by attribute TAGREF via the tag ID.
 						This container element contains the individual elements for LayoutTags, StructureTags, RoleTags, NamedEntityTags and OtherTags
+					</xsd:documentation>
+				</xsd:annotation>
+			</xsd:element>
+			<xsd:element name="ReadingOrder" type="ReadingOrderType" minOccurs="0">
+				<xsd:annotation>
+					<xsd:documentation>
+						Describes alternative hierarchical orderings of the page (i.e. total orders over its segments, for linear text flow),
+						in addition to the explicit flat reading order defined by @IDNEXT on the block level,
+						and the implicit flat reading order implied by the segment element ordering.
 					</xsd:documentation>
 				</xsd:annotation>
 			</xsd:element>
@@ -202,6 +215,113 @@ For the full text see https://creativecommons.org/licenses/by-sa/4.0/legalcode. 
 				<xsd:element name="OtherTag" type="TagType"/>
 			</xsd:choice>
 		</xsd:sequence>
+	</xsd:complexType>
+	<xsd:complexType name="ReadingOrderType">
+		<xsd:annotation>
+			<xsd:documentation>
+                                Defines one or more reading orders within the
+                                page. Groups may be either unordered or ordered and can
+                                contain other groups, e.g. a page containing
+                                unrelated texts that are ordered individually
+                                would be encoded as an UnorderedGroup containing
+                                multiple OrderedGroups. The granularity of
+                                elements can vary inside groups.
+			</xsd:documentation>
+		</xsd:annotation>
+		<xsd:sequence>
+			<xsd:choice minOccurs="1" maxOccurs="unbounded">
+				<xsd:element name="OrderedGroup" type="OrderedGroupType"/>
+				<xsd:element name="UnorderedGroup" type="UnorderedGroupType"/>
+			</xsd:choice>
+		</xsd:sequence>
+	</xsd:complexType>
+	<xsd:complexType name="ElementRefType">
+		<xsd:annotation>
+			<xsd:documentation>
+				A reference to an element such as a block, TextLine, String, or Glyph.
+			</xsd:documentation>
+		</xsd:annotation>
+		<xsd:attribute name="ID" type="xsd:ID" use="required"/>
+		<xsd:attribute name="REF" type="xsd:IDREFS" use="required">
+			<xsd:annotation>
+				<xsd:documentation>
+                                        A link to the referenced element. Valid
+                                        target elements are any block type,
+                                        TextLine, String, or Glyph.
+				</xsd:documentation>
+			</xsd:annotation>
+		</xsd:attribute>
+		<xsd:attribute name="TAGREFS" type="xsd:IDREFS" use="optional">
+			<xsd:annotation>
+				<xsd:documentation>
+                                        Optionally annotates the role of the
+                                        referenced element in the reading order
+                                        with one or more tags. Examples could be
+                                        interlinear additions or marginalia.
+				</xsd:documentation>
+			</xsd:annotation>
+		</xsd:attribute>
+	</xsd:complexType>
+	<xsd:complexType name="OrderedGroupType">
+		<xsd:annotation>
+			<xsd:documentation>
+				A group containing ordered elements (i.e. the sequence of OrderedGroup, UnorderedGroup or ElementRef subelements is ordered).
+			</xsd:documentation>
+		</xsd:annotation>
+		<xsd:sequence>
+			<xsd:choice minOccurs="1" maxOccurs="unbounded">
+				<xsd:element name="ElementRef" type="ElementRefType"/>
+				<xsd:element name="OrderedGroup" type="OrderedGroupType"/>
+				<xsd:element name="UnorderedGroup" type="UnorderedGroupType"/>
+			</xsd:choice>
+		</xsd:sequence>
+		<xsd:attribute name="ID" type="xsd:ID" use="required"/>
+		<xsd:attribute name="TAGREFS" type="xsd:IDREFS" use="optional">
+			<xsd:annotation>
+				<xsd:documentation>
+                                        Optionally annotates the role of the
+                                        group in the reading order
+                                        with one or more tags. Examples could be
+                                        distinguishing
+                                        parallel texts or apparatus criticus and
+                                        main text.
+				</xsd:documentation>
+			</xsd:annotation>
+		</xsd:attribute>
+		<xsd:attribute name="REF" type="xsd:IDREFS" use="optional">
+			<xsd:annotation>
+				<xsd:documentation>
+					A link to the referenced element. Valid
+					target elements are any block type,
+					TextLine, or String.
+				</xsd:documentation>
+			</xsd:annotation>
+		</xsd:attribute>
+	</xsd:complexType>
+	<xsd:complexType name="UnorderedGroupType">
+		<xsd:annotation>
+			<xsd:documentation>
+				A group containing unordered elements (i.e. the sequence of OrderedGroup, UnorderedGroup or ElementRef subelements is arbitrary).
+			</xsd:documentation>
+		</xsd:annotation>
+		<xsd:sequence>
+			<xsd:choice minOccurs="1" maxOccurs="unbounded">
+				<xsd:element name="ElementRef" type="ElementRefType"/>
+				<xsd:element name="OrderedGroup" type="OrderedGroupType"/>
+				<xsd:element name="UnorderedGroup" type="UnorderedGroupType"/>
+			</xsd:choice>
+		</xsd:sequence>
+		<xsd:attribute name="ID" type="xsd:ID" use="required"/>
+		<xsd:attribute name="TAGREFS" type="xsd:IDREFS" use="optional"/>
+		<xsd:attribute name="REF" type="xsd:IDREFS" use="optional">
+			<xsd:annotation>
+				<xsd:documentation>
+					A link to the referenced element. Valid
+					target elements are any block type,
+					TextLine, or String.
+				</xsd:documentation>
+			</xsd:annotation>
+		</xsd:attribute>
 	</xsd:complexType>
 	<xsd:simpleType name="QualityType">
 		<xsd:annotation>
@@ -432,7 +552,7 @@ For the full text see https://creativecommons.org/licenses/by-sa/4.0/legalcode. 
 		</xsd:attribute>
 		<xsd:attribute name="IDNEXT" type="xsd:IDREF" use="optional">
 			<xsd:annotation>
-				<xsd:documentation>The next block in reading sequence on the page.</xsd:documentation>
+				<xsd:documentation>The next block in reading order of the page (if ReadingOrder is not specified, and elements are not in order).</xsd:documentation>
 			</xsd:annotation>
 		</xsd:attribute>
 		<xsd:attribute name="CS" type="xsd:boolean" use="optional">
@@ -572,6 +692,19 @@ For the full text see https://creativecommons.org/licenses/by-sa/4.0/legalcode. 
 			<xsd:element name="Circle" type="CircleType"/>
 		</xsd:choice>
 	</xsd:complexType>
+	<xsd:simpleType name="InlineDirType">
+		<xsd:annotation>
+			<xsd:documentation>Describes the inline base direction and line orientation of a line or of all lines inside a text block.</xsd:documentation>
+			<xsd:documentation>The meaning of these terms is defined by the W3C writing modes document: <a href="https://www.w3.org/TR/css-writing-modes-3/#writing-mode"/></xsd:documentation>
+			<xsd:documentation>These values should correspond to the base direction set in the BiDi algorithm to the respective elements during Unicode encoding. A value of "ttb" (top-to-bottom) implies a base direction of left-to-right, a value of "btt" (bottom-to-top) a base direction of right-to-left.</xsd:documentation>
+		</xsd:annotation>
+		<xsd:restriction base="xsd:string">
+			<xsd:enumeration value="ltr"/>
+			<xsd:enumeration value="rtl"/>
+			<xsd:enumeration value="ttb"/>
+			<xsd:enumeration value="btt"/>
+		</xsd:restriction>
+	</xsd:simpleType>
 	<xsd:complexType name="PolygonType">
 		<xsd:annotation>
 			<xsd:documentation>A polygon shape.</xsd:documentation>
@@ -725,7 +858,7 @@ For the full text see https://creativecommons.org/licenses/by-sa/4.0/legalcode. 
 	</xsd:complexType>
 	<xsd:complexType name="ocrProcessingType">
 		<xsd:annotation>
-			<xsd:documentation>Deprecated. processingType should be used instead.</xsd:documentation>
+			<xsd:documentation>Deprecated. processingStepType should be used instead.</xsd:documentation>
 			<xsd:documentation>Information on how the text was created, including preprocessing, OCR processing, and postprocessing steps. Where possible, this draws from MIX's change history.</xsd:documentation>
 		</xsd:annotation>
 		<xsd:sequence>
@@ -938,6 +1071,11 @@ For the full text see https://creativecommons.org/licenses/by-sa/4.0/legalcode. 
 									<xsd:documentation>Correction Status. Indicates whether manual correction has been done or not. The correction status should be recorded at the highest level possible (Block, TextLine, String).</xsd:documentation>
 								</xsd:annotation>
 							</xsd:attribute>
+							<xsd:attribute name="BASEDIRECTION" type="InlineDirType" use="optional">
+								<xsd:annotation>
+									<xsd:documentation>Indicates the inline base direction of this TextLine. Overrides the value on elements higher in the hierarchy.</xsd:documentation>
+								</xsd:annotation>
+							</xsd:attribute>
 						</xsd:complexType>
 					</xsd:element>
 				</xsd:sequence>
@@ -949,6 +1087,11 @@ For the full text see https://creativecommons.org/licenses/by-sa/4.0/legalcode. 
 				<xsd:attribute name="LANG" type="xsd:language" use="optional">
 					<xsd:annotation>
 						<xsd:documentation>Attribute to record language of the textblock.</xsd:documentation>
+					</xsd:annotation>
+				</xsd:attribute>
+				<xsd:attribute name="BASEDIRECTION" type="InlineDirType" use="optional">
+					<xsd:annotation>
+						<xsd:documentation>Indicates the inline base direction of the TextBlock.</xsd:documentation>
 					</xsd:annotation>
 				</xsd:attribute>
 			</xsd:extension>
@@ -1044,8 +1187,8 @@ For the full text see https://creativecommons.org/licenses/by-sa/4.0/legalcode. 
 		<xsd:attribute name="GC" use="optional">
 			<xsd:annotation>
 				<xsd:documentation>
-					This GC attribute records a float value between 0.0 and 1.0 that expresses the level of confidence for the variant where is 1 is certain.
-					This attribute is optional. If it is not available, the default value for the variant is “0”.
+					This GC attribute records a float value between 0.0 and 1.0 that expresses the level of confidence for the glyph where 1 is certain.
+					This attribute is optional. If it is not available, the default value for the glyph is “0”.
 					The GC attribute semantic is the same as the WC attribute on the String element and VC on Variant element.
 				</xsd:documentation>
 			</xsd:annotation>

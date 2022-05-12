@@ -98,7 +98,8 @@ def binarizer(threshold, zoom, escale, border, perc, range, low, high, input, ou
                 fp.write(serialization.serialize([],
                                                  image_name=f'{output}.png',
                                                  image_size=res.size,
-                                                 template=ctx.meta['output_mode']))
+                                                 template=ctx.meta['output_mode'],
+                                                 processing_steps=ctx.meta['steps']))
         else:
             form = None
             ext = os.path.splitext(output)[1]
@@ -169,7 +170,8 @@ def segmenter(legacy, model, text_direction, scale, maxcolseps, black_colseps,
             fp.write(serialization.serialize_segmentation(res,
                                                           image_name=ctx.meta['base_image'],
                                                           image_size=im.size,
-                                                          template=ctx.meta['output_mode']))
+                                                          template=ctx.meta['output_mode'],
+                                                          processing_steps=ctx.meta['steps']))
     else:
         with click.open_file(output, 'w') as fp:
             fp = cast(IO[Any], fp)
@@ -245,12 +247,14 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore, input,
         logger.info('Serializing as {} into {}'.format(ctx.meta['output_mode'], output))
         if ctx.meta['output_mode'] != 'native':
             from kraken import serialization
-            fp.write(serialization.serialize(preds, ctx.meta['base_image'],
-                                             Image.open(ctx.meta['base_image']).size,
-                                             ctx.meta['text_direction'],
-                                             tags,
-                                             bounds['regions'] if 'regions' in bounds else None,
-                                             ctx.meta['output_mode']))
+            fp.write(serialization.serialize(records=preds,
+                                             image_name=ctx.meta['base_image'],
+                                             image_size=Image.open(ctx.meta['base_image']).size,
+                                             writing_mode=ctx.meta['text_direction'],
+                                             scripts=tags,
+                                             regions=bounds['regions'] if 'regions' in bounds else None,
+                                             template=ctx.meta['output_mode'],
+                                             processing_steps=ctx.meta['steps']))
         else:
             fp.write('\n'.join(s.prediction for s in preds))
         message('\u2713', fg='green')
@@ -315,6 +319,7 @@ def cli(input, batch_input, suffix, verbose, format_type, pdf_format, serializer
     ctx.meta['raise_failed'] = raise_on_error
     ctx.meta['output_mode'] = serializer
     ctx.meta['verbose'] = verbose
+    ctx.meta['steps'] = []
     log.set_logger(logger, level=30 - min(10 * verbose, 20))
 
 
@@ -329,6 +334,7 @@ def process_pipeline(subcommands, input, batch_input, suffix, verbose, format_ty
     import tempfile
 
     ctx = click.get_current_context()
+
 
     input = list(input)
     # expand batch inputs
@@ -376,6 +382,7 @@ def process_pipeline(subcommands, input, batch_input, suffix, verbose, format_ty
                     progress.update(pdf_parse_task, total=num_pages)
                     logger.warning(f'{fpath} is not a PDF file. Skipping.')
         input = new_input
+        ctx.meta['steps'].insert(0, {'category': 'preprocessing', 'description': 'PDF image extraction', 'settings': {}})
 
     for io_pair in input:
         ctx.meta['first_process'] = True
@@ -406,6 +413,7 @@ def process_pipeline(subcommands, input, batch_input, suffix, verbose, format_ty
 
 
 @cli.command('binarize')
+@click.pass_context
 @click.option('--threshold', show_default=True, default=0.5, type=click.FLOAT)
 @click.option('--zoom', show_default=True, default=0.5, type=click.FLOAT)
 @click.option('--escale', show_default=True, default=1.0, type=click.FLOAT)
@@ -414,11 +422,23 @@ def process_pipeline(subcommands, input, batch_input, suffix, verbose, format_ty
 @click.option('--range', show_default=True, default=20, type=click.INT)
 @click.option('--low', show_default=True, default=5, type=click.IntRange(1, 100))
 @click.option('--high', show_default=True, default=90, type=click.IntRange(1, 100))
-def binarize(threshold, zoom, escale, border, perc, range, low, high):
+def binarize(ctx, threshold, zoom, escale, border, perc, range, low, high):
     """
     Binarizes page images.
     """
-    return partial(binarizer, threshold, zoom, escale, border, perc, range, low, high)
+    ctx.meta['steps'].append({'category': 'preprocessing',
+                              'description': 'Image binarization',
+                              'settings': {'threshold': threshold,
+                                           'zoom': zoom,
+                                           'escale': escale,
+                                           'border': border,
+                                           'perc': perc,
+                                           'range': range,
+                                           'low': low,
+                                           'high': high}})
+
+    return partial(binarizer, threshold, zoom, escale, border, perc, range,
+                   low, high)
 
 
 @cli.command('segment')
@@ -457,6 +477,11 @@ def segment(ctx, model, boxes, text_direction, scale, maxcolseps,
     if boxes is False:
         if not model:
             model = SEGMENTATION_DEFAULT_MODEL
+        ctx.meta['steps'].append({'category': 'processing',
+                                  'description': 'Baseline and region segmentation',
+                                  'settings': {'model': os.path.basename(model),
+                                               'text_direction': text_direction}})
+
         from kraken.lib.vgsl import TorchVGSLModel
         message(f'Loading ANN {model}\t', nl=False)
         try:
@@ -467,11 +492,20 @@ def segment(ctx, model, boxes, text_direction, scale, maxcolseps,
                 raise
             message('\u2717', fg='red')
             ctx.exit(1)
+
         message('\u2713', fg='green')
+    else:
+        ctx.meta['steps'].append({'category': 'processing',
+                                  'description': 'bounding box segmentation',
+                                  'settings': {'text_direction': text_direction,
+                                               'scale': scale,
+                                               'maxcolseps': maxcolseps,
+                                               'black_colseps': black_colseps,
+                                               'remove_hlines': remove_hlines,
+                                               'pad': pad}})
 
     return partial(segmenter, boxes, model, text_direction, scale, maxcolseps,
-                   black_colseps, remove_hlines, pad, mask,
-                   ctx.meta['device'])
+                   black_colseps, remove_hlines, pad, mask, ctx.meta['device'])
 
 
 def _validate_mm(ctx, param, value):
@@ -566,6 +600,13 @@ def ocr(ctx, model, pad, reorder, base_dir, no_segmentation, text_direction, thr
         nm = nn
     # thread count is global so setting it once is sufficient
     nm[k].nn.set_num_threads(threads)
+
+    ctx.meta['steps'].append({'category': 'processing',
+                              'description': 'Text line recognition',
+                              'settings': {'text_direction': text_direction,
+                                           'models': ' '.join(os.path.basename(v) for v in model.values()),
+                                           'pad': pad,
+                                           'bidi_reordering': reorder}})
 
     # set output mode
     ctx.meta['text_direction'] = text_direction

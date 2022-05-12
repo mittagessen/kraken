@@ -28,7 +28,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <PcGts xmlns="http://schema.primaresearch.org/PAGE/gts/pagecontent/2019-07-15" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://schema.primaresearch.org/PAGE/gts/pagecontent/2019-07-15 http://schema.primaresearch.org/PAGE/gts/pagecontent/2019-07-15/pagecontent.xsd">
 	<Metadata>
-		<Creator>kraken</Creator>
+		<Creator>kraken {{ metadata.version }}</Creator>
 		<Created>{{ page.date }}</Created>
 		<LastChange>{{ page.date }}</LastChange>
 	</Metadata>

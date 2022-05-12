@@ -20,6 +20,7 @@ import datetime
 import numpy as np
 import shapely.geometry as geom
 
+from pkg_resources import get_distribution
 from shapely.ops import unary_union
 from collections import Counter
 
@@ -27,7 +28,7 @@ from kraken.rpred import ocr_record
 from kraken.lib.util import make_printable
 from kraken.lib.segmentation import is_in_region
 
-from typing import List, Tuple, Iterable, Optional, Sequence, Dict, Any
+from typing import Union, List, Tuple, Iterable, Optional, Sequence, Dict, Any
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +77,8 @@ def serialize(records: Sequence[ocr_record],
               writing_mode: str = 'horizontal-tb',
               scripts: Optional[Iterable[str]] = None,
               regions: Optional[Dict[str, List[List[Tuple[int, int]]]]] = None,
-              template: str = 'hocr') -> str:
+              template: str = 'hocr',
+              processing_steps: Optional[List[Dict[str, Union[Dict, str, float, int, bool]]]] = None) -> str:
     """
     Serializes a list of ocr_records into an output document.
 
@@ -87,21 +89,25 @@ def serialize(records: Sequence[ocr_record],
     Note: Empty records are ignored for serialization purposes.
 
     Args:
-        records (iterable): List of kraken.rpred.ocr_record
-        image_name (str): Name of the source image
-        image_size (tuple): Dimensions of the source image
-        writing_mode (str): Sets the principal layout of lines and the
-                            direction in which blocks progress. Valid values
-                            are horizontal-tb, vertical-rl, and
-                            vertical-lr.
-        scripts (list): List of scripts contained in the OCR records
-        regions (list): Dictionary mapping region types to a list of region
-                        polygons.
-        template (str): Selector for the serialization format. May be
-                        'hocr' or 'alto'.
+        records: List of kraken.rpred.ocr_record
+        image_name: Name of the source image
+        image_size: Dimensions of the source image
+        writing_mode: Sets the principal layout of lines and the
+                      direction in which blocks progress. Valid values are
+                      horizontal-tb, vertical-rl, and vertical-lr.
+        scripts: List of scripts contained in the OCR records
+        regions: Dictionary mapping region types to a list of region polygons.
+        template: Selector for the serialization format. May be 'hocr',
+                  'alto', 'page' or any template found in the template directory.
+        processing_steps: A list of dictionaries describing the processing kraken performed on the inputs:
+                          ```
+                          {'category': 'preprocessing',
+                           'description': 'natural language description of process',
+                           'settings': {'arg0': 'foo', 'argX': 'bar'}}
+                          ```
 
     Returns:
-            (str) rendered template.
+        The rendered template
     """
     logger.info(f'Serialize {len(records)} records from {image_name} with template {template}.')
     page = {'entities': [],
@@ -111,6 +117,9 @@ def serialize(records: Sequence[ocr_record],
             'scripts': scripts,
             'date': datetime.datetime.now(datetime.timezone.utc).isoformat(),
             'base_dir': [rec.base_dir for rec in records][0] if len(records) else None}  # type: dict
+    metadata = {'processing_steps': processing_steps,
+                'version': get_distribution('kraken').version}
+
     seg_idx = 0
     char_idx = 0
     region_map = {}
@@ -232,13 +241,14 @@ def serialize(records: Sequence[ocr_record],
     logger.debug('Retrieving template.')
     tmpl = env.get_template(template)
     logger.debug('Rendering data.')
-    return tmpl.render(page=page)
+    return tmpl.render(page=page, metadata=metadata)
 
 
 def serialize_segmentation(segresult: Dict[str, Any],
                            image_name: str = None,
                            image_size: Tuple[int, int] = (0, 0),
-                           template: str = 'hocr') -> str:
+                           template: str = 'hocr',
+                           processing_steps: Optional[List[Dict[str, Union[Dict, str, float, int, bool]]]] = None) -> str:
     """
     Serializes a segmentation result into an output document.
 
@@ -264,7 +274,8 @@ def serialize_segmentation(segresult: Dict[str, Any],
                      image_name=image_name,
                      image_size=image_size,
                      regions=segresult['regions'] if 'regions' in segresult else None,
-                     template=template)
+                     template=template,
+                     processing_steps=processing_steps)
 
 
 def render_report(model: str,

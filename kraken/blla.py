@@ -31,7 +31,7 @@ import torchvision.transforms as tf
 
 from typing import Optional, Dict, Callable, Union, List, Any, Tuple
 
-from scipy.ndimage.filters import gaussian_filter
+from scipy.ndimage import gaussian_filter
 from skimage.filters import sobel
 
 from kraken.lib import vgsl, dataset

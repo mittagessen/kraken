@@ -2,7 +2,8 @@
 Various add-ons to the SciPy morphology package
 """
 import numpy as np
-from scipy.ndimage import morphology, measurements, filters
+from scipy.ndimage import label, find_objects
+from scipy.ndimage import morphology, filters
 
 
 def label(image: np.ndarray, **kw) -> np.ndarray:
@@ -12,17 +13,17 @@ def label(image: np.ndarray, **kw) -> np.ndarray:
     types it accepts on different platforms.
     """
     try:
-        return measurements.label(image, **kw)
+        return label(image, **kw)
     except Exception:
         pass
     types = ["int32", "uint32", "int64", "uint64", "int16", "uint16"]
     for t in types:
         try:
-            return measurements.label(np.array(image, dtype=t), **kw)
+            return label(np.array(image, dtype=t), **kw)
         except Exception:
             pass
     # let it raise the same exception as before
-    return measurements.label(image, **kw)
+    return label(image, **kw)
 
 
 def find_objects(image: np.ndarray, **kw) -> np.ndarray:
@@ -32,17 +33,17 @@ def find_objects(image: np.ndarray, **kw) -> np.ndarray:
     the data types it accepts on different platforms.
     """
     try:
-        return measurements.find_objects(image, **kw)
+        return find_objects(image, **kw)
     except Exception:
         pass
     types = ["int32", "uint32", "int64", "uint64", "int16", "uint16"]
     for t in types:
         try:
-            return measurements.find_objects(np.array(image, dtype=t), **kw)
+            return find_objects(np.array(image, dtype=t), **kw)
         except Exception:
             pass
     # let it raise the same exception as before
-    return measurements.find_objects(image, **kw)
+    return find_objects(image, **kw)
 
 
 def r_dilation(image, size, origin=0):
