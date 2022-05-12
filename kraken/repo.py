@@ -15,17 +15,18 @@
 """
 Accessors to the model repository on zenodo.
 """
-from typing import Callable, Any
-from contextlib import closing
-
-from kraken.lib.exceptions import KrakenRepoException
-
 import os
 import json
 import urllib
 import pathlib
 import logging
 import requests
+
+from pathlib import Path
+from contextlib import closing
+from typing import Callable, Any
+
+from kraken.lib.exceptions import KrakenRepoException
 
 __all__ = ['get_model', 'get_description', 'get_listing', 'publish_model']
 
@@ -48,8 +49,10 @@ def publish_model(model_file: [str, pathlib.Path] = None,
         access_token: Zenodo API access token
         callback: Function called for every 1024 octet chunk uploaded.
     """
+    model_file = Path(model_file)
     fp = open(model_file, 'rb')
-    total = len(model_file) + 4
+    _metadata = json.dumps(metadata)
+    total = model_file.stat().st_size + len(_metadata) + 3
     headers = {"Content-Type": "application/json"}
     r = requests.post(f'{MODEL_REPO}deposit/depositions',
                       params={'access_token': access_token}, json={},
@@ -58,19 +61,19 @@ def publish_model(model_file: [str, pathlib.Path] = None,
     callback(total, 1)
     deposition_id = r.json()['id']
     data = {'filename': 'metadata.json'}
-    files = {'file': ('metadata.json', json.dumps(metadata))}
+    files = {'file': ('metadata.json', _metadata)}
     r = requests.post(f'{MODEL_REPO}deposit/depositions/{deposition_id}/files',
                       params={'access_token': access_token}, data=data,
                       files=files)
     r.raise_for_status()
-    callback(total, 1)
+    callback(total, len(_metadata))
     data = {'filename': metadata['name']}
     files = {'file': fp}
     r = requests.post(f'{MODEL_REPO}deposit/depositions/{deposition_id}/files',
                       params={'access_token': access_token}, data=data,
                       files=files)
     r.raise_for_status()
-    callback(total, 1)
+    callback(total, model_file.stat().st_size)
     # fill zenodo metadata
     data = {'metadata': {
                         'title': metadata['summary'],
@@ -96,7 +99,7 @@ def publish_model(model_file: [str, pathlib.Path] = None,
     r = requests.post(f'{MODEL_REPO}deposit/depositions/{deposition_id}/actions/publish',
                       params={'access_token': access_token})
     r.raise_for_status()
-    callback(total, len(model_file))
+    callback(total, 1)
     return r.json()['doi']
 
 

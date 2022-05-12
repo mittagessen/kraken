@@ -26,7 +26,7 @@ from bidi.algorithm import get_display
 from typing import cast, Set, List, IO, Any, Dict
 
 from kraken.lib import log
-from kraken.lib.progress import KrakenProgressBar
+from kraken.lib.progress import KrakenProgressBar, KrakenDownloadProgressBar
 from kraken.lib.exceptions import KrakenCairoSurfaceException
 from kraken.lib.exceptions import KrakenInputException
 from kraken.lib.default_specs import (SEGMENTATION_HYPER_PARAMS,
@@ -1191,8 +1191,10 @@ def publish(ctx, metadata, access_token, model):
         metadata = json.load(metadata)
         validate(metadata, schema)
     metadata['graphemes'] = [char for char in ''.join(nn.codec.c2l.keys())]
-    oid = repo.publish_model(model, metadata, access_token, partial(message, '.', nl=False))
-    message('\nmodel PID: {}'.format(oid))
+    with KrakenDownloadProgressBar() as progress:
+        upload_task = progress.add_task('Uploading', total=0, visible=True if not ctx.meta['verbose'] else False)
+        oid = repo.publish_model(model, metadata, access_token, lambda total, advance: progress.update(upload_task, total=total, advance=advance))
+    message('model PID: {}'.format(oid))
 
 
 @cli.command('compile')
