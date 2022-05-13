@@ -156,11 +156,15 @@ option                                          action
 Model Repository
 ----------------
 
+.. _repo:
+
 There is a semi-curated `repository
-<https://github.com/mittagessen/kraken-models>`_ of freely licensed recognition
-models that can be accessed from the command line using a few subcommands. For
-evaluating a series of models it is also possible to just clone the repository
-using the normal git client. 
+<https://zenodo.org/communities/ocr_models>`_ of freely licensed recognition
+models that can be interacted with from the command line using a few
+subcommands. 
+
+Querying and Model Retrieval
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The ``list`` subcommand retrieves a list of all models available and prints
 them including some additional information (identifier, type, and a short
@@ -169,40 +173,79 @@ description):
 .. code-block:: console
 
         $ kraken list
-        Retrieving model list   ✓
-        default (pyrnn) - A converted version of en-default.pyrnn.gz
-        toy (clstm) - A toy model trained on 400 lines of the UW3 data set.
+        Retrieving model list ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 8/8 0:00:00 0:00:07
+        10.5281/zenodo.6542744 (pytorch) - LECTAUREP Contemporary French Model (Administration)
+        10.5281/zenodo.5617783 (pytorch) - Cremma-Medieval Old French Model (Litterature)
+        10.5281/zenodo.5468665 (pytorch) - Medieval Hebrew manuscripts in Sephardi bookhand version 1.0
         ...
 
 To access more detailed information the ``show`` subcommand may be used:
 
 .. code-block:: console
 
-        $ kraken show toy
-        name: toy.clstm
+        $ kraken show 10.5281/zenodo.5617783
+        name: 10.5281/zenodo.5617783
 
-        A toy model trained on 400 lines of the UW3 data set.
+        Cremma-Medieval Old French Model (Litterature)
 
-        author: Benjamin Kiessling (mittagessen@l.unchti.me)
-        http://kraken.re
+        ....
+        scripts: Latn
+        alphabet: &'(),-.0123456789:;?ABCDEFGHIJKLMNOPQRSTUVXabcdefghijklmnopqrstuvwxyz¶ãíñõ÷ħĩłũƺᵉẽ’•⁊⁹ꝑꝓꝯꝰ SPACE, COMBINING ACUTE ACCENT, COMBINING TILDE, COMBINING MACRON, COMBINING ZIGZAG ABOVE, COMBINING LATIN SMALL LETTER A, COMBINING LATIN SMALL LETTER E, COMBINING LATIN SMALL LETTER I, COMBINING LATIN SMALL LETTER O, COMBINING LATIN SMALL LETTER U, COMBINING LATIN SMALL LETTER C, COMBINING LATIN SMALL LETTER R, COMBINING LATIN SMALL LETTER T, COMBINING UR ABOVE, COMBINING US ABOVE, COMBINING LATIN SMALL LETTER S, 0xe8e5, 0xf038, 0xf128
+        accuracy: 95.49%
+        license: CC-BY-SA-2.0
+        author(s): Pinche, Ariane
+        date: 2021-10-29
 
 If a suitable model has been decided upon it can be retrieved using the ``get``
 subcommand:
 
 .. code-block:: console
 
-        $ kraken get toy
-        Retrieving model        ✓
+        $ kraken get 10.5281/zenodo.5617783
+        Processing ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 16.1/16.1 MB 0:00:00 0:00:10
+        Model name: cremma_medieval_bicerin.mlmodel
 
-Models will be placed in $XDG_BASE_DIR and can be accessed using their name as
-shown by the ``show`` command, e.g.:
+Models will be placed in ``$XDG_BASE_DIR`` and can be accessed using their name as
+printed in the last line of the ``kraken get`` output.
 
 .. code-block:: console
 
-        $ kraken -i ... ... ocr -m toy
+        $ kraken -i ... ... ocr -m cremma_medieval_bicerin.mlmodel
 
-Additions and updates to existing models are always welcome! Just open a pull
-request or write an email.
+Publishing
+^^^^^^^^^^
+
+When one would like to share a model with the wider world (for fame and glory!)
+it is possible (and recommended) to upload them to repository. The process
+consists of 2 stages: the creation of the deposit on the Zenodo platform
+followed by approval of the model in the community making it discoverable for
+other kraken users.
+
+For uploading model a Zenodo account and a personal access token is required.
+After account creation tokens can be created under the account settings:
+
+.. image:: _static/pat.png
+  :width: 800
+  :alt: Zenodo token creation dialogue
+
+With the token models can then be uploaded:
+
+.. code-block:: console
+
+   $ ketos publish -a $ACCESS_TOKEN aaebv2-2.mlmodel
+   DOI: 10.5281/zenodo.5617783
+
+A number of important metadata will be asked for such as a short description of
+the model, long form description, recognized scripts, and authorship.
+Afterwards the model is deposited at Zenodo. This deposit is persistent, i.e.
+can't be changed or deleted so it is important to make sure that all the
+information is correct. Each deposit also has a unique persistent identifier, a
+DOI, that can be used to refer to it, e.g. in publications or when pointing
+someone to a particular model.
+
+Once the deposit has been created a request (requiring manual approval) for
+inclusion in the repository will automatically be created which will make it
+discoverable by other users.
 
 Recognition
 -----------

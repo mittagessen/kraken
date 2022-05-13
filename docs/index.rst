@@ -27,7 +27,7 @@ kraken's main features are:
     output
   - Word bounding boxes and character cuts
   - Multi-script recognition support
-  - `Public repository <https://zenodo.org/communities/ocr_models>`_ of model files
+  - :ref:`Public repository <repo>` of model files
   - :ref:`Lightweight model files <models>`
   - :ref:`Variable recognition network architectures <vgsl>`
 
