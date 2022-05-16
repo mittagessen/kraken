@@ -426,7 +426,7 @@ class RecognitionModel(pl.LightningModule):
                 raise ValueError('1cycle learning rate scheduler selected but '
                                  'number of epochs is less than 0 '
                                  f'({self.hparams.epochs}).')
-            lr_sched['scheduler'] = lr_scheduler.OneCycleLR(optim, max_lr=1.0, epochs=self.hparams.epochs, steps_per_epoch=len(self.train_set))
+            lr_sched['scheduler'] = lr_scheduler.OneCycleLR(optim, max_lr=1.0, epochs=self.hparams.epochs, steps_per_epoch=len(self.train_set), verbose=True)
             lr_sched['interval'] = 'step'
         elif self.hparams.schedule != 'constant':
             raise ValueError(f'Unsupported learning rate scheduler {self.hparams.schedule}.')
