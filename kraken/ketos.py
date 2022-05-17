@@ -64,10 +64,10 @@ def cli(ctx, verbose, seed, deterministic):
     ctx.meta['deterministic'] = deterministic
     if seed:
         from pytorch_lightning import seed_everything
-        seed_everything(seed)
+        seed_everything(seed, workers=True)
     elif deterministic:
         from pytorch_lightning import seed_everything
-        seed_everything(seed)
+        seed_everything(42, workers=True)
 
     ctx.meta['verbose'] = verbose
     log.set_logger(logger, level=30 - min(10 * verbose, 20))
