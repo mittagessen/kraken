@@ -58,12 +58,16 @@ def message(msg, **styles):
 @click.option('-s', '--seed', default=None, type=click.INT,
               help='Seed for numpy\'s and torch\'s RNG. Set to a fixed value to '
                    'ensure reproducible random splits of data')
-def cli(ctx, verbose, seed):
+@click.option('-r', '--deterministic/--no-deterministic', default=False,
+              help="Enables deterministic training. If no seed is given and enabled the seed will be set to 42.")
+def cli(ctx, verbose, seed, deterministic):
+    ctx.meta['deterministic'] = deterministic
     if seed:
-        import numpy.random
-        numpy.random.seed(seed)
-        from torch import manual_seed
-        manual_seed(seed)
+        from pytorch_lightning import seed_everything
+        seed_everything(seed)
+    elif deterministic:
+        from pytorch_lightning import seed_everything
+        seed_everything(seed)
 
     ctx.meta['verbose'] = verbose
     log.set_logger(logger, level=30 - min(10 * verbose, 20))
@@ -359,6 +363,7 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs, min_epochs
                             max_epochs=hyper_params['epochs'] if hyper_params['quit'] == 'dumb' else -1,
                             min_epochs=hyper_params['min_epochs'],
                             enable_progress_bar=True if not ctx.meta['verbose'] else False,
+                            deterministic=ctx.meta['deterministic'],
                             **val_check_interval)
 
     trainer.fit(model)
@@ -611,6 +616,7 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
                             max_epochs=hyper_params['epochs'] if hyper_params['quit'] == 'dumb' else -1,
                             min_epochs=hyper_params['min_epochs'],
                             enable_progress_bar=True if not ctx.meta['verbose'] else False,
+                            deterministic=ctx.meta['deterministic'],
                             **val_check_interval)
     try:
         trainer.fit(model)
