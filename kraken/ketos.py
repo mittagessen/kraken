@@ -1131,8 +1131,11 @@ def line_generator(ctx, font, maxlines, encoding, normalization, renormalize,
               type=click.File(mode='r', lazy=True), help='Metadata for the '
               'model. Will be prompted from the user if not given')
 @click.option('-a', '--access-token', prompt=True, help='Zenodo access token')
+@click.option('-p', '--private/--public', default=False, help='Disables Zenodo '
+              'community inclusion request. Allows upload of models that will not show '
+              'up on `kraken list` output')
 @click.argument('model', nargs=1, type=click.Path(exists=False, readable=True, dir_okay=False))
-def publish(ctx, metadata, access_token, model):
+def publish(ctx, metadata, access_token, private, model):
     """
     Publishes a model on the zenodo model repository.
     """
@@ -1199,7 +1202,7 @@ def publish(ctx, metadata, access_token, model):
     metadata['graphemes'] = [char for char in ''.join(nn.codec.c2l.keys())]
     with KrakenDownloadProgressBar() as progress:
         upload_task = progress.add_task('Uploading', total=0, visible=True if not ctx.meta['verbose'] else False)
-        oid = repo.publish_model(model, metadata, access_token, lambda total, advance: progress.update(upload_task, total=total, advance=advance))
+        oid = repo.publish_model(model, metadata, access_token, lambda total, advance: progress.update(upload_task, total=total, advance=advance), private)
     message('model PID: {}'.format(oid))
 
 

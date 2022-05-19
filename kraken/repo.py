@@ -39,7 +39,8 @@ SUPPORTED_MODELS = set(['kraken_pytorch'])
 def publish_model(model_file: [str, pathlib.Path] = None,
                   metadata: dict = None,
                   access_token: str = None,
-                  callback: Callable[[int, int], Any] = lambda: None) -> str:
+                  callback: Callable[[int, int], Any] = lambda: None,
+                  private: bool = False) -> str:
     """
     Publishes a model to the repository.
 
@@ -47,7 +48,9 @@ def publish_model(model_file: [str, pathlib.Path] = None,
         model_file: Path to read model from.
         metadata: Metadata dictionary
         access_token: Zenodo API access token
-        callback: Function called for every 1024 octet chunk uploaded.
+        callback: Function called with octet-wise progress.
+        private: Whether to generate a community inclusion request that makes
+                 the model recoverable by the public.
     """
     model_file = Path(model_file)
     fp = open(model_file, 'rb')
@@ -82,11 +85,14 @@ def publish_model(model_file: [str, pathlib.Path] = None,
                         'description': metadata['description'],
                         'creators': metadata['authors'],
                         'access_right': 'open',
-                        'communities': [{'identifier': 'ocr_models'}],
                         'keywords': ['kraken_pytorch'],
                         'license': metadata['license']
                         }
             }
+
+    if not private:
+        data['metadata']['communities'] = [{'identifier': 'ocr_models'}]
+
     # add link to training data to metadata
     if 'source' in metadata:
         data['metadata']['related_identifiers'] = [{'relation': 'isSupplementTo', 'identifier': metadata['source']}]
