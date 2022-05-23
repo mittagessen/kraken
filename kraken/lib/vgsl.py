@@ -5,6 +5,7 @@ import re
 import json
 import torch
 import logging
+import warnings
 import pathlib
 
 from torch import nn
@@ -14,9 +15,14 @@ from kraken.lib import layers
 from kraken.lib.codec import PytorchCodec
 from kraken.lib.exceptions import KrakenInvalidModelException
 
-from coremltools.models import MLModel
-from coremltools.models import datatypes
-from coremltools.models.neural_network import NeuralNetworkBuilder
+# filter out coreml warnings coming from their conversion routines (which we don't use).
+with warnings.catch_warnings():
+    warnings.filterwarnings(action='ignore', message='has not been tested with coremltools')
+    warnings.filterwarnings(action='ignore', message='is not supported')
+
+    from coremltools.models import MLModel
+    from coremltools.models import datatypes
+    from coremltools.models.neural_network import NeuralNetworkBuilder
 
 from google.protobuf.message import DecodeError
 
