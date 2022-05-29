@@ -60,7 +60,7 @@ def cli(format_type, topline, files):
             for line in lines:
                 pol = line.find('./{*}Coords')
                 if pol is not None:
-                    pol.attrib['points'] = ' '.join([','.join([str(x) for x in pt]) for pt in o[idx]])
+                    pol.attrib['points'] = ' '.join([','.join([str(x) for x in pt]) for pt in polygons[idx]])
                     idx += 1
             with open(splitext(fname)[0] + '_rewrite.xml', 'wb') as fp:
                 doc.write(fp, encoding='UTF-8', xml_declaration=True)
