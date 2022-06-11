@@ -461,20 +461,35 @@ class RecognitionModel(pl.LightningModule):
                 try:
                     self.train_set.dataset.encode(codec)
                 except KrakenEncodeException:
-                    alpha_diff = set(self.train_set.dataset.alphabet).difference(set(codec.c2l.keys()))
+                    alpha_diff = set(self.train_set.dataset.alphabet).difference(
+                        set(codec.c2l.keys())
+                    )
+                    alpha_diff_val = set(self.val_set.dataset.alphabet).difference(
+                        set(codec.c2l.keys())
+                    )
                     if self.resize == 'fail':
                         raise KrakenInputException(f'Training data and model codec alphabets mismatch: {alpha_diff}')
                     elif self.resize == 'add':
-                        logger.info(f'Resizing codec to include {len(alpha_diff)} new code points')
-                        codec = codec.add_labels(alpha_diff)
+                        logger.info(f'Resizing codec to include '
+                                    f'{len(alpha_diff.union(alpha_diff_val))} new code points')
+                        # Add the characters in val only
+                        codec = codec.add_labels(alpha_diff.union(alpha_diff_val))
                         self.nn.add_codec(codec)
                         logger.info(f'Resizing last layer in network to {codec.max_label+1} outputs')
                         self.nn.resize_output(codec.max_label + 1)
                         self.train_set.dataset.encode(self.nn.codec)
                     elif self.resize == 'both':
-                        logger.info(f'Resizing network or given codec to {self.train_set.dataset.alphabet} code sequences')
+                        logger.info(f'Resizing network or given codec to '
+                                    f'{len(self.train_set.dataset.alphabet)+len(self.val_set.dataset.alphabet)} '
+                                    f'code sequences')
                         self.train_set.dataset.encode(None)
                         ncodec, del_labels = codec.merge(self.train_set.dataset.codec)
+                        # Add the characters in val only
+                        val_diff = set(self.val_set.dataset.alphabet).difference(
+                            set(ncodec.c2l.keys())
+                        )
+                        ncodec.add_labels(val_diff)
+                        # Switch codec.
                         self.nn.add_codec(ncodec)
                         logger.info(f'Deleting {len(del_labels)} output classes from network '
                                     f'({len(codec)-len(del_labels)} retained)')
