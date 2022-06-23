@@ -401,9 +401,6 @@ class RecognitionModel(pl.LightningModule):
         logger.debug(f'Constructing {self.hparams.optimizer} optimizer (lr: {self.hparams.lrate}, momentum: {self.hparams.momentum})')
         if self.hparams.optimizer == 'Adam':
             optim = torch.optim.Adam(self.nn.nn.parameters(), lr=self.hparams.lrate, weight_decay=self.hparams.weight_decay)
-        elif self.hparams.optimizer == 'Lamb':
-            from pytorch_lamb import Lamb
-            optim = Lamb(self.nn.nn.parameters(), lr=self.hparams.lrate, weight_decay=self.hparams.weight_decay)
         else:
             optim = getattr(torch.optim, self.hparams.optimizer)(self.nn.nn.parameters(),
                                                                  lr=self.hparams.lrate,
@@ -879,9 +876,6 @@ class SegmentationModel(pl.LightningModule):
         logger.debug(f'Constructing {self.hparams.optimizer} optimizer (lr: {self.hparams.lrate}, momentum: {self.hparams.momentum})')
         if self.hparams.optimizer == 'Adam':
             optim = torch.optim.Adam(self.nn.nn.parameters(), lr=self.hparams.lrate, weight_decay=self.hparams.weight_decay)
-        elif self.hparams.optimizer == 'Lamb':
-            from pytorch_lamb import Lamb
-            optim = Lamb(self.nn.nn.parameters(), lr=self.hparams.lrate, weight_decay=self.hparams.weight_decay)
         else:
             optim = getattr(torch.optim, self.hparams.optimizer)(self.nn.nn.parameters(),
                                                                  lr=self.hparams.lrate,
