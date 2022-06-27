@@ -304,7 +304,8 @@ class Reshape(Module):
         input_shape = torch.zeros([x if x else 1 for x in input])
         with torch.no_grad():
             o, _ = self.forward(input_shape)
-        return tuple(o.shape)  # type: ignore
+        self.output_shape = tuple(o.shape)
+        return self.output_shape  # type: ignore
 
     def deserialize(self, name, spec):
         """
@@ -867,7 +868,8 @@ class GroupNorm(Module):
         return o, seq_len
 
     def get_shape(self, input: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
-        return input
+        self.output_shape = input
+        return self.output_shape  # type: ignore
 
     def deserialize(self, name: str, spec) -> None:
         """
