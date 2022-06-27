@@ -74,13 +74,13 @@ class TorchVGSLModel(object):
     respectively.
 
     Attributes:
-        input (tuple): Expected input tensor as a 4-tuple.
-        nn (torch.nn.Sequential): Stack of layers parsed from the spec.
-        criterion (torch.nn.Module): Fully parametrized loss function.
-        user_metadata (dict): dict with user defined metadata. Is flushed into
+        input: Expected input tensor as a 4-tuple.
+        nn: Stack of layers parsed from the spec.
+        criterion: Fully parametrized loss function.
+        user_metadata: dict with user defined metadata. Is flushed into
                              model file during saving/overwritten by loading
                              operations.
-        one_channel_mode (str): Field indicating the image type used during
+        one_channel_mode: Field indicating the image type used during
                                 training of one-channel images. Is '1' for
                                 models trained on binarized images, 'L' for
                                 grayscale, and None otherwise.
@@ -90,46 +90,46 @@ class TorchVGSLModel(object):
         Constructs a torch module from a (subset of) VSGL spec.
 
         Args:
-            spec (str): Model definition similar to tesseract as follows:
-                        ============ FUNCTIONAL OPS ============
-                        C(s|t|r|l|rl|m)[{name}]<y>,<x>,<d>[,<y_stride>,<x_stride>]
-                          Convolves using a y,x window, with no shrinkage, SAME
-                          infill, d outputs, with s|t|r|l|m non-linear layer.
-                          (s|t|r|l|m) specifies the type of non-linearity:
-                          s = sigmoid
-                          t = tanh
-                          r = relu
-                          lr = leaky relu
-                          l = linear (i.e., None)
-                          m = softmax
-                        L(f|r|b)(x|y)[s][{name}]<n> LSTM cell with n outputs.
-                          f runs the LSTM forward only.
-                          r runs the LSTM reversed only.
-                          b runs the LSTM bidirectionally.
-                          x runs the LSTM in the x-dimension (on data with or without the
-                             y-dimension).
-                          y runs the LSTM in the y-dimension (data must have a y dimension).
-                          s (optional) summarizes the output in the requested dimension,
-                             outputting only the final step, collapsing the dimension to a
-                             single element.
-                          Examples:
-                          Lfx128 runs a forward-only LSTM in the x-dimension with 128
-                                 outputs, treating any y dimension independently.
-                          Lfys64 runs a forward-only LSTM in the y-dimension with 64 outputs
-                                 and collapses the y-dimension to 1 element.
-                        Do[{name}][<p>,<d>] Insert a dropout layer operating in
-                                            <d> dimensions with probability
-                                            <p>. Defaults to 1D with 0.5
-                                            probability.
-                        Gn[{name}]<n> A group normalization layer with n groups
-                        ============ PLUMBING OPS ============
-                        [...] Execute ... networks in series (layers).
-                        (...) Execute ... networks in parallel.
-                        I[{name}] Identity function to build residual connections in parallel layers.
-                        Mp[{name}]<y>,<x>[<y_stride>,<x_stride>] Maxpool the input, reducing the (y,x) rectangle to a
-                          single vector value.
-                        S[{name}]<d>(<a>x<b>)<e>,<f> Splits one dimension, moves one part to another
-                          dimension.
+            spec: Model definition similar to tesseract as follows:
+                  ============ FUNCTIONAL OPS ============
+                  C(s|t|r|l|rl|m)[{name}]<y>,<x>,<d>[,<y_stride>,<x_stride>]
+                    Convolves using a y,x window, with no shrinkage, SAME
+                    infill, d outputs, with s|t|r|l|m non-linear layer.
+                    (s|t|r|l|m) specifies the type of non-linearity:
+                    s = sigmoid
+                    t = tanh
+                    r = relu
+                    lr = leaky relu
+                    l = linear (i.e., None)
+                    m = softmax
+                  L(f|r|b)(x|y)[s][{name}]<n> LSTM cell with n outputs.
+                    f runs the LSTM forward only.
+                    r runs the LSTM reversed only.
+                    b runs the LSTM bidirectionally.
+                    x runs the LSTM in the x-dimension (on data with or without the
+                       y-dimension).
+                    y runs the LSTM in the y-dimension (data must have a y dimension).
+                    s (optional) summarizes the output in the requested dimension,
+                       outputting only the final step, collapsing the dimension to a
+                       single element.
+                    Examples:
+                    Lfx128 runs a forward-only LSTM in the x-dimension with 128
+                           outputs, treating any y dimension independently.
+                    Lfys64 runs a forward-only LSTM in the y-dimension with 64 outputs
+                           and collapses the y-dimension to 1 element.
+                  Do[{name}][<p>,<d>] Insert a dropout layer operating in
+                                      <d> dimensions with probability
+                                      <p>. Defaults to 1D with 0.5
+                                      probability.
+                  Gn[{name}]<n> A group normalization layer with n groups
+                  ============ PLUMBING OPS ============
+                  [...] Execute ... networks in series (layers).
+                  (...) Execute ... networks in parallel.
+                  I[{name}] Identity function to build residual connections in parallel layers.
+                  Mp[{name}]<y>,<x>[<y_stride>,<x_stride>] Maxpool the input, reducing the (y,x) rectangle to a
+                    single vector value.
+                  S[{name}]<d>(<a>x<b>)<e>,<f> Splits one dimension, moves one part to another
+                    dimension.
         """
         self.spec = spec
         self.named_spec = []  # type:  List[str]
