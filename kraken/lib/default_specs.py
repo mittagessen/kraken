@@ -19,6 +19,36 @@ Default VGSL specs and hyperparameters
 SEGMENTATION_SPEC = '[1,1800,0,3 Cr7,7,64,2,2 Gn32 Cr3,3,128,2,2 Gn32 Cr3,3,128 Gn32 Cr3,3,256 Gn32 Cr3,3,256 Gn32 Lbx32 Lby32 Cr1,1,32 Gn32 Lby32 Lbx32]' # NOQA
 RECOGNITION_SPEC = '[1,48,0,1 Cr4,2,32,4,2 Gn32 Cr4,2,64,1,1 Gn32 Mp4,2,4,2 Cr3,3,128,1,1 Gn32 Mp1,2,1,2 S1(1x0)1,3 Lbx256 Do0.5 Lbx256 Do0.5 Lbx256 Do0.5]' # NOQA
 
+RECOGNITION_PRETRAIN_HYPER_PARAMS = {'pad': 16,
+                                     'freq': 1.0,
+                                     'batch_size': 1,
+                                     'quit': 'dumb',
+                                     'epochs': 100,
+                                     'min_epochs': 5,
+                                     'lag': 5,
+                                     'min_delta': None,
+                                     'optimizer': 'Adam',
+                                     'lrate': 1e-3,
+                                     'momentum': 0.9,
+                                     'weight_decay': 0.0,
+                                     'schedule': 'constant',
+                                     'completed_epochs': 0,
+                                     'augment': False,
+                                     # lr scheduler params
+                                     # step/exp decay
+                                     'step_size': 10,
+                                     'gamma': 0.1,
+                                     # reduce on plateau
+                                     'rop_factor': 0.1,
+                                     'rop_patience': 5,
+                                     # cosine
+                                     'cos_t_max': 50,
+                                     # masking parameters
+                                     'mask_width': 12,
+                                     'mask_prob': 0.5,
+                                     'num_negatives': 5
+}
+
 RECOGNITION_HYPER_PARAMS = {'pad': 16,
                             'freq': 1.0,
                             'batch_size': 1,
