@@ -207,6 +207,20 @@ class PretrainDataModule(pl.LightningDataModule):
                 dataset.rebuild_alphabet()
         return dataset
 
+    def train_dataloader(self):
+        return DataLoader(self.train_set,
+                          collate_fn=collate_sequences,
+                          batch_size=self.hparams.batch_size,
+                          num_workers=self.hparams.num_workers,
+                          pin_memory=True)
+
+    def val_dataloader(self):
+        return DataLoader(self.val_set,
+                          collate_fn=collate_sequences,
+                          batch_size=self.hparams.batch_size,
+                          num_workers=self.hparams.num_workers,
+                          pin_memory=True)
+
 
 class RecognitionPretrainModel(pl.LightningModule):
     def __init__(self,
