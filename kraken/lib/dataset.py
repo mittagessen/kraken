@@ -819,6 +819,7 @@ class GroundTruthDataset(Dataset):
                  suffix: str = '.gt.txt',
                  normalization: Optional[str] = None,
                  whitespace_normalization: bool = True,
+                 ignore_empty_lines: bool = True,
                  reorder: Union[bool, str] = True,
                  im_transforms: Callable[[Any], torch.Tensor] = transforms.Compose([]),
                  augmentation: bool = False) -> None:

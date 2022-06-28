@@ -53,10 +53,14 @@ class PretrainDataModule(pl.LightningDataModule):
                  partition: Optional[float] = 0.9,
                  binary_dataset_split: bool = False,
                  batch_size: int = default_specs.RECOGNITION_PRETRAIN_HYPER_PARAMS['batch_size'],
+                 height: int = 48,
+                 width: int = 0,
+                 channels: int = 1,
                  num_workers: int = 1,
                  repolygonize: bool = False,
                  force_binarization: bool = False,
                  format_type: str = 'path',
+                 pad: int = 16,
                  augment: bool = default_specs.RECOGNITION_PRETRAIN_HYPER_PARAMS['augment']):
         """
         A LightningDataModule encapsulating text-less training data for
@@ -73,6 +77,7 @@ class PretrainDataModule(pl.LightningDataModule):
             format_type:
             augment:
         """
+        super().__init__()
         self.save_hyperparameters()
 
         DatasetClass = GroundTruthDataset
@@ -130,11 +135,11 @@ class PretrainDataModule(pl.LightningDataModule):
         else:
             raise ValueError(f'format_type {format_type} not in [alto, page, xml, path, binary].')
 
-        self.transforms = ImageInputTransforms(batch,
+        self.transforms = ImageInputTransforms(batch_size,
                                                height,
                                                width,
                                                channels,
-                                               self.hparams.pad,
+                                               pad,
                                                valid_norm,
                                                force_binarization)
 
@@ -184,14 +189,13 @@ class PretrainDataModule(pl.LightningDataModule):
                        DatasetClass,
                        training_data,
                        **kwargs):
-        dataset = DatasetClass(normalization=self.hparams.normalization,
-                               whitespace_normalization=self.hparams.normalize_whitespace,
-                               im_transforms=self.transforms,
+        dataset = DatasetClass(im_transforms=self.transforms,
                                augmentation=self.hparams.augment,
+                               ignore_empty_lines=False,
                                **kwargs)
 
-        if (self.num_workers and self.num_workers > 1) and self.format_type != 'binary':
-            with Pool(processes=self.num_workers) as pool:
+        if (self.hparams.num_workers and self.hparams.num_workers > 1) and self.hparams.format_type != 'binary':
+            with Pool(processes=self.hparams.num_workers) as pool:
                 for im in pool.imap_unordered(partial(_star_fun, dataset.parse), training_data, 5):
                     logger.debug(f'Adding sample {im} to training set')
                     if im:
@@ -202,9 +206,6 @@ class PretrainDataModule(pl.LightningDataModule):
                     dataset.add(**im)
                 except KrakenInputException as e:
                     logger.warning(str(e))
-            if self.format_type == 'binary' and self.hparams.normalization:
-                logger.debug(f'Rebuilding dataset using unicode normalization')
-                dataset.rebuild_alphabet()
         return dataset
 
     def train_dataloader(self):
