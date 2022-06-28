@@ -59,7 +59,6 @@ def _star_fun(fun, kwargs):
 
 class KrakenTrainer(pl.Trainer):
     def __init__(self,
-                 callbacks: Optional[Union[List[Callback], Callback]] = None,
                  enable_progress_bar: bool = True,
                  enable_summary: bool = True,
                  min_epochs=5,
