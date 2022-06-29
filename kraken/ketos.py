@@ -370,10 +370,10 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs, min_epochs
 
     if quit == 'early':
         message('Moving best model {0}_{1}.mlmodel ({2}) to {0}_best.mlmodel'.format(
-            output, trainer.stopper.best_epoch, trainer.stopper.best_loss))
+            output, model.best_epoch, model.best_metric))
         logger.info('Moving best model {0}_{1}.mlmodel ({2}) to {0}_best.mlmodel'.format(
-            output, trainer.stopper.best_epoch, trainer.stopper.best_loss))
-        shutil.copy(f'{output}_{trainer.stopper.best_epoch}.mlmodel', f'{output}_best.mlmodel')
+            output, model.best_epoch, model.best_metric))
+        shutil.copy(f'{output}_{model.best_epoch}.mlmodel', f'{output}_best.mlmodel')
 
 
 @cli.command('train')
