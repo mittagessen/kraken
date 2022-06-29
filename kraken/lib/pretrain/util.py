@@ -10,8 +10,6 @@ import torch
 import random
 import numpy as np
 
-logger = logging.getLogger(__name__)
-
 def positive_integers_with_sum(n, total):
     ls = [0]
     rv = []

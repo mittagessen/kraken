@@ -5,7 +5,7 @@ import torch
 import numpy as np
 
 from typing import List, Tuple, Optional, Iterable
-from torch.nn import Module, Sequential
+from torch.nn import Module, Sequential, Embedding, Linear
 from torch.nn import functional as F
 from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
 from coremltools.proto import NeuralNetwork_pb2
@@ -54,8 +54,8 @@ class Wav2Vec2Mask(Module):
         self.num_negatives = num_negatives
 
         # mask embedding replacing the masked out areas
-        self.mask_emb = nn.Embedding(mask_width, context_encoder_input_dim)
-        self.project_q = nn.Linear(context_encoder_input_dim, final_dim)
+        self.mask_emb = Embedding(mask_width, context_encoder_input_dim)
+        self.project_q = Linear(context_encoder_input_dim, final_dim)
 
     def forward(self, inputs: torch.Tensor, seq_len: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         N, C, H, W = inputs.shape

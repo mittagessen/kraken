@@ -24,6 +24,7 @@ import numpy as np
 import torch.nn.functional as F
 import pytorch_lightning as pl
 
+from itertools import chain
 from functools import partial
 from torch.multiprocessing import Pool
 from torch.optim import lr_scheduler
@@ -32,13 +33,12 @@ from pytorch_lightning.callbacks import Callback, EarlyStopping
 
 from kraken.lib import models, vgsl, default_specs, layers
 from kraken.lib.xml import preparse_xml_data
-from kraken.lib.util import make_printable
-from kraken.lib.codec import PytorchCodec
 from kraken.lib.dataset import (ArrowIPCRecognitionDataset,
                                 GroundTruthDataset, PolygonGTDataset,
                                 ImageInputTransforms, collate_sequences)
 from kraken.lib.exceptions import KrakenInputException
 from kraken.lib.train import _configure_optimizer_and_lr_scheduler
+from kraken.lib.pretrain.layers import Wav2Vec2Mask
 
 from torch.utils.data import DataLoader, random_split, Subset
 
@@ -168,22 +168,7 @@ class PretrainDataModule(pl.LightningDataModule):
                              'command. Please add valid XML, line, or binary data.')
 
         logger.info(f'Training set {len(self.train_set)} lines, validation set '
-                    f'{len(self.val_set)} lines, alphabet {len(train_set.alphabet)} '
-                    'symbols')
-        alpha_diff_only_train = set(self.train_set.dataset.alphabet).difference(set(self.val_set.dataset.alphabet))
-        alpha_diff_only_val = set(self.val_set.dataset.alphabet).difference(set(self.train_set.dataset.alphabet))
-        if alpha_diff_only_train:
-            logger.warning(f'alphabet mismatch: chars in training set only: '
-                           f'{alpha_diff_only_train} (not included in accuracy test '
-                           'during training)')
-        if alpha_diff_only_val:
-            logger.warning(f'alphabet mismatch: chars in validation set only: {alpha_diff_only_val} (not trained)')
-        logger.info('grapheme\tcount')
-        for k, v in sorted(train_set.alphabet.items(), key=lambda x: x[1], reverse=True):
-            char = make_printable(k)
-            if char == k:
-                char = '\t' + char
-            logger.info(f'{char}\t{v}')
+                    f'{len(self.val_set)} lines')
 
     def _build_dataset(self,
                        DatasetClass,
@@ -223,12 +208,18 @@ class PretrainDataModule(pl.LightningDataModule):
                           pin_memory=True)
 
 
+    def setup(self, stage: Optional[str] = None):
+        self.train_set.dataset.no_encode()
+        self.val_set.dataset.no_encode()
+
+
 class RecognitionPretrainModel(pl.LightningModule):
     def __init__(self,
                  hyper_params: Dict[str, Any] = None,
                  output: str = 'model',
                  spec: str = default_specs.RECOGNITION_SPEC,
-                 model: Optional[Union[pathlib.Path, str]] = None):
+                 model: Optional[Union[pathlib.Path, str]] = None,
+                 len_train_set: int = -1):
         """
         A LightningModule encapsulating the unsupervised pretraining setup for
         a text recognition model.
@@ -241,11 +232,11 @@ class RecognitionPretrainModel(pl.LightningModule):
         Args:
             hyper_params (dict): Hyperparameter dictionary containing all fields
                                  from
-                                 kraken.lib.default_specs.RECOGNITION_HYPER_PARAMS
+                                 kraken.lib.default_specs.RECOGNITION_PRETRAIN_HYPER_PARAMS
             **kwargs: Setup parameters, i.e. CLI parameters of the train() command.
         """
         super().__init__()
-        hyper_params_ = default_specs.RECOGNITION_HYPER_PARAMS
+        hyper_params_ = default_specs.RECOGNITION_PRETRAIN_HYPER_PARAMS
         if model:
             logger.info(f'Loading existing model from {model} ')
             self.nn = vgsl.TorchVGSLModel.load_model(model)
@@ -266,9 +257,8 @@ class RecognitionPretrainModel(pl.LightningModule):
         self.save_hyperparameters(hyper_params_)
 
         self.model = model
-        self.num_workers = num_workers
-        self.format_type = format_type
         self.output = output
+        self.len_train_set = len_train_set
 
         self.best_epoch = 0
         self.best_metric = 0.0
@@ -292,17 +282,6 @@ class RecognitionPretrainModel(pl.LightningModule):
         if 'file_system' in torch.multiprocessing.get_all_sharing_strategies():
             logger.debug('Setting multiprocessing tensor sharing strategy to file_system')
             torch.multiprocessing.set_sharing_strategy('file_system')
-
-        if codec:
-            logger.info('Instantiating codec')
-            self.codec = PytorchCodec(codec)
-            for k, v in self.codec.c2l.items():
-                char = make_printable(k)
-                if char == k:
-                    char = '\t' + char
-                logger.info(f'{char}\t{v}')
-        else:
-            self.codec = None
 
         logger.info('Encoding training set')
 
@@ -350,11 +329,10 @@ class RecognitionPretrainModel(pl.LightningModule):
     def configure_optimizers(self):
         return _configure_optimizer_and_lr_scheduler(self.hparams,
                                                      chain(self.features.parameters(),
-                                                           self.mask_layer.parameters(),
+                                                           self.wav2vecmask.parameters(),
                                                            self.encoder.parameters()),
-                                                     len_train_set=len(self.train_set),
+                                                     len_train_set=self.len_train_set,
                                                      loss_tracking_mode='min')
-
 
     def setup(self, stage: Optional[str] = None):
         # finalize models in case of appending/loading
@@ -367,49 +345,27 @@ class RecognitionPretrainModel(pl.LightningModule):
                 # initialize weights
                 self.nn.init_weights()
 
-            self.train_set.dataset.no_encode()
-            self.val_set.dataset.no_encode()
-
             self.nn.hyper_params = self.hparams
             self.nn.model_type = 'recognition'
 
-            for idx, layer in enumerate(self.nn.children()):
+            self.net = self.nn.nn
+
+            for idx, layer in enumerate(self.net.children()):
                 if isinstance(layer, layers.TransposedSummarizingRNN):
                     break
 
-
-
-            self.features = net.nn[:idx-1]
-            self.wav2vecmask = Wav2Vec2Mask(net.nn[idx-1].output_shape,
-                                            net.nn[-1].output_shape[1],
+            self.features = self.net[:idx-1]
+            self.wav2vecmask = Wav2Vec2Mask(self.net[idx-1].output_shape[1],
+                                            self.net[-1].output_shape[1],
                                             self.hparams.mask_width,
                                             self.hparams.mask_prob,
                                             self.hparams.num_negatives)
-            self.encoder = net.nn[idx:]
+            self.encoder = self.net[idx:]
 
-            if not self.nn.seg_type:
-                logger.info(f'Setting seg_type to {self.train_set.dataset.seg_type}.')
-                self.nn.seg_type = self.train_set.dataset.seg_type
+            #if not self.nn.seg_type:
+            #    logger.info(f'Setting seg_type to {self.train_set.dataset.seg_type}.')
+            #    self.nn.seg_type = self.train_set.dataset.seg_type
 
-            self.net = self.nn.nn
-
-            torch.set_num_threads(max(self.num_workers, 1))
-
-    def train_dataloader(self):
-        return DataLoader(self.train_set,
-                          batch_size=self.hparams.batch_size,
-                          num_workers=self.num_workers,
-                          pin_memory=True,
-                          shuffle=True,
-                          collate_fn=collate_sequences)
-
-    def val_dataloader(self):
-        return DataLoader(self.val_set,
-                          shuffle=False,
-                          batch_size=self.hparams.batch_size,
-                          num_workers=self.num_workers,
-                          pin_memory=True,
-                          collate_fn=collate_sequences)
 
     def configure_callbacks(self):
         callbacks = []
