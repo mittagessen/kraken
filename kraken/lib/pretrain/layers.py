@@ -59,9 +59,11 @@ class Wav2Vec2Mask(Module):
 
     def forward(self, inputs: torch.Tensor, seq_len: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         N, C, H, W = inputs.shape
-        inputs = inputs.reshape(C, H, -1)
-        mask, num_masks = compute_masks(self.mask_prob, self.mask_width, self.num_neg_samples, seq_len, W)
-        inputs[..., mask == 1] = self.mask_emb.weight.T.repeat(num_masks)
+        if H != 1:
+            raise Exception(f'Height has to be 1, not {H} for Wav2Vec2 masking layer.')
+        inputs = inputs.reshape(C, -1)
+        mask, num_masks = compute_masks(self.mask_prob, self.mask_width, self.num_negatives, seq_len, W)
+        inputs[..., mask == 1] = self.mask_emb.weight.T.repeat(1, num_masks)
         masked_inputs = self.project_q(inputs[..., mask == 1])
         negative_samples = self.project_q(inputs[..., mask == 2])
         return {'output': inputs,

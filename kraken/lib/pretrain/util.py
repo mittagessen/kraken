@@ -43,11 +43,10 @@ def compute_masks(mask_prob: int,
     """
     mask_samples = np.zeros(max_len * len(seq_lens))
     neg_samples = []
-    num_masks = mask_prob * sum(seq_lens) // mask_width + num_neg_samples
+    num_masks = int(mask_prob * sum(seq_lens.numpy()) // mask_width + num_neg_samples)
     for idx, seq_len in enumerate(seq_lens):
-
         base_idx = idx * max_len
-        indices = [x+w for x in positive_integers_with_sum(num_masks, (seq_len)-num_masks*mask_width)]
+        indices = [x+mask_width for x in positive_integers_with_sum(num_masks, (seq_len)-num_masks*mask_width)]
         start = 0
         sample_mask = []
         for i in indices:
@@ -56,7 +55,7 @@ def compute_masks(mask_prob: int,
             start+=i
         neg_idx = random.sample(range(len(sample_mask)), num_neg_samples)
         sample_neg = [sample_mask.pop(idx) for idx in sorted(neg_idx, reverse=True)]
-        mask_samples[sample_mask] = 1
-        mask_samples[sample_neg] = 2
+        mask_samples[np.r_[tuple(sample_mask)]] = 1
+        mask_samples[np.r_[tuple(sample_neg)]] = 2
 
     return mask_samples, num_masks - num_neg_samples

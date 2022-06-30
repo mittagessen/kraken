@@ -293,7 +293,6 @@ class RecognitionPretrainModel(pl.LightningModule):
         # sequence batch
         if 'seq_lens' in batch:
             seq_lens, label_lens = batch['seq_lens'], batch['target_lens']
-            target = (target, label_lens)
             output = self.features(batch['image'], seq_lens)
         else:
             output = self.features(batch['image'])
@@ -329,7 +328,7 @@ class RecognitionPretrainModel(pl.LightningModule):
     def configure_optimizers(self):
         return _configure_optimizer_and_lr_scheduler(self.hparams,
                                                      chain(self.features.parameters(),
-                                                           self.wav2vecmask.parameters(),
+                                                           self.wav2vec2mask.parameters(),
                                                            self.encoder.parameters()),
                                                      len_train_set=self.len_train_set,
                                                      loss_tracking_mode='min')
@@ -354,12 +353,12 @@ class RecognitionPretrainModel(pl.LightningModule):
                 if isinstance(layer, layers.TransposedSummarizingRNN):
                     break
 
-            self.features = self.net[:idx-1]
-            self.wav2vecmask = Wav2Vec2Mask(self.net[idx-1].output_shape[1],
-                                            self.net[-1].output_shape[1],
-                                            self.hparams.mask_width,
-                                            self.hparams.mask_prob,
-                                            self.hparams.num_negatives)
+            self.features = self.net[:idx]
+            self.wav2vec2mask = Wav2Vec2Mask(self.net[idx-1].output_shape[1],
+                                             self.net[-1].output_shape[1],
+                                             self.hparams.mask_width,
+                                             self.hparams.mask_prob,
+                                             self.hparams.num_negatives)
             self.encoder = self.net[idx:]
 
             #if not self.nn.seg_type:
