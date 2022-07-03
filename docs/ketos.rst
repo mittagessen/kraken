@@ -471,7 +471,7 @@ Fine tuning/transfer learning with last layer adaptation and slicing:
 
 In addition there are a couple of specific options that allow filtering of
 baseline and region types. Datasets are often annotated to a level that is too
-detailled or contains undesirable types, e.g. when combining segmentation data
+detailed or contains undesirable types, e.g. when combining segmentation data
 from different sources. The most basic option is the suppression of *all* of
 either baseline or region data contained in the dataset:
 
