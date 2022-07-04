@@ -808,7 +808,7 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
     message('Average accuracy: {:0.2f}%, (stddev: {:0.2f})'.format(np.mean(acc_list) * 100, np.std(acc_list) * 100))
 
 
-@cli.command('extract')
+@cli.command('extract', deprecated=True)
 @click.pass_context
 @click.option('-b', '--binarize/--no-binarize', show_default=True, default=True,
               help='Binarize color/grayscale images')
@@ -907,7 +907,7 @@ def extract(ctx, binarize, normalization, normalize_whitespace, reorder,
         fp.write('\n'.join(manifest))
 
 
-@cli.command('transcribe')
+@cli.command('transcribe', deprecated=True)
 @click.pass_context
 @click.option('-d', '--text-direction', default='horizontal-lr',
               type=click.Choice(['horizontal-lr', 'horizontal-rl', 'vertical-lr', 'vertical-rl']),
@@ -998,7 +998,7 @@ def transcription(ctx, text_direction, scale, bw, maxcolseps,
     message('\u2713', fg='green')
 
 
-@cli.command('linegen')
+@cli.command('linegen', deprecated=True)
 @click.pass_context
 @click.option('-f', '--font', default='sans',
               help='Font family to render texts in.')
