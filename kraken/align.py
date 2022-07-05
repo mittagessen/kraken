@@ -28,7 +28,11 @@ import numpy as np
 from PIL import Image
 from bidi.algorithm import get_display
 
+from typing import List, Dict, Any
+
 from kraken import rpred
+from kraken.lib.codec import PytorchCodec
+from kraken.lib.models import TorchSeqRecognizer
 from kraken.lib.exceptions import KrakenInputException, KrakenEncodeException
 from kraken.lib.segmentation import compute_polygon_section
 
@@ -67,7 +71,7 @@ def fst_from_lattice(outputs: np.ndarray):
     Generates an FST from the network output tensor.
 
     Arguments:
-        outputs (np.ndarray): Output tensor of shape (Batch, Labels, Length).
+        outputs: Output tensor of shape (batch, labels, length).
 
     Returns:
         An OpenFST FST object.
@@ -89,7 +93,7 @@ def fst_from_lattice(outputs: np.ndarray):
     return f
 
 
-def fst_from_text(line, codec):
+def fst_from_text(line: str, codec: PytorchCodec):
     """
     Creates an FST of a text line in label space.
 
@@ -174,14 +178,14 @@ def _generate_line_record(graph, final_step):
     return zip(bounds, labels)
 
 
-def forced_align(doc, model):
+def forced_align(doc: Dict[str, Any], model: TorchSeqRecognizer) -> List[rpred.ocr_record]:
     """
     Performs a forced character alignment of text with recognition model
     output activations.
 
     Argument:
-        doc (dict): Parsed document.
-        model (kraken.lib.model.TorchSeqRecognizer): Recognition model to use for alignment.
+        doc: Parsed document.
+        model: Recognition model to use for alignment.
 
     Returns:
         A list of kraken.rpred.ocr_record.
@@ -189,10 +193,16 @@ def forced_align(doc, model):
     im = Image.open(doc['image'])
     predictor = rpred.rpred(model, im, doc)
     records = []
-    for line in doc['lines']:
+    for idx, line in enumerate(doc['lines']):
         bidi_text = get_display(line['text'])
         gt_fst = fst_from_text(bidi_text, model.codec)
         next(predictor)
+        if model.outputs.shape[2] < 2*len(model.codec.encode(bidi_text)):
+            logger.warning(f'Could not align line {idx}. Output sequence length {model.outputs.shape[2]} < '
+                           f'{2*len(model.codec.encode(bidi_text))} (length of "{line["text"]}" after encoding).')
+            records.append(rpred.ocr_record('', [], [], line))
+            continue
+
         lat_fst = fst_from_lattice(model.outputs)
         composed_graph = _compose(lat_fst, gt_fst)
         short_graph = _shortest_path(composed_graph)
