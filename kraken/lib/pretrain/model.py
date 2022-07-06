@@ -1,5 +1,5 @@
 #
-# Copyright 2015 Benjamin Kiessling
+# Copyright 2022 Benjamin Kiessling
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
 # or implied. See the License for the specific language governing
 # permissions and limitations under the License.
 """
-Training loop interception helpers
+Pytorch-lightning modules for recognition model pretraining.
 """
 import re
 import torch
@@ -282,9 +282,9 @@ class RecognitionPretrainModel(pl.LightningModule):
             m = re.match(r'(\d+),(\d+),(\d+),(\d+)', blocks[0])
             if not m:
                 raise ValueError(f'Invalid input spec {blocks[0]}')
-            batch, height, width, channels = [int(x) for x in m.groups()]
+            self.batch, self.height, self.width, self.channels = [int(x) for x in m.groups()]
         else:
-            batch, channels, height, width = self.nn.input
+            self.batch, self.channels, self.height, self.width = self.nn.input
 
         if 'file_system' in torch.multiprocessing.get_all_sharing_strategies():
             logger.debug('Setting multiprocessing tensor sharing strategy to file_system')

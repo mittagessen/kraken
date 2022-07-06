@@ -201,21 +201,29 @@ def pretrain(ctx, batch_size, pad, output, spec, append, load, freq, quit, epoch
     else:
         val_check_interval = {'val_check_interval': hyper_params['freq']}
 
-    data_module = PretrainDataModule()
     model = RecognitionPretrainModel(hyper_params=hyper_params,
                                      output=output,
                                      spec=spec,
                                      append=append,
                                      model=load,
+                                     load_hyper_parameters=load_hyper_parameters)
+
+    data_module = PretrainDataModule(batch_size=hyper_params.pop('batch_size'),
+                                     pad=hyper_params.pop('pad'),
+                                     augment=hyper_params.pop('augment'),
                                      training_data=ground_truth,
                                      evaluation_data=evaluation_files,
                                      partition=partition,
                                      binary_dataset_split=fixed_splits,
                                      num_workers=workers,
-                                     load_hyper_parameters=load_hyper_parameters,
+                                     height=model.height,
+                                     width=model.width,
+                                     channels=model.channels,
                                      repolygonize=repolygonize,
                                      force_binarization=force_binarization,
                                      format_type=format_type)
+
+    model.len_train_set = len(data_module.train_dataloader())
 
     trainer = KrakenTrainer(gpus=device,
                             max_epochs=hyper_params['epochs'] if hyper_params['quit'] == 'dumb' else -1,
@@ -223,7 +231,7 @@ def pretrain(ctx, batch_size, pad, output, spec, append, load, freq, quit, epoch
                             enable_progress_bar=True if not ctx.meta['verbose'] else False,
                             deterministic=ctx.meta['deterministic'],
                             **val_check_interval)
-    trainer.fit(model)
+    trainer.fit(model, datamodule=data_module)
 
     if quit == 'early':
         message('Moving best model {0}_{1}.mlmodel ({2}) to {0}_best.mlmodel'.format(
