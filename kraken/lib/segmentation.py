@@ -922,19 +922,17 @@ def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image.Image:
 
     Args:
         im: Input image
-        bounds: A list of dicts in baseline:
-            ```
-            {'type': 'baselines',
-             'lines': [{'baseline': [[x_0, y_0], ... [x_n, y_n]],
-                        'boundary': [[x_0, y_0], ... [x_n, y_n]]},
-                       ....]
-            }
-            ```
-            or bounding box format:
-            ```
-            {'boxes': [[x_0, y_0, x_1, y_1], ...],
-             'text_direction': 'horizontal-lr'}
-            ```
+        bounds: A list of dicts in baseline::
+
+                    {'type': 'baselines',
+                     'lines': [{'baseline': [[x_0, y_0], ... [x_n, y_n]],
+                                'boundary': [[x_0, y_0], ... [x_n, y_n]]},
+                               ....]
+                    }
+
+                or bounding box format::
+
+                    {'boxes': [[x_0, y_0, x_1, y_1], ...], 'text_direction': 'horizontal-lr'}
 
     Yields:
         The extracted subimage
