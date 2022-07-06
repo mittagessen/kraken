@@ -19,20 +19,17 @@ import re
 import torch
 import pathlib
 import logging
-import warnings
-import numpy as np
 import torch.nn.functional as F
 import pytorch_lightning as pl
 
 from itertools import chain
 from functools import partial
 from torch.multiprocessing import Pool
-from torch.optim import lr_scheduler
-from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
-from typing import Callable, Dict, Optional, Sequence, Union, Any, List
-from pytorch_lightning.callbacks import Callback, EarlyStopping
+from torch.nn.utils.rnn import pack_padded_sequence
+from typing import Dict, Optional, Sequence, Union, Any
+from pytorch_lightning.callbacks import EarlyStopping
 
-from kraken.lib import models, vgsl, default_specs, layers
+from kraken.lib import vgsl, default_specs, layers
 from kraken.lib.xml import preparse_xml_data
 from kraken.lib.dataset import (ArrowIPCRecognitionDataset,
                                 GroundTruthDataset, PolygonGTDataset,
@@ -208,7 +205,6 @@ class PretrainDataModule(pl.LightningDataModule):
                           num_workers=self.hparams.num_workers,
                           pin_memory=True)
 
-
     def setup(self, stage: Optional[str] = None):
         self.train_set.dataset.no_encode()
         self.val_set.dataset.no_encode()
@@ -279,13 +275,11 @@ class RecognitionPretrainModel(pl.LightningModule):
         else:
             batch, channels, height, width = self.nn.input
 
-
         if 'file_system' in torch.multiprocessing.get_all_sharing_strategies():
             logger.debug('Setting multiprocessing tensor sharing strategy to file_system')
             torch.multiprocessing.set_sharing_strategy('file_system')
 
         logger.info('Encoding training set')
-
 
     def forward(self, x, seq_lens):
         return self.net(x, seq_lens)
@@ -293,8 +287,7 @@ class RecognitionPretrainModel(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         # sequence batch
         if 'seq_lens' in batch:
-            seq_lens, label_lens = batch['seq_lens'], batch['target_lens']
-            output = self.features(batch['image'], seq_lens)
+            output = self.features(batch['image'], batch['seq_lens'])
         else:
             output = self.features(batch['image'])
 
@@ -314,7 +307,7 @@ class RecognitionPretrainModel(pl.LightningModule):
         N, C, H, W = output.shape
         output = output.transpose(1, 3).reshape(-1, W, C)
         packed_output = pack_padded_sequence(output, seq_lens, batch_first=True, enforce_sorted=False)
-         # masked features after encoder
+        # masked features after encoder
         x = packed_output.data[mask_output['mask'] == 1].reshape_as(y)
 
         mask_n_neg = torch.cat([y, negatives], dim=0)
@@ -370,7 +363,6 @@ class RecognitionPretrainModel(pl.LightningModule):
                                              self.hparams.mask_prob,
                                              self.hparams.num_negatives)
             self.encoder = self.net[idx:]
-
 
     def configure_callbacks(self):
         callbacks = []

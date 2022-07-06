@@ -2,13 +2,10 @@
 Layers for VGSL models
 """
 import torch
-import numpy as np
 
-from typing import List, Tuple, Optional, Iterable
-from torch.nn import Module, Sequential, Embedding, Linear
-from torch.nn import functional as F
+from typing import Tuple, Optional
+from torch.nn import Module, Embedding, Linear
 from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
-from coremltools.proto import NeuralNetwork_pb2
 
 from kraken.lib.pretrain.util import compute_masks
 

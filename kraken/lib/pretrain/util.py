@@ -3,12 +3,12 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
-import itertools
-from typing import Optional, Tuple, Sequence, Union
+from typing import Sequence, Union
 
 import torch
 import random
 import numpy as np
+
 
 def positive_integers_with_sum(n, total):
     ls = [0]
@@ -21,6 +21,7 @@ def positive_integers_with_sum(n, total):
     for i in range(1, len(ls)):
         rv.append(ls[i] - ls[i-1])
     return rv
+
 
 def compute_masks(mask_prob: int,
                   mask_width: int,
@@ -54,7 +55,7 @@ def compute_masks(mask_prob: int,
     for i in indices:
         i_start = random.randint(start, i+start-mask_width)
         mask_slices.append(slice(i_start, i_start+mask_width))
-        start+=i
+        start += i
 
     neg_idx = random.sample(range(len(mask_slices)), num_neg_samples)
     neg_slices = [mask_slices.pop(idx) for idx in sorted(neg_idx, reverse=True)]
