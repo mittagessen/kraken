@@ -2,6 +2,7 @@
 
 import click
 
+
 @click.command()
 @click.option('-f', '--format-type', type=click.Choice(['xml', 'alto', 'page']), default='xml',
               help='Sets the input document format. In ALTO and PageXML mode all '
@@ -32,7 +33,7 @@ def cli(format_type, model, repolygonize, files):
     from PIL import Image
     from os.path import splitext
     from kraken import blla
-    from kraken.lib import dataset, segmentation, vgsl, xml
+    from kraken.lib import segmentation, vgsl, xml
 
     if model is None:
         for doc in files:
@@ -54,6 +55,7 @@ def cli(format_type, model, repolygonize, files):
             for idx, (im, box) in enumerate(segmentation.extract_polygons(full_im, bounds)):
                 click.echo('.', nl=False)
                 im.save('{}.{}.jpg'.format(splitext(doc)[0], idx))
+
 
 if __name__ == '__main__':
     cli()

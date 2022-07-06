@@ -4,18 +4,16 @@ Produces semi-transparent neural segmenter output overlays
 """
 import click
 
+
 @click.command()
 @click.argument('files', nargs=-1)
 def cli(files):
 
-    import sys
     import torch
     from PIL import Image
-    from kraken.lib import vgsl, dataset
-    import torch.nn.functional as F
     from os.path import splitext
     import torchvision.transforms as tf
-    from kraken.lib import dataset, segmentation, vgsl
+    from kraken.lib import dataset
 
     batch, channels, height, width = 1, 3, 1200, 0
     transforms = dataset.ImageInputTransforms(batch, height, width, channels, 0, valid_norm=False)
@@ -43,6 +41,7 @@ def cli(files):
         Image.composite(overlay, bl, heat).save(splitext(img)[0] + '.overlay.png')
         del o
         del im
+
 
 if __name__ == '__main__':
     cli()

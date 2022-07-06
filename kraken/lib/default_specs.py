@@ -48,7 +48,7 @@ RECOGNITION_PRETRAIN_HYPER_PARAMS = {'pad': 16,
                                      'mask_prob': 0.2,
                                      'num_negatives': 2,
                                      'logit_temp': 0.1,
-}
+                                     }
 
 RECOGNITION_HYPER_PARAMS = {'pad': 16,
                             'freq': 1.0,

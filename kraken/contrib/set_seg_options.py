@@ -5,6 +5,7 @@ A script setting the metadata of segmentation models.
 import click
 import shutil
 
+
 @click.command()
 @click.option('-b', '--bounding-region', multiple=True, help='Sets region identifiers which bound line bounding polygons')
 @click.option('--topline/--baseline', default=False, help='Sets model line type to baseline or topline')
@@ -13,8 +14,6 @@ def cli(bounding_region, topline, model):
     """
     A script setting the metadata of segmentation models.
     """
-    from PIL import Image, ImageDraw
-
     from kraken.lib import vgsl
 
     net = vgsl.TorchVGSLModel.load_model(model)
@@ -44,6 +43,7 @@ def cli(bounding_region, topline, model):
     net.user_metadata['topline'] = topline
     shutil.copy(model, f'{model}.bak')
     net.save_model(model)
+
 
 if __name__ == '__main__':
     cli()

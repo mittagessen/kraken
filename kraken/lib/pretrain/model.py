@@ -44,6 +44,16 @@ from torch.utils.data import DataLoader, random_split, Subset
 logger = logging.getLogger(__name__)
 
 
+def _star_fun(fun, kwargs):
+    try:
+        return fun(**kwargs)
+    except FileNotFoundError as e:
+        logger.warning(f'{e.strerror}: {e.filename}. Skipping.')
+    except KrakenInputException as e:
+        logger.warning(str(e))
+    return None
+
+
 class PretrainDataModule(pl.LightningDataModule):
     def __init__(self,
                  training_data: Union[Sequence[Union[pathlib.Path, str]], Sequence[Dict[str, Any]]] = None,
@@ -216,6 +226,7 @@ class RecognitionPretrainModel(pl.LightningModule):
                  output: str = 'model',
                  spec: str = default_specs.RECOGNITION_SPEC,
                  model: Optional[Union[pathlib.Path, str]] = None,
+                 load_hyper_parameters: bool = False,
                  len_train_set: int = -1):
         """
         A LightningModule encapsulating the unsupervised pretraining setup for

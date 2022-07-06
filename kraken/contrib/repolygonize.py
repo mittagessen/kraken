@@ -3,8 +3,8 @@
 Reads in a bunch of ALTO documents and repolygonizes the lines contained with
 the kraken polygonizer.
 """
-
 import click
+
 
 @click.command()
 @click.option('-f', '--format-type', type=click.Choice(['alto', 'page']), default='alto',
@@ -28,16 +28,12 @@ def cli(format_type, topline, files):
         click.echo(ctx.get_help())
         ctx.exit()
 
-    import os
-    import numpy as np
-    import sys
     from lxml import etree
     from os.path import splitext
 
     from kraken.lib import xml
-    from kraken import serialization, rpred
     from PIL import Image
-    from kraken.lib.segmentation import calculate_polygonal_environment, scale_polygonal_lines
+    from kraken.lib.segmentation import calculate_polygonal_environment
 
     def _repl_alto(fname, polygons):
         with open(fname, 'rb') as fp:
@@ -80,12 +76,13 @@ def cli(format_type, topline, files):
         click.echo(f'Processing {doc} ', nl=False)
         seg = parse_fn(doc)
         im = Image.open(seg['image']).convert('L')
-        l = []
+        baselines = []
         for x in seg['lines']:
             bl = x['baseline'] if x['baseline'] is not None else [0, 0]
-            l.append(bl)
-        o = calculate_polygonal_environment(im, l, scale=(1800, 0), topline=topline)
+            baselines.append(bl)
+        o = calculate_polygonal_environment(im, baselines, scale=(1800, 0), topline=topline)
         repl_fn(doc, o)
+
 
 if __name__ == '__main__':
     cli()

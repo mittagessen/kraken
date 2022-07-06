@@ -12,6 +12,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
 # or implied. See the License for the specific language governing
 # permissions and limitations under the License.
+"""
+kraken.ketos
+~~~~~~~~~~~~~
+
+Command line drivers for training functionality.
+"""
+
 import click
 import logging
 
