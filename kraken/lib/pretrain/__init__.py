@@ -15,3 +15,5 @@
 """
 Tools for unsupervised pretraining of recognition models.
 """
+
+from .model import PretrainDataModule, RecognitionPretrainModel

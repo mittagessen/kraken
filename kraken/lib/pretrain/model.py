@@ -371,10 +371,6 @@ class RecognitionPretrainModel(pl.LightningModule):
                                              self.hparams.num_negatives)
             self.encoder = self.net[idx:]
 
-            #if not self.nn.seg_type:
-            #    logger.info(f'Setting seg_type to {self.train_set.dataset.seg_type}.')
-            #    self.nn.seg_type = self.train_set.dataset.seg_type
-
 
     def configure_callbacks(self):
         callbacks = []
