@@ -21,7 +21,6 @@ RECOGNITION_SPEC = '[1,48,0,1 Cr4,2,32,4,2 Gn32 Cr4,2,64,1,1 Gn32 Mp4,2,4,2 Cr3,
 
 RECOGNITION_PRETRAIN_HYPER_PARAMS = {'pad': 16,
                                      'freq': 1.0,
-                                     'batch_size': 1,
                                      'quit': 'dumb',
                                      'epochs': 100,
                                      'min_epochs': 5,
@@ -44,9 +43,10 @@ RECOGNITION_PRETRAIN_HYPER_PARAMS = {'pad': 16,
                                      # cosine
                                      'cos_t_max': 50,
                                      # masking parameters
-                                     'mask_width': 12,
-                                     'mask_prob': 0.5,
-                                     'num_negatives': 2
+                                     'mask_width': 4,
+                                     'mask_prob': 0.2,
+                                     'num_negatives': 2,
+                                     'logit_temp': 0.1,
 }
 
 RECOGNITION_HYPER_PARAMS = {'pad': 16,

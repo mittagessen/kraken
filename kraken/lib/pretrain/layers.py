@@ -38,7 +38,8 @@ class Wav2Vec2Mask(Module):
                        final linear projection.
             mask_width: width of the non-overlapping masked areas.
             mask_prob: probability of masking at each time step
-            num_negatives: number of negative samples
+            num_negatives: number of negative samples with width mask_width *
+                           num_masks
 
         Shape:
             - Inputs: :math:`(N, C, H, W)` where `N` batches, `C` channels, `H`
@@ -61,13 +62,22 @@ class Wav2Vec2Mask(Module):
         N, C, H, W = inputs.shape
         if H != 1:
             raise Exception(f'Height has to be 1, not {H} for Wav2Vec2 masking layer.')
-        inputs = inputs.reshape(C, -1)
-        mask, num_masks = compute_masks(self.mask_prob, self.mask_width, self.num_negatives, seq_len, W)
-        inputs[..., mask == 1] = self.mask_emb.weight.T.repeat(1, num_masks)
-        masked_inputs = self.project_q(inputs[..., mask == 1])
-        negative_samples = self.project_q(inputs[..., mask == 2])
+
+        # NCHW -> NWC
+        inputs = inputs.transpose(1, 3).reshape(-1, W, C)
+        packed_inputs = pack_padded_sequence(inputs, seq_len, batch_first=True, enforce_sorted=False)
+        mask, num_masks, num_negatives = compute_masks(self.mask_prob, self.mask_width, self.num_negatives, seq_len)
+
+        unmasked_samples = self.project_q(packed_inputs.data[mask == 1]).reshape(1, num_masks, self.mask_width, -1)
+        negative_samples = self.project_q(packed_inputs.data[mask == 2]).reshape(self.num_negatives, num_masks, self.mask_width, -1)
+
+        # mask features
+        packed_inputs.data[mask == 1] = self.mask_emb.weight.repeat(num_masks, 1)
+        inputs, seq_len = pad_packed_sequence(packed_inputs, batch_first=True)
+        # NWC -> NCHW
+        inputs = inputs.permute(0, 2, 1).unsqueeze(2)
         return {'output': inputs,
-                'masked_outputs': masked_inputs,
+                'unmasked_samples': unmasked_samples,
                 'negative_samples': negative_samples,
                 'seq_len': seq_len,
                 'mask': mask}

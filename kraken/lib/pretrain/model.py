@@ -28,6 +28,7 @@ from itertools import chain
 from functools import partial
 from torch.multiprocessing import Pool
 from torch.optim import lr_scheduler
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 from typing import Callable, Dict, Optional, Sequence, Union, Any, List
 from pytorch_lightning.callbacks import Callback, EarlyStopping
 
@@ -52,7 +53,7 @@ class PretrainDataModule(pl.LightningDataModule):
                  evaluation_data: Optional[Union[Sequence[Union[pathlib.Path, str]], Sequence[Dict[str, Any]]]] = None,
                  partition: Optional[float] = 0.9,
                  binary_dataset_split: bool = False,
-                 batch_size: int = default_specs.RECOGNITION_PRETRAIN_HYPER_PARAMS['batch_size'],
+                 batch_size: int = 4,
                  height: int = 48,
                  width: int = 0,
                  channels: int = 1,
@@ -297,26 +298,35 @@ class RecognitionPretrainModel(pl.LightningModule):
         else:
             output = self.features(batch['image'])
 
-        mask_ouput = self.wav2vec2mask(*output)
+        # height should be 1 by now
+        if output[0].size(2) != 1:
+            raise KrakenInputException('Expected dimension 3 to be 1, actual {}'.format(output[0].size(2)))
+
+        mask_output = self.wav2vec2mask(*output)
 
         # run contextual encoder, i.e. recurrent layers
         output, seq_lens = self.encoder(mask_output['output'], mask_output['seq_len'])
 
-        # height should be 1 by now
-        if output.size(2) != 1:
-            raise KrakenInputException('Expected dimension 3 to be 1, actual {}'.format(output.size(2)))
-
-        y = mask_output['masked_outputs']
-        x = output[..., mask_output['mask'] == 1]
+        # unmasked features in encoder output domain
+        y = mask_output['unmasked_samples']
+        # negative samples
         negatives = mask_output['negative_samples']
+        N, C, H, W = output.shape
+        output = output.transpose(1, 3).reshape(-1, W, C)
+        packed_output = pack_padded_sequence(output, seq_lens, batch_first=True, enforce_sorted=False)
+         # masked features after encoder
+        x = packed_output.data[mask_output['mask'] == 1].reshape_as(y)
 
-        neg_is_pos = (y == negatives).all(-1)
-        y = y.unsqueeze(0)
-        targets = torch.cat([y, negatives], dim=0)
-        logits = torch.cosine_similarity(x.float(), targets.float(), dim=-1).type_as(x)
-        logits /= self.logit_temp
-        loss = F.cross_entropy(logits, target)
+        mask_n_neg = torch.cat([y, negatives], dim=0)
+        logits = torch.cosine_similarity(x.float(), mask_n_neg.float(), dim=-1).type_as(x)
 
+        targets = logits.new_zeros(logits.size(1) * logits.size(2), dtype=torch.long)
+
+        logits = logits.transpose(0, 2)
+        logits = logits.reshape(-1, logits.size(-1))
+        logits /= self.hparams.logit_temp
+
+        loss = F.cross_entropy(logits, targets, reduction='sum')
         return loss
 
     def validation_step(self, batch, batch_idx):

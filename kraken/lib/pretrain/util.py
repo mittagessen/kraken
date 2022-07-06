@@ -25,37 +25,41 @@ def positive_integers_with_sum(n, total):
 def compute_masks(mask_prob: int,
                   mask_width: int,
                   num_neg_samples: int,
-                  seq_lens: Union[torch.Tensor, Sequence[int]],
-                  max_len: int):
+                  seq_lens: Union[torch.Tensor, Sequence[int]]):
     """
     Samples num_mask non-overlapping random masks of length mask_width in
     sequence of length seq_len.
 
     Args:
         mask_prob: Probability of each individual token being chosen as start
-                   of a masked sequence. Overall number of masks is mask_prob *
-                   sum(seq_lens) / mask_width.
+                   of a masked sequence. Overall number of masks num_masks is
+                   mask_prob * sum(seq_lens) / mask_width.
         mask_width: width of each mask
-        num_neg_samples: Number of samples in unmasked sequence parts.
-        seq_len: sequence length
+        num_neg_samples: Number of samples from unmasked sequence parts (gets
+                         multiplied by num_mask)
+        seq_lens: sequence lengths
 
-    Returns
+    Returns:
+        An index array containing 1 for masked bits, 2 for negative samples,
+        the number of masks, and the actual number of negative samples.
     """
-    mask_samples = np.zeros(max_len * len(seq_lens))
-    neg_samples = []
-    num_masks = int(mask_prob * sum(seq_lens.numpy()) // mask_width + num_neg_samples)
-    for idx, seq_len in enumerate(seq_lens):
-        base_idx = idx * max_len
-        indices = [x+mask_width for x in positive_integers_with_sum(num_masks, (seq_len)-num_masks*mask_width)]
-        start = 0
-        sample_mask = []
-        for i in indices:
-            i_start = random.randint(start, i+start-mask_width)
-            sample_mask.append(slice(base_idx+i_start, base_idx+i_start+mask_width))
-            start+=i
-        neg_idx = random.sample(range(len(sample_mask)), num_neg_samples)
-        sample_neg = [sample_mask.pop(idx) for idx in sorted(neg_idx, reverse=True)]
-        mask_samples[np.r_[tuple(sample_mask)]] = 1
-        mask_samples[np.r_[tuple(sample_neg)]] = 2
+    mask_samples = np.zeros(sum(seq_lens))
+    num_masks = int(mask_prob * sum(seq_lens.numpy()) // mask_width)
+    num_neg_samples = num_masks * num_neg_samples
+    num_masks += num_neg_samples
 
-    return mask_samples, num_masks - num_neg_samples
+    indices = [x+mask_width for x in positive_integers_with_sum(num_masks, sum(seq_lens)-num_masks*mask_width)]
+    start = 0
+    mask_slices = []
+    for i in indices:
+        i_start = random.randint(start, i+start-mask_width)
+        mask_slices.append(slice(i_start, i_start+mask_width))
+        start+=i
+
+    neg_idx = random.sample(range(len(mask_slices)), num_neg_samples)
+    neg_slices = [mask_slices.pop(idx) for idx in sorted(neg_idx, reverse=True)]
+
+    mask_samples[np.r_[tuple(mask_slices)]] = 1
+    mask_samples[np.r_[tuple(neg_slices)]] = 2
+
+    return mask_samples, num_masks - num_neg_samples, num_neg_samples
