@@ -154,7 +154,7 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
               default=RECOGNITION_PRETRAIN_HYPER_PARAMS['augment'],
               help='Enable image augmentation')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
-def pretrain(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
+def pretrain(ctx, batch_size, pad, output, spec, load, freq, quit, epochs,
              min_epochs, lag, min_delta, device, optimizer, lrate, momentum,
              weight_decay, schedule, gamma, step_size, sched_patience, cos_max,
              partition, fixed_splits, training_files, evaluation_files, workers,
@@ -163,9 +163,6 @@ def pretrain(ctx, batch_size, pad, output, spec, append, load, freq, quit, epoch
     """
     Trains a model from image-text pairs.
     """
-    if not load and append:
-        raise click.BadOptionUsage('append', 'append option requires loading an existing model')
-
     if not (0 <= freq <= 1) and freq % 1.0 != 0:
         raise click.BadOptionUsage('freq', 'freq needs to be either in the interval [0,1.0] or a positive integer.')
 
@@ -224,7 +221,6 @@ def pretrain(ctx, batch_size, pad, output, spec, append, load, freq, quit, epoch
     model = RecognitionPretrainModel(hyper_params=hyper_params,
                                      output=output,
                                      spec=spec,
-                                     append=append,
                                      model=load,
                                      load_hyper_parameters=load_hyper_parameters)
 
