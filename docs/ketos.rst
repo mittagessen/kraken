@@ -429,6 +429,8 @@ with `sample.codec` containing:
 Segmentation training
 ---------------------
 
+.. _segtrain:
+
 Training a segmentation model is very similar to training models for text
 recognition. The basic invocation is:
 
