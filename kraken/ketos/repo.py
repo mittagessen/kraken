@@ -1,5 +1,5 @@
 #
-# Copyright 2015 Benjamin Kiessling
+# Copyright 2022 Benjamin Kiessling
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,6 +12,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
 # or implied. See the License for the specific language governing
 # permissions and limitations under the License.
+"""
+kraken.ketos.repo
+~~~~~~~~~~~~~~~~~
+
+Command line driver for publishing models to the model repository.
+"""
 import os
 import click
 import logging
