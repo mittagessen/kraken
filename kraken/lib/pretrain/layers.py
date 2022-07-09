@@ -62,7 +62,8 @@ class Wav2Vec2Mask(Module):
 
         # NCHW -> NWC
         inputs = inputs.transpose(1, 3).reshape(-1, W, C)
-        packed_inputs = pack_padded_sequence(inputs, seq_len.cpu(), batch_first=True, enforce_sorted=False)
+        seq_len = seq_len.cpu()
+        packed_inputs = pack_padded_sequence(inputs, seq_len, batch_first=True, enforce_sorted=False)
         mask, num_masks, num_negatives = compute_masks(self.mask_prob, self.mask_width, self.num_negatives, seq_len)
 
         unmasked_samples = self.project_q(packed_inputs.data[mask == 1]).reshape(1, num_masks, self.mask_width, -1)
