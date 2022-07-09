@@ -83,7 +83,6 @@ class KrakenTrainer(pl.Trainer):
             from pytorch_lightning.callbacks import RichModelSummary
             summary_cb = RichModelSummary(max_depth=2)
             kwargs['callbacks'].append(summary_cb)
-        else:
             kwargs['enable_model_summary'] = False
 
         kwargs['callbacks'].extend([KrakenSetOneChannelMode(), KrakenSaveModel()])
@@ -116,8 +115,9 @@ class KrakenSaveModel(Callback):
     def on_validation_end(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule") -> None:
         if not trainer.sanity_checking:
             trainer.model.nn.hyper_params['completed_epochs'] += 1
-            trainer.model.nn.user_metadata['accuracy'].append(
-                ((trainer.current_epoch + 1) * len(trainer.model.train_set), float(trainer.logged_metrics['val_metric'])))
+            metric = float(trainer.logged_metrics['val_metric']) if 'val_metric' in trainer.logged_metrics else -1.0
+            trainer.model.nn.user_metadata['accuracy'].append((trainer.global_step, metric))
+            trainer.model.nn.user_metadata['metrics'].append((trainer.global_step, trainer.logged_metrics))
 
             logger.info('Saving to {}_{}'.format(trainer.model.output, trainer.current_epoch))
             trainer.model.nn.save_model(f'{trainer.model.output}_{trainer.current_epoch}.mlmodel')
