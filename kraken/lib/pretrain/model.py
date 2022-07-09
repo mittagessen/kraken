@@ -374,6 +374,7 @@ class RecognitionPretrainModel(pl.LightningModule):
                                              self.hparams.mask_prob,
                                              self.hparams.num_negatives)
             self.encoder = self.net[idx:]
+            self.nn.aux_layers = {'wav2vec2mask': self.wav2vec2mask}
 
     def configure_callbacks(self):
         callbacks = []

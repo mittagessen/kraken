@@ -89,18 +89,29 @@ class Wav2Vec2Mask(Module):
         """
         Sets the weights of an initialized module from a CoreML protobuf spec.
         """
-        # extract conv parameters
-        emb = [x for x in spec.neuralNetwork.layers if x.name == '{}_wave2vec2'.format(name)][0].embedding
+        # extract embedding parameters
+        emb = [x for x in spec.neuralNetwork.layers if x.name == '{}_wave2vec2_emb'.format(name)][0].embedding
         weights = torch.Tensor(emb.weights.floatValue).resize_as_(self.mask_emb.weight.data)
         self.mask_emb.weight = torch.nn.Parameter(weights)
+        # extract linear projection parameters
+        lin = [x for x in spec.neuralNetwork.layers if x.name == '{}_wave2vec2_lin'.format(name)][0].innerProduct
+        weights = torch.Tensor(lin.weights.floatValue).resize_as_(self.project_q.weight.data)
+        bias = torch.Tensor(lin.bias.floatValue)
+        self.project_q.weight = torch.nn.Parameter(weights)
+        self.project_q.bias = torch.nn.Parameter(bias)
 
     def serialize(self, name: str, input: str, builder):
         """
         Serializes the module using a NeuralNetworkBuilder.
         """
-        wave2vec2_name = '{}_wave2vec2'.format(name)
-        builder.add_embedding(wave2vec2_name, self.mask_emb.weight.data.numpy(),
+        wave2vec2_emb_name = f'{name}_wave2vec2_emb'
+        builder.add_embedding(wave2vec2_emb_name, self.mask_emb.weight.data.numpy(),
                               None,
-                              self.height, self.mask_width,
-                              has_bias=False, input_name=input, output_name=wave2vec2_name)
+                              self.context_encoder_input_dim, self.mask_width,
+                              has_bias=False, input_name=input, output_name=wave2vec2_emb_name)
+        wave2vec2_lin_name = f'{name}_wave2vec2_lin'
+        builder.add_inner_product(wave2vec2_lin_name, self.project_q.weight.data.numpy(),
+                                  self.project_q.bias.data.numpy(),
+                                  self.context_encoder_input_dim, self.final_dim,
+                                  has_bias=True, input_name=input, output_name=wave2vec2_lin_name)
         return name

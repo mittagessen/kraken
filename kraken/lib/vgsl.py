@@ -142,10 +142,12 @@ class TorchVGSLModel(object):
         self.criterion = None  # type: Any
         self.nn = layers.MultiParamSequential()
         self.user_metadata = {'accuracy': [],
+                              'metrics': [],
                               'seg_type': None,
                               'one_channel_mode': None,
                               'model_type': None,
-                              'hyper_params': {}}  # type: dict[str, str]
+                              'hyper_params': {}}  # type: dict[str, Any]
+        self._aux_layers = nn.ModuleDict()
 
         self.idx = -1
         spec = spec.strip()
@@ -299,14 +301,17 @@ class TorchVGSLModel(object):
         except Exception as exc:
             raise KrakenInvalidModelException('Failed parsing out layers from model weights') from exc
 
+        logger.info(f'Deserializing auxiliary layers.')
         if 'codec' in mlmodel.user_defined_metadata:
             nn.add_codec(PytorchCodec(json.loads(mlmodel.user_defined_metadata['codec'])))
 
         nn.user_metadata = {'accuracy': [],
+                            'metrics': [],
                             'seg_type': 'bbox',
                             'one_channel_mode': '1',
                             'model_type': None,
                             'hyper_params': {}}  # type: dict[str, str]
+
         if 'kraken_meta' in mlmodel.user_defined_metadata:
             nn.user_metadata.update(json.loads(mlmodel.user_defined_metadata['kraken_meta']))
         return nn
@@ -349,12 +354,20 @@ class TorchVGSLModel(object):
     def hyper_params(self, val: Dict[str, Any]):
         self.user_metadata['hyper_params'].update(val)
 
+    @property
+    def aux_layers(self, **kwargs):
+        return self._aux_layers
+
+    @aux_layers.setter
+    def aux_layers(self, val: Dict[str, torch.nn.Module]):
+        self._aux_layers.update(val)
+
     def save_model(self, path: str):
         """
         Serializes the model into path.
 
         Args:
-            path (str): Target destination
+            path: Target destination
         """
         inputs = [('input', datatypes.Array(*self.input))]
         outputs = [('output', datatypes.Array(*self.output))]
@@ -372,6 +385,9 @@ class TorchVGSLModel(object):
                     else:
                         l.serialize(name, input, net_builder)
             _serialize_layer(self.nn, input, net_builder)
+            logger.debug(f'Serializing {len(self.aux_layers)} auxiliary layers')
+            _serialize_layer(self.aux_layers, input, net_builder)
+
             mlmodel = MLModel(net_builder.spec)
             mlmodel.short_description = 'kraken model'
             mlmodel.user_defined_metadata['vgsl'] = '[' + ' '.join(self.named_spec) + ']'
@@ -379,6 +395,8 @@ class TorchVGSLModel(object):
                 mlmodel.user_defined_metadata['codec'] = json.dumps(self.codec.c2l)
             if self.user_metadata:
                 mlmodel.user_defined_metadata['kraken_meta'] = json.dumps(self.user_metadata)
+            if self.aux_layers:
+                mlmodel.user_defined_metadata['aux_layers'] = json.dumps(tuple(self.aux_layers.keys()))
             mlmodel.save(path)
         finally:
             self.nn.to(prev_device)
