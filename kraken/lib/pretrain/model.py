@@ -14,6 +14,19 @@
 # permissions and limitations under the License.
 """
 Pytorch-lightning modules for recognition model pretraining.
+
+Pretraining is based on an image inpainting surrogate task that aims to
+reconstruct randomly sampled masked patches from the initial convolutional
+feature maps that have been replaced with a learnable embedding. The model is
+trained with a contrastive loss where negative samples are randomly generated
+from the unmasked parts of the sequence.
+
+Apart from an improved sampling method the implementation is mostly a faithful
+adaptation of:
+
+Vogler, Nikolai, et al. "Lacuna Reconstruction: Self-supervised Pre-training
+for Low-Resource Historical Document Transcription." arXiv preprint
+arXiv:2112.08692 (2021).
 """
 import re
 import torch
@@ -295,7 +308,7 @@ class RecognitionPretrainModel(pl.LightningModule):
     def forward(self, x, seq_lens):
         return self.net(x, seq_lens)
 
-    def training_step(self, batch, batch_idx):
+    def _step(self, batch, batch_idx):
         # sequence batch
         if 'seq_lens' in batch:
             output = self.features(batch['image'], batch['seq_lens'])
@@ -331,13 +344,14 @@ class RecognitionPretrainModel(pl.LightningModule):
         logits /= self.hparams.logit_temp
 
         loss = F.cross_entropy(logits, targets, reduction='sum')
+        self.log('CE', loss, on_epoch=False)
         return loss
 
     def validation_step(self, batch, batch_idx):
-        pass
+        _step(batch, batch_idx)
 
-    def validation_epoch_end(self, outputs):
-        pass
+    def training_step(self, batch, batch_idx):
+        return step(batch, batch_idx)
 
     def configure_optimizers(self):
         return _configure_optimizer_and_lr_scheduler(self.hparams,
