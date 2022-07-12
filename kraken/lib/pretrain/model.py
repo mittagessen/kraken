@@ -351,7 +351,7 @@ class RecognitionPretrainModel(pl.LightningModule):
         _step(batch, batch_idx)
 
     def training_step(self, batch, batch_idx):
-        return step(batch, batch_idx)
+        return _step(batch, batch_idx)
 
     def configure_optimizers(self):
         return _configure_optimizer_and_lr_scheduler(self.hparams,
