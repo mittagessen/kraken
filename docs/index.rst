@@ -23,7 +23,7 @@ kraken's main features are:
   - `Right-to-Left <https://en.wikipedia.org/wiki/Right-to-left>`_, `BiDi
     <https://en.wikipedia.org/wiki/Bi-directional_text>`_, and Top-to-Bottom
     script support
-  - `ALTO <https://www.loc.gov/standards/alto/>`_, PageXML, abbyXML, and hOCR
+  - `ALTO <https://www.loc.gov/standards/alto/>`_, PageXML, abbyyXML, and hOCR
     output
   - Word bounding boxes and character cuts
   - Multi-script recognition support

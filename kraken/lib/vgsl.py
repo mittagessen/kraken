@@ -669,7 +669,7 @@ class TorchVGSLModel(object):
                 if block_depth == 0:
                     break
         if block_depth:
-            raise ValueError('Unbalanced parantheses in VGSL spec')
+            raise ValueError('Unbalanced parentheses in VGSL spec')
         named_spec, nn, oshape = self._parse(input, [blocks[idx][1:]] + blocks[idx+1:idx+bl_idx] + [blocks[idx+bl_idx][:-1]])
         named_spec[0]._block = '[' + named_spec[0]._block
         named_spec[-1]._block = named_spec[-1]._block + ']'
@@ -698,7 +698,7 @@ class TorchVGSLModel(object):
                 if block_depth == 0:
                     break
         if block_depth:
-            raise ValueError('Unbalanced parantheses in VGSL spec')
+            raise ValueError('Unbalanced parentheses in VGSL spec')
         named_spec, nn, oshape = self._parse(input, [blocks[idx][1:]] + blocks[idx+1:idx+bl_idx] + [blocks[idx+bl_idx][:-1]], parallel=True)
         named_spec[0]._block = '(' + named_spec[0]._block
         named_spec[-1]._block = named_spec[-1]._block + ')'

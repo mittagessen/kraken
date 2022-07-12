@@ -119,7 +119,7 @@ def build_binary_dataset(files: Optional[List[Union[str, pathlib.Path, Dict]]] =
                           the output file. Larger batches require more
                           transient memory but slightly improve reading
                           performance.
-        callback: Function called everytime a new recordbatch is flushed into
+        callback: Function called every time a new recordbatch is flushed into
                   the Arrow IPC file.
     """
 
