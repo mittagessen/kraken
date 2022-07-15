@@ -304,6 +304,8 @@ class TorchVGSLModel(object):
         if 'aux_layers' in mlmodel.user_defined_metadata:
             logger.info(f'Deserializing auxiliary layers.')
             aux_layers = json.loads(mlmodel.user_defined_metadata['aux_layers'])
+
+
         if 'codec' in mlmodel.user_defined_metadata:
             nn.add_codec(PytorchCodec(json.loads(mlmodel.user_defined_metadata['codec'])))
 
@@ -646,7 +648,7 @@ class TorchVGSLModel(object):
         if nl == 'c' and dim == 2:
             raise ValueError('CTC not supported for heatmap output')
         if nl in ['l', 's'] and int(m.group('out')) >= 1:
-            self.criterion = nn.BCELoss()
+            self.criterion = nn.BCEWithLogitsLoss()
         elif nl == 'c':
             self.criterion = nn.CTCLoss(reduction='sum', zero_infinity=True)
         else:
