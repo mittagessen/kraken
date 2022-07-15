@@ -95,6 +95,7 @@ def _validate_merging(ctx, param, value):
               type=click.FLOAT,
               help='Minimum improvement between epochs to reset early stopping. By default it scales the delta by the best loss')
 @click.option('-d', '--device', show_default=True, default='cpu', help='Select device to use (cpu, cuda:0, cuda:1, ...)')
+@click.option('-p', '--precision', default='32', type=click.Choice(['32', '16']), help='set tensor precision')
 @click.option('--optimizer',
               show_default=True,
               default=SEGMENTATION_HYPER_PARAMS['optimizer'],
@@ -198,7 +199,7 @@ def _validate_merging(ctx, param, value):
 @click.option('-bl', '--baseline', 'topline', flag_value='baseline', default='baseline')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs, min_epochs,
-             lag, min_delta, device, optimizer, lrate, momentum, weight_decay,
+             lag, min_delta, device, precision, optimizer, lrate, momentum, weight_decay,
              schedule, gamma, step_size, sched_patience, cos_max, partition,
              training_files, evaluation_files, workers, load_hyper_parameters,
              force_binarization, format_type, suppress_regions,
@@ -309,6 +310,7 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs, min_epochs
                             min_epochs=hyper_params['min_epochs'],
                             enable_progress_bar=True if not ctx.meta['verbose'] else False,
                             deterministic=ctx.meta['deterministic'],
+                            precision=int(precision),
                             **val_check_interval)
 
     trainer.fit(model)
