@@ -344,11 +344,11 @@ class RecognitionPretrainModel(pl.LightningModule):
         logits /= self.hparams.logit_temp
 
         loss = F.cross_entropy(logits, targets, reduction='sum')
-        self.log('CE', loss, on_epoch=False)
         return loss
 
     def validation_step(self, batch, batch_idx):
-        self._step(batch, batch_idx)
+        loss = self._step(batch, batch_idx)
+        self.log('CE', loss, on_epoch=False)
 
     def training_step(self, batch, batch_idx):
         return self._step(batch, batch_idx)

@@ -11,7 +11,7 @@ import pathlib
 from torch import nn
 from typing import Sequence, List, Tuple, Union, Optional, Iterable, Callable, Dict, Any
 
-from kraken.lib import layers
+from kraken.lib import layers, pretrain
 from kraken.lib.codec import PytorchCodec
 from kraken.lib.exceptions import KrakenInvalidModelException
 
@@ -548,6 +548,27 @@ class TorchVGSLModel(object):
         fn = layers.GroupNorm(input[1], groups)
         self.idx += 1
         logger.debug('{}\t\tgroupnorm\tgroups {}'.format(self.idx, groups))
+        return fn.get_shape(input), [VGSLBlock(blocks[idx], m.group('type'), m.group('name'), self.idx)], fn
+
+    def build_wav2vec2(self,
+                       input: Tuple[int, int, int, int],
+                       blocks: List[str],
+                       idx: int) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
+        """
+        Builds a Wav2Vec2 masking layer.
+        """
+        pattern = re.compile(r'(?P<type>W)(?P<name>{\w+})(?P<final_dim>\d+),(?P<mask_width>\d+),(?P<mask_prob>(\d+(\.\d*)?|\.\d+)),(?P<num_negatives>\d+)')
+        m = pattern.match(blocks[idx])
+        if not m:
+            return None, None, None
+        final_dim = int(m.group('final_dim'))
+        mask_width = int(m.group('mask_width'))
+        mask_prob = float(m.group('mask_prob'))
+        num_negatives = int(m.group('num_negatives'))
+        fn = pretrain.layers.Wav2Vec2Mask(input[1], final_dim, mask_width, mask_prob, num_negatives)
+        self.idx += 1
+        logger.debug(f'{self.idx}\t\twav2vec2\tmask width {mask_width}, prob '
+                     f'{mask_prob}, negative samples {num_negatives}')
         return fn.get_shape(input), [VGSLBlock(blocks[idx], m.group('type'), m.group('name'), self.idx)], fn
 
     def build_conv(self,
