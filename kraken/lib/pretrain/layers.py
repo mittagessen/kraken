@@ -7,6 +7,7 @@ from typing import Tuple, Optional
 from torch.nn import Module, Embedding, Linear
 from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
 
+from kraken.lib.vgsl import VGSLBlock
 from kraken.lib.pretrain.util import compute_masks
 
 # all tensors are ordered NCHW, the "feature" dimension is C, so the output of
@@ -30,7 +31,7 @@ class Wav2Vec2Mask(Module):
         """
 
         Args:
-            context_encoder_input_dim: size of the ``H` input dimension
+            context_encoder_input_dim: size of the `C` input dimension
             final_dim: size of the decoder `C` output dimension just before the
                        final linear projection.
             mask_width: width of the non-overlapping masked areas.
@@ -85,6 +86,13 @@ class Wav2Vec2Mask(Module):
         Calculates the output shape from input 4D tuple NCHW.
         """
         return self.input
+
+    def get_spec(self) -> "VGSLBlock":
+        """
+        Generates a VGSL spec block from the layer instance.
+        """
+        return f'1,{self.final_dim},0,1 W{self.final_dim},{self.mask_width},{self.mask_prob},{self.num_negatives}'
+
 
     def deserialize(self, name: str, spec) -> None:
         """

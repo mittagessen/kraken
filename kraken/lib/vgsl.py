@@ -11,7 +11,7 @@ import pathlib
 from torch import nn
 from typing import Sequence, List, Tuple, Union, Optional, Iterable, Callable, Dict, Any
 
-from kraken.lib import layers, pretrain
+from kraken.lib import layers
 from kraken.lib.codec import PytorchCodec
 from kraken.lib.exceptions import KrakenInvalidModelException
 
@@ -565,6 +565,7 @@ class TorchVGSLModel(object):
         mask_width = int(m.group('mask_width'))
         mask_prob = float(m.group('mask_prob'))
         num_negatives = int(m.group('num_negatives'))
+        from kraken.lib import pretrain
         fn = pretrain.layers.Wav2Vec2Mask(input[1], final_dim, mask_width, mask_prob, num_negatives)
         self.idx += 1
         logger.debug(f'{self.idx}\t\twav2vec2\tmask width {mask_width}, prob '
