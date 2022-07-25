@@ -389,8 +389,14 @@ class TorchVGSLModel(object):
                     else:
                         l.serialize(name, input, net_builder)
             _serialize_layer(self.nn, input, net_builder)
-            logger.debug(f'Serializing {len(self.aux_layers)} auxiliary layers')
-            _serialize_layer(self.aux_layers, input, net_builder)
+            if self.aux_layers:
+                prev_aux_device = next(self.aux_layers.parameters()).device
+                try:
+                    logger.debug(f'Serializing {len(self.aux_layers)} auxiliary layers')
+                    self.aux_layers.to('cpu')
+                    _serialize_layer(self.aux_layers, input, net_builder)
+                finally:
+                    self.aux_layers.to(prev_aux_device)
 
             mlmodel = MLModel(net_builder.spec)
             mlmodel.short_description = 'kraken model'
