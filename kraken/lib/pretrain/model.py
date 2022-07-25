@@ -348,10 +348,12 @@ class RecognitionPretrainModel(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         loss = self._step(batch, batch_idx)
-        self.log('CE', loss, on_epoch=False)
+        self.log('CE', loss)
 
     def training_step(self, batch, batch_idx):
-        return self._step(batch, batch_idx)
+        loss = self._step(batch, batch_idx)
+        self.log('CE', loss)
+        return loss
 
     def configure_optimizers(self):
         return _configure_optimizer_and_lr_scheduler(self.hparams,
