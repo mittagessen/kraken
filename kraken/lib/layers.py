@@ -20,30 +20,22 @@ class MultiParamSequential(Sequential):
     """
     Sequential variant accepting multiple arguments.
     """
-
-    def forward(self, *inputs):
-        for module in self._modules.values():
-            if type(inputs) == tuple:
-                inputs = module(*inputs)
-            else:
-                inputs = module(inputs)
-        return inputs
+    def forward(self, inputs: torch.Tensor, seq_lens: torch.Tensor = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+        for module in self.children():
+            inputs, seq_lens = module(inputs, seq_lens)
+        return inputs, seq_lens
 
 
 class MultiParamParallel(Module):
     """
     Parallel module.
     """
-    def forward(self, *inputs):
+    def forward(self, inputs: torch.Tensor, seq_lens: torch.Tensor = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         outputs = []
-        seq_lens = None
-        for module in self._modules.values():
-            if type(inputs) == tuple:
-                output, seq_lens = module(*inputs)
-                outputs.append(output)
-            else:
-                outputs.append(module(inputs))
-        return torch.cat(outputs, dim=1), seq_lens
+        for module in self.children():
+            output, _seq_lens = module(inputs, seq_lens)
+            outputs.append(output)
+        return torch.cat(outputs, dim=1), _seq_lens
 
 
 def PeepholeLSTMCell(input: torch.Tensor,
@@ -484,11 +476,14 @@ class TransposedSummarizingRNN(Module):
             if inputs.shape[0] != len(seq_len):
                 raise Exception(f'Height has to be 1 (not f{inputs.shape[0]} for batching/multi-sequences.')
             seq_len = seq_len.cpu()
-            inputs = pack_padded_sequence(inputs, seq_len, batch_first=True, enforce_sorted=False)
-        # (H*N)WO
-        o, _ = self.layer(inputs)
-        if not self.transpose and seq_len is not None:
+            _inputs = pack_padded_sequence(inputs, seq_len, batch_first=True, enforce_sorted=False)
+            # (H*N)WO
+            o, _ = self.layer(_inputs)
             o, seq_len = pad_packed_sequence(o, batch_first=True)
+        else:
+            # (H*N)WO
+            o, _ = self.layer(inputs)
+
         # resize to HNWO
         o = o.view(siz[0], siz[1], siz[2], self.output_size)
         if self.summarize:
@@ -862,7 +857,7 @@ class GroupNorm(Module):
 
         self.layer = torch.nn.GroupNorm(num_groups, in_channels)
 
-    def forward(self, inputs: torch.Tensor, seq_len: torch.Tensor) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+    def forward(self, inputs: torch.Tensor, seq_len: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         o = self.layer(inputs)
         return o, seq_len
 
