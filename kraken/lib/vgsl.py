@@ -163,6 +163,7 @@ class TorchVGSLModel(object):
         named_spec, self.nn, self.output = self._parse(self.input, blocks)
         self.named_spec.extend(str(x) for x in named_spec)
         self.init_weights()
+        self.nn = torch.jit.script(self.nn)
 
     def _parse(self, input: Tuple[int, int, int, int], blocks: Sequence[str], parallel=False) -> None:
         """
