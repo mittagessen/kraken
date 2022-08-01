@@ -31,7 +31,7 @@ particular setup of the pipeline and the models utilized it can be optional.
 For the non-trainable legacy bounding box segmenter binarization is mandatory
 although it is still possible to feed color and grayscale images to the
 recognizer. The trainable baseline segmenter can work with black and white,
-grayscale, and color images, depending on the training data and netork
+grayscale, and color images, depending on the training data and network
 configuration utilized; though grayscale and color data are used in almost all
 cases.
 
