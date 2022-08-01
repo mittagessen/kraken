@@ -465,7 +465,7 @@ class RecognitionModel(pl.LightningModule):
                     else:
                         raise ValueError(f'invalid resize parameter value {self.resize}')
 
-                codec.strict = False
+                self.nn.codec.strict = False
 
             else:
                 self.train_set.dataset.encode(self.codec)
