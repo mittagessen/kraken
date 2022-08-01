@@ -75,7 +75,7 @@ Baseline segmentation
 
 The baseline segmentation method is based on a neural network that classifies
 image pixels into baselines and regions. Because it is trainable, a
-segmentation model is required in addition to the image to be segmentation and
+segmentation model is required in addition to the image to be segmented and
 it has to be loaded first:
 
 .. code-block:: python
