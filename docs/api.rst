@@ -31,7 +31,7 @@ particular setup of the pipeline and the models utilized it can be optional.
 For the non-trainable legacy bounding box segmenter binarization is mandatory
 although it is still possible to feed color and grayscale images to the
 recognizer. The trainable baseline segmenter can work with black and white,
-grayscale, and color images, depending on the training data and netork
+grayscale, and color images, depending on the training data and network
 configuration utilized; though grayscale and color data are used in almost all
 cases.
 
@@ -75,7 +75,7 @@ Baseline segmentation
 
 The baseline segmentation method is based on a neural network that classifies
 image pixels into baselines and regions. Because it is trainable, a
-segmentation model is required in addition to the image to be segmentation and
+segmentation model is required in addition to the image to be segmented and
 it has to be loaded first:
 
 .. code-block:: python
