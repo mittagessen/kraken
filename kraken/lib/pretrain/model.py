@@ -395,8 +395,8 @@ class RecognitionPretrainModel(pl.LightningModule):
     def configure_callbacks(self):
         callbacks = []
         if self.hparams.quit == 'early':
-            callbacks.append(EarlyStopping(monitor='val_accuracy',
-                                           mode='max',
+            callbacks.append(EarlyStopping(monitor='CE',
+                                           mode='min',
                                            patience=self.hparams.lag,
-                                           stopping_threshold=1.0))
+                                           stopping_threshold=0.0))
         return callbacks
