@@ -773,7 +773,7 @@ class ActConv2D(Module):
     def forward(self, inputs: torch.Tensor, seq_len: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         o = self.co(inputs)
         # return logits for sigmoid activation during training
-        if not self.nl_name == 'SIGMOID' and not self.training:
+        if not (self.nl_name == 'SIGMOID' and self.training):
             o = self.nl(o)
 
         if seq_len is not None:
