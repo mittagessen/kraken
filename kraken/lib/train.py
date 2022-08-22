@@ -401,6 +401,20 @@ class RecognitionModel(pl.LightningModule):
             self.best_metric = accuracy
         self.log_dict({'val_accuracy': accuracy, 'val_metric': accuracy}, prog_bar=True)
 
+    def optimizer_step(self, epoch, batch_idx, optimizer, optimizer_idx,
+                       optimizer_closure, on_tpu=False, using_native_amp=False,
+                       using_lbfgs=False):
+        # update params
+        optimizer.step(closure=optimizer_closure)
+
+        # learning rate warmup
+        # XXX: other lr_schedulers are *also* run in parallel as we can't
+        # disable them temporarily.
+        if self.hparams.warmup and self.trainer.global_step < self.hparams.warmup:
+            lr_scale = min(1.0, float(self.trainer.global_step + 1) / self.hparams.warmup)
+            for pg in optimizer.param_groups:
+                pg["lr"] = lr_scale * self.hparams.lrate
+
     def configure_optimizers(self):
         return _configure_optimizer_and_lr_scheduler(self.hparams,
                                                      self.nn.nn.parameters(),
@@ -873,8 +887,23 @@ class SegmentationModel(pl.LightningModule):
 
         return callbacks
 
+    def optimizer_step(self, epoch, batch_idx, optimizer, optimizer_idx,
+                       optimizer_closure, on_tpu=False, using_native_amp=False,
+                       using_lbfgs=False):
+        # update params
+        optimizer.step(closure=optimizer_closure)
+
+        # learning rate warmup
+        # XXX: other lr_schedulers are *also* run in parallel as we can't
+        # disable them temporarily.
+        if self.hparams.warmup and self.trainer.global_step < self.hparams.warmup:
+            lr_scale = min(1.0, float(self.trainer.global_step + 1) / self.hparams.warmup)
+            for pg in optimizer.param_groups:
+                pg["lr"] = lr_scale * self.hparams.lrate
+
 
 def _configure_optimizer_and_lr_scheduler(hparams, params, len_train_set=None, loss_tracking_mode='max'):
+    # XXX: Warmup is not configured here because it needs to be manually done in optimizer_step()
     logger.debug(f'Constructing {hparams.optimizer} optimizer (lr: {hparams.lrate}, momentum: {hparams.momentum})')
     if hparams.optimizer == 'Adam':
         optim = torch.optim.Adam(params, lr=hparams.lrate, weight_decay=hparams.weight_decay)

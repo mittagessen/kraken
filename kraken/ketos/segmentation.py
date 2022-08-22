@@ -108,6 +108,8 @@ def _validate_merging(ctx, param, value):
 @click.option('-m', '--momentum', show_default=True, default=SEGMENTATION_HYPER_PARAMS['momentum'], help='Momentum')
 @click.option('-w', '--weight-decay', show_default=True,
               default=SEGMENTATION_HYPER_PARAMS['weight_decay'], help='Weight decay')
+@click.option('--warmup', show_default=True, type=float,
+              default=SEGMENTATION_HYPER_PARAMS['warmup'], help='Number of samples to ramp up to `lrate` initial learning rate.')
 @click.option('--schedule',
               show_default=True,
               type=click.Choice(['constant',
@@ -200,7 +202,7 @@ def _validate_merging(ctx, param, value):
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs, min_epochs,
              lag, min_delta, device, precision, optimizer, lrate, momentum, weight_decay,
-             schedule, gamma, step_size, sched_patience, cos_max, partition,
+             warmup, schedule, gamma, step_size, sched_patience, cos_max, partition,
              training_files, evaluation_files, workers, load_hyper_parameters,
              force_binarization, format_type, suppress_regions,
              suppress_baselines, valid_regions, valid_baselines, merge_regions,
@@ -239,6 +241,7 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs, min_epochs
                          'lrate': lrate,
                          'momentum': momentum,
                          'weight_decay': weight_decay,
+                         'warmup': warmup,
                          'schedule': schedule,
                          'augment': augment,
                          'gamma': gamma,

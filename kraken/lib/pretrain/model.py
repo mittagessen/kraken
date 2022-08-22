@@ -355,6 +355,20 @@ class RecognitionPretrainModel(pl.LightningModule):
         self.log('CE', loss)
         return loss
 
+    def optimizer_step(self, epoch, batch_idx, optimizer, optimizer_idx,
+                       optimizer_closure, on_tpu=False, using_native_amp=False,
+                       using_lbfgs=False):
+        # update params
+        optimizer.step(closure=optimizer_closure)
+
+        # learning rate warmup
+        # XXX: other lr_schedulers are *also* run in parallel as we can't
+        # disable them temporarily.
+        if self.hparams.warmup and self.trainer.global_step < self.hparams.warmup:
+            lr_scale = min(1.0, float(self.trainer.global_step + 1) / self.hparams.warmup)
+            for pg in optimizer.param_groups:
+                pg["lr"] = lr_scale * self.hparams.lrate
+
     def configure_optimizers(self):
         return _configure_optimizer_and_lr_scheduler(self.hparams,
                                                      chain(self.features.parameters(),

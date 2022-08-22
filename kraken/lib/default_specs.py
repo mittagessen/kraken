@@ -48,6 +48,7 @@ RECOGNITION_PRETRAIN_HYPER_PARAMS = {'pad': 16,
                                      'mask_prob': 0.2,
                                      'num_negatives': 2,
                                      'logit_temp': 0.1,
+                                     'warmup': 0,
                                      }
 
 RECOGNITION_HYPER_PARAMS = {'pad': 16,
@@ -76,6 +77,7 @@ RECOGNITION_HYPER_PARAMS = {'pad': 16,
                             'rop_patience': 5,
                             # cosine
                             'cos_t_max': 50,
+                            'warmup': 0,
                             }
 
 SEGMENTATION_HYPER_PARAMS = {'line_width': 8,
@@ -101,4 +103,5 @@ SEGMENTATION_HYPER_PARAMS = {'line_width': 8,
                              'rop_patience': 5,
                              # cosine
                              'cos_t_max': 50,
+                             'warmup': 0,
                              }
