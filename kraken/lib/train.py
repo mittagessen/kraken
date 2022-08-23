@@ -914,26 +914,36 @@ def _configure_optimizer_and_lr_scheduler(hparams, params, len_train_set=None, l
                                                         weight_decay=hparams.weight_decay)
     lr_sched = {}
     if hparams.schedule == 'exponential':
-        lr_sched['scheduler'] = lr_scheduler.ExponentialLR(optim, hparams.gamma)
+        lr_sched = {'scheduler': lr_scheduler.ExponentialLR(optim, hparams.gamma, last_epoch=self.hparams.completed_epochs-1),
+                    'frequency': len_train_set,
+                    'interval': 'step'}
     elif hparams.schedule == 'cosine':
-        lr_sched['scheduler'] = lr_scheduler.CosineAnnealingLR(optim, hparams.cos_t_max)
+        lr_sched = {'scheduler': lr_scheduler.CosineAnnealingLR(optim, hparams.gamma, last_epoch=self.hparams.completed_epochs-1),
+                    'frequency': len_train_set,
+                    'interval': 'step'}
     elif hparams.schedule == 'step':
-        lr_sched['scheduler'] = lr_scheduler.StepLR(optim, hparams.step_size, hparams.gamma)
+        lr_sched = {'scheduler': lr_scheduler.StepLR(optim, hparams.step_size, hparams.gamma, last_epoch=self.hparams.completed_epochs-1),
+                    'frequency': len_train_set,
+                    'interval': 'step'}
     elif hparams.schedule == 'reduceonplateau':
-        lr_sched['scheduler'] = lr_scheduler.ReduceLROnPlateau(optim,
+        lr_sched = {'scheduler': lr_scheduler.ReduceLROnPlateau(optim,
                                                                mode=loss_tracking_mode,
                                                                factor=hparams.rop_factor,
-                                                               patience=hparams.rop_patience)
+                                                               patience=hparams.rop_patience),
+                    'frequency': len_train_set,
+                    'interval': 'step'}
     elif hparams.schedule == '1cycle':
         if hparams.epochs <= 0:
             raise ValueError('1cycle learning rate scheduler selected but '
                              'number of epochs is less than 0 '
                              f'({hparams.epochs}).')
-        lr_sched['scheduler'] = lr_scheduler.OneCycleLR(optim,
-                                                        max_lr=hparams.lrate,
-                                                        epochs=hparams.epochs,
-                                                        steps_per_epoch=len_train_set)
-        lr_sched['interval'] = 'step'
+        last_epoch = self.hparams.completed_epochs*len_train_set if self.hparams.completed_epochs else -1
+        lr_sched = {'scheduler': lr_scheduler.OneCycleLR(optim,
+                                                      max_lr=hparams.lrate,
+                                                      epochs=hparams.epochs,
+                                                      steps_per_epoch=len_train_set,
+                                                      last_epoch=last_epoch),
+                    'interval': 'step'}
     elif hparams.schedule != 'constant':
         raise ValueError(f'Unsupported learning rate scheduler {hparams.schedule}.')
 
