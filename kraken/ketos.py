@@ -1384,11 +1384,6 @@ def segtest(ctx, model, evaluation_files, device, workers, threshold,
     if regions_diff:
         message(f'Model region types missing in the test set: {", ".join(sorted(list(regions_diff)))}')
 
-    if device == 'cpu':
-        device = None
-    elif device.startswith('cuda'):
-        device = [int(device.split(':')[-1])]
-
     if len(test_set) == 0:
         raise click.UsageError('No evaluation data was provided to the test command. Use `-e` or the `test_set` argument.')
 
