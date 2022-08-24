@@ -348,8 +348,9 @@ def vectorize_regions(im: np.ndarray, threshold: float = 0.5):
         boundary = boundary_tracing(x)
         if len(boundary) > 2:
             boundaries.append(geom.Polygon(boundary))
-    # merge regions that overlap after simplification
+    # merge regions that overlap 
     boundaries = unary_union(boundaries)
+    # simplify them afterwards
     if boundaries.type == 'Polygon':
         boundaries = [boundaries.boundary.simplify(10)]
     else:
