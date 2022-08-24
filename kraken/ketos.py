@@ -704,7 +704,7 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
     nn = {}
     for p in model:
         message('Loading model {}\t'.format(p), nl=False)
-        nn[p] = models.load_any(p)
+        nn[p] = models.load_any(p, device=device)
         message('\u2713', fg='green')
 
     test_set = list(test_set)
@@ -770,7 +770,6 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
         ds_loader = DataLoader(ds,
                                batch_size=batch_size,
                                num_workers=workers,
-                               pin_memory=True,
                                collate_fn=collate_sequences)
 
         with KrakenProgressBar() as progress:
