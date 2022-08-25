@@ -1,146 +1,107 @@
 {% set proc_type_table = {'processing': 'contentGeneration',
-			  'preprocessing': 'preOperation',
-			  'postprocessing': 'postOperation'}
+              'preprocessing': 'preOperation',
+              'postprocessing': 'postOperation'}
 %}
-{% macro render_line(page, line) -%}
-<TextLine ID="line_{{ line.index }}"
-	  HPOS="{{ line.bbox[0] }}"
-	  VPOS="{{ line.bbox[1] }}" 
-	  WIDTH="{{ line.bbox[2] - line.bbox[0] }}" 
-	  HEIGHT="{{ line.bbox[3] - line.bbox[1] }}"
-	  {%- if line.baseline %}
-	  BASELINE="{{ line.baseline|sum(start=[])|join(' ') }}"
-	  {% endif %}
-          {% if line.script and line.script in page.types %}
-          {% for type in page.types %}
-          {% if type == line.script %}
-          TAGREFS="TYPE_{{ loop.index }}"
-          {%- endif -%}
-          {%- endfor -%}
-	  {%- endif -%}>
-	{% if line.boundary %}
-		<Shape>
-			<Polygon POINTS="{{ line.boundary|sum(start=[])|join(' ') }}"/>
-		</Shape>
-	{% endif %}
-        {% if line.recognition|length() == 0 %}
-		<String CONTENT=""/>
-	{% else %}
-	{% for segment in line.recognition %}
-		{# ALTO forbids encoding whitespace before any String/Shape tags #}
-		{% if segment.text is whitespace and loop.index > 1 %}
-		<SP ID="segment_{{ segment.index }}"
-		    HPOS="{{ segment.bbox[0]}}" 
-		    VPOS="{{ segment.bbox[1] }}"
-		    WIDTH="{{ segment.bbox[2] - segment.bbox[0] }}" 
-		    HEIGHT="{{ segment.bbox[3] - segment.bbox[1] }}"/>
-		{% else %}
-		<String ID="segment_{{ segment.index }}"
-			CONTENT="{{ segment.text|e }}" 
-			HPOS="{{ segment.bbox[0] }}" 
-			VPOS="{{ segment.bbox[1] }}"
-			WIDTH="{{ segment.bbox[2] - segment.bbox[0] }}" 
-			HEIGHT="{{ segment.bbox[3] - segment.bbox[1] }}" 
-			WC="{{ (segment.confidences|sum / segment.confidences|length)|round(4) }}">
-			{% if segment.boundary %}
-			<Shape>
-				<Polygon POINTS="{{ segment.boundary|sum(start=[])|join(' ') }}"/>
-			</Shape>
-			{% endif %}
-			{% for char in segment.recognition %}
-			<Glyph ID="char_{{ char.index }}" 
-			       CONTENT="{{ char.text|e }}"
-			       HPOS="{{ char.bbox[0] }}"
-			       VPOS="{{ char.bbox[1] }}"
-			       WIDTH="{{ char.bbox[2] - char.bbox[0] }}"
-			       HEIGHT="{{ char.bbox[3] - char.bbox[1] }}"
-			       GC="{{ char.confidence|round(4) }}">
-			{% if char.boundary %}
-			<Shape>
-				<Polygon POINTS="{{ char.boundary|sum(start=[])|join(' ') }}"/>
-			</Shape>
-			{% endif %}
-			</Glyph>
-			{% endfor %}
-		</String>
-		{% endif %}
-	{% endfor %}
-	{% endif %}
-</TextLine>
-{%- endmacro %}
+{%+ macro render_line(page, line) +%}
+                    <TextLine ID="line_{{ line.index }}" HPOS="{{ line.bbox[0] }}" VPOS="{{ line.bbox[1] }}" WIDTH="{{ line.bbox[2] - line.bbox[0] }}" HEIGHT="{{ line.bbox[3] - line.bbox[1] }}" {% if line.baseline %}BASELINE="{{ line.baseline|sum(start=[])|join(' ') }}"{% endif %} {% if line.tags %}TAGREFS="{% for type in page.types %}{% if type in line.tags.values() %}TYPE_{{ loop.index }}{% endif %}{% endfor %}"{% endif %}>
+                        {% if line.boundary %}
+                        <Shape>
+                            <Polygon POINTS="{{ line.boundary|sum(start=[])|join(' ') }}"/>
+                        </Shape>
+                        {% endif %}
+                            {% if line.recognition|length() == 0 %}
+                        <String CONTENT=""/>
+                        {% else %}
+                        {% for segment in line.recognition %}
+                        {# ALTO forbids encoding whitespace before any String/Shape tags #}
+                        {% if segment.text is whitespace and loop.index > 1 %}
+                        <SP ID="segment_{{ segment.index }}" HPOS="{{ segment.bbox[0]}}"  VPOS="{{ segment.bbox[1] }}" WIDTH="{{ segment.bbox[2] - segment.bbox[0] }}"  HEIGHT="{{ segment.bbox[3] - segment.bbox[1] }}"/>
+                        {% else %}
+                        <String ID="segment_{{ segment.index }}" CONTENT="{{ segment.text|e }}" HPOS="{{ segment.bbox[0] }}" VPOS="{{ segment.bbox[1] }}" WIDTH="{{ segment.bbox[2] - segment.bbox[0] }}" HEIGHT="{{ segment.bbox[3] - segment.bbox[1] }}" WC="{{ (segment.confidences|sum / segment.confidences|length)|round(4) }}">
+                            {% if segment.boundary %}
+                            <Shape>
+                                <Polygon POINTS="{{ segment.boundary|sum(start=[])|join(' ') }}"/>
+                            </Shape>
+                            {% endif %}
+                            {% for char in segment.recognition %}
+                            <Glyph ID="char_{{ char.index }}" CONTENT="{{ char.text|e }}" HPOS="{{ char.bbox[0] }}" VPOS="{{ char.bbox[1] }}" WIDTH="{{ char.bbox[2] - char.bbox[0] }}" HEIGHT="{{ char.bbox[3] - char.bbox[1] }}" GC="{{ char.confidence|round(4) }}">
+                                {% if char.boundary %}
+                                <Shape>
+                                    <Polygon POINTS="{{ char.boundary|sum(start=[])|join(' ') }}"/>
+                                </Shape>
+                                {% endif %}
+                            </Glyph>
+                            {% endfor %}
+                        </String>
+                        {% endif %}
+                        {% endfor %}
+                        {% endif %}
+                    </TextLine>
+{%+ endmacro %}
 <?xml version="1.0" encoding="UTF-8"?>
 <alto xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xmlns="http://www.loc.gov/standards/alto/ns-v4#"
-	xsi:schemaLocation="http://www.loc.gov/standards/alto/ns-v4# http://www.loc.gov/standards/alto/v4/alto-4-3.xsd">
-	<Description>
-		<MeasurementUnit>pixel</MeasurementUnit>
-		<sourceImageInformation>
-			<fileName>{{ page.name }}</fileName>
-		</sourceImageInformation>
-		{% if metadata.processing_steps %}
-		{% for step in metadata.processing_steps -%}
-		<Processing ID="OCR_{{ loop.index }}">
-			<processingCategory>{{ proc_type_table[step.category] }}</processingCategory>
-			<processingStepDescription>{{ step.description }}</processingStepDescription>
-			<processingStepSettings>{% for k, v in step.settings.items() %}{{k}}: {{v}}; {% endfor %}</processingStepSettings>
-			<processingSoftware>
-				<softwareName>kraken</softwareName>
-				<softwareVersion>{{ metadata.version }}</softwareVersion>
-			</processingSoftware>
-		</Processing>
-		{% endfor %}
-		{% else -%}
-		<Processing ID="OCR_0">
-			<processingCategory>other</processingCategory>
-			<processingStepDescription>unknown</processingStepDescription>
-			<processingSoftware>
-				<softwareName>kraken</softwareName>
-				<softwareVersion>{{ metadata.version }}</softwareVersion>
-			</processingSoftware>
-		</Processing>
-		{% endif %}
-	</Description>
-	<Tags>
-	{% for reg_type in page.types %}
-	<OtherTag ID="TYPE_{{ loop.index }}" LABEL="{{ reg_type }}"/>
-	{% endfor %}
-	</Tags>
-	<Layout>
-		<Page WIDTH="{{ page.size[0] }}" HEIGHT="{{ page.size[1] }}" PHYSICAL_IMG_NR="0" ID="page_0">
-			<PrintSpace HPOS="0" VPOS="0" WIDTH="{{ page.size[0] }}" HEIGHT="{{ page.size[1] }}">
-			{% for entity in page.entities %}
-				{% if entity.type == "region" %}
-					{% if loop.previtem and loop.previtem.type == 'line' %}
-					</TextBlock>
-					{% endif %}
-					<TextBlock ID="block_{{ entity.index }}"
-						   HPOS="{{ entity.bbox[0] }}"
-						   VPOS="{{ entity.bbox[1] }}" 
-						   WIDTH="{{ entity.bbox[2] - entity.bbox[0] }}" 
-						   HEIGHT="{{ entity.bbox[3] - entity.bbox[1] }}"
- 					           {% for type in page.types %}
- 					           {% if type == entity.region_type %}
- 					           TAGREFS="TYPE_{{ loop.index }}"
- 					           {%- endif -%}
- 					           {%- endfor -%}>
-					<Shape>
-						<Polygon POINTS="{{ entity.boundary|sum(start=[])|join(' ') }}"/>
-					</Shape>
-					{% for line in entity.lines %}
-					{{ render_line(page, line) }}
-					{% endfor %}
-					</TextBlock>
-				{% else %}
-				{% if not loop.previtem or loop.previtem.type != 'line' %}
-				<TextBlock ID="textblock_{{ loop.index }}">
-				{% endif %}
-				{{ render_line(page, entity) }}
-				{% if loop.last %}
-				</TextBlock>
-				{% endif %}
-			{% endif %}
-			{% endfor %}
-			</PrintSpace>
-		</Page>
-	</Layout>
+    xmlns="http://www.loc.gov/standards/alto/ns-v4#"
+    xsi:schemaLocation="http://www.loc.gov/standards/alto/ns-v4# http://www.loc.gov/standards/alto/v4/alto-4-3.xsd">
+    <Description>
+        <MeasurementUnit>pixel</MeasurementUnit>
+        <sourceImageInformation>
+            <fileName>{{ page.name }}</fileName>
+        </sourceImageInformation>
+        {% if metadata.processing_steps %}
+        {% for step in metadata.processing_steps %}
+        <Processing ID="OCR_{{ loop.index }}">
+            <processingCategory>{{ proc_type_table[step.category] }}</processingCategory>
+            <processingStepDescription>{{ step.description }}</processingStepDescription>
+            <processingStepSettings>{% for k, v in step.settings.items() %}{{k}}: {{v}}; {% endfor %}</processingStepSettings>
+            <processingSoftware>
+                <softwareName>kraken</softwareName>
+                <softwareVersion>{{ metadata.version }}</softwareVersion>
+            </processingSoftware>
+        </Processing>
+        {% endfor %}
+        {% else %}
+        <Processing ID="OCR_0">
+            <processingCategory>other</processingCategory>
+            <processingStepDescription>unknown</processingStepDescription>
+            <processingSoftware>
+                <softwareName>kraken</softwareName>
+                <softwareVersion>{{ metadata.version }}</softwareVersion>
+            </processingSoftware>
+        </Processing>
+        {% endif %}
+    </Description>
+    <Tags>
+    {% for reg_type in page.types %}
+        <OtherTag ID="TYPE_{{ loop.index }}" LABEL="{{ reg_type }}"/>
+    {% endfor %}
+    </Tags>
+    <Layout>
+        <Page WIDTH="{{ page.size[0] }}" HEIGHT="{{ page.size[1] }}" PHYSICAL_IMG_NR="0" ID="page_0">
+            <PrintSpace HPOS="0" VPOS="0" WIDTH="{{ page.size[0] }}" HEIGHT="{{ page.size[1] }}">
+            {% for entity in page.entities %}
+                {% if entity.type == "region" %}
+                {% if loop.previtem and loop.previtem.type == 'line' %}
+                </TextBlock>
+                {% endif %}
+                <TextBlock ID="block_{{ entity.index }}" HPOS="{{ entity.bbox[0] }}" VPOS="{{ entity.bbox[1] }}" WIDTH="{{ entity.bbox[2] - entity.bbox[0] }}" HEIGHT="{{ entity.bbox[3] - entity.bbox[1] }}" {% for type in page.types %}{% if type == entity.region_type %}TAGREFS="TYPE_{{ loop.index }}"{% endif %}{% endfor %}>
+                    <Shape>
+                        <Polygon POINTS="{{ entity.boundary|sum(start=[])|join(' ') }}"/>
+                    </Shape>
+                    {%- for line in entity.lines -%}
+                    {{ render_line(page, line) }}
+                    {%- endfor -%}
+                </TextBlock>
+                {% else %}
+                {% if not loop.previtem or loop.previtem.type != 'line' %}
+                <TextBlock ID="textblock_{{ loop.index }}">
+                {% endif %}
+                    {{ render_line(page, entity) }}
+                {% if loop.last %}
+                </TextBlock>
+                {% endif %}
+            {% endif %}
+            {% endfor %}
+            </PrintSpace>
+        </Page>
+    </Layout>
 </alto>

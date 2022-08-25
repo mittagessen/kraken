@@ -131,7 +131,11 @@ def serialize(records: Sequence[ocr_record],
                 idx += 1
 
     # build region and line type dict
-    page['types'] = list(set(line.tags.values() for line in records if line.tags is not None))
+    types = []
+    for line in records:
+        if line.tags is not None:
+           types.extend(line.tags.values())
+    page['types'] = list(set(types))
     if regions is not None:
         page['types'].extend(list(regions.keys()))
 
@@ -234,7 +238,7 @@ def serialize(records: Sequence[ocr_record],
     logger.debug('Initializing jinja environment.')
     env = Environment(loader=PackageLoader('kraken', 'templates'),
                       trim_blocks=True,
-                      lstrip_blocks=False,
+                      lstrip_blocks=True,
                       autoescape=True)
     env.tests['whitespace'] = str.isspace
     env.filters['rescale'] = _rescale

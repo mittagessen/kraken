@@ -1,41 +1,41 @@
-{% macro render_line(page, line) -%}
-<line baseline="{{ ((line.bbox[1] + line.bbox[3]) / 2)|int }}" l="{{ line.bbox[0] }}" r="{{ line.bbox[2] }}" t="{{ line.bbox[1] }}" b="{{ line.bbox[3] }}"><formatting lang="">
-	{% for segment in line.recognition %}
-	{% for char in segment.recognition %}
-	{% if loop.first %}
-	<charParams l="{{ char.bbox[0] }}" r="{{ char.bbox[2] }}" t="{{ char.bbox[1] }}" b="{{ char.bbox[3] }}" wordStart="1" charConfidence="{{ [char.confidence]|rescale(0, 100)|int }}">{{ char.text }}</charParams>
-	{% else %}
-	<charParams l="{{ char.bbox[0] }}" r="{{ char.bbox[2] }}" t="{{ char.bbox[1] }}" b="{{ char.bbox[3] }}" wordStart="0" charConfidence="{{ [char.confidence]|rescale(0, 100)|int }}">{{ char.text }}</charParams>
-	{% endif %}
-	{% endfor %}
-        {% endfor %}
-</formatting>
-</line>
-{%- endmacro %}
+{%+ macro render_line(page, line) +%}
+                    <line baseline="{{ ((line.bbox[1] + line.bbox[3]) / 2)|int }}" l="{{ line.bbox[0] }}" r="{{ line.bbox[2] }}" t="{{ line.bbox[1] }}" b="{{ line.bbox[3] }}"><formatting lang="">
+                        {% for segment in line.recognition %}
+                        {% for char in segment.recognition %}
+                        {% if loop.first %}
+                        <charParams l="{{ char.bbox[0] }}" r="{{ char.bbox[2] }}" t="{{ char.bbox[1] }}" b="{{ char.bbox[3] }}" wordStart="1" charConfidence="{{ [char.confidence]|rescale(0, 100)|int }}">{{ char.text }}</charParams>
+                        {% else %}
+                        <charParams l="{{ char.bbox[0] }}" r="{{ char.bbox[2] }}" t="{{ char.bbox[1] }}" b="{{ char.bbox[3] }}" wordStart="0" charConfidence="{{ [char.confidence]|rescale(0, 100)|int }}">{{ char.text }}</charParams>
+                        {% endif %}
+                        {% endfor %}
+                        {% endfor %}
+                    </formatting>
+                    </line>
+{%+ endmacro %}
 <?xml version="1.0" encoding="UTF-8"?>
 <document xmlns="http://www.abbyy.com/FineReader_xml/FineReader10-schema-v1.xml" version="1.0" producer="kraken {{ metadata.version}}">
-	<page width="{{ page.size[0] }}" height="{{ page.size[1] }}" resolution="0" originalCoords="1">
-		{% for entity in page.entities %}
-		{% if entity.type == "region" %}
-		<block blockType="Text">
-			<text>
-				<par>
-				{% for line in entity.lines %}
-				{{ render_line(page, line) }}
-				{% endfor %}
-				</par>
-			</text>
-		</block>
-		{% else %}
-		<block blockType="Text">
-			<text>
-				<par>
-                                {{ render_line(page, entity) }}
-				</par>
-			</text>
-		</block>
-		{% endif %}
-		{% endfor %}
-	</page>
+    <page width="{{ page.size[0] }}" height="{{ page.size[1] }}" resolution="0" originalCoords="1">
+        {% for entity in page.entities %}
+        {% if entity.type == "region" %}
+        <block blockType="Text">
+            <text>
+                <par>
+                {%- for line in entity.lines -%}
+                    {{ render_line(page, line) }}
+                {%- endfor -%}
+                </par>
+            </text>
+        </block>
+        {% else %}
+        <block blockType="Text">
+            <text>
+                <par>
+                    {{ render_line(page, entity) }}
+                </par>
+            </text>
+        </block>
+        {% endif %}
+        {% endfor %}
+    </page>
 </document>
 
