@@ -135,7 +135,7 @@ class TorchVGSLModel(object):
         self.named_spec = []  # type:  List[str]
         self.ops = [self.build_addition, self.build_identity, self.build_rnn,
                     self.build_dropout, self.build_maxpool, self.build_conv,
-                    self.build_output, self.build_reshape,
+                    self.build_output, self.build_reshape, self.build_wav2vec2,
                     self.build_groupnorm, self.build_series,
                     self.build_parallel]
         self.codec = None  # type: Optional[PytorchCodec]
@@ -303,8 +303,7 @@ class TorchVGSLModel(object):
 
         if 'aux_layers' in mlmodel.user_defined_metadata:
             logger.info(f'Deserializing auxiliary layers.')
-            aux_layers = json.loads(mlmodel.user_defined_metadata['aux_layers'])
-
+            nn.aux_layers = {k: cls(v).nn.get_submodule(k) for k, v in json.loads(mlmodel.user_defined_metadata['aux_layers']).items()}
 
         if 'codec' in mlmodel.user_defined_metadata:
             nn.add_codec(PytorchCodec(json.loads(mlmodel.user_defined_metadata['codec'])))
@@ -406,7 +405,7 @@ class TorchVGSLModel(object):
             if self.user_metadata:
                 mlmodel.user_defined_metadata['kraken_meta'] = json.dumps(self.user_metadata)
             if self.aux_layers:
-                mlmodel.user_defined_metadata['aux_layers'] = json.dumps(tuple(self.aux_layers.keys()))
+                mlmodel.user_defined_metadata['aux_layers'] = json.dumps({k: v.get_spec(k) for k, v in self.aux_layers.items()})
             mlmodel.save(path)
         finally:
             self.nn.to(prev_device)
