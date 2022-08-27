@@ -388,9 +388,6 @@ class RecognitionPretrainModel(pl.LightningModule):
                 # initialize weights
                 self.nn.init_weights()
 
-            self.nn.hyper_params = self.hparams
-            self.nn.model_type = 'recognition'
-
             self.net = self.nn.nn
 
             for idx, layer in enumerate(self.net.children()):
@@ -398,13 +395,32 @@ class RecognitionPretrainModel(pl.LightningModule):
                     break
 
             self.features = self.net[:idx]
-            self.wav2vec2mask = Wav2Vec2Mask(self.net[idx-1].output_shape[1],
-                                             self.net[-1].output_shape[1],
-                                             self.hparams.mask_width,
-                                             self.hparams.mask_prob,
-                                             self.hparams.num_negatives)
+            if self.model and 'wav2vec2mask' in self.nn.aux_layers:
+                logger.info('Extracting wav2vec2mask layer from model: mask width '
+                            f'{self.nn.aux_layers["wav2vec2mask"].mask_width}, prob '
+                            f'{self.nn.aux_layers["wav2vec2mask"].mask_prob}, negative samples '
+                            f'{self.nn.aux_layers["wav2vec2mask"].num_negatives}')
+                self.wav2vec2mask = self.nn.aux_layers
+                logger.info("Overriding masking hyperparameters with model one's: ")
+                self.hparams.mask_width = self.wav2vec2mask.mask_width
+                self.hparams.mask_mask_prob = self.wav2vec2mask.mask_prob
+                self.hparams.num_negatives = self.wav2vec2mask.num_negatives
+            else:
+                logger.info(f'Instantiating new wav2vec2mask layer: mask width '
+                            f'{self.hparams.mask_width}, prob '
+                            f'{self.hparams.mask_prob}, negative samples '
+                            f'{self.hparams.num_negatives}')
+                self.wav2vec2mask = Wav2Vec2Mask(self.net[idx-1].output_shape[1],
+                                                 self.net[-1].output_shape[1],
+                                                 self.hparams.mask_width,
+                                                 self.hparams.mask_prob,
+                                                 self.hparams.num_negatives)
+                self.nn.aux_layers = {'wav2vec2mask': self.wav2vec2mask}
+
             self.encoder = self.net[idx:]
-            self.nn.aux_layers = {'wav2vec2mask': self.wav2vec2mask}
+            self.nn.hyper_params = self.hparams
+            self.nn.model_type = 'recognition'
+
 
     def configure_callbacks(self):
         callbacks = []
