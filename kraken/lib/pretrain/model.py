@@ -400,7 +400,7 @@ class RecognitionPretrainModel(pl.LightningModule):
                             f'{self.nn.aux_layers["wav2vec2mask"].mask_width}, prob '
                             f'{self.nn.aux_layers["wav2vec2mask"].mask_prob}, negative samples '
                             f'{self.nn.aux_layers["wav2vec2mask"].num_negatives}')
-                self.wav2vec2mask = self.nn.aux_layers
+                self.wav2vec2mask = self.nn.aux_layers['wav2vec2mask']
                 logger.info("Overriding masking hyperparameters with model one's: ")
                 self.hparams.mask_width = self.wav2vec2mask.mask_width
                 self.hparams.mask_mask_prob = self.wav2vec2mask.mask_prob
