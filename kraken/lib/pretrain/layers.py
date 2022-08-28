@@ -91,7 +91,7 @@ class Wav2Vec2Mask(Module):
         """
         Generates a VGSL spec block from the layer instance.
         """
-        return f'[1,{self.final_dim},0,1 W{{{name}}}{self.final_dim},{self.mask_width},{self.mask_prob},{self.num_negatives}]'
+        return f'[1,{self.final_dim},0,{self.context_encoder_input_dim} W{{{name}}}{self.final_dim},{self.mask_width},{self.mask_prob},{self.num_negatives}]'
 
     def deserialize(self, name: str, spec) -> None:
         """
