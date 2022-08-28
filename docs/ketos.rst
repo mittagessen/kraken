@@ -429,6 +429,38 @@ with `sample.codec` containing:
 Unsupervised recognition pretraining
 ------------------------------------
 
+Text recognition models can be pretrained in an unsupervised fashion from text
+line images, both in bounding box and baseline format. The pretraining is
+performed through a contrastive surrogate task aiming to distinguish in-painted
+parts of the input image features from randomly sampled distractor slices.
+
+All data sources accepted by the supervised trainer are valid for pretraining.
+
+The basic pretraining call is very similar to a training one:
+
+.. code-block:: console
+
+   $ ketos pretrain -f binary foo.arrow
+
+There are a couple of hyperparameters that are specific to pretraining: the
+mask width (at the subsampling level of the last convolutional layer), the
+probability of a particular position being the start position of a mask, and
+the number of negative distractor samples.
+
+.. code-block:: console
+
+   $ ketos pretrain -o pretrain --mask-width 4 --mask-probability 0.2 --num-negatives 3 -f binary foo.arrow
+
+Once a model has been pretrained it has to be adapted to perform actual
+recognition with a standard labelled dataset, although training data
+requirements will usually be much reduced:
+
+.. code-block:: console
+
+   $ ketos train -i pretrain_best.mlmodel --warmup 5000 -f binary labelled.arrow
+
+It is recommended to use learning rate warmup (`warmup`) for at least one epoch
+to improve convergence of the pretrained model.
 
 Segmentation training
 ---------------------
