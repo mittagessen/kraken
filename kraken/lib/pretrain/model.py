@@ -44,6 +44,7 @@ from pytorch_lightning.callbacks import EarlyStopping
 
 from kraken.lib import vgsl, default_specs, layers
 from kraken.lib.xml import preparse_xml_data
+from kraken.lib.codec import PytorchCodec
 from kraken.lib.dataset import (ArrowIPCRecognitionDataset,
                                 GroundTruthDataset, PolygonGTDataset,
                                 ImageInputTransforms, collate_sequences)
@@ -417,10 +418,14 @@ class RecognitionPretrainModel(pl.LightningModule):
                                                  self.hparams.num_negatives)
                 self.nn.aux_layers = {'wav2vec2mask': self.wav2vec2mask}
 
+            # add dummy codec and output layer for 
+            if not self.nn.codec and not isinstance(self.net[-1], layers.LinSoftmax):
+                logger.info('Adding dummy codec and output layer to model')
+                self.nn.add_codec(PytorchCodec(' '))
+                self.nn.append(len(self.net), "[O1c2]")
             self.encoder = self.net[idx:]
             self.nn.hyper_params = self.hparams
             self.nn.model_type = 'recognition'
-
 
     def configure_callbacks(self):
         callbacks = []
