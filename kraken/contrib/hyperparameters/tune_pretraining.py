@@ -11,10 +11,8 @@ from ray.tune.integration.pytorch_lightning import TuneReportCallback
 
 from kraken.lib.default_spec import RECOGNITION_PRETRAIN_HYPER_PARAMS, RECOGNITION_SPEC
 from kraken.lib.pretrain.model import PretrainDataModule, RecognitionPretrainModel
-from ray.tune.schedulers import ASHAScheduler
 
 import pytorch_lightning as pl
-
 
 config = {'lrate': tune.loguniform(1e-8, 1e-2),
           'num_negatives': tune.qrandint(2, 100, 8),
@@ -30,7 +28,7 @@ def train_tune(config, training_data=None, epochs=100):
     hyper_params.update(config)
 
     model = RecognitionPretrainModel(hyper_params=hyper_params,
-                                     output='model',
+                                     output='./model',
                                      spec=RECOGNITION_SPEC)
 
     data_module = PretrainDataModule(batch_size=hyper_params.pop('batch_size'),
@@ -48,7 +46,7 @@ def train_tune(config, training_data=None, epochs=100):
                          gpus=1,
                          callbacks=[callback],
                          enable_progress_bar=False)
-    trainer.fit(model)
+    trainer.fit(model, datamodule=data_module)
 
 
 analysis = tune.run(partial(train_tune, training_data=sys.argv[2:]), local_dir=sys.argv[1], num_samples=100, resources_per_trial=resources_per_trial, config=config)
