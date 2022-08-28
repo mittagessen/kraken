@@ -356,20 +356,6 @@ class RecognitionPretrainModel(pl.LightningModule):
         self.log('CE', loss)
         return loss
 
-    def optimizer_step(self, epoch, batch_idx, optimizer, optimizer_idx,
-                       optimizer_closure, on_tpu=False, using_native_amp=False,
-                       using_lbfgs=False):
-        # update params
-        optimizer.step(closure=optimizer_closure)
-
-        # learning rate warmup
-        # XXX: other lr_schedulers are *also* run in parallel as we can't
-        # disable them temporarily.
-        if self.hparams.warmup and self.trainer.global_step < self.hparams.warmup:
-            lr_scale = min(1.0, float(self.trainer.global_step + 1) / self.hparams.warmup)
-            for pg in optimizer.param_groups:
-                pg["lr"] = lr_scale * self.hparams.lrate
-
     def configure_optimizers(self):
         return _configure_optimizer_and_lr_scheduler(self.hparams,
                                                      chain(self.features.parameters(),
@@ -377,6 +363,28 @@ class RecognitionPretrainModel(pl.LightningModule):
                                                            self.encoder.parameters()),
                                                      len_train_set=self.len_train_set,
                                                      loss_tracking_mode='min')
+
+    def optimizer_step(self, epoch, batch_idx, optimizer, optimizer_idx,
+                       optimizer_closure, on_tpu=False, using_native_amp=False,
+                       using_lbfgs=False):
+        # update params
+        optimizer.step(closure=optimizer_closure)
+
+        # linear warmup between 0 and the initial learning rate `lrate` in `warmup`
+        # steps.
+        if self.hparams.warmup and self.trainer.global_step < self.hparams.warmup:
+            lr_scale = min(1.0, float(self.trainer.global_step + 1) / self.hparams.warmup)
+            for pg in optimizer.param_groups:
+                pg["lr"] = lr_scale * self.hparams.lrate
+
+    def lr_scheduler_step(self, scheduler, optimizer_idx, metric):
+        if not self.hparams.warmup or self.trainer.global_step >= self.hparams.warmup:
+            # step OneCycleLR each batch if not in warmup phase
+            if isinstance(scheduler, lr_scheduler.OneCycleLR):
+                scheduler.step()
+            # step every other scheduler epoch-wise
+            elif self.trainer.is_last_batch:
+                scheduler.step()
 
     def setup(self, stage: Optional[str] = None):
         # finalize models in case of appending/loading
