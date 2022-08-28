@@ -19,10 +19,10 @@ import pytorch_lightning as pl
 config = {'lrate': tune.loguniform(1e-8, 1e-2),
           'num_negatives': tune.qrandint(2, 100, 8),
           'mask_prob': tune.loguniform(0.01, 0.2),
-          'mask_prob': tune.qrandint(2, 8, 2),
-         }
+          'mask_width': tune.qrandint(2, 8, 2)}
 
 resources_per_trial = {"cpu": 8, "gpu": 0.5}
+
 
 def train_tune(config, training_data=None, epochs=100):
 
@@ -30,14 +30,14 @@ def train_tune(config, training_data=None, epochs=100):
     hyper_params.update(config)
 
     model = RecognitionPretrainModel(hyper_params=hyper_params,
-                                     output=output,
+                                     output='model',
                                      spec=RECOGNITION_SPEC)
 
     data_module = PretrainDataModule(batch_size=hyper_params.pop('batch_size'),
                                      pad=hyper_params.pop('pad'),
                                      augment=hyper_params.pop('augment'),
                                      training_data=training_data,
-                                     num_workers=resource_per_trial['cpu'],
+                                     num_workers=resources_per_trial['cpu'],
                                      height=model.height,
                                      width=model.width,
                                      channels=model.channels,
