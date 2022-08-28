@@ -583,7 +583,7 @@ class ArrowIPCRecognitionDataset(Dataset):
             text = func(text)
         if not text:
             logger.debug(f'Text line "{sample["text"]}" is empty after transformations')
-            if self.ignore_empty_lines:
+            if not self.ignore_empty_lines:
                 raise Exception('empty text line')
         return text
 
