@@ -37,6 +37,7 @@ import pytorch_lightning as pl
 
 from itertools import chain
 from functools import partial
+from torch.optim import lr_scheduler
 from torch.multiprocessing import Pool
 from torch.nn.utils.rnn import pack_padded_sequence
 from typing import Dict, Optional, Sequence, Union, Any
