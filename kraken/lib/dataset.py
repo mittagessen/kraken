@@ -918,7 +918,7 @@ class GroundTruthDataset(Dataset):
             text = fp.read().strip('\n\r')
             for func in self.text_transforms:
                 text = func(text)
-            if not text and self.ignore_empty_lines:
+            if not text and not self.ignore_empty_lines:
                 raise KrakenInputException(f'Text line is empty ({fp.name})')
         return {'image': image, 'text': text, 'preparse': True}
 
