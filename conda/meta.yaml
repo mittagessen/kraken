@@ -13,25 +13,25 @@ requirements:
   run:
      - python-bidi=0.4.2
      - lxml=4.8.0
-     - regex=2022.3.15
-     - requests=2.27.1
+     - regex=2022.7.9
+     - requests=2.28.1
      - click=8.1.2
      - numpy=1.21.5
-     - pillow=9.0.1
-     - scipy=1.7.3
+     - pillow=9.2.0
+     - scipy=1.9.0
      - jinja2=3.0.3
      - conda-forge::torchvision=0.12.0
-     - conda-forge::pytorch=1.11.0
+     - conda-forge::pytorch=1.12.0
      - cudatoolkit>=10.2
      - jsonschema=3.2.0
      - scikit-image=0.19.2
-     - shapely=1.8.0
+     - shapely=1.7.1
      - pyvips=2.1.15
      - coremltools=4.1
-     - pyarrow=4.0.1
-     - conda-forge::pytorch-lightning=1.6.0
-     - conda-forge::albumentations=1.0.3
-     - conda-forge::rich=12.1.0
+     - pyarrow=8.0.0
+     - conda-forge::pytorch-lightning=1.6.5
+     - conda-forge::albumentations=1.2.1
+     - conda-forge::rich=12.5.1
 about:
   home: http://kraken.re
   license: Apache License
