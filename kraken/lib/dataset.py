@@ -451,6 +451,7 @@ class ArrowIPCRecognitionDataset(Dataset):
     def __init__(self,
                  normalization: Optional[str] = None,
                  whitespace_normalization: bool = True,
+                 ignore_empty_lines: bool = True,
                  reorder: Union[bool, str] = True,
                  im_transforms: Callable[[Any], torch.Tensor] = transforms.Compose([]),
                  augmentation: bool = False,
@@ -462,6 +463,7 @@ class ArrowIPCRecognitionDataset(Dataset):
             normalization: Unicode normalization for gt
             whitespace_normalization: Normalizes unicode whitespace and strips
                                       whitespace.
+            ignore_empty_lines: Whether to return samples without text.
             reorder: Whether to rearrange code points in "display"/LTR order.
                      Set to L|R to change the default text direction.
             im_transforms: Function taking an PIL.Image and returning a tensor
@@ -481,6 +483,7 @@ class ArrowIPCRecognitionDataset(Dataset):
         self._num_lines = 0
         self.arrow_table = None
         self.codec = None
+        self.ignore_empty_lines = ignore_empty_lines
 
         self.seg_type = None
         # built text transformations
@@ -563,25 +566,24 @@ class ArrowIPCRecognitionDataset(Dataset):
 
     def rebuild_alphabet(self):
         self.alphabet = Counter()
+        _ignore_empty_lines = self.ignore_empty_lines
+        self.ignore_empty_lines = False
         for index in range(len(self)):
             text = self._apply_text_transform(
                 self.arrow_table.column('lines')[index].as_py(),
-                raise_on_empty=False
             )
             self.alphabet.update(text)
+        self.ignore_empty_lines = _ignore_empty_lines
 
-    def _apply_text_transform(self, sample, raise_on_empty: bool = True) -> str:
+    def _apply_text_transform(self, sample) -> str:
         """ Applies text transform to a sample.
-
-        Raise_on_empty raises an Exception if it finds an empty line.
-
         """
         text = sample['text']
         for func in self.text_transforms:
             text = func(text)
         if not text:
             logger.debug(f'Text line "{sample["text"]}" is empty after transformations')
-            if raise_on_empty:
+            if not self.ignore_empty_lines:
                 raise Exception('empty text line')
         return text
 
@@ -642,6 +644,7 @@ class PolygonGTDataset(Dataset):
     def __init__(self,
                  normalization: Optional[str] = None,
                  whitespace_normalization: bool = True,
+                 ignore_empty_lines: bool = True,
                  reorder: Union[bool, str] = True,
                  im_transforms: Callable[[Any], torch.Tensor] = transforms.Compose([]),
                  augmentation: bool = False) -> None:
@@ -649,15 +652,15 @@ class PolygonGTDataset(Dataset):
         Creates a dataset for a polygonal (baseline) transcription model.
 
         Args:
-            normalization (str): Unicode normalization for gt
-            whitespace_normalization (str): Normalizes unicode whitespace and
-                                            strips whitespace.
-            reorder (bool|str): Whether to rearrange code points in "display"/LTR
-                                order. Set to L|R to change the default text
-                                direction.
-            im_transforms (func): Function taking an PIL.Image and returning a
-                                  tensor suitable for forward passes.
-            augmentation (bool): Enables augmentation.
+            normalization: Unicode normalization for gt
+            whitespace_normalization: Normalizes unicode whitespace and strips
+                                      whitespace.
+            ignore_empty_lines: Whether to return samples without text.
+            reorder: Whether to rearrange code points in "display"/LTR order.
+                     Set to L|R to change the default text direction.
+            im_transforms: Function taking an PIL.Image and returning a tensor
+                           suitable for forward passes.
+            augmentation: Enables augmentation.
         """
         self._images = []  # type:  Union[List[Image], List[torch.Tensor]]
         self._gt = []  # type:  List[str]
@@ -665,6 +668,7 @@ class PolygonGTDataset(Dataset):
         self.text_transforms = []  # type: List[Callable[[str], str]]
         self.transforms = im_transforms
         self.aug = None
+        self.ignore_empty_lines = ignore_empty_lines
 
         self.seg_type = 'baselines'
         # built text transformations
@@ -736,7 +740,7 @@ class PolygonGTDataset(Dataset):
         orig_text = text
         for func in self.text_transforms:
             text = func(text)
-        if not text:
+        if not text and not self.ignore_empty_lines:
             raise KrakenInputException(f'Text line "{orig_text}" is empty after transformations')
         if not baseline:
             raise KrakenInputException('No baseline given for line')
@@ -815,6 +819,7 @@ class GroundTruthDataset(Dataset):
                  suffix: str = '.gt.txt',
                  normalization: Optional[str] = None,
                  whitespace_normalization: bool = True,
+                 ignore_empty_lines: bool = True,
                  reorder: Union[bool, str] = True,
                  im_transforms: Callable[[Any], torch.Tensor] = transforms.Compose([]),
                  augmentation: bool = False) -> None:
@@ -822,26 +827,27 @@ class GroundTruthDataset(Dataset):
         Reads a list of image-text pairs and creates a ground truth set.
 
         Args:
-            split (func): Function for generating the base name without
-                          extensions from paths
-            suffix (str): Suffix to attach to image base name for text
-                          retrieval
-            mode (str): Image color space. Either RGB (color) or L
-                        (grayscale/bw). Only L is compatible with vertical
-                        scaling/dewarping.
-            scale (int, tuple): Target height or (width, height) of dewarped
-                                line images. Vertical-only scaling is through
-                                CenterLineNormalizer, resizing with Lanczos
-                                interpolation. Set to 0 to disable.
-            normalization (str): Unicode normalization for gt
-            whitespace_normalization (str): Normalizes unicode whitespace and
-                                            strips whitespace.
-            reorder (bool|str): Whether to rearrange code points in "display"/LTR
-                                order. Set to L|R to change the default text
-                                direction.
-            im_transforms (func): Function taking an PIL.Image and returning a
-                                  tensor suitable for forward passes.
-            augmentation (bool): Enables augmentation.
+            split: Function for generating the base name without
+                   extensions from paths
+            suffix: Suffix to attach to image base name for text
+                    retrieval
+            mode: Image color space. Either RGB (color) or L
+                  (grayscale/bw). Only L is compatible with vertical
+                  scaling/dewarping.
+            scale: Target height or (width, height) of dewarped
+                   line images. Vertical-only scaling is through
+                   CenterLineNormalizer, resizing with Lanczos
+                   interpolation. Set to 0 to disable.
+            normalization: Unicode normalization for gt
+            whitespace_normalization: Normalizes unicode whitespace and
+                                      strips whitespace.
+            ignore_empty_lines: Whether to return samples without text.
+            reorder: Whether to rearrange code points in "display"/LTR
+                     order. Set to L|R to change the default text
+                     direction.
+            im_transforms: Function taking an PIL.Image and returning a
+                           tensor suitable for forward passes.
+            augmentation: Enables augmentation.
         """
         self.suffix = suffix
         self.split = partial(F_t.suffix_split, split=split, suffix=suffix)
@@ -850,6 +856,7 @@ class GroundTruthDataset(Dataset):
         self.alphabet = Counter()  # type: Counter
         self.text_transforms = []  # type: List[Callable[[str], str]]
         self.transforms = im_transforms
+        self.ignore_empty_lines = ignore_empty_lines
         self.aug = None
 
         self.seg_type = 'bbox'
@@ -908,12 +915,12 @@ class GroundTruthDataset(Dataset):
             image (str): Input image path
         """
         with open(self.split(image), 'r', encoding='utf-8') as fp:
-            gt = fp.read().strip('\n\r')
+            text = fp.read().strip('\n\r')
             for func in self.text_transforms:
-                gt = func(gt)
-            if not gt:
+                text = func(text)
+            if not text and not self.ignore_empty_lines:
                 raise KrakenInputException(f'Text line is empty ({fp.name})')
-        return {'image': image, 'text': gt, 'preparse': True}
+        return {'image': image, 'text': text, 'preparse': True}
 
     def encode(self, codec: Optional[PytorchCodec] = None) -> None:
         """

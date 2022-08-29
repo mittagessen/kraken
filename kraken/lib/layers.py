@@ -304,7 +304,8 @@ class Reshape(Module):
         input_shape = torch.zeros([x if x else 1 for x in input])
         with torch.no_grad():
             o, _ = self.forward(input_shape)
-        return tuple(o.shape)  # type: ignore
+        self.output_shape = tuple(o.shape)
+        return self.output_shape  # type: ignore
 
     def deserialize(self, name, spec):
         """
@@ -771,7 +772,10 @@ class ActConv2D(Module):
 
     def forward(self, inputs: torch.Tensor, seq_len: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         o = self.co(inputs)
-        o = self.nl(o)
+        # return logits for sigmoid activation during training
+        if not (self.nl_name == 'SIGMOID' and self.training):
+            o = self.nl(o)
+
         if seq_len is not None:
             seq_len = torch.clamp(torch.floor(
                 (seq_len+2*self.padding[1]-(self.kernel_size[1]-1)-1).float()/self.stride[1]+1), min=1).int()
@@ -867,7 +871,8 @@ class GroupNorm(Module):
         return o, seq_len
 
     def get_shape(self, input: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
-        return input
+        self.output_shape = input
+        return self.output_shape  # type: ignore
 
     def deserialize(self, name: str, spec) -> None:
         """

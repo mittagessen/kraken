@@ -2,7 +2,8 @@
 Various add-ons to the SciPy morphology package
 """
 import numpy as np
-from scipy.ndimage import label, find_objects
+from scipy.ndimage import label as _label
+from scipy.ndimage import find_objects as _find_objects
 from scipy.ndimage import morphology, filters
 
 
@@ -13,17 +14,17 @@ def label(image: np.ndarray, **kw) -> np.ndarray:
     types it accepts on different platforms.
     """
     try:
-        return label(image, **kw)
+        return _label(image, **kw)
     except Exception:
         pass
     types = ["int32", "uint32", "int64", "uint64", "int16", "uint16"]
     for t in types:
         try:
-            return label(np.array(image, dtype=t), **kw)
+            return _label(np.array(image, dtype=t), **kw)
         except Exception:
             pass
     # let it raise the same exception as before
-    return label(image, **kw)
+    return _label(image, **kw)
 
 
 def find_objects(image: np.ndarray, **kw) -> np.ndarray:
@@ -33,17 +34,17 @@ def find_objects(image: np.ndarray, **kw) -> np.ndarray:
     the data types it accepts on different platforms.
     """
     try:
-        return find_objects(image, **kw)
+        return _find_objects(image, **kw)
     except Exception:
         pass
     types = ["int32", "uint32", "int64", "uint64", "int16", "uint16"]
     for t in types:
         try:
-            return find_objects(np.array(image, dtype=t), **kw)
+            return _find_objects(np.array(image, dtype=t), **kw)
         except Exception:
             pass
     # let it raise the same exception as before
-    return find_objects(image, **kw)
+    return _find_objects(image, **kw)
 
 
 def r_dilation(image, size, origin=0):

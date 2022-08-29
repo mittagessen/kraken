@@ -99,12 +99,12 @@ def serialize(records: Sequence[ocr_record],
         regions: Dictionary mapping region types to a list of region polygons.
         template: Selector for the serialization format. May be 'hocr',
                   'alto', 'page' or any template found in the template directory.
-        processing_steps: A list of dictionaries describing the processing kraken performed on the inputs:
-                          ```
+        processing_steps: A list of dictionaries describing the processing kraken performed on the inputs::
+
                           {'category': 'preprocessing',
                            'description': 'natural language description of process',
-                           'settings': {'arg0': 'foo', 'argX': 'bar'}}
-                          ```
+                           'settings': {'arg0': 'foo', 'argX': 'bar'}
+                          }
 
     Returns:
         The rendered template

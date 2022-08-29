@@ -74,13 +74,13 @@ class TorchVGSLModel(object):
     respectively.
 
     Attributes:
-        input (tuple): Expected input tensor as a 4-tuple.
-        nn (torch.nn.Sequential): Stack of layers parsed from the spec.
-        criterion (torch.nn.Module): Fully parametrized loss function.
-        user_metadata (dict): dict with user defined metadata. Is flushed into
+        input: Expected input tensor as a 4-tuple.
+        nn: Stack of layers parsed from the spec.
+        criterion: Fully parametrized loss function.
+        user_metadata: dict with user defined metadata. Is flushed into
                              model file during saving/overwritten by loading
                              operations.
-        one_channel_mode (str): Field indicating the image type used during
+        one_channel_mode: Field indicating the image type used during
                                 training of one-channel images. Is '1' for
                                 models trained on binarized images, 'L' for
                                 grayscale, and None otherwise.
@@ -90,62 +90,64 @@ class TorchVGSLModel(object):
         Constructs a torch module from a (subset of) VSGL spec.
 
         Args:
-            spec (str): Model definition similar to tesseract as follows:
-                        ============ FUNCTIONAL OPS ============
-                        C(s|t|r|l|rl|m)[{name}]<y>,<x>,<d>[,<y_stride>,<x_stride>]
-                          Convolves using a y,x window, with no shrinkage, SAME
-                          infill, d outputs, with s|t|r|l|m non-linear layer.
-                          (s|t|r|l|m) specifies the type of non-linearity:
-                          s = sigmoid
-                          t = tanh
-                          r = relu
-                          lr = leaky relu
-                          l = linear (i.e., None)
-                          m = softmax
-                        L(f|r|b)(x|y)[s][{name}]<n> LSTM cell with n outputs.
-                          f runs the LSTM forward only.
-                          r runs the LSTM reversed only.
-                          b runs the LSTM bidirectionally.
-                          x runs the LSTM in the x-dimension (on data with or without the
-                             y-dimension).
-                          y runs the LSTM in the y-dimension (data must have a y dimension).
-                          s (optional) summarizes the output in the requested dimension,
-                             outputting only the final step, collapsing the dimension to a
-                             single element.
-                          Examples:
-                          Lfx128 runs a forward-only LSTM in the x-dimension with 128
-                                 outputs, treating any y dimension independently.
-                          Lfys64 runs a forward-only LSTM in the y-dimension with 64 outputs
-                                 and collapses the y-dimension to 1 element.
-                        Do[{name}][<p>,<d>] Insert a dropout layer operating in
-                                            <d> dimensions with probability
-                                            <p>. Defaults to 1D with 0.5
-                                            probability.
-                        Gn[{name}]<n> A group normalization layer with n groups
-                        ============ PLUMBING OPS ============
-                        [...] Execute ... networks in series (layers).
-                        (...) Execute ... networks in parallel.
-                        I[{name}] Identity function to build residual connections in parallel layers.
-                        Mp[{name}]<y>,<x>[<y_stride>,<x_stride>] Maxpool the input, reducing the (y,x) rectangle to a
-                          single vector value.
-                        S[{name}]<d>(<a>x<b>)<e>,<f> Splits one dimension, moves one part to another
-                          dimension.
+            spec: Model definition similar to tesseract as follows:
+                  ============ FUNCTIONAL OPS ============
+                  C(s|t|r|l|rl|m)[{name}]<y>,<x>,<d>[,<y_stride>,<x_stride>]
+                    Convolves using a y,x window, with no shrinkage, SAME
+                    infill, d outputs, with s|t|r|l|m non-linear layer.
+                    (s|t|r|l|m) specifies the type of non-linearity:
+                    s = sigmoid
+                    t = tanh
+                    r = relu
+                    lr = leaky relu
+                    l = linear (i.e., None)
+                    m = softmax
+                  L(f|r|b)(x|y)[s][{name}]<n> LSTM cell with n outputs.
+                    f runs the LSTM forward only.
+                    r runs the LSTM reversed only.
+                    b runs the LSTM bidirectionally.
+                    x runs the LSTM in the x-dimension (on data with or without the
+                       y-dimension).
+                    y runs the LSTM in the y-dimension (data must have a y dimension).
+                    s (optional) summarizes the output in the requested dimension,
+                       outputting only the final step, collapsing the dimension to a
+                       single element.
+                    Examples:
+                    Lfx128 runs a forward-only LSTM in the x-dimension with 128
+                           outputs, treating any y dimension independently.
+                    Lfys64 runs a forward-only LSTM in the y-dimension with 64 outputs
+                           and collapses the y-dimension to 1 element.
+                  Do[{name}][<p>,<d>] Insert a dropout layer operating in
+                                      <d> dimensions with probability
+                                      <p>. Defaults to 1D with 0.5
+                                      probability.
+                  Gn[{name}]<n> A group normalization layer with n groups
+                  ============ PLUMBING OPS ============
+                  [...] Execute ... networks in series (layers).
+                  (...) Execute ... networks in parallel.
+                  I[{name}] Identity function to build residual connections in parallel layers.
+                  Mp[{name}]<y>,<x>[<y_stride>,<x_stride>] Maxpool the input, reducing the (y,x) rectangle to a
+                    single vector value.
+                  S[{name}]<d>(<a>x<b>)<e>,<f> Splits one dimension, moves one part to another
+                    dimension.
         """
         self.spec = spec
         self.named_spec = []  # type:  List[str]
         self.ops = [self.build_addition, self.build_identity, self.build_rnn,
                     self.build_dropout, self.build_maxpool, self.build_conv,
-                    self.build_output, self.build_reshape,
+                    self.build_output, self.build_reshape, self.build_wav2vec2,
                     self.build_groupnorm, self.build_series,
                     self.build_parallel]
         self.codec = None  # type: Optional[PytorchCodec]
         self.criterion = None  # type: Any
         self.nn = layers.MultiParamSequential()
         self.user_metadata = {'accuracy': [],
+                              'metrics': [],
                               'seg_type': None,
                               'one_channel_mode': None,
                               'model_type': None,
-                              'hyper_params': {}}  # type: dict[str, str]
+                              'hyper_params': {}}  # type: dict[str, Any]
+        self._aux_layers = nn.ModuleDict()
 
         self.idx = -1
         spec = spec.strip()
@@ -299,14 +301,20 @@ class TorchVGSLModel(object):
         except Exception as exc:
             raise KrakenInvalidModelException('Failed parsing out layers from model weights') from exc
 
+        if 'aux_layers' in mlmodel.user_defined_metadata:
+            logger.info(f'Deserializing auxiliary layers.')
+            nn.aux_layers = {k: cls(v).nn.get_submodule(k) for k, v in json.loads(mlmodel.user_defined_metadata['aux_layers']).items()}
+
         if 'codec' in mlmodel.user_defined_metadata:
             nn.add_codec(PytorchCodec(json.loads(mlmodel.user_defined_metadata['codec'])))
 
         nn.user_metadata = {'accuracy': [],
+                            'metrics': [],
                             'seg_type': 'bbox',
                             'one_channel_mode': '1',
                             'model_type': None,
                             'hyper_params': {}}  # type: dict[str, str]
+
         if 'kraken_meta' in mlmodel.user_defined_metadata:
             nn.user_metadata.update(json.loads(mlmodel.user_defined_metadata['kraken_meta']))
         return nn
@@ -349,12 +357,20 @@ class TorchVGSLModel(object):
     def hyper_params(self, val: Dict[str, Any]):
         self.user_metadata['hyper_params'].update(val)
 
+    @property
+    def aux_layers(self, **kwargs):
+        return self._aux_layers
+
+    @aux_layers.setter
+    def aux_layers(self, val: Dict[str, torch.nn.Module]):
+        self._aux_layers.update(val)
+
     def save_model(self, path: str):
         """
         Serializes the model into path.
 
         Args:
-            path (str): Target destination
+            path: Target destination
         """
         inputs = [('input', datatypes.Array(*self.input))]
         outputs = [('output', datatypes.Array(*self.output))]
@@ -372,6 +388,15 @@ class TorchVGSLModel(object):
                     else:
                         l.serialize(name, input, net_builder)
             _serialize_layer(self.nn, input, net_builder)
+            if self.aux_layers:
+                prev_aux_device = next(self.aux_layers.parameters()).device
+                try:
+                    logger.debug(f'Serializing {len(self.aux_layers)} auxiliary layers')
+                    self.aux_layers.to('cpu')
+                    _serialize_layer(self.aux_layers, input, net_builder)
+                finally:
+                    self.aux_layers.to(prev_aux_device)
+
             mlmodel = MLModel(net_builder.spec)
             mlmodel.short_description = 'kraken model'
             mlmodel.user_defined_metadata['vgsl'] = '[' + ' '.join(self.named_spec) + ']'
@@ -379,6 +404,8 @@ class TorchVGSLModel(object):
                 mlmodel.user_defined_metadata['codec'] = json.dumps(self.codec.c2l)
             if self.user_metadata:
                 mlmodel.user_defined_metadata['kraken_meta'] = json.dumps(self.user_metadata)
+            if self.aux_layers:
+                mlmodel.user_defined_metadata['aux_layers'] = json.dumps({k: v.get_spec(k) for k, v in self.aux_layers.items()})
             mlmodel.save(path)
         finally:
             self.nn.to(prev_device)
@@ -528,6 +555,28 @@ class TorchVGSLModel(object):
         logger.debug('{}\t\tgroupnorm\tgroups {}'.format(self.idx, groups))
         return fn.get_shape(input), [VGSLBlock(blocks[idx], m.group('type'), m.group('name'), self.idx)], fn
 
+    def build_wav2vec2(self,
+                       input: Tuple[int, int, int, int],
+                       blocks: List[str],
+                       idx: int) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
+        """
+        Builds a Wav2Vec2 masking layer.
+        """
+        pattern = re.compile(r'(?P<type>W)(?P<name>{\w+})(?P<final_dim>\d+),(?P<mask_width>\d+),(?P<mask_prob>(\d+(\.\d*)?|\.\d+)),(?P<num_negatives>\d+)')
+        m = pattern.match(blocks[idx])
+        if not m:
+            return None, None, None
+        final_dim = int(m.group('final_dim'))
+        mask_width = int(m.group('mask_width'))
+        mask_prob = float(m.group('mask_prob'))
+        num_negatives = int(m.group('num_negatives'))
+        from kraken.lib import pretrain
+        fn = pretrain.layers.Wav2Vec2Mask(input[1], final_dim, mask_width, mask_prob, num_negatives)
+        self.idx += 1
+        logger.debug(f'{self.idx}\t\twav2vec2\tmask width {mask_width}, prob '
+                     f'{mask_prob}, negative samples {num_negatives}')
+        return fn.get_shape(input), [VGSLBlock(blocks[idx], m.group('type'), m.group('name'), self.idx)], fn
+
     def build_conv(self,
                    input: Tuple[int, int, int, int],
                    blocks: List[str],
@@ -626,7 +675,7 @@ class TorchVGSLModel(object):
         if nl == 'c' and dim == 2:
             raise ValueError('CTC not supported for heatmap output')
         if nl in ['l', 's'] and int(m.group('out')) >= 1:
-            self.criterion = nn.BCELoss()
+            self.criterion = nn.BCEWithLogitsLoss()
         elif nl == 'c':
             self.criterion = nn.CTCLoss(reduction='sum', zero_infinity=True)
         else:

@@ -29,6 +29,7 @@ def slugify(value):
     value = re.sub(r'[-\s]+', '-', value)
     return value
 
+
 def _repl_alto(fname, cuts):
     with open(fname, 'rb') as fp:
         doc = etree.parse(fp)
@@ -40,10 +41,10 @@ def _repl_alto(fname, cuts):
                 if el.tag.endswith('Shape'):
                     continue
                 elif el.tag.endswith('SP'):
-                    idx +=1
+                    idx += 1
                 elif el.tag.endswith('String'):
                     str_len = len(el.get('CONTENT'))
-                    # clear out all 
+                    # clear out all
                     for chld in el:
                         if chld.tag.endswith('Glyph'):
                             el.remove(chld)
@@ -59,6 +60,7 @@ def _repl_alto(fname, cuts):
         with open(f'{os.path.basename(fname)}_algn.xml', 'wb') as fp:
             doc.write(fp, encoding='UTF-8', xml_declaration=True)
 
+
 def _repl_page(fname, cuts):
     with open(fname, 'rb') as fp:
         doc = etree.parse(fp)
@@ -69,6 +71,7 @@ def _repl_page(fname, cuts):
                 glyph.attrib['points'] = ' '.join([','.join([str(x) for x in pt]) for pt in cut])
         with open(f'{os.path.basename(fname)}_algn.xml', 'wb') as fp:
             doc.write(fp, encoding='UTF-8', xml_declaration=True)
+
 
 @click.command()
 @click.option('-f', '--format-type', type=click.Choice(['alto', 'page']), default='page',
@@ -94,7 +97,7 @@ def cli(format_type, model, output, files):
     from PIL import Image, ImageDraw
 
     from kraken.lib import models, xml
-    from kraken import align, serialization
+    from kraken import align
 
     if format_type == 'alto':
         fn = xml.parse_alto
@@ -122,6 +125,7 @@ def cli(format_type, model, output, files):
         else:
             repl_fn(doc, records)
         click.secho('\u2713', fg='green')
+
 
 if __name__ == '__main__':
     cli()

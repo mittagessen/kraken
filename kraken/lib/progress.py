@@ -16,6 +16,7 @@
 Handlers for rich-based progress bars.
 """
 from typing import Any, Dict, Optional, Union
+from numbers import Number
 
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks.progress.base import ProgressBarBase
@@ -101,7 +102,10 @@ class MetricsTextColumn(ProgressColumn):
 
         text = ""
         for k, v in self._metrics.items():
-            text += f"{k}: {v:.5f} "
+            if isinstance(v, Number):
+                text += f"{k}: {v:.5f} "
+            else:
+                text += f"{k}: {v} "
         return Text(text, justify="left")
 
 
@@ -148,7 +152,8 @@ class KrakenTrainProgressBar(ProgressBarBase):
     def __init__(self,
                  refresh_rate: int = 1,
                  leave: bool = True,
-                 console_kwargs: Optional[Dict[str, Any]] = None) -> None:
+                 console_kwargs: Optional[Dict[str, Any]] = None,
+                 ignored_metrics=('loss', 'val_metric')) -> None:
         super().__init__()
         self._refresh_rate: int = refresh_rate
         self._leave: bool = leave
@@ -159,6 +164,7 @@ class KrakenTrainProgressBar(ProgressBarBase):
         self._reset_progress_bar_ids()
         self._metric_component = None
         self._progress_stopped: bool = False
+        self.ignored_metrics = ignored_metrics
 
     @property
     def refresh_rate(self) -> float:
@@ -335,8 +341,8 @@ class KrakenTrainProgressBar(ProgressBarBase):
 
     def _update_metrics(self, trainer, pl_module) -> None:
         metrics = self.get_metrics(trainer, pl_module)
-        metrics.pop('loss', None)
-        metrics.pop('val_metric', None)
+        for x in self.ignored_metrics:
+            metrics.pop(x, None)
         if self._metric_component:
             self._metric_component.update(metrics)
 

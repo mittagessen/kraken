@@ -24,7 +24,7 @@ import numpy as np
 import pyarrow as pa
 import tempfile
 
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 from collections import Counter
 from typing import Optional, List, Union, Callable, Tuple, Dict
 from multiprocessing import Pool
@@ -43,7 +43,7 @@ def _extract_line(xml_record):
     lines = []
     try:
         im = Image.open(xml_record['image'])
-    except FileNotFoundError:
+    except (FileNotFoundError, UnidentifiedImageError):
         return lines, None, None
     if is_bitonal(im):
         im = im.convert('1')
@@ -66,7 +66,7 @@ def _extract_line(xml_record):
 def _extract_path_line(xml_record):
     try:
         im = Image.open(xml_record['image'])
-    except FileNotFoundError:
+    except (FileNotFoundError, UnidentifiedImageError):
         return [], None, None
     if not xml_record['lines'][0]['text']:
         return [], None, None
@@ -156,7 +156,7 @@ def build_binary_dataset(files: Optional[List[Union[str, pathlib.Path, Dict]]] =
             try:
                 with open(data['image'], 'rb') as fp:
                     Image.open(fp)
-            except FileNotFoundError as e:
+            except (FileNotFoundError, UnidentifiedImageError) as e:
                 logger.warning(f'Could not open file {e.filename} in {doc}')
                 continue
             docs.append(data)

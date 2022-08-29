@@ -63,6 +63,7 @@ class KrakenTrainer(pl.Trainer):
                  enable_summary: bool = True,
                  min_epochs=5,
                  max_epochs=100,
+                 pb_ignored_metrics=('loss', 'val_metric'),
                  *args,
                  **kwargs):
         kwargs['logger'] = False
@@ -75,14 +76,13 @@ class KrakenTrainer(pl.Trainer):
             kwargs['callbacks'] = [kwargs['callbacks']]
 
         if enable_progress_bar:
-            progress_bar_cb = progress.KrakenTrainProgressBar()
+            progress_bar_cb = progress.KrakenTrainProgressBar(ignored_metrics=pb_ignored_metrics)
             kwargs['callbacks'].append(progress_bar_cb)
 
         if enable_summary:
             from pytorch_lightning.callbacks import RichModelSummary
             summary_cb = RichModelSummary(max_depth=2)
             kwargs['callbacks'].append(summary_cb)
-        else:
             kwargs['enable_model_summary'] = False
 
         kwargs['callbacks'].extend([KrakenSetOneChannelMode(), KrakenSaveModel()])
@@ -102,7 +102,10 @@ class KrakenSetOneChannelMode(Callback):
     def on_train_epoch_end(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule") -> None:
         # fill one_channel_mode after 1 iteration over training data set
         if not trainer.sanity_checking and trainer.current_epoch == 0 and trainer.model.nn.model_type == 'recognition':
-            im_mode = trainer.model.train_set.dataset.im_mode
+            ds = getattr(pl_module, 'train_set', None)
+            if not ds and trainer.datamodule:
+                ds = trainer.datamodule.train_set
+            im_mode = ds.dataset.im_mode
             if im_mode in ['1', 'L']:
                 logger.info(f'Setting model one_channel_mode to {im_mode}.')
                 trainer.model.nn.one_channel_mode = im_mode
@@ -115,8 +118,9 @@ class KrakenSaveModel(Callback):
     def on_validation_end(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule") -> None:
         if not trainer.sanity_checking:
             trainer.model.nn.hyper_params['completed_epochs'] += 1
-            trainer.model.nn.user_metadata['accuracy'].append(
-                ((trainer.current_epoch + 1) * len(trainer.model.train_set), float(trainer.logged_metrics['val_metric'])))
+            metric = float(trainer.logged_metrics['val_metric']) if 'val_metric' in trainer.logged_metrics else -1.0
+            trainer.model.nn.user_metadata['accuracy'].append((trainer.global_step, metric))
+            trainer.model.nn.user_metadata['metrics'].append((trainer.global_step, {k: float(v) for k, v in trainer.logged_metrics.items()}))
 
             logger.info('Saving to {}_{}'.format(trainer.model.output, trainer.current_epoch))
             trainer.model.nn.save_model(f'{trainer.model.output}_{trainer.current_epoch}.mlmodel')
@@ -349,7 +353,7 @@ class RecognitionModel(pl.LightningModule):
                 except KrakenInputException as e:
                     logger.warning(str(e))
             if self.format_type == 'binary' and self.hparams.normalization:
-                logger.debug(f'Rebuilding dataset using unicode normalization')
+                logger.debug('Rebuilding dataset using unicode normalization')
                 dataset.rebuild_alphabet()
         return dataset
 
@@ -395,48 +399,6 @@ class RecognitionModel(pl.LightningModule):
             self.best_epoch = self.current_epoch
             self.best_metric = accuracy
         self.log_dict({'val_accuracy': accuracy, 'val_metric': accuracy}, prog_bar=True)
-
-    def configure_optimizers(self):
-        logger.debug(f'Constructing {self.hparams.optimizer} optimizer (lr: {self.hparams.lrate}, momentum: {self.hparams.momentum})')
-        if self.hparams.optimizer == 'Adam':
-            optim = torch.optim.Adam(self.nn.nn.parameters(), lr=self.hparams.lrate, weight_decay=self.hparams.weight_decay)
-        elif self.hparams.optimizer == 'Lamb':
-            from pytorch_lamb import Lamb
-            optim = Lamb(self.nn.nn.parameters(), lr=self.hparams.lrate, weight_decay=self.hparams.weight_decay)
-        else:
-            optim = getattr(torch.optim, self.hparams.optimizer)(self.nn.nn.parameters(),
-                                                                 lr=self.hparams.lrate,
-                                                                 momentum=self.hparams.momentum,
-                                                                 weight_decay=self.hparams.weight_decay)
-        lr_sched = {}
-        if self.hparams.schedule == 'exponential':
-            lr_sched['scheduler'] = lr_scheduler.ExponentialLR(optim, self.hparams.gamma)
-        elif self.hparams.schedule == 'cosine':
-            lr_sched['scheduler'] = lr_scheduler.CosineAnnealingLR(optim, self.hparams.cos_t_max)
-        elif self.hparams.schedule == 'step':
-            lr_sched['scheduler'] = lr_scheduler.StepLR(optim, self.hparams.step_size, self.hparams.gamma)
-        elif self.hparams.schedule == 'reduceonplateau':
-            lr_sched['scheduler'] = lr_scheduler.ReduceLROnPlateau(optim,
-                                                                   mode='max',
-                                                                   factor=self.hparams.rop_factor,
-                                                                   patience=self.hparams.rop_patience)
-        elif self.hparams.schedule == '1cycle':
-            if self.hparams.epochs <= 0:
-                raise ValueError('1cycle learning rate scheduler selected but '
-                                 'number of epochs is less than 0 '
-                                 f'({self.hparams.epochs}).')
-            lr_sched['scheduler'] = lr_scheduler.OneCycleLR(optim,
-                                                            max_lr=self.hparams.lrate,
-                                                            epochs=self.hparams.epochs,
-                                                            steps_per_epoch=len(self.train_set))
-            lr_sched['interval'] = 'step'
-        elif self.hparams.schedule != 'constant':
-            raise ValueError(f'Unsupported learning rate scheduler {self.hparams.schedule}.')
-
-        if lr_sched:
-            lr_sched['monitor'] = 'val_metric'
-
-        return [optim], lr_sched if lr_sched else []
 
     def setup(self, stage: Optional[str] = None):
         # finalize models in case of appending/loading
@@ -496,9 +458,9 @@ class RecognitionModel(pl.LightningModule):
                         self.nn.resize_output(ncodec.max_label + 1, del_labels)
                     else:
                         raise ValueError(f'invalid resize parameter value {self.resize}')
-                        
+
                 self.nn.codec.strict = False
-                
+
             else:
                 self.train_set.dataset.encode(self.codec)
                 logger.info(f'Creating new model {self.spec} with {self.train_set.dataset.codec.max_label+1} outputs')
@@ -553,6 +515,40 @@ class RecognitionModel(pl.LightningModule):
                                            patience=self.hparams.lag,
                                            stopping_threshold=1.0))
         return callbacks
+
+    # configuration of optimizers and learning rate schedulers
+    # --------------------------------------------------------
+    #
+    # All schedulers are created internally with a frequency of step to enable
+    # batch-wise learning rate warmup. In lr_scheduler_step() calls to the
+    # scheduler are then only performed at the end of the epoch.
+    def configure_optimizers(self):
+        return _configure_optimizer_and_lr_scheduler(self.hparams,
+                                                     self.nn.nn.parameters(),
+                                                     len_train_set=len(self.train_set),
+                                                     loss_tracking_mode='max')
+
+    def optimizer_step(self, epoch, batch_idx, optimizer, optimizer_idx,
+                       optimizer_closure, on_tpu=False, using_native_amp=False,
+                       using_lbfgs=False):
+        # update params
+        optimizer.step(closure=optimizer_closure)
+
+        # linear warmup between 0 and the initial learning rate `lrate` in `warmup`
+        # steps.
+        if self.hparams.warmup and self.trainer.global_step < self.hparams.warmup:
+            lr_scale = min(1.0, float(self.trainer.global_step + 1) / self.hparams.warmup)
+            for pg in optimizer.param_groups:
+                pg["lr"] = lr_scale * self.hparams.lrate
+
+    def lr_scheduler_step(self, scheduler, optimizer_idx, metric):
+        if not self.hparams.warmup or self.trainer.global_step >= self.hparams.warmup:
+            # step OneCycleLR each batch if not in warmup phase
+            if isinstance(scheduler, lr_scheduler.OneCycleLR):
+                scheduler.step()
+            # step every other scheduler epoch-wise
+            elif self.trainer.is_last_batch:
+                scheduler.step()
 
 
 class SegmentationModel(pl.LightningModule):
@@ -889,49 +885,6 @@ class SegmentationModel(pl.LightningModule):
 
             torch.set_num_threads(max(self.num_workers, 1))
 
-    def configure_optimizers(self):
-        logger.debug(f'Constructing {self.hparams.optimizer} optimizer (lr: {self.hparams.lrate}, momentum: {self.hparams.momentum})')
-        if self.hparams.optimizer == 'Adam':
-            optim = torch.optim.Adam(self.nn.nn.parameters(), lr=self.hparams.lrate, weight_decay=self.hparams.weight_decay)
-        elif self.hparams.optimizer == 'Lamb':
-            from pytorch_lamb import Lamb
-            optim = Lamb(self.nn.nn.parameters(), lr=self.hparams.lrate, weight_decay=self.hparams.weight_decay)
-        else:
-            optim = getattr(torch.optim, self.hparams.optimizer)(self.nn.nn.parameters(),
-                                                                 lr=self.hparams.lrate,
-                                                                 momentum=self.hparams.momentum,
-                                                                 weight_decay=self.hparams.weight_decay)
-
-        lr_sched = {}
-        if self.hparams.schedule == 'exponential':
-            lr_sched['scheduler'] = lr_scheduler.ExponentialLR(optim, self.hparams.gamma)
-        elif self.hparams.schedule == 'cosine':
-            lr_sched['scheduler'] = lr_scheduler.CosineAnnealingLR(optim, self.hparams.cos_t_max)
-        elif self.hparams.schedule == 'step':
-            lr_sched['scheduler'] = lr_scheduler.StepLR(optim, self.hparams.step_size, self.hparams.gamma)
-        elif self.hparams.schedule == 'reduceonplateau':
-            lr_sched['scheduler'] = lr_scheduler.ReduceLROnPlateau(optim,
-                                                                   mode='max',
-                                                                   factor=self.hparams.rop_factor,
-                                                                   patience=self.hparams.rop_patience)
-        elif self.hparams.schedule == '1cycle':
-            if self.hparams.epochs <= 0:
-                raise ValueError('1cycle learning rate scheduler selected but '
-                                 'number of epochs is less than 0 '
-                                 f'({self.hparams.epochs}).')
-            lr_sched['scheduler'] = lr_scheduler.OneCycleLR(optim,
-                                                            max_lr=self.hparams.lrate,
-                                                            epochs=self.hparams.epochs,
-                                                            steps_per_epoch=len(self.train_set))
-            lr_sched['interval'] = 'step'
-        elif self.hparams.schedule != 'constant':
-            raise ValueError(f'Unsupported learning rate scheduler {self.hparams.schedule}.')
-
-        if lr_sched:
-            lr_sched['monitor'] = 'val_metric'
-
-        return [optim], lr_sched if lr_sched else []
-
     def train_dataloader(self):
         return DataLoader(self.train_set,
                           batch_size=1,
@@ -955,3 +908,84 @@ class SegmentationModel(pl.LightningModule):
                                            stopping_threshold=1.0))
 
         return callbacks
+
+    # configuration of optimizers and learning rate schedulers
+    # --------------------------------------------------------
+    #
+    # All schedulers are created internally with a frequency of step to enable
+    # batch-wise learning rate warmup. In lr_scheduler_step() calls to the
+    # scheduler are then only performed at the end of the epoch.
+    def configure_optimizers(self):
+        return _configure_optimizer_and_lr_scheduler(self.hparams,
+                                                     self.nn.nn.parameters(),
+                                                     len_train_set=len(self.train_set),
+                                                     loss_tracking_mode='max')
+
+    def optimizer_step(self, epoch, batch_idx, optimizer, optimizer_idx,
+                       optimizer_closure, on_tpu=False, using_native_amp=False,
+                       using_lbfgs=False):
+        # update params
+        optimizer.step(closure=optimizer_closure)
+
+        # linear warmup between 0 and the initial learning rate `lrate` in `warmup`
+        # steps.
+        if self.hparams.warmup and self.trainer.global_step < self.hparams.warmup:
+            lr_scale = min(1.0, float(self.trainer.global_step + 1) / self.hparams.warmup)
+            for pg in optimizer.param_groups:
+                pg["lr"] = lr_scale * self.hparams.lrate
+
+    def lr_scheduler_step(self, scheduler, optimizer_idx, metric):
+        if not self.hparams.warmup or self.trainer.global_step >= self.hparams.warmup:
+            # step OneCycleLR each batch if not in warmup phase
+            if isinstance(scheduler, lr_scheduler.OneCycleLR):
+                scheduler.step()
+            # step every other scheduler epoch-wise
+            elif self.trainer.is_last_batch:
+                scheduler.step()
+
+
+def _configure_optimizer_and_lr_scheduler(hparams, params, len_train_set=None, loss_tracking_mode='max'):
+    # XXX: Warmup is not configured here because it needs to be manually done in optimizer_step()
+    logger.debug(f'Constructing {hparams.optimizer} optimizer (lr: {hparams.lrate}, momentum: {hparams.momentum})')
+    if hparams.optimizer == 'Adam':
+        optim = torch.optim.Adam(params, lr=hparams.lrate, weight_decay=hparams.weight_decay)
+    else:
+        optim = getattr(torch.optim, hparams.optimizer)(params,
+                                                        lr=hparams.lrate,
+                                                        momentum=hparams.momentum,
+                                                        weight_decay=hparams.weight_decay)
+    lr_sched = {}
+    if hparams.schedule == 'exponential':
+        lr_sched = {'scheduler': lr_scheduler.ExponentialLR(optim, hparams.gamma, last_epoch=hparams.completed_epochs-1),
+                    'interval': 'step'}
+    elif hparams.schedule == 'cosine':
+        lr_sched = {'scheduler': lr_scheduler.CosineAnnealingLR(optim, hparams.gamma, last_epoch=hparams.completed_epochs-1, verbose=True),
+                    'interval': 'step'}
+    elif hparams.schedule == 'step':
+        lr_sched = {'scheduler': lr_scheduler.StepLR(optim, hparams.step_size, hparams.gamma, last_epoch=hparams.completed_epochs-1),
+                    'interval': 'step'}
+    elif hparams.schedule == 'reduceonplateau':
+        lr_sched = {'scheduler': lr_scheduler.ReduceLROnPlateau(optim,
+                                                               mode=loss_tracking_mode,
+                                                               factor=hparams.rop_factor,
+                                                               patience=hparams.rop_patience),
+                    'interval': 'step'}
+    elif hparams.schedule == '1cycle':
+        if hparams.epochs <= 0:
+            raise ValueError('1cycle learning rate scheduler selected but '
+                             'number of epochs is less than 0 '
+                             f'({hparams.epochs}).')
+        last_epoch = hparams.completed_epochs*len_train_set if hparams.completed_epochs else -1
+        lr_sched = {'scheduler': lr_scheduler.OneCycleLR(optim,
+                                                      max_lr=hparams.lrate,
+                                                      epochs=hparams.epochs,
+                                                      steps_per_epoch=len_train_set,
+                                                      last_epoch=last_epoch),
+                    'interval': 'step'}
+    elif hparams.schedule != 'constant':
+        raise ValueError(f'Unsupported learning rate scheduler {hparams.schedule}.')
+
+    if lr_sched:
+        lr_sched['monitor'] = 'val_metric'
+
+    return [optim], lr_sched if lr_sched else []

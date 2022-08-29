@@ -49,6 +49,7 @@ LEGACY_MODEL_DIR = '/usr/local/share/ocropus'
 # raise default max image size to 20k * 20k pixels
 Image.MAX_IMAGE_PIXELS = 20000 ** 2
 
+
 def message(msg: str, **styles) -> None:
     if logger.getEffectiveLevel() >= 30:
         click.secho(msg, **styles)
@@ -166,7 +167,6 @@ def segmenter(legacy, model, text_direction, scale, maxcolseps, black_colseps,
             fp = cast(IO[Any], fp)
             logger.info('Serializing as {} into {}'.format(ctx.meta['output_mode'], output))
             from kraken import serialization
-            from kraken.rpred import ocr_record
             fp.write(serialization.serialize_segmentation(res,
                                                           image_name=ctx.meta['base_image'],
                                                           image_size=im.size,
@@ -334,7 +334,6 @@ def process_pipeline(subcommands, input, batch_input, suffix, verbose, format_ty
     import tempfile
 
     ctx = click.get_current_context()
-
 
     input = list(input)
     # expand batch inputs

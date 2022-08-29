@@ -16,7 +16,6 @@ cmap = cycle([(230, 25, 75, 127),
 bmap = (0, 130, 200, 255)
 
 
-
 def slugify(value):
     """
     Normalizes string, converts to lowercase, removes non-alpha characters,
@@ -74,11 +73,14 @@ def cli(format_type, model, repolygonize, files):
                 im = Image.open(data['image']).convert('L')
                 lines = data['lines']
                 polygons = segmentation.calculate_polygonal_environment(im, [x['baseline'] for x in lines], scale=(1200, 0))
-                data['lines'] = [{'boundary': polygon, 'baseline': orig['baseline'], 'text': orig['text'], 'script': orig['script']} for orig, polygon in zip(lines, polygons)]
+                data['lines'] = [{'boundary': polygon,
+                                  'baseline': orig['baseline'],
+                                  'text': orig['text'],
+                                  'tags': orig['tags']} for orig, polygon in zip(lines, polygons)]
             # reorder lines by type
             lines = defaultdict(list)
-            for  line in data['lines']:
-                lines[line['script']].append(line)
+            for line in data['lines']:
+                lines[line['tags']['type']].append(line)
             im = Image.open(data['image']).convert('RGBA')
             for t, ls in lines.items():
                 tmp = Image.new('RGBA', im.size, (0, 0, 0, 0))
@@ -112,8 +114,8 @@ def cli(format_type, model, repolygonize, files):
             res = blla.segment(im, model=net)
             # reorder lines by type
             lines = defaultdict(list)
-            for  line in res['lines']:
-                lines[line['script']].append(line)
+            for line in res['lines']:
+                lines[line['tags']]['type'].append(line)
             im = im.convert('RGBA')
             for t, ls in lines.items():
                 tmp = Image.new('RGBA', im.size, (0, 0, 0, 0))
@@ -138,6 +140,7 @@ def cli(format_type, model, repolygonize, files):
                 base_image = Image.alpha_composite(im, tmp)
                 base_image.save(f'high_{os.path.basename(doc)}_regions_{slugify(t)}.png')
             click.secho('\u2713', fg='green')
+
 
 if __name__ == '__main__':
     cli()
