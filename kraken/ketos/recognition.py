@@ -26,7 +26,7 @@ from typing import List
 from kraken.lib.progress import KrakenProgressBar
 from kraken.lib.exceptions import KrakenInputException
 from kraken.lib.default_specs import RECOGNITION_HYPER_PARAMS, RECOGNITION_SPEC
-from .util import _validate_manifests, _expand_gt, message
+from .util import _validate_manifests, _expand_gt, message, to_ptl_device
 
 logging.captureWarnings(True)
 logger = logging.getLogger('kraken')
@@ -243,10 +243,10 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
         logger.debug(f'Loading codec file from {codec}')
         codec = json.load(codec)
 
-    if device == 'cpu':
-        device = None
-    elif device.startswith('cuda'):
-        device = [int(device.split(':')[-1])]
+    try:
+        accelerator, device = to_ptl_device(device)
+    except Exception as e:
+        raise click.BadOptionUsage('device', str(e))
 
     if hyper_params['freq'] > 1:
         val_check_interval = {'check_val_every_n_epoch': int(hyper_params['freq'])}
@@ -271,7 +271,8 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
                              codec=codec,
                              resize=resize)
 
-    trainer = KrakenTrainer(gpus=device,
+    trainer = KrakenTrainer(accelerator=accelerator,
+                            devices=device,
                             max_epochs=hyper_params['epochs'] if hyper_params['quit'] == 'dumb' else -1,
                             min_epochs=hyper_params['min_epochs'],
                             enable_progress_bar=True if not ctx.meta['verbose'] else False,

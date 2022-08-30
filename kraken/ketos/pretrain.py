@@ -26,7 +26,7 @@ from PIL import Image
 from kraken.lib.default_specs import (RECOGNITION_PRETRAIN_HYPER_PARAMS,
                                       RECOGNITION_SPEC)
 
-from .util import _validate_manifests, _expand_gt, message
+from .util import _validate_manifests, _expand_gt, message, to_ptl_device
 
 logging.captureWarnings(True)
 logger = logging.getLogger('kraken')
@@ -233,10 +233,10 @@ def pretrain(ctx, batch_size, pad, output, spec, load, freq, quit, epochs,
     if len(ground_truth) == 0:
         raise click.UsageError('No training data was provided to the train command. Use `-t` or the `ground_truth` argument.')
 
-    if device == 'cpu':
-        device = None
-    elif device.startswith('cuda'):
-        device = [int(device.split(':')[-1])]
+    try:
+        accelerator, device = to_ptl_device(device)
+    except Exception as e:
+        raise click.BadOptionUsage('device', str(e))
 
     if hyper_params['freq'] > 1:
         val_check_interval = {'check_val_every_n_epoch': int(hyper_params['freq'])}
@@ -266,7 +266,8 @@ def pretrain(ctx, batch_size, pad, output, spec, load, freq, quit, epochs,
 
     model.len_train_set = len(data_module.train_dataloader())
 
-    trainer = KrakenTrainer(gpus=device,
+    trainer = KrakenTrainer(accelerator=accelerator,
+                            devices=device,
                             max_epochs=hyper_params['epochs'] if hyper_params['quit'] == 'dumb' else -1,
                             min_epochs=hyper_params['min_epochs'],
                             enable_progress_bar=True if not ctx.meta['verbose'] else False,

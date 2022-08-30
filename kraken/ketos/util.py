@@ -23,6 +23,8 @@ import glob
 import click
 import logging
 
+from typing import List, Optional, Tuple
+
 logging.captureWarnings(True)
 logger = logging.getLogger('kraken')
 
@@ -49,3 +51,12 @@ def _expand_gt(ctx, param, value):
 def message(msg, **styles):
     if logger.getEffectiveLevel() >= 30:
         click.secho(msg, **styles)
+
+
+def to_ptl_device(device: str) -> Tuple[str, Optional[List[int]]]:
+    if any([device == x for x in ['cpu', 'mps']]):
+        return device, None
+    elif any([device.startswith(x) for x in ['tpu', 'cuda', 'hpu', 'ipu']]):
+        dev, idx = device.split(':')
+        return dev, [int(idx)]
+    raise Exception(f'Invalid device {device} specified')

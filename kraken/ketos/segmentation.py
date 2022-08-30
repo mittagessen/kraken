@@ -28,7 +28,7 @@ from kraken.lib.progress import KrakenProgressBar
 from kraken.lib.exceptions import KrakenInputException
 from kraken.lib.default_specs import SEGMENTATION_HYPER_PARAMS, SEGMENTATION_SPEC
 
-from kraken.ketos.util import _validate_manifests, _expand_gt, message
+from kraken.ketos.util import _validate_manifests, _expand_gt, message, to_ptl_device
 
 logging.captureWarnings(True)
 logger = logging.getLogger('kraken')
@@ -267,10 +267,10 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs, min_epochs
 
     topline = loc[topline]
 
-    if device == 'cpu':
-        device = None
-    elif device.startswith('cuda'):
-        device = [int(device.split(':')[-1])]
+    try:
+        accelerator, device = to_ptl_device(device)
+    except Exception as e:
+        raise click.BadOptionUsage('device', str(e))
 
     if hyper_params['freq'] > 1:
         val_check_interval = {'check_val_every_n_epoch': int(hyper_params['freq'])}
@@ -308,7 +308,8 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs, min_epochs
     if len(model.train_set) == 0:
         raise click.UsageError('No valid training data was provided to the train command. Use `-t` or the `ground_truth` argument.')
 
-    trainer = KrakenTrainer(gpus=device,
+    trainer = KrakenTrainer(accelerator=accelerator,
+                            devices=device,
                             max_epochs=hyper_params['epochs'] if hyper_params['quit'] == 'dumb' else -1,
                             min_epochs=hyper_params['min_epochs'],
                             enable_progress_bar=True if not ctx.meta['verbose'] else False,
@@ -446,10 +447,14 @@ def segtest(ctx, model, evaluation_files, device, workers, threshold,
     if regions_diff:
         message(f'Model region types missing in the test set: {", ".join(sorted(list(regions_diff)))}')
 
-    if device == 'cpu':
-        device = None
-    elif device.startswith('cuda'):
-        device = [int(device.split(':')[-1])]
+    try:
+        accelerator, device = to_ptl_device(device)
+        if device:
+            device = f'{accelerator}:{device}'
+        else:
+            device = accelerator
+    except Exception as e:
+        raise click.BadOptionUsage('device', str(e))
 
     if len(test_set) == 0:
         raise click.UsageError('No evaluation data was provided to the test command. Use `-e` or the `test_set` argument.')
