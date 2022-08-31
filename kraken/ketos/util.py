@@ -58,5 +58,7 @@ def to_ptl_device(device: str) -> Tuple[str, Optional[List[int]]]:
         return device, None
     elif any([device.startswith(x) for x in ['tpu', 'cuda', 'hpu', 'ipu']]):
         dev, idx = device.split(':')
+        if dev == 'cuda':
+            dev = 'gpu'
         return dev, [int(idx)]
     raise Exception(f'Invalid device {device} specified')
