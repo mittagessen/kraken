@@ -959,7 +959,7 @@ def _configure_optimizer_and_lr_scheduler(hparams, params, len_train_set=None, l
         lr_sched = {'scheduler': lr_scheduler.ExponentialLR(optim, hparams.gamma, last_epoch=hparams.completed_epochs-1),
                     'interval': 'step'}
     elif hparams.schedule == 'cosine':
-        lr_sched = {'scheduler': lr_scheduler.CosineAnnealingLR(optim, hparams.gamma, last_epoch=hparams.completed_epochs-1, verbose=True),
+        lr_sched = {'scheduler': lr_scheduler.CosineAnnealingLR(optim, hparams.gamma, last_epoch=hparams.completed_epochs-1),
                     'interval': 'step'}
     elif hparams.schedule == 'step':
         lr_sched = {'scheduler': lr_scheduler.StepLR(optim, hparams.step_size, hparams.gamma, last_epoch=hparams.completed_epochs-1),
