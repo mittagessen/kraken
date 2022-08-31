@@ -2,7 +2,7 @@
 """
 A script for a grid search over pretraining hyperparameters.
 """
-import sys
+import click
 from functools import partial
 
 from ray import tune
@@ -13,6 +13,7 @@ from kraken.lib.default_spec import RECOGNITION_PRETRAIN_HYPER_PARAMS, RECOGNITI
 from kraken.lib.pretrain.model import PretrainDataModule, RecognitionPretrainModel
 
 import pytorch_lightning as pl
+from pytorch_lightning import seed_everything
 
 config = {'lrate': tune.loguniform(1e-8, 1e-2),
           'num_negatives': tune.qrandint(2, 100, 8),
@@ -22,14 +23,14 @@ config = {'lrate': tune.loguniform(1e-8, 1e-2),
 resources_per_trial = {"cpu": 8, "gpu": 0.5}
 
 
-def train_tune(config, training_data=None, epochs=100):
+def train_tune(config, training_data=None, epochs=100, spec=RECOGNITION_SPEC):
 
     hyper_params = RECOGNITION_PRETRAIN_HYPER_PARAMS.copy()
     hyper_params.update(config)
 
     model = RecognitionPretrainModel(hyper_params=hyper_params,
                                      output='./model',
-                                     spec=RECOGNITION_SPEC)
+                                     spec=spec)
 
     data_module = PretrainDataModule(batch_size=hyper_params.pop('batch_size'),
                                      pad=hyper_params.pop('pad'),
@@ -43,12 +44,29 @@ def train_tune(config, training_data=None, epochs=100):
 
     callback = TuneReportCallback({'loss': 'CE'}, on='validation_end')
     trainer = pl.Trainer(max_epochs=epochs,
-                         gpus=1,
+                         accelerator='cuda',
+                         devices=1,
                          callbacks=[callback],
                          enable_progress_bar=False)
     trainer.fit(model, datamodule=data_module)
 
+@click.command()
+@click.option('-v', '--verbose', default=0, count=True)
+@click.option('-s', '--seed', default=42, type=click.INT,
+              help='Seed for numpy\'s and torch\'s RNG. Set to a fixed value to '
+                   'ensure reproducible random splits of data')
+@click.option('-o', '--output', show_default=True, type=click.Path(), default='pretrain_hyper', help='output directory')
+@click.option('-n', '--num-samples', show_default=True, type=int, default=100, help='Number of samples to train')
+@click.option('-N', '--epochs', show_default=True, type=int, default=20, help='Maximum number of epochs to train per sample')
+@click.option('-s', '--spec', show_default=True, default=RECOGNITION_SPEC, help='VGSL spec of the network to train.')
+@click.argument('files', nargs=-1)
+def cli(verbose, seed, output, num_samples, epochs, spec, files):
 
-analysis = tune.run(partial(train_tune, training_data=sys.argv[2:]), local_dir=sys.argv[1], num_samples=100, resources_per_trial=resources_per_trial, config=config)
+    seed_everything(seed, workers=True)
 
-print("Best hyperparameters found were: ", analysis.get_best_config(metric='accuracy', mode='max'))
+    analysis = tune.run(partial(train_tune,
+                                training_data=files,
+                                epochs=epochs,
+                                spec=spec), local_dir=output, num_samples=num_samples, resources_per_trial=resources_per_trial, config=config)
+
+    click.echo("Best hyperparameters found were: ", analysis.get_best_config(metric='accuracy', mode='max'))
