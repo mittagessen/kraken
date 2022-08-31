@@ -9,7 +9,7 @@ from ray import tune
 
 from ray.tune.integration.pytorch_lightning import TuneReportCallback
 
-from kraken.lib.default_spec import RECOGNITION_PRETRAIN_HYPER_PARAMS, RECOGNITION_SPEC
+from kraken.lib.default_specs import RECOGNITION_PRETRAIN_HYPER_PARAMS, RECOGNITION_SPEC
 from kraken.lib.pretrain.model import PretrainDataModule, RecognitionPretrainModel
 
 import pytorch_lightning as pl
