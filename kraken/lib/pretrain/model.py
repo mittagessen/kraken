@@ -349,7 +349,7 @@ class RecognitionPretrainModel(pl.LightningModule):
 
             loss = F.cross_entropy(logits, targets, reduction='sum')
             return loss
-        except RunTimeError as e:
+        except RuntimeError as e:
             if is_oom_error(e):
                 logger.warning(f'Out of memory error in trainer. Skipping batch and freeing caches.')
                 garbage_collection_cuda()
