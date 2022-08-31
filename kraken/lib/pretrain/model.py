@@ -347,7 +347,7 @@ class RecognitionPretrainModel(pl.LightningModule):
             logits = logits.reshape(-1, logits.size(-1))
             logits /= self.hparams.logit_temp
 
-            loss = F.cross_entropy(logits, targets, reduction='sum')
+            loss = F.cross_entropy(logits, targets)
             return loss
         except RuntimeError as e:
             if is_oom_error(e):
