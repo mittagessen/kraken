@@ -285,7 +285,7 @@ class RecognitionPretrainModel(pl.LightningModule):
         self.len_train_set = len_train_set
 
         self.best_epoch = 0
-        self.best_metric = 0.0
+        self.best_metric = 1.0
 
         spec = spec.strip()
         if spec[0] != '[' or spec[-1] != ']':
