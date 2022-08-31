@@ -70,3 +70,6 @@ def cli(verbose, seed, output, num_samples, epochs, spec, files):
                                 spec=spec), local_dir=output, num_samples=num_samples, resources_per_trial=resources_per_trial, config=config)
 
     click.echo("Best hyperparameters found were: ", analysis.get_best_config(metric='accuracy', mode='max'))
+
+if __name__ == '__main__':
+    cli()
