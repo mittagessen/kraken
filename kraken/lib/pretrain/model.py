@@ -29,6 +29,7 @@ for Low-Resource Historical Document Transcription." arXiv preprint
 arXiv:2112.08692 (2021).
 """
 import re
+import math
 import torch
 import pathlib
 import logging
@@ -285,7 +286,7 @@ class RecognitionPretrainModel(pl.LightningModule):
         self.len_train_set = len_train_set
 
         self.best_epoch = 0
-        self.best_metric = 99999
+        self.best_metric = math.inf
 
         spec = spec.strip()
         if spec[0] != '[' or spec[-1] != ']':
