@@ -42,6 +42,7 @@ from torch.multiprocessing import Pool
 from torch.nn.utils.rnn import pack_padded_sequence
 from typing import Dict, Optional, Sequence, Union, Any
 from pytorch_lightning.callbacks import EarlyStopping
+from pytorch_lightning.utilities.memory import is_oom_error, garbage_collection_cuda
 
 from kraken.lib import vgsl, default_specs, layers
 from kraken.lib.xml import preparse_xml_data
@@ -311,42 +312,49 @@ class RecognitionPretrainModel(pl.LightningModule):
         return self.net(x, seq_lens)
 
     def _step(self, batch, batch_idx):
-        # sequence batch
-        if 'seq_lens' in batch:
-            output = self.features(batch['image'], batch['seq_lens'])
-        else:
-            output = self.features(batch['image'])
+        try:
+            # sequence batch
+            if 'seq_lens' in batch:
+                output = self.features(batch['image'], batch['seq_lens'])
+            else:
+                output = self.features(batch['image'])
 
-        # height should be 1 by now
-        if output[0].size(2) != 1:
-            raise KrakenInputException('Expected dimension 3 to be 1, actual {}'.format(output[0].size(2)))
+            # height should be 1 by now
+            if output[0].size(2) != 1:
+                raise KrakenInputException('Expected dimension 3 to be 1, actual {}'.format(output[0].size(2)))
 
-        mask_output = self.wav2vec2mask(*output)
+            mask_output = self.wav2vec2mask(*output)
 
-        # run contextual encoder, i.e. recurrent layers
-        output, seq_lens = self.encoder(mask_output['output'], mask_output['seq_len'])
+            # run contextual encoder, i.e. recurrent layers
+            output, seq_lens = self.encoder(mask_output['output'], mask_output['seq_len'])
 
-        # unmasked features in encoder output domain
-        y = mask_output['unmasked_samples']
-        # negative samples
-        negatives = mask_output['negative_samples']
-        N, C, H, W = output.shape
-        output = output.transpose(1, 3).reshape(-1, W, C)
-        packed_output = pack_padded_sequence(output, seq_lens, batch_first=True, enforce_sorted=False)
-        # masked features after encoder
-        x = packed_output.data[mask_output['mask'] == 1].reshape_as(y)
+            # unmasked features in encoder output domain
+            y = mask_output['unmasked_samples']
+            # negative samples
+            negatives = mask_output['negative_samples']
+            N, C, H, W = output.shape
+            output = output.transpose(1, 3).reshape(-1, W, C)
+            packed_output = pack_padded_sequence(output, seq_lens, batch_first=True, enforce_sorted=False)
+            # masked features after encoder
+            x = packed_output.data[mask_output['mask'] == 1].reshape_as(y)
 
-        mask_n_neg = torch.cat([y, negatives], dim=0)
-        logits = torch.cosine_similarity(x.float(), mask_n_neg.float(), dim=-1).type_as(x)
+            mask_n_neg = torch.cat([y, negatives], dim=0)
+            logits = torch.cosine_similarity(x.float(), mask_n_neg.float(), dim=-1).type_as(x)
 
-        targets = logits.new_zeros(logits.size(1) * logits.size(2), dtype=torch.long)
+            targets = logits.new_zeros(logits.size(1) * logits.size(2), dtype=torch.long)
 
-        logits = logits.transpose(0, 2)
-        logits = logits.reshape(-1, logits.size(-1))
-        logits /= self.hparams.logit_temp
+            logits = logits.transpose(0, 2)
+            logits = logits.reshape(-1, logits.size(-1))
+            logits /= self.hparams.logit_temp
 
-        loss = F.cross_entropy(logits, targets, reduction='sum')
-        return loss
+            loss = F.cross_entropy(logits, targets, reduction='sum')
+            return loss
+        except RunTimeError as e:
+            if is_oom_error(e):
+                logger.warning(f'Out of memory error in trainer. Skipping batch and freeing caches.')
+                garbage_collection_cuda()
+            else:
+                raise
 
     def validation_step(self, batch, batch_idx):
         loss = self._step(batch, batch_idx)
