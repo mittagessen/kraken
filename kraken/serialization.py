@@ -207,6 +207,8 @@ def serialize(records: Sequence[ocr_record],
                         pol = geom.Polygon(x)
                     except ValueError:
                         pol = geom.LineString(x).buffer(0.5, cap_style=2)
+                    if not pol.is_valid:
+                        continue
                     if pol.area == 0.0:
                         pol = pol.buffer(0.5)
                     # if area is still 0 it's probably a point
