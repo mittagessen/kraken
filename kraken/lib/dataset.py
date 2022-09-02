@@ -584,7 +584,7 @@ class ArrowIPCRecognitionDataset(Dataset):
         if not text:
             logger.debug(f'Text line "{sample["text"]}" is empty after transformations')
             if not self.ignore_empty_lines:
-                raise Exception('empty text line')
+                raise KrakenInputException('Empty text line')
         return text
 
     def encode(self, codec: Optional[PytorchCodec] = None) -> None:
@@ -597,13 +597,11 @@ class ArrowIPCRecognitionDataset(Dataset):
             for index in range(self._num_lines):
                 try:
                     text = self._apply_text_transform(
-                        self.arrow_table.column('lines')[index].as_py(),
-                        raise_on_empty=False
-                    )
+                        self.arrow_table.column('lines')[index].as_py())
                     self.codec.encode(text)
                 except KrakenEncodeException as e:
                     raise e
-                except Exception:
+                except KrakenInputException:
                     pass
         else:
             self.codec = PytorchCodec(''.join(self.alphabet.keys()))
