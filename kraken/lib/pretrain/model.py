@@ -201,7 +201,7 @@ class PretrainDataModule(pl.LightningDataModule):
                        **kwargs):
         dataset = DatasetClass(im_transforms=self.transforms,
                                augmentation=self.hparams.augment,
-                               ignore_empty_lines=False,
+                               skip_empty_lines=False,
                                **kwargs)
 
         if (self.hparams.num_workers and self.hparams.num_workers > 1) and self.hparams.format_type != 'binary':
