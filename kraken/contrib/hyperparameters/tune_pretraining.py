@@ -17,7 +17,7 @@ import pytorch_lightning as pl
 from pytorch_lightning import seed_everything
 
 config = {'lrate': tune.loguniform(1e-8, 1e-2),
-          'num_negatives': tune.qrandint(2, 100, 8),
+          'num_negatives': tune.qrandint(1, 4, 1),
           'mask_prob': tune.loguniform(0.01, 0.2),
           'mask_width': tune.qrandint(2, 8, 2)}
 
