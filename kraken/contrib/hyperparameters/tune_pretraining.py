@@ -45,7 +45,7 @@ def train_tune(config, training_data=None, epochs=100, spec=RECOGNITION_SPEC):
 
     callback = TuneReportCallback({'loss': 'CE'}, on='validation_end')
     trainer = pl.Trainer(max_epochs=epochs,
-                         accelerator='cuda',
+                         accelerator='gpu',
                          devices=1,
                          callbacks=[callback],
                          enable_progress_bar=False)
@@ -58,7 +58,7 @@ def train_tune(config, training_data=None, epochs=100, spec=RECOGNITION_SPEC):
                    'ensure reproducible random splits of data')
 @click.option('-o', '--output', show_default=True, type=click.Path(), default='pretrain_hyper', help='output directory')
 @click.option('-n', '--num-samples', show_default=True, type=int, default=100, help='Number of samples to train')
-@click.option('-N', '--epochs', show_default=True, type=int, default=20, help='Maximum number of epochs to train per sample')
+@click.option('-N', '--epochs', show_default=True, type=int, default=10, help='Maximum number of epochs to train per sample')
 @click.option('-s', '--spec', show_default=True, default=RECOGNITION_SPEC, help='VGSL spec of the network to train.')
 @click.option('-t', '--training-files', show_default=True, default=None, multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
