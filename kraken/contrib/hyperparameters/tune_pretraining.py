@@ -59,8 +59,19 @@ def train_tune(config, training_data=None, epochs=100, spec=RECOGNITION_SPEC):
 @click.option('-n', '--num-samples', show_default=True, type=int, default=100, help='Number of samples to train')
 @click.option('-N', '--epochs', show_default=True, type=int, default=20, help='Maximum number of epochs to train per sample')
 @click.option('-s', '--spec', show_default=True, default=RECOGNITION_SPEC, help='VGSL spec of the network to train.')
+@click.option('-t', '--training-files', show_default=True, default=None, multiple=True,
+              callback=_validate_manifests, type=click.File(mode='r', lazy=True),
+              help='File(s) with additional paths to training data')
 @click.argument('files', nargs=-1)
-def cli(verbose, seed, output, num_samples, epochs, spec, files):
+def cli(verbose, seed, output, num_samples, epochs, spec, training_files, files):
+
+    files = list(files)
+
+    if training_files:
+        files.extend(training_files)
+
+    if not files:
+        raise click.UsageError('No training data was provided to the search command. Use `-t` or the `files` argument.')
 
     seed_everything(seed, workers=True)
 
