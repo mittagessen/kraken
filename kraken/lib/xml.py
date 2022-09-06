@@ -377,7 +377,7 @@ def parse_alto(filename: Union[str, pathlib.Path]) -> Dict[str, Any]:
             # try to find shape object
             coords = region.find('./{*}Shape/{*}Polygon')
             if coords is not None:
-                points = [int(float(x)) for x in coords.get('POINTS').split(' ')]
+                points = [int(float(x)) for x in coords.get('POINTS').replace(',', ' ').split(' ')]
                 boundary = zip(points[::2], points[1::2])
                 boundary = [k for k, g in groupby(boundary)]
             elif (region.get('HPOS') is not None and region.get('VPOS') is not None and
@@ -418,7 +418,7 @@ def parse_alto(filename: Union[str, pathlib.Path]) -> Dict[str, Any]:
             boundary = None
             if pol is not None:
                 try:
-                    points = [int(float(x)) for x in pol.get('POINTS').split(' ')]
+                    points = [int(float(x)) for x in pol.get('POINTS').replace(',', ' ').split(' ')]
                     boundary = zip(points[::2], points[1::2])
                     boundary = [k for k, g in groupby(boundary)]
                 except ValueError:
