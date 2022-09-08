@@ -521,7 +521,10 @@ class mm_rpred(object):
         flat_box = [point for box in line['boxes'][0] for point in box[1]]
         xmin, xmax = min(flat_box[::2]), max(flat_box[::2])
         ymin, ymax = min(flat_box[1::2]), max(flat_box[1::2])
-        rec = BBoxOCRRecord('', [], [], ((xmin, ymin), (xmin, ymax), (xmax, ymax), (xmax, ymin)))
+        line_bbox = ((xmin, ymin), (xmin, ymax), (xmax, ymax), (xmax, ymin))
+        prediction = ''
+        cuts = []
+        confidences = []
         for tag, (box, coords) in zip(map(lambda x: x[0], line['boxes'][0]),
                                       extract_polygons(self.im, {'text_direction': line['text_direction'],
                                                                  'boxes': map(lambda x: x[1], line['boxes'][0])})):
@@ -574,10 +577,11 @@ class mm_rpred(object):
                     ymax = coords[1] + self._scale_val(end, 0, self.box.size[1])
                     pos.append([[coords[0], ymin], [coords[2], ymin], [coords[2], ymax], [coords[0], ymax]])
                 conf.append(c)
-            rec.prediction += pred
-            rec.cuts.extend(pos)
-            rec.confidences.extend(conf)
-        rec = BaselineOCRRecord(pred, pos, conf, coords)
+            prediction += pred
+            cuts.extend(pos)
+            confidences.extend(conf)
+
+        rec = BaselineOCRRecord(prediction, cuts, confidences, line_bbox)
         if self.bidi_reordering:
             logger.debug('BiDi reordering record.')
             return rec.logical_order(base_dir=self.bidi_reordering if self.bidi_reordering in ('L', 'R') else None)
