@@ -21,6 +21,7 @@ Generators for recognition on lines images.
 import logging
 import bidi.algorithm as bd
 
+from abc import ABC, abstractmethod
 from PIL import Image
 from functools import partial
 from collections import defaultdict
@@ -34,46 +35,61 @@ from kraken.lib.dataset import ImageInputTransforms
 
 import copy
 
-__all__ = ['ocr_record', 'bidi_record', 'mm_rpred', 'rpred']
+__all__ = ['ocr_record', 'BaselineOCRRecord', 'BBoxOCRRecord', 'mm_rpred', 'rpred']
 
 logger = logging.getLogger(__name__)
 
 
-class ocr_record(object):
+class ocr_record(metaclass=ABC):
     """
     A record object containing the recognition result of a single line
     """
-    def __init__(self, prediction: str, cuts, confidences: List[float], line: Union[List, Dict[str, List]]) -> None:
-        self.prediction = prediction
-        self.cuts = cuts
-        self.confidences = confidences
-        self.tags = None if 'tags' not in line else line['tags']
-        self.type = 'baselines' if 'baseline' in line else 'box'
-        self.base_dir = None
-        if self.type == 'baselines':
-            self.line = line['boundary']
-            self.baseline = line['baseline']
-        else:
-            self.line = line
+    base_dir = None
 
+    def __init__(self, prediction: str, cuts: Sequence, confidences: List[float], display_order: bool = True) -> None:
+        self._prediction = prediction
+        self._cuts = cuts
+        self._confidences = confidences
+        self._display_order = display_order
+
+    @property
+    @abstractmethod
+    def type(self):
+        pass
+
+    @abstractmethod
     def __len__(self) -> int:
-        return len(self.prediction)
+        return len(self._prediction)
 
+    @abstractmethod
     def __str__(self) -> str:
-        return self.prediction
+        return self._prediction
 
+    @property
+    @abstractmethod
+    def prediction(self) -> str:
+        return self._prediction
+
+    @property
+    @abstractmethod
+    def cuts(self) -> Sequence:
+        return self._cuts
+
+    @property
+    @abstractmethod
+    def confidences(self) -> List[float]:
+        return self._confidences
+
+    @abstractmethod
     def __iter__(self):
         self.idx = -1
         return self
 
+    @abstractmethod
     def __next__(self) -> Tuple[str, int, float]:
-        if self.idx + 1 < len(self):
-            self.idx += 1
-            return (self.prediction[self.idx], self.cuts[self.idx],
-                    self.confidences[self.idx])
-        else:
-            raise StopIteration
+        pass
 
+    @abstractmethod
     def __getitem__(self, key: Union[int, slice]):
         if isinstance(key, slice):
             return [self[i] for i in range(*key.indices(len(self)))]
@@ -87,56 +103,296 @@ class ocr_record(object):
         else:
             raise TypeError('Invalid argument type')
 
+    @abstractmethod
+    def display_order(self, base_dir) -> 'ocr_record':
+        pass
 
-def bidi_record(record: ocr_record, base_dir=None) -> ocr_record:
+    @abstractmethod
+    def logical_order(self, base_dir) -> 'ocr_record':
+        pass
+
+
+class BaselineOCRRecord(ocr_record):
     """
-    Reorders a record using the Unicode BiDi algorithm.
+    A record object containing the recognition result of a single line in
+    baseline format.
 
-    Models trained for RTL or mixed scripts still emit classes in LTR order
-    requiring reordering for proper display.
+    Attributes:
+        type: 'baselines' to indicate a baseline record
+        prediction: The text predicted by the network as one continuous string.
+        cuts: The absolute bounding polygons for each code point in prediction
+              as a list of tuples [(x0, y0), (x1, y2), ...].
+        confidences: A list of floats indicating the confidence value of each
+                     code point.
 
-    Args:
-        record (kraken.rpred.ocr_record)
-
-    Returns:
-        kraken.rpred.ocr_record
+    Notes:
+        When slicing the record the behavior of the cuts is changed from
+        earlier versions of kraken. Instead of returning per-character bounding
+        polygons a single polygons section of the line bounding polygon
+        starting at the first and extending to the last code point emitted by
+        the network is returned. This aids numerical stability when computing
+        aggregated bounding polygons such as for words. Individual code point
+        bounding polygons are still accessible through the `cuts` attribute or
+        by iterating over the record code point by code point.
     """
-    storage = bd.get_empty_storage()
+    type = 'baselines'
 
-    if base_dir not in ('L', 'R'):
-        base_level = bd.get_base_level(record.prediction)
-    else:
-        base_level = {'L': 0, 'R': 1}[base_dir]
+    def __init__(self, prediction: str,
+                 cuts: Sequence[Tuple[int, int]],
+                 confidences: List[float],
+                 line: Dict[str, List],
+                 display_order: bool = True) -> None:
+        super().__init__(prediction, cuts, confidences, display_order)
+        if 'baseline' not in line:
+            raise TypeError('Invalid argument type (non-baseline line)')
+        self.tags = None if 'tags' not in line else line['tags']
+        self.line = line['boundary']
+        self.baseline = line['baseline']
 
-    storage['base_level'] = base_level
-    storage['base_dir'] = ('L', 'R')[base_level]
+    def __repr__(self) -> str:
+        return f'pred: {self.prediction} baseline: {self.baseline} boundary: {self.line} confidences: {self.confidences}'
 
-    bd.get_embedding_levels(record.prediction, storage)
-    bd.explicit_embed_and_overrides(storage)
-    bd.resolve_weak_types(storage)
-    bd.resolve_neutral_types(storage, False)
-    bd.resolve_implicit_levels(storage, False)
-    for i, j in enumerate(record):
-        storage['chars'][i]['record'] = j
-    bd.reorder_resolved_levels(storage, False)
-    bd.apply_mirroring(storage, False)
-    prediction = ''
-    cuts = []
-    confidences = []
-    for ch in storage['chars']:
-        # code point may have been mirrored
-        prediction = prediction + ch['ch']
-        cuts.append(ch['record'][1])
-        confidences.append(ch['record'][2])
-    # carry over whole line information
-    if record.type == 'baselines':
-        line = {'boundary': record.line, 'baseline': record.baseline}
-    else:
-        line = record.line
-    rec = ocr_record(prediction, cuts, confidences, line)
-    rec.tags = record.tags
-    rec.base_dir = base_dir
-    return rec
+    def __next__(self) -> Tuple[str, int, float]:
+        if self.idx + 1 < len(self):
+            self.idx += 1
+            return (self.prediction[self.idx],
+                    compute_polygon_section(self.baseline,
+                                            self.line,
+                                            self.cuts[self.idx][0],
+                                            self.cuts[self.idx][1]),
+                    self.confidences[self.idx])
+        else:
+            raise StopIteration
+
+    def _get_raw_item(self, key: int):
+        if key < 0:
+            key += len(self)
+        if key >= len(self):
+            raise IndexError('Index (%d) is out of range' % key)
+        return (self.prediction[key],
+                self.cuts[key],
+                self.confidences[key])
+
+    def __getitem__(self, key: Union[int, slice]):
+        if isinstance(key, slice):
+            recs = [self._get_raw_item(i) for i in range(*key.indices(len(self)))]
+            prediction = ''.join([x[0] for x in recs])
+            flat_offsets =  sum([x[1] for x in recs], ())
+            cut = compute_polygon_section(self.baseline,
+                                          self.line,
+                                          min(flat_offsets),
+                                          max(flat_offsets))
+            confidence = np.mean([x[2] for x in recs])
+            return (prediction, cut, confidence)
+
+        elif isinstance(key, int):
+            pred, cut, confidence = self._get_raw_item(i)
+            return (pred,
+                    compute_polygon_section(self.baseline, self.line, cuts[0], cuts[1]),
+                    confidence)
+        else:
+            raise TypeError('Invalid argument type')
+
+    @property
+    def cuts(self) -> List[Tuple[int, int]]:
+         return [compute_polygon_section(self.baseline, self.line, cut[0], cut[1]) for cut in self._cuts]
+
+    def logical_order(self, base_dir: Optional[str] = None) -> 'BaselineOCRRecord':
+        """
+        Returns the OCR record in Unicode logical order, i.e. in the order the
+        characters in the line would be read by a human.
+
+        Args:
+            base_dir: An optional string defining the base direction (also
+                      called paragraph direction) for the BiDi algorithm. Valid
+                      values are 'L' or 'R'. If None is given the default
+                      auto-resolution will be used.
+        """
+        if self._display_order:
+            return self._reorder(base_dir)
+        else:
+            return self
+
+    def display_order(self, base_dir: Optional[str] = None) -> 'BaselineOCRRecord':
+        """
+        Returns the OCR record in Unicode display order, i.e. ordered from left
+        to right inside the line.
+
+        Args:
+            base_dir: An optional string defining the base direction (also
+                      called paragraph direction) for the BiDi algorithm. Valid
+                      values are 'L' or 'R'. If None is given the default
+                      auto-resolution will be used.
+        """
+        if self._display_order:
+            return self
+        else:
+            return self._reorder(base_dir)
+
+    def _reorder(self, base_dir: Optional[str] = None) -> 'BaselineOCRRecord':
+        """
+        Reorder the record using the BiDi algorithm.
+        """
+        storage = bd.get_empty_storage()
+
+        if base_dir not in ('L', 'R'):
+            base_level = bd.get_base_level(self._prediction)
+        else:
+            base_level = {'L': 0, 'R': 1}[base_dir]
+
+        storage['base_level'] = base_level
+        storage['base_dir'] = ('L', 'R')[base_level]
+
+        bd.get_embedding_levels(self._prediction, storage)
+        bd.explicit_embed_and_overrides(storage)
+        bd.resolve_weak_types(storage)
+        bd.resolve_neutral_types(storage, False)
+        bd.resolve_implicit_levels(storage, False)
+        for i, j in enumerate(zip(self._prediction, self._cuts, self._confidences)):
+            storage['chars'][i]['record'] = j
+        bd.reorder_resolved_levels(storage, False)
+        bd.apply_mirroring(storage, False)
+        prediction = ''
+        cuts = []
+        confidences = []
+        for ch in storage['chars']:
+            # code point may have been mirrored
+            prediction = prediction + ch['ch']
+            cuts.append(ch['record'][1])
+            confidences.append(ch['record'][2])
+        line = {'boundary': self.line, 'baseline': self.baseline}
+        rec = BaselineOCRRecord(prediction, cuts, confidences, line)
+        rec.tags = self.tags
+        rec.base_dir = base_dir
+        rec._display_order = not self._display_order
+        return rec
+
+
+class BBoxOCRRecord(ocr_record):
+    """
+    A record object containing the recognition result of a single line in
+    bbox format.
+    """
+    type = 'box'
+
+    def __init__(self, prediction: str,
+                 cuts: Sequence[Tuple[Tuple[int, int],
+                                      Tuple[int, int],
+                                      Tuple[int, int],
+                                      Tuple[int, int]]],
+                 confidences: List[float],
+                 line: Tuple[Tuple[int, int],
+                             Tuple[int, int],
+                             Tuple[int, int],
+                             Tuple[int, int]],
+                 display_order: bool = True) -> None:
+        super().__init__(prediction, cuts, confidences, display_order)
+        if 'baseline' in line:
+            raise TypeError('Invalid argument type (baseline line)')
+        self.line = line
+
+    def __repr__(self) -> str:
+        return f'pred: {self.prediction} line: {self.line} confidences: {self.confidences}'
+
+    def __next__(self) -> Tuple[str, int, float]:
+        if self.idx + 1 < len(self):
+            self.idx += 1
+            return (self.prediction[self.idx],
+                    self.cuts[idx],
+                    self.confidences[self.idx])
+        else:
+            raise StopIteration
+
+    def _get_raw_item(self, key: int):
+        if key < 0:
+            key += len(self)
+        if key >= len(self):
+            raise IndexError('Index (%d) is out of range' % key)
+        return (self.prediction[key],
+                self.cuts[key],
+                self.confidences[key])
+
+    def __getitem__(self, key: Union[int, slice]):
+        if isinstance(key, slice):
+            recs = [self._get_raw_item(i) for i in range(*key.indices(len(self)))]
+            prediction = ''.join([x[0] for x in recs])
+            flat_offsets =  sum([x[1] for x in recs], ())
+            min_x, max_x = min(flat_offsets[::2]), max(flat_offsets[::2])
+            min_y, max_y = min(flat_offsets[1::2]), max(flat_offsets[1::2])
+            cut = ((min_x, min_y), (max_x, min_y), (max_x, max_y), (min_y, min_y))
+            confidence = np.mean([x[2] for x in recs])
+            return (prediction, cut, confidence)
+        elif isinstance(key, int):
+            return self._get_raw_item(i)
+        else:
+            raise TypeError('Invalid argument type')
+
+    def logical_order(self, base_dir: Optional[str] = None) -> 'BBoxOCRRecord':
+        """
+        Returns the OCR record in Unicode logical order, i.e. in the order the
+        characters in the line would be read by a human.
+
+        Args:
+            base_dir: An optional string defining the base direction (also
+                      called paragraph direction) for the BiDi algorithm. Valid
+                      values are 'L' or 'R'. If None is given the default
+                      auto-resolution will be used.
+        """
+        if self._display_order:
+            return self._reorder(base_dir)
+        else:
+            return self
+
+    def display_order(self, base_dir: Optional[str] = None) -> 'BBoxOCRRecord':
+        """
+        Returns the OCR record in Unicode display order, i.e. ordered from left
+        to right inside the line.
+
+        Args:
+            base_dir: An optional string defining the base direction (also
+                      called paragraph direction) for the BiDi algorithm. Valid
+                      values are 'L' or 'R'. If None is given the default
+                      auto-resolution will be used.
+        """
+        if self._display_order:
+            return self
+        else:
+            return self._reorder(base_dir)
+
+    def _reorder(self, base_dir: Optional[str] = None) -> 'BBoxOCRRecord':
+        storage = bd.get_empty_storage()
+
+        if base_dir not in ('L', 'R'):
+            base_level = bd.get_base_level(self.prediction)
+        else:
+            base_level = {'L': 0, 'R': 1}[base_dir]
+
+        storage['base_level'] = base_level
+        storage['base_dir'] = ('L', 'R')[base_level]
+
+        bd.get_embedding_levels(self.prediction, storage)
+        bd.explicit_embed_and_overrides(storage)
+        bd.resolve_weak_types(storage)
+        bd.resolve_neutral_types(storage, False)
+        bd.resolve_implicit_levels(storage, False)
+        for i, j in enumerate(zip(self.prediction, self.cuts, self.confidences)):
+            storage['chars'][i]['record'] = j
+        bd.reorder_resolved_levels(storage, False)
+        bd.apply_mirroring(storage, False)
+        prediction = ''
+        cuts = []
+        confidences = []
+        for ch in storage['chars']:
+            # code point may have been mirrored
+            prediction = prediction + ch['ch']
+            cuts.append(ch['record'][1])
+            confidences.append(ch['record'][2])
+        # carry over whole line information
+        rec = BBoxOCRRecord(prediction, cuts, confidences, self.line)
+        rec.tags = self.tags
+        rec.base_dir = base_dir
+        rec._display_order = not self._display_order
+        return rec
 
 
 class mm_rpred(object):
@@ -252,7 +508,7 @@ class mm_rpred(object):
         flat_box = [point for box in line['boxes'][0] for point in box[1]]
         xmin, xmax = min(flat_box[::2]), max(flat_box[::2])
         ymin, ymax = min(flat_box[1::2]), max(flat_box[1::2])
-        rec = ocr_record('', [], [], [[xmin, ymin], [xmin, ymax], [xmax, ymax], [xmax, ymin]])
+        rec = BBoxOCRRecord('', [], [], ((xmin, ymin), (xmin, ymax), (xmax, ymax), (xmax, ymin)))
         for tag, (box, coords) in zip(map(lambda x: x[0], line['boxes'][0]),
                                       extract_polygons(self.im, {'text_direction': line['text_direction'],
                                                                  'boxes': map(lambda x: x[1], line['boxes'][0])})):
@@ -320,13 +576,13 @@ class mm_rpred(object):
             for tag in line['lines'][0]['tags'].values():
                 if tag in self.tags_ignore:
                     logger.info(f'Ignoring line segment with tags {line["lines"][0]["tags"]} based on {tag}.')
-                    return ocr_record('', [], [], line['lines'][0])
+                    return BaselineOCRRecord('', [], [], line['lines'][0])
 
         try:
             box, coords = next(extract_polygons(self.im, line))
         except KrakenInputException as e:
             logger.warning(f'Extracting line failed: {e}')
-            return ocr_record('', [], [], line['lines'][0])
+            return BaselineOCRRecord('', [], [], line['lines'][0])
 
         self.box = box
 
@@ -334,15 +590,17 @@ class mm_rpred(object):
         # check if boxes are non-zero in any dimension
         if 0 in box.size:
             logger.warning(f'bbox {coords} with zero dimension. Emitting empty record.')
-            return ocr_record('', [], [], coords)
+            return BaselineOCRRecord('', [], [], coords)
         # try conversion into tensor
         try:
             line = self.ts[tag](box)
-        except Exception:
-            return ocr_record('', [], [], coords)
+        except Exception as e:
+            logger.warning(f'Tensor conversion failed with {e}. Emitting empty record.')
+            return BaselineOCRRecord('', [], [], coords)
         # check if line is non-zero
         if line.max() == line.min():
-            return ocr_record('', [], [], coords)
+            logger.warning(f'Empty line after tensor conversion. Emitting empty record.')
+            return BaselineOCRRecord('', [], [], coords)
 
         preds = net.predict(line.unsqueeze(0))[0]
         # calculate recognized LSTM locations of characters
@@ -356,18 +614,16 @@ class mm_rpred(object):
         pos = []
         conf = []
         for _, start, end, c in preds:
-            pos.append(compute_polygon_section(coords['baseline'],
-                                               coords['boundary'],
-                                               self._scale_val(start, 0, self.box.size[0]),
-                                               self._scale_val(end, 0, self.box.size[0])))
+            pos.append((self._scale_val(start, 0, self.box.size[0]),
+                        self._scale_val(end, 0, self.box.size[0])))
             conf.append(c)
+        rec = BaselineOCRRecord(pred, pos, conf, coords)
         if self.bidi_reordering:
             logger.debug('BiDi reordering record.')
-            return bidi_record(ocr_record(pred, pos, conf, coords),
-                               base_dir=self.bidi_reordering if self.bidi_reordering in ('L', 'R') else None)
+            return rec.logical_order(base_dir=self.bidi_reordering if self.bidi_reordering in ('L', 'R') else None)
         else:
             logger.debug('Emitting raw record')
-            return ocr_record(pred, pos, conf, coords)
+            return rec.display_order(None)
 
     def __next__(self):
         bound = self.bounds

@@ -847,7 +847,7 @@ def _test_intersect(bp, uv, bs):
 def compute_polygon_section(baseline: Sequence[Tuple[int, int]],
                             boundary: Sequence[Tuple[int, int]],
                             dist1: int,
-                            dist2: int) -> List[Tuple[int, int]]:
+                            dist2: int) -> Tuple[Tuple[int, int]]:
     """
     Given a baseline, polygonal boundary, and two points on the baseline return
     the rectangle formed by the orthogonal cuts on that baseline segment. The
@@ -913,7 +913,7 @@ def compute_polygon_section(baseline: Sequence[Tuple[int, int]],
         return seg_points.astype('int').tolist()
     o = np.int_(points[0]).reshape(-1, 2).tolist()
     o.extend(np.int_(np.roll(points[1], 2)).reshape(-1, 2).tolist())
-    return o
+    return tuple(o)
 
 
 def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image.Image:
