@@ -19,6 +19,7 @@ kraken.rpred
 Generators for recognition on lines images.
 """
 import logging
+import numpy as np
 import bidi.algorithm as bd
 
 from abc import ABC, abstractmethod
@@ -46,7 +47,13 @@ class ocr_record(metaclass=ABC):
     """
     base_dir = None
 
-    def __init__(self, prediction: str, cuts: Sequence, confidences: List[float], display_order: bool = True) -> None:
+    def __init__(self,
+                 prediction: str,
+                 cuts: Sequence[Union[Tuple[int, int], Tuple[Tuple[int, int],
+                                                             Tuple[int, int],
+                                                             Tuple[int, int],
+                                                             Tuple[int, int]]]],
+                 confidences: Sequence[float], display_order: bool = True) -> None:
         self._prediction = prediction
         self._cuts = cuts
         self._confidences = confidences
@@ -86,7 +93,13 @@ class ocr_record(metaclass=ABC):
         return self
 
     @abstractmethod
-    def __next__(self) -> Tuple[str, int, float]:
+    def __next__(self) -> Tuple[str,
+                                Union[Sequence[Tuple[int, int]],
+                                      Tuple[Tuple[int, int],
+                                            Tuple[int, int],
+                                            Tuple[int, int],
+                                            Tuple[int, int]]],
+                                float]:
         pass
 
     @abstractmethod
@@ -139,7 +152,7 @@ class BaselineOCRRecord(ocr_record):
 
     def __init__(self, prediction: str,
                  cuts: Sequence[Tuple[int, int]],
-                 confidences: List[float],
+                 confidences: Sequence[float],
                  line: Dict[str, List],
                  display_order: bool = True) -> None:
         super().__init__(prediction, cuts, confidences, display_order)
@@ -177,7 +190,7 @@ class BaselineOCRRecord(ocr_record):
         if isinstance(key, slice):
             recs = [self._get_raw_item(i) for i in range(*key.indices(len(self)))]
             prediction = ''.join([x[0] for x in recs])
-            flat_offsets =  sum([x[1] for x in recs], ())
+            flat_offsets = sum([x[1] for x in recs], ())
             cut = compute_polygon_section(self.baseline,
                                           self.line,
                                           min(flat_offsets),
@@ -186,16 +199,16 @@ class BaselineOCRRecord(ocr_record):
             return (prediction, cut, confidence)
 
         elif isinstance(key, int):
-            pred, cut, confidence = self._get_raw_item(i)
+            pred, cut, confidence = self._get_raw_item(key)
             return (pred,
-                    compute_polygon_section(self.baseline, self.line, cuts[0], cuts[1]),
+                    compute_polygon_section(self.baseline, self.line, cut[0], cut[1]),
                     confidence)
         else:
             raise TypeError('Invalid argument type')
 
     @property
-    def cuts(self) -> List[Tuple[int, int]]:
-         return [compute_polygon_section(self.baseline, self.line, cut[0], cut[1]) for cut in self._cuts]
+    def cuts(self) -> Tuple[Tuple[int, int]]:
+        return tuple([compute_polygon_section(self.baseline, self.line, cut[0], cut[1]) for cut in self._cuts])
 
     def logical_order(self, base_dir: Optional[str] = None) -> 'BaselineOCRRecord':
         """
@@ -280,7 +293,7 @@ class BBoxOCRRecord(ocr_record):
                                       Tuple[int, int],
                                       Tuple[int, int],
                                       Tuple[int, int]]],
-                 confidences: List[float],
+                 confidences: Sequence[float],
                  line: Tuple[Tuple[int, int],
                              Tuple[int, int],
                              Tuple[int, int],
@@ -298,7 +311,7 @@ class BBoxOCRRecord(ocr_record):
         if self.idx + 1 < len(self):
             self.idx += 1
             return (self.prediction[self.idx],
-                    self.cuts[idx],
+                    self.cuts[self.idx],
                     self.confidences[self.idx])
         else:
             raise StopIteration
@@ -316,14 +329,14 @@ class BBoxOCRRecord(ocr_record):
         if isinstance(key, slice):
             recs = [self._get_raw_item(i) for i in range(*key.indices(len(self)))]
             prediction = ''.join([x[0] for x in recs])
-            flat_offsets =  sum([x[1] for x in recs], ())
+            flat_offsets = sum([x[1] for x in recs], ())
             min_x, max_x = min(flat_offsets[::2]), max(flat_offsets[::2])
             min_y, max_y = min(flat_offsets[1::2]), max(flat_offsets[1::2])
             cut = ((min_x, min_y), (max_x, min_y), (max_x, max_y), (min_y, min_y))
             confidence = np.mean([x[2] for x in recs])
             return (prediction, cut, confidence)
         elif isinstance(key, int):
-            return self._get_raw_item(i)
+            return self._get_raw_item(key)
         else:
             raise TypeError('Invalid argument type')
 
@@ -520,19 +533,19 @@ class mm_rpred(object):
             # check if boxes are non-zero in any dimension
             if 0 in box.size:
                 logger.warning(f'bbox {coords} with zero dimension. Emitting empty record.')
-                continue
+                return BBoxOCRRecord('', [], [], coords)
             # try conversion into tensor
             try:
                 logger.debug('Preparing run.')
                 line = self.ts[tag](box)
             except Exception:
-                logger.warning(f'Conversion of line {coords} failed. Skipping.')
-                continue
+                logger.warning(f'Conversion of line {coords} failed. Emitting empty record..')
+                return BBoxOCRRecord('', [], [], coords)
 
             # check if line is non-zero
             if line.max() == line.min():
-                logger.warning('Empty run. Skipping.')
-                continue
+                logger.warning('Empty run. Emitting empty record.')
+                return BBoxOCRRecord('', [], [], coords)
 
             _, net = self._resolve_tags_to_model({'type': tag}, self.nets)
 
@@ -564,12 +577,13 @@ class mm_rpred(object):
             rec.prediction += pred
             rec.cuts.extend(pos)
             rec.confidences.extend(conf)
+        rec = BaselineOCRRecord(pred, pos, conf, coords)
         if self.bidi_reordering:
             logger.debug('BiDi reordering record.')
-            return bidi_record(rec, base_dir=self.bidi_reordering if self.bidi_reordering in ('L', 'R') else None)
+            return rec.logical_order(base_dir=self.bidi_reordering if self.bidi_reordering in ('L', 'R') else None)
         else:
             logger.debug('Emitting raw record')
-            return rec
+            return rec.display_order(None)
 
     def _recognize_baseline_line(self, line):
         if self.tags_ignore is not None:
@@ -599,7 +613,7 @@ class mm_rpred(object):
             return BaselineOCRRecord('', [], [], coords)
         # check if line is non-zero
         if line.max() == line.min():
-            logger.warning(f'Empty line after tensor conversion. Emitting empty record.')
+            logger.warning('Empty line after tensor conversion. Emitting empty record.')
             return BaselineOCRRecord('', [], [], coords)
 
         preds = net.predict(line.unsqueeze(0))[0]
