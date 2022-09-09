@@ -396,8 +396,10 @@ class RecognitionModel(pl.LightningModule):
         error = torch.stack([x['error'] for x in outputs]).sum()
         accuracy = (chars - error) / (chars + torch.finfo(torch.float).eps)
         if accuracy > self.best_metric:
+            logger.debug(f'Updating best metric from {self.best_metric} ({self.best_epoch}) to {accuracy} ({self.current_epoch})')
             self.best_epoch = self.current_epoch
             self.best_metric = accuracy
+        logger.info(f'validation run: total chars {chars} errors {error} accuracy {accuracy}')
         self.log_dict({'val_accuracy': accuracy, 'val_metric': accuracy}, prog_bar=True)
 
     def setup(self, stage: Optional[str] = None):
@@ -756,9 +758,11 @@ class SegmentationModel(pl.LightningModule):
         freq_iu = torch.sum(cls_cnt / cls_cnt.sum() * iu)
 
         if mean_iu > self.best_metric:
+            logger.debug(f'Updating best metric from {self.best_metric} ({self.best_epoch}) to {mean_iu} ({self.current_epoch})')
             self.best_epoch = self.current_epoch
             self.best_metric = mean_iu
 
+        logger.info(f'validation run: accuracy {pixel_accuracy} mean_acc {mean_accuracy} mean_iu {mean_iu} freq_iu {freq_iu}')
         self.log_dict({'val_accuracy': pixel_accuracy,
                        'val_mean_acc': mean_accuracy,
                        'val_mean_iu': mean_iu,
