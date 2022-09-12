@@ -41,7 +41,7 @@ __all__ = ['ocr_record', 'BaselineOCRRecord', 'BBoxOCRRecord', 'mm_rpred', 'rpre
 logger = logging.getLogger(__name__)
 
 
-class ocr_record(metaclass=ABC):
+class ocr_record(ABC):
     """
     A record object containing the recognition result of a single line
     """
@@ -64,30 +64,24 @@ class ocr_record(metaclass=ABC):
     def type(self):
         pass
 
-    @abstractmethod
     def __len__(self) -> int:
         return len(self._prediction)
 
-    @abstractmethod
     def __str__(self) -> str:
         return self._prediction
 
     @property
-    @abstractmethod
     def prediction(self) -> str:
         return self._prediction
 
     @property
-    @abstractmethod
     def cuts(self) -> Sequence:
         return self._cuts
 
     @property
-    @abstractmethod
     def confidences(self) -> List[float]:
         return self._confidences
 
-    @abstractmethod
     def __iter__(self):
         self.idx = -1
         return self
@@ -104,17 +98,7 @@ class ocr_record(metaclass=ABC):
 
     @abstractmethod
     def __getitem__(self, key: Union[int, slice]):
-        if isinstance(key, slice):
-            return [self[i] for i in range(*key.indices(len(self)))]
-        elif isinstance(key, int):
-            if key < 0:
-                key += len(self)
-            if key >= len(self):
-                raise IndexError('Index (%d) is out of range' % key)
-            return (self.prediction[key], self.cuts[key],
-                    self.confidences[key])
-        else:
-            raise TypeError('Invalid argument type')
+        pass
 
     @abstractmethod
     def display_order(self, base_dir) -> 'ocr_record':
@@ -190,7 +174,7 @@ class BaselineOCRRecord(ocr_record):
         if isinstance(key, slice):
             recs = [self._get_raw_item(i) for i in range(*key.indices(len(self)))]
             prediction = ''.join([x[0] for x in recs])
-            flat_offsets = sum([x[1] for x in recs], ())
+            flat_offsets = sum((tuple(x[1]) for x in recs), ())
             cut = compute_polygon_section(self.baseline,
                                           self.line,
                                           min(flat_offsets),
@@ -329,10 +313,12 @@ class BBoxOCRRecord(ocr_record):
         if isinstance(key, slice):
             recs = [self._get_raw_item(i) for i in range(*key.indices(len(self)))]
             prediction = ''.join([x[0] for x in recs])
-            flat_offsets = sum([x[1] for x in recs], ())
-            min_x, max_x = min(flat_offsets[::2]), max(flat_offsets[::2])
-            min_y, max_y = min(flat_offsets[1::2]), max(flat_offsets[1::2])
-            cut = ((min_x, min_y), (max_x, min_y), (max_x, max_y), (min_y, min_y))
+            box = [x[1] for x in recs]
+            flat_box = [point for pol in box for point in pol]
+            flat_box = [x for point in flat_box for x in point]
+            min_x, max_x = min(flat_box[::2]), max(flat_box[::2])
+            min_y, max_y = min(flat_box[1::2]), max(flat_box[1::2])
+            cut = ((min_x, min_y), (max_x, min_y), (max_x, max_y), (min_x, max_y))
             confidence = np.mean([x[2] for x in recs])
             return (prediction, cut, confidence)
         elif isinstance(key, int):
@@ -402,7 +388,6 @@ class BBoxOCRRecord(ocr_record):
             confidences.append(ch['record'][2])
         # carry over whole line information
         rec = BBoxOCRRecord(prediction, cuts, confidences, self.line)
-        rec.tags = self.tags
         rec.base_dir = base_dir
         rec._display_order = not self._display_order
         return rec

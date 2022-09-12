@@ -24,7 +24,7 @@ from pkg_resources import get_distribution
 from shapely.ops import unary_union
 from collections import Counter
 
-from kraken.rpred import ocr_record
+from kraken.rpred import BaselineOCRRecord, BBoxOCRRecord, ocr_record
 from kraken.lib.util import make_printable
 from kraken.lib.segmentation import is_in_region
 
@@ -269,13 +269,13 @@ def serialize_segmentation(segresult: Dict[str, Any],
             (str) rendered template.
     """
     if 'type' in segresult and segresult['type'] == 'baselines':
-        records = [ocr_record('', '', '', bl) for bl in segresult['lines']]
+        records = [BaselineOCRRecord('', (,), (,), bl) for bl in segresult['lines']]
     else:
         records = []
         for line in segresult['boxes']:
             xmin, xmax = min(line[::2]), max(line[::2])
             ymin, ymax = min(line[1::2]), max(line[1::2])
-            records.append(ocr_record('', [], [], [[xmin, ymin], [xmin, ymax], [xmax, ymax], [xmax, ymin]]))
+            records.append(BBoxOCRReocrd('', (,), (,), ((xmin, ymin), (xmin, ymax), (xmax, ymax), (xmax, ymin))))
     return serialize(records,
                      image_name=image_name,
                      image_size=image_size,
