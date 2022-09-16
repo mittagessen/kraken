@@ -275,7 +275,7 @@ def serialize_segmentation(segresult: Dict[str, Any],
         for line in segresult['boxes']:
             xmin, xmax = min(line[::2]), max(line[::2])
             ymin, ymax = min(line[1::2]), max(line[1::2])
-            records.append(BBoxOCRReocrd('', (), (), ((xmin, ymin), (xmin, ymax), (xmax, ymax), (xmax, ymin))))
+            records.append(BBoxOCRRecord('', (), (), ((xmin, ymin), (xmin, ymax), (xmax, ymax), (xmax, ymin))))
     return serialize(records,
                      image_name=image_name,
                      image_size=image_size,
