@@ -53,7 +53,8 @@ class ocr_record(ABC):
                                                              Tuple[int, int],
                                                              Tuple[int, int],
                                                              Tuple[int, int]]]],
-                 confidences: Sequence[float], display_order: bool = True) -> None:
+                 confidences: Sequence[float],
+                 display_order: bool = True) -> None:
         self._prediction = prediction
         self._cuts = cuts
         self._confidences = confidences

@@ -9,11 +9,134 @@ from pathlib import Path
 from collections import defaultdict
 
 from kraken.lib.models import load_any
-from kraken.rpred import rpred, mm_rpred
+from kraken.rpred import rpred, mm_rpred, BaselineOCRRecord, BBoxOCRRecord
 from kraken.lib.exceptions import KrakenInputException
 
 thisfile = Path(__file__).resolve().parent
 resources = thisfile / 'resources'
+
+class TestBBoxRecords(unittest.TestCase):
+    """
+    Tests the bounding box OCR record.
+    """
+    def setUp(self):
+        with open(resources / 'records.json', 'r') as fp:
+            self.box_records = json.load(fp)
+            self.ltr_record = self.box_records[0]
+
+        with open(resources / 'bl_records.json', 'r') as fp:
+            self.bl_records = json.load(fp)
+
+    def test_bbox_record_cuts(self):
+        """
+        Make sure that the cuts of a record are converted to absolute coordinates.
+        """
+        record = BBoxOCRRecord(*self.ltr_record)
+        self.assertEqual(record[2:8][1], ((1508, 119), (1674, 119), (1674, 256), (1508, 256)))
+
+    def test_bbox_record_redisplay(self):
+        """
+        Test that a display order record remains in display order when
+        requesting a DO record.
+        """
+        record = BBoxOCRRecord(*self.ltr_record, display_order=True)
+        self.assertEqual(record, record.display_order())
+
+    def test_bbox_record_relogical(self):
+        """
+        Test that a logical order record remains in logical order when
+        requesting a LO record.
+        """
+        record = BBoxOCRRecord(*self.ltr_record, display_order=False)
+        self.assertEqual(record, record.logical_order())
+
+    def test_bbox_record_display(self):
+        """
+        test display order conversion of record.
+        """
+        record = BBoxOCRRecord(*self.ltr_record, display_order=False)
+        re_record = record.display_order()
+        self.assertEqual(re_record.prediction, 'في معجزاته عليه السلام')
+        self.assertEqual(re_record[:][1], ((1437, 119), (2173, 119), (2173, 256), (1437, 256)))
+        self.assertAlmostEqual(re_record[2:8][2], 0.9554762)
+
+    def test_bbox_record_logical(self):
+        """
+        Test logical order conversion of record.
+        """
+        record = BBoxOCRRecord(*self.ltr_record, display_order=True)
+        re_record = record.logical_order()
+        self.assertEqual(re_record.prediction, 'في معجزاته عليه السلام')
+        self.assertEqual(re_record[:][1], ((1437, 119), (2173, 119), (2173, 256), (1437, 256)))
+        self.assertAlmostEqual(re_record[2:8][2], 0.9554762)
+
+    def test_bbox_record_slicing(self):
+        """
+        Tests simple slicing/aggregation of elements in record.
+        """
+        pass 
+
+    def test_bbox_record_slicing(self):
+        """
+        Tests complex slicing/aggregation of elements in record.
+        """
+        record = BBoxOCRRecord(*self.ltr_record, display_order=True)
+        pred, cut, conf = record[1:5:2]
+        self.assertEqual(pred, 'اس')
+        self.assertEqual(cut, ((1484, 119), (1568, 119), (1568, 256), (1484, 256)))
+        self.assertAlmostEqual(conf, 0.74411)
+
+class TestBaselineRecords(unittest.TestCase):
+    """
+    Tests the baseline OCR record.
+    """
+    def setUp(self):
+        self.bidi_record = ()
+        self.ltr_record = ()
+
+    def test_baseline_record_cuts(self):
+        """
+        Make sure that the cuts of a record are converted to absolute coordinates.
+        """
+        pass
+
+    def test_baseline_record_redisplay(self):
+        """
+        Test that a display order record remains in display order when
+        requesting a DO record.
+        """
+        pass
+
+    def test_baseline_record_relogical(self):
+        """
+        Test that a logical order record remains in logical order when
+        requesting a LO record.
+        """
+        pass
+
+    def test_baseline_record_display(self):
+        """
+        test display order conversion of record.
+        """
+        pass
+
+    def test_baseline_record_logical(self):
+        """
+        Test logical order conversion of record.
+        """
+        pass
+
+    def test_baseline_record_slicing(self):
+        """
+        Tests simple slicing/aggregation of elements in record.
+        """
+        pass
+
+    def test_baseline_record_slicing(self):
+        """
+        Tests complex slicing/aggregation of elements in record.
+        """
+        pass
 
 class TestRecognition(unittest.TestCase):
 
