@@ -43,7 +43,10 @@ def cli(format_type, topline, files):
             for line in lines:
                 pol = line.find('./{*}Shape/{*}Polygon')
                 if pol is not None:
-                    pol.attrib['POINTS'] = ' '.join([str(coord) for pt in polygons[idx] for coord in pt])
+                    if polygons[idx] is not None:
+                        pol.attrib['POINTS'] = ' '.join([str(coord) for pt in polygons[idx] for coord in pt])
+                    else:
+                        pol.attrib['POINTS'] = ''
                     idx += 1
             with open(splitext(fname)[0] + '_rewrite.xml', 'wb') as fp:
                 doc.write(fp, encoding='UTF-8', xml_declaration=True)
@@ -56,7 +59,10 @@ def cli(format_type, topline, files):
             for line in lines:
                 pol = line.find('./{*}Coords')
                 if pol is not None:
-                    pol.attrib['points'] = ' '.join([','.join([str(x) for x in pt]) for pt in polygons[idx]])
+                    if polygons[idx] is not None:
+                        pol.attrib['points'] = ' '.join([','.join([str(x) for x in pt]) for pt in polygons[idx]])
+                    else:
+                        pol.attrib['points'] = ''
                     idx += 1
             with open(splitext(fname)[0] + '_rewrite.xml', 'wb') as fp:
                 doc.write(fp, encoding='UTF-8', xml_declaration=True)
@@ -73,7 +79,7 @@ def cli(format_type, topline, files):
                'centerline': None}[topline]
 
     for doc in files:
-        click.echo(f'Processing {doc} ', nl=False)
+        click.echo(f'Processing {doc} ')
         seg = parse_fn(doc)
         im = Image.open(seg['image']).convert('L')
         baselines = []
