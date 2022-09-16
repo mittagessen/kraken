@@ -41,6 +41,8 @@ def cli(format_type, topline, files):
             lines = doc.findall('.//{*}TextLine')
             idx = 0
             for line in lines:
+                if line.get('BASELINE') is None:
+                    continue
                 pol = line.find('./{*}Shape/{*}Polygon')
                 if pol is not None:
                     if polygons[idx] is not None:
@@ -51,12 +53,26 @@ def cli(format_type, topline, files):
             with open(splitext(fname)[0] + '_rewrite.xml', 'wb') as fp:
                 doc.write(fp, encoding='UTF-8', xml_declaration=True)
 
+    def _parse_page_coords(coords):
+        points = [x for x in coords.split(' ')]
+        points = [int(c) for point in points for c in point.split(',')]
+        pts = zip(points[::2], points[1::2])
+        return [k for k, g in groupby(pts)]
+
     def _repl_page(fname, polygons):
         with open(fname, 'rb') as fp:
             doc = etree.parse(fp)
             lines = doc.findall('.//{*}TextLine')
             idx = 0
             for line in lines:
+                base = line.find('./{*}Baseline')
+                if base is not None and not base.get('points').isspace() and len(base.get('points')):
+                    try:
+                        _parse_page_coords(base.get('points'))
+                    except Exception:
+                        continue
+                else:
+                    continue
                 pol = line.find('./{*}Coords')
                 if pol is not None:
                     if polygons[idx] is not None:
