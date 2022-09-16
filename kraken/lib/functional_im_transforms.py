@@ -23,6 +23,7 @@ import bidi.algorithm as bd
 
 from os import path
 from PIL import Image
+from PIL.Image import Resampling
 
 from typing import Tuple, Optional, Callable, Any
 
@@ -47,7 +48,7 @@ def pil_dewarp(im: Image.Image, lnorm: CenterNormalizer) -> Image.Image:
 
 
 def pil_fixed_resize(im: Image.Image, scale: Tuple[int, int]) -> Image.Image:
-    return _fixed_resize(im, scale, Image.LANCZOS)
+    return _fixed_resize(im, scale, Resampling.LANCZOS)
 
 
 def tensor_invert(im: torch.Tensor) -> torch.Tensor:
@@ -58,7 +59,7 @@ def tensor_permute(im: torch.Tensor, perm: Tuple[int, ...]) -> torch.Tensor:
     return im.permute(*perm)
 
 
-def _fixed_resize(img: Image.Image, size: Tuple[int, int], interpolation: int = Image.LANCZOS):
+def _fixed_resize(img: Image.Image, size: Tuple[int, int], interpolation: int = Resampling.LANCZOS):
     """
     Doesn't do the annoying runtime scale dimension switching the default
     pytorch transform does.
