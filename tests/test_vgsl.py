@@ -47,8 +47,8 @@ class TestVGSL(unittest.TestCase):
         Test appending one VGSL spec to another.
         """
         rnn = vgsl.TorchVGSLModel('[1,1,0,48 Lbx10 Do O1c57]')
-        rnn.append(1, '[Cr1,1,2 Gn32 Cr3,3,4]')
-        self.assertEqual(rnn.spec, '[1,1,0,48 Lbx{L_0}10 Cr{C_1}1,1,2 Gn{Gn_2}32 Cr{C_3}3,3,4]')
+        rnn.append(1, '[Cr1,1,2 Gn2 Cr3,3,4]')
+        self.assertEqual(rnn.spec, '[1,1,0,48 Lbx{L_0}10 Cr{C_1}1,1,2 Gn{Gn_2}2 Cr{C_3}3,3,4]')
 
     def test_resize(self):
         """
