@@ -522,19 +522,19 @@ class mm_rpred(object):
             # check if boxes are non-zero in any dimension
             if 0 in box.size:
                 logger.warning(f'bbox {coords} with zero dimension. Emitting empty record.')
-                return BBoxOCRRecord('', [], [], coords)
+                return BBoxOCRRecord('', (), (), coords)
             # try conversion into tensor
             try:
                 logger.debug('Preparing run.')
                 line = self.ts[tag](box)
             except Exception:
                 logger.warning(f'Conversion of line {coords} failed. Emitting empty record..')
-                return BBoxOCRRecord('', [], [], coords)
+                return BBoxOCRRecord('', (), (), coords)
 
             # check if line is non-zero
             if line.max() == line.min():
                 logger.warning('Empty run. Emitting empty record.')
-                return BBoxOCRRecord('', [], [], coords)
+                return BBoxOCRRecord('', (), (), coords)
 
             _, net = self._resolve_tags_to_model({'type': tag}, self.nets)
 
@@ -567,7 +567,7 @@ class mm_rpred(object):
             cuts.extend(pos)
             confidences.extend(conf)
 
-        rec = BaselineOCRRecord(prediction, cuts, confidences, line_bbox)
+        rec = BBoxOCRRecord(prediction, cuts, confidences, line_bbox)
         if self.bidi_reordering:
             logger.debug('BiDi reordering record.')
             return rec.logical_order(base_dir=self.bidi_reordering if self.bidi_reordering in ('L', 'R') else None)
