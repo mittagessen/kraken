@@ -25,9 +25,6 @@ class TestBBoxRecords(unittest.TestCase):
             self.box_records = json.load(fp)
             self.ltr_record = self.box_records[0]
 
-        with open(resources / 'bl_records.json', 'r') as fp:
-            self.bl_records = json.load(fp)
-
     def test_bbox_record_cuts(self):
         """
         Make sure that the cuts of a record are converted to absolute coordinates.

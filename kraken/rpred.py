@@ -168,7 +168,7 @@ class BaselineOCRRecord(ocr_record):
         if key >= len(self):
             raise IndexError('Index (%d) is out of range' % key)
         return (self.prediction[key],
-                self.cuts[key],
+                self._cuts[key],
                 self.confidences[key])
 
     def __getitem__(self, key: Union[int, slice]):
@@ -192,7 +192,7 @@ class BaselineOCRRecord(ocr_record):
             raise TypeError('Invalid argument type')
 
     @property
-    def cuts(self) -> Tuple[Tuple[int, int]]:
+    def cuts(self) -> Sequence[Tuple[int, int]]:
         return tuple([compute_polygon_section(self.baseline, self.line, cut[0], cut[1]) for cut in self._cuts])
 
     def logical_order(self, base_dir: Optional[str] = None) -> 'BaselineOCRRecord':
