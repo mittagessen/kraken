@@ -20,8 +20,8 @@ dependencies:
   - pytorch=1.2.0='cuda92*'
   - cudatoolkit<=9.2
   - jsonschema
-  - scikit-image>=0.17.0,<=0.19.2
-  - shapely>=1.7,<1.8
+  - scikit-image>=0.17.0,<=0.19.3
+  - shapely>=1.8
   - pyvips
   - imagemagick<7.0.9
   - coremltools>=3.3
