@@ -554,7 +554,7 @@ def _calc_roi(line, bounds, baselines, suppl_obj, p_dir):
     ip_line = [line[0]]
     dist = 10
     while dist < ls.length:
-        ip_line.append(np.array(ls.interpolate(dist)))
+        ip_line.append(np.array(ls.interpolate(dist).coords[0]))
         dist += 10
     ip_line.append(line[-1])
     ip_line = np.array(ip_line)
@@ -679,8 +679,8 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
             line = geom.LineString(line)
             offset = default_specs.SEGMENTATION_HYPER_PARAMS['line_width'] if topline is not None else 0
             offset_line = line.parallel_offset(offset, side='left' if topline else 'right')
-            line = np.array(line, dtype=float)
-            offset_line = np.array(offset_line, dtype=float)
+            line = np.array(line.coords, dtype=float)
+            offset_line = np.array(offset_line.coords, dtype=float)
 
             # parallel_offset on the right reverses the coordinate order
             if not topline:
@@ -703,6 +703,7 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
                                            im_feats,
                                            bounds))
         except Exception as e:
+            raise
             logger.warning(f'Polygonizer failed on line {idx}: {e}')
             polygons.append(None)
 
