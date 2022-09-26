@@ -232,18 +232,17 @@ def _extend_boundaries(baselines, bin_bl_map):
             l_point = boundary_pol.boundary.intersection(geom.LineString([(bl[0][0]-10*(bl[1][0]-bl[0][0]),
                                                                            bl[0][1]-10*(bl[1][1]-bl[0][1])), bl[0]]))
             if l_point.type != 'Point':
-                bl[0] = np.array(nearest_points(geom.Point(bl[0]), boundary_pol)[1], 'int').tolist()
+                bl[0] = np.array(nearest_points(geom.Point(bl[0]), boundary_pol)[1].coords[0], 'int').tolist()
             else:
-                bl[0] = np.array(l_point, 'int').tolist()
+                bl[0] = np.array(l_point.coords[0], 'int').tolist()
         # 'right' side
         if boundary_pol.contains(geom.Point(bl[-1])):
             r_point = boundary_pol.boundary.intersection(geom.LineString([(bl[-1][0]-10*(bl[-2][0]-bl[-1][0]),
-                                                                           bl[-1][1]-10*(bl[-2][1]-bl[-1][1])),
-                                                                          bl[-1]]))
+                                                                           bl[-1][1]-10*(bl[-2][1]-bl[-1][1])), bl[-1]]))
             if r_point.type != 'Point':
-                bl[-1] = np.array(nearest_points(geom.Point(bl[-1]), boundary_pol)[1], 'int').tolist()
+                bl[-1] = np.array(nearest_points(geom.Point(bl[-1]), boundary_pol)[1].coords[0], 'int').tolist()
             else:
-                bl[-1] = np.array(r_point, 'int').tolist()
+                bl[-1] = np.array(r_point.coords[0], 'int').tolist()
     return baselines
 
 
