@@ -217,6 +217,8 @@ def _extend_boundaries(baselines, bin_bl_map):
             if len(b) > 3:
                 boundaries.append(geom.Polygon(b).simplify(0.01).buffer(0))
         except Exception as e:
+            import IPython
+            IPython.embed()
             logger.warning(f'Boundary tracing failed in baseline elongation: {e}')
             continue
 
@@ -582,6 +584,8 @@ def _calc_roi(line, bounds, baselines, suppl_obj, p_dir):
 
     def _find_closest_point(pt, intersects):
         spt = geom.Point(pt)
+        if intersects.is_empty:
+            raise Exception(f'No intersection with boundaries. Shapely intersection object: {intersects.wkt}')
         if intersects.type == 'MultiPoint':
             return min([p for p in intersects.geoms], key=lambda x: spt.distance(x))
         elif intersects.type == 'Point':
