@@ -586,8 +586,8 @@ def _calc_roi(line, bounds, baselines, suppl_obj, p_dir):
             return min([p for p in intersects.geoms], key=lambda x: spt.distance(x))
         elif intersects.type == 'Point':
             return intersects
-        elif intersects.type == 'GeometryCollection' and len(intersects) > 0:
-            t = min([p for p in intersects], key=lambda x: spt.distance(x))
+        elif intersects.type == 'GeometryCollection' and len(intersects.geoms) > 0:
+            t = min([p for p in intersects.geoms], key=lambda x: spt.distance(x))
             if t == 'Point':
                 return t
             else:
