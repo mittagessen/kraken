@@ -213,12 +213,14 @@ def _extend_boundaries(baselines, bin_bl_map):
     boundaries = []
     for x in regionprops(labelled):
         try:
+            # skip lines with very small bounding polygons
+            if x.area < 6:
+                logger.info(f'Skipping baseline extension for very small blob of area {x.area}')
+                continue
             b = boundary_tracing(x)
             if len(b) > 3:
                 boundaries.append(geom.Polygon(b).simplify(0.01).buffer(0))
         except Exception as e:
-            import IPython
-            IPython.embed()
             logger.warning(f'Boundary tracing failed in baseline elongation: {e}')
             continue
 
