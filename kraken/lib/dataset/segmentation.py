@@ -281,15 +281,15 @@ class BaselineSet(Dataset):
                 t[cls_idx, rr, cc] = 1
                 split_pt = shp_line.interpolate(split_offset).buffer(0.001)
                 # top
-                start_sep = np.array((split(shp_line, split_pt)[0].buffer(self.line_width,
-                                                                          cap_style=3).boundary.coords), dtype=int)
+                start_sep = np.array((split(shp_line, split_pt).geoms[0].buffer(self.line_width,
+                                                                                cap_style=3).boundary.coords), dtype=int)
                 rr_s, cc_s = polygon(start_sep[:, 1], start_sep[:, 0], shape=image.shape[1:])
                 t[start_sep_cls, rr_s, cc_s] = 1
                 t[start_sep_cls, rr, cc] = 0
                 split_pt = shp_line.interpolate(-split_offset).buffer(0.001)
                 # top
-                end_sep = np.array((split(shp_line, split_pt)[-1].buffer(self.line_width,
-                                                                         cap_style=3).boundary.coords), dtype=int)
+                end_sep = np.array((split(shp_line, split_pt).geoms[-1].buffer(self.line_width,
+                                                                               cap_style=3).boundary.coords), dtype=int)
                 rr_s, cc_s = polygon(end_sep[:, 1], end_sep[:, 0], shape=image.shape[1:])
                 t[end_sep_cls, rr_s, cc_s] = 1
                 t[end_sep_cls, rr, cc] = 0
