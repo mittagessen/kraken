@@ -14,11 +14,11 @@ dependencies:
   - scipy
   - jinja2
   - conda-forge::torchvision
-  - conda-forge::pytorch>=1.7.1,<=1.11
+  - conda-forge::pytorch>=1.7.1,<=1.13
   - cudatoolkit>=9.2
   - jsonschema
-  - scikit-image>=0.17.0,<=0.19.2
-  - shapely>=1.7,<1.8
+  - scikit-image>=0.17.0,<=0.19.3
+  - shapely>=1.8
   - pyvips
   - imagemagick>=7.1.0
   - coremltools>=3.3

@@ -31,6 +31,7 @@ def cli(format_type, topline, files):
     from lxml import etree
     from os.path import splitext
 
+    from itertools import groupby
     from kraken.lib import xml
     from PIL import Image
     from kraken.lib.segmentation import calculate_polygonal_environment

@@ -21,10 +21,9 @@ import numpy as np
 import shapely.geometry as geom
 
 from pkg_resources import get_distribution
-from shapely.ops import unary_union
 from collections import Counter
 
-from kraken.rpred import ocr_record
+from kraken.rpred import BaselineOCRRecord, BBoxOCRRecord, ocr_record
 from kraken.lib.util import make_printable
 from kraken.lib.segmentation import is_in_region
 
@@ -133,7 +132,7 @@ def serialize(records: Sequence[ocr_record],
     # build region and line type dict
     types = []
     for line in records:
-        if line.tags is not None:
+        if hasattr(line, 'tags') and line.tags is not None:
            types.extend(line.tags.values())
     page['types'] = list(set(types))
     if regions is not None:
@@ -173,7 +172,7 @@ def serialize(records: Sequence[ocr_record],
                 'boundary': [list(x) for x in record.line],
                 'type': 'line'
                 }
-        if record.tags is not None:
+        if hasattr(record, 'tags') and record.tags is not None:
             line['tags'] = record.tags
         if record.type == 'baselines':
             line['baseline'] = [list(x) for x in record.baseline]
@@ -183,10 +182,11 @@ def serialize(records: Sequence[ocr_record],
         for segment in splits:
             if len(segment) == 0:
                 continue
-            seg_bbox = max_bbox(record.cuts[line_offset:line_offset + len(segment)])
+            seg_cuts = record.cuts[line_offset:line_offset + len(segment)]
+            seg_bbox = max_bbox(seg_cuts)
             seg_struct = {'bbox': seg_bbox,
                           'confidences': record.confidences[line_offset:line_offset + len(segment)],
-                          'cuts': record.cuts[line_offset:line_offset + len(segment)],
+                          'cuts': seg_cuts,
                           'text': segment,
                           'recognition': [{'bbox': max_bbox([cut]),
                                            'boundary': cut,
@@ -195,27 +195,13 @@ def serialize(records: Sequence[ocr_record],
                                            'index': cid}
                                           for conf, cut, char, cid in
                                           zip(record.confidences[line_offset:line_offset + len(segment)],
-                                              record.cuts[line_offset:line_offset + len(segment)],
+                                              seg_cuts,
                                               segment,
                                               range(char_idx, char_idx + len(segment)))],
                           'index': seg_idx}
             # compute convex hull of all characters in segment
             if record.type == 'baselines':
-                pols = []
-                for x in record.cuts[line_offset:line_offset + len(segment)]:
-                    try:
-                        pol = geom.Polygon(x)
-                    except ValueError:
-                        pol = geom.LineString(x).buffer(0.5, cap_style=2)
-                    if pol.area == 0.0:
-                        pol = pol.buffer(0.5)
-                    # if area is still 0 it's probably a point
-                    if pol.area == 0.0:
-                        pol = geom.Point(x[0]).buffer(0.5)
-                    pols.append(pol)
-                pols = unary_union(pols)
-                coords = np.array(pols.convex_hull.exterior.coords, dtype=np.uint).tolist()
-                seg_struct['boundary'] = coords
+                seg_struct['boundary']  = record[line_offset:line_offset + len(segment)][1]
             line['recognition'].append(seg_struct)
             char_idx += len(segment)
             seg_idx += 1
@@ -267,13 +253,13 @@ def serialize_segmentation(segresult: Dict[str, Any],
             (str) rendered template.
     """
     if 'type' in segresult and segresult['type'] == 'baselines':
-        records = [ocr_record('', '', '', bl) for bl in segresult['lines']]
+        records = [BaselineOCRRecord('', (), (), bl) for bl in segresult['lines']]
     else:
         records = []
         for line in segresult['boxes']:
             xmin, xmax = min(line[::2]), max(line[::2])
             ymin, ymax = min(line[1::2]), max(line[1::2])
-            records.append(ocr_record('', [], [], [[xmin, ymin], [xmin, ymax], [xmax, ymax], [xmax, ymin]]))
+            records.append(BBoxOCRRecord('', (), (), ((xmin, ymin), (xmin, ymax), (xmax, ymax), (xmax, ymin))))
     return serialize(records,
                      image_name=image_name,
                      image_size=image_size,

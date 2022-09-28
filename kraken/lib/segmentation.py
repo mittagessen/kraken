@@ -213,6 +213,10 @@ def _extend_boundaries(baselines, bin_bl_map):
     boundaries = []
     for x in regionprops(labelled):
         try:
+            # skip lines with very small bounding polygons
+            if x.area < 6:
+                logger.info(f'Skipping baseline extension for very small blob of area {x.area}')
+                continue
             b = boundary_tracing(x)
             if len(b) > 3:
                 boundaries.append(geom.Polygon(b).simplify(0.01).buffer(0))
@@ -232,18 +236,17 @@ def _extend_boundaries(baselines, bin_bl_map):
             l_point = boundary_pol.boundary.intersection(geom.LineString([(bl[0][0]-10*(bl[1][0]-bl[0][0]),
                                                                            bl[0][1]-10*(bl[1][1]-bl[0][1])), bl[0]]))
             if l_point.type != 'Point':
-                bl[0] = np.array(nearest_points(geom.Point(bl[0]), boundary_pol)[1], 'int').tolist()
+                bl[0] = np.array(nearest_points(geom.Point(bl[0]), boundary_pol)[1].coords[0], 'int').tolist()
             else:
-                bl[0] = np.array(l_point, 'int').tolist()
+                bl[0] = np.array(l_point.coords[0], 'int').tolist()
         # 'right' side
         if boundary_pol.contains(geom.Point(bl[-1])):
             r_point = boundary_pol.boundary.intersection(geom.LineString([(bl[-1][0]-10*(bl[-2][0]-bl[-1][0]),
-                                                                           bl[-1][1]-10*(bl[-2][1]-bl[-1][1])),
-                                                                          bl[-1]]))
+                                                                           bl[-1][1]-10*(bl[-2][1]-bl[-1][1])), bl[-1]]))
             if r_point.type != 'Point':
-                bl[-1] = np.array(nearest_points(geom.Point(bl[-1]), boundary_pol)[1], 'int').tolist()
+                bl[-1] = np.array(nearest_points(geom.Point(bl[-1]), boundary_pol)[1].coords[0], 'int').tolist()
             else:
-                bl[-1] = np.array(r_point, 'int').tolist()
+                bl[-1] = np.array(r_point.coords[0], 'int').tolist()
     return baselines
 
 
@@ -555,7 +558,7 @@ def _calc_roi(line, bounds, baselines, suppl_obj, p_dir):
     ip_line = [line[0]]
     dist = 10
     while dist < ls.length:
-        ip_line.append(np.array(ls.interpolate(dist)))
+        ip_line.append(np.array(ls.interpolate(dist).coords[0]))
         dist += 10
     ip_line.append(line[-1])
     ip_line = np.array(ip_line)
@@ -583,12 +586,14 @@ def _calc_roi(line, bounds, baselines, suppl_obj, p_dir):
 
     def _find_closest_point(pt, intersects):
         spt = geom.Point(pt)
+        if intersects.is_empty:
+            raise Exception(f'No intersection with boundaries. Shapely intersection object: {intersects.wkt}')
         if intersects.type == 'MultiPoint':
             return min([p for p in intersects.geoms], key=lambda x: spt.distance(x))
         elif intersects.type == 'Point':
             return intersects
-        elif intersects.type == 'GeometryCollection' and len(intersects) > 0:
-            t = min([p for p in intersects], key=lambda x: spt.distance(x))
+        elif intersects.type == 'GeometryCollection' and len(intersects.geoms) > 0:
+            t = min([p for p in intersects.geoms], key=lambda x: spt.distance(x))
             if t == 'Point':
                 return t
             else:
@@ -680,8 +685,8 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
             line = geom.LineString(line)
             offset = default_specs.SEGMENTATION_HYPER_PARAMS['line_width'] if topline is not None else 0
             offset_line = line.parallel_offset(offset, side='left' if topline else 'right')
-            line = np.array(line, dtype=float)
-            offset_line = np.array(offset_line, dtype=float)
+            line = np.array(line.coords, dtype=float)
+            offset_line = np.array(offset_line.coords, dtype=float)
 
             # parallel_offset on the right reverses the coordinate order
             if not topline:
@@ -704,6 +709,7 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
                                            im_feats,
                                            bounds))
         except Exception as e:
+            raise
             logger.warning(f'Polygonizer failed on line {idx}: {e}')
             polygons.append(None)
 
@@ -847,7 +853,7 @@ def _test_intersect(bp, uv, bs):
 def compute_polygon_section(baseline: Sequence[Tuple[int, int]],
                             boundary: Sequence[Tuple[int, int]],
                             dist1: int,
-                            dist2: int) -> List[Tuple[int, int]]:
+                            dist2: int) -> Tuple[Tuple[int, int]]:
     """
     Given a baseline, polygonal boundary, and two points on the baseline return
     the rectangle formed by the orthogonal cuts on that baseline segment. The
@@ -913,7 +919,7 @@ def compute_polygon_section(baseline: Sequence[Tuple[int, int]],
         return seg_points.astype('int').tolist()
     o = np.int_(points[0]).reshape(-1, 2).tolist()
     o.extend(np.int_(np.roll(points[1], 2)).reshape(-1, 2).tolist())
-    return o
+    return tuple(o)
 
 
 def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image.Image:

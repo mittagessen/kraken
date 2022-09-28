@@ -73,11 +73,11 @@ class TestSerializations(unittest.TestCase):
     """
     def setUp(self):
         with open(resources /'records.json', 'r') as fp:
-            self.box_records = [rpred.ocr_record(**x) for x in json.load(fp)]
+            self.box_records = [rpred.BBoxOCRRecord(**x) for x in json.load(fp)]
 
         with open(resources / 'bl_records.json', 'r') as fp:
             recs = json.load(fp)
-            self.bl_records = [rpred.ocr_record(**bl) for bl in recs['lines']]
+            self.bl_records = [rpred.BaselineOCRRecord(**bl) for bl in recs['lines']]
             self.bl_regions = recs['regions']
 
         self.metadata_steps = [{'category': 'preprocessing', 'description': 'PDF image extraction', 'settings': {}},
