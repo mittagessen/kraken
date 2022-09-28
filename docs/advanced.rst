@@ -134,8 +134,8 @@ Baseline Segmentation
 The baseline segmenter works by applying a segmentation model on a page image
 which labels each pixel on the image with one or more classes with each class
 corresponding to a line or region of a specific type. In addition there are two
-auxilary classes that are used to determine the line orientation. A simplified
-example of a composite image of the auxilary classes and a single line type
+auxiliary classes that are used to determine the line orientation. A simplified
+example of a composite image of the auxiliary classes and a single line type
 without regions can be seen below:
 
 .. image:: _static/blla_heatmap.jpg
