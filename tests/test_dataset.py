@@ -106,20 +106,41 @@ class TestBaselineSet(unittest.TestCase):
         self.assertEqual(sample['image'].shape, (1, 200, 100))
         self.assertEqual(sample['target'].shape, (ds.num_classes, 200, 100))
 
-    def test_baselineset_simple_merge_regions(self):
+    def test_baselineset_merge_after_valid_baselines(self):
         """
-        Test region merging in BaselineSet
+        Test that filtering with valid_baselines occurs before merging.
         """
-        # merge $par into $tip
+        # merge $par and $pac into $tip but discard $par before
         ds = BaselineSet(imgs=[self.doc, self.doc],
                          im_transforms=self.transforms,
-                         merge_regions={'$par': '$tip'},
+                         valid_baselines=('$tip', '$pac'),
+                         merge_baselines={'$par': '$tip', '$pac': '$tip'},
                          mode='xml')
 
         sample = ds[0]
         self.assertEqual(len(ds), 2)
-        self.assertEqual(ds.num_classes, 9)
-        self.assertEqual(set(ds.class_mapping['regions'].keys()), set(('$tip', '$pag', '$pac')))
+        self.assertEqual(ds.num_classes, 7)
+        self.assertEqual(set(ds.class_mapping['baselines'].keys()), set(('$tip',)))
+        self.assertEqual(len(ds.targets[0]['baselines']['$tip']), 26)
+        self.assertNotIn('$par', ds.class_mapping['baselines'])
+        self.assertEqual(sample['image'].shape, (1, 200, 100))
+        self.assertEqual(sample['target'].shape, (ds.num_classes, 200, 100))
+
+    def test_baselineset_merge_after_valid_regions(self):
+        """
+        Test that filtering with valid_regions occurs before merging.
+        """
+        # merge $par and $pac into $tip but discard $par before
+        ds = BaselineSet(imgs=[self.doc, self.doc],
+                         im_transforms=self.transforms,
+                         valid_regions=('$tip', '$pac'),
+                         merge_regions={'$par': '$tip', '$pac': '$tip'},
+                         mode='xml')
+
+        sample = ds[0]
+        self.assertEqual(len(ds), 2)
+        self.assertEqual(ds.num_classes, 7)
+        self.assertEqual(set(ds.class_mapping['regions'].keys()), set(('$tip',)))
         self.assertEqual(len(ds.targets[0]['regions']['$tip']), 2)
         self.assertNotIn('$par', ds.class_mapping['regions'])
         self.assertEqual(sample['image'].shape, (1, 200, 100))
