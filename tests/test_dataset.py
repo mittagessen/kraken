@@ -5,7 +5,7 @@ from pathlib import Path
 from pytest import raises
 
 from PIL import Image
-from kraken.lib.dataset import ImageInputTransforms
+from kraken.lib.dataset import ImageInputTransforms, BaselineSet
 
 from kraken.lib.util import is_bitonal
 from kraken.lib.exceptions import KrakenInputException
@@ -22,6 +22,109 @@ def check_output(self, config, im, output_tensor):
         self.assertEqual(len(output_tensor.int().unique()), 2)
     if config['channels'] == 3:
         self.assertEqual(output_tensor.shape[0], 3)
+
+class TestBaselineSet(unittest.TestCase):
+    """
+    Tests for the BaselineSet segmentation dataset class
+    """
+    def setUp(self):
+        self.doc = resources / '170025120000003,0074.xml'
+        self.transforms = ImageInputTransforms(batch=1,
+                                               height=200,
+                                               width=100,
+                                               channels=1,
+                                               pad=0)
+
+    def test_baselineset_simple_xml(self):
+        """
+        Tests simple BaselineSet instantiation
+        """
+        ds = BaselineSet(imgs=[self.doc, self.doc],
+                         im_transforms=self.transforms,
+                         mode='xml')
+
+        sample = ds[0]
+        self.assertEqual(len(ds), 2)
+        self.assertEqual(ds.num_classes, 10)
+        self.assertEqual(sample['image'].shape, (1, 200, 100))
+        self.assertEqual(sample['target'].shape, (ds.num_classes, 200, 100))
+
+    def test_baselineset_simple_valid_baselines(self):
+        """
+        Test baseline whitelisting in BaselineSet
+        """
+        # filter out $pac and $pag baseline classes
+        ds = BaselineSet(imgs=[self.doc, self.doc],
+                         im_transforms=self.transforms,
+                         valid_baselines=['$par', '$tip'],
+                         mode='xml')
+
+        sample = ds[0]
+        self.assertEqual(len(ds), 2)
+        self.assertEqual(ds.num_classes, 8)
+        self.assertEqual(set(ds.class_mapping['baselines'].keys()), set(('$tip', '$par')))
+        self.assertNotIn('$pac', ds.class_mapping['baselines'])
+        self.assertNotIn('$pag', ds.class_mapping['baselines'])
+        self.assertEqual(sample['image'].shape, (1, 200, 100))
+        self.assertEqual(sample['target'].shape, (ds.num_classes, 200, 100))
+
+    def test_baselineset_simple_valid_regions(self):
+        """
+        Test region whitelisting in BaselineSet
+        """
+        # filter out $tip and $par regions
+        ds = BaselineSet(imgs=[self.doc, self.doc],
+                         im_transforms=self.transforms,
+                         valid_regions=['$pag', '$pac'],
+                         mode='xml')
+
+        sample = ds[0]
+        self.assertEqual(len(ds), 2)
+        self.assertEqual(ds.num_classes, 8)
+        self.assertEqual(set(ds.class_mapping['regions'].keys()), set(('$pag', '$pac')))
+        self.assertNotIn('$par', ds.class_mapping['regions'])
+        self.assertNotIn('$tip', ds.class_mapping['regions'])
+        self.assertEqual(sample['image'].shape, (1, 200, 100))
+        self.assertEqual(sample['target'].shape, (ds.num_classes, 200, 100))
+
+    def test_baselineset_simple_merge_baselines(self):
+        """
+        Test baseline merging in BaselineSet
+        """
+        # merge $par into $tip
+        ds = BaselineSet(imgs=[self.doc, self.doc],
+                         im_transforms=self.transforms,
+                         merge_baselines={'$par': '$tip'},
+                         mode='xml')
+
+        sample = ds[0]
+        self.assertEqual(len(ds), 2)
+        self.assertEqual(ds.num_classes, 9)
+        self.assertEqual(set(ds.class_mapping['baselines'].keys()), set(('$tip', '$pag', '$pac')))
+        self.assertEqual(len(ds.targets[0]['baselines']['$tip']), 18)
+        self.assertNotIn('$par', ds.class_mapping['baselines'])
+        self.assertEqual(sample['image'].shape, (1, 200, 100))
+        self.assertEqual(sample['target'].shape, (ds.num_classes, 200, 100))
+
+    def test_baselineset_simple_merge_regions(self):
+        """
+        Test region merging in BaselineSet
+        """
+        # merge $par into $tip
+        ds = BaselineSet(imgs=[self.doc, self.doc],
+                         im_transforms=self.transforms,
+                         merge_regions={'$par': '$tip'},
+                         mode='xml')
+
+        sample = ds[0]
+        self.assertEqual(len(ds), 2)
+        self.assertEqual(ds.num_classes, 9)
+        self.assertEqual(set(ds.class_mapping['regions'].keys()), set(('$tip', '$pag', '$pac')))
+        self.assertEqual(len(ds.targets[0]['regions']['$tip']), 2)
+        self.assertNotIn('$par', ds.class_mapping['regions'])
+        self.assertEqual(sample['image'].shape, (1, 200, 100))
+        self.assertEqual(sample['target'].shape, (ds.num_classes, 200, 100))
+
 
 class TestInputTransforms(unittest.TestCase):
     """
