@@ -357,7 +357,7 @@ def vectorize_regions(im: np.ndarray, threshold: float = 0.5):
     if boundaries.type == 'Polygon':
         boundaries = [boundaries.boundary.simplify(10)]
     else:
-        boundaries = [x.boundary.simplify(10) for x in unary_union(boundaries)]
+        boundaries = [x.boundary.simplify(10) for x in boundaries.geoms]
     return [np.array(x.coords, dtype=np.uint)[:, [1, 0]].tolist() for x in boundaries]
 
 
