@@ -170,7 +170,7 @@ class ArrowIPCRecognitionDataset(Dataset):
     def rebuild_alphabet(self):
         self.alphabet = Counter()
         _skip_empty_lines = self.skip_empty_lines
-        self.skip_empty_lines = False
+        self.skip_empty_lines = True
         for index in range(len(self)):
             text = self._apply_text_transform(
                 self.arrow_table.column('lines')[index].as_py(),
