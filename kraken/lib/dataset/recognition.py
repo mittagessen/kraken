@@ -54,7 +54,7 @@ class ArrowIPCRecognitionDataset(Dataset):
     def __init__(self,
                  normalization: Optional[str] = None,
                  whitespace_normalization: bool = True,
-                 ignore_empty_lines: bool = True,
+                 skip_empty_lines: bool = True,
                  reorder: Union[bool, str] = True,
                  im_transforms: Callable[[Any], torch.Tensor] = transforms.Compose([]),
                  augmentation: bool = False,
@@ -66,7 +66,7 @@ class ArrowIPCRecognitionDataset(Dataset):
             normalization: Unicode normalization for gt
             whitespace_normalization: Normalizes unicode whitespace and strips
                                       whitespace.
-            ignore_empty_lines: Whether to return samples without text.
+            skip_empty_lines: Whether to return samples without text.
             reorder: Whether to rearrange code points in "display"/LTR order.
                      Set to L|R to change the default text direction.
             im_transforms: Function taking an PIL.Image and returning a tensor
@@ -86,7 +86,7 @@ class ArrowIPCRecognitionDataset(Dataset):
         self._num_lines = 0
         self.arrow_table = None
         self.codec = None
-        self.ignore_empty_lines = ignore_empty_lines
+        self.skip_empty_lines = skip_empty_lines
 
         self.seg_type = None
         # built text transformations
@@ -169,14 +169,14 @@ class ArrowIPCRecognitionDataset(Dataset):
 
     def rebuild_alphabet(self):
         self.alphabet = Counter()
-        _ignore_empty_lines = self.ignore_empty_lines
-        self.ignore_empty_lines = False
+        _skip_empty_lines = self.skip_empty_lines
+        self.skip_empty_lines = False
         for index in range(len(self)):
             text = self._apply_text_transform(
                 self.arrow_table.column('lines')[index].as_py(),
             )
             self.alphabet.update(text)
-        self.ignore_empty_lines = _ignore_empty_lines
+        self.skip_empty_lines = _skip_empty_lines
 
     def _apply_text_transform(self, sample) -> str:
         """ Applies text transform to a sample.
@@ -186,8 +186,8 @@ class ArrowIPCRecognitionDataset(Dataset):
             text = func(text)
         if not text:
             logger.debug(f'Text line "{sample["text"]}" is empty after transformations')
-            if not self.ignore_empty_lines:
-                raise Exception('empty text line')
+            if not self.skip_empty_lines:
+                raise KrakenInputException('empty text line')
         return text
 
     def encode(self, codec: Optional[PytorchCodec] = None) -> None:
@@ -201,12 +201,11 @@ class ArrowIPCRecognitionDataset(Dataset):
                 try:
                     text = self._apply_text_transform(
                         self.arrow_table.column('lines')[index].as_py(),
-                        raise_on_empty=False
                     )
                     self.codec.encode(text)
                 except KrakenEncodeException as e:
                     raise e
-                except Exception:
+                except KrakenInputException:
                     pass
         else:
             self.codec = PytorchCodec(''.join(self.alphabet.keys()))
@@ -247,7 +246,7 @@ class PolygonGTDataset(Dataset):
     def __init__(self,
                  normalization: Optional[str] = None,
                  whitespace_normalization: bool = True,
-                 ignore_empty_lines: bool = True,
+                 skip_empty_lines: bool = True,
                  reorder: Union[bool, str] = True,
                  im_transforms: Callable[[Any], torch.Tensor] = transforms.Compose([]),
                  augmentation: bool = False) -> None:
@@ -258,7 +257,7 @@ class PolygonGTDataset(Dataset):
             normalization: Unicode normalization for gt
             whitespace_normalization: Normalizes unicode whitespace and strips
                                       whitespace.
-            ignore_empty_lines: Whether to return samples without text.
+            skip_empty_lines: Whether to return samples without text.
             reorder: Whether to rearrange code points in "display"/LTR order.
                      Set to L|R to change the default text direction.
             im_transforms: Function taking an PIL.Image and returning a tensor
@@ -271,7 +270,7 @@ class PolygonGTDataset(Dataset):
         self.text_transforms = []  # type: List[Callable[[str], str]]
         self.transforms = im_transforms
         self.aug = None
-        self.ignore_empty_lines = ignore_empty_lines
+        self.skip_empty_lines = skip_empty_lines
 
         self.seg_type = 'baselines'
         # built text transformations
@@ -343,7 +342,7 @@ class PolygonGTDataset(Dataset):
         orig_text = text
         for func in self.text_transforms:
             text = func(text)
-        if not text and not self.ignore_empty_lines:
+        if not text and self.skip_empty_lines:
             raise KrakenInputException(f'Text line "{orig_text}" is empty after transformations')
         if not baseline:
             raise KrakenInputException('No baseline given for line')
@@ -422,7 +421,7 @@ class GroundTruthDataset(Dataset):
                  suffix: str = '.gt.txt',
                  normalization: Optional[str] = None,
                  whitespace_normalization: bool = True,
-                 ignore_empty_lines: bool = True,
+                 skip_empty_lines: bool = True,
                  reorder: Union[bool, str] = True,
                  im_transforms: Callable[[Any], torch.Tensor] = transforms.Compose([]),
                  augmentation: bool = False) -> None:
@@ -444,7 +443,7 @@ class GroundTruthDataset(Dataset):
             normalization: Unicode normalization for gt
             whitespace_normalization: Normalizes unicode whitespace and
                                       strips whitespace.
-            ignore_empty_lines: Whether to return samples without text.
+            skip_empty_lines: Whether to return samples without text.
             reorder: Whether to rearrange code points in "display"/LTR
                      order. Set to L|R to change the default text
                      direction.
@@ -459,7 +458,7 @@ class GroundTruthDataset(Dataset):
         self.alphabet = Counter()  # type: Counter
         self.text_transforms = []  # type: List[Callable[[str], str]]
         self.transforms = im_transforms
-        self.ignore_empty_lines = ignore_empty_lines
+        self.skip_empty_lines = skip_empty_lines
         self.aug = None
 
         self.seg_type = 'bbox'
@@ -521,7 +520,7 @@ class GroundTruthDataset(Dataset):
             text = fp.read().strip('\n\r')
             for func in self.text_transforms:
                 text = func(text)
-            if not text and not self.ignore_empty_lines:
+            if not text and self.skip_empty_lines:
                 raise KrakenInputException(f'Text line is empty ({fp.name})')
         return {'image': image, 'text': text, 'preparse': True}
 
