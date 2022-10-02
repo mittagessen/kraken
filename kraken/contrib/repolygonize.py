@@ -50,7 +50,7 @@ def cli(format_type, topline, files):
                         pol.attrib['POINTS'] = ' '.join([str(coord) for pt in polygons[idx] for coord in pt])
                     else:
                         pol.attrib['POINTS'] = ''
-                    idx += 1
+                idx += 1
             with open(splitext(fname)[0] + '_rewrite.xml', 'wb') as fp:
                 doc.write(fp, encoding='UTF-8', xml_declaration=True)
 
@@ -80,7 +80,7 @@ def cli(format_type, topline, files):
                         pol.attrib['points'] = ' '.join([','.join([str(x) for x in pt]) for pt in polygons[idx]])
                     else:
                         pol.attrib['points'] = ''
-                    idx += 1
+                idx += 1
             with open(splitext(fname)[0] + '_rewrite.xml', 'wb') as fp:
                 doc.write(fp, encoding='UTF-8', xml_declaration=True)
 
