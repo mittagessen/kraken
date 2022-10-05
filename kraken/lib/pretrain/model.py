@@ -337,9 +337,8 @@ class RecognitionPretrainModel(pl.LightningModule):
             output = output.transpose(1, 3).reshape(-1, W, C)
             packed_output = pack_padded_sequence(output, seq_lens, batch_first=True, enforce_sorted=False)
             # masked features after encoder
-            x = packed_output.data[mask_output['mask'] == 1].reshape_as(y)
-
-            mask_n_neg = torch.cat([y, negatives], dim=0)
+            x = output[mask_output['mask']].reshape_as(y)
+            mask_n_neg = torch.cat([y.unsqueeze(0), negatives], dim=0)
             logits = torch.cosine_similarity(x.float(), mask_n_neg.float(), dim=-1).type_as(x)
 
             targets = logits.new_zeros(logits.size(1) * logits.size(2), dtype=torch.long)

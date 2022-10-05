@@ -46,7 +46,7 @@ RECOGNITION_PRETRAIN_HYPER_PARAMS = {'pad': 16,
                                      # masking parameters
                                      'mask_width': 4,
                                      'mask_prob': 0.2,
-                                     'num_negatives': 2,
+                                     'num_negatives': 100,
                                      'logit_temp': 0.1,
                                      'warmup': 0,
                                      }
