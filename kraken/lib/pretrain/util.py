@@ -93,7 +93,7 @@ def sample_negatives(y, num_samples, num_neg_samples: int):
     return negs
 
 
-def compute_mask_indices(shape: Tuple[int, int], mask_prob: float, mask_length: int) -> np.ndarray:
+def compute_mask_indices(shape: Tuple[int, int], mask_prob: float, mask_length: int = 4, mask_min_space: int = 2) -> np.ndarray:
     """
     Computes random mask spans for a given shape
 
@@ -121,18 +121,34 @@ def compute_mask_indices(shape: Tuple[int, int], mask_prob: float, mask_length: 
         if sum(lengths) == 0:
             lengths[0] = min(mask_length, sz - 1)
 
-        min_len = min(lengths)
-        if sz - min_len <= num_mask:
-            min_len = sz - num_mask - 1
-        mask_idc = np.random.choice(sz - min_len, num_mask, replace=False)
+        mask_idc = []
 
-        mask_idc = np.asarray(
-            [
-                mask_idc[j] + offset
-                for j in range(len(mask_idc))
-                for offset in range(lengths[j])
-            ]
-        )
+        def arrange(s, e, length, keep_length):
+            span_start = np.random.randint(s, e - length)
+            mask_idc.extend(span_start + i for i in range(length))
+
+            new_parts = []
+            if span_start - s - mask_min_space >= keep_length:
+                new_parts.append((s, span_start - mask_min_space + 1))
+            if e - span_start - keep_length - mask_min_space > keep_length:
+                new_parts.append((span_start + length + mask_min_space, e))
+            return new_parts
+
+        parts = [(0, sz)]
+        min_length = min(lengths)
+        for length in sorted(lengths, reverse=True):
+            lens = np.fromiter(
+                (e - s if e - s >= length + mask_min_space else 0 for s, e in parts),
+                np.int,
+            )
+            l_sum = np.sum(lens)
+            if l_sum == 0:
+                break
+            probs = lens / np.sum(lens)
+            c = np.random.choice(len(parts), p=probs)
+            s, e = parts.pop(c)
+            parts.extend(arrange(s, e, length, min_length))
+        mask_idc = np.asarray(mask_idc)
 
         mask_idcs.append(np.unique(mask_idc[mask_idc < sz]))
 
