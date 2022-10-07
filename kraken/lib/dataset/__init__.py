@@ -17,4 +17,4 @@ Top-level module containing datasets for recognition and segmentation training.
 """
 from .recognition import ArrowIPCRecognitionDataset, PolygonGTDataset, GroundTruthDataset
 from .segmentation import BaselineSet
-from .utils import ImageInputTransforms, compute_error, collate_sequences
+from .utils import ImageInputTransforms, compute_error, collate_sequences, global_align, compute_confusions
