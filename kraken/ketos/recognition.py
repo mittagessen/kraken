@@ -86,8 +86,10 @@ logger = logging.getLogger('kraken')
 @click.option('-m', '--momentum', show_default=True, default=RECOGNITION_HYPER_PARAMS['momentum'], help='Momentum')
 @click.option('-w', '--weight-decay', show_default=True, type=float,
               default=RECOGNITION_HYPER_PARAMS['weight_decay'], help='Weight decay')
-@click.option('--warmup', show_default=True, type=float,
+@click.option('--warmup', show_default=True, type=int,
               default=RECOGNITION_HYPER_PARAMS['warmup'], help='Number of samples to ramp up to `lrate` initial learning rate.')
+@click.option('--freeze-backbone', show_default=True, type=int,
+              default=RECOGNITION_HYPER_PARAMS['freeze_backbone'], help='Number of samples to keep the backbone (everything but last layer) frozen.')
 @click.option('--schedule',
               show_default=True,
               type=click.Choice(['constant',
@@ -173,8 +175,8 @@ logger = logging.getLogger('kraken')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
           min_epochs, lag, min_delta, device, optimizer, lrate, momentum,
-          weight_decay, warmup, schedule, gamma, step_size, sched_patience,
-          cos_max, partition, fixed_splits, normalization,
+          weight_decay, warmup, freeze_backbone, schedule, gamma, step_size,
+          sched_patience, cos_max, partition, fixed_splits, normalization,
           normalize_whitespace, codec, resize, reorder, base_dir,
           training_files, evaluation_files, workers, load_hyper_parameters,
           repolygonize, force_binarization, format_type, augment,
@@ -215,6 +217,7 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
                          'momentum': momentum,
                          'weight_decay': weight_decay,
                          'warmup': warmup,
+                         'freeze_backbone': freeze_backbone,
                          'schedule': schedule,
                          'gamma': gamma,
                          'step_size': step_size,

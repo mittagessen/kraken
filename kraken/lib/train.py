@@ -543,6 +543,10 @@ class RecognitionModel(pl.LightningModule):
             for pg in optimizer.param_groups:
                 pg["lr"] = lr_scale * self.hparams.lrate
 
+        # freeze backbone until global step is reached.
+        if self.hparams.freeze_backbone and self.trainer.global_step < self.hparams.freeze_backbone:
+            self.nn.model[:-1].requires_grad_(False)
+
     def lr_scheduler_step(self, scheduler, optimizer_idx, metric):
         if not self.hparams.warmup or self.trainer.global_step >= self.hparams.warmup:
             # step OneCycleLR each batch if not in warmup phase
