@@ -78,6 +78,7 @@ RECOGNITION_HYPER_PARAMS = {'pad': 16,
                             # cosine
                             'cos_t_max': 50,
                             'warmup': 0,
+                            'freeze_backbone': 0,
                             }
 
 SEGMENTATION_HYPER_PARAMS = {'line_width': 8,
