@@ -278,6 +278,7 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
                             devices=device,
                             max_epochs=hyper_params['epochs'] if hyper_params['quit'] == 'dumb' else -1,
                             min_epochs=hyper_params['min_epochs'],
+                            freeze_backbone=hyper_params['freeze_backbone'],
                             enable_progress_bar=True if not ctx.meta['verbose'] else False,
                             deterministic=ctx.meta['deterministic'],
                             **val_check_interval)
