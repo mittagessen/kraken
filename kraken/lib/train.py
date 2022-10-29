@@ -63,7 +63,7 @@ class KrakenTrainer(pl.Trainer):
                  enable_summary: bool = True,
                  min_epochs=5,
                  max_epochs=100,
-                 pb_ignored_metrics=('loss', 'val_metric'),
+                 pb_ignored_metrics=(),
                  *args,
                  **kwargs):
         kwargs['logger'] = False
