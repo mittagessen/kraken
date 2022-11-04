@@ -55,6 +55,9 @@ def _extract_line(xml_record):
         except KrakenInputException:
             logger.warning(f'Invalid line {idx} in {im.filename}')
             continue
+        except Exception as e:
+            logger.warning(f'Unexpected exception {e} from line {idx} in {im.filename}')
+            continue
         if not line['text']:
             continue
         fp = io.BytesIO()
