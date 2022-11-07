@@ -61,9 +61,10 @@ class KrakenTrainer(pl.Trainer):
     def __init__(self,
                  enable_progress_bar: bool = True,
                  enable_summary: bool = True,
-                 min_epochs=5,
-                 max_epochs=100,
-                 pb_ignored_metrics=('loss', 'val_metric'),
+                 min_epochs: int = 5,
+                 max_epochs: int = 100,
+                 pb_ignored_metrics: Sequence[str] = ('loss', 'val_metric'),
+                 move_metrics_to_cpu: bool = True,
                  *args,
                  **kwargs):
         kwargs['logger'] = False
@@ -72,6 +73,7 @@ class KrakenTrainer(pl.Trainer):
         kwargs['min_epochs'] = min_epochs
         kwargs['max_epochs'] = max_epochs
         kwargs['callbacks'] = ([] if 'callbacks' not in kwargs else kwargs['callbacks'])
+        kwargs['move_metrics_to_cpu'] = move_metrics_to_cpu
         if not isinstance(kwargs['callbacks'], list):
             kwargs['callbacks'] = [kwargs['callbacks']]
 
