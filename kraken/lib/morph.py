@@ -3,8 +3,9 @@ Various add-ons to the SciPy morphology package
 """
 import numpy as np
 from scipy.ndimage import label as _label
+from scipy.ndimage import distance_transform_edt
 from scipy.ndimage import find_objects as _find_objects
-from scipy.ndimage import morphology, filters
+from scipy.ndimage import filters
 
 
 def label(image: np.ndarray, **kw) -> np.ndarray:
@@ -81,9 +82,9 @@ def rb_opening(image, size, origin=0):
 
 def spread_labels(labels, maxdist=9999999):
     """Spread the given labels to the background"""
-    distances, features = morphology.distance_transform_edt(labels == 0,
-                                                            return_distances=1,
-                                                            return_indices=1)
+    distances, features = distance_transform_edt(labels == 0,
+                                                 return_distances=1,
+                                                 return_indices=1)
     indexes = features[0] * labels.shape[1] + features[1]
     spread = labels.ravel()[indexes.ravel()].reshape(*labels.shape)
     spread *= (distances < maxdist)
