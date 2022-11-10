@@ -15,15 +15,15 @@
 """
 ALTO/Page data loaders for segmentation training
 """
-import os.path
+import re
 import pathlib
 import logging
 
+from pathlib import Path
 from itertools import groupby
 from lxml import etree
-from os.path import dirname
 from PIL import Image
-from typing import Union, Dict, Any, Sequence
+from typing import Union, Dict, Any, Sequence, Tuple
 
 from collections import defaultdict
 from kraken.lib.segmentation import calculate_polygonal_environment
@@ -201,7 +201,7 @@ def parse_page(filename: Union[str, pathlib.Path]) -> Dict[str, Any]:
         return [k for k, g in groupby(pts)]
 
     with open(filename, 'rb') as fp:
-        base_dir = dirname(filename)
+        base_dir = Path(filename).parent
         try:
             doc = etree.parse(fp)
         except etree.XMLSyntaxError as e:
@@ -219,7 +219,7 @@ def parse_page(filename: Union[str, pathlib.Path]) -> Dict[str, Any]:
             logger.warning(f'Invalid value {image.get("readingDirection")} encountered in page-level reading direction.')
             base_direction = None
         lines = doc.findall('.//{*}TextLine')
-        data = {'image': os.path.join(base_dir, image.get('imageFilename')),
+        data = {'image': base_dir.joinpath(image.get('imageFilename')),
                 'lines': [],
                 'type': 'baselines',
                 'base_dir': base_direction,
@@ -334,8 +334,27 @@ def parse_alto(filename: Union[str, pathlib.Path]) -> Dict[str, Any]:
                        {...}],
              'regions': {'region_type_0': [[[x0, y0], ...], ...], ...}}
     """
+    def _parse_pointstype(coords: str) -> Sequence[Tuple[float, float]]:
+        """
+        ALTO's PointsType is underspecified so a variety of serializations are valid:
+
+            x0, y0 x1, y1 ...
+            x0 y0 x1 y1 ...
+            (x0, y0) (x1, y1) ...
+            (x0 y0) (x1 y1) ...
+
+        Returns:
+            A list of tuples [(x0, y0), (x1, y1), ...]
+        """
+        float_re = re.compile(r'[-+]?(\d+(\.\d*)?|\.\d+)([eE][-+]?\d+)?')
+        points = [float(point.group()) for point in float_re.finditer(coords)]
+        if len(points) % 2:
+            raise ValueError(f'Odd number of points in points sequence: {points}')
+        pts = zip(points[::2], points[1::2])
+        return [k for k, g in groupby(pts)]
+
     with open(filename, 'rb') as fp:
-        base_dir = dirname(filename)
+        base_dir = Path(filename).parent
         try:
             doc = etree.parse(fp)
         except etree.XMLSyntaxError as e:
@@ -344,7 +363,7 @@ def parse_alto(filename: Union[str, pathlib.Path]) -> Dict[str, Any]:
         if image is None or not image.text:
             raise KrakenInputException('No valid filename found in ALTO file')
         lines = doc.findall('.//{*}TextLine')
-        data = {'image': os.path.join(base_dir, image.text),
+        data = {'image': base_dir.joinpath(image.text),
                 'lines': [],
                 'type': 'baselines',
                 'base_dir': None,
@@ -377,9 +396,7 @@ def parse_alto(filename: Union[str, pathlib.Path]) -> Dict[str, Any]:
             # try to find shape object
             coords = region.find('./{*}Shape/{*}Polygon')
             if coords is not None:
-                points = [int(float(x)) for x in coords.get('POINTS').split(' ')]
-                boundary = zip(points[::2], points[1::2])
-                boundary = [k for k, g in groupby(boundary)]
+                boundary = _parse_pointstype(coords.get('POINTS'))
             elif (region.get('HPOS') is not None and region.get('VPOS') is not None and
                   region.get('WIDTH') is not None and region.get('HEIGHT') is not None):
                 # use rectangular definition
@@ -418,9 +435,7 @@ def parse_alto(filename: Union[str, pathlib.Path]) -> Dict[str, Any]:
             boundary = None
             if pol is not None:
                 try:
-                    points = [int(float(x)) for x in pol.get('POINTS').split(' ')]
-                    boundary = zip(points[::2], points[1::2])
-                    boundary = [k for k, g in groupby(boundary)]
+                    boundary = _parse_pointstype(pol.get('POINTS'))
                 except ValueError:
                     logger.info('TextLine {} without polygon'.format(line.get('ID')))
             else:
@@ -428,9 +443,7 @@ def parse_alto(filename: Union[str, pathlib.Path]) -> Dict[str, Any]:
 
             baseline = None
             try:
-                points = [int(float(x)) for x in line.get('BASELINE').split(' ')]
-                baseline = list(zip(points[::2], points[1::2]))
-                baseline = [k for k, g in groupby(baseline)]
+                baseline = _parse_pointstype(line.get('BASELINE'))
             except ValueError:
                 logger.info('TextLine {} without baseline'.format(line.get('ID')))
 
