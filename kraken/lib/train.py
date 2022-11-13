@@ -86,7 +86,7 @@ class KrakenTrainer(pl.Trainer):
             kwargs['callbacks'].append(summary_cb)
             kwargs['enable_model_summary'] = False
 
-        if freeze_backbone:
+        if freeze_backbone > 0:
             kwargs['callbacks'].append(KrakenFreezeBackbone(freeze_backbone))
 
         kwargs['callbacks'].extend([KrakenSetOneChannelMode(), KrakenSaveModel()])
