@@ -108,10 +108,13 @@ class KrakenFreezeBackbone(BaseFinetuning):
         self.unfreeze_at_iteration = unfreeze_at_iterations
 
     def freeze_before_training(self, pl_module):
-        self.freeze(pl_module.nn.model[:-1])
+        pass
 
     def finetune_function(self, pl_module, current_epoch, optimizer, optimizer_idx):
         pass
+
+    def on_train_start(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule") -> None:
+        self.freeze(pl_module.net[:-1])
 
     def on_train_batch_start(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule", batch, batch_idx) -> None:
         """
@@ -122,7 +125,7 @@ class KrakenFreezeBackbone(BaseFinetuning):
 
             for opt_idx, optimizer in _get_active_optimizers(trainer.optimizers, trainer.optimizer_frequencies, 0):
                 num_param_groups = len(optimizer.param_groups)
-                self.unfreeze_and_add_param_group(modules=pl_module.nn.model[:-1],
+                self.unfreeze_and_add_param_group(modules=pl_module.net[:-1],
                                                   optimizer=optimizer,
                                                   train_bn=True,)
                 current_param_groups = optimizer.param_groups
