@@ -149,6 +149,7 @@ def vec_lines(heatmap: torch.Tensor,
               scal_im: np.ndarray = None,
               suppl_obj: List[np.ndarray] = None,
               topline: Optional[bool] = False,
+              polygonize: bool = True,
               **kwargs) -> List[Dict[str, Any]]:
     r"""
     Computes lines from a stack of heatmaps, a class mapping, and scaling
@@ -170,6 +171,7 @@ def vec_lines(heatmap: torch.Tensor,
                    polygonization.
         topline: True for a topline, False for baseline, or None for a
                  centerline.
+        polygonize: Switch to disable polygonization.
 
     Returns:
         A list of dictionaries containing the baselines, bounding polygons, and
@@ -194,26 +196,29 @@ def vec_lines(heatmap: torch.Tensor,
         baselines.extend([(bl_type, x) for x in vectorize_lines(heatmap[(st_sep, end_sep, idx), :, :])])
     logger.debug('Polygonizing lines')
 
-    im_feats = gaussian_filter(sobel(scal_im), 0.5)
+    if polygonize:
+        im_feats = gaussian_filter(sobel(scal_im), 0.5)
 
-    lines = []
-    reg_pols = [geom.Polygon(x) for x in regions]
-    for bl_idx in range(len(baselines)):
-        bl = baselines[bl_idx]
-        mid_point = geom.LineString(bl[1]).interpolate(0.5, normalized=True)
+        lines = []
+        reg_pols = [geom.Polygon(x) for x in regions]
+        for bl_idx in range(len(baselines)):
+            bl = baselines[bl_idx]
+            mid_point = geom.LineString(bl[1]).interpolate(0.5, normalized=True)
 
-        suppl_obj = [x[1] for x in baselines[:bl_idx] + baselines[bl_idx+1:]]
-        for reg_idx, reg_pol in enumerate(reg_pols):
-            if reg_pol.contains(mid_point):
-                suppl_obj.append(regions[reg_idx])
+            suppl_obj = [x[1] for x in baselines[:bl_idx] + baselines[bl_idx+1:]]
+            for reg_idx, reg_pol in enumerate(reg_pols):
+                if reg_pol.contains(mid_point):
+                    suppl_obj.append(regions[reg_idx])
 
-        pol = calculate_polygonal_environment(baselines=[bl[1]], im_feats=im_feats, suppl_obj=suppl_obj, topline=topline)
-        if pol[0] is not None:
-            lines.append((bl[0], bl[1], pol[0]))
+            pol = calculate_polygonal_environment(baselines=[bl[1]], im_feats=im_feats, suppl_obj=suppl_obj, topline=topline)
+            if pol[0] is not None:
+                lines.append((bl[0], bl[1], pol[0]))
 
-    logger.debug('Scaling vectorized lines')
-    sc = scale_polygonal_lines([x[1:] for x in lines], scale)
-    lines = list(zip([x[0] for x in lines], [x[0] for x in sc], [x[1] for x in sc]))
+        logger.debug('Scaling vectorized lines')
+        sc = scale_polygonal_lines([x[1:] for x in lines], scale)
+        lines = list(zip([x[0] for x in lines], [x[0] for x in sc], [x[1] for x in sc]))
+    else:
+
     logger.debug('Reordering baselines')
     lines = reading_order_fn(lines=lines, regions=regions, text_direction=text_direction[-2:])
     return [{'tags': {'type': bl_type}, 'baseline': bl, 'boundary': pl} for bl_type, bl, pl in lines]
@@ -224,7 +229,8 @@ def segment(im: PIL.Image.Image,
             mask: Optional[np.ndarray] = None,
             reading_order_fn: Callable = polygonal_reading_order,
             model: Union[List[vgsl.TorchVGSLModel], vgsl.TorchVGSLModel] = None,
-            device: str = 'cpu') -> Dict[str, Any]:
+            device: str = 'cpu',
+            compute_flags: Tuple[str] = ('regions', 'baselines', 'boundaries')) -> Dict[str, Any]:
     r"""
     Segments a page into text lines using the baseline segmenter.
 
@@ -245,6 +251,23 @@ def segment(im: PIL.Image.Image,
         model: One or more TorchVGSLModel containing a segmentation model. If
                none is given a default model will be loaded.
         device: The target device to run the neural network on.
+        compute_flags: Selects features to return. Is a tuple of strings which
+                       may contain 'regions', 'baselines', and 'boundaries'.
+                       For example:
+
+                        .. code-block::
+                            :force:
+
+                            blla.segment(..., compute_flags=('regions',))
+
+                        skips baseline and boundary generation,
+
+                        .. code-block::
+                            :force:
+
+                            blla.segment(..., compute_flags=('baselines', 'boundaries'))
+
+                        skips region computation, and so on.
 
     Returns:
         A dictionary containing the text direction and under the key 'lines' a
@@ -296,23 +319,29 @@ def segment(im: PIL.Image.Image,
                    False: 'bottom'}[net.user_metadata['topline']]
             logger.debug(f'Baseline location: {loc}')
         rets = compute_segmentation_map(im, mask, net, device)
-        regions = vec_regions(**rets)
-        # flatten regions for line ordering/fetch bounding regions
+        lines = []
+        regions = {}
         line_regs = []
         suppl_obj = []
-        for cls, regs in regions.items():
-            line_regs.extend(regs)
-            if rets['bounding_regions'] is not None and cls in rets['bounding_regions']:
-                suppl_obj.extend(regs)
-        # convert back to net scale
-        suppl_obj = scale_regions(suppl_obj, 1/rets['scale'])
-        line_regs = scale_regions(line_regs, 1/rets['scale'])
-        lines = vec_lines(**rets,
-                          regions=line_regs,
-                          reading_order_fn=reading_order_fn,
-                          text_direction=text_direction,
-                          suppl_obj=suppl_obj,
-                          topline=net.user_metadata['topline'] if 'topline' in net.user_metadata else False)
+
+        if 'regions' in compute_flags:
+            regions = vec_regions(**rets)
+            # flatten regions for line ordering/fetch bounding regions
+            for cls, regs in regions.items():
+                line_regs.extend(regs)
+                if rets['bounding_regions'] is not None and cls in rets['bounding_regions']:
+                    suppl_obj.extend(regs)
+            # convert back to net scale
+            suppl_obj = scale_regions(suppl_obj, 1/rets['scale'])
+            line_regs = scale_regions(line_regs, 1/rets['scale'])
+
+        if 'baselines' in compute_flags:
+            lines = vec_lines(**rets,
+                              regions=line_regs,
+                              reading_order_fn=reading_order_fn,
+                              text_direction=text_direction,
+                              suppl_obj=suppl_obj,
+                              topline=net.user_metadata['topline'] if 'topline' in net.user_metadata else False)
 
     if len(rets['cls_map']['baselines']) > 1:
         script_detection = True

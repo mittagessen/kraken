@@ -76,19 +76,22 @@ jobs:
           python-version: 3.9
       - name: install conda build
         shell: bash -l {0}
-        run: conda install conda-build conda-verify anaconda-client
+        run: conda install "conda-build>=3.20" colorama pip ruamel ruamel.yaml rich mamba jsonschema conda-verify anaconda-client -c conda-forge
       # Runs the action with the following inputs or defaults if not specified.
+      - name: install boa
+        shell: bash -l {0}
+        run: pip install https://github.com/mamba-org/boa/archive/refs/tags/0.13.0.zip
       - name: validate recipe
         shell: bash -l {0}
         id: conda_validation
         run: |
-          PACKAGE_PATHS=$(conda build . --output --check -c conda-forge)
+          PACKAGE_PATHS=$(conda mambabuild . --output --check -c conda-forge)
           PACKAGE_PATHS="${PACKAGE_PATHS//$'\n'/' '}"
           PACKAGE_PATHS="${PACKAGE_PATHS//$'\r'/''}"
           echo "::set-output name=package_paths::$PACKAGE_PATHS"
       - name: run build
         shell: bash -l {0}
-        run: conda build . -c conda-forge
+        run: conda mambabuild . -c conda-forge
       - name: convert packages
         shell: bash -l {0}
         run: |
