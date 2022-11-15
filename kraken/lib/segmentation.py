@@ -235,7 +235,7 @@ def _extend_boundaries(baselines, bin_bl_map):
         if boundary_pol.contains(geom.Point(bl[0])):
             l_point = boundary_pol.boundary.intersection(geom.LineString([(bl[0][0]-10*(bl[1][0]-bl[0][0]),
                                                                            bl[0][1]-10*(bl[1][1]-bl[0][1])), bl[0]]))
-            if l_point.type != 'Point':
+            if l_point.geom_type != 'Point':
                 bl[0] = np.array(nearest_points(geom.Point(bl[0]), boundary_pol)[1].coords[0], 'int').tolist()
             else:
                 bl[0] = np.array(l_point.coords[0], 'int').tolist()
@@ -243,7 +243,7 @@ def _extend_boundaries(baselines, bin_bl_map):
         if boundary_pol.contains(geom.Point(bl[-1])):
             r_point = boundary_pol.boundary.intersection(geom.LineString([(bl[-1][0]-10*(bl[-2][0]-bl[-1][0]),
                                                                            bl[-1][1]-10*(bl[-2][1]-bl[-1][1])), bl[-1]]))
-            if r_point.type != 'Point':
+            if r_point.geom_type != 'Point':
                 bl[-1] = np.array(nearest_points(geom.Point(bl[-1]), boundary_pol)[1].coords[0], 'int').tolist()
             else:
                 bl[-1] = np.array(r_point.coords[0], 'int').tolist()
@@ -354,7 +354,7 @@ def vectorize_regions(im: np.ndarray, threshold: float = 0.5):
     # merge regions that overlap 
     boundaries = unary_union(boundaries)
     # simplify them afterwards
-    if boundaries.type == 'Polygon':
+    if boundaries.geom_type == 'Polygon':
         boundaries = [boundaries.boundary.simplify(10)]
     else:
         boundaries = [x.boundary.simplify(10) for x in boundaries.geoms]
@@ -536,11 +536,11 @@ def _extract_patch(env_up, env_bottom, baseline, offset_baseline, end_points, di
 
     # ugly workaround against GEOM parallel_offset bug creating a
     # MultiLineString out of offset LineString
-    if upper_seam.parallel_offset(offset//2, side='right').type == 'MultiLineString' or offset == 0:
+    if upper_seam.parallel_offset(offset//2, side='right').geom_type == 'MultiLineString' or offset == 0:
         upper_seam = np.array(upper_seam.coords, dtype=int)
     else:
         upper_seam = np.array(upper_seam.parallel_offset(offset//2, side='right').coords, dtype=int)[::-1]
-    if bottom_seam.parallel_offset(offset//2, side='left').type == 'MultiLineString' or offset == 0:
+    if bottom_seam.parallel_offset(offset//2, side='left').geom_type == 'MultiLineString' or offset == 0:
         bottom_seam = np.array(bottom_seam.coords, dtype=int)
     else:
         bottom_seam = np.array(bottom_seam.parallel_offset(offset//2, side='left').coords, dtype=int)
@@ -588,11 +588,11 @@ def _calc_roi(line, bounds, baselines, suppl_obj, p_dir):
         spt = geom.Point(pt)
         if intersects.is_empty:
             raise Exception(f'No intersection with boundaries. Shapely intersection object: {intersects.wkt}')
-        if intersects.type == 'MultiPoint':
+        if intersects.geom_type == 'MultiPoint':
             return min([p for p in intersects.geoms], key=lambda x: spt.distance(x))
-        elif intersects.type == 'Point':
+        elif intersects.geom_type == 'Point':
             return intersects
-        elif intersects.type == 'GeometryCollection' and len(intersects.geoms) > 0:
+        elif intersects.geom_type == 'GeometryCollection' and len(intersects.geoms) > 0:
             t = min([p for p in intersects.geoms], key=lambda x: spt.distance(x))
             if t == 'Point':
                 return t
@@ -886,18 +886,18 @@ def compute_polygon_section(baseline: Sequence[Tuple[int, int]],
         l_point = boundary_pol.boundary.intersection(geom.LineString(
             [(bl[0][0]-10*(bl[1][0]-bl[0][0]), bl[0][1]-10*(bl[1][1]-bl[0][1])), bl[0]]))
         # intersection is incidental with boundary so take closest point instead
-        if l_point.type != 'Point':
-            bl[0] = np.array(nearest_points(geom.Point(bl[0]), boundary_pol)[1], 'int')
+        if l_point.geom_type != 'Point':
+            bl[0] = np.array(nearest_points(geom.Point(bl[0]), boundary_pol)[1].coords[0], 'int')
         else:
-            bl[0] = np.array(l_point, 'int')
+            bl[0] = np.array(l_point.coords[0], 'int')
     if boundary_pol.contains(geom.Point(bl[-1])):
         logger.debug(f'Extending rightmost end of baseline {bl} to polygon boundary')
         r_point = boundary_pol.boundary.intersection(geom.LineString(
             [(bl[-1][0]-10*(bl[-2][0]-bl[-1][0]), bl[-1][1]-10*(bl[-2][1]-bl[-1][1])), bl[-1]]))
-        if r_point.type != 'Point':
-            bl[-1] = np.array(nearest_points(geom.Point(bl[-1]), boundary_pol)[1], 'int')
+        if r_point.geom_type != 'Point':
+            bl[-1] = np.array(nearest_points(geom.Point(bl[-1]), boundary_pol)[1].coords[0], 'int')
         else:
-            bl[-1] = np.array(r_point, 'int')
+            bl[-1] = np.array(r_point.coords[0], 'int')
     dist1 = min(geom.LineString(bl).length - np.finfo(float).eps, dist1)
     dist2 = min(geom.LineString(bl).length - np.finfo(float).eps, dist2)
     dists = np.cumsum(np.diag(np.roll(squareform(pdist(bl)), 1)))
