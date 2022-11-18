@@ -272,6 +272,11 @@ class RecognitionModel(pl.LightningModule):
                                                valid_norm,
                                                force_binarization)
 
+        self.example_input_array = torch.Tensor(batch,
+                                                channels,
+                                                height if height else 32,
+                                                width if width else 400)
+
         if 'file_system' in torch.multiprocessing.get_all_sharing_strategies():
             logger.debug('Setting multiprocessing tensor sharing strategy to file_system')
             torch.multiprocessing.set_sharing_strategy('file_system')
@@ -359,7 +364,7 @@ class RecognitionModel(pl.LightningModule):
                 dataset.rebuild_alphabet()
         return dataset
 
-    def forward(self, x, seq_lens):
+    def forward(self, x, seq_lens=None):
         return self.net(x, seq_lens)
 
     def training_step(self, batch, batch_idx):
@@ -646,6 +651,11 @@ class SegmentationModel(pl.LightningModule):
             raise ValueError('No training data provided. Please add some.')
 
         transforms = ImageInputTransforms(batch, height, width, channels, 0, valid_norm=False, force_binarization=force_binarization)
+
+        self.example_input_array = torch.Tensor(batch,
+                                                channels,
+                                                height if height else 400,
+                                                width if width else 300)
 
         # set multiprocessing tensor sharing strategy
         if 'file_system' in torch.multiprocessing.get_all_sharing_strategies():
