@@ -422,10 +422,10 @@ metadata such as bounding boxes and confidences:
 
 .. code-block:: console
 
-        $ kraken -i ... ... ocr -t # text output
-        $ kraken -i ... ... ocr -h # hOCR output
-        $ kraken -i ... ... ocr -a # ALTO output
-        $ kraken -i ... ... ocr -y # abbyyXML output
+        $ kraken -n -i ... ... ocr # text output
+        $ kraken -h -i ... ... ocr # hOCR output
+        $ kraken -a -i ... ... ocr # ALTO output
+        $ kraken -y -i ... ... ocr # abbyyXML output
 
 hOCR output is slightly different from hOCR files produced by ocropus. Each
 ``ocr_line`` span contains not only the bounding box of the line but also
