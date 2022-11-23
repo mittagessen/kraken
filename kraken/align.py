@@ -197,11 +197,14 @@ def forced_align(doc: Dict[str, Any], model: TorchSeqRecognizer) -> List[rpred.o
         bidi_text = get_display(line['text'])
         gt_fst = fst_from_text(bidi_text, model.codec)
         next(predictor)
+        model.codec.strict = False
         if model.outputs.shape[2] < 2*len(model.codec.encode(bidi_text)):
             logger.warning(f'Could not align line {idx}. Output sequence length {model.outputs.shape[2]} < '
                            f'{2*len(model.codec.encode(bidi_text))} (length of "{line["text"]}" after encoding).')
             records.append(rpred.ocr_record('', [], [], line))
+            model.codec.strict = True
             continue
+        model.codec.strict = True
 
         lat_fst = fst_from_lattice(model.outputs)
         composed_graph = _compose(lat_fst, gt_fst)
