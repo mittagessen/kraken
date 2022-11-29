@@ -104,53 +104,53 @@ both from scratch and from existing models. Here are its most important command 
 ======================================================= ======
 option                                                  action
 ======================================================= ======
--o, --output                                            Output model file prefix. Defaults to model.
--s, --spec                                              VGSL spec of the network to train. CTC layer
+-o, \--output                                           Output model file prefix. Defaults to model.
+-s, \--spec                                             VGSL spec of the network to train. CTC layer
                                                         will be added automatically. default:
                                                         [1,48,0,1 Cr3,3,32 Do0.1,2 Mp2,2 Cr3,3,64
                                                         Do0.1,2 Mp2,2 S1(1x12)1,3 Lbx100 Do]
--a, --append                                            Removes layers before argument and then
+-a, \--append                                           Removes layers before argument and then
                                                         appends spec. Only works when loading an
                                                         existing model
--i, --load                                              Load existing file to continue training
--F, --savefreq                                          Model save frequency in epochs during
+-i, \--load                                             Load existing file to continue training
+-F, \--savefreq                                         Model save frequency in epochs during
                                                         training
--q, --quit                                              Stop condition for training. Set to `early`
+-q, \--quit                                             Stop condition for training. Set to `early`
                                                         for early stopping (default) or `dumb` for fixed
                                                         number of epochs.
--N, --epochs                                            Number of epochs to train for.
---min-epochs                                            Minimum number of epochs to train for when using early stopping.
---lag                                                   Number of epochs to wait before stopping
+-N, \--epochs                                           Number of epochs to train for.
+\--min-epochs                                           Minimum number of epochs to train for when using early stopping.
+\--lag                                                  Number of epochs to wait before stopping
                                                         training without improvement. Only used when using early stopping.
--d, --device                                            Select device to use (cpu, cuda:0, cuda:1,...). GPU acceleration requires CUDA.
---optimizer                                             Select optimizer (Adam, SGD, RMSprop).
--r, --lrate                                             Learning rate  [default: 0.001]
--m, --momentum                                          Momentum used with SGD optimizer. Ignored otherwise.
--w, --weight-decay                                      Weight decay.
---schedule                                              Sets the learning rate scheduler. May be either constant, 1cycle, exponential, cosine, step, or
+-d, \--device                                           Select device to use (cpu, cuda:0, cuda:1,...). GPU acceleration requires CUDA.
+\--optimizer                                            Select optimizer (Adam, SGD, RMSprop).
+-r, \--lrate                                            Learning rate  [default: 0.001]
+-m, \--momentum                                         Momentum used with SGD optimizer. Ignored otherwise.
+-w, \--weight-decay                                     Weight decay.
+\--schedule                                             Sets the learning rate scheduler. May be either constant, 1cycle, exponential, cosine, step, or
                                                         reduceonplateau. For 1cycle the cycle length is determined by the `--epoch` option.
--p, --partition                                         Ground truth data partition ratio between train/validation set
--u, --normalization                                     Ground truth Unicode normalization. One of NFC, NFKC, NFD, NFKD.
--c, --codec                                             Load a codec JSON definition (invalid if loading existing model)
---resize                                                Codec/output layer resizing option. If set
+-p, \--partition                                        Ground truth data partition ratio between train/validation set
+-u, \--normalization                                    Ground truth Unicode normalization. One of NFC, NFKC, NFD, NFKD.
+-c, \--codec                                            Load a codec JSON definition (invalid if loading existing model)
+\--resize                                               Codec/output layer resizing option. If set
                                                         to `add` code points will be added, `both`
                                                         will set the layer to match exactly the
                                                         training data, `fail` will abort if training
                                                         data and model codec do not match. Only valid when refining an existing model.
--n, --reorder / --no-reorder                            Reordering of code points to display order.
--t, --training-files                                    File(s) with additional paths to training data. Used to 
-                                                        enforce an explicit train/validation set split and deal with 
+-n, \--reorder / \--no-reorder                          Reordering of code points to display order.
+-t, \--training-files                                   File(s) with additional paths to training data. Used to
+                                                        enforce an explicit train/validation set split and deal with
                                                         training sets with more lines than the command line can process. Can be used more than once.
--e, --evaluation-files                                  File(s) with paths to evaluation data. Overrides the `-p` parameter.
--f, --format-type                                       Sets the training and evaluation data format.
+-e, \--evaluation-files                                 File(s) with paths to evaluation data. Overrides the `-p` parameter.
+-f, \--format-type                                      Sets the training and evaluation data format.
                                                         Valid choices are 'path', 'xml' (default), 'alto', 'page', or binary.
                                                         In `alto`, `page`, and xml mode all data is extracted from XML files
                                                         containing both baselines and a link to source images.
                                                         In `path` mode arguments are image files sharing a prefix up to the last
                                                         extension with JSON `.path` files containing the baseline information.
                                                         In `binary` mode arguments are precompiled binary dataset files.
---augment / --no-augment                                Enables/disables data augmentation.
---workers                                               Number of OpenMP threads and workers used to perform neural network passes and load samples from the dataset.
+\--augment / \--no-augment                              Enables/disables data augmentation.
+\--workers                                              Number of OpenMP threads and workers used to perform neural network passes and load samples from the dataset.
 ======================================================= ======
 
 From Scratch
