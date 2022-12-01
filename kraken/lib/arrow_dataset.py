@@ -33,6 +33,7 @@ from kraken.lib.segmentation import extract_polygons
 from kraken.lib.xml import parse_xml, parse_alto, parse_page
 from kraken.lib.util import is_bitonal, make_printable
 from kraken.lib.exceptions import KrakenInputException
+from os import extsep
 
 import logging
 
@@ -157,6 +158,8 @@ def build_binary_dataset(files: Optional[List[Union[str, pathlib.Path, Dict]]] =
                 logger.warning(f'Invalid input file {doc}')
                 continue
             try:
+                name_ext = data['image'].split(extsep, 1)
+                if name_ext[1] == 'gt.txt': data['image'] = name_ext[0]+'.png'
                 with open(data['image'], 'rb') as fp:
                     Image.open(fp)
             except (FileNotFoundError, UnidentifiedImageError) as e:

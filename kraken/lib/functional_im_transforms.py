@@ -21,7 +21,7 @@ import regex
 import unicodedata
 import bidi.algorithm as bd
 
-from os import path
+from os import extsep
 from PIL import Image
 from PIL.Image import Resampling
 
@@ -91,7 +91,7 @@ def text_reorder(text: str, base_dir: Optional[str] = None) -> str:
 
 
 def default_split(x: str) -> str:
-    return path.splitext(x)[0]
+    return x.split(extsep, 1)[0]
 
 
 def suffix_split(x: str, split: Callable[[str], str], suffix: str) -> str:
