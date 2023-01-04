@@ -191,7 +191,7 @@ def vec_lines(heatmap: torch.Tensor,
     baselines = []
     for bl_type, idx in cls_map['baselines'].items():
         logger.debug(f'Vectorizing lines of type {bl_type}')
-        baselines.extend([(bl_type, x) for x in vectorize_lines(heatmap[(st_sep, end_sep, idx), :, :])])
+        baselines.extend([(bl_type, x) for x in vectorize_lines(heatmap[(st_sep, end_sep, idx), :, :], text_direction=text_direction[:-3])])
     logger.debug('Polygonizing lines')
 
     im_feats = gaussian_filter(sobel(scal_im), 0.5)

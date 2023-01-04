@@ -26,7 +26,6 @@ def slugify(value):
     value = re.sub(r'[-\s]+', '-', value)
     return value
 
-
 @click.command()
 @click.option('-f', '--format-type', type=click.Choice(['xml', 'alto', 'page']), default='xml',
               help='Sets the input document format. In ALTO and PageXML mode all '
@@ -34,6 +33,11 @@ def slugify(value):
               'link to source images.')
 @click.option('-i', '--model', default=None, show_default=True, type=click.Path(exists=True),
               help='Baseline detection model to use. Overrides format type and expects image files as input.')
+@click.option('-d', '--text-direction', default='horizontal-lr',
+              show_default=True,
+              type=click.Choice(['horizontal-lr', 'horizontal-rl',
+                                 'vertical-lr', 'vertical-rl']),
+              help='Sets principal text direction')
 @click.option('--repolygonize/--no-repolygonize', show_default=True,
               default=False, help='Repolygonizes line data in ALTO/PageXML '
               'files. This ensures that the trained model is compatible with the '
@@ -44,7 +48,7 @@ def slugify(value):
               'and will not scale input images to the same size as the segmenter '
               'does.')
 @click.argument('files', nargs=-1)
-def cli(format_type, model, repolygonize, files):
+def cli(format_type, model, text_direction, repolygonize, files):
     """
     A script producing overlays of lines and regions from either ALTO or
     PageXML files or run a model to do the same.
@@ -111,11 +115,11 @@ def cli(format_type, model, repolygonize, files):
         for doc in files:
             click.echo(f'Processing {doc} ', nl=False)
             im = Image.open(doc)
-            res = blla.segment(im, model=net)
+            res = blla.segment(im, model=net, text_direction=text_direction)
             # reorder lines by type
             lines = defaultdict(list)
             for line in res['lines']:
-                lines[line['tags']]['type'].append(line)
+                lines[line['tags']['type']].append(line)
             im = im.convert('RGBA')
             for t, ls in lines.items():
                 tmp = Image.new('RGBA', im.size, (0, 0, 0, 0))

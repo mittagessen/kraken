@@ -273,7 +273,8 @@ class LineMCP(MCP_Connect):
         return 2 if float_cumcost else 0
 
 
-def vectorize_lines(im: np.ndarray, threshold: float = 0.17, min_length=5):
+def vectorize_lines(im: np.ndarray, threshold: float = 0.17, min_length=5,
+                    text_direction: str = 'horizontal'):
     """
     Vectorizes lines from a binarized array.
 
@@ -283,11 +284,16 @@ def vectorize_lines(im: np.ndarray, threshold: float = 0.17, min_length=5):
                          end_separators, baseline).
         threshold (float): Threshold for baseline blob detection.
         min_length (int): Minimal length of output baselines.
+        text_direction (str): Base orientation of the text line (horizontal or
+                              vertical).
 
     Returns:
         [[x0, y0, ... xn, yn], [xm, ym, ..., xk, yk], ... ]
         A list of lists containing the points of all baseline polylines.
     """
+    if text_direction not in ['horizontal', 'vertical']:
+        raise ValueError(f'Invalid text direction "{text_direction}"')
+
     # split into baseline and separator map
     st_map = im[0]
     end_map = im[1]
@@ -323,9 +329,14 @@ def vectorize_lines(im: np.ndarray, threshold: float = 0.17, min_length=5):
         elif f_st_map[l_end] - f_end_map[l_end] < -0.2 and f_st_map[r_end] - f_end_map[r_end] > 0.2:
             bl = bl[::-1]
         else:
-            logger.debug('Insufficient marker confidences in output. Defaulting to upright line.')
-        if bl[0][1] > bl[-1][1]:
-            bl = bl[::-1]
+            if text_direction == 'horizontal':
+                logger.debug('Insufficient marker confidences in output. Defaulting to horizontal upright line.')
+                if bl[0][1] > bl[-1][1]:
+                    bl = bl[::-1]
+            else:
+                logger.debug('Insufficient marker confidences in output. Defaulting to top-to-bottom line.')
+                if bl[0][0] > bl[-1][0]:
+                    bl = bl[::-1]
         if geom.LineString(bl).length >= min_length:
             oriented_lines.append([x[::-1] for x in bl])
     return oriented_lines
