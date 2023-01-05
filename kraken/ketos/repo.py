@@ -53,7 +53,7 @@ def publish(ctx, metadata, access_token, private, model):
     from kraken import repo
     from kraken.lib import models
 
-    with pkg_resources.resource_stream(__name__, 'metadata.schema.json') as fp:
+    with pkg_resources.resource_stream('kraken', 'metadata.schema.json') as fp:
         schema = json.load(fp)
 
     nn = models.load_any(model)
