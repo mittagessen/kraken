@@ -17,7 +17,7 @@ dependencies:
   - conda-forge::pytorch-cpu>=1.7.1,<1.14
   - jsonschema
   - scikit-image>=0.17.0,<=0.19.3
-  - shapely>=1.8
+  - shapely>=2.0
   - pyvips
   - imagemagick>=7.1.0
   - coremltools>=3.3

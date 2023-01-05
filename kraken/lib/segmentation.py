@@ -28,6 +28,7 @@ from scipy.ndimage.morphology import distance_transform_cdt
 from scipy.spatial.distance import pdist, squareform
 
 from shapely.ops import nearest_points, unary_union
+from shapely.validation import explain_validity
 
 from skimage import draw, filters
 from skimage.graph import MCP_Connect
@@ -559,6 +560,11 @@ def _extract_patch(env_up, env_bottom, baseline, offset_baseline, end_points, di
     # offsetting might produce bounds outside the image. Clip it to the image bounds.
     polygon = np.concatenate(([end_points[0]], upper_seam, [end_points[-1]], bottom_seam[::-1]))
     polygon = geom.Polygon(polygon)
+    if not polygon.is_valid:
+        polygon = np.concatenate(([end_points[-1]], upper_seam, [end_points[0]], bottom_seam))
+        polygon = geom.Polygon(polygon)
+    if not polygon.is_valid:
+        raise Exception(f'Invalid bounding polygon computed: {explain_validity(polygon)}')
     polygon = np.array(roi_polygon.intersection(polygon).boundary.coords, dtype=int)
     return polygon
 
