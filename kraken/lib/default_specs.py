@@ -81,6 +81,7 @@ RECOGNITION_HYPER_PARAMS = {'pad': 16,
                             }
 
 SEGMENTATION_HYPER_PARAMS = {'line_width': 8,
+                             'padding': (0, 0),
                              'freq': 1.0,
                              'quit': 'dumb',
                              'epochs': 50,

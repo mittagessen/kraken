@@ -650,7 +650,13 @@ class SegmentationModel(pl.LightningModule):
         if not training_data:
             raise ValueError('No training data provided. Please add some.')
 
-        transforms = ImageInputTransforms(batch, height, width, channels, 0, valid_norm=False, force_binarization=force_binarization)
+        transforms = ImageInputTransforms(batch,
+                                          height,
+                                          width,
+                                          channels,
+                                          self.hparams.padding,
+                                          valid_norm=False,
+                                          force_binarization=force_binarization)
 
         self.example_input_array = torch.Tensor(batch,
                                                 channels,

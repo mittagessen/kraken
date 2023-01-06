@@ -83,7 +83,14 @@ def compute_segmentation_map(im: PIL.Image.Image,
     model.to(device)
 
     batch, channels, height, width = model.input
-    transforms = dataset.ImageInputTransforms(batch, height, width, channels, 0, valid_norm=False)
+    padding = model.user_metadata['hyper_params']['padding'] if 'padding' in model.user_metadata['hyper_params'] else (0, 0)
+    # expand padding to 4-tuple (left, right, top, bottom)
+    if isinstance(padding, int):
+        padding = (padding,) * 4
+    elif len(padding) == 2:
+        padding = (padding[0], padding[0], padding[1] , padding[1])
+
+    transforms = dataset.ImageInputTransforms(batch, height, width, channels, padding, valid_norm=False)
     tf_idx, _ = next(filter(lambda x: isinstance(x[1], tf.ToTensor), enumerate(transforms.transforms)))
     res_tf = tf.Compose(transforms.transforms[:tf_idx])
     scal_im = np.array(res_tf(im).convert('L'))
@@ -105,8 +112,13 @@ def compute_segmentation_map(im: PIL.Image.Image,
         o, _ = model.nn(tensor_im.unsqueeze(0).to(device))
     logger.debug('Upsampling network output')
     o = F.interpolate(o, size=scal_im.shape)
+    # remove padding
+    o = o[:,:,padding[2]:-padding[3], padding[0]:-padding[1]]
+    scal_im = scal_im[padding[2]:-padding[3], padding[0]:-padding[1]]
+
     o = o.squeeze().cpu().numpy()
     scale = np.divide(im.size, o.shape[:0:-1])
+
     bounding_regions = model.user_metadata['bounding_regions'] if 'bounding_regions' in model.user_metadata else None
     return {'heatmap': o,
             'cls_map': model.user_metadata['class_mapping'],

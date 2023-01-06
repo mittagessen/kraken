@@ -63,6 +63,8 @@ def _validate_merging(ctx, param, value):
               show_default=True,
               default=SEGMENTATION_HYPER_PARAMS['line_width'],
               help='The height of each baseline in the target after scaling')
+@click.option('--pad', show_default=True, type=(int, int), default=(0, 0),
+              help='Padding (left/right, top/bottom) around the page image')
 @click.option('-i', '--load', show_default=True, type=click.Path(exists=True,
               readable=True), help='Load existing file to continue training')
 @click.option('-F', '--freq', show_default=True, default=SEGMENTATION_HYPER_PARAMS['freq'], type=click.FLOAT,
@@ -200,13 +202,15 @@ def _validate_merging(ctx, param, value):
 @click.option('-cl', '--centerline', 'topline', flag_value='centerline')
 @click.option('-bl', '--baseline', 'topline', flag_value='baseline', default='baseline')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
-def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs, min_epochs,
-             lag, min_delta, device, precision, optimizer, lrate, momentum, weight_decay,
-             warmup, schedule, gamma, step_size, sched_patience, cos_max, partition,
-             training_files, evaluation_files, workers, load_hyper_parameters,
+def segtrain(ctx, output, spec, line_width, padding, load, freq, quit, epochs,
+             min_epochs, lag, min_delta, device, precision, optimizer, lrate,
+             momentum, weight_decay, warmup, schedule, gamma, step_size,
+             sched_patience, cos_max, partition, training_files,
+             evaluation_files, workers, load_hyper_parameters,
              force_binarization, format_type, suppress_regions,
              suppress_baselines, valid_regions, valid_baselines, merge_regions,
-             merge_baselines, bounding_regions, augment, resize, topline, ground_truth):
+             merge_baselines, bounding_regions, augment, resize, topline,
+             ground_truth):
     """
     Trains a baseline labeling model for layout analysis
     """
@@ -231,6 +235,7 @@ def segtrain(ctx, output, spec, line_width, load, freq, quit, epochs, min_epochs
     # populate hyperparameters from command line args
     hyper_params = SEGMENTATION_HYPER_PARAMS.copy()
     hyper_params.update({'line_width': line_width,
+                         'padding': padding,
                          'freq': freq,
                          'quit': quit,
                          'epochs': epochs,
