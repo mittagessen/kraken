@@ -202,7 +202,7 @@ def _validate_merging(ctx, param, value):
 @click.option('-cl', '--centerline', 'topline', flag_value='centerline')
 @click.option('-bl', '--baseline', 'topline', flag_value='baseline', default='baseline')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
-def segtrain(ctx, output, spec, line_width, padding, load, freq, quit, epochs,
+def segtrain(ctx, output, spec, line_width, pad, load, freq, quit, epochs,
              min_epochs, lag, min_delta, device, precision, optimizer, lrate,
              momentum, weight_decay, warmup, schedule, gamma, step_size,
              sched_patience, cos_max, partition, training_files,
@@ -235,7 +235,7 @@ def segtrain(ctx, output, spec, line_width, padding, load, freq, quit, epochs,
     # populate hyperparameters from command line args
     hyper_params = SEGMENTATION_HYPER_PARAMS.copy()
     hyper_params.update({'line_width': line_width,
-                         'padding': padding,
+                         'padding': pad,
                          'freq': freq,
                          'quit': quit,
                          'epochs': epochs,
