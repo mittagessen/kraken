@@ -95,7 +95,7 @@ def _validate_merging(ctx, param, value):
               type=click.FLOAT,
               help='Minimum improvement between epochs to reset early stopping. By default it scales the delta by the best loss')
 @click.option('-d', '--device', show_default=True, default='cpu', help='Select device to use (cpu, cuda:0, cuda:1, ...)')
-@click.option('-p', '--precision', default='32', type=click.Choice(['32', '16']), help='set tensor precision')
+@click.option('--precision', default='32', type=click.Choice(['32', '16']), help='set tensor precision')
 @click.option('--optimizer',
               show_default=True,
               default=SEGMENTATION_HYPER_PARAMS['optimizer'],
