@@ -18,7 +18,6 @@ Processing for baseline segmenter output
 import PIL
 import logging
 import numpy as np
-import torch.nn.functional as F
 import shapely.geometry as geom
 
 from collections import defaultdict

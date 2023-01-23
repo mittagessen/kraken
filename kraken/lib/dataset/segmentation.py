@@ -19,6 +19,7 @@ import json
 import torch
 import traceback
 import numpy as np
+import torch.nn.functional as F
 import shapely.geometry as geom
 
 from os import path
