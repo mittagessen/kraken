@@ -17,13 +17,14 @@ Utility functions for data loading and training of VGSL networks.
 """
 import json
 import torch
+import numbers
 import pkg_resources
 import torch.nn.functional as F
 
 from functools import partial
 from torchvision import transforms
 from collections import Counter
-from typing import Dict, List, Tuple, Sequence, Any
+from typing import Dict, List, Tuple, Sequence, Any, Union
 
 from kraken.lib.models import TorchSeqRecognizer
 from kraken.lib.exceptions import KrakenInputException
@@ -46,7 +47,7 @@ class ImageInputTransforms(transforms.Compose):
                  height: int,
                  width: int,
                  channels: int,
-                 pad: int,
+                 pad: Union[int, Tuple[int, int], Tuple[int, int, int, int]],
                  valid_norm: bool = True,
                  force_binarization: bool = False) -> None:
         """
@@ -68,11 +69,11 @@ class ImageInputTransforms(transforms.Compose):
         super().__init__(None)
 
         self._scale = (height, width)  # type: Tuple[int, int]
-        self._pad = pad
         self._valid_norm = valid_norm
         self._force_binarization = force_binarization
         self._batch = batch
         self._channels = channels
+        self.pad = pad
 
         self._create_transforms()
 
@@ -120,7 +121,7 @@ class ImageInputTransforms(transforms.Compose):
             else:
                 self.transforms.append(transforms.Lambda(partial(F_t.pil_fixed_resize, scale=self._scale)))
         if self._pad:
-            self.transforms.append(transforms.Pad((self._pad, 0), fill=255))
+            self.transforms.append(transforms.Pad(self._pad, fill=255))
         self.transforms.append(transforms.ToTensor())
         # invert
         self.transforms.append(transforms.Lambda(F_t.tensor_invert))
@@ -216,7 +217,9 @@ class ImageInputTransforms(transforms.Compose):
         return self._pad
 
     @pad.setter
-    def pad(self, pad: int) -> None:
+    def pad(self, pad: Union[int, Tuple[int, int], Tuple[int, int, int, int]]) -> None:
+        if not isinstance(pad, (numbers.Number, tuple, list)):
+            raise TypeError('Got inappropriate padding arg')
         self._pad = pad
         self._create_transforms()
 

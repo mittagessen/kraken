@@ -19,6 +19,7 @@ import json
 import torch
 import traceback
 import numpy as np
+import torch.nn.functional as F
 import shapely.geometry as geom
 
 from os import path
@@ -50,6 +51,7 @@ class BaselineSet(Dataset):
     def __init__(self, imgs: Sequence[str] = None,
                  suffix: str = '.path',
                  line_width: int = 4,
+                 padding: Tuple[int, int, int, int] = (0, 0, 0, 0),
                  im_transforms: Callable[[Any], torch.Tensor] = transforms.Compose([]),
                  mode: str = 'path',
                  augmentation: bool = False,
@@ -61,30 +63,33 @@ class BaselineSet(Dataset):
         Reads a list of image-json pairs and creates a data set.
 
         Args:
-            imgs (list):
-            suffix (int): Suffix to attach to image base name to load JSON
-                          files from.
-            line_width (int): Height of the baseline in the scaled input.
-            target_size (tuple): Target size of the image as a (height, width) tuple.
-            mode (str): Either path, alto, page, xml, or None. In alto, page,
-                        and xml mode the baseline paths and image data is
-                        retrieved from an ALTO/PageXML file. In `None` mode
-                        data is iteratively added through the `add` method.
-            augmentation (bool): Enable/disable augmentation.
-            valid_baselines (list): Sequence of valid baseline identifiers. If
-                                    `None` all are valid.
-            merge_baselines (dict): Sequence of baseline identifiers to merge.
-                                    Note that merging occurs after entities not
-                                    in valid_* have been discarded.
-            valid_regions (list): Sequence of valid region identifiers. If
-                                  `None` all are valid.
-            merge_regions (dict): Sequence of region identifiers to merge.
-                                  Note that merging occurs after entities not
-                                  in valid_* have been discarded.
+            imgs:
+            suffix: Suffix to attach to image base name to load JSON files
+                    from.
+            line_width: Height of the baseline in the scaled input.
+            padding: Tuple of ints containing the left/right, top/bottom
+                     padding of the input images.
+            target_size: Target size of the image as a (height, width) tuple.
+            mode: Either path, alto, page, xml, or None. In alto, page, and xml
+                  mode the baseline paths and image data is retrieved from an
+                  ALTO/PageXML file. In `None` mode data is iteratively added
+                  through the `add` method.
+            augmentation: Enable/disable augmentation.
+            valid_baselines: Sequence of valid baseline identifiers. If `None`
+                             all are valid.
+            merge_baselines: Sequence of baseline identifiers to merge.  Note
+                             that merging occurs after entities not in valid_*
+                             have been discarded.
+            valid_regions: Sequence of valid region identifiers. If `None` all
+                           are valid.
+            merge_regions: Sequence of region identifiers to merge. Note that
+                           merging occurs after entities not in valid_* have
+                           been discarded.
         """
         super().__init__()
         self.mode = mode
         self.im_mode = '1'
+        self.pad = padding
         self.aug = None
         self.targets = []
         # n-th entry contains semantic of n-th class
@@ -259,8 +264,8 @@ class BaselineSet(Dataset):
     def transform(self, image, target):
         orig_size = image.size
         image = self.transforms(image)
-        scale = image.shape[2]/orig_size[0]
-        t = torch.zeros((self.num_classes,) + image.shape[1:])
+        scale = (image.shape[2] - 2*self.pad[1])/orig_size[0]
+        t = torch.zeros((self.num_classes,) + tuple(np.subtract(image.shape[1:], (2*self.pad[1], 2*self.pad[0]))))
         start_sep_cls = self.class_mapping['aux']['_start_separator']
         end_sep_cls = self.class_mapping['aux']['_end_separator']
 
@@ -303,7 +308,7 @@ class BaselineSet(Dataset):
                 region = np.array(region)*scale
                 rr, cc = polygon(region[:, 1], region[:, 0], shape=image.shape[1:])
                 t[cls_idx, rr, cc] = 1
-        target = t
+        target = F.pad(t, self.pad)
         if self.aug:
             image = image.permute(1, 2, 0).numpy()
             target = target.permute(1, 2, 0).numpy()

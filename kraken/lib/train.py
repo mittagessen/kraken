@@ -650,7 +650,13 @@ class SegmentationModel(pl.LightningModule):
         if not training_data:
             raise ValueError('No training data provided. Please add some.')
 
-        transforms = ImageInputTransforms(batch, height, width, channels, 0, valid_norm=False, force_binarization=force_binarization)
+        transforms = ImageInputTransforms(batch,
+                                          height,
+                                          width,
+                                          channels,
+                                          self.hparams.padding,
+                                          valid_norm=False,
+                                          force_binarization=force_binarization)
 
         self.example_input_array = torch.Tensor(batch,
                                                 channels,
@@ -786,7 +792,7 @@ class SegmentationModel(pl.LightningModule):
         if stage in [None, 'fit']:
             if not self.model:
                 self.spec = f'[{self.spec[1:-1]} O2l{self.train_set.dataset.num_classes}]'
-                logger.info(f'Creating model {self.spec} with {self.train_set.dataset.num_classes} outputs ', nl=False)
+                logger.info(f'Creating model {self.spec} with {self.train_set.dataset.num_classes} outputs')
                 nn = vgsl.TorchVGSLModel(self.spec)
                 if self.bounding_regions is not None:
                     nn.user_metadata['bounding_regions'] = self.bounding_regions
