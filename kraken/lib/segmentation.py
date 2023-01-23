@@ -18,7 +18,9 @@ Processing for baseline segmenter output
 import PIL
 import logging
 import numpy as np
+import torch.nn.functional as F
 import shapely.geometry as geom
+
 from collections import defaultdict
 
 from PIL import Image
@@ -363,7 +365,7 @@ def vectorize_regions(im: np.ndarray, threshold: float = 0.5):
         boundary = boundary_tracing(x)
         if len(boundary) > 2:
             boundaries.append(geom.Polygon(boundary))
-    # merge regions that overlap 
+    # merge regions that overlap
     boundaries = unary_union(boundaries)
     # simplify them afterwards
     if boundaries.geom_type == 'Polygon':
