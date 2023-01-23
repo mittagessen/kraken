@@ -264,7 +264,7 @@ class BaselineSet(Dataset):
         orig_size = image.size
         image = self.transforms(image)
         scale = (image.shape[2] - 2*self.pad[1])/orig_size[0]
-        t = torch.zeros((self.num_classes,) + (image.shape[1:] - (2*self.pad[1], 2*self.pad[0])))
+        t = torch.zeros((self.num_classes,) + tuple(np.subtract(image.shape[1:], (2*self.pad[1], 2*self.pad[0]))))
         start_sep_cls = self.class_mapping['aux']['_start_separator']
         end_sep_cls = self.class_mapping['aux']['_end_separator']
 
