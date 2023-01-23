@@ -8,7 +8,7 @@ from torch.nn import Module, Embedding, Linear
 from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
 
 from kraken.lib.vgsl import VGSLBlock
-from kraken.lib.pretrain.util import compute_masks
+from kraken.lib.pretrain.util import compute_mask_indices, sample_negatives
 
 # all tensors are ordered NCHW, the "feature" dimension is C, so the output of
 # an LSTM will be put into C same as the filters of a CNN.
@@ -53,7 +53,7 @@ class Wav2Vec2Mask(Module):
         self.num_negatives = num_negatives
 
         # mask embedding replacing the masked out areas
-        self.mask_emb = Embedding(mask_width, context_encoder_input_dim)
+        self.mask_emb = Embedding(1, context_encoder_input_dim)
         self.project_q = Linear(context_encoder_input_dim, final_dim)
 
     def forward(self, inputs: torch.Tensor, seq_len: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
@@ -63,23 +63,26 @@ class Wav2Vec2Mask(Module):
 
         # NCHW -> NWC
         inputs = inputs.transpose(1, 3).reshape(-1, W, C)
-        seq_len = seq_len.cpu()
-        packed_inputs = pack_padded_sequence(inputs, seq_len, batch_first=True, enforce_sorted=False)
-        mask, num_masks, num_negatives = compute_masks(self.mask_prob, self.mask_width, self.num_negatives, seq_len)
+        mask_indices = compute_mask_indices((N, W), self.mask_prob, self.mask_width)
+        mask_indices = torch.from_numpy(mask_indices).to(inputs.device)
 
-        unmasked_samples = self.project_q(packed_inputs.data[mask == 1]).reshape(1, num_masks, self.mask_width, -1)
-        negative_samples = self.project_q(packed_inputs.data[mask == 2]).reshape(self.num_negatives, num_masks, self.mask_width, -1)
+        unmasked_features = inputs.clone()
+        # mask out 
+        inputs[mask_indices] = self.mask_emb.weight
+        # project into same dimensionality as final recurrent layer
+        unmasked_features = self.project_q(unmasked_features)
+        unmasked_samples = unmasked_features[mask_indices].view(unmasked_features.size(0), -1, unmasked_features.size(-1))
 
-        # mask features
-        packed_inputs.data[mask == 1] = self.mask_emb.weight.repeat(num_masks, 1)
-        inputs, seq_len = pad_packed_sequence(packed_inputs, batch_first=True)
+        # negative samples
+        negative_samples = sample_negatives(unmasked_samples, unmasked_samples.size(1), self.num_negatives)
+
         # NWC -> NCHW
         inputs = inputs.permute(0, 2, 1).unsqueeze(2)
         return {'output': inputs,
                 'unmasked_samples': unmasked_samples,
                 'negative_samples': negative_samples,
                 'seq_len': seq_len,
-                'mask': mask}
+                'mask': mask_indices}
 
     def get_shape(self, input: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
         """

@@ -13,7 +13,7 @@ dependencies:
   - requests
   - click>=8.1
   - numpy
-  - pillow==6.1
+  - pillow>=9.2.0
   - scipy
   - jinja2
   - torchvision=0.4.0
@@ -26,7 +26,7 @@ dependencies:
   - imagemagick<7.0.9
   - coremltools>=3.3
   - pyarrow
-  - pytorch-lightning
+  - pytorch-lightning>=1.7.0
   - pip
   - albumentations
   - rich

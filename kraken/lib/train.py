@@ -28,7 +28,7 @@ from functools import partial
 from torch.multiprocessing import Pool
 from torch.optim import lr_scheduler
 from typing import Callable, Dict, Optional, Sequence, Union, Any, List
-from pytorch_lightning.callbacks import Callback, EarlyStopping
+from pytorch_lightning.callbacks import Callback, EarlyStopping, BaseFinetuning
 
 from kraken.lib import models, vgsl, default_specs, progress
 from kraken.lib.xml import preparse_xml_data
@@ -65,6 +65,7 @@ class KrakenTrainer(pl.Trainer):
                  max_epochs: int = 100,
                  pb_ignored_metrics: Sequence[str] = ('loss', 'val_metric'),
                  move_metrics_to_cpu: bool = True,
+                 freeze_backbone=-1,
                  *args,
                  **kwargs):
         kwargs['logger'] = False
@@ -87,6 +88,9 @@ class KrakenTrainer(pl.Trainer):
             kwargs['callbacks'].append(summary_cb)
             kwargs['enable_model_summary'] = False
 
+        if freeze_backbone > 0:
+            kwargs['callbacks'].append(KrakenFreezeBackbone(freeze_backbone))
+
         kwargs['callbacks'].extend([KrakenSetOneChannelMode(), KrakenSaveModel()])
         super().__init__(*args, **kwargs)
 
@@ -95,6 +99,43 @@ class KrakenTrainer(pl.Trainer):
             warnings.filterwarnings(action='ignore', category=UserWarning,
                                     message='The dataloader,')
             super().fit(*args, **kwargs)
+
+
+class KrakenFreezeBackbone(BaseFinetuning):
+    """
+    Callback freezing all but the last layer for fixed number of iterations.
+    """
+    def __init__(self, unfreeze_at_iterations=10):
+        super().__init__()
+        self.unfreeze_at_iteration = unfreeze_at_iterations
+
+    def freeze_before_training(self, pl_module):
+        pass
+
+    def finetune_function(self, pl_module, current_epoch, optimizer, optimizer_idx):
+        pass
+
+    def on_train_start(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule") -> None:
+        self.freeze(pl_module.net[:-1])
+
+    def on_train_batch_start(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule", batch, batch_idx) -> None:
+        """
+        Called for each training batch.
+        """
+        if trainer.global_step == self.unfreeze_at_iteration:
+            from pytorch_lightning.loops.utilities import _get_active_optimizers
+
+            for opt_idx, optimizer in _get_active_optimizers(trainer.optimizers, trainer.optimizer_frequencies, 0):
+                num_param_groups = len(optimizer.param_groups)
+                self.unfreeze_and_add_param_group(modules=pl_module.net[:-1],
+                                                  optimizer=optimizer,
+                                                  train_bn=True,)
+                current_param_groups = optimizer.param_groups
+                self._store(pl_module, opt_idx, num_param_groups, current_param_groups)
+
+    def on_train_epoch_start(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule") -> None:
+        """Called when the epoch begins."""
+        pass
 
 
 class KrakenSetOneChannelMode(Callback):
@@ -549,6 +590,7 @@ class RecognitionModel(pl.LightningModule):
             lr_scale = min(1.0, float(self.trainer.global_step + 1) / self.hparams.warmup)
             for pg in optimizer.param_groups:
                 pg["lr"] = lr_scale * self.hparams.lrate
+
 
     def lr_scheduler_step(self, scheduler, optimizer_idx, metric):
         if not self.hparams.warmup or self.trainer.global_step >= self.hparams.warmup:

@@ -45,10 +45,10 @@ RECOGNITION_PRETRAIN_HYPER_PARAMS = {'pad': 16,
                                      'cos_t_max': 100,
                                      # masking parameters
                                      'mask_width': 4,
-                                     'mask_prob': 0.2,
-                                     'num_negatives': 2,
+                                     'mask_prob': 0.5,
+                                     'num_negatives': 100,
                                      'logit_temp': 0.1,
-                                     'warmup': 0,
+                                     'warmup': 32000,
                                      }
 
 RECOGNITION_HYPER_PARAMS = {'pad': 16,
@@ -78,6 +78,7 @@ RECOGNITION_HYPER_PARAMS = {'pad': 16,
                             # cosine
                             'cos_t_max': 50,
                             'warmup': 0,
+                            'freeze_backbone': 0,
                             }
 
 SEGMENTATION_HYPER_PARAMS = {'line_width': 8,

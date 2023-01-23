@@ -137,7 +137,7 @@ class TorchSeqRecognizer(object):
 
         Args:
             line: NCHW line tensor
-            lens: Optional tensor
+            lens: Optional tensor containing the sequence lengths of the input batch.
         """
         o, olens = self.forward(line, lens)
         dec_strs = []
