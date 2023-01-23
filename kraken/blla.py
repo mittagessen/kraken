@@ -113,8 +113,11 @@ def compute_segmentation_map(im: PIL.Image.Image,
     logger.debug('Upsampling network output')
     o = F.interpolate(o, size=scal_im.shape)
     # remove padding
-    o = o[:,:,padding[2]:-padding[3], padding[0]:-padding[1]]
-    scal_im = scal_im[padding[2]:-padding[3], padding[0]:-padding[1]]
+    padding = [pad if pad else None for pad in padding]
+    padding[1] = -padding[1] if padding[1] else None
+    padding[3] = -padding[3] if padding[3] else None
+    o = o[:,:,padding[2]:padding[3], padding[0]:padding[1]]
+    scal_im = scal_im[padding[2]:padding[3], padding[0]:padding[1]]
 
     o = o.squeeze().cpu().numpy()
     scale = np.divide(im.size, o.shape[:0:-1])
