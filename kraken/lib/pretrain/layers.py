@@ -5,7 +5,6 @@ import torch
 
 from typing import Tuple, Optional
 from torch.nn import Module, Embedding, Linear
-from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
 
 from kraken.lib.vgsl import VGSLBlock
 from kraken.lib.pretrain.util import compute_mask_indices, sample_negatives
@@ -67,7 +66,7 @@ class Wav2Vec2Mask(Module):
         mask_indices = torch.from_numpy(mask_indices).to(inputs.device)
 
         unmasked_features = inputs.clone()
-        # mask out 
+        # mask out
         inputs[mask_indices] = self.mask_emb.weight
         # project into same dimensionality as final recurrent layer
         unmasked_features = self.project_q(unmasked_features)

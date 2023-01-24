@@ -302,7 +302,7 @@ class TorchVGSLModel(object):
             raise KrakenInvalidModelException('Failed parsing out layers from model weights') from exc
 
         if 'aux_layers' in mlmodel.user_defined_metadata:
-            logger.info(f'Deserializing auxiliary layers.')
+            logger.info('Deserializing auxiliary layers.')
             nn.aux_layers = {k: cls(v).nn.get_submodule(k) for k, v in json.loads(mlmodel.user_defined_metadata['aux_layers']).items()}
 
         if 'codec' in mlmodel.user_defined_metadata:

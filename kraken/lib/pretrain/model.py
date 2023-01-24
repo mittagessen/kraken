@@ -40,7 +40,6 @@ from itertools import chain
 from functools import partial
 from torch.optim import lr_scheduler
 from torch.multiprocessing import Pool
-from torch.nn.utils.rnn import pack_padded_sequence
 from typing import Dict, Optional, Sequence, Union, Any
 from pytorch_lightning.callbacks import EarlyStopping
 from pytorch_lightning.utilities.memory import is_oom_error, garbage_collection_cuda
@@ -335,7 +334,6 @@ class RecognitionPretrainModel(pl.LightningModule):
             negatives = mask_output['negative_samples']
             N, C, H, W = output.shape
             output = output.transpose(1, 3).reshape(-1, W, C)
-            packed_output = pack_padded_sequence(output, seq_lens, batch_first=True, enforce_sorted=False)
             # masked features after encoder
             x = output[mask_output['mask']].reshape_as(y)
             mask_n_neg = torch.cat([y.unsqueeze(0), negatives], dim=0)
@@ -351,7 +349,7 @@ class RecognitionPretrainModel(pl.LightningModule):
             return loss
         except RuntimeError as e:
             if is_oom_error(e):
-                logger.warning(f'Out of memory error in trainer. Skipping batch and freeing caches.')
+                logger.warning('Out of memory error in trainer. Skipping batch and freeing caches.')
                 garbage_collection_cuda()
             else:
                 raise
@@ -437,7 +435,7 @@ class RecognitionPretrainModel(pl.LightningModule):
                                                  self.hparams.num_negatives)
                 self.nn.aux_layers = {'wav2vec2mask': self.wav2vec2mask}
 
-            # add dummy codec and output layer for 
+            # add dummy codec and output layer
             if not self.nn.codec and not isinstance(self.net[-1], layers.LinSoftmax):
                 logger.info('Adding dummy codec and output layer to model')
                 self.nn.add_codec(PytorchCodec(' '))

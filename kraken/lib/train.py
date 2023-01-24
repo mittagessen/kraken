@@ -27,7 +27,7 @@ import pytorch_lightning as pl
 from functools import partial
 from torch.multiprocessing import Pool
 from torch.optim import lr_scheduler
-from typing import Callable, Dict, Optional, Sequence, Union, Any, List
+from typing import Callable, Dict, Optional, Sequence, Union, Any, Literal
 from pytorch_lightning.callbacks import Callback, EarlyStopping, BaseFinetuning
 
 from kraken.lib import models, vgsl, default_specs, progress
@@ -185,9 +185,9 @@ class RecognitionModel(pl.LightningModule):
                  load_hyper_parameters: bool = False,
                  repolygonize: bool = False,
                  force_binarization: bool = False,
-                 format_type: str = 'path',
+                 format_type: Literal['path', 'alto', 'page', 'xml', 'binary'] = 'path',
                  codec: Optional[Dict] = None,
-                 resize: str = 'fail'):
+                 resize: Literal['fail', 'add', 'both'] = 'fail'):
         """
         A LightningModule encapsulating the training setup for a text
         recognition model.
@@ -591,7 +591,6 @@ class RecognitionModel(pl.LightningModule):
             for pg in optimizer.param_groups:
                 pg["lr"] = lr_scale * self.hparams.lrate
 
-
     def lr_scheduler_step(self, scheduler, optimizer_idx, metric):
         if not self.hparams.warmup or self.trainer.global_step >= self.hparams.warmup:
             # step OneCycleLR each batch if not in warmup phase
@@ -616,7 +615,7 @@ class SegmentationModel(pl.LightningModule):
                  partition: Optional[float] = 0.9,
                  num_workers: int = 1,
                  force_binarization: bool = False,
-                 format_type: str = 'path',
+                 format_type: Literal['path', 'alto', 'page', 'xml'] = 'path',
                  suppress_regions: bool = False,
                  suppress_baselines: bool = False,
                  valid_regions: Optional[Sequence[str]] = None,
@@ -624,7 +623,7 @@ class SegmentationModel(pl.LightningModule):
                  merge_regions: Optional[Dict[str, str]] = None,
                  merge_baselines: Optional[Dict[str, str]] = None,
                  bounding_regions: Optional[Sequence[str]] = None,
-                 resize: str = 'fail',
+                 resize: Literal['fail', 'both', 'add'] = 'fail',
                  topline: Union[bool, None] = False):
         """
         A LightningModule encapsulating the training setup for a page
@@ -1030,9 +1029,9 @@ def _configure_optimizer_and_lr_scheduler(hparams, params, len_train_set=None, l
                     'interval': 'step'}
     elif hparams.schedule == 'reduceonplateau':
         lr_sched = {'scheduler': lr_scheduler.ReduceLROnPlateau(optim,
-                                                               mode=loss_tracking_mode,
-                                                               factor=hparams.rop_factor,
-                                                               patience=hparams.rop_patience),
+                                                                mode=loss_tracking_mode,
+                                                                factor=hparams.rop_factor,
+                                                                patience=hparams.rop_patience),
                     'interval': 'step'}
     elif hparams.schedule == '1cycle':
         if hparams.epochs <= 0:
@@ -1041,10 +1040,10 @@ def _configure_optimizer_and_lr_scheduler(hparams, params, len_train_set=None, l
                              f'({hparams.epochs}).')
         last_epoch = hparams.completed_epochs*len_train_set if hparams.completed_epochs else -1
         lr_sched = {'scheduler': lr_scheduler.OneCycleLR(optim,
-                                                      max_lr=hparams.lrate,
-                                                      epochs=hparams.epochs,
-                                                      steps_per_epoch=len_train_set,
-                                                      last_epoch=last_epoch),
+                                                         max_lr=hparams.lrate,
+                                                         epochs=hparams.epochs,
+                                                         steps_per_epoch=len_train_set,
+                                                         last_epoch=last_epoch),
                     'interval': 'step'}
     elif hparams.schedule != 'constant':
         raise ValueError(f'Unsupported learning rate scheduler {hparams.schedule}.')

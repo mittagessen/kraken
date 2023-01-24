@@ -17,7 +17,6 @@ from jinja2 import Environment, PackageLoader
 import regex
 import logging
 import datetime
-import numpy as np
 import shapely.geometry as geom
 
 from pkg_resources import get_distribution
@@ -133,7 +132,7 @@ def serialize(records: Sequence[ocr_record],
     types = []
     for line in records:
         if hasattr(line, 'tags') and line.tags is not None:
-           types.extend(line.tags.values())
+            types.extend(line.tags.values())
     page['types'] = list(set(types))
     if regions is not None:
         page['types'].extend(list(regions.keys()))
@@ -201,7 +200,7 @@ def serialize(records: Sequence[ocr_record],
                           'index': seg_idx}
             # compute convex hull of all characters in segment
             if record.type == 'baselines':
-                seg_struct['boundary']  = record[line_offset:line_offset + len(segment)][1]
+                seg_struct['boundary'] = record[line_offset:line_offset + len(segment)][1]
             line['recognition'].append(seg_struct)
             char_idx += len(segment)
             seg_idx += 1
