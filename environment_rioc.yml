@@ -6,7 +6,7 @@ channels:
   - defaults
   - conda-forge
 dependencies:
-  - python>=3.7
+  - python>=3.8
   - python-bidi
   - lxml
   - regex
