@@ -3,7 +3,7 @@ channels:
   - defaults
   - conda-forge
 dependencies:
-  - python>=3.7
+  - python>=3.8
   - python-bidi
   - lxml
   - regex
@@ -23,6 +23,7 @@ dependencies:
   - coremltools>=3.3
   - pyarrow
   - conda-forge::pytorch-lightning>=1.7.0
+  - conda-forge::torchmetrics
   - pip
   - albumentations
   - rich
