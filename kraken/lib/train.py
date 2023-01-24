@@ -26,6 +26,7 @@ import pytorch_lightning as pl
 
 from functools import partial
 from torch.multiprocessing import Pool
+from torchmetrics.classification import MultilabelAccuracy, MultilabelJaccardIndex
 from torch.optim import lr_scheduler
 from typing import Callable, Dict, Optional, Sequence, Union, Any, Literal
 from pytorch_lightning.callbacks import Callback, EarlyStopping, BaseFinetuning
@@ -788,33 +789,20 @@ class SegmentationModel(pl.LightningModule):
         pred, _ = self.nn.nn(x)
         # scale target to output size
         y = F.interpolate(y, size=(pred.size(2), pred.size(3))).squeeze(0).bool()
-        pred = pred.squeeze() > 0.3
         pred = pred.view(pred.size(0), -1)
         y = y.view(y.size(0), -1)
 
-        return {'intersections': (y & pred).sum(dim=1, dtype=torch.double),
-                'unions':  (y | pred).sum(dim=1, dtype=torch.double),
-                'corrects': torch.eq(y, pred).sum(dim=1, dtype=torch.double),
-                'cls_cnt': y.sum(dim=1, dtype=torch.double),
-                'all_n': torch.tensor(y.size(1), dtype=torch.double, device=self.device)}
+        self.val_px_accuracy.update(pred, y)
+        self.val_mean_accuracy.update(pred, y)
+        self.val_mean_iu.update(pred, y)
+        self.val_freq_iu.update(pred, y)
 
     def validation_epoch_end(self, outputs):
-        smooth = torch.finfo(torch.float).eps
 
-        intersections = torch.stack([x['intersections'] for x in outputs]).sum()
-        unions = torch.stack([x['unions'] for x in outputs]).sum()
-        corrects = torch.stack([x['corrects'] for x in outputs]).sum()
-        cls_cnt = torch.stack([x['cls_cnt'] for x in outputs]).sum()
-        all_n = torch.stack([x['all_n'] for x in outputs]).sum()
-
-        # all_positives = tp + fp
-        # actual_positives = tp + fn
-        # true_positivies = tp
-        pixel_accuracy = corrects.sum() / all_n.sum()
-        mean_accuracy = torch.mean(corrects / all_n)
-        iu = (intersections + smooth) / (unions + smooth)
-        mean_iu = torch.mean(iu)
-        freq_iu = torch.sum(cls_cnt / cls_cnt.sum() * iu)
+        pixel_accuracy = self.val_px_accuracy.compute()
+        mean_accuracy = self.val_mean_accuracy.compute()
+        mean_iu = self.val_mean_iu.compute()
+        freq_iu = self.val_freq_iu.compute()
 
         if mean_iu > self.best_metric:
             logger.debug(f'Updating best metric from {self.best_metric} ({self.best_epoch}) to {mean_iu} ({self.current_epoch})')
@@ -827,6 +815,11 @@ class SegmentationModel(pl.LightningModule):
                        'val_mean_iu': mean_iu,
                        'val_freq_iu': freq_iu,
                        'val_metric': mean_iu}, prog_bar=True)
+
+        self.val_px_accuracy.reset()
+        self.val_mean_accuracy.reset()
+        self.val_mean_iu.reset()
+        self.val_freq_iu.reset()
 
     def setup(self, stage: Optional[str] = None):
         # finalize models in case of appending/loading
@@ -947,6 +940,12 @@ class SegmentationModel(pl.LightningModule):
             self.net = self.nn.nn
 
             torch.set_num_threads(max(self.num_workers, 1))
+
+            # set up validation metrics after output classes have been determined
+            self.val_px_accuracy = MultilabelAccuracy(average='micro', num_classes=self.train_set.dataset.num_classes)
+            self.val_mean_accuracy = MultilabelAccuracy(average='macro', num_classes=self.train_set.dataset.num_classes)
+            self.val_mean_iu = MultilabelJaccardIndex(average='macro', num_classes=self.train_set.dataset.num_classes)
+            self.val_freq_iu = MultilabelJaccardIndex(average='weighted', num_classes=self.train_set.dataset.num_classes)
 
     def train_dataloader(self):
         return DataLoader(self.train_set,
