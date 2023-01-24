@@ -39,6 +39,7 @@ import pytorch_lightning as pl
 from itertools import chain
 from functools import partial
 from torch.optim import lr_scheduler
+from torchmetrics import BinaryAccuracy
 from torch.multiprocessing import Pool
 from typing import Dict, Optional, Sequence, Union, Any
 from pytorch_lightning.callbacks import EarlyStopping
@@ -194,6 +195,8 @@ class PretrainDataModule(pl.LightningDataModule):
         logger.info(f'Training set {len(self.train_set)} lines, validation set '
                     f'{len(self.val_set)} lines')
 
+        self.val_accuracy = BinaryAccuracy()
+
     def _build_dataset(self,
                        DatasetClass,
                        training_data,
@@ -346,7 +349,7 @@ class RecognitionPretrainModel(pl.LightningModule):
             logits /= self.hparams.logit_temp
 
             loss = F.cross_entropy(logits, targets)
-            return loss
+            return logits, targets, loss
         except RuntimeError as e:
             if is_oom_error(e):
                 logger.warning('Out of memory error in trainer. Skipping batch and freeing caches.')
@@ -355,15 +358,19 @@ class RecognitionPretrainModel(pl.LightningModule):
                 raise
 
     def validation_step(self, batch, batch_idx):
-        loss = self._step(batch, batch_idx)
-        if loss is not None:
-            self.log('CE', loss)
+        o = self._step(batch, batch_idx)
+        if o is not None:
+            logits, targets, loss = o
+            self.val_acc(logits, targets)
+            self.log('CE', loss, on_step=True, on_epoch=True)
+            self.log('val_acc', self.val_accuracy)
 
     def training_step(self, batch, batch_idx):
-        loss = self._step(batch, batch_idx)
-        if loss is not None:
+        o = self._step(batch, batch_idx)
+        if o is not None:
+            _, _, loss = o
             self.log('CE', loss)
-        return loss
+            return loss
 
     def configure_optimizers(self):
         return _configure_optimizer_and_lr_scheduler(self.hparams,
