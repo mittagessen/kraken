@@ -788,9 +788,7 @@ class SegmentationModel(pl.LightningModule):
         x, y = batch['image'], batch['target']
         pred, _ = self.nn.nn(x)
         # scale target to output size
-        y = F.interpolate(y, size=(pred.size(2), pred.size(3))).squeeze(0).bool()
-        pred = pred.view(pred.size(0), -1)
-        y = y.view(y.size(0), -1)
+        y = F.interpolate(y, size=(pred.size(2), pred.size(3))).int()
 
         self.val_px_accuracy.update(pred, y)
         self.val_mean_accuracy.update(pred, y)
