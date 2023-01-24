@@ -942,10 +942,10 @@ class SegmentationModel(pl.LightningModule):
             torch.set_num_threads(max(self.num_workers, 1))
 
             # set up validation metrics after output classes have been determined
-            self.val_px_accuracy = MultilabelAccuracy(average='micro', num_classes=self.train_set.dataset.num_classes)
-            self.val_mean_accuracy = MultilabelAccuracy(average='macro', num_classes=self.train_set.dataset.num_classes)
-            self.val_mean_iu = MultilabelJaccardIndex(average='macro', num_classes=self.train_set.dataset.num_classes)
-            self.val_freq_iu = MultilabelJaccardIndex(average='weighted', num_classes=self.train_set.dataset.num_classes)
+            self.val_px_accuracy = MultilabelAccuracy(average='micro', num_labels=self.train_set.dataset.num_classes)
+            self.val_mean_accuracy = MultilabelAccuracy(average='macro', num_labels=self.train_set.dataset.num_classes)
+            self.val_mean_iu = MultilabelJaccardIndex(average='macro', num_labels=self.train_set.dataset.num_classes)
+            self.val_freq_iu = MultilabelJaccardIndex(average='weighted', num_labels=self.train_set.dataset.num_classes)
 
     def train_dataloader(self):
         return DataLoader(self.train_set,
