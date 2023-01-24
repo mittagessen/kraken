@@ -39,8 +39,8 @@ import pytorch_lightning as pl
 from itertools import chain
 from functools import partial
 from torch.optim import lr_scheduler
-from torchmetrics import BinaryAccuracy
 from torch.multiprocessing import Pool
+from torchmetrics.classification import BinaryAccuracy
 from typing import Dict, Optional, Sequence, Union, Any
 from pytorch_lightning.callbacks import EarlyStopping
 from pytorch_lightning.utilities.memory import is_oom_error, garbage_collection_cuda
