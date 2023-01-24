@@ -85,6 +85,7 @@ class ImageInputTransforms(transforms.Compose):
         if height == 1 and width == 0 and self._channels > 3:
             perm = (1, 0, 2)
             self._scale = (self._channels, 0)
+            self._channels = 1
             if self._valid_norm:
                 self._center_norm = True
             self._mode = 'L'

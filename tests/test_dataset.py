@@ -159,7 +159,7 @@ class TestInputTransforms(unittest.TestCase):
                             'height': 48,
                             'width': 0,
                             'channels': 1,
-                            'pad': 16,
+                            'pad': (16, 0),
                             'valid_norm': False,
                             'force_binarization': False}
 
@@ -167,7 +167,7 @@ class TestInputTransforms(unittest.TestCase):
                                  'height': 48,
                                  'width': 0,
                                  'channels': 1,
-                                 'pad': 16,
+                                 'pad': (16, 0),
                                  'valid_norm': True,
                                  'force_binarization': False}
 
@@ -175,7 +175,7 @@ class TestInputTransforms(unittest.TestCase):
                                 'height': 48,
                                 'width': 0,
                                 'channels': 3,
-                                'pad': 16,
+                                'pad': (16, 0),
                                 'valid_norm': False,
                                 'force_binarization': False}
 
@@ -183,7 +183,7 @@ class TestInputTransforms(unittest.TestCase):
                                      'height': 48,
                                      'width': 0,
                                      'channels': 3,
-                                     'pad': 16,
+                                     'pad': (16, 0),
                                      'valid_norm': True,
                                      'force_binarization': False}
 
@@ -191,7 +191,7 @@ class TestInputTransforms(unittest.TestCase):
                                     'height': 1,
                                     'width': 0,
                                     'channels': 72,
-                                    'pad': 16,
+                                    'pad': (16, 0),
                                     'valid_norm': False,
                                     'force_binarization': False}
 
@@ -199,7 +199,7 @@ class TestInputTransforms(unittest.TestCase):
                                  'height': 48,
                                  'width': 0,
                                  'channels': 4,
-                                 'pad': 16,
+                                 'pad': (16, 0),
                                  'valid_norm': False,
                                  'force_binarization': False}
 
@@ -251,12 +251,14 @@ class TestInputTransforms(unittest.TestCase):
         tf = ImageInputTransforms(**self.channel_height_inst)
         for k, v in self.channel_height_inst.items():
             if k == 'channels':
-                self.assertEqual(self.channel_height_inst['height'], tf.channels)
+                self.assertEqual(1, tf.channels)
             elif k == 'height':
                 self.assertEqual(self.channel_height_inst['channels'], tf.height)
             else:
                 self.assertEqual(getattr(tf, k), v)
         self.assertFalse(tf.centerline_norm)
+        self.channel_height_inst['height'] = self.channel_height_inst['channels']
+        self.channel_height_inst['channels'] = 1
         check_output(self, self.channel_height_inst, self.im, tf(self.im))
 
     def test_imageinputtransforms_invalid_channels(self):
