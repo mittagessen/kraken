@@ -88,7 +88,7 @@ def compute_segmentation_map(im: PIL.Image.Image,
     if isinstance(padding, int):
         padding = (padding,) * 4
     elif len(padding) == 2:
-        padding = (padding[0], padding[0], padding[1] , padding[1])
+        padding = (padding[0], padding[0], padding[1], padding[1])
 
     transforms = dataset.ImageInputTransforms(batch, height, width, channels, padding, valid_norm=False)
     tf_idx, _ = next(filter(lambda x: isinstance(x[1], tf.ToTensor), enumerate(transforms.transforms)))
@@ -116,7 +116,7 @@ def compute_segmentation_map(im: PIL.Image.Image,
     padding = [pad if pad else None for pad in padding]
     padding[1] = -padding[1] if padding[1] else None
     padding[3] = -padding[3] if padding[3] else None
-    o = o[:,:,padding[2]:padding[3], padding[0]:padding[1]]
+    o = o[:, :, padding[2]:padding[3], padding[0]:padding[1]]
     scal_im = scal_im[padding[2]:padding[3], padding[0]:padding[1]]
 
     o = o.squeeze().cpu().numpy()
