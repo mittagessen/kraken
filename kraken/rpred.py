@@ -494,7 +494,7 @@ class mm_rpred(object):
             logger.debug('Loading line transforms for {}'.format(tag))
             network = nets[tag]
             batch, channels, height, width = network.nn.input
-            self.ts[tag] = ImageInputTransforms(batch, height, width, channels, pad, valid_norm)
+            self.ts[tag] = ImageInputTransforms(batch, height, width, channels, (pad, 0), valid_norm)
 
         self.im = im
         self.nets = nets

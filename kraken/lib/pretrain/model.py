@@ -164,7 +164,7 @@ class PretrainDataModule(pl.LightningDataModule):
                                                height,
                                                width,
                                                channels,
-                                               pad,
+                                               (pad, 0),
                                                valid_norm,
                                                force_binarization)
 
