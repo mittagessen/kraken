@@ -24,6 +24,7 @@ dependencies:
   - coremltools>=3.3
   - pyarrow
   - conda-forge::pytorch-lightning>=1.7.0
+  - conda-forge::torchmetrics
   - pip
   - albumentations
   - rich
