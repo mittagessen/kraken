@@ -22,12 +22,11 @@ from pathlib import Path
 from itertools import groupby
 from lxml import etree
 from PIL import Image
-from typing import Union, Dict, Any, Sequence, Tuple, Literal
+from typing import Union, Dict, Any, Sequence, Tuple, Literal, Optional, List
 
 from os import PathLike
 from collections import defaultdict
 from kraken.lib.segmentation import calculate_polygonal_environment
-from kraken.lib.exceptions import KrakenInputException
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +88,7 @@ def preparse_xml_data(filenames: Sequence[Union[str, PathLike]],
     for fn in filenames:
         try:
             data = parse_fn(fn)
-        except KrakenInputException as e:
+        except ValueError as e:
             logger.warning(e)
             continue
         try:
@@ -482,7 +481,7 @@ class XMLPage(object):
     type: Literal['baselines', 'bbox'] == 'baselines'
     base_dir: Optional[Literal['L', 'R']] = None
     imagename: pathlib.Path = None
-    _order: Dict[str, Dict[str, Any]] = None
+    _orders: Dict[str, Dict[str, Any]] = None
     has_tags: bool = False
     _tag_set: Optional[Dict] = None
     has_splits: bool = False
@@ -495,6 +494,11 @@ class XMLPage(object):
         self.filename = Path(filename)
         self.filetype = filetype
 
+        self._regions = {}
+        self._baselines = {}
+        self._orders = {'line_implicit': {'order': [], 'is_total': True, 'description': 'Implicit line order derived from element sequence'},
+                        'region_implicit': {'order': [], 'is_total': True, 'description': 'Implicit region order derived from element sequence'}}
+
         if filetype == 'xml':
             self._parse_xml()
         elif filetype == 'alto':
@@ -502,10 +506,18 @@ class XMLPage(object):
         elif filetype == 'page':
             self._parse_page()
 
-        self._regions = {}
-        self._baselines = {}
-        self._orders = {'line_implicit': {'order': [], 'is_total': True, 'description': 'Implicit line order derived from element sequence'},
-                        'region_implicit': {'order': [], 'is_total': True, 'description': 'Implicit region order derived from element sequence'}}
+    def _parse_xml(self):
+        with open(self.filename, 'rb') as fp:
+            try:
+                doc = etree.parse(fp)
+            except etree.XMLSyntaxError as e:
+                raise ValueError(f'Parsing {self.filename} failed: {e}')
+        if doc.getroot().tag.endswith('alto'):
+            return self._parse_alto()
+        elif doc.getroot().tag.endswith('PcGts'):
+            return self._parse_page()
+        else:
+            raise ValueError(f'Unknown XML format in {self.filename}')
 
     def _parse_alto(self):
         with open(self.filename, 'rb') as fp:
@@ -513,10 +525,10 @@ class XMLPage(object):
             try:
                 doc = etree.parse(fp)
             except etree.XMLSyntaxError as e:
-                raise KrakenInputException('Parsing {} failed: {}'.format(self.filename, e))
+                raise ValueError('Parsing {} failed: {}'.format(self.filename, e))
             image = doc.find('.//{*}fileName')
             if image is None or not image.text:
-                raise KrakenInputException('No valid image filename found in ALTO file {self.filename}')
+                raise ValueError('No valid image filename found in ALTO file {self.filename}')
             self.imagename = base_directory.joinpath(image.text)
 
             lines = doc.findall('.//{*}TextLine')
@@ -550,7 +562,7 @@ class XMLPage(object):
                 # try to find shape object
                 coords = region.find('./{*}Shape/{*}Polygon')
                 if coords is not None:
-                    boundary = _parse_pointstype(coords.get('POINTS'))
+                    boundary = self._parse_alto_pointstype(coords.get('POINTS'))
                 elif (region.get('HPOS') is not None and region.get('VPOS') is not None and
                       region.get('WIDTH') is not None and region.get('HEIGHT') is not None):
                     # use rectangular definition
@@ -580,7 +592,7 @@ class XMLPage(object):
                 region_data[rtype].append({'id': region.get('ID'), 'boundary': boundary})
                 # register implicit reading order
                 self._orders['region_implicit']['order'].append(region.get('ID'))
-            self.regions = region_data
+            self._regions = region_data
 
             self._tag_set = set(('default',))
             self.lines = []
@@ -639,30 +651,42 @@ class XMLPage(object):
             # parse explicit reading orders if they exist
             ro_el = doc.find('.//{*}ReadingOrder')
             if ro_el is not None:
-               reading_orders = ro_el.getchildren()
-               # UnorderedGroup at top-level => treated as multiple reading orders
-               if len(reading_orders) == 1 and reading_orders[0].tag.endswith('UnorderedGroup'):
-                    reading_orders = reading_orders.getchildren()
-               else:
-                   reading_orders = [reading_orders]
-               def _parse_group(el):
-                   _ro = []
-                   if el.tag.endswith('UnorderedGroup'):
-                       _ro.append([_parse_group(x) for x in el.iterchildren()])
-                       is_total = False
-                   elif el.tag.endswith('OrderedGroup'):
-                       _ro.extend(_parse_group(x) for x in el.iterchildren())
-                   else:
-                       return el.get('REF')
-                   return _ro
+                reading_orders = ro_el.getchildren()
+                # UnorderedGroup at top-level => treated as multiple reading orders
+                if len(reading_orders) == 1 and reading_orders[0].tag.endswith('UnorderedGroup'):
+                     reading_orders = reading_orders[0].getchildren()
+                else:
+                    reading_orders = [reading_orders]
+                def _parse_group(el):
+                    _ro = []
+                    if el.tag.endswith('UnorderedGroup'):
+                        _ro.append([_parse_group(x) for x in el.iterchildren()])
+                        is_total = False
+                    elif el.tag.endswith('OrderedGroup'):
+                        _ro.extend(_parse_group(x) for x in el.iterchildren())
+                    else:
+                        ref = el.get('REF')
+                        res = doc.find(f'.//{{*}}*[@ID="{ref}"]')
+                        if res is None:
+                            logger.warning(f'Nonexistant element with ID {ref} in reading order. Skipping RO {ro.get("ID")}.')
+                            is_valid = False
+                            return _ro
+                        tag = res.tag.split('}')[-1]
+                        if tag not in alto_regions.keys() and tag != 'TextLine':
+                            logger.warning(f'Sub-line element with ID {ref} in reading order. Skipping RO {ro.get("ID")}.')
+                            is_valid = False
+                    return _ro
 
-               for ro in reading_orders:
-                   is_total = True
-                   joint_order = _parse_group(ro)
-                   tag = ro.get('TAGREFS')
-                   self._orders[ro.get('ID')] = {'order': joint_order,
-                                                 'is_total': is_total,
-                                                 'description': cls_map[tag] if tag and tag in cls_map else ''}
+                for ro in reading_orders:
+                    is_total = True
+                    is_valid = True
+                    joint_order = _parse_group(ro)
+                    if is_valid:
+                        tag = ro.get('TAGREFS')
+                        self._orders[ro.get('ID')] = {'order': joint_order,
+                                                      'is_total': is_total,
+                                                      'description': cls_map[tag] if tag and tag in cls_map else ''}
+        self.filetype = 'alto'
 
     def _parse_page(self):
         with open(self.filename, 'rb') as fp:
@@ -671,10 +695,10 @@ class XMLPage(object):
             try:
                 doc = etree.parse(fp)
             except etree.XMLSyntaxError as e:
-                raise KrakenInputException('Parsing {} failed: {}'.format(self.filename, e))
+                raise ValueError(f'Parsing {self.filename} failed: {e}')
             image = doc.find('.//{*}Page')
             if image is None or image.get('imageFilename') is None:
-                raise KrakenInputException('No valid image filename found in PageXML file {}'.format(self.filename))
+                raise ValueError(f'No valid image filename found in PageXML file {self.filename}')
             try:
                 self.base_dir = {'left-to-right': 'L',
                                  'right-to-left': 'R',
@@ -684,19 +708,17 @@ class XMLPage(object):
             except KeyError:
                 logger.warning(f'Invalid value {image.get("readingDirection")} encountered in page-level reading direction.')
             lines = doc.findall('.//{*}TextLine')
-            self.imagename = base_dir.joinpath(image.get('imageFilename'))
+            self.imagename = base_directory.joinpath(image.get('imageFilename'))
             # find all image regions
-            regions = []
-            for x in page_regions.keys():
-                regions.extend(doc.findall('.//{{*}}{}'.format(x)))
+            regions = [reg for reg in image.iterfind('./{*}*')]
             # parse region type and coords
             region_data = defaultdict(list)
             tr_region_order = []
             for region in regions:
-                coords = region.find('{*}Coords')
+                coords = region.find('./{*}Coords')
                 if coords is not None and not coords.get('points').isspace() and len(coords.get('points')):
                     try:
-                        coords = _parse_coords(coords.get('points'))
+                        coords = self._parse_page_coords(coords.get('points'))
                     except Exception:
                         logger.warning('Region {} without coordinates'.format(region.get('id')))
                         continue
@@ -706,9 +728,9 @@ class XMLPage(object):
                 rtype = region.get('type')
                 # parse transkribus-style custom field if possible
                 custom_str = region.get('custom')
-                if not rtype and custom_str:
-                    cs = _parse_page_custom(custom_str)
-                    if 'structure' in cs and 'type' in cs['structure']:
+                if custom_str:
+                    cs = self._parse_page_custom(custom_str)
+                    if not rtype and 'structure' in cs and 'type' in cs['structure']:
                         rtype = cs['structure']['type']
                     # transkribus-style reading order
                     if 'readingOrder' in cs and 'index'in cs['readingOrder']:
@@ -720,11 +742,11 @@ class XMLPage(object):
                 # register implicit reading order
                 self._orders['region_implicit']['order'].append(region.get('id'))
             # add transkribus-style region order
-            self._order['region_transkribus'] = {'order': [x[1] for x in sorted(tr_region_order, key=lambda k: k[0])],
-                                                 'is_total': True if len(set(map(lambda x: x[0], tr_region_order))) == len(tr_region_order) else False,
-                                                 'description': 'Explicit region order from `custom` attribute'}
+            self._orders['region_transkribus'] = {'order': [x[0] for x in sorted(tr_region_order, key=lambda k: k[1])],
+                                                  'is_total': True if len(set(map(lambda x: x[0], tr_region_order))) == len(tr_region_order) else False,
+                                                  'description': 'Explicit region order from `custom` attribute'}
 
-            self.regions = region_data
+            self._regions = region_data
 
             # parse line information
             self._tag_set = set(('default',))
@@ -744,7 +766,7 @@ class XMLPage(object):
                 baseline = None
                 if base is not None and not base.get('points').isspace() and len(base.get('points')):
                     try:
-                        baseline = self._parse_coords(base.get('points'))
+                        baseline = self._parse_page_coords(base.get('points'))
                     except Exception:
                         logger.info('TextLine {} without baseline'.format(line.get('id')))
                         continue
@@ -765,7 +787,7 @@ class XMLPage(object):
                 split_type = None
                 custom_str = line.get('custom')
                 if custom_str:
-                    cs = _parse_page_custom(custom_str)
+                    cs = self._parse_page_custom(custom_str)
                     if 'structure' in cs and 'type' in cs['structure']:
                         tags['type'] = cs['structure']['type']
                         self._tag_set.add(tags['type'])
@@ -776,19 +798,19 @@ class XMLPage(object):
                         self._tag_set.add(split_type)
                     if 'readingOrder' in cs and 'index' in cs['readingOrder']:
                         # look up region index from parent
-                        reg_cus = _parse_page_custom(line.getparent().get('custom'))
+                        reg_cus = self._parse_page_custom(line.getparent().get('custom'))
                         if 'readingOrder' not in reg_cus or 'index' not in reg_cus['readingOrder']:
                             logger.warning('Incomplete `custom` attribute reading order found.')
                             valid_tr_lo = False
                         else:
                             tmp_transkribus_line_order[int(reg_cus['readingOrder']['index'])].append((int(cs['readingOrder']['index']), line.get('id')))
 
-                self.lines.append({'id': line.get('id'),
-                                   'baseline': baseline,
-                                   'boundary': boundary,
-                                   'text': text,
-                                   'split': split_type,
-                                   'tags': tags})
+                self._baselines[line.get('id')] = {'baseline': baseline,
+                                                   'boundary': boundary,
+                                                   'text': text,
+                                                   'split': split_type,
+                                                   'tags': tags}
+
                 # register implicit reading order
                 self._orders['line_implicit']['order'].append(line.get('id'))
             if tmp_transkribus_line_order:
@@ -798,9 +820,9 @@ class XMLPage(object):
                 tr_line_order = []
                 for _, lines in tmp_reg_order:
                     tr_line_order.extend([x[1] for x in sorted(lines, key=lambda k: k[0])])
-            self._order['line_transkribus'] = {'order': tr_line_order,
-                                               'is_total': True,
-                                               'description': 'Explicit line order from `custom` attribute'}
+                self._orders['line_transkribus'] = {'order': tr_line_order,
+                                                    'is_total': True,
+                                                    'description': 'Explicit line order from `custom` attribute'}
 
             # parse explicit reading orders if they exist
             ro_el = doc.find('.//{*}ReadingOrder')
@@ -828,11 +850,12 @@ class XMLPage(object):
                                                  'is_total': is_total,
                                                  'description': ro.get('caption') if ro.get('caption') else ''}
 
+        if len(self._tag_set) > 1:
+            self.has_tags = True
+        else:
+            self.has_tags = False
 
-            if len(self._tag_set) > 1:
-                self.has_tags = True
-            else:
-                self.has_tags = False
+        self.filetype = 'page'
 
     @property
     def regions(self):
@@ -842,14 +865,18 @@ class XMLPage(object):
     def baselines(self):
         return self._baselines
 
+    @property
+    def reading_orders(self):
+        return self._orders
+
     def get_baselines_by_region(self, region):
         pass
 
     def get_baselines_by_tag(self, key, value):
-        pass
+        return {k: v for k, v in self._baselines.items() if v['tags'].get(key) == value}
 
     def get_baselines_by_split(self, split: Literal['train', 'validation', 'test']):
-        pass
+        return {k: v for k, v in self._baselines.items() if v['tags'].get(key) == split}
 
     @property
     def tags(self):
@@ -902,3 +929,8 @@ class XMLPage(object):
         pts = zip(points[::2], points[1::2])
         return [k for k, g in groupby(pts)]
 
+    def __str__(self):
+        return f'XMLPage {self.filename} (format: {self.filetype}, image: {self.imagename})'
+
+    def __repr__(self):
+        return f'XMLPage(filename={self.filename}, filetype={self.filetype})'
