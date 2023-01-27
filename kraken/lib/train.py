@@ -1045,7 +1045,9 @@ def _configure_optimizer_and_lr_scheduler(hparams, params, len_train_set=None, l
     elif hparams.schedule != 'constant':
         raise ValueError(f'Unsupported learning rate scheduler {hparams.schedule}.')
 
+    ret = {'optimizer': optim}
     if lr_sched:
         lr_sched['monitor'] = 'val_metric'
+        ret['lr_scheduler'] = lr_sched
 
-    return [optim], lr_sched if lr_sched else []
+    return ret
