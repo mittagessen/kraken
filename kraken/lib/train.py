@@ -310,7 +310,7 @@ class RecognitionModel(pl.LightningModule):
                                                height,
                                                width,
                                                channels,
-                                               self.hparams.pad,
+                                               (self.hparams.pad, 0),
                                                valid_norm,
                                                force_binarization)
 
