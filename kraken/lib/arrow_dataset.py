@@ -158,7 +158,7 @@ def build_binary_dataset(files: Optional[List[Union[str, pathlib.Path, Dict]]] =
                 logger.warning(f'Invalid input file {doc}')
                 continue
             try:
-                name_ext = data['image'].split(extsep, 1)
+                name_ext = str(data['image']).split(extsep, 1)
                 if name_ext[1] == 'gt.txt':
                     data['image'] = name_ext[0] + '.png'
                 with open(data['image'], 'rb') as fp:
