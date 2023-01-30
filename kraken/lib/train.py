@@ -26,6 +26,7 @@ import pytorch_lightning as pl
 
 from functools import partial
 from torch.multiprocessing import Pool
+from torchmetrics import CharErrorRate
 from torchmetrics.classification import MultilabelAccuracy, MultilabelJaccardIndex
 from torch.optim import lr_scheduler
 from typing import Callable, Dict, Optional, Sequence, Union, Any, Literal
@@ -379,6 +380,8 @@ class RecognitionModel(pl.LightningModule):
 
         logger.info('Encoding training set')
 
+        self.val_cer = CharErrorRate()
+
     def _build_dataset(self,
                        DatasetClass,
                        training_data,
@@ -436,21 +439,28 @@ class RecognitionModel(pl.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        chars, error = compute_error(self.rec_nn, batch)
-        chars = torch.tensor(chars)
-        error = torch.tensor(error)
-        return {'chars': chars, 'error': error}
+        pred = self.rec_nn.predict_string(batch['image'], batch['seq_lens'])
+        idx = 0
+        decoded_targets = []
+        for offset in batch['target_lens']:
+            decoded_targets.append(''.join([x[0] for x in self.val_codec.decode([(x, 0, 0, 0) for x in batch['target'][idx:idx+offset]])]))
+            idx += offset
+        self.val_cer.update(pred, decoded_targets)
 
     def validation_epoch_end(self, outputs):
-        chars = torch.stack([x['chars'] for x in outputs]).sum()
-        error = torch.stack([x['error'] for x in outputs]).sum()
-        accuracy = (chars - error) / (chars + torch.finfo(torch.float).eps)
+
+        self.val_cer.compute()
+        accuracy = 1.0 - self.val_cer
+
         if accuracy > self.best_metric:
             logger.debug(f'Updating best metric from {self.best_metric} ({self.best_epoch}) to {accuracy} ({self.current_epoch})')
             self.best_epoch = self.current_epoch
             self.best_metric = accuracy
-        logger.info(f'validation run: total chars {chars} errors {error} accuracy {accuracy}')
-        self.log_dict({'val_accuracy': accuracy, 'val_metric': accuracy}, prog_bar=True)
+        logger.info(f'validation run: total chars {self.val_cer.total} errors {self.val_cer.errors} accuracy {accuracy}')
+        self.log_dict({'val_accuracy': accuracy,
+                       'val_metric': accuracy}, prog_bar=True)
+        self.val_cer.reset()
+
 
     def setup(self, stage: Optional[str] = None):
         # finalize models in case of appending/loading
@@ -485,34 +495,42 @@ class RecognitionModel(pl.LightningModule):
                     elif self.resize == 'add':
                         logger.info(f'Resizing codec to include '
                                     f'{len(alpha_diff.union(alpha_diff_val))} new code points')
-                        # Add the characters in val only
-                        codec = codec.add_labels(alpha_diff.union(alpha_diff_val))
-                        self.nn.add_codec(codec)
+                        # Construct two codecs:
+                        # 1. training codec containing only the vocabulary in the training dataset
+                        # 2. validation codec = training codec + validation set vocabulary
+                        # This keep the codec in the model from being 'polluted' by non-trained characters.
+                        train_codec = codec.add_labels(alpha_diff)
+                        val_codec = train_codec.add_labels(alpha_diff.difference(alpha_diff_val))
+
+                        self.nn.add_codec(train_codec)
                         logger.info(f'Resizing last layer in network to {codec.max_label+1} outputs')
                         self.nn.resize_output(codec.max_label + 1)
-                        self.train_set.dataset.encode(self.nn.codec)
+                        self.train_set.dataset.encode(train_codec)
+                        self.val_set.dataset.encode(val_codec)
+                        self.val_codec = val_codec
                     elif self.resize == 'both':
                         logger.info(f'Resizing network or given codec to '
                                     f'{len(self.train_set.dataset.alphabet)+len(self.val_set.dataset.alphabet)} '
                                     f'code sequences')
+                        # same codec procedure as above, just with merging.
                         self.train_set.dataset.encode(None)
-                        ncodec, del_labels = codec.merge(self.train_set.dataset.codec)
-                        # Add the characters in val only
+                        train_codec, del_labels = codec.merge(self.train_set.dataset.codec)
                         val_diff = set(self.val_set.dataset.alphabet).difference(
-                            set(ncodec.c2l.keys())
+                            set(train_codec.c2l.keys())
                         )
-                        ncodec.add_labels(val_diff)
+                        val_codec = train_codec.add_labels(val_diff)
                         # Switch codec.
-                        self.nn.add_codec(ncodec)
+                        self.nn.add_codec(train_codec)
                         logger.info(f'Deleting {len(del_labels)} output classes from network '
                                     f'({len(codec)-len(del_labels)} retained)')
-                        self.train_set.dataset.encode(ncodec)
                         self.nn.resize_output(ncodec.max_label + 1, del_labels)
+                        self.train_set.dataset.encode(train_codec)
+                        self.val_set.dataset.encode(val_codec)
+                        self.val_codec = val_codec
                     else:
                         raise ValueError(f'invalid resize parameter value {self.resize}')
 
                 self.nn.codec.strict = False
-
             else:
                 self.train_set.dataset.encode(self.codec)
                 logger.info(f'Creating new model {self.spec} with {self.train_set.dataset.codec.max_label+1} outputs')
@@ -521,8 +539,13 @@ class RecognitionModel(pl.LightningModule):
                 # initialize weights
                 self.nn.init_weights()
                 self.nn.add_codec(self.train_set.dataset.codec)
-
-            self.val_set.dataset.encode(self.nn.codec)
+                # same procedure as above
+                val_diff = set(self.val_set.dataset.alphabet).difference(
+                    set(self.train_set.dataset.codec.c2l.keys())
+                )
+                val_codec = self.nn.codec.add_labels(val_diff)
+                self.val_set.dataset.encode(val_codec)
+                self.val_codec = val_codec
 
             if self.nn.one_channel_mode and self.train_set.dataset.im_mode != self.nn.one_channel_mode:
                 logger.warning(f'Neural network has been trained on mode {self.nn.one_channel_mode} images, '
