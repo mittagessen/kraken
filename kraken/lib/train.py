@@ -450,7 +450,7 @@ class RecognitionModel(pl.LightningModule):
     def validation_epoch_end(self, outputs):
 
         self.val_cer.compute()
-        accuracy = 1.0 - self.val_cer
+        accuracy = 1.0 - self.val_cer.compute()
 
         if accuracy > self.best_metric:
             logger.debug(f'Updating best metric from {self.best_metric} ({self.best_epoch}) to {accuracy} ({self.current_epoch})')
