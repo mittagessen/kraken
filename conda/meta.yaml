@@ -30,7 +30,7 @@ requirements:
      - coremltools>=4.1
      - pyarrow
      - conda-forge::pytorch-lightning>=1.7
-     - conda-forge::torchmetrics
+     - conda-forge::torchmetrics>=0.10.0
      - conda-forge::albumentations
      - conda-forge::rich
 about:
