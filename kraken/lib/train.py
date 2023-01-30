@@ -94,6 +94,7 @@ class KrakenTrainer(pl.Trainer):
 
         kwargs['callbacks'].extend([KrakenSetOneChannelMode(), KrakenSaveModel()])
         super().__init__(*args, **kwargs)
+        self.automatic_optimization = False
 
     def fit(self, *args, **kwargs):
         with warnings.catch_warnings():
@@ -599,7 +600,10 @@ class RecognitionModel(pl.LightningModule):
                 scheduler.step()
             # step every other scheduler epoch-wise
             elif self.trainer.is_last_batch:
-                scheduler.step()
+                if metric is None:
+                    scheduler.step()
+                else:
+                    scheduler.step(metric)
 
 
 class SegmentationModel(pl.LightningModule):
@@ -1047,7 +1051,11 @@ def _configure_optimizer_and_lr_scheduler(hparams, params, len_train_set=None, l
 
     ret = {'optimizer': optim}
     if lr_sched:
-        lr_sched['monitor'] = 'val_metric'
         ret['lr_scheduler'] = lr_sched
+
+    if hparams.schedule == 'reduceonplateau':
+        lr_sched['monitor'] = 'val_metric'
+        lr_sched['strict'] = False
+        lr_sched['reduce_on_plateau'] = True
 
     return ret
