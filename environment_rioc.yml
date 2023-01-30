@@ -12,7 +12,7 @@ dependencies:
   - regex
   - requests
   - click>=8.1
-  - numpy
+  - numpy<=1.23.99
   - pillow>=9.2.0
   - scipy
   - jinja2
