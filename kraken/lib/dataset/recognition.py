@@ -161,6 +161,20 @@ class ArrowIPCRecognitionDataset(Dataset):
         num_lines = metadata['counts'][self._split_filter] if self._split_filter else metadata['counts']['all']
         if self._split_filter:
             ds_table = ds_table.filter(ds_table.column(self._split_filter))
+        if self.skip_empty_lines:
+            logger.debug('Getting indices of empty lines after text transformation.')
+            self.skip_empty_lines = False
+            mask = np.ones(len(ds_table), dtype=bool)
+            for index in range(len(ds_table)):
+                try:
+                    text = self._apply_text_transform(ds_table.column('lines')[index].as_py(),)
+                except KrakenInputException:
+                    mask[index] = False
+                    continue
+            num_lines = np.count_nonzero(mask)
+            logger.debug(f'Filtering out {np.count_nonzero(~mask)} empty lines')
+            ds_table = ds_table.filter(pa.array(mask))
+            self.skip_empty_lines = True
         if not self.arrow_table:
             self.arrow_table = ds_table
         else:
@@ -168,18 +182,20 @@ class ArrowIPCRecognitionDataset(Dataset):
         self._num_lines += num_lines
 
     def rebuild_alphabet(self):
+        """
+        Recomputes the alphabet depending on the given text transformation.
+        """
         self.alphabet = Counter()
-        _skip_empty_lines = self.skip_empty_lines
-        self.skip_empty_lines = True
         for index in range(len(self)):
-            text = self._apply_text_transform(
-                self.arrow_table.column('lines')[index].as_py(),
-            )
-            self.alphabet.update(text)
-        self.skip_empty_lines = _skip_empty_lines
+            try:
+                text = self._apply_text_transform(self.arrow_table.column('lines')[index].as_py(),)
+                self.alphabet.update(text)
+            except KrakenInputException:
+                continue
 
     def _apply_text_transform(self, sample) -> str:
-        """ Applies text transform to a sample.
+        """
+        Applies text transform to a sample.
         """
         text = sample['text']
         for func in self.text_transforms:
