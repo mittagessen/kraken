@@ -33,7 +33,6 @@ from kraken.lib.lineest import CenterNormalizer
 from kraken.lib import functional_im_transforms as F_t
 
 __all__ = ['ImageInputTransforms',
-           'compute_error',
            'collate_sequences']
 
 import logging
@@ -258,21 +257,6 @@ class ImageInputTransforms(transforms.Compose):
         self._create_transforms()
 
 
-def _fast_levenshtein(seq1: Sequence[Any], seq2: Sequence[Any]) -> int:
-    oneago = None
-    thisrow = list(range(1, len(seq2) + 1)) + [0]
-    rows = [thisrow]
-    for x in range(len(seq1)):
-        oneago, thisrow = thisrow, [0] * len(seq2) + [x + 1]
-        for y in range(len(seq2)):
-            delcost = oneago[y] + 1
-            addcost = thisrow[y - 1] + 1
-            subcost = oneago[y - 1] + (seq1[x] != seq2[y])
-            thisrow[y] = min(delcost, addcost, subcost)
-        rows.append(thisrow)
-    return thisrow[len(seq2) - 1]
-
-
 def global_align(seq1: Sequence[Any], seq2: Sequence[Any]) -> Tuple[int, List[str], List[str]]:
     """
     Computes a global alignment of two strings.
@@ -363,28 +347,6 @@ def compute_confusions(algn1: Sequence[str], algn2: Sequence[str]):
             elif k[0] != k[1]:
                 subs[script] += v
     return counts, scripts, ins, dels, subs
-
-
-def compute_error(model: TorchSeqRecognizer, batch: Dict[str, torch.Tensor]) -> Tuple[int, int]:
-    """
-    Computes error report from a model and a list of line image-text pairs.
-
-    Args:
-        model: Model used for recognition
-        validation_set: List of tuples (image, text) for validation
-
-    Returns:
-        A tuple with total number of characters and edit distance across the
-        whole validation set.
-    """
-    preds = model.predict_string(batch['image'], batch['seq_lens'])
-    idx = 0
-    error = 0
-    for pred, offset in zip(preds, batch['target_lens']):
-        text = ''.join(x[0] for x in model.codec.decode([(x, 0, 0, 0) for x in batch['target'][idx:idx+offset]]))
-        idx += offset
-        error += _fast_levenshtein(pred, text)
-    return int(batch['target_lens'].sum()), error
 
 
 def collate_sequences(batch):

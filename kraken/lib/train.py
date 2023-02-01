@@ -38,8 +38,7 @@ from kraken.lib.util import make_printable
 from kraken.lib.codec import PytorchCodec
 from kraken.lib.dataset import (ArrowIPCRecognitionDataset, BaselineSet,
                                 GroundTruthDataset, PolygonGTDataset,
-                                ImageInputTransforms, compute_error,
-                                collate_sequences)
+                                ImageInputTransforms, collate_sequences)
 from kraken.lib.models import validate_hyper_parameters
 from kraken.lib.exceptions import KrakenInputException, KrakenEncodeException
 
