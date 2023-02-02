@@ -522,7 +522,7 @@ class RecognitionModel(pl.LightningModule):
                         self.nn.add_codec(train_codec)
                         logger.info(f'Deleting {len(del_labels)} output classes from network '
                                     f'({len(codec)-len(del_labels)} retained)')
-                        self.nn.resize_output(ncodec.max_label + 1, del_labels)
+                        self.nn.resize_output(train_codec.max_label + 1, del_labels)
                         self.train_set.dataset.encode(train_codec)
                         self.val_set.dataset.encode(val_codec)
                         self.val_codec = val_codec
