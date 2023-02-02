@@ -361,9 +361,9 @@ class RecognitionPretrainModel(pl.LightningModule):
         o = self._step(batch, batch_idx)
         if o is not None:
             logits, targets, loss = o
-            self.val_acc(logits, targets)
+            self.val_accuracy(logits, targets)
             self.log('CE', loss, on_step=True, on_epoch=True)
-            self.log('val_acc', self.val_accuracy)
+            self.log('val_acc', self.val_accuracy, on_step=True, on_epoch=True)
 
     def training_step(self, batch, batch_idx):
         o = self._step(batch, batch_idx)
