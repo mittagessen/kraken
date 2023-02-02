@@ -40,7 +40,6 @@ from itertools import chain
 from functools import partial
 from torch.optim import lr_scheduler
 from torch.multiprocessing import Pool
-from torchmetrics.classification import BinaryAccuracy
 from typing import Dict, Optional, Sequence, Union, Any
 from pytorch_lightning.callbacks import EarlyStopping
 from pytorch_lightning.utilities.memory import is_oom_error, garbage_collection_cuda
@@ -309,8 +308,6 @@ class RecognitionPretrainModel(pl.LightningModule):
 
         logger.info('Encoding training set')
 
-        self.val_accuracy = BinaryAccuracy()
-
     def forward(self, x, seq_lens):
         return self.net(x, seq_lens)
 
@@ -361,9 +358,7 @@ class RecognitionPretrainModel(pl.LightningModule):
         o = self._step(batch, batch_idx)
         if o is not None:
             logits, targets, loss = o
-            self.val_accuracy(logits, targets)
             self.log('CE', loss, on_step=True, on_epoch=True)
-            self.log('val_acc', self.val_accuracy, on_step=True, on_epoch=True)
 
     def training_step(self, batch, batch_idx):
         o = self._step(batch, batch_idx)
