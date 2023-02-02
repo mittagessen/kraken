@@ -338,7 +338,7 @@ class PolygonGTDataset(Dataset):
         self.alphabet.update(kwargs['text'])
 
     def parse(self,
-              image: Union[str, Image.Image],
+              image: Union[pathlib.Path, str, Image.Image],
               text: str,
               baseline: List[Tuple[int, int]],
               boundary: List[Tuple[int, int]],
@@ -433,7 +433,7 @@ class GroundTruthDataset(Dataset):
 
     All data is cached in memory.
     """
-    def __init__(self, split: Callable[[str], str] = F_t.default_split,
+    def __init__(self, split: Callable[[Union[pathlib.Path, str]], str] = F_t.default_split,
                  suffix: str = '.gt.txt',
                  normalization: Optional[str] = None,
                  whitespace_normalization: bool = True,
@@ -523,7 +523,7 @@ class GroundTruthDataset(Dataset):
         self._gt.append(kwargs['text'])
         self.alphabet.update(kwargs['text'])
 
-    def parse(self, image: Union[str, Image.Image], *args, **kwargs) -> Dict:
+    def parse(self, image: Union[pathlib.Path, str, Image.Image], *args, **kwargs) -> Dict:
         """
         Parses a sample for this dataset.
 
