@@ -195,8 +195,6 @@ class PretrainDataModule(pl.LightningDataModule):
         logger.info(f'Training set {len(self.train_set)} lines, validation set '
                     f'{len(self.val_set)} lines')
 
-        self.val_accuracy = BinaryAccuracy()
-
     def _build_dataset(self,
                        DatasetClass,
                        training_data,
@@ -310,6 +308,8 @@ class RecognitionPretrainModel(pl.LightningModule):
             torch.multiprocessing.set_sharing_strategy('file_system')
 
         logger.info('Encoding training set')
+
+        self.val_accuracy = BinaryAccuracy()
 
     def forward(self, x, seq_lens):
         return self.net(x, seq_lens)
