@@ -25,6 +25,7 @@ import pyarrow as pa
 import tempfile
 
 from PIL import Image, UnidentifiedImageError
+from functools import partial
 from collections import Counter
 from typing import Optional, List, Union, Callable, Tuple, Dict
 from multiprocessing import Pool
@@ -40,7 +41,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def _extract_line(xml_record):
+def _extract_line(xml_record, skip_empty_lines: bool = True):
     lines = []
     try:
         im = Image.open(xml_record['image'])
@@ -59,7 +60,7 @@ def _extract_line(xml_record):
         except Exception as e:
             logger.warning(f'Unexpected exception {e} from line {idx} in {im.filename}')
             continue
-        if not line['text']:
+        if not line['text'] and skip_empty_lines:
             continue
         fp = io.BytesIO()
         line_im.save(fp, format='png')
@@ -67,12 +68,12 @@ def _extract_line(xml_record):
     return lines, im.mode
 
 
-def _extract_path_line(xml_record):
+def _extract_path_line(xml_record, skip_empty_lines: bool = True):
     try:
         im = Image.open(xml_record['image'])
     except (FileNotFoundError, UnidentifiedImageError):
         return [], None, None
-    if not xml_record['lines'][0]['text']:
+    if not xml_record['lines'][0]['text'] and skip_empty_lines:
         return [], None, None
     if is_bitonal(im):
         im = im.convert('1')
@@ -82,10 +83,13 @@ def _extract_path_line(xml_record):
     return [line], im.mode
 
 
-def parse_path(path: Union[str, pathlib.Path], suffix: str = '.gt.txt', split=F_t.default_split):
+def parse_path(path: Union[str, pathlib.Path],
+               suffix: str = '.gt.txt',
+               split=F_t.default_split,
+               skip_empty_lines: bool = True):
     with open(F_t.suffix_split(path, split=split, suffix=suffix), 'r', encoding='utf-8') as fp:
         gt = fp.read().strip('\n\r')
-        if not gt:
+        if not gt and skip_empty_lines:
             raise KrakenInputException(f'No text for ground truth line {path}.')
     return {'image': path, 'lines': [{'text': gt}]}
 
@@ -98,6 +102,7 @@ def build_binary_dataset(files: Optional[List[Union[str, pathlib.Path, Dict]]] =
                          random_split: Optional[Tuple[float, float, float]] = None,
                          force_type: Optional[str] = None,
                          recordbatch_size: int = 100,
+                         skip_empty_lines: bool = True,
                          callback: Callable[[int, int], None] = lambda chunk, lines: None) -> None:
     """
     Parses XML files and dumps the baseline-style line images and text into a
@@ -123,12 +128,13 @@ def build_binary_dataset(files: Optional[List[Union[str, pathlib.Path, Dict]]] =
                           the output file. Larger batches require more
                           transient memory but slightly improve reading
                           performance.
+        skip_empty_lines: Do not compile empty text lines into the dataset.
         callback: Function called every time a new recordbatch is flushed into
                   the Arrow IPC file.
     """
 
     logger.info('Parsing XML files')
-    extract_fn = _extract_line
+    extract_fn = partial(_extract_line, skip_empty_lines=skip_empty_lines)
     parse_fn = None
     if format_type == 'xml':
         parse_fn = parse_xml
@@ -139,8 +145,8 @@ def build_binary_dataset(files: Optional[List[Union[str, pathlib.Path, Dict]]] =
     elif format_type == 'path':
         if not ignore_splits:
             logger.warning('ignore_splits is False and format_type is path. Will not serialize splits.')
-        parse_fn = parse_path
-        extract_fn = _extract_path_line
+        parse_fn = partial(parse_path, skip_empty_lines=skip_empty_lines)
+        extract_fn = partial(_extract_path_line, skip_empty_lines=skip_empty_lines)
     elif format_type is None:
         pass
     else:
