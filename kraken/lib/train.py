@@ -168,7 +168,7 @@ class FaultySampleStopping(Callback):
     def __init__(self, threshold:int = 10):
         self.threshold = threshold
 
-    def on_train_batch_start(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule", batch, batch_idx, dataloader_idx) -> None:
+    def on_train_batch_start(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule", batch, batch_idx) -> None:
         ds = getattr(pl_module, 'train_set', None)
         if not ds and trainer.datamodule:
             ds = trainer.datamodule.train_set
