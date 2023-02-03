@@ -174,8 +174,8 @@ class FaultySampleStopping(Callback):
             ds = trainer.datamodule.train_set
 
         if len(ds.dataset.failed_samples) > self.threshold:
-            log.warning(f'At least {len(ds.dataset.failed_samples)} unloadable '
-                         'samples in training dataset. Aborting.')
+            logger.warning(f'At least {len(ds.dataset.failed_samples)} unloadable '
+                            'samples in training dataset. Aborting.')
             trainer.should_stop = True
 
     def on_validation_batch_start(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule", batch, batch_idx, dataloader_idx) -> None:
@@ -184,8 +184,8 @@ class FaultySampleStopping(Callback):
             ds = trainer.datamodule.val_set
 
         if len(ds.dataset.failed_samples) > self.threshold:
-            log.warning(f'At least {len(ds.dataset.failed_samples)} unloadable '
-                         'samples in validation dataset. Aborting.')
+            logger.warning(f'At least {len(ds.dataset.failed_samples)} unloadable '
+                            'samples in validation dataset. Aborting.')
             trainer.should_stop = True
 
 

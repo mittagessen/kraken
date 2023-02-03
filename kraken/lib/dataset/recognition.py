@@ -245,7 +245,7 @@ class ArrowIPCRecognitionDataset(Dataset):
                 im = torch.tensor(o['image'].transpose(2, 0, 1))
             text = self._apply_text_transform(sample)
         except Exception:
-            self.failed_samples.add(idx)
+            self.failed_samples.add(index)
             idx = np.random.randint(0, len(self))
             logger.debug(traceback.format_exc())
             logger.info(f'Failed. Replacing with sample {idx}')
@@ -421,7 +421,7 @@ class PolygonGTDataset(Dataset):
                 im = torch.tensor(o['image'].transpose(2, 0, 1))
             return {'image': im, 'target': item[1]}
         except Exception:
-            self.failed_samples.add(idx)
+            self.failed_samples.add(index)
             idx = np.random.randint(0, len(self.training_set))
             logger.debug(traceback.format_exc())
             logger.info(f'Failed. Replacing with sample {idx}')
@@ -590,7 +590,7 @@ class GroundTruthDataset(Dataset):
                 im = torch.tensor(o['image'].transpose(2, 0, 1))
             return {'image': im, 'target': item[1]}
         except Exception:
-            self.failed_samples.add(idx)
+            self.failed_samples.add(index)
             idx = np.random.randint(0, len(self.training_set))
             logger.debug(traceback.format_exc())
             logger.info(f'Failed. Replacing with sample {idx}')
