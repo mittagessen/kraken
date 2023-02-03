@@ -67,6 +67,7 @@ class KrakenTrainer(pl.Trainer):
                  pb_ignored_metrics: Sequence[str] = ('loss', 'val_metric'),
                  move_metrics_to_cpu: bool = True,
                  freeze_backbone=-1,
+                 failed_sample_threshold=10,
                  *args,
                  **kwargs):
         kwargs['logger'] = False
@@ -91,6 +92,9 @@ class KrakenTrainer(pl.Trainer):
 
         if freeze_backbone > 0:
             kwargs['callbacks'].append(KrakenFreezeBackbone(freeze_backbone))
+
+        if failed_sample_threshold > 0:
+            kwargs['callbacks'].append(FaultySampleStopping(failed_sample_threshold))
 
         kwargs['callbacks'].extend([KrakenSetOneChannelMode(), KrakenSaveModel()])
         super().__init__(*args, **kwargs)
@@ -154,6 +158,35 @@ class KrakenSetOneChannelMode(Callback):
             if im_mode in ['1', 'L']:
                 logger.info(f'Setting model one_channel_mode to {im_mode}.')
                 trainer.model.nn.one_channel_mode = im_mode
+
+
+class FaultySampleStopping(Callback):
+    """
+    Callback that aborts training if a preset number of samples failed to load
+    from the training/validation datasets.
+    """
+    def __init__(self, threshold:int = 10):
+        self.threshold = threshold
+
+    def on_train_batch_start(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule") -> None:
+        ds = getattr(pl_module, 'train_set', None)
+        if not ds and trainer.datamodule:
+            ds = trainer.datamodule.train_set
+
+        if len(ds.dataset.failed_samples) > self.threshold:
+            log.warning(f'At least {len(ds.dataset.failed_samples)} unloadable '
+                         'samples in training dataset. Aborting.')
+            trainer.should_stop = True
+
+    def on_validation_batch_start(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule") -> None:
+        ds = getattr(pl_module, 'val_set', None)
+        if not ds and trainer.datamodule:
+            ds = trainer.datamodule.val_set
+
+        if len(ds.dataset.failed_samples) > self.threshold:
+            log.warning(f'At least {len(ds.dataset.failed_samples)} unloadable '
+                         'samples in validation dataset. Aborting.')
+            trainer.should_stop = True
 
 
 class KrakenSaveModel(Callback):

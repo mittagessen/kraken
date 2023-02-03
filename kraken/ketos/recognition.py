@@ -172,6 +172,8 @@ logger = logging.getLogger('kraken')
               show_default=True,
               default=RECOGNITION_HYPER_PARAMS['augment'],
               help='Enable image augmentation')
+@click.option('--failed-sample-threshold', show_default=True, default=10,
+              help='Abort if more than `n` samples fail to load.')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
           min_epochs, lag, min_delta, device, optimizer, lrate, momentum,
@@ -180,7 +182,7 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
           normalize_whitespace, codec, resize, reorder, base_dir,
           training_files, evaluation_files, workers, load_hyper_parameters,
           repolygonize, force_binarization, format_type, augment,
-          ground_truth):
+          failed_sample_threshold, ground_truth):
     """
     Trains a model from image-text pairs.
     """
@@ -279,6 +281,7 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
                             max_epochs=hyper_params['epochs'] if hyper_params['quit'] == 'dumb' else -1,
                             min_epochs=hyper_params['min_epochs'],
                             freeze_backbone=hyper_params['freeze_backbone'],
+                            failed_sample_threshold=failed_sample_threshold,
                             enable_progress_bar=True if not ctx.meta['verbose'] else False,
                             deterministic=ctx.meta['deterministic'],
                             **val_check_interval)

@@ -94,6 +94,8 @@ class BaselineSet(Dataset):
         self.targets = []
         # n-th entry contains semantic of n-th class
         self.class_mapping = {'aux': {'_start_separator': 0, '_end_separator': 1}, 'baselines': {}, 'regions': {}}
+        # keep track of samples that failed to load
+        self.failed_samples = set()
         self.class_stats = {'baselines': defaultdict(int), 'regions': defaultdict(int)}
         self.num_classes = 2
         self.mbl_dict = merge_baselines if merge_baselines is not None else {}
@@ -241,6 +243,7 @@ class BaselineSet(Dataset):
                 im, target = self.transform(im, target)
                 return {'image': im, 'target': target}
             except Exception:
+                self.failed_samples.add(idx)
                 idx = np.random.randint(0, len(self.imgs))
                 logger.debug(traceback.format_exc())
                 logger.info(f'Failed. Replacing with sample {idx}')

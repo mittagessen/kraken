@@ -185,6 +185,8 @@ def _validate_merging(ctx, param, value):
               callback=_validate_merging)
 @click.option('-br', '--bounding-regions', show_default=True, default=None, multiple=True,
               help='Regions treated as boundaries for polygonization purposes. May be used multiple times.')
+@click.option('--failed-sample-threshold', show_default=True, default=10,
+              help='Abort if more than `n` samples fail to load.')
 @click.option('--augment/--no-augment',
               show_default=True,
               default=SEGMENTATION_HYPER_PARAMS['augment'],
@@ -209,8 +211,8 @@ def segtrain(ctx, output, spec, line_width, pad, load, freq, quit, epochs,
              evaluation_files, workers, load_hyper_parameters,
              force_binarization, format_type, suppress_regions,
              suppress_baselines, valid_regions, valid_baselines, merge_regions,
-             merge_baselines, bounding_regions, augment, resize, topline,
-             ground_truth):
+             merge_baselines, bounding_regions, failed_sample_threshold,
+             augment, resize, topline, ground_truth):
     """
     Trains a baseline labeling model for layout analysis
     """
@@ -319,6 +321,7 @@ def segtrain(ctx, output, spec, line_width, pad, load, freq, quit, epochs,
                             min_epochs=hyper_params['min_epochs'],
                             enable_progress_bar=True if not ctx.meta['verbose'] else False,
                             deterministic=ctx.meta['deterministic'],
+                            failed_sample_threshold=failed_sample_threshold,
                             precision=int(precision),
                             **val_check_interval)
 

@@ -80,6 +80,7 @@ class ArrowIPCRecognitionDataset(Dataset):
         """
         self.alphabet = Counter()  # type: Counter
         self.text_transforms = []  # type: List[Callable[[str], str]]
+        self.failed_samples = set()
         self.transforms = im_transforms
         self.aug = None
         self._split_filter = split_filter
@@ -244,6 +245,7 @@ class ArrowIPCRecognitionDataset(Dataset):
                 im = torch.tensor(o['image'].transpose(2, 0, 1))
             text = self._apply_text_transform(sample)
         except Exception:
+            self.failed_samples.add(idx)
             idx = np.random.randint(0, len(self))
             logger.debug(traceback.format_exc())
             logger.info(f'Failed. Replacing with sample {idx}')
@@ -287,6 +289,7 @@ class PolygonGTDataset(Dataset):
         self.transforms = im_transforms
         self.aug = None
         self.skip_empty_lines = skip_empty_lines
+        self.failed_samples = set()
 
         self.seg_type = 'baselines'
         # built text transformations
@@ -418,6 +421,7 @@ class PolygonGTDataset(Dataset):
                 im = torch.tensor(o['image'].transpose(2, 0, 1))
             return {'image': im, 'target': item[1]}
         except Exception:
+            self.failed_samples.add(idx)
             idx = np.random.randint(0, len(self.training_set))
             logger.debug(traceback.format_exc())
             logger.info(f'Failed. Replacing with sample {idx}')
@@ -476,6 +480,7 @@ class GroundTruthDataset(Dataset):
         self.transforms = im_transforms
         self.skip_empty_lines = skip_empty_lines
         self.aug = None
+        self.failed_samples = set()
 
         self.seg_type = 'bbox'
         # built text transformations
@@ -585,6 +590,7 @@ class GroundTruthDataset(Dataset):
                 im = torch.tensor(o['image'].transpose(2, 0, 1))
             return {'image': im, 'target': item[1]}
         except Exception:
+            self.failed_samples.add(idx)
             idx = np.random.randint(0, len(self.training_set))
             logger.debug(traceback.format_exc())
             logger.info(f'Failed. Replacing with sample {idx}')
