@@ -848,6 +848,7 @@ class SegmentationModel(pl.LightningModule):
         output, _ = self.nn.nn(input)
         output = F.interpolate(output, size=(target.size(2), target.size(3)))
         loss = self.nn.criterion(output, target)
+        self.log('train_loss', loss, on_step=True, on_epoch=False, prog_bar=False, logger=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -874,11 +875,12 @@ class SegmentationModel(pl.LightningModule):
             self.best_metric = mean_iu
 
         logger.info(f'validation run: accuracy {pixel_accuracy} mean_acc {mean_accuracy} mean_iu {mean_iu} freq_iu {freq_iu}')
-        self.log_dict({'val_accuracy': pixel_accuracy,
-                       'val_mean_acc': mean_accuracy,
-                       'val_mean_iu': mean_iu,
-                       'val_freq_iu': freq_iu,
-                       'val_metric': mean_iu}, prog_bar=True)
+
+        self.log('val_accuracy', pixel_accuracy, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+        self.log('val_mean_acc', mean_accuracy, on_step=False, on_epoch=True, prog_bar=False, logger=True)
+        self.log('val_mean_iu', mean_iu, on_step=False, on_epoch=True, prog_bar=False, logger=True)
+        self.log('val_freq_iu', freq_iu, on_step=False, on_epoch=True, prog_bar=False, logger=True)
+        self.log('val_metric', mean_iu, on_step=False, on_epoch=True, prog_bar=False, logger=False)
 
         self.val_px_accuracy.reset()
         self.val_mean_accuracy.reset()
