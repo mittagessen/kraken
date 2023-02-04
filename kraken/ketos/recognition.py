@@ -174,6 +174,8 @@ logger = logging.getLogger('kraken')
               help='Enable image augmentation')
 @click.option('--failed-sample-threshold', show_default=True, default=10,
               help='Abort if more than `n` samples fail to load.')
+@click.option('--debug', is_flag=True, show_default=True, default=False,
+              help='Log training to local file system in TensorBoard format.')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
           min_epochs, lag, min_delta, device, optimizer, lrate, momentum,
@@ -182,7 +184,7 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
           normalize_whitespace, codec, resize, reorder, base_dir,
           training_files, evaluation_files, workers, load_hyper_parameters,
           repolygonize, force_binarization, format_type, augment,
-          failed_sample_threshold, ground_truth):
+          failed_sample_threshold, ground_truth, debug):
     """
     Trains a model from image-text pairs.
     """
@@ -227,7 +229,8 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
                          'cos_t_max': cos_max,
                          'normalization': normalization,
                          'normalize_whitespace': normalize_whitespace,
-                         'augment': augment})
+                         'augment': augment,
+                         'debug': debug,})
 
     # disable automatic partition when given evaluation set explicitly
     if evaluation_files:
@@ -284,6 +287,7 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
                             failed_sample_threshold=failed_sample_threshold,
                             enable_progress_bar=True if not ctx.meta['verbose'] else False,
                             deterministic=ctx.meta['deterministic'],
+                            debug=debug,
                             **val_check_interval)
     try:
         trainer.fit(model)

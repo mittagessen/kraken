@@ -30,7 +30,7 @@ from torchmetrics import CharErrorRate
 from torchmetrics.classification import MultilabelAccuracy, MultilabelJaccardIndex
 from torch.optim import lr_scheduler
 from typing import Callable, Dict, Optional, Sequence, Union, Any, Literal
-from pytorch_lightning.callbacks import Callback, EarlyStopping, BaseFinetuning
+from pytorch_lightning.callbacks import Callback, EarlyStopping, BaseFinetuning, LearningRateMonitor
 
 from kraken.lib import models, vgsl, default_specs, progress
 from kraken.lib.xml import preparse_xml_data
@@ -68,9 +68,13 @@ class KrakenTrainer(pl.Trainer):
                  move_metrics_to_cpu: bool = True,
                  freeze_backbone=-1,
                  failed_sample_threshold=10,
+                 debug=False,
                  *args,
                  **kwargs):
-        kwargs['logger'] = False
+        if debug:
+            kwargs['logger'] = pl.loggers.TensorBoardLogger('./', name='debug_logs')
+        else:
+            kwargs['logger'] = False
         kwargs['enable_checkpointing'] = False
         kwargs['enable_progress_bar'] = enable_progress_bar
         kwargs['min_epochs'] = min_epochs
@@ -468,6 +472,7 @@ class RecognitionModel(pl.LightningModule):
                                  target,
                                  seq_lens,
                                  target_lens)
+        self.log('train_loss', loss, on_step=True, on_epoch=False, prog_bar=False, logger=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -489,8 +494,8 @@ class RecognitionModel(pl.LightningModule):
             self.best_epoch = self.current_epoch
             self.best_metric = accuracy
         logger.info(f'validation run: total chars {self.val_cer.total} errors {self.val_cer.errors} accuracy {accuracy}')
-        self.log_dict({'val_accuracy': accuracy,
-                       'val_metric': accuracy}, prog_bar=True)
+        self.log('val_accuracy', accuracy, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+        self.log('val_metric', accuracy, on_step=False, on_epoch=True, prog_bar=False, logger=False)
         self.val_cer.reset()
 
 
@@ -621,6 +626,8 @@ class RecognitionModel(pl.LightningModule):
                                            mode='max',
                                            patience=self.hparams.lag,
                                            stopping_threshold=1.0))
+        if self.hparams.debug:
+            callbacks.append(LearningRateMonitor(logging_interval='step'))
         return callbacks
 
     # configuration of optimizers and learning rate schedulers
