@@ -17,6 +17,7 @@ ALTO/Page data loaders for segmentation training
 """
 import re
 import logging
+from pathlib import Path
 
 from itertools import groupby
 from lxml import etree
