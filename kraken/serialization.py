@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
 # or implied. See the License for the specific language governing
 # permissions and limitations under the License.
-from jinja2 import Environment, PackageLoader, DictLoader
+from jinja2 import Environment, PackageLoader, FunctionLoader
 
 import regex
 import logging
@@ -230,8 +230,10 @@ def serialize(records: Sequence[ocr_record],
         logger.debug('Initializing native jinja environment.')
         loader = PackageLoader('kraken', 'templates')
     elif template_source == 'custom':
-        loader = DictLoader({'default': template})
-        template = 'default'
+        def _load_template(name):
+            return open(template, 'r').read(), name, lambda: True
+        loader = FunctionLoader(_load_template)
+
     env = Environment(loader=loader,
                       trim_blocks=True,
                       lstrip_blocks=True,

@@ -24,6 +24,7 @@ import logging
 import pkg_resources
 
 from typing import Dict, Union, List, cast, Any, IO, Callable
+from pathlib import Path
 from rich.traceback import install
 from functools import partial
 from PIL import Image
@@ -100,7 +101,7 @@ def binarizer(threshold, zoom, escale, border, perc, range, low, high, input, ou
                                                  image_name=f'{output}.png',
                                                  image_size=res.size,
                                                  template=ctx.meta['output_template'],
-                                                 template_source='custom' if ctx.meta['output_mode'] != 'template' else 'native',
+                                                 template_source='custom' if ctx.meta['output_mode'] == 'template' else 'native',
                                                  processing_steps=ctx.meta['steps']))
         else:
             form = None
@@ -172,7 +173,7 @@ def segmenter(legacy, model, text_direction, scale, maxcolseps, black_colseps,
                                                           image_name=ctx.meta['base_image'],
                                                           image_size=im.size,
                                                           template=ctx.meta['output_template'],
-                                                          template_source='custom' if ctx.meta['output_mode'] != 'template' else 'native',
+                                                          template_source='custom' if ctx.meta['output_mode'] == 'template' else 'native',
                                                           processing_steps=ctx.meta['steps']))
     else:
         with click.open_file(output, 'w') as fp:
@@ -256,7 +257,7 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore, input,
                                              scripts=tags,
                                              regions=bounds['regions'] if 'regions' in bounds else None,
                                              template=ctx.meta['output_template'],
-                                             template_source='custom' if ctx.meta['output_mode'] != 'template' else 'native',
+                                             template_source='custom' if ctx.meta['output_mode'] == 'template' else 'native',
                                              processing_steps=ctx.meta['steps']))
         else:
             fp.write('\n'.join(s.prediction for s in preds))
@@ -296,7 +297,7 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore, input,
 @click.option('-n', '--native', 'serializer', flag_value='native', default=True,
               show_default=True)
 @click.option('-t', '--template',
-              default=click.Path(exists=True, dir_okay=False, path_type=Path, show_default=True),
+              default=click.Path(exists=True, dir_okay=False, path_type=Path),
               help='Explicitly set jinja template for output serialization. Overrides -h/-a/-y/-x/-n.')
 @click.option('-d', '--device', default='cpu', show_default=True,
               help='Select device to use (cpu, cuda:0, cuda:1, ...)')
