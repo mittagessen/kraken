@@ -19,6 +19,7 @@ import logging
 import datetime
 import shapely.geometry as geom
 
+from os import PathLike
 from pkg_resources import get_distribution
 from collections import Counter
 
@@ -26,7 +27,7 @@ from kraken.rpred import BaselineOCRRecord, BBoxOCRRecord, ocr_record
 from kraken.lib.util import make_printable
 from kraken.lib.segmentation import is_in_region
 
-from typing import Union, List, Tuple, Iterable, Optional, Sequence, Dict, Any
+from typing import Union, List, Tuple, Iterable, Optional, Sequence, Dict, Any, Literal
 
 logger = logging.getLogger(__name__)
 
@@ -70,12 +71,12 @@ def max_bbox(boxes: Iterable[Sequence[int]]) -> Tuple[int, int, int, int]:
 
 
 def serialize(records: Sequence[ocr_record],
-              image_name: str = None,
+              image_name: Union[PathLike, str] = None,
               image_size: Tuple[int, int] = (0, 0),
-              writing_mode: str = 'horizontal-tb',
+              writing_mode: Literal['horizontal-tb', 'vertical-lr', 'vertical-rl'] = 'horizontal-tb',
               scripts: Optional[Iterable[str]] = None,
               regions: Optional[Dict[str, List[List[Tuple[int, int]]]]] = None,
-              template: str = 'hocr',
+              template: [PathLike, str] = 'hocr',
               processing_steps: Optional[List[Dict[str, Union[Dict, str, float, int, bool]]]] = None) -> str:
     """
     Serializes a list of ocr_records into an output document.
@@ -234,9 +235,9 @@ def serialize(records: Sequence[ocr_record],
 
 
 def serialize_segmentation(segresult: Dict[str, Any],
-                           image_name: str = None,
+                           image_name: Union[PathLike, str] = None,
                            image_size: Tuple[int, int] = (0, 0),
-                           template: str = 'hocr',
+                           template: Unin[PathLike, str] = 'hocr',
                            processing_steps: Optional[List[Dict[str, Union[Dict, str, float, int, bool]]]] = None) -> str:
     """
     Serializes a segmentation result into an output document.

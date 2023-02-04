@@ -5,7 +5,7 @@ kraken.lib.models
 Wrapper around TorchVGSLModel including a variety of forward pass helpers for
 sequence classification.
 """
-from os.path import expandvars, expanduser, abspath
+from os.path import expandvars, expanduser, abspath, PathLike
 
 import torch
 import numpy as np
@@ -28,7 +28,11 @@ class TorchSeqRecognizer(object):
     """
     A wrapper class around a TorchVGSLModel for text recognition.
     """
-    def __init__(self, nn: TorchVGSLModel, decoder=kraken.lib.ctc_decoder.greedy_decoder, train: bool = False, device: str = 'cpu'):
+    def __init__(self,
+                 nn: TorchVGSLModel,
+                 decoder=kraken.lib.ctc_decoder.greedy_decoder,
+                 train: bool = False,
+                 device: str = 'cpu'):
         """
         Constructs a sequence recognizer from a VGSL model and a decoder.
 
@@ -166,7 +170,9 @@ class TorchSeqRecognizer(object):
         return oseqs
 
 
-def load_any(fname: str, train: bool = False, device: str = 'cpu') -> TorchSeqRecognizer:
+def load_any(fname: Union[PathLike, str],
+             train: bool = False,
+             device: str = 'cpu') -> TorchSeqRecognizer:
     """
     Loads anything that was, is, and will be a valid ocropus model and
     instantiates a shiny new kraken.lib.lstm.SeqRecognizer from the RNN

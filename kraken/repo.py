@@ -18,10 +18,10 @@ Accessors to the model repository on zenodo.
 import os
 import json
 import urllib
-import pathlib
 import logging
 import requests
 
+from os import PathLike
 from pathlib import Path
 from contextlib import closing
 from typing import Callable, Any
@@ -36,7 +36,7 @@ MODEL_REPO = 'https://zenodo.org/api/'
 SUPPORTED_MODELS = set(['kraken_pytorch'])
 
 
-def publish_model(model_file: [str, pathlib.Path] = None,
+def publish_model(model_file: [str, PathLike] = None,
                   metadata: dict = None,
                   access_token: str = None,
                   callback: Callable[[int, int], Any] = lambda: None,

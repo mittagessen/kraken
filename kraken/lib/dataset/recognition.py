@@ -18,12 +18,12 @@ Utility functions for data loading and training of VGSL networks.
 import io
 import json
 import torch
-import pathlib
 import traceback
 import numpy as np
 import pyarrow as pa
 
 from PIL import Image
+from os import PathLike
 from functools import partial
 from torchvision import transforms
 from collections import Counter
@@ -122,7 +122,7 @@ class ArrowIPCRecognitionDataset(Dataset):
 
         self.im_mode = self.transforms.mode
 
-    def add(self, file: Union[str, pathlib.Path]) -> None:
+    def add(self, file: Union[str, PathLike]) -> None:
         """
         Adds an Arrow IPC file to the dataset.
 
@@ -341,7 +341,7 @@ class PolygonGTDataset(Dataset):
         self.alphabet.update(kwargs['text'])
 
     def parse(self,
-              image: Union[pathlib.Path, str, Image.Image],
+              image: Union[PathLike, str, Image.Image],
               text: str,
               baseline: List[Tuple[int, int]],
               boundary: List[Tuple[int, int]],
@@ -437,7 +437,7 @@ class GroundTruthDataset(Dataset):
 
     All data is cached in memory.
     """
-    def __init__(self, split: Callable[[Union[pathlib.Path, str]], str] = F_t.default_split,
+    def __init__(self, split: Callable[[Union[PathLike, str]], str] = F_t.default_split,
                  suffix: str = '.gt.txt',
                  normalization: Optional[str] = None,
                  whitespace_normalization: bool = True,
@@ -528,7 +528,7 @@ class GroundTruthDataset(Dataset):
         self._gt.append(kwargs['text'])
         self.alphabet.update(kwargs['text'])
 
-    def parse(self, image: Union[pathlib.Path, str, Image.Image], *args, **kwargs) -> Dict:
+    def parse(self, image: Union[PathLike, str, Image.Image], *args, **kwargs) -> Dict:
         """
         Parses a sample for this dataset.
 

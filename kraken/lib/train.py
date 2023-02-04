@@ -17,13 +17,13 @@ Training loop interception helpers
 """
 import re
 import torch
-import pathlib
 import logging
 import warnings
 import numpy as np
 import torch.nn.functional as F
 import pytorch_lightning as pl
 
+from os import PathLike
 from functools import partial
 from torch.multiprocessing import Pool
 from torchmetrics import CharErrorRate
@@ -210,10 +210,10 @@ class RecognitionModel(pl.LightningModule):
                  output: str = 'model',
                  spec: str = default_specs.RECOGNITION_SPEC,
                  append: Optional[int] = None,
-                 model: Optional[Union[pathlib.Path, str]] = None,
+                 model: Optional[Union[PathLike, str]] = None,
                  reorder: Union[bool, str] = True,
-                 training_data: Union[Sequence[Union[pathlib.Path, str]], Sequence[Dict[str, Any]]] = None,
-                 evaluation_data: Optional[Union[Sequence[Union[pathlib.Path, str]], Sequence[Dict[str, Any]]]] = None,
+                 training_data: Union[Sequence[Union[PathLike, str]], Sequence[Dict[str, Any]]] = None,
+                 evaluation_data: Optional[Union[Sequence[Union[PathLike, str]], Sequence[Dict[str, Any]]]] = None,
                  partition: Optional[float] = 0.9,
                  binary_dataset_split: bool = False,
                  num_workers: int = 1,
@@ -669,9 +669,9 @@ class SegmentationModel(pl.LightningModule):
                  message: Callable[[str], None] = lambda *args, **kwargs: None,
                  output: str = 'model',
                  spec: str = default_specs.SEGMENTATION_SPEC,
-                 model: Optional[Union[pathlib.Path, str]] = None,
-                 training_data: Union[Sequence[Union[pathlib.Path, str]], Sequence[Dict[str, Any]]] = None,
-                 evaluation_data: Optional[Union[Sequence[Union[pathlib.Path, str]], Sequence[Dict[str, Any]]]] = None,
+                 model: Optional[Union[PathLike, str]] = None,
+                 training_data: Union[Sequence[Union[PathLike, str]], Sequence[Dict[str, Any]]] = None,
+                 evaluation_data: Optional[Union[Sequence[Union[PathLike, str]], Sequence[Dict[str, Any]]]] = None,
                  partition: Optional[float] = 0.9,
                  num_workers: int = 1,
                  force_binarization: bool = False,

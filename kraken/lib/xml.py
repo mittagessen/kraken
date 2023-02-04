@@ -16,15 +16,14 @@
 ALTO/Page data loaders for segmentation training
 """
 import re
-import pathlib
 import logging
 
-from pathlib import Path
 from itertools import groupby
 from lxml import etree
 from PIL import Image
 from typing import Union, Dict, Any, Sequence, Tuple
 
+from os import PathLike
 from collections import defaultdict
 from kraken.lib.segmentation import calculate_polygonal_environment
 from kraken.lib.exceptions import KrakenInputException
@@ -57,7 +56,7 @@ alto_regions = {'TextBlock': 'text',
                 'ComposedBlock': 'composed'}
 
 
-def preparse_xml_data(filenames: Sequence[Union[str, pathlib.Path]],
+def preparse_xml_data(filenames: Sequence[Union[str, PathLike]],
                       format_type: str = 'xml',
                       repolygonize: bool = False) -> Dict[str, Any]:
     """
@@ -126,7 +125,7 @@ def _repolygonize(im: Image.Image, lines: Sequence[Dict[str, Any]]):
              'script': orig['script']} for orig, polygon in zip(lines, polygons)]
 
 
-def parse_xml(filename: Union[str, pathlib.Path]) -> Dict[str, Any]:
+def parse_xml(filename: Union[str, PathLike]) -> Dict[str, Any]:
     """
     Parses either a PageXML or ALTO file with autodetermination of the file
     format.
@@ -159,7 +158,7 @@ def parse_xml(filename: Union[str, pathlib.Path]) -> Dict[str, Any]:
         raise KrakenInputException(f'Unknown XML format in {filename}')
 
 
-def parse_page(filename: Union[str, pathlib.Path]) -> Dict[str, Any]:
+def parse_page(filename: Union[str, PathLike]) -> Dict[str, Any]:
     """
     Parses a PageXML file, returns the baselines defined in it, and loads the
     referenced image.
@@ -314,7 +313,7 @@ def parse_page(filename: Union[str, pathlib.Path]) -> Dict[str, Any]:
         return data
 
 
-def parse_alto(filename: Union[str, pathlib.Path]) -> Dict[str, Any]:
+def parse_alto(filename: Union[str, PathLike]) -> Dict[str, Any]:
     """
     Parses an ALTO file, returns the baselines defined in it, and loads the
     referenced image.

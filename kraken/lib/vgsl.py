@@ -6,9 +6,9 @@ import json
 import torch
 import logging
 import warnings
-import pathlib
 
 from torch import nn
+from os import PathLike
 from typing import Sequence, List, Tuple, Union, Optional, Iterable, Callable, Dict, Any
 
 from kraken.lib import layers
@@ -260,7 +260,7 @@ class TorchVGSLModel(object):
         torch.set_num_threads(num)
 
     @classmethod
-    def load_model(cls, path: Union[str, pathlib.Path]):
+    def load_model(cls, path: Union[str, PathLike]):
         """
         Deserializes a VGSL model from a CoreML file.
 
@@ -275,7 +275,7 @@ class TorchVGSLModel(object):
             string, protobuf file, or without appropriate metadata).
             FileNotFoundError if the path doesn't point to a file.
         """
-        if isinstance(path, pathlib.Path):
+        if isinstance(path, PathLike):
             path = path.as_posix()
         try:
             mlmodel = MLModel(path)

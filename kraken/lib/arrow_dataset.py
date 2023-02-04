@@ -19,7 +19,6 @@ __all__ = ['build_binary_dataset']
 
 import io
 import json
-import pathlib
 import numpy as np
 import pyarrow as pa
 import tempfile
@@ -34,7 +33,7 @@ from kraken.lib.segmentation import extract_polygons
 from kraken.lib.xml import parse_xml, parse_alto, parse_page
 from kraken.lib.util import is_bitonal, make_printable
 from kraken.lib.exceptions import KrakenInputException
-from os import extsep
+from os import extsep, PathLike
 
 import logging
 
@@ -83,7 +82,7 @@ def _extract_path_line(xml_record, skip_empty_lines: bool = True):
     return [line], im.mode
 
 
-def parse_path(path: Union[str, pathlib.Path],
+def parse_path(path: Union[str, PathLike],
                suffix: str = '.gt.txt',
                split=F_t.default_split,
                skip_empty_lines: bool = True):
@@ -94,8 +93,8 @@ def parse_path(path: Union[str, pathlib.Path],
     return {'image': path, 'lines': [{'text': gt}]}
 
 
-def build_binary_dataset(files: Optional[List[Union[str, pathlib.Path, Dict]]] = None,
-                         output_file: Union[str, pathlib.Path] = None,
+def build_binary_dataset(files: Optional[List[Union[str, PathLike, Dict]]] = None,
+                         output_file: Union[str, PathLike] = None,
                          format_type: str = 'xml',
                          num_workers: int = 0,
                          ignore_splits: bool = False,

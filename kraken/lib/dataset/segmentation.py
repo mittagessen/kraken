@@ -22,14 +22,14 @@ import numpy as np
 import torch.nn.functional as F
 import shapely.geometry as geom
 
-from os import path
+from os import path, PathLike
 from PIL import Image
 from shapely.ops import split
 from itertools import groupby
 from torchvision import transforms
 from collections import defaultdict
 from torch.utils.data import Dataset
-from typing import Dict, List, Tuple, Sequence, Callable, Any, Union
+from typing import Dict, List, Tuple, Sequence, Callable, Any, Union, Literal, Optional
 
 from skimage.draw import polygon
 
@@ -48,12 +48,12 @@ class BaselineSet(Dataset):
     """
     Dataset for training a baseline/region segmentation model.
     """
-    def __init__(self, imgs: Sequence[str] = None,
+    def __init__(self, imgs: Sequence[Union[PathLike, str]] = None,
                  suffix: str = '.path',
                  line_width: int = 4,
                  padding: Tuple[int, int, int, int] = (0, 0, 0, 0),
                  im_transforms: Callable[[Any], torch.Tensor] = transforms.Compose([]),
-                 mode: str = 'path',
+                 mode: Optional[Literal['path', 'alto', 'page', 'xml']] = 'path',
                  augmentation: bool = False,
                  valid_baselines: Sequence[str] = None,
                  merge_baselines: Dict[str, Sequence[str]] = None,
@@ -185,7 +185,7 @@ class BaselineSet(Dataset):
         self.seg_type = None
 
     def add(self,
-            image: Union[str, Image.Image],
+            image: Union[PathLike, str, Image.Image],
             baselines: List[List[List[Tuple[int, int]]]] = None,
             regions: Dict[str, List[List[Tuple[int, int]]]] = None,
             *args,
@@ -194,13 +194,13 @@ class BaselineSet(Dataset):
         Adds a page to the dataset.
 
         Args:
-            im (path): Path to the whole page image
-            baseline (dict): A list containing dicts with a list of coordinates
-                             and tags [{'baseline': [[x0, y0], ...,
-                             [xn, yn]], 'tags': ('script_type',)}, ...]
-            regions (dict): A dict containing list of lists of coordinates
-                            {'region_type_0': [[x0, y0], ..., [xn, yn]]],
-                            'region_type_1': ...}.
+            im: Path to the whole page image
+            baseline: A list containing dicts with a list of coordinates
+                      and tags [{'baseline': [[x0, y0], ...,
+                      [xn, yn]], 'tags': ('script_type',)}, ...]
+            regions: A dict containing list of lists of coordinates
+                     {'region_type_0': [[x0, y0], ..., [xn, yn]]],
+                     'region_type_1': ...}.
         """
         if self.mode:
             raise Exception(f'The `add` method is incompatible with dataset mode {self.mode}')

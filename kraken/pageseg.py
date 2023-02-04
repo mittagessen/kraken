@@ -301,7 +301,8 @@ def rotate_lines(lines: np.ndarray, angle: float, offset: int) -> np.ndarray:
     return np.column_stack((x.flatten(), y.flatten())).reshape(-1, 4)
 
 
-def segment(im, text_direction: str = 'horizontal-lr',
+def segment(im,
+            text_direction: str = 'horizontal-lr',
             scale: Optional[float] = None,
             maxcolseps: float = 2,
             black_colseps: bool = False,

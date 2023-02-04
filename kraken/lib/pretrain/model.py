@@ -31,11 +31,11 @@ arXiv:2112.08692 (2021).
 import re
 import math
 import torch
-import pathlib
 import logging
 import torch.nn.functional as F
 import pytorch_lightning as pl
 
+from os import PathLike
 from itertools import chain
 from functools import partial
 from torch.optim import lr_scheduler
@@ -72,8 +72,8 @@ def _star_fun(fun, kwargs):
 
 class PretrainDataModule(pl.LightningDataModule):
     def __init__(self,
-                 training_data: Union[Sequence[Union[pathlib.Path, str]], Sequence[Dict[str, Any]]] = None,
-                 evaluation_data: Optional[Union[Sequence[Union[pathlib.Path, str]], Sequence[Dict[str, Any]]]] = None,
+                 training_data: Union[Sequence[Union[PathLike, str]], Sequence[Dict[str, Any]]] = None,
+                 evaluation_data: Optional[Union[Sequence[Union[PathLike, str]], Sequence[Dict[str, Any]]]] = None,
                  partition: Optional[float] = 0.9,
                  binary_dataset_split: bool = False,
                  batch_size: int = 4,
@@ -241,7 +241,7 @@ class RecognitionPretrainModel(pl.LightningModule):
                  hyper_params: Dict[str, Any] = None,
                  output: str = 'model',
                  spec: str = default_specs.RECOGNITION_SPEC,
-                 model: Optional[Union[pathlib.Path, str]] = None,
+                 model: Optional[Union[PathLike, str]] = None,
                  load_hyper_parameters: bool = False,
                  len_train_set: int = -1):
         """
