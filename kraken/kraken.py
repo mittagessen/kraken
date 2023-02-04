@@ -99,7 +99,8 @@ def binarizer(threshold, zoom, escale, border, perc, range, low, high, input, ou
                 fp.write(serialization.serialize([],
                                                  image_name=f'{output}.png',
                                                  image_size=res.size,
-                                                 template=ctx.meta['output_mode'],
+                                                 template=ctx.meta['output_template'],
+                                                 template_source='custom' if ctx.meta['output_mode'] != 'template' else 'native',
                                                  processing_steps=ctx.meta['steps']))
         else:
             form = None
@@ -170,7 +171,8 @@ def segmenter(legacy, model, text_direction, scale, maxcolseps, black_colseps,
             fp.write(serialization.serialize_segmentation(res,
                                                           image_name=ctx.meta['base_image'],
                                                           image_size=im.size,
-                                                          template=ctx.meta['output_mode'],
+                                                          template=ctx.meta['output_template'],
+                                                          template_source='custom' if ctx.meta['output_mode'] != 'template' else 'native',
                                                           processing_steps=ctx.meta['steps']))
     else:
         with click.open_file(output, 'w') as fp:
@@ -253,7 +255,8 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore, input,
                                              writing_mode=ctx.meta['text_direction'],
                                              scripts=tags,
                                              regions=bounds['regions'] if 'regions' in bounds else None,
-                                             template=ctx.meta['output_mode'],
+                                             template=ctx.meta['output_template'],
+                                             template_source='custom' if ctx.meta['output_mode'] != 'template' else 'native',
                                              processing_steps=ctx.meta['steps']))
         else:
             fp.write('\n'.join(s.prediction for s in preds))
@@ -263,8 +266,8 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore, input,
 @click.group(chain=True)
 @click.version_option()
 @click.option('-i', '--input',
-              type=(click.Path(exists=True),  # type: ignore
-                    click.Path(writable=True)),
+              type=(click.Path(exists=True, dir_okay=False, path_type=Path),  # type: ignore
+                    click.Path(writable=True, dir_okay=False, path_type=Path)),
               multiple=True,
               help='Input-output file pairs. Each input file (first argument) is mapped to one '
                    'output file (second argument), e.g. `-i input.png output.txt`')
@@ -292,11 +295,15 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore, input,
 @click.option('-x', '--pagexml', 'serializer', flag_value='pagexml')
 @click.option('-n', '--native', 'serializer', flag_value='native', default=True,
               show_default=True)
+@click.option('-t', '--template',
+              default=click.Path(exists=True, dir_okay=False, path_type=Path, show_default=True),
+              help='Explicitly set jinja template for output serialization. Overrides -h/-a/-y/-x/-n.')
 @click.option('-d', '--device', default='cpu', show_default=True,
               help='Select device to use (cpu, cuda:0, cuda:1, ...)')
 @click.option('-r', '--raise-on-error/--no-raise-on-error', default=False, show_default=True,
               help='Raises the exception that caused processing to fail in the case of an error')
-def cli(input, batch_input, suffix, verbose, format_type, pdf_format, serializer, device, raise_on_error):
+def cli(input, batch_input, suffix, verbose, format_type, pdf_format,
+        serializer, template, device, raise_on_error):
     """
     Base command for recognition functionality.
 
@@ -317,7 +324,12 @@ def cli(input, batch_input, suffix, verbose, format_type, pdf_format, serializer
     ctx.meta['device'] = device
     ctx.meta['input_format_type'] = format_type if format_type != 'pdf' else 'image'
     ctx.meta['raise_failed'] = raise_on_error
-    ctx.meta['output_mode'] = serializer
+    if not template:
+        ctx.meta['output_mode'] = serializer
+        ctx.meta['output_template'] = serializer
+    else:
+        ctx.meta['output_mode'] = 'template'
+        ctx.meta['output_template'] = template
     ctx.meta['verbose'] = verbose
     ctx.meta['steps'] = []
     log.set_logger(logger, level=30 - min(10 * verbose, 20))

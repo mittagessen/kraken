@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
 # or implied. See the License for the specific language governing
 # permissions and limitations under the License.
-from jinja2 import Environment, PackageLoader
+from jinja2 import Environment, PackageLoader, DictLoader
 
 import regex
 import logging
@@ -31,7 +31,7 @@ from typing import Union, List, Tuple, Iterable, Optional, Sequence, Dict, Any, 
 
 logger = logging.getLogger(__name__)
 
-__all__ = ['serialize', 'render_report']
+__all__ = ['serialize', 'serialize_segmentation', 'render_report']
 
 
 def _rescale(val: Sequence[float], low: float, high: float) -> List[float]:
@@ -76,7 +76,8 @@ def serialize(records: Sequence[ocr_record],
               writing_mode: Literal['horizontal-tb', 'vertical-lr', 'vertical-rl'] = 'horizontal-tb',
               scripts: Optional[Iterable[str]] = None,
               regions: Optional[Dict[str, List[List[Tuple[int, int]]]]] = None,
-              template: [PathLike, str] = 'hocr',
+              template: [PathLike, str] = 'alto',
+              template_source: Literal['native', 'custom'] = 'native',
               processing_steps: Optional[List[Dict[str, Union[Dict, str, float, int, bool]]]] = None) -> str:
     """
     Serializes a list of ocr_records into an output document.
@@ -97,7 +98,11 @@ def serialize(records: Sequence[ocr_record],
         scripts: List of scripts contained in the OCR records
         regions: Dictionary mapping region types to a list of region polygons.
         template: Selector for the serialization format. May be 'hocr',
-                  'alto', 'page' or any template found in the template directory.
+                  'alto', 'page' or any template found in the template
+                  directory. If template_source is set to `custom` a path to a
+                  template is expected.
+        template_source: Switch to enable loading of custom templates from
+                         outside the kraken package.
         processing_steps: A list of dictionaries describing the processing kraken performed on the inputs::
 
                           {'category': 'preprocessing',
@@ -221,8 +226,13 @@ def serialize(records: Sequence[ocr_record],
                       }
             page['entities'].append(region)
 
-    logger.debug('Initializing jinja environment.')
-    env = Environment(loader=PackageLoader('kraken', 'templates'),
+    if template_source == 'native':
+        logger.debug('Initializing native jinja environment.')
+        loader = PackageLoader('kraken', 'templates')
+    elif template_source == 'custom':
+        loader = DictLoader({'default': template})
+        template = 'default'
+    env = Environment(loader=loader,
                       trim_blocks=True,
                       lstrip_blocks=True,
                       autoescape=True)
@@ -237,17 +247,19 @@ def serialize(records: Sequence[ocr_record],
 def serialize_segmentation(segresult: Dict[str, Any],
                            image_name: Union[PathLike, str] = None,
                            image_size: Tuple[int, int] = (0, 0),
-                           template: Unin[PathLike, str] = 'hocr',
+                           template: Union[PathLike, str] = 'alto',
+                           template_source: Literal['native', 'custom'] = 'native',
                            processing_steps: Optional[List[Dict[str, Union[Dict, str, float, int, bool]]]] = None) -> str:
     """
     Serializes a segmentation result into an output document.
 
     Args:
         segresult: Result of blla.segment
-        image_name (str): Name of the source image
-        image_size (tuple): Dimensions of the source image
-        template (str): Selector for the serialization format. May be
-                        'hocr' or 'alto'.
+        image_name: Name of the source image
+        image_size: Dimensions of the source image
+        template: Selector for the serialization format. Any value accepted by
+                  `serialize` is valid.
+        template_source: Enables/disables loading of external templates.
 
     Returns:
             (str) rendered template.
@@ -265,6 +277,7 @@ def serialize_segmentation(segresult: Dict[str, Any],
                      image_size=image_size,
                      regions=segresult['regions'] if 'regions' in segresult else None,
                      template=template,
+                     template_source=template_source,
                      processing_steps=processing_steps)
 
 
