@@ -203,6 +203,8 @@ def _validate_merging(ctx, param, value):
                    ' centerline for scripts annotated with a central line.')
 @click.option('-cl', '--centerline', 'topline', flag_value='centerline')
 @click.option('-bl', '--baseline', 'topline', flag_value='baseline', default='baseline')
+@click.option('--debug', is_flag=True, show_default=True, default=False,
+              help='Log training to local file system in TensorBoard format.')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def segtrain(ctx, output, spec, line_width, pad, load, freq, quit, epochs,
              min_epochs, lag, min_delta, device, precision, optimizer, lrate,
@@ -212,7 +214,7 @@ def segtrain(ctx, output, spec, line_width, pad, load, freq, quit, epochs,
              force_binarization, format_type, suppress_regions,
              suppress_baselines, valid_regions, valid_baselines, merge_regions,
              merge_baselines, bounding_regions, failed_sample_threshold,
-             augment, resize, topline, ground_truth):
+             augment, resize, topline, debug, ground_truth):
     """
     Trains a baseline labeling model for layout analysis
     """
@@ -254,7 +256,8 @@ def segtrain(ctx, output, spec, line_width, pad, load, freq, quit, epochs,
                          'gamma': gamma,
                          'step_size': step_size,
                          'rop_patience': sched_patience,
-                         'cos_t_max': cos_max})
+                         'cos_t_max': cos_max,
+                         'debug': debug,})
 
     # disable automatic partition when given evaluation set explicitly
     if evaluation_files:
@@ -323,6 +326,7 @@ def segtrain(ctx, output, spec, line_width, pad, load, freq, quit, epochs,
                             deterministic=ctx.meta['deterministic'],
                             failed_sample_threshold=failed_sample_threshold,
                             precision=int(precision),
+                            debug=debug,
                             **val_check_interval)
 
     trainer.fit(model)

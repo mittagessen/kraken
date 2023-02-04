@@ -1,0 +1,2031 @@
+CHANGES
+=======
+
+* min\_epochs is broken in ptl right now
+* more attempts
+* 2nd attempt
+* proper callback hook signature
+* Add switch to abort training if more than \`n\` samples fail to load during training
+* remove accuracy calc in pretrain for now
+* arrgh
+* torchmetrics in pretrain
+* ncodec/train\_codec in \`both\` adaptation mode
+* better typing for datasets/im\_transforms
+* Add skip-empty-lines/keep-empty-lines switch to \`ketos compile\`
+* Fixes recognition training regression with binary datasets
+* remove unused levenshtein distance function
+* fix metric computation in recognition validation
+* better numpy pinning
+* better treatment of training/validation set codecs
+* ReduceLRonPlateau compatibility with manual optimization
+* bump torchmetrics minimum version to 0.10.0
+* pathlib fix for arrow dataset compilation
+* fix padding in recognition training
+* return dict in optimizer configuration
+* no torchvision packages for 3.11
+* python 3.11 tests
+* slight metadata field bug in ImageInputTransforms
+* new padding semantics broke rpred/pretraining
+* Use torchmetrics for pretrain/segtrain validation metrics
+* more linting
+* some linter cleanup
+* Original implementation of unsupervised pretraining
+* Add optional padding to blla segmenter
+* remove duplicate shorthand switch in segtrain (-p)
+* fix metadata schema location resolution in publish
+* Bump up shapely to 2.0
+* Line orientation heuristic for vertical lines
+* make ketos train run again
+* fix 'compile' not being able to handle 'path' (.gt.txt+.png) input anymore
+* Fix formatting of ketos documentation
+* update advanced docs recognition section
+* make alignment ctc check work with non-encodable seqs
+* 3.10 not 3.1
+* see if 3.10 workflow works now
+* use local xlink xsd
+* Add example tensors to model summary
+* Missed shapely 2.0 compatibility changes in polygon section computation
+* revert half-baked blla.py changes
+* build conda packages with boa
+* update baselineset\_overlay.py to newest API
+* bump maximum pytorch version to 1.13
+* distance\_function\_edt from scipy.ndimage
+* More flexible ALTO PointsType parsing
+* Move metrics to CPU
+* catch-all exceptions in arrow dataset builder
+* forgot to move scripts.json
+* forgot to expose global\_align, compute\_confusions in dataset refactor
+* Correct alignment bug in repolygonize.py
+* more merge regression
+* merge regression with skip\_empty\_lines
+* Crash on shapely 2.0a1 in region vectorizer
+* merge error
+* Fix new typos in documentation (found by codespell)
+* test combined merging and whitelisting in baselineset
+* shapely 2.0 fixes for BaselineSet
+* baselineset tests
+* refactor dataset module
+* bump up minimum version of shapely to 1.8.x
+* dataset.py adaptation for shapely 2.0
+* baseline extension fixes for very small blobs
+* more robust line extension code
+* more \_calc\_roi fixes
+* calculate\_polygonal\_environment fixes for shapely 2.0
+* shapely 2.0 fix for line extension code
+* serialization for new ocr records
+* actual new records
+* update baseline records for new format
+* small bugfix in vgsl tests
+* s/Image.LANCZOS/Resampling.LANCZOS
+* robustify repolygonization script
+* clear out lines that fail repolygonization in repolygonize.py
+* working bbox record tests
+* correct imports
+* same in texts
+* better living through correct class instantiation
+* urrgh
+* fix syntax error in serialization
+* bbox record tests
+* fix box calculation in bboxocrrecord
+* log validation results to kraken log as well
+* properly deal with bbox recognition record generation
+* unify failure handling behavior across line types in recognizer
+* smarter ocr records
+* don't log None's in pretraining
+* more reasonable negative sample numbers
+* fix gpu acceleration in pretraining tuning
+* import validate\_manifests
+* manifest file for pretraining hyperparams
+* rename ignore\_empty\_lines to skip\_empty\_lines
+* fix arrow dataset encoding with given codec
+* skip invalid character polygons in serializer
+* make it actually inf
+* arrgh
+* fix initial metric in pretraining
+* compute mean of less instead of summing in pretraining
+* fix typo in RuntimeError
+* add garbage collection on OOM error in pretraining
+* rewrite cuda to gpu in ptl device
+* execute cli
+* typo
+* wrap hyperparam tuning into a nicer click cli
+* disable verbose switch in cosine lr scheduling
+* Support for all pytorch-lightning supported devices in ketos
+* hyperparameter tuning for training script
+
+4.2.0
+-----
+
+* Unsupervised pretraining for recognition models
+* update dependencies
+* shut up division-by-zero warning in intersection test
+* nicer looking serializer output
+* Adapt abbyyxml to new serializer data structure
+* also honor --device in ketos test
+* fix comment
+* Move region polygon simplification to later point in vectorization
+* honor --device switch in ketos segtest
+* Show more informative message for recognition model
+* Move nn.codec to False to prevent wrong codec strict mode change
+* Fix grammar in documentation
+* Fix typo in documentation
+* better error handling in forced alignment code
+* Fix some typos (found by codespell)
+* Fix typo in name
+* Fix crash in segtrain with early stopping model moving
+* fix callbacks in KrakenTrainer
+* invalid citation file
+* refer to website not git repo
+* Add citation file
+* bump up default spec input image size to 1800
+* use local variable
+* filter out non-pertinent coreml warnings
+* add --private/--public switch to ketos publish
+* arrgh
+* Make seeding more deterministic and add deterministic switch
+* set correct learning rate in onecycle policy
+* update model repository docs
+* accidentally deleted coremltools req
+* Add processing steps and kraken version to serialized output
+* fix progress bar in ketos publish
+* (fix) As for binary automatic split, val chars should be part of the codec in resize/add
+* (fix) Codec should be set back to Strict=False after resize
+* switch tabulate for rich
+* (Feat) --threshold as a parameter for testing
+* (Feat) Add a baseline/region class-independant IoU
+* (Feat) Added a ketos segtest option, tested only on VGSL
+* add leakyrelu to activation functions in conv
+* fix crash with align.py when using pywrapfst
+
+4.1.2
+-----
+
+* set border value in erosion in seamcarve
+
+4.1.1
+-----
+
+* fixed minimum version of click too low
+* change default segmentation model to one with higher resolution
+* unauthorized git urls don't work anymore
+
+4.1
+---
+
+* resolve with mamba
+* didn't work
+* try to resolve conda build timeouts
+* Bump minimum click version to 8.0
+* chain exceptions in vgsl
+* abort processing if augmentation is selected
+* factor out model serialization and one\_channel\_mode setting into callbacks
+* fix regression in bbox type dataset compilation
+* better help message on \`ketos compile --workers\`
+* Rebuild Arrow alphabet if the normalization is set. Fixes #340
+* add direct data structure input to build\_arrow\_dataset
+* clip line polygon to image bounds
+* typo in tag filter
+* make sure callbacks at on\_validation\_end are called
+* fix tag parsing in datase
+* fix alto parser when last line doesn't have a tag
+* Allow bug fix releases of Python 3.10
+* bump pytorch/scikit-image upper version limit
+* Fix ketos test progress bar regression
+* pin requirements in conda binary packages
+* linter stuff
+
+4.0
+---
+
+* fix typo
+* define \_\_all\_\_
+* provide explicit download bar
+* Add test\_serialize\_segmentation\_pagexml
+* Add serialize\_segementation to API reference
+* Test serialize\_segmentation
+* Add utility serialization.serialize\_segmentation
+* add rich to requirements
+* More informative callbacks in kraken.repo
+* building better brogress bars
+* use rich traceback handler
+* deprecate click progress bar
+* add rich progress bars to kraken output
+* Use rich progressbar instead of internal click one
+* updated training api examples
+* add albumentations to dependencies
+* typo in docstring
+* incorporate other svg diagrams
+* Add sample codec section to docs
+* nicer looking funding statements
+* Updated funding notices
+* arrrgh, merging is hard
+* Squashed commit of feature/docs
+* Add Unicode/whitespace normalization info to docs
+* updated ketos documentation
+* Use correct way of getting a UTC datetime object
+* Provide timestamp as explicit UTC
+* Complete rewrite of the training code and addition of fast precompiled datasets
+
+3.0.9
+-----
+
+* merge error in 3.0.8
+
+3.0.8
+-----
+
+* pin scikit-image to between 0.17 and 0.19.1
+* fix scikit-image auto-casting crash
+* fix oneyclelr instantiation
+* shup up shapely deprecation warning
+
+3.0.7
+-----
+
+* fix rotation angle in fast path of extract\_lines
+* CustomPageXML parsing: allow ":" in value
+* docs: Replace "an central" by "a central"
+* docs: Replace "repeatedlyduring" by "repeatedly during"
+* docs: Replace "in for" by "for"
+* fix regression in alignment code with non-strict codecs
+* Fix serialization of models with parameter-less first layer
+* weight decay is obviously float
+* Fix regression in Lfys layers introduced by batching
+* Deduplicate -d in ketos linegen
+* Ensure tuple-ness of degradation in linegen module
+* Keep absolute best model around with early stopping
+* remove superfluous print() debug statement
+* Also test serialization of regions only
+* Improve serialization behavior of line-less pages
+* Fix crash during serialization of pages without lines
+* Also rebuild gh-pages on tags
+
+3.0.6
+-----
+
+* Janitorial work fixing deployment of packages/gh-pages
+* raise PIL image size limit to 20k\*20k im dimensions
+* Also test against python 3.9
+* Correct one RTL RO bug
+* readme is rst not markdown
+* Add funding statement
+* Fix typo (found by codespell)
+* Drop short option form -p for --pad in all ketos commands
+* fix connected component test in pageseg.segment
+* Update .gitignore
+* fall back to simple scaling when centerline dewarping fails
+* test basic functionality of the lineest module
+* also reinstantiate codec in lib/train.py
+* actuall load codec file in cli driver
+* Don't use thread pool if there is a single thread
+* Add missing documentation for ketos -f option
+* Add input validation like in PolygonGTDataset.parse() so that invalid line does not raise uncatched expection
+* Correct input parameter modification
+* actually apply masking in blla segmenter
+* fix most lgtm alerts
+* Fix typos in comments and documentation (found by codespell)
+* Unpin imagemagick, local install in conda
+* move pyvips into an extra for pip-based installs
+* change bl records in tests for ones with correct RO
+* add bl\_records for tests
+* Revert "Do not duplicate regions during serialization"
+* also check line order after serialization/deserialization
+* add dummy String beneath TextLine w/o text in ALTO
+* better tests for serialization
+* Remove legacy line
+* Add region entities in order of lines
+* test for duplicate IDs in serializer output
+* Do not duplicate regions during serialization
+* rename serialization tests only testing box data
+* small typing fixes in lib/layers.py
+* Bump maximum pytorch version to 1.9
+* Note about prefix-freeness in codec docstring
+* Output TextEquiv for Word and TextLine too
+* Adjust slice creation in test too
+* Adjust creating slices from line bounds
+* fix codec adding in both mode
+* nicer repr string for PytorchCodec
+* and decoding self-synchronization
+* test self-synchronizing of encoder(s)
+* better exception message
+* codec validation in \_\_init\_\_()
+* deprecate nose and switch to pytest
+* make codec self-synchronizing
+* really fix #284 this time
+* print hyperparameters after loading
+* add baseline offset options to repolygonization script
+* regression in early stopping for transcription
+* Refer to Image class, not module, in typing
+* Fix typing: tensor -> Tensor
+* Call Python float instead of np.float
+* Replace dtype np.float with float
+* Replace dtype np.bool with bool
+* Replace np.int dtypes with int
+* Add typing to compute\_lines
+* Update typing for polygonal\_reading\_order
+* Use np.ndarray for typing
+* Add RTL tests, improve typing and spacing
+* Improve typing in segmentation module
+* explicit model sanity checks in blla.segment()
+* refactor segmentation.py slightly
+* fix regression in polygonization in the presence of regions
+* remove travis CI
+* Linter changes
+* Expect same reading order in both ltr and rtl
+* Do pip-install requirements in workflow
+* Convert polygons to slices in helper function
+* Let line examples in test doc touch
+* Install kraken with pbr features
+* Install wheel package in workflow
+* Rename GH workflow, update README badge
+* Do not test with Python 3.9
+* Test with Python 3.9
+* Skip train tests
+* Install kraken in workflow
+* Fix flake messages
+* Rename and update test workflow
+* Add reading order tests
+* fixes overwriting of is\_in\_region function
+* add epsilon to character accuracy calculation
+* Fix parse\_palto misspelling in segmentation\_overlay.py
+* Document batch input syntax in advanced usage section
+* Unify in region detection in RO and serialization
+* bump minimum version of scikit-image to 0.17.0
+* rewrite alto file while hopefully keeping everything
+* rewrite forced alignment code to preserve xml file contents
+* fix regression in early stopping when training on GPU
+* baselineset overlay
+* Add spaces to CLI help for contrib scripts
+* Add spaces to CLI help in kraken and ketos
+
+3.0.5
+-----
+
+* reduce number of points in bounding polygons
+* trigger early stopping when perfect accuracy is achieved
+
+3.0.4
+-----
+
+* fix mixed up endpoints in pols for centerlines
+* remove debug raise
+* workaround for geos bug
+* hopefully final fix to get valid bounding polygons in all cases
+* saner behavior of the -tl/-bl/-cl switches
+
+3.0.3
+-----
+
+* correct polygon around offset baseline
+* nicer formatting for help message in topline/baseline/centerline switch
+* null offset in cli drivers for polygonization
+* Allow no offset in polygonization
+* fix regression causing crash in unparallelized dataset building
+* simple testing workflow
+* my boss complained about the misleading comment on top of the script
+* segmentation model postprocessing option setter script
+
+3.0.2
+-----
+
+* do not load validation set into training set without parallelization
+* make compute\_error output conform to indicated typing
+* more helpful warning message about empty text transformation results
+* doc versioning template changes
+* add sphinx-multiversion
+
+3.0.1
+-----
+
+* fix base\_direction in serialization
+* rewrite repolygonization script
+* source bidi base direction also from xml if none is given explicitly
+* serialize base text direction into pagexml
+* add base text direction switches to ketos
+* Connected components check in pageseg.segment()
+* fix spurious warning about seg\_type in recognizer
+* make lines half as wide in the training set
+* baseline overlay dataset script
+* parse default text direction out of PageXML files
+* remove 'AL' mode from bidi switches
+* add base\_dir to training tools
+* add default text direction switches to datasets
+* revert offsetting of baselines during training
+* add base text direction switches to rpred/mm\_rpred
+* add explicit base direction to bidi\_record
+* Handle point character cut in serializer
+* correct overly large polygons caused by aliasing
+* inversion of topline/baseline switch in ketos segtrain
+* make threads=0 work again for trainers
+* fix typo in variable name
+* slightly increase threshold to reduce merging of close lines
+
+3.0b25
+------
+
+* add chunking
+* fix unicode normalization
+* correct exception handling in pool
+* tie everything together
+* text transforms to named functions
+* typos
+* convert everything to named functions
+* add process pools to loading
+* split parse/add function in dataset loader
+* line offsetting in postprocessing
+* Revert "topline code in trainer"
+* line offset in postprocessing
+* set topline/baseline switch to model metadata
+* add xml output to alignment script
+
+3.0b24
+------
+
+* Fix regression in region vectorization
+* debug overlay script for forced alignment
+* forced aligment module
+* set 1cycle length to step\_size
+* moar lr schedulers
+* add cli parameters for lr schedulers
+* new lr schedulers
+* default parameters for new lr schedulers
+
+3.0b23
+------
+
+* fix missing default model in rpred()
+* topline code in trainer
+* topline/baseline switch in cli driver
+* print more model metadata in segment()
+* fix crash with native output in ocr module
+* fix overlapping regions after polygon simplification
+* correct side of line
+* proper line offsets
+* move serialization switch to top level cli driver
+
+3.0b22
+------
+
+* Revert "asynchronous loader from pytorch lightning"
+* Revert "Revert "suppress spurious bw/grayscale warning in blla""
+* add warning if polygonizer fails now
+* more numerical stability fixes in polygonizer
+* Revert "suppress spurious bw/grayscale warning in blla"
+* arg fix
+* asynchronous loader from pytorch lightning
+* suppress spurious bw/grayscale warning in blla
+* one more off-by-one error
+* ensure image is grayscale in polygon calculation
+* off-by-one error in bounds
+
+3.0b21
+------
+
+* add tests for resizing on layer level
+* tests for codec resizing
+* Fixes max epoch message not being shown for recognition training
+* Applies segtrain hyper params fix to reco training
+
+3.0b20
+------
+
+* Fixes crash on empty hyper\_params argument
+* Fixes lines and regions classes in the validation set absent of the training set interupting training
+* Fixes restart epoch count msg not being shown in all cases
+* Loads hyper params incrementaly and reset the epoch count when training on top of a model
+* print full tracebacks in debug log when sample loading fails
+* more helpful log messages when image transformation fails
+
+3.0b19
+------
+
+* allow selection of legacy segmenter again
+
+3.0b18
+------
+
+* pin scikit-image to < 0.18.0
+* also raise exception when adding text to PolygonGTDataset without transfrmations
+* change order of event callbacks in trainer
+* and cuda conda update
+* non-cuda pip install
+* update non-cuda environment file
+* new default segmentation model with non-semantic text region
+* shut up scipy warning on sato filter
+* make pdf loader work with different sized pages\`
+
+3.0b17
+------
+
+* fix regression in lstm layer with pytorch 1.7
+
+3.0b16
+------
+
+* check for character locations in padding
+* remove debug raise
+
+3.0b15
+------
+
+* hotfix for polygonization
+
+3.0b14
+------
+
+* catch errors in bl elongation code
+* correct feature calculation when given raw image in calculate\_polygonal\_environment
+* use correct scale for repolygonization script
+
+3.0b13
+------
+
+* index update
+* update readme for new segmenter
+* better hyperparameters
+* forgot to uncomment invalid seam skipping
+* revert to line-wise compute of polygons
+* fix default model selection for bl segmenter
+* Revert "test python 3.8 in travis"
+* skip anaconda build
+* test python 3.8 in travis
+* test fixes
+* make repolygonization switch work in segmentation\_overlay.py
+* make repolygonization work again
+* cite origin of boundary tracing function
+* clamp bounding polygon to 1 stdev
+* calculate polygonization batchwise to get accurate line height averages
+* correct avg line height computation
+* recalc distance bias by average line height
+* compute average line height/depth in 2-pass seamcarve
+
+3.0b12
+------
+
+* region vectorizer fixes
+* baseline extension code fixes
+* fix None-ness test for polygon
+* fix docstrings
+* switch out contour finder with boundary tracing
+* new vectorizer without superpixels
+* change shape of separators to increase attachment to lines
+* more sensible region boundaries for polygonisation
+* add default model for segmenter
+* add @brobertson's printed word bbox spreader to contrib
+* new bl segmentation heatmap overlay script
+* assign lines not by centroid but actual line mid point to regions
+
+3.0b11
+------
+
+* disable batching per default
+* assign lines to regions based on centroid
+* also make page parser set script\_detection flag correctly
+* set script\_detection flag correctly in alto parser
+* allow generic xml inputs in kraken cli driver
+* better error handling in PolygonGTDataset
+* bump alto version to 4.2
+* unify error handling in alto/page parser
+* make recognition work with larger than bl boundaries
+* better error handling in ketos test
+* don't abort recognition with invalid line coordinates
+* add exception handling switch in cli drivers
+* fix \_\_all\_\_ symbols in dataset.py
+* don't swallow maxcolseps parameter in legacy segmenter
+* remove unused code in ketos test
+
+3.0b10
+------
+
+* type bounds correctly in precalculated polygon calculation path
+
+3.0b9
+-----
+
+* forgot to commit 2nd half of fix
+* regression in last polygonizatoin speedup
+* pin channels in conda envs
+* try to avoid line shortening by masking separators
+
+3.0b8
+-----
+
+* fix counting of regions in dataset
+* fix layer resizing with delete only operations
+* add class counts to dataset/print on segtrain
+* make multiline format string work properly
+* fix re-serialization of regions
+* add bounding regions treated as boundaries for polygonization
+
+3.0b7
+-----
+
+* make page serialization test work
+* new records
+* set default params for segmentation
+* more test fixes
+* fix fp leak in xml parser
+* fix layer tests
+* fix for both mode model adaptation with empty regs/baselines
+* off-by-one error in resize
+* fix layer resizing
+* add new resizing modes to cli segtrain driver
+* add both mode to segmentation model adaptation
+* make conv resize fun work with TorchVGSLModel
+* add add mode to segmentation trainer adaptation thingy
+* remove debug printing of tagrefs
+* wip seg model resizing
+* add resizing to conv layers
+* remove old click exceptions in train gen
+* enable training resumption of region/line classed seg models
+* Auto-taggification in rpred.rpred broke transcription interface
+* remove prompting for deprecated option in lack of seg message
+* fix serialization with legacy segmenter
+* add new alto typing to parser
+* new alto serialization format
+* Serialize region shape as polygon in alto
+* deal with non-coordinated blocks in alto
+* refactor segmentation to allow only computing regions/lines
+* parse regions in alto
+* fix crash in debug log output
+* ensure python native types for evaluation
+
+3.0b6
+-----
+
+* net scale computation regression
+* fix typo in log message
+* Fixes to region training when using BaselineSet.add()
+* add exponential decay lr scheduling
+* experimental memleak fix
+* regression in page parsing
+* more sanity checks for xml parsers
+* Fix some typos, etc. in the usage info texts
+* correct rounding errors in sequence length computation
+* off-by-one error in reading order determination
+* make \`ketos test\` work with new batching code
+* merge regression
+* import missing dependency
+* inference batching fixes for segmentation
+* downgrade character bounding box calculation warning to info
+* ignore len output
+* aaargh again
+* aargh
+* val\_loader wrapper for baseline eval
+* and loss func for segmentation
+* do not return dict in transform func of baselineset
+* adjust hyperparameters for batching
+* ensure float division in accuracy calculation
+* ensure character bounding boxes have non-zero area
+* fix for repolygonization script
+* make model adaptation work again
+* correctly mask output in multi-seq predict\_\* funcs
+* don't return tensor in accuracy computation
+* make evaluation work with batches
+* make TorchSeqRecognizer multi-seq capable
+* regression in pagexml parsing
+* wip
+* switch datasets over to dict returns
+* fix seq\_len computation on cuda
+* more robust xml parsing
+* add batching to recognition training
+* re-enable invalid sample substitution
+* add sequence packing to rnn layers
+* add multi param sequential container
+* shape calculation fix in reshape layer
+* add seq\_len parameter to layers
+* bump pytorch requirement for pip
+* also pin torchvision in legacy conda env
+* tests for krakentrainer object
+* slight fix for loaded data feed in krakentrainer
+* forgot resize param in krakentrainer constructors
+
+3.0b5
+-----
+
+* fix typo
+
+3.0b4
+-----
+
+* proper progressbar printing pour programming (p)interface
+* fix message prototype
+* remove unnecessary whitespace
+* use explicit args in KrakenTrainer constructors
+* use KrakenTrainer constructor for segmentation training
+* make training generator constructor of krakentrainer
+* use new training API in ketos train
+* it's .alphabet not .\_alphabet
+* stdout redirection regression
+* typo in log string
+* add autodetermination for xml parsing
+* add switch to ketos
+* set completed epochs in trainer
+* add hyperparameter saving/loading for segtrain
+* enable hyperparameter saving/loading for recognition training
+* also move default hyperparameter specs to separate module
+* readd hyper parameter setter to vgsl object
+* add examples of expected alto/page information in parser
+* use default\_specs in ketos cli driver
+* add module with default network specs
+* change env name back to kraken
+* clean up environments
+* make augmentation work with box model preload
+* bump versions
+* forgot to remove debug printf
+* typo
+* more typing
+* fix typing errors
+* update readme
+* bump versions
+* segmentation\_overlay functionality extension
+* some doc update
+* print warning in blla.segment for incorrect image mode
+* fix crash on very slim lines
+* some minor bugs in template rendering
+* remove obsolete parameter
+* also scale suppl\_obj
+* fix merge error
+* remove gap between line and separators
+* remove script detection from legacy segmenter
+* remove legacy script
+* repolygonization script
+* add line orientation determination to vectorizer
+* drop -p short option for padding in ketos transcribe
+* remove smoothing filter in line vectorization
+* stupid syntax error
+* scale none line dropping fix
+* fix augmentation with preloading
+* rewrite of extract\_lines/sementation\_overlay
+* remove per format polygon extractor
+* fix script\_detection flag in blla output
+* faster pdf parsing through pyvips
+* swap out wand for pyvips
+* add libvips to requirements in docs
+* add wand to requirements/env
+* pin pillow to version 6.1
+* pin pillow to version 6.1
+* eliminate fd leak in processing pipeline
+* wip pdf input
+* add alto/page input to all subcommands
+* unify xml.parse\_\* and blla.segment output
+* scale input baselines when using scale parameter
+* fix regression in separator calculation for duplicate line end coordinates
+* bump min version of coremltools
+* bump min version of coremltools
+* correct output class count in dataset
+* cuda support fix in blla.segment
+* no ctx in subfunctions
+* add device parameter to blla.segment
+* fix regression calculation
+* repolygonize with empty boundaries in source xml
+* fix regression calculation
+* repolygonize with empty boundaries in source xml
+* fix whitespace in page output
+* make page output valid in bbox mode
+* parse\_alto  float compatibility
+* skip empty lines again
+* layer tests with stride support
+* import exception
+* bump alto schema to alto 4.1
+* make pagexml validate against schema
+* deal with characters located on start of line
+* correct cap style for buffer of non-area character segments
+* correct segment bounding polygons
+* fix iou metrics
+* remove unneeded metrics
+* deprecate non-region metrics
+* moar dtype
+* proper dtype
+* move to correct device
+* sum
+* add accurate date too serialization output
+* fix computation of iu/acuracy
+* arrrgh
+* typos
+* new metric in validation printout
+* fix metric calc
+* add region-sensible metrics to train.py
+* add pagexml output
+* region hocr template
+* fix textblock ids
+* rewrite ALTO template for region output
+* make sure character polygons are lists
+* fix typo in augmentation path for train
+* use regions in RO for blla
+* retain script type in ocr\_record class
+* auto -x/-bl switch determination regression
+* adapt reading order determination to ensure region monotonicity
+* s/type/script
+* remove legacy u-strings
+* fix switch confusion in cli frontend
+* adapt segmenter postprocessing to regions
+* ensure images are in range 0/255 for extract\_polygons
+* add polygon vectorizer
+* make merge\_regions work
+* typo
+* make -mb/-mr/-vb/-vr multiple
+* for real this time
+* make augmentation work with new region segmenter
+* add switches to suppress regions/baselines
+* add bl/regions filtering/merging to cli driver
+* add filtering/merging capability to baselineset
+* save class mapping in region segmenter training
+* skip empty regions/lines in xml parsing
+* deal with buffer polygons extending beyond image limits
+* make evaluation work with new region segmenter
+* vgsl cleanup
+* make baselineset compatible with BCELoss
+* make output layer activation inference behave more sensibly
+* WIP regions
+* s/ElasticDistortion/ElasticTransform
+* augmentation to legacy bbox recognition training
+* set augmentation field in no-aug mode
+* add augmentation for recognition model training
+* test pagexml/alto compatibility
+* set fallback metadata values in model loading via dict updateset fallback metadata values in model loading via dict updateset fallback metadata values in model loading via dict updateset fallback metadata values in model loading via dict updateset fallback metadata values in model loading via dict update
+* add scaling parameter to calculate\_polygonal\_environment
+* fix skipped rescaling in blla.segment
+
+3.0b3
+-----
+
+* Make datasets work with region parsed xml output again
+* repolygonization with scaling
+* Add region parsing to XML functions
+* correctly set ocm mode in trainer
+* changes for functioning ocm flags
+* filter uncarveable lines in blla.segment
+* Allow calculate\_polygonal\_environment to skip uncarveable lines
+* reorganize one\_channel\_mode/seg\_type attributes in vgsl module
+* Set model to train mode in KrakenTrainer
+* better elongated line clipping
+* add repolygonize\_page
+* hacked together image augmentation in segtrain
+* also print intersection object in exception
+* don't use prepared shapely object
+* make closest intersect work with line intersections
+
+3.0b2
+-----
+
+* do not elongate baseline beyond image bounds
+* deal with empty docs
+* also extract text in extract\_polygons\_alto
+* make repolygonize.py work again
+* Add fast path to polygon patch extraction
+* polygon extraction for alto files
+* approximate overly fine polygons in extract
+* fix repolygonizer
+
+3.0b1
+-----
+
+* corner cases in bounds type checking
+* Add elongation offsets to compensate for skeletonization
+* Revert "more robust parametrization of vectorizer"
+* replace polynomial regression with sp + filtering
+* fix up repolygonize.py
+* correct oob error in beam decoding
+* fix crappy test
+* make feature flags work correctly with legacy models
+* make one channel mode work in mm\_rpred
+* extract poly script equivalent for native json output
+* make segment cmd work with new blla.segment syntax
+* s/o/im
+* more robust parametrization of vectorizer
+* print warning when applying binary model on non-binary images
+* capture warnings in cli drivers
+* print warning when using a model trained on mismatching segmentation
+* add segmentation type information to recognition models
+* add more helpful error message when all training dataset files were unparseable
+* add repolygonization option
+* deal with N,C,0,H format in generate\_transforms
+* add one\_channel\_mode field to vgsl models
+* import is\_bitonal
+* Add image mode to dataset
+* fix x-y coordinate swap in polygonal reading order
+* repolygonization script
+* debugging overlay for reading order/polygonizer output
+* fix crashes caused by incorrect ROI approximation
+* make polygonizer work with older numpy versions
+* vectorized seamcarve in polygonization
+* add horizontal scaling to seamcarve
+* amend docstring to explain default energy map creation
+* Add optional precomputed energy map to polygonizer
+* deal with empty suppl\_obj in polygonizer
+* Allow supplementary objects in polygonization
+* interpolate lines at fixed distances for roi calculation
+* duh
+* improve de-masking and angle estimation
+* crop rotated patch to ensure maskless start for seamcarve
+* forgot to de-comment polygon return
+* numpy 1.18 compatibility + vertical line support in polygonizer
+* fix type error in polygonization
+* use correct slope for ROI assembly boundaries
+* crop seam to masked out sections of ROI
+* correct backrotation of intermediate seam
+* wip seamcarve backrotation
+* Handle out of polygon crashes in ocr submodule
+* more accurate log output in cli drivers
+* eliminate fd leak in processing pipeline
+* accidentally removed polygon intersect calc in forward pass
+* Ensure polygon transformation fits into output array
+* add line type information to xml preparsing
+* vastly faster patch polygonal extraction
+* Skip triangulation for images with 2 SPs
+* remove debug printfs
+* even more
+* dial back on approximation
+* integer underflow in polygonisation
+* smooth polygon contour before approximation
+* transposition was correct after all
+* wip
+* do not flip x-y coordinates in extract patch
+
+2.0.8
+-----
+
+* hopefully make setup.cfg pypi compliant
+* wip
+* fix zero-area polygons in small lines
+* offset baseline separators from actual baseline in dataset
+* selected wrong indices in polygonization
+* initial linting
+* remove print-debugging
+* zippy-zippy
+* make blla segment work with new polygonization
+* fix off-by-one error in intersect computation
+* cleaned up new polygonization
+* New watershed polygonisation
+* add bl roi extractor to segmentation
+* add method for baseline roi extraction
+* filter triangulation by variance
+* add new segmenter debugging script
+* Debugging polygon extraction script
+* Raise Exception on invalid xml documents
+* don't raise on polygon extraction error in training
+* accidentally erased test\_intersect
+* ignore with invalid lines in page xml
+* type in prepare\_xml\_data
+* don't crash on invalid bl segmenter data anymore
+* undefined variable in calc poly env
+* reduce min\_sp\_dist for unscaled net output
+* don't scale up net output before vectorization
+* correctly deal with empty input images in segmenter
+* switched bl- and sep-map around in sp finder
+* add point perturbation to qhull options
+* Do the same for legacy segmenter
+* update docstring and add configurable reading order function
+* refactor line vectorization in private subfunctions
+* add text normalization options from training to test
+* forgot to install kraken in conda env
+* update conda environment file for new pytorch insanity
+* and the same for cuda
+* point to new model repository in docs
+* forgot to install kraken in conda env
+* and the same for cuda
+* update conda environment file for new pytorch insanity
+* scale output after vectorizer in segmenter
+* suppress warning in vectorizer
+* add segmenter output scaling function
+* force to baseline segmentation when given model
+* Update segmentation.py
+* adapt blla segmenter to new polygonization
+* add reading order determination for polygonal lines
+* Update requirements
+* new polygonization code
+* change exception behavior of load\_model()
+* new polygonization
+* sort clusters
+* add sp clustering approach for baseline polygonization
+* skip invalid file args in ketos test
+* raise exception if add is called in wrong mode
+* add none mode to baselineset
+* we got a 3.7 compatible coremltools now
+* the wheel is not universal anymore
+* fix regression on explicit eval files
+* correctly reverse array to make leftmost point start
+* polygonal computation crash fix
+* fix parsing of vgsl heatmap definitions
+* more tolerance in approximation
+* make boundary list
+* proper tolerances
+* eurocentric line orientation
+* approximate polygon baseline again
+
+2.0.7
+-----
+
+* pypi metadata rejection issue
+
+2.0.6
+-----
+
+* fix invalid set\_num\_threads in ketos for pytorch 1.2
+* reset timer in progressbar
+* remove smoothing from segmenter training
+* enable eval mode in baseline evaluation
+* hopefully compute \`correct\` correctly now
+* fix also positive term in metric calculation
+* arrgh change order
+* adjust evaluator for multiclass output
+* fix baseline evaluator
+* fix output dimension
+* raise warning instead of exception for lines without baseline definition
+* add separator class to segmenter training
+* really fix coordinate order this time
+* flip polygon coordinate order
+* fix polygonization of the first line
+* correctly order baselines and polyons in segmenter output dict
+* forgot to kick pytorch channels out of non-cuda env file
+* Improve ketos transcribe user interface
+* move line sorting to lib/segmentation.py
+* make no-preload mode work for blla
+* increase lag in early stopping for segmenter
+* add auto-switch for manual page transcriptions
+* remove debug shows
+* hacky polygonization with convex hull
+* proper polygonization
+* make training from alto/page work
+* fix typehint
+* make training from pagexml work
+* proper parsing of pagexml files
+* baseline only template for pagexml
+* add polygonal dataset
+* add format switches to training frontend
+* add alto data mode to baseline dataset
+* proper baseline serialization
+* alto baseline parser thingy
+* make serialization work for both modes again
+* Unify rpred and mm\_rpred for real this time
+* auto-tag new segmenter output
+* Revert "intermediate to  unify rpred and mm\_rpred"
+* intermediate to  unify rpred and mm\_rpred
+* make a rpred an iterator class instead of generator
+* remove approximation
+* add segmenter to frontend
+* polygonize serialization
+* add polygonal support to alto
+* properly initialize empty records in mm\_rpred
+* add baseline segmenter data to serialization functions
+* put line polygons in ocr\_record
+* baseline support in rpred
+* change cuts of ocr\_record to polygons
+* add scikit image to requirements file
+* correctly place source points on polygon intersect
+* Finish recognition funs
+* switch code over to x, y order
+* make polygonization work
+* add dummy environment calculation
+* bump up line width to a more reasonable 8 pixels
+* cast torch tensor metric to float for serialization
+* arrrgh
+* add small delta to mcc calculation
+* don't smooth targets in eval run
+* fix metric calculation in segmenter
+* typo
+* print mcc
+* fix mcc calculation
+* reorder view
+* forgot unsqueeze
+* rescale output in eval
+* fix multi-device eval
+* aaaarg
+* make segtrain work
+* correctly set thread count in segtrain
+* bug
+* bug
+* more typos
+* moar typos
+* fix typo
+* correctly move model around
+* arrgh
+* remove unnecessary parameters
+* make recog training work again
+* refactor evaluation in training loop
+* moar stuff in blla module
+* add another trainer class for page segmentation
+* Use kraken primitives for image preprocessing
+* add baseline dataset
+* add docs for group normalization layer
+* doument new parameters for conv layer
+* make stride x,y separable for consistency
+* add stride option to vgsl conv layer
+* add segtrain function to ketos
+* add vectorization code for blla
+* Revert "some small doc updates"
+* some small doc updates
+* also change docs on site
+* add correct id for default model
+* add switch disabling RO det in pageseg
+
+2.0.5
+-----
+
+* unpin conda build
+
+2.0.4
+-----
+
+* deal with pip requirements in conda build
+
+2.0.3
+-----
+
+* try to upload correct version this time
+
+2.0.2
+-----
+
+* only upload stable releases to anaconda
+* correctly set os version in conda deploy
+* actually build conda package
+* Write a bold notice about windows compatibility into the README
+* try pinning conda build
+* update everything in conda env
+* fix path of upload script
+* install conda-build in root conda env
+* add conda autodeploy
+* Explicitly print model path in ocr subcmd errors
+* move py\_requires to setup.cfg
+* python interpreter check for new versions of pip
+* we don't support python 2 anymore
+* add missing field in sample segmenter output docs
+* Fix type hints for PIL.Image.Image
+* better test coverage for binarization
+* fix other error message in get\_description
+* fix bitonality test for solid color images
+* show char mismatch for train/valid. set separately
+* Fix exception in error message
+* initiailize accuracy log in metadata in trainer
+* Make publish work with non-metadataized models
+
+2.0.1
+-----
+
+* hotfix lr scheduler
+* Disable CI for 3.7 until the coreml people get their shit together
+* Add jsonschema to conda envs
+
+2.0.0
+-----
+
+* Set new repository live
+* change stopper tests for new API
+* print model accuracy in show command
+* autofill accuracy in metadata
+* disable hyperparameter loading again
+* Fix fd exhaustion caused by parallel tensor loading
+* Add add\_loaded to GroundTruthDataset
+* Fix pagination in repo queries
+* make legacy peephole bilstm work again
+* skip openmp thread setting test
+* Add group normalization layer
+* Add schema validation to model upload functionality
+* Add model metadata JSON schema
+* Correctly handle RGBA input in ketos transcribe
+* Add usage note to ketos transcribe
+* New zenodo repository functions
+* Add masking to segmentation
+* Ensure binarized output is identical in size to original
+* Add explicit RNG seeds to ketos command
+* add mask parameter to segment()
+* fix typo in ketos arg command
+* Set min\_delta datatype to float
+* pin version of python to 3.6.6 in anaconda
+* add normalize\_whitespace to ketos train
+
+1.0.1
+-----
+
+* Temporarily disable script detection
+
+1.0.0
+-----
+
+* for some reason the openmp thread setter doesn't work in tests
+* more travis stuff
+* Add channels to travis
+* quiet down travis script
+* Update README for 1.0 release
+* rudimentary cli tests
+* skip existing distributions on pypi
+* Add pytorch 1.0.0 to requirements file
+* bump pytorch release to 1.0.0
+* fix typo in parallell loading
+* Add parallel data loading of non-preloaded sets
+* autoscale early stopping
+* lower min-delta in early stopping again
+* Fix python version in conda env to 3.6
+* Restore model location if saving fails
+* fix crash on infinite loss debug message
+* correctly encode training set in \`add\` mode
+* adjust train stopper tests to new behavior
+* disable script detection by default
+* partial early stopping fix
+* final part of sub-epoch saving/testing and stopping
+* allow sub-epoch testing/saving intervals
+* Add option for external segmentation to ketos transcribe
+* reorder code points in \`test\` command
+* apparently i'm being paid by psl not ephe
+* decrease min-delta in early stopping to 0.002
+* correct typo in log message
+* fix wildly broken bounding boxes in recognition
+* Helper scrpit for marking up character bounding boxes
+* autoescape jinja2 templates
+* Add master branch installation instructions to readme
+* updated training manual
+* fix make\_printable for empty string
+* generic make\_printable function
+* typing extensions
+* print warning if no\_segmentation mode is enabled but segmentation is provided through any other option
+* add no\_segmentation mode to ocr subcommand
+* Add no\_segmentation mode to ocr subcommand
+* add conda env files
+* update documentation for \`ketos test\` command
+* fix test in fixed epoch trainer
+* Add batch input tooling to kraken cli command
+* add ISRI-style accuracy report
+* global alignment and per-script confusion matrix code
+* move it to correct location
+* script database as of now
+* generate\_scripts.py
+* also save result of first epoch
+* Print warning for invalid entries in manifest files
+* beautify epoch part of training progress bar
+* introduced off-by-one error in fixed epoch stopper
+* run evaluation after epoch
+* fix dynamic size inference in reshape layer
+* only print format warning when output is actually jpg
+* fix file format inference in chained binarization
+* Help message for 1cycle policy
+* Add test command to ketos
+* fix constant lr schedule
+* add hyperparameter scheduling to ketos
+* remove always-on png forcing
+* Changes related to #88
+* click 7.0 doesn't support py3.5 anymore
+* this one actually adds help text
+* help text for input/output definitions
+* correct web site link to ephe
+* Don't use os.get\_schedaffinity()
+* bump to click 7.0
+* default reduction changed in CTCLoss in master
+* change default output format for ketos extract
+* update readme for next stable release
+* work around faulty torchvision dependencies in travis
+* fix tests
+* disallow floaty save/report frequency
+* whitespace error in linegen
+* adjust default learning rate to work better with SGD
+* i'm stupid
+* truly fix regression this time
+* Revert "fix regression in model device placement"
+* fix regression in model device placement
+* superfluous whitespace in tests
+* Move DataLoader instantiation further back in ketos
+* Allow glob expression resolution in python
+* move weights to CPU for serialization
+* fix uuid output format str
+* Add variable extractor output format option
+* remove superfluous python build
+* Tests for layers, trainers, and a bit of vgsl
+* Add abbyyxml serialization tests
+* add python 3.7 workaround for travis
+* Fix alto verification in tests
+* restore pyrnn model for tests
+* Add input name in ketos output
+* Add padding option to segmenter
+* python 3.5. type hint
+* install torchvision from own channel
+* another python 3.5 type fix
+* hopefully fix travis build
+* python 3.5 variable type hints
+* use new master build
+* pin\_memory and move tensors asynchronously
+* typo in travis config
+* install master pytorch in travis env
+* linter fixes
+* Ketos extended documentation
+* ketos extract default text order switch
+* moar docs
+* Also print best loss when using early stopping
+* prettify index page in docs a bit
+* expanded vgsl docs
+* Update training tutorial for kraken 1.0
+* Move best model when using early stopping
+* fix new ctc loss
+* last type hint error
+* regression: non-hidden progress bar in verbose mode
+* bump minimum pytorch version to 0.4.1
+* no\_grad() appropriately in S get\_shape
+* python 3.7 in travis/setup.cfg
+* correct type hint
+* last typing fixes
+* almost complete type hinting
+* Use new pytorch CTC bindings
+* get rid of most type errors in lib/\*.py
+* Initial nonfunctional type annotations
+* Fix 2d dropout in vgsl layer
+* Fix tables in advanced docs
+* add versions template to index
+* doc updates
+* vgsl docstring improvements
+* VGSL docs
+* pep8 compat
+* add device args to load\_any
+* doc string update for reshape layer
+* New default network architecture
+* Add reshape layer to VGSL implementation
+* correctly move gradient to device in loss
+* forward pass cpu/gpu fixes
+* also move targets from gpu during ctc calc
+* syntax fix
+* remove init\_hidden
+* compute\_error incorrect invocation
+* tensor device moving unification
+* Fix supported python versions in setuptools
+* Fix extractor check for empty lines
+* fix regression of pytorch merge in script detection
+* Add beam search decoder
+* CTC code formatting
+* Fix get\_schedaffinity in kraken.py
+* Update ALTO output to 4.0
+* Update documentation for kraken 1.0
+* dump python 3.4
+* install pytorch in travis
+* More travis fixes
+* fix test setup
+* Fix mirroring of some weak code points ([{}])
+* Some code points don't have a name
+* Add whitespace normalization switch to ketos extract
+* ketos: check for exceptions in test set
+* correctly raise on empty text line in gtdataset even without transforms
+* bump trial iteration log to info level
+* Also raise for empty text in GTDataSet.add
+* show default values in ketos extract
+* debug logging in dataset
+* Add coremltools to requirements file
+* Refactor RNN deserialization with local functions
+* Move default model in detect\_scripts to function definition
+* Use torch.set\_num\_threads to limit parallelization
+* show default values in kraken help prompt
+* Add early/dumb stopping switch to ketos
+* EarlyStopping and EpochStopping
+* Use method in TorchVGSLNetwork to resize output layer
+* Add \`both\` codec/output layer resizing mode
+* move imports around to speed up help/version in kraken
+* move imports around to speed up help/version print in ketos
+* Output layer resizing, add mode
+* Add resize method to LinSoftmax
+* Note about layer initialization in append
+* Add slicing operation to ketos train + vgsl
+* use model input spec when loading models in ketos
+* Add argument disabling preloading in dataset
+* Add explicit train/eval set switches to ketos
+* Add length to progressbar in kraken cli
+* Add dropout to default model spec in ketos
+* Disable progress bars when running in verbose mode
+* Add pytorch to requirements.txt
+* Remove obsolete \_\_future\_\_ imports
+* Limit minimum log level through -v switches
+* Add device switches to vgsl and model
+* Adapt tests to new API
+* More unnoticed merge fixes
+* Fix codec tests
+* Clean up lib.util a bit
+* Fix misresolved merge conflicts
+* Log parsed layer definitions in vgsl
+* Remove overlooked click.echo calls
+* Wrap epochs in progressbar
+* remote debugging printfs
+* Switch to greedy decoder by default
+* more efficient greedy decoder
+* Change default optimizer to RMSprop
+* Use input transform generator throughout
+* Add input transform generator to dataset module
+* Correctly select image mode for training
+* optimizer selection in ketos
+* remove codec parameter from TorchSeqRecognizer
+* Fix dropout VGSL regex
+* Add method returning maximum label index to codec
+* Fix model loading in ketos train
+* pep8 and linter modifications
+* Add \_\_all\_\_ to all modules
+* codec argument to TorchSeqRecognizer
+* Weirdly fast CTC implementation from chainer
+* new (pytorch 0.4.0) weight initialization
+* Correctly split linear projection and softmax during training
+* Fix infinite loop in codec
+* Disable softmax in CTC output layers during training
+* Pad with white instead of very dark grey
+* Multiple changes in training frontend
+* s/predictString/predict\_string
+* Convert generator into list for torch 0.4 compat
+* Missing paranthesis in load\_any
+* Actually serialize backwards layer in TransposedSummarizingRNN
+* Transpose input in thresholding ctc decoder
+* Correctly calculate gradient in ctc
+* Allow dimensionality and probability parameters for dropout
+* Add Dropout to layers
+* Load new format model in detect\_scripts
+* s/FloatTensor/Tensor/g in vgsl.py
+* Purge lstm.py of code
+* s/FloatTensor/Tensor/g
+
+0.10.0
+------
+
+* Add horizontal-lr/rl switch to ketos transcribe
+* Fix namespace correction in segmenter
+* Fix regression in ketos extractor
+
+0.9.17
+------
+
+* Add option disabling horizontal line removal
+* Correctly test for grayscality in rpred
+* Add support CLI support for grayscale recognition
+* Improved script detection post-processing
+* Fix unbound error when feeding binarized images to ketos transcribe
+
+0.9.16
+------
+
+* Add abbyyXML-like output serialization
+* Add abbyyxml output switch
+* ignore list for multiscript detection + padding checks
+* Enable grayscale in transcription environments
+* Proper unicode sandwich for i/o
+
+0.9.15
+------
+
+* Fix type of log in ketos causing crashes on py2
+
+0.9.14
+------
+
+* Hotfix for logger styles
+
+0.9.13
+------
+
+* Fix undefined variable in mm\_rpred logging
+
+0.9.12
+------
+
+* Hotfix for last release
+
+0.9.11
+------
+
+* Check explicitly for whitespace when extracting
+* Clean up TorchSeqRecognizer and add train flag
+* Clean up TorchSeqRecognizer and add train flag
+* Clean up TorchSeqRecognizer and add train flag
+* Clean up imports
+* Remove separate model loaders
+* put ctc decoders in separate file
+* Add pyrnn deserialization
+* Add pronn loader to load\_any
+* Add switch to disable gradient calculation for inference
+* Split layers from VGSL plumbing module
+* Add pronn deserialization to TorchVGSLModel
+* Add peephole lstm pytorch implementation
+* Add TorchSeqRecognizer support to rpred module
+* Fix padding in ground truth data set
+* Fix 1-augmentation in VGSL module
+* Add TorchSeqRecognizer
+* Change default model to mlmodel
+* Legacy CLSTM to VGSL translation support
+* ketos train with pytorch-vgsl support
+* Dump codec as json into CoreML file
+* CoreML serialization and deserialization
+* Missing log setup module from logging branch
+* Correctly merge inherited scripts in script detection
+* Make all logging args unicode
+* Integrate logging in cli frontends
+* Add warning/error logging to exceptions
+* Logging for transcription module
+* logging for serialization module
+* logging for rpred module
+* Logging for pageseg module
+* Logging for repository module
+* Logging for line generator
+* Whitespace
+* Logging for binarization module
+* Correctly subtract padding when determining bbbox
+
+0.9.10
+------
+
+* s/break/continue
+
+0.9.9
+-----
+
+* Serialization multiscript stability fixes
+* Whitespace fixes
+* line generator improvements
+* functionless stash dissection commit
+* More verbose exceptions in repo module
+* Add network unique names to each layer in VGSL
+* Remove incorrect exception in docstring
+* Slightly more enlightening error msgs in ocr cmd
+* Arbitrary image resizing in GroundTruthDataset
+* Correct behavior of summarizing network
+* Suppress warning in CenterNormalizer
+* Unassigned variable in CTC exception
+* Iterative GroundTruthDataset creation
+* Make TransposedRNN actually work
+* Make CTC loss interact more seamlessly with vgsl
+* Escape inputs for codec
+* Change decoder to deal with cuts and confidences
+* Tests for new codec
+* Not all decoder inputs are in fact printable
+* Many-to-many capable codec
+* Make GroundTruthContainer a pytorch dataset
+* VGSL parser blocks and minor fixes
+* Log domain addition in CTC
+
+0.9.8
+-----
+
+* Addresses some doc issues from #70
+* Explicit None-ness check to shut up warning
+* s/transcrib/transcribe
+* Fix exception in verbose output with mm recognition
+* Remove superfluous whitespace
+* Strip comments from html file before text extraction
+* README: show CI status of master in travis badge
+* Fix future warning in ketos
+* github is my inter-machine git stash
+* transposed rnn block for vgsl
+* vgsl-ish implementation
+* Compute log loss from alpha array in ctc
+* misc. syntax errors in ctc loss
+* python CTC loss module for pytorch
+* Convert transcription prefill mode unicode to byte str
+
+0.9.7
+-----
+
+* Rename transcrib to transcribe
+* Get rid of unicode\_literals
+* Note about new binary wheels and compilation
+
+0.9.6
+-----
+
+* clstm isn't on conda
+* Enable autodeploy for tags
+* Re-enable distort line and fix ordering
+* Use new clstm binding wheel from PyPi
+* Fix line degradation model
+* Add horizontal text direction switch to segmenter
+* Change degradation model
+* Use segmentation bboxes instead of character cuts
+* Change behavior of prefill mode
+* Switch to non-iterator dict accessors
+* Fix highlighting in prefilled transcription envs
+* s/apt-get/apt + python-pip
+
+0.9.5
+-----
+
+* Misc. documentation updates
+* Add script information to hOCR output
+
+0.9.4
+-----
+
+* Fix default model selection without -m parameter
+
+0.9.3
+-----
+
+* Link training manual in doc index
+* Default to mono-script recognition without clstm
+* Add CLI interface for multi-script recognition
+* Fix decoder bug when output starts with non-zero class
+* Fix predictString output length
+* fixed translate\_back\_locations, stopped using translate\_back in tlstm
+* workaround for diverging output of translate\_back and translate\_back\_locations
+* Training and OCR in Torch now enabled in the CLI
+* Fix converted model lookup
+* Add script detection and multi model selector to cli
+* translate\_back\_locations; tlstm now in rpred
+* Legacy clstm now integrated
+* added network.outputs for compatibility
+* New TlstmSeqRecognizer\_legacy for compatibility with the ancient clstm version used in kraken
+* new translate\_back\_locations
+* Add mm\_rpred function
+* Add script detection data to package
+* Add detect\_script to pageseg
+* Dependency info added
+* CLSTM Protobuf
+* Log-Softmax added, issue with max() on cuda avoided
+* Imports
+* New SeqRecognizer based on pytorch
+* \* added a weight field to the line generator and a parameter to change it
+* Close opened files in ketos transcrib
+* Update pageseg docstring
+* Explicitely set exports through \_\_all\_\_
+* Add version switch to kraken/ketos
+* Adapted to current clstm code
+* Catch exception caused by empty images in pageseg
+* Fix python 3.6 segmentation result regression
+* Allow more data types in extract\_boxes
+
+0.9.2
+-----
+
+* Accumulated documentation changes
+* Add hocr-spec-python to test requirements
+* Validate hOCR output usin hocr\_spec\_python
+* Add scripts to \`\`kraken show\`\` output
+* Remove daft running delta cuts from hOCR output
+* Bring hOCR output in line with hOCR 1.2 spec
+* Remove typo in hocr template
+* Output error when trying to train from scratch
+* Disable UserWarnings in kraken
+* Make reorder switch in ocr cmd work
+* Aaand another regression from 5eeba707
+* finally fix tests
+* Fix regression in rpred introduced by @5eeba707
+* Make segmentation tests work with new segmenter output
+* Add training alphabet field to GT class
+* PEP8 compliance
+* Change help messages regarding code point ordering
+* Add display/logical order switch for ocr cmd
+* Switch default to no reorder for linegen
+* Add no-reorder/reorder switch to ketos linegen
+* \* added exception handling (exception is thrown at binarization.py:nlbin)
+* Add rotation switch to ketos extract
+* Add vertical line support to transcription UI
+* s/horizontal-lr/horizontal-tb
+* Correct docstring
+* Add maxcolseps to segment subcommand again
+* Support 0 columns separators in pageseg
+* Fixes #28
+* Add correct bounding boxes to vertical recognition output
+* Add vertical text support to page segmentation
+* Add text direction option to kraken command
+* Add writing\_mode arg to output serialization
+* Fixes #32
+* Remove unused function in morph module
+
+0.9.1
+-----
+
+* Change affine transformation matrix to 1d array in normalizer
+
+0.9.0
+-----
+
+* Make ketos great(er than python2) again
+* Adapt extractor to new template
+* New template using CSS image maps
+* Change transcription interface code
+* More descriptive (verbose) output during training
+* Recalculate alphabet after repartitioning
+* Add \`\`train\`\` subcommand to ketos
+* Add rudimentary error report computation methods
+* Add trainSequence/trainString to ClstmSeqRecognizer
+* Add KrakenEncodeException/KrakenDecodeException
+* Add correct check mark to kraken output
+* Add GroundTruthContainer for training data
+* s/x\_conf/x\_confs
+* Fix import broken by s/html/serialization
+* Various documentation updates
+* Use json instead of pickle for serialization data
+* Open pickle in binary mode
+* Make README reflect some minor syntax changes
+* Make hOCR output XML compliant
+* Minimal tests for output serialization
+* Skip initial whitespace in records for ALTO serialization
+* Correct output of translate\_back\_locations to output highest value
+* Add character/word confidences to ALTO output
+* typo: repositories -> models
+* Add preliminary support for more serialization formats
+* Use is\_bitonal in page segmentation sanity check
+* Binarize images in transcription()
+* Robustness change in is\_bitonal
+* Add is\_bitonal function to binarization module
+* README: Capitalize the first letter in a sentence
+* Fix exception in repository index retrieval
+* Add mirroring to the prediction output
+* Update README
+* Switch 3.3 for 3.5 in Travis testing
+* Use new packages available in conda
+* Raise protobuf requirement to final release
+* Use proper integral shape in binarization
+* Add option to skip codepoint reordering for transcription extractor
+* Add lxml to requirements file
+* Add alphabet view to repository metadata display
+* Remove unused template
+* Add extractor for GT interface
+* Escape data when downloading ground truth
+* Correctly extract last class from output array
+* Fix CI
+
+0.8.0
+-----
+
+* Update documentation for new "default" case
+* Jinja templating for hOCR output
+* Remove smooth scrolling and make saving work
+* Add legacy degradation to linegen module
+* Catch UserWarning in binarization module
+* Typo in transcription docstring
+* Don't unload clstm model after recognition
+* Make rpred BiDi- and RTL-compatible
+* Add new back translation routine
+* Add python-bidi to requirements
+* Add helper function for proper RTL codepoint ordering
+* Add transcription interface to CLI
+* Remove subcommand-less invocation
+
+0.7.7
+-----
+
+* Fix example in the documentation
+* Correctly create app\_dir for retrieval
+* advanced\_linegen stuff from the stash
+* Add strip and max\_length option to linegen
+* Add renormalization switch to ketos linegen
+* Reimplement line renderers using ctypes
+* Add vext.gi for linegen
+* Documentation for ketos linegen
+* Deal with affine transformation changing image dims
+* Crop image using pillow as get\_pixel\_extents is buggy
+* fontconfig template for custom fonts
+* Add preliminary line degradation code
+* Add ketos command for training related tasks
+* Add KrakenCairoSurfaceException
+* Add help texts to subcommands
+* Add degradation function to linegen module
+* Add per-file license headers
+* Add distortion/degradation from ocropy-linegen
+* First draft of pango based artifical line generation utility
+* Header for linegen work
+
+0.7.6
+-----
+
+* requests needs 'params' argument when passing parameters in url
+* Check input lines for emptyness
+
+0.7.5
+-----
+
+* Pin protobuf version
+* More transcription interfac work
+* Finally fix bounding boxes
+* Rough transcription interface
+
+0.7.4
+-----
+
+* Increased robustness for recognition
+* Ignore the LSTM maxlen parameter
+
+0.7.3
+-----
+
+* Correctly select confidences
+* Calculate bounding boxes correctly once and for all
+* Don't include class 0 cuts for bounding boxes
+* Fix output location properly this time
+* Fix automatic conversion of models
+* Fix calculation of bounding boxes
+* Fix output of segmenter
+* Use app dir storage instead of "POSIX"
+* Really check that image is not empty
+* Ensure model directory exists before writing to it
+
+0.7.2
+-----
+
+* Remove in-place modification causing an exception
+
+0.7.1
+-----
+
+* Correctly decode incoming data on python 3
+* Add correct click version to requirements.txt
+
+0.7
+---
+
+* Change default model
+* Make CI work again
+* Update documentation for new protobuf models
+* Fix tests and python 3 compatibility
+* Remove h5py from requirements
+* Delete erroneous protoc output
+* Get rid of HDF5 models and introduce new protobuf serialization
+* Add documentation to public repository
+* Rename subcommand function because of collisions
+* Add subcommands dealing with the model repository
+* ocropy got rid of a lot of spagetti code, too
+
+0.6.3
+-----
+
+* Make verbose output switch do something again
+* Revert "Add 3.5 to CI"
+* Add 3.5 to CI
+
+0.6.2
+-----
+
+* Remove support for bz2ipped models
+* Update docs
+
+0.6.1
+-----
+
+* Rip out the parallelization code
+* Buffer reads off gzipped/bzipped pyrnn model
+* Add support for CLSTM models
+
+0.6
+---
+
+* Document new behavior
+* Update README with new CLI syntax
+* Default to binarize/segment/ocr without subcommands
+* Skip tests only supported in python 2.7 on python 3
+* Raise correct exception when using python 3
+* Catch all exceptions in load\_pyrnn
+
+0.5
+---
+
+* Paralellize execution of subcommands and make them chainable
+* Add Flake8 section to setup.cfg
+* Armin seems to be able to keep an API consistent across releases
+* Making everything PEP8 compatible again
+* Smallest possible test models (6.8MB o.O)
+* More tests
+* Replace Lovecraftian horror that was the old download progress bar
+
+0.4.7
+-----
+
+* Actually skip line if normalization fails
+* Yield empty records when line can't be normalized
+
+0.4.6
+-----
+
+* Raise exception when loading models failed
+
+0.4.5
+-----
+
+* Fix off-by-one error in ocr\_record class
+* Fix exception in download command
+
+0.4.4
+-----
+
+* Unpin dependencies
+
+0.4.3
+-----
+
+* Link to new website
+* Create model directory if it doesn't already exist
+* Fix minor unit64->uint64 typo
+* Reduce requirements a little
+
+0.4.2
+-----
+
+* Temporarily install Cython on Travis
+* Drop six requirement
+
+0.4.1
+-----
+
+* Add we support python 3.3. too
+* Update travis file
+
+0.4.0
+-----
+
+* Add trove classifier
+* Explanatory note on python 3
+* Fix version number with python 3
+* Yay we're universal now
+* Make unpickling on python2 possible again
+* And fix python 2 bugs in click
+* Futurize stage 2
+* Stage 1 futurizing
+
+0.3.4
+-----
+
+* s/.next/next()
+* Remove all methods related to training as we'll switch to CLSTM soonish
+* Lonely test for rpred
+* Fix unbound error when no model could be found
+* Add image needed for segmentation test harness
+* Correct inheritance of test harness
+* Tests for page segmentation/error handling
+* Binarization tests
+* Update .gitignore
+* Error handling/tests on model loading
+* Tests never worked
+* Some notes on advanced use
+* Revert "Tell pbr to skip stuff"
+* Tell pbr to skip stuff
+* gitignore
+* Download HDF5 model with download command
+* default model is even larger
+* Docs
+
+0.3.3
+-----
+
+* Add h5py to requirements file
+
+0.3.2
+-----
+
+* Fix links in readme
+* command line usage of HDF5 models
+* Fix line normalization parameter
+* Convert README to rst
+* New load\_any function
+* First work on an unified interface to trained models
+* new tool for converting pyrnns to clstm format
+* some utilities
+* py3k: Add \_\_future\_\_ imports on remaining files
+* py3k: Enable true division
+* py3k: Wrap range, map and zip in list when necessary
+* Use print function instead of statement
+* Add Travis badge to readme
+* Enable testing on Travis using Miniconda
+
+0.3.1
+-----
+
+* Our wheel is not universal
+
+0.3
+---
+
+* Remove the abomination that is native.py/nutils.py
+
+0.2.5
+-----
+
+* Update requirements file
+
+0.2.4
+-----
+
+* Hotfix for stupidity
+
+0.2.3
+-----
+
+* Refactor some more code
+* Preinstall of numpy is no longer necessary
+
+0.2.2
+-----
+
+* Update requirements file
+
+0.2.1
+-----
+
+* Add some error detection and handling to load\_rnn
+* Rename invalid model exception
+* Create test files
+* Refactor output of rpred, add separate dewarp function
+
+0.2.0
+-----
+
+* Complete but relatively untested hocr output
+* Some preliminary hOCR output
+* Calculate character bounding boxes
+
+0.1.0
+-----
+
+* Build wheel
+* Add license
+* Change behavior of cli
+* Update requirements.txt
+* Note that python package building is a serious case of wtf
+* Some more initial work
+* Initial commit
