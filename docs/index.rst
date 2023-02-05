@@ -215,7 +215,7 @@ kraken is developed at the `École Pratique des Hautes Études <http://ephe.fr>`
 
    .. container:: leftside
 
-        .. image:: https://ec.europa.eu/regional_policy/images/information/logos/eu_flag.jpg
+        .. image:: _static/normal-reproduction-low-resolution.jpg
           :width: 100
           :alt: Co-financed by the European Union
 
