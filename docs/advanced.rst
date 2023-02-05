@@ -9,8 +9,8 @@ lines from an image), recognition (feeding text lines images into a
 classifier), and finally serialization of results into an appropriate format
 such as ALTO or PageXML.
 
-Input Specification
--------------------
+Input and Outputs 
+-----------------
 
 Kraken inputs and their outputs can be defined in multiple ways. The most
 simple are input-output pairs, i.e. producing one output document for one input
@@ -58,6 +58,50 @@ region segmentation for recognition:
 
 The code is able to automatically determine if a file is in PageXML or ALTO format.
 
+Output formats
+^^^^^^^^^^^^^^
+
+All commands have a default output format such as raw text for `ocr`, a plain
+image for `binarize`, or a JSON definition of the the segmentation for
+`segment`. These are specific to kraken and generally not suitable for further
+processing by other software but a number of standardized data exchange formats
+can be selected. Per default `ALTO <http://www.loc.gov/standards/alto/>`_,
+`PageXML <https://en.wikipedia.org/wiki/PAGE_(XML)>`_, `hOCR
+<http://hocr.info>`_, and abbyyXML containing additional metadata such as
+bounding boxes and confidences are implemented. In addition, custom `jinja
+<https://jinja.palletsprojects.com>`_ templates can be loaded to crate
+individualised output such as TEI.
+
+Output formats are selected on the main `kraken` command and apply to the last
+subcommand defined in the subcommand chain. For example:
+
+.. code-block:: console
+
+        $ kraken --alto -i ... segment -bl
+
+will serialize a plain segmentation in ALTO into the specified output file.
+
+The currently available format switches are:
+
+.. code-block:: console
+
+        $ kraken -n -i ... ... # native output
+        $ kraken -a -i ... ... # ALTO output
+        $ kraken -x -i ... ... # PageXML output
+        $ kraken -h -i ... ... # hOCR output
+        $ kraken -y -i ... ... # abbyyXML output
+
+Custom templates can be loaded with the `--template` option:
+
+.. code-block:: console
+
+        $ kraken --template /my/awesome/template.tmpl -i ... ... 
+
+The data objects used by the templates are considered internal to kraken and
+can change from time to time. The best way to get some orientation when writing
+a new template from scratch is to have a look at the existing templates `here
+<https://github.com/mittagessen/kraken/tree/master/kraken/templates>`_.
+        
 Binarization
 ------------
 
@@ -415,25 +459,4 @@ It is also possible to disable recognition on a particular script by mapping to
 the special model keyword `ignore`. Ignored lines will still be serialized but
 will not contain any recognition results.
 
-The ``ocr`` subcommand is able to serialize the recognition results either as
-plain text (default), as `hOCR <http://hocr.info>`_, into `ALTO
-<http://www.loc.gov/standards/alto/>`_, or abbyyXML containing additional
-metadata such as bounding boxes and confidences:
 
-.. code-block:: console
-
-        $ kraken -n -i ... ... ocr # text output
-        $ kraken -h -i ... ... ocr # hOCR output
-        $ kraken -a -i ... ... ocr # ALTO output
-        $ kraken -y -i ... ... ocr # abbyyXML output
-
-hOCR output is slightly different from hOCR files produced by ocropus. Each
-``ocr_line`` span contains not only the bounding box of the line but also
-character boxes (``x_bboxes`` attribute) indicating the coordinates of each
-character. In each line alternating sequences of alphanumeric and
-non-alphanumeric (in the unicode sense) characters are put into ``ocrx_word``
-spans. Both have bounding boxes as attributes and the recognition confidence
-for each character in the ``x_conf`` attribute.
-
-Paragraph detection has been removed as it was deemed to be unduly dependent on
-certain typographic features which may not be valid for your input.
