@@ -28,7 +28,6 @@ kraken's main features are:
   - Word bounding boxes and character cuts
   - Multi-script recognition support
   - :ref:`Public repository <repo>` of model files
-  - :ref:`Lightweight model files <models>`
   - :ref:`Variable recognition network architectures <vgsl>`
 
 Pull requests and code contributions are always welcome. 
