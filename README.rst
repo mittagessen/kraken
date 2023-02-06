@@ -18,7 +18,6 @@ kraken's main features are:
   - Word bounding boxes and character cuts
   - Multi-script recognition support
   - `Public repository <https://zenodo.org/communities/ocr_models>`_ of model files
-  - Lightweight model files
   - Variable recognition network architectures
 
 Installation
@@ -142,7 +141,7 @@ kraken is developed at the `École Pratique des Hautes Études <http://ephe.fr>`
 
    .. container::
 
-        .. image:: https://ec.europa.eu/regional_policy/images/information/logos/eu_flag.jpg
+        .. image:: https://raw.githubusercontent.com/mittagessen/kraken/master/docs/_static/normal-reproduction-low-resolution.jpg
           :width: 100
           :alt: Co-financed by the European Union
 
