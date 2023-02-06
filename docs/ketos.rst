@@ -434,7 +434,17 @@ line images, both in bounding box and baseline format. The pretraining is
 performed through a contrastive surrogate task aiming to distinguish in-painted
 parts of the input image features from randomly sampled distractor slices.
 
-All data sources accepted by the supervised trainer are valid for pretraining.
+All data sources accepted by the supervised trainer are valid for pretraining
+but for performance reasons it is recommended to use pre-compiled binary
+datasets. One thing to keep in mind is that compilation filters out empty
+(non-transcribed) text lines per default which is undesirable for pretraining.
+With the `--keep-empty-lines` option all valid lines will be written to the
+dataset file:
+
+.. code-block:: console
+
+   $ ketos compile --keep-empty-lines -f xml -o foo.arrow *.xml
+
 
 The basic pretraining call is very similar to a training one:
 
@@ -457,10 +467,16 @@ requirements will usually be much reduced:
 
 .. code-block:: console
 
-   $ ketos train -i pretrain_best.mlmodel --warmup 5000 -f binary labelled.arrow
+   $ ketos train -i pretrain_best.mlmodel --warmup 5000 --freeze-backbone 1000 -f binary labelled.arrow
 
-It is recommended to use learning rate warmup (`warmup`) for at least one epoch
-to improve convergence of the pretrained model.
+It is necessary to use learning rate warmup (`warmup`) for at least a couple of
+epochs in addition to freezing the backbone (all but the last fully connected
+layer performing the classification) to have the model converge during
+fine-tuning. Fine-tuning models from pre-trained weights is quite a bit less
+stable than training from scratch or fine-tuning an existing model. As such it
+can be necessary to run a couple of trials with different hyperparameters to
+find workable ones. It is entirely possible that pretrained models do not
+converge at all even with reasonable hyperparameter configurations.
 
 Segmentation training
 ---------------------
