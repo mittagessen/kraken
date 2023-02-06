@@ -474,9 +474,10 @@ epochs in addition to freezing the backbone (all but the last fully connected
 layer performing the classification) to have the model converge during
 fine-tuning. Fine-tuning models from pre-trained weights is quite a bit less
 stable than training from scratch or fine-tuning an existing model. As such it
-can be necessary to run a couple of trials with different hyperparameters to
-find workable ones. It is entirely possible that pretrained models do not
-converge at all even with reasonable hyperparameter configurations.
+can be necessary to run a couple of trials with different hyperparameters
+(principally learning rate) to find workable ones. It is entirely possible that
+pretrained models do not converge at all even with reasonable hyperparameter
+configurations.
 
 Segmentation training
 ---------------------
