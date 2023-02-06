@@ -120,7 +120,7 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
               help='Epoch of minimal learning rate for cosine LR scheduler.')
 @click.option('-p', '--partition', show_default=True, default=0.9,
               help='Ground truth data partition ratio between train/validation set')
-@click.option('--fixed-splits/--ignore-fixed-split', show_default=True, default=False,
+@click.option('--fixed-splits/--ignore-fixed-splits', show_default=True, default=False,
               help='Whether to honor fixed splits in binary datasets.')
 @click.option('-t', '--training-files', show_default=True, default=None, multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
