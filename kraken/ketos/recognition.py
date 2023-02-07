@@ -422,7 +422,7 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
         message('Evaluating {}'.format(p))
         logger.info('Evaluating {}'.format(p))
         batch, channels, height, width = net.nn.input
-        ts = ImageInputTransforms(batch, height, width, channels, pad, valid_norm, force_binarization)
+        ts = ImageInputTransforms(batch, height, width, channels, (pad, 0), valid_norm, force_binarization)
         ds = DatasetClass(normalization=normalization,
                           whitespace_normalization=normalize_whitespace,
                           reorder=reorder,
