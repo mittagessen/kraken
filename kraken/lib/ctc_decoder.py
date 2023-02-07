@@ -57,7 +57,7 @@ def beam_decoder(outputs: np.ndarray, beam_size: int = 3) -> List[Tuple[int, int
     c, w = outputs.shape
 
     # construct decoder with dummy tokens
-    decoder = beam_search_decoder(nbest=1, beam_size=beam_size, tokens=tokens=['-'] + [str(idx) for idx in range(c-2)] + ['|'])
+    decoder = beam_search_decoder(nbest=1, beam_size=beam_size, tokens=['-'] + [str(idx) for idx in range(c-2)] + ['|'])
     hypotheses = decoder(outputs.T.unsqueeze(0))[0][0]
     return [(c, timestep, timestep, outputs[c, timestep]) for (c, timestep) in zip(hypotheses.tokens, hypotheses.timesteps)]
 
