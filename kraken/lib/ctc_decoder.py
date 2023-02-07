@@ -23,6 +23,7 @@ more complex beam search decoder.
 Extracted label sequences are converted into the code point domain using kraken.lib.codec.PytorchCodec.
 """
 
+import torch
 import collections
 import numpy as np
 
@@ -30,14 +31,12 @@ from typing import List, Tuple
 from scipy.special import logsumexp
 from scipy.ndimage import measurements
 
-from torchaudio.models.decoder import ctc_decoder as beam_search_decoder
-
 from itertools import groupby
 
 __all__ = ['beam_decoder', 'greedy_decoder', 'blank_threshold_decoder']
 
 
-def beam_decoder(outputs: np.ndarray, beam_size: int = 3) -> List[Tuple[int, int, int, float]]:
+def beam_decoder(outputs: np.ndarray, beam_size: int = 15) -> List[Tuple[int, int, int, float]]:
     """
     Translates back the network output to a label sequence using
     same-prefix-merge beam search decoding as described in [0].
@@ -54,13 +53,29 @@ def beam_decoder(outputs: np.ndarray, beam_size: int = 3) -> List[Tuple[int, int
         A list with tuples (class, start, end, prob). max is the maximum value
         of the softmax layer in the region.
     """
+    try:
+        from torchaudio.models.decoder import ctc_decoder as beam_search_decoder
+    except ImportError:
+        logger.error('Beam search decoding requires torchaudio')
+        raise
+
+    outputs = torch.tensor(outputs)
     c, w = outputs.shape
 
     # construct decoder with dummy tokens
-    decoder = beam_search_decoder(nbest=1, beam_size=beam_size, tokens=['-'] + [str(idx) for idx in range(c-2)] + ['|'])
+    tokens = ['-'] + [str(idx) for idx in range(c-1)] + ['|']
+    decoder = beam_search_decoder(nbest=1, beam_size=beam_size, lexicon=None, tokens=tokens)
     hypotheses = decoder(outputs.T.unsqueeze(0))[0][0]
-    return [(c, timestep, timestep, outputs[c, timestep]) for (c, timestep) in zip(hypotheses.tokens, hypotheses.timesteps)]
-
+    dec = []
+    for l, timestep in zip(hypotheses.tokens, hypotheses.timesteps):
+        # filter out silence token that the implementation *really* wants to
+        # put out for some reason.
+        if l != len(tokens)-1:
+            dec.append((int(l),
+                        int(min(timestep, w-1)),
+                        int(min(timestep, w-1)),
+                        float(outputs[l, min(timestep, w-1)])))
+    return dec
 
 def greedy_decoder(outputs: np.ndarray) -> List[Tuple[int, int, int, float]]:
     """
