@@ -21,7 +21,7 @@ import regex
 import unicodedata
 import bidi.algorithm as bd
 
-from os import extsep, PathLike
+from os import PathLike
 from pathlib import Path
 from PIL import Image
 from PIL.Image import Resampling
@@ -92,7 +92,7 @@ def text_reorder(text: str, base_dir: Optional[str] = None) -> str:
 
 
 def default_split(x: Union[PathLike, str]) -> str:
-    x =  Path(x)
+    x = Path(x)
     while x.suffixes:
         x = x.with_suffix('')
     return str(x)
