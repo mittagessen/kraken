@@ -9,7 +9,7 @@ dependencies:
   - regex
   - requests
   - click>=8.1
-  - numpy<=1.23.99
+  - numpy>=1.23.0,<=1.23.99
   - pillow>=9.2.0
   - scipy
   - jinja2
@@ -17,10 +17,10 @@ dependencies:
   - conda-forge::pytorch-cpu>=1.7.1,<1.14
   - jsonschema
   - scikit-image>=0.17.0,<=0.19.3
-  - shapely>=2.0
+  - shapely==2.0.1
   - pyvips
   - imagemagick>=7.1.0
-  - coremltools>=3.3
+  - coremltools>=4.1
   - pyarrow
   - conda-forge::pytorch-lightning>=1.7.0
   - conda-forge::torchmetrics>=0.10.0
