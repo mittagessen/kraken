@@ -18,11 +18,11 @@ facilitate pickling.
 """
 import torch
 import regex
-import pathlib
 import unicodedata
 import bidi.algorithm as bd
 
-from os import extsep
+from os import extsep, PathLike
+from pathlib import Path
 from PIL import Image
 from PIL.Image import Resampling
 
@@ -91,9 +91,12 @@ def text_reorder(text: str, base_dir: Optional[str] = None) -> str:
     return bd.get_display(text, base_dir=base_dir)
 
 
-def default_split(x: Union[pathlib.Path, str]) -> str:
-    return str(x).split(extsep, 1)[0]
+def default_split(x: Union[PathLike, str]) -> str:
+    x =  Path(x)
+    while x.suffixes:
+        x = x.with_suffix('')
+    return str(x)
 
 
-def suffix_split(x: Union[pathlib.Path, str], split: Callable[[Union[pathlib.Path, str]], str], suffix: str) -> str:
+def suffix_split(x: Union[PathLike, str], split: Callable[[Union[PathLike, str]], str], suffix: str) -> str:
     return split(x) + suffix
