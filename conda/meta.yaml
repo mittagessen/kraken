@@ -27,7 +27,7 @@ requirements:
      - scikit-image>=0.17.0,<=0.19.3
      - shapely==2.0.1
      - pyvips
-     - coremltools>=4.1
+     - coremltools>=6.0
      - pyarrow
      - conda-forge::pytorch-lightning>=1.7
      - conda-forge::torchmetrics>=0.10.0

@@ -24,7 +24,7 @@ dependencies:
   - shapely==2.0.1
   - pyvips
   - imagemagick<7.0.9
-  - coremltools>=3.3
+  - coremltools>=6.0
   - pyarrow
   - pytorch-lightning>=1.7.0
   - torchmetrics>0.10.0
