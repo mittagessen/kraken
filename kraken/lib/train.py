@@ -672,7 +672,7 @@ class RecognitionModel(pl.LightningModule):
     # batch-wise learning rate warmup. In lr_scheduler_step() calls to the
     # scheduler are then only performed at the end of the epoch.
     def configure_optimizers(self):
-        optimizer0 = gdtuo.SGD(lr=self.hparams.lrate)
+        optimizer0 = gdtuo.SGD(self.hparams.lrate)
         optimizer1 = CompatibleAdam(optimizer=optimizer0)
         mw = CompatibleModuleWrapper(self, optimizer1)
         mw.initialize()
