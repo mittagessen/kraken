@@ -32,6 +32,8 @@ from torch.optim import lr_scheduler
 from typing import Callable, Dict, Optional, Sequence, Union, Any, Literal
 from pytorch_lightning.callbacks import Callback, EarlyStopping, BaseFinetuning
 
+from gradient_descent_the_ultimate_optimizer import gdtuo
+
 from kraken.lib import models, vgsl, default_specs, progress
 from kraken.lib.xml import preparse_xml_data
 from kraken.lib.util import make_printable
@@ -56,6 +58,39 @@ def _star_fun(fun, kwargs):
     except KrakenInputException as e:
         logger.warning(str(e))
     return None
+
+class CompatibleAdam(gdtuo.Adam):
+    param_groups = None
+    defaults = None
+
+    @property
+    def state(self):
+        return self.cache
+
+    def state_dict(self):
+        return {}
+
+    def load_state_dict(self):
+        pass
+
+
+class CompatibleModuleWrapper(gdtuo.ModuleWrapper):
+    param_groups = None
+    defaults = None
+
+    @property
+    def state(self):
+        return self.optimizer.state
+
+    def step(self, closure):
+        # ignore the closure - optional during manual optimization anyways
+        return super().step()
+
+    def state_dict(self):
+        return self.optimizer.state_dict()
+
+    def load_state_dict(self):
+        return self.optimizer.load_state_dict()
 
 
 class KrakenTrainer(pl.Trainer):
@@ -98,7 +133,6 @@ class KrakenTrainer(pl.Trainer):
 
         kwargs['callbacks'].extend([KrakenSetOneChannelMode(), KrakenSaveModel()])
         super().__init__(*args, **kwargs)
-        self.automatic_optimization = False
 
     def fit(self, *args, **kwargs):
         with warnings.catch_warnings():
@@ -413,6 +447,7 @@ class RecognitionModel(pl.LightningModule):
         logger.info('Encoding training set')
 
         self.val_cer = CharErrorRate()
+        self.automatic_optimization = False
 
     def _build_dataset(self,
                        DatasetClass,
@@ -446,6 +481,10 @@ class RecognitionModel(pl.LightningModule):
         return self.net(x, seq_lens)
 
     def training_step(self, batch, batch_idx):
+        mw = self.optimizers()
+        mw.begin()
+        mw.zero_grad()
+
         input, target = batch['image'], batch['target']
         # sequence batch
         if 'seq_lens' in batch:
@@ -468,6 +507,9 @@ class RecognitionModel(pl.LightningModule):
                                  target,
                                  seq_lens,
                                  target_lens)
+
+        loss.backward(create_graph=True)
+        mw.step()
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -630,23 +672,29 @@ class RecognitionModel(pl.LightningModule):
     # batch-wise learning rate warmup. In lr_scheduler_step() calls to the
     # scheduler are then only performed at the end of the epoch.
     def configure_optimizers(self):
-        return _configure_optimizer_and_lr_scheduler(self.hparams,
-                                                     self.nn.nn.parameters(),
-                                                     len_train_set=len(self.train_set),
-                                                     loss_tracking_mode='max')
+        optimizer0 = gdtuo.SGD(lr=hparams.lrate)
+        optimizer1 = CompatibleAdam(optimizer=optimizer0)
+        mw = CompatibleModuleWrapper(self, optimizer1)
+        mw.initialize()
+        return mw
 
-    def optimizer_step(self, epoch, batch_idx, optimizer, optimizer_idx,
-                       optimizer_closure, on_tpu=False, using_native_amp=False,
-                       using_lbfgs=False):
-        # update params
-        optimizer.step(closure=optimizer_closure)
+        #return _configure_optimizer_and_lr_scheduler(self.hparams,
+        #                                             self.nn.nn.parameters(),
+        #                                             len_train_set=len(self.train_set),
+        #                                             loss_tracking_mode='max')
 
-        # linear warmup between 0 and the initial learning rate `lrate` in `warmup`
-        # steps.
-        if self.hparams.warmup and self.trainer.global_step < self.hparams.warmup:
-            lr_scale = min(1.0, float(self.trainer.global_step + 1) / self.hparams.warmup)
-            for pg in optimizer.param_groups:
-                pg["lr"] = lr_scale * self.hparams.lrate
+    #def optimizer_step(self, epoch, batch_idx, optimizer, optimizer_idx,
+    #                   optimizer_closure, on_tpu=False, using_native_amp=False,
+    #                   using_lbfgs=False):
+    #    # update params
+    #    optimizer.step(closure=optimizer_closure)
+
+    #    # linear warmup between 0 and the initial learning rate `lrate` in `warmup`
+    #    # steps.
+    #    if self.hparams.warmup and self.trainer.global_step < self.hparams.warmup:
+    #        lr_scale = min(1.0, float(self.trainer.global_step + 1) / self.hparams.warmup)
+    #        for pg in optimizer.param_groups:
+    #            pg["lr"] = lr_scale * self.hparams.lrate
 
     def lr_scheduler_step(self, scheduler, optimizer_idx, metric):
         if not self.hparams.warmup or self.trainer.global_step >= self.hparams.warmup:
@@ -832,6 +880,8 @@ class SegmentationModel(pl.LightningModule):
 
         self.train_set = train_set
         self.val_set = val_set
+
+        self.automatic_optimization = False
 
     def forward(self, x):
         return self.nn.nn(x)
@@ -1073,6 +1123,7 @@ def _configure_optimizer_and_lr_scheduler(hparams, params, len_train_set=None, l
                                                         lr=hparams.lrate,
                                                         momentum=hparams.momentum,
                                                         weight_decay=hparams.weight_decay)
+
     lr_sched = {}
     if hparams.schedule == 'exponential':
         lr_sched = {'scheduler': lr_scheduler.ExponentialLR(optim, hparams.gamma, last_epoch=hparams.completed_epochs-1),
