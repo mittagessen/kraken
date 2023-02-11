@@ -68,11 +68,13 @@ class KrakenTrainer(pl.Trainer):
                  move_metrics_to_cpu: bool = True,
                  freeze_backbone=-1,
                  failed_sample_threshold=10,
-                 debug=False,
+                 pl_logger: Optional[pl.loggers.logger.DummyLogger] = None,
+                 log_dir: Optional[PathLike] = None,
                  *args,
                  **kwargs):
-        if debug:
-            kwargs['logger'] = pl.loggers.TensorBoardLogger('./', name='debug_logs')
+        if pl_logger:
+            if pl_logger == 'tensorboard':
+                kwargs['logger'] = pl.loggers.TensorBoardLogger(log_dir)
         else:
             kwargs['logger'] = False
         kwargs['enable_checkpointing'] = False
@@ -626,7 +628,7 @@ class RecognitionModel(pl.LightningModule):
                                            mode='max',
                                            patience=self.hparams.lag,
                                            stopping_threshold=1.0))
-        if self.hparams.debug:
+        if self.hparams.pl_logger:
             callbacks.append(LearningRateMonitor(logging_interval='step'))
         return callbacks
 
@@ -875,11 +877,7 @@ class SegmentationModel(pl.LightningModule):
             self.best_metric = mean_iu
 
         logger.info(f'validation run: accuracy {pixel_accuracy} mean_acc {mean_accuracy} mean_iu {mean_iu} freq_iu {freq_iu}')
-        # self.log_dict({'val_accuracy': pixel_accuracy,
-        #                'val_mean_acc': mean_accuracy,
-        #                'val_mean_iu': mean_iu,
-        #                'val_freq_iu': freq_iu,
-        #                'val_metric': mean_iu}, prog_bar=True)
+
         self.log('val_accuracy', pixel_accuracy, on_step=False, on_epoch=True, prog_bar=True, logger=True)
         self.log('val_mean_acc', mean_accuracy, on_step=False, on_epoch=True, prog_bar=True, logger=True)
         self.log('val_mean_iu', mean_iu, on_step=False, on_epoch=True, prog_bar=True, logger=True)
@@ -1038,6 +1036,8 @@ class SegmentationModel(pl.LightningModule):
                                            mode='max',
                                            patience=self.hparams.lag,
                                            stopping_threshold=1.0))
+        if self.hparams.pl_logger:
+            callbacks.append(LearningRateMonitor(logging_interval='step'))
 
         return callbacks
 
