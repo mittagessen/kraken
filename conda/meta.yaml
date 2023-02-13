@@ -25,7 +25,7 @@ requirements:
      - cudatoolkit>=11.0
      - jsonschema
      - scikit-image>=0.17.0,<=0.19.3
-     - shapely==2.0.1
+     - shapely==1.8.5
      - pyvips
      - coremltools>=6.0
      - pyarrow
