@@ -19,6 +19,7 @@ kraken.ketos.segmentation
 Command line driver for segmentation training and evaluation.
 """
 import click
+import pathlib
 import logging
 
 from PIL import Image
@@ -203,6 +204,10 @@ def _validate_merging(ctx, param, value):
                    ' centerline for scripts annotated with a central line.')
 @click.option('-cl', '--centerline', 'topline', flag_value='centerline')
 @click.option('-bl', '--baseline', 'topline', flag_value='baseline', default='baseline')
+@click.option('--logger', 'pl_logger', show_default=True, type=click.Choice([None, 'tensorboard']), default=None,
+              help='Logger used by PyTorch Lightning to track metrics such as loss and accuracy.')
+@click.option('--log-dir', show_default=True, type=click.Path(exists=True, dir_okay=True, writable=True),
+              help='Path to directory where the logger will store the logs. If not set, a directory will be created in the current working directory.')          
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def segtrain(ctx, output, spec, line_width, pad, load, freq, quit, epochs,
              min_epochs, lag, min_delta, device, precision, optimizer, lrate,
@@ -212,7 +217,7 @@ def segtrain(ctx, output, spec, line_width, pad, load, freq, quit, epochs,
              force_binarization, format_type, suppress_regions,
              suppress_baselines, valid_regions, valid_baselines, merge_regions,
              merge_baselines, bounding_regions, failed_sample_threshold,
-             augment, resize, topline, ground_truth):
+             augment, resize, topline, pl_logger, log_dir, ground_truth):
     """
     Trains a baseline labeling model for layout analysis
     """
@@ -231,6 +236,15 @@ def segtrain(ctx, output, spec, line_width, pad, load, freq, quit, epochs,
             import albumentations # NOQA
         except ImportError:
             raise click.BadOptionUsage('augment', 'augmentation needs the `albumentations` package installed.')
+
+    if pl_logger == 'tensorboard':
+        try:
+            import tensorboard
+        except ImportError:
+            raise click.BadOptionUsage('logger', 'tensorboard logger needs the `tensorboard` package installed.')
+
+    if log_dir is None:
+        log_dir = pathlib.Path.cwd()
 
     logger.info('Building ground truth set from {} document images'.format(len(ground_truth) + len(training_files)))
 
@@ -254,7 +268,8 @@ def segtrain(ctx, output, spec, line_width, pad, load, freq, quit, epochs,
                          'gamma': gamma,
                          'step_size': step_size,
                          'rop_patience': sched_patience,
-                         'cos_t_max': cos_max})
+                         'cos_t_max': cos_max,
+                         'pl_logger': pl_logger,})
 
     # disable automatic partition when given evaluation set explicitly
     if evaluation_files:
@@ -323,6 +338,8 @@ def segtrain(ctx, output, spec, line_width, pad, load, freq, quit, epochs,
                             deterministic=ctx.meta['deterministic'],
                             failed_sample_threshold=failed_sample_threshold,
                             precision=int(precision),
+                            pl_logger=pl_logger,
+                            log_dir=log_dir,
                             **val_check_interval)
 
     trainer.fit(model)

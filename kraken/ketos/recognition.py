@@ -20,6 +20,7 @@ Command line driver for recognition training and evaluation.
 """
 import click
 import logging
+import pathlib
 
 from typing import List
 
@@ -174,6 +175,10 @@ logger = logging.getLogger('kraken')
               help='Enable image augmentation')
 @click.option('--failed-sample-threshold', show_default=True, default=10,
               help='Abort if more than `n` samples fail to load.')
+@click.option('--logger', 'pl_logger', show_default=True, type=click.Choice([None, 'tensorboard']), default=None,
+              help='Logger used by PyTorch Lightning to track metrics such as loss and accuracy.')
+@click.option('--log-dir', show_default=True, type=click.Path(exists=True, dir_okay=True, writable=True),
+              help='Path to directory where the logger will store the logs. If not set, a directory will be created in the current working directory.')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
           min_epochs, lag, min_delta, device, optimizer, lrate, momentum,
@@ -182,7 +187,7 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
           normalize_whitespace, codec, resize, reorder, base_dir,
           training_files, evaluation_files, workers, load_hyper_parameters,
           repolygonize, force_binarization, format_type, augment,
-          failed_sample_threshold, ground_truth):
+          failed_sample_threshold, pl_logger, log_dir, ground_truth):
     """
     Trains a model from image-text pairs.
     """
@@ -200,6 +205,15 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
             import albumentations # NOQA
         except ImportError:
             raise click.BadOptionUsage('augment', 'augmentation needs the `albumentations` package installed.')
+
+    if pl_logger == 'tensorboard':
+        try:
+            import tensorboard
+        except ImportError:
+            raise click.BadOptionUsage('logger', 'tensorboard logger needs the `tensorboard` package installed.')
+
+    if log_dir is None:
+        log_dir = pathlib.Path.cwd()
 
     import json
     import shutil
@@ -227,7 +241,8 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
                          'cos_t_max': cos_max,
                          'normalization': normalization,
                          'normalize_whitespace': normalize_whitespace,
-                         'augment': augment})
+                         'augment': augment,
+                         'pl_logger': pl_logger,})
 
     # disable automatic partition when given evaluation set explicitly
     if evaluation_files:
@@ -284,6 +299,8 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
                             failed_sample_threshold=failed_sample_threshold,
                             enable_progress_bar=True if not ctx.meta['verbose'] else False,
                             deterministic=ctx.meta['deterministic'],
+                            pl_logger=pl_logger,
+                            log_dir=log_dir,
                             **val_check_interval)
     try:
         trainer.fit(model)
