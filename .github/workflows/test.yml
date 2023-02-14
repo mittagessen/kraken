@@ -80,7 +80,7 @@ jobs:
       # Runs the action with the following inputs or defaults if not specified.
       - name: install boa
         shell: bash -l {0}
-        run: pip install https://github.com/mamba-org/boa/archive/refs/tags/0.13.0.zip
+        run: pip install https://github.com/mamba-org/boa/archive/refs/tags/0.14.0.zip
       - name: validate recipe
         shell: bash -l {0}
         id: conda_validation
