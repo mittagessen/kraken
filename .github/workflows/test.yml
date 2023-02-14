@@ -85,9 +85,7 @@ jobs:
         shell: bash -l {0}
         id: conda_validation
         run: |
-          PACKAGE_PATHS=$(conda mambabuild . --output --check -c conda-forge)
-          PACKAGE_PATHS="${PACKAGE_PATHS//$'\n'/' '}"
-          PACKAGE_PATHS="${PACKAGE_PATHS//$'\r'/''}"
+          PACKAGE_PATHS=$(conda mambabuild . --output --check -c conda-forge | tail -n 1)
           echo "::set-output name=package_paths::$PACKAGE_PATHS"
       - name: run build
         shell: bash -l {0}
