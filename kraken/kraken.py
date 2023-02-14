@@ -296,8 +296,7 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore, input,
 @click.option('-x', '--pagexml', 'serializer', flag_value='pagexml')
 @click.option('-n', '--native', 'serializer', flag_value='native', default=True,
               show_default=True)
-@click.option('-t', '--template',
-              type=click.Path(exists=True, dir_okay=False, path_type=Path),
+@click.option('-t', '--template', type=click.Path(exists=True, dir_okay=False),
               help='Explicitly set jinja template for output serialization. Overrides -h/-a/-y/-x/-n.')
 @click.option('-d', '--device', default='cpu', show_default=True,
               help='Select device to use (cpu, cuda:0, cuda:1, ...)')
