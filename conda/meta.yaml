@@ -20,14 +20,14 @@ requirements:
      - pillow>=9.2.0
      - scipy
      - jinja2
-     - torchvision>=0.12.0
+     - torchvision
      - pytorch>=1.12.0
      - cudatoolkit
      - jsonschema
      - scikit-image>=0.17.0,<=0.19.3
      - shapely==1.8.5
      - pyvips
-     - coremltools>=4.1
+     - conda-forge::coremltools
      - pyarrow
      - pytorch-lightning>=1.7
      - torchmetrics>=0.10.0
