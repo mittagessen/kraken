@@ -175,7 +175,7 @@ logger = logging.getLogger('kraken')
               help='Enable image augmentation')
 @click.option('--failed-sample-threshold', show_default=True, default=10,
               help='Abort if more than `n` samples fail to load.')
-@click.option('--logger', 'pl_logger', show_default=True, type=click.Choice([None, 'tensorboard']), default=None,
+@click.option('--logger', 'pl_logger', show_default=True, type=click.Choice(['tensorboard']), default=None,
               help='Logger used by PyTorch Lightning to track metrics such as loss and accuracy.')
 @click.option('--log-dir', show_default=True, type=click.Path(exists=True, dir_okay=True, writable=True),
               help='Path to directory where the logger will store the logs. If not set, a directory will be created in the current working directory.')

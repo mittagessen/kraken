@@ -204,10 +204,10 @@ def _validate_merging(ctx, param, value):
                    ' centerline for scripts annotated with a central line.')
 @click.option('-cl', '--centerline', 'topline', flag_value='centerline')
 @click.option('-bl', '--baseline', 'topline', flag_value='baseline', default='baseline')
-@click.option('--logger', 'pl_logger', show_default=True, type=click.Choice([None, 'tensorboard']), default=None,
+@click.option('--logger', 'pl_logger', show_default=True, type=click.Choice(['tensorboard']), default=None,
               help='Logger used by PyTorch Lightning to track metrics such as loss and accuracy.')
 @click.option('--log-dir', show_default=True, type=click.Path(exists=True, dir_okay=True, writable=True),
-              help='Path to directory where the logger will store the logs. If not set, a directory will be created in the current working directory.')          
+              help='Path to directory where the logger will store the logs. If not set, a directory will be created in the current working directory.')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def segtrain(ctx, output, spec, line_width, pad, load, freq, quit, epochs,
              min_epochs, lag, min_delta, device, precision, optimizer, lrate,
