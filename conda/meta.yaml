@@ -20,19 +20,19 @@ requirements:
      - pillow>=9.2.0
      - scipy
      - jinja2
-     - conda-forge::torchvision>=0.12.0
-     - conda-forge::pytorch>=1.12.0
-     - conda-forge::cudatoolkit>=11.0
+     - torchvision>=0.12.0
+     - pytorch>=1.12.0
+     - cudatoolkit
      - jsonschema
      - scikit-image>=0.17.0,<=0.19.3
      - shapely==1.8.5
      - pyvips
-     - conda-forge::coremltools>=4.1
+     - coremltools>=4.1
      - pyarrow
-     - conda-forge::pytorch-lightning>=1.7
-     - conda-forge::torchmetrics>=0.10.0
-     - conda-forge::albumentations
-     - conda-forge::rich
+     - pytorch-lightning>=1.7
+     - torchmetrics>=0.10.0
+     - albumentations
+     - rich
 about:
   home: http://kraken.re
   license: APACHE
