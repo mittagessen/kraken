@@ -366,7 +366,7 @@ class RecognitionPretrainModel(pl.LightningModule):
                     _max = logits.argmax(-1) == 0
                     _min = logits.argmin(-1) == 0
                     both = _max & _min
-                    corr = _max.long().sum.item() - both.long().sum().item()
+                    corr = _max.long().sum().item() - both.long().sum().item()
             self.log('CE', loss, on_step=True, on_epoch=True)
 
     def training_step(self, batch, batch_idx):
