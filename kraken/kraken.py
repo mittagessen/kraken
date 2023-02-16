@@ -158,7 +158,8 @@ def segmenter(legacy, model, text_direction, scale, maxcolseps, black_colseps,
                                   pad=pad,
                                   mask=mask)
         else:
-            res = blla.segment(im, text_direction, mask=mask, model=model, device=device)
+            res = blla.segment(im, text_direction, mask=mask, model=model, device=device,
+                               raise_on_error=ctx.meta['raise_failed'])
     except Exception:
         if ctx.meta['raise_failed']:
             raise
