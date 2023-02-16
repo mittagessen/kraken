@@ -74,12 +74,10 @@ jobs:
       - uses: conda-incubator/setup-miniconda@v2
         with:
           python-version: 3.9
-          mamba-version: "*"
           channels: conda-forge,defaults
-          channel-priority: true
       - name: install dependencies build
         shell: bash -l {0}
-        run: mamba install "conda-build>=3.20" colorama pip ruamel ruamel.yaml rich jsonschema conda-verify anaconda-client
+        run: conda install "conda-build>=3.20" colorama pip ruamel ruamel.yaml rich jsonschema conda-verify anaconda-client
       # Runs the action with the following inputs or defaults if not specified.
       - name: install boa
         shell: bash -l {0}
