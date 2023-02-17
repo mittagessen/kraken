@@ -77,7 +77,7 @@ jobs:
           miniforge-variant: Mambaforge
       - name: install dependencies build
         shell: bash -l {0}
-        run: mamba install "conda-build>=3.20" colorama pip ruamel ruamel.yaml rich jsonschema conda-verify anaconda-client
+        run: mamba install "conda-build>=3.20" colorama pip ruamel ruamel.yaml rich jsonschema conda-verify anaconda-client mamba
       # Runs the action with the following inputs or defaults if not specified.
       - name: install boa
         shell: bash -l {0}
