@@ -21,7 +21,6 @@ dependencies:
   - shapely==1.8.5
   - pyvips
   - imagemagick>=7.1.0
-  - coremltools>=6.0
   - pyarrow
   - conda-forge::pytorch-lightning>=1.7.0
   - conda-forge::torchmetrics>=0.10.0
@@ -29,4 +28,5 @@ dependencies:
   - albumentations
   - rich
   - pip:
+    - coremltools>=6.0
     - file:.
