@@ -152,7 +152,7 @@ jobs:
       - name: Create redirect
         run: cp docs/redirect.html build/html/index.html
       - name: Push gh-pages
-        uses: crazy-max/ghaction-github-pages@v2
+        uses: crazy-max/ghaction-github-pages@v3
         with:
           target_branch: gh-pages
           build_dir: build/html
