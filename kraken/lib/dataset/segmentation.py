@@ -157,6 +157,8 @@ class BaselineSet(Dataset):
         else:
             raise Exception('invalid dataset mode')
         if augmentation:
+            import cv2
+            cv2.setNumThreads(0)
             from albumentations import (
                 Compose, ToFloat, RandomRotate90, Flip, OneOf, MotionBlur, MedianBlur, Blur,
                 ShiftScaleRotate, OpticalDistortion, ElasticTransform,
