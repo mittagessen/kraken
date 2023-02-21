@@ -49,6 +49,8 @@ RECOGNITION_PRETRAIN_HYPER_PARAMS = {'pad': 16,
                                      'num_negatives': 100,
                                      'logit_temp': 0.1,
                                      'warmup': 32000,
+                                     # loggers
+                                     'pl_logger': None,
                                      }
 
 RECOGNITION_HYPER_PARAMS = {'pad': 16,
@@ -79,6 +81,8 @@ RECOGNITION_HYPER_PARAMS = {'pad': 16,
                             'cos_t_max': 50,
                             'warmup': 0,
                             'freeze_backbone': 0,
+                            # loggers
+                            'pl_logger': None,
                             }
 
 SEGMENTATION_HYPER_PARAMS = {'line_width': 8,
@@ -106,4 +110,6 @@ SEGMENTATION_HYPER_PARAMS = {'line_width': 8,
                              # cosine
                              'cos_t_max': 50,
                              'warmup': 0,
+                             # loggers
+                             'pl_logger': None,
                              }
