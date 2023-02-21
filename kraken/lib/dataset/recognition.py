@@ -101,6 +101,8 @@ class ArrowIPCRecognitionDataset(Dataset):
             else:
                 self.text_transforms.append(F_t.text_reorder)
         if augmentation:
+            import cv2
+            cv2.setNumThreads(0)
             from albumentations import (
                 Compose, ToFloat, OneOf, MotionBlur, MedianBlur, Blur,
                 ShiftScaleRotate, OpticalDistortion, ElasticTransform,
