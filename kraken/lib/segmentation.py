@@ -639,7 +639,8 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
                                     suppl_obj: Sequence[Sequence[Tuple[int, int]]] = None,
                                     im_feats: np.ndarray = None,
                                     scale: Tuple[int, int] = None,
-                                    topline: bool = False):
+                                    topline: bool = False,
+                                    raise_on_error: bool = False):
     """
     Given a list of baselines and an input image, calculates a polygonal
     environment around each baseline.
@@ -666,6 +667,8 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
                         be offset upwards, if set to True, baselines are on the
                         top and will be offset downwards. If set to None, no
                         offset will be applied.
+        raise_on_error: Raises error instead of logging them when they are
+                        not-blocking
     Returns:
         List of lists of coordinates. If no polygonization could be compute for
         a baseline `None` is returned instead.
@@ -727,6 +730,8 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
                                            im_feats,
                                            bounds))
         except Exception as e:
+            if raise_on_error:
+                raise
             logger.warning(f'Polygonizer failed on line {idx}: {e}')
             polygons.append(None)
 

@@ -164,6 +164,7 @@ def vec_lines(heatmap: torch.Tensor,
               scal_im: np.ndarray = None,
               suppl_obj: List[np.ndarray] = None,
               topline: Optional[bool] = False,
+              raise_on_error: bool = False,
               **kwargs) -> List[Dict[str, Any]]:
     r"""
     Computes lines from a stack of heatmaps, a class mapping, and scaling
@@ -185,6 +186,8 @@ def vec_lines(heatmap: torch.Tensor,
                    polygonization.
         topline: True for a topline, False for baseline, or None for a
                  centerline.
+        raise_on_error: Raises error instead of logging them when they are
+                        not-blocking
 
     Returns:
         A list of dictionaries containing the baselines, bounding polygons, and
@@ -222,7 +225,13 @@ def vec_lines(heatmap: torch.Tensor,
             if reg_pol.contains(mid_point):
                 suppl_obj.append(regions[reg_idx])
 
-        pol = calculate_polygonal_environment(baselines=[bl[1]], im_feats=im_feats, suppl_obj=suppl_obj, topline=topline)
+        pol = calculate_polygonal_environment(
+            baselines=[bl[1]],
+            im_feats=im_feats,
+            suppl_obj=suppl_obj,
+            topline=topline,
+            raise_on_error=raise_on_error
+        )
         if pol[0] is not None:
             lines.append((bl[0], bl[1], pol[0]))
 
@@ -239,7 +248,8 @@ def segment(im: PIL.Image.Image,
             mask: Optional[np.ndarray] = None,
             reading_order_fn: Callable = polygonal_reading_order,
             model: Union[List[vgsl.TorchVGSLModel], vgsl.TorchVGSLModel] = None,
-            device: str = 'cpu') -> Dict[str, Any]:
+            device: str = 'cpu',
+            raise_on_error: bool = False) -> Dict[str, Any]:
     r"""
     Segments a page into text lines using the baseline segmenter.
 
@@ -260,6 +270,8 @@ def segment(im: PIL.Image.Image,
         model: One or more TorchVGSLModel containing a segmentation model. If
                none is given a default model will be loaded.
         device: The target device to run the neural network on.
+        raise_on_error: Raises error instead of logging them when they are
+                        not-blocking
 
     Returns:
         A dictionary containing the text direction and under the key 'lines' a
@@ -327,7 +339,8 @@ def segment(im: PIL.Image.Image,
                           reading_order_fn=reading_order_fn,
                           text_direction=text_direction,
                           suppl_obj=suppl_obj,
-                          topline=net.user_metadata['topline'] if 'topline' in net.user_metadata else False)
+                          topline=net.user_metadata['topline'] if 'topline' in net.user_metadata else False,
+                          raise_on_error=raise_on_error)
 
     if len(rets['cls_map']['baselines']) > 1:
         script_detection = True
