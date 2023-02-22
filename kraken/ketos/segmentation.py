@@ -103,7 +103,6 @@ def _validate_merging(ctx, param, value):
                 default='16-mixed', 
                 type=click.Choice(['32', 'bf16', '16', '16-mixed', 'bf16-mixed']),
                 help='Numerical precision to use for training. Default is 16-mixed precision.')
-@click.option('--precision', default='32', type=click.Choice(['32', '16']), help='set tensor precision')
 @click.option('--optimizer',
               show_default=True,
               default=SEGMENTATION_HYPER_PARAMS['optimizer'],
