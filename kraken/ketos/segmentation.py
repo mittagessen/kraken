@@ -98,6 +98,11 @@ def _validate_merging(ctx, param, value):
               type=click.FLOAT,
               help='Minimum improvement between epochs to reset early stopping. By default it scales the delta by the best loss')
 @click.option('-d', '--device', show_default=True, default='cpu', help='Select device to use (cpu, cuda:0, cuda:1, ...)')
+@click.option('--precision',
+                show_default=True, 
+                default='16-mixed', 
+                type=click.Choice(['32', 'bf16', '16', '16-mixed', 'bf16-mixed']),
+                help='Numerical precision to use for training. Default is 16-mixed precision.')
 @click.option('--precision', default='32', type=click.Choice(['32', '16']), help='set tensor precision')
 @click.option('--optimizer',
               show_default=True,
@@ -332,6 +337,7 @@ def segtrain(ctx, output, spec, line_width, pad, load, freq, quit, epochs,
 
     trainer = KrakenTrainer(accelerator=accelerator,
                             devices=device,
+                            precision=precision,
                             max_epochs=hyper_params['epochs'] if hyper_params['quit'] == 'dumb' else -1,
                             min_epochs=hyper_params['min_epochs'],
                             enable_progress_bar=True if not ctx.meta['verbose'] else False,
