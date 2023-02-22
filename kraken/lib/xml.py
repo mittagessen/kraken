@@ -17,6 +17,8 @@ ALTO/Page data loaders for segmentation training
 """
 import re
 import logging
+
+from os import PathLike
 from pathlib import Path
 
 from itertools import groupby
@@ -480,7 +482,7 @@ class XMLPage(object):
 
     type: Literal['baselines', 'bbox'] == 'baselines'
     base_dir: Optional[Literal['L', 'R']] = None
-    imagename: pathlib.Path = None
+    imagename: PathLike = None
     _orders: Dict[str, Dict[str, Any]] = None
     has_tags: bool = False
     _tag_set: Optional[Dict] = None
@@ -488,7 +490,7 @@ class XMLPage(object):
     _split_set: Optional[List] = None
 
     def __init__(self,
-                 filename: Union[str, pathlib.Path],
+                 filename: Union[str, PathLike],
                  filetype: Literal['xml', 'alto', 'page'] = 'xml'):
         super().__init__()
         self.filename = Path(filename)
@@ -653,13 +655,16 @@ class XMLPage(object):
                 reading_orders = ro_el.getchildren()
                 # UnorderedGroup at top-level => treated as multiple reading orders
                 if len(reading_orders) == 1 and reading_orders[0].tag.endswith('UnorderedGroup'):
-                     reading_orders = reading_orders[0].getchildren()
+                    reading_orders = reading_orders[0].getchildren()
                 else:
                     reading_orders = [reading_orders]
+
                 def _parse_group(el):
+                    nonlocal is_valid
+
                     _ro = []
                     if el.tag.endswith('UnorderedGroup'):
-                        _ro.append([_parse_group(x) for x in el.iterchildren()])
+                        _ro = [_parse_group(x) for x in el.iterchildren()]
                         is_total = False
                     elif el.tag.endswith('OrderedGroup'):
                         _ro.extend(_parse_group(x) for x in el.iterchildren())
@@ -667,13 +672,15 @@ class XMLPage(object):
                         ref = el.get('REF')
                         res = doc.find(f'.//{{*}}*[@ID="{ref}"]')
                         if res is None:
-                            logger.warning(f'Nonexistant element with ID {ref} in reading order. Skipping RO {ro.get("ID")}.')
+                            logger.warning(f'Nonexistent element with ID {ref} in reading order. Skipping RO {ro.get("ID")}.')
                             is_valid = False
                             return _ro
                         tag = res.tag.split('}')[-1]
                         if tag not in alto_regions.keys() and tag != 'TextLine':
                             logger.warning(f'Sub-line element with ID {ref} in reading order. Skipping RO {ro.get("ID")}.')
                             is_valid = False
+                            return _ro
+                        return ref
                     return _ro
 
                 for ro in reading_orders:
@@ -839,7 +846,7 @@ class XMLPage(object):
                def _parse_group(el):
                    _ro = []
                    if el.tag.endswith('UnorderedGroup'):
-                       _ro.append([_parse_group(x) for x in el.iterchildren()])
+                       _ro = [_parse_group(x) for x in el.iterchildren()]
                        is_total = False
                    elif el.tag.endswith('OrderedGroup'):
                        _ro.extend(_parse_group(x) for x in el.iterchildren())
@@ -887,8 +894,8 @@ class XMLPage(object):
                 if el in self.lines:
                     return self.lines[el]
                 # substitute lines if region in RO
-                elif el in [reg['id'] for regs in doc.regions.values() for reg in regs]:
-                    _ro.extend(self.get_lines_by_region(el))
+                elif el in [reg['id'] for regs in self.regions.values() for reg in regs]:
+                    _ro.extend(self.get_sorted_lines_by_region(el))
                 else:
                     raise ValueError(f'Invalid reading order {ro}')
             return _ro
@@ -900,12 +907,32 @@ class XMLPage(object):
         """
         Returns ordered regions from particular reading order.
         """
+        if ro not in self.reading_orders:
+            raise ValueError(f'Unknown reading order {ro}')
 
+        regions = {reg['id']: key for key, regs in self.regions.items() for reg in regs}
+
+        def _traverse_ro(el):
+            _ro = []
+            if isinstance(el, list):
+                _ro.append([_traverse_ro(x) for x in el])
+            else:
+                # if region directly append to ro
+                if el in regions.keys():
+                    return [reg for reg in self.regions[regions[el]] if reg['id'] == el][0]
+                else:
+                    raise ValueError(f'Invalid reading order {ro}')
+            return _ro
+
+        _ro = self.reading_orders[ro]
+        return _traverse_ro(_ro['order'])
 
     def get_sorted_lines_by_region(self, region, ro='line_implicit'):
         """
         Returns ordered lines in region.
         """
+        if ro not in self.reading_orders:
+            raise ValueError(f'Unknown reading order {ro}')
         if self.reading_orders[ro]['is_total'] is False:
             raise ValueError('Fetching lines by region of a non-total order is not supported')
         lines = [(id, line) for id, line in self._lines.items() if line['region'] == region]
