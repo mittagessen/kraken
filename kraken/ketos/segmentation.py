@@ -23,7 +23,6 @@ import pathlib
 import logging
 
 from PIL import Image
-from typing import Dict
 
 from kraken.lib.progress import KrakenProgressBar
 from kraken.lib.exceptions import KrakenInputException
@@ -99,10 +98,10 @@ def _validate_merging(ctx, param, value):
               help='Minimum improvement between epochs to reset early stopping. By default it scales the delta by the best loss')
 @click.option('-d', '--device', show_default=True, default='cpu', help='Select device to use (cpu, cuda:0, cuda:1, ...)')
 @click.option('--precision',
-                show_default=True, 
-                default='16',
-                type=click.Choice(['64', '32', 'bf16', '16']),
-                help='Numerical precision to use for training. Default is 16-bit mixed precision.')
+              show_default=True,
+              default='16',
+              type=click.Choice(['64', '32', 'bf16', '16']),
+              help='Numerical precision to use for training. Default is 16-bit mixed precision.')
 @click.option('--optimizer',
               show_default=True,
               default=SEGMENTATION_HYPER_PARAMS['optimizer'],
@@ -243,7 +242,7 @@ def segtrain(ctx, output, spec, line_width, pad, load, freq, quit, epochs,
 
     if pl_logger == 'tensorboard':
         try:
-            import tensorboard
+            import tensorboard # NOQA
         except ImportError:
             raise click.BadOptionUsage('logger', 'tensorboard logger needs the `tensorboard` package installed.')
 
@@ -273,7 +272,8 @@ def segtrain(ctx, output, spec, line_width, pad, load, freq, quit, epochs,
                          'step_size': step_size,
                          'rop_patience': sched_patience,
                          'cos_t_max': cos_max,
-                         'pl_logger': pl_logger,})
+                         'pl_logger': pl_logger,
+                         })
 
     # disable automatic partition when given evaluation set explicitly
     if evaluation_files:
@@ -342,7 +342,6 @@ def segtrain(ctx, output, spec, line_width, pad, load, freq, quit, epochs,
                             enable_progress_bar=True if not ctx.meta['verbose'] else False,
                             deterministic=ctx.meta['deterministic'],
                             failed_sample_threshold=failed_sample_threshold,
-                            precision=int(precision),
                             pl_logger=pl_logger,
                             log_dir=log_dir,
                             **val_check_interval)

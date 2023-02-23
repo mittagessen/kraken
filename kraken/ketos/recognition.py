@@ -77,10 +77,10 @@ logger = logging.getLogger('kraken')
               help='Minimum improvement between epochs to reset early stopping. Default is scales the delta by the best loss')
 @click.option('-d', '--device', show_default=True, default='cpu', help='Select device to use (cpu, cuda:0, cuda:1, ...)')
 @click.option('--precision',
-                show_default=True, 
-                default='16', 
-                type=click.Choice(['64', '32', 'bf16', '16']),
-                help='Numerical precision to use for training. Default is 16-bit mixed precision.')
+              show_default=True,
+              default='16',
+              type=click.Choice(['64', '32', 'bf16', '16']),
+              help='Numerical precision to use for training. Default is 16-bit mixed precision.')
 @click.option('--optimizer',
               show_default=True,
               default=RECOGNITION_HYPER_PARAMS['optimizer'],
@@ -213,7 +213,7 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
 
     if pl_logger == 'tensorboard':
         try:
-            import tensorboard
+            import tensorboard # NOQA
         except ImportError:
             raise click.BadOptionUsage('logger', 'tensorboard logger needs the `tensorboard` package installed.')
 
@@ -247,7 +247,8 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
                          'normalization': normalization,
                          'normalize_whitespace': normalize_whitespace,
                          'augment': augment,
-                         'pl_logger': pl_logger,})
+                         'pl_logger': pl_logger,
+                         })
 
     # disable automatic partition when given evaluation set explicitly
     if evaluation_files:

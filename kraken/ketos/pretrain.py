@@ -78,10 +78,10 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
               help='Minimum improvement between epochs to reset early stopping. Default is scales the delta by the best loss')
 @click.option('-d', '--device', show_default=True, default='cpu', help='Select device to use (cpu, cuda:0, cuda:1, ...)')
 @click.option('--precision',
-                show_default=True, 
-                default='16', 
-                type=click.Choice(['64', '32', 'bf16', '16']),
-                help='Numerical precision to use for training. Default is 16-bit mixed precision.')
+              show_default=True,
+              default='16',
+              type=click.Choice(['64', '32', 'bf16', '16']),
+              help='Numerical precision to use for training. Default is 16-bit mixed precision.')
 @click.option('--optimizer',
               show_default=True,
               default=RECOGNITION_PRETRAIN_HYPER_PARAMS['optimizer'],
