@@ -23,7 +23,7 @@ dependencies:
   - imagemagick>=7.1.0
   - coremltools>=6.0
   - pyarrow
-  - conda-forge::pytorch-lightning>=1.7.0
+  - conda-forge::pytorch-lightning>=1.9.0,<2.0
   - conda-forge::torchmetrics>=0.10.0
   - pip
   - albumentations

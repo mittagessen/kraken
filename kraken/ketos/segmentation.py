@@ -100,7 +100,7 @@ def _validate_merging(ctx, param, value):
 @click.option('-d', '--device', show_default=True, default='cpu', help='Select device to use (cpu, cuda:0, cuda:1, ...)')
 @click.option('--precision',
                 show_default=True, 
-                default='16', 
+                default='16',
                 type=click.Choice(['64', '32', 'bf16', '16']),
                 help='Numerical precision to use for training. Default is 16-bit mixed precision.')
 @click.option('--optimizer',
