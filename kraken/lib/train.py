@@ -77,11 +77,6 @@ class KrakenTrainer(pl.Trainer):
                 kwargs['logger'] = pl.loggers.TensorBoardLogger(log_dir)
         else:
             kwargs['logger'] = False
-        if 'mixed' in kwargs['precision']:
-            precision = kwargs['precision'].split('-')[0]
-            kwargs['precision'] = precision
-            if torch.cuda.is_available():
-                kwargs['plugins'] = [pl.plugins.precision.MixedPrecisionPlugin(precision, 'cuda')]
         kwargs['enable_checkpointing'] = False
         kwargs['enable_progress_bar'] = enable_progress_bar
         kwargs['min_epochs'] = min_epochs
