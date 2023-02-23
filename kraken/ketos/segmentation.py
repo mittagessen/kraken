@@ -112,7 +112,7 @@ def _validate_merging(ctx, param, value):
 @click.option('-w', '--weight-decay', show_default=True,
               default=SEGMENTATION_HYPER_PARAMS['weight_decay'], help='Weight decay')
 @click.option('--warmup', show_default=True, type=float,
-              default=SEGMENTATION_HYPER_PARAMS['warmup'], help='Number of samples to ramp up to `lrate` initial learning rate.')
+              default=SEGMENTATION_HYPER_PARAMS['warmup'], help='Number of steps to ramp up to `lrate` initial learning rate.')
 @click.option('--schedule',
               show_default=True,
               type=click.Choice(['constant',

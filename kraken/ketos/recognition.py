@@ -88,7 +88,7 @@ logger = logging.getLogger('kraken')
 @click.option('-w', '--weight-decay', show_default=True, type=float,
               default=RECOGNITION_HYPER_PARAMS['weight_decay'], help='Weight decay')
 @click.option('--warmup', show_default=True, type=int,
-              default=RECOGNITION_HYPER_PARAMS['warmup'], help='Number of samples to ramp up to `lrate` initial learning rate.')
+              default=RECOGNITION_HYPER_PARAMS['warmup'], help='Number of steps to ramp up to `lrate` initial learning rate.')
 @click.option('--freeze-backbone', show_default=True, type=int,
               default=RECOGNITION_HYPER_PARAMS['freeze_backbone'], help='Number of samples to keep the backbone (everything but last layer) frozen.')
 @click.option('--schedule',
