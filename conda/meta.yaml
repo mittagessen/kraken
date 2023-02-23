@@ -19,7 +19,7 @@ requirements:
      - numpy<=1.23.99
      - pillow>=9.2.0
      - scipy
-     - jinja2
+     - jinja2>=3.0
      - torchvision
      - pytorch>=1.12.0
      - cudatoolkit
