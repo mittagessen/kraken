@@ -78,9 +78,9 @@ logger = logging.getLogger('kraken')
 @click.option('-d', '--device', show_default=True, default='cpu', help='Select device to use (cpu, cuda:0, cuda:1, ...)')
 @click.option('--precision',
                 show_default=True, 
-                default='16-mixed', 
-                type=click.Choice(['32', 'bf16', '16', '16-mixed', 'bf16-mixed']),
-                help='Numerical precision to use for training. Default is 16-mixed precision.')
+                default='16', 
+                type=click.Choice(['64', '32', 'bf16', '16']),
+                help='Numerical precision to use for training. Default is 16-bit mixed precision.')
 @click.option('--optimizer',
               show_default=True,
               default=RECOGNITION_HYPER_PARAMS['optimizer'],
