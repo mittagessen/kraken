@@ -80,7 +80,8 @@ class KrakenTrainer(pl.Trainer):
         if 'mixed' in kwargs['precision']:
             precision = kwargs['precision'].split('-')[0]
             kwargs['precision'] = precision
-            kwargs['plugins'] = [pl.plugins.precision.MixedPrecisionPlugin(precision, 'cuda')]
+            if torch.cuda.is_available():
+                kwargs['plugins'] = [pl.plugins.precision.MixedPrecisionPlugin(precision, 'cuda')]
         kwargs['enable_checkpointing'] = False
         kwargs['enable_progress_bar'] = enable_progress_bar
         kwargs['min_epochs'] = min_epochs
