@@ -77,6 +77,11 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
               type=click.FLOAT,
               help='Minimum improvement between epochs to reset early stopping. Default is scales the delta by the best loss')
 @click.option('-d', '--device', show_default=True, default='cpu', help='Select device to use (cpu, cuda:0, cuda:1, ...)')
+@click.option('--precision',
+                show_default=True, 
+                default='16', 
+                type=click.Choice(['64', '32', 'bf16', '16']),
+                help='Numerical precision to use for training. Default is 16-bit mixed precision.')
 @click.option('--optimizer',
               show_default=True,
               default=RECOGNITION_PRETRAIN_HYPER_PARAMS['optimizer'],
@@ -176,7 +181,7 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
               help='Multiplicative factor for the logits used in contrastive loss.')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def pretrain(ctx, batch_size, pad, output, spec, load, freq, quit, epochs,
-             min_epochs, lag, min_delta, device, optimizer, lrate, momentum,
+             min_epochs, lag, min_delta, device, precision, optimizer, lrate, momentum,
              weight_decay, warmup, schedule, gamma, step_size, sched_patience,
              cos_max, partition, fixed_splits, training_files,
              evaluation_files, workers, load_hyper_parameters, repolygonize,
@@ -271,6 +276,7 @@ def pretrain(ctx, batch_size, pad, output, spec, load, freq, quit, epochs,
 
     trainer = KrakenTrainer(accelerator=accelerator,
                             devices=device,
+                            precision=precision,
                             max_epochs=hyper_params['epochs'] if hyper_params['quit'] == 'dumb' else -1,
                             min_epochs=hyper_params['min_epochs'],
                             enable_progress_bar=True if not ctx.meta['verbose'] else False,

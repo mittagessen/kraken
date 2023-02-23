@@ -76,6 +76,11 @@ logger = logging.getLogger('kraken')
               type=click.FLOAT,
               help='Minimum improvement between epochs to reset early stopping. Default is scales the delta by the best loss')
 @click.option('-d', '--device', show_default=True, default='cpu', help='Select device to use (cpu, cuda:0, cuda:1, ...)')
+@click.option('--precision',
+                show_default=True, 
+                default='16', 
+                type=click.Choice(['64', '32', 'bf16', '16']),
+                help='Numerical precision to use for training. Default is 16-bit mixed precision.')
 @click.option('--optimizer',
               show_default=True,
               default=RECOGNITION_HYPER_PARAMS['optimizer'],
@@ -181,7 +186,7 @@ logger = logging.getLogger('kraken')
               help='Path to directory where the logger will store the logs. If not set, a directory will be created in the current working directory.')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
-          min_epochs, lag, min_delta, device, optimizer, lrate, momentum,
+          min_epochs, lag, min_delta, device, precision, optimizer, lrate, momentum,
           weight_decay, warmup, freeze_backbone, schedule, gamma, step_size,
           sched_patience, cos_max, partition, fixed_splits, normalization,
           normalize_whitespace, codec, resize, reorder, base_dir,
@@ -293,6 +298,7 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
 
     trainer = KrakenTrainer(accelerator=accelerator,
                             devices=device,
+                            precision=precision,
                             max_epochs=hyper_params['epochs'] if hyper_params['quit'] == 'dumb' else -1,
                             min_epochs=hyper_params['min_epochs'],
                             freeze_backbone=hyper_params['freeze_backbone'],
