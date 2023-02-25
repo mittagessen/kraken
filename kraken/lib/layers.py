@@ -866,9 +866,12 @@ class GroupNorm(Module):
 
         self.layer = torch.nn.GroupNorm(num_groups, in_channels)
 
-    def forward(self, inputs: torch.Tensor, seq_len: torch.Tensor) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
-        o = self.layer(inputs)
-        return o, seq_len
+    def forward(self, inputs: torch.Tensor, seq_len: Optional[torch.Tensor]) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+        t = inputs.dtype
+        # XXX: verify that pytorch AMP casts the inputs to float32 correctly at
+        # some point.
+        o = self.layer(inputs.type(torch.float32))
+        return o.type(t), seq_len
 
     def get_shape(self, input: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
         self.output_shape = input
