@@ -11,6 +11,32 @@ Both segmentation and recognition are trainable in kraken. The segmentation
 model finds baselines and regions on a page image. Recognition models convert
 text image lines found by the segmenter into digital text.
 
+Best practices
+---------------------
+
+Recognition model training
+~~~~~~~~~~~~~~~~~~~~
+
+* The default architecture works well for decently sized datasets.
+* Use precompiled binary datasets and put them in a place where they can be memory mapped during training (local storage, not NFS or similar).
+* Use the --logger flag to track your training metrics across experiments using Tensorboard.
+* If the network doesn't converge before the early stopping aborts training, increase --min-epochs or --lag. Use the --logger option to inspect your training loss.
+* Use the flag --augment to activate data augmentation.
+* Increase the amount of --workers to speedup data loading. This is essential when you use the --augment option.
+* When using an Nvidia GPU, set the --precision option to 16 to use automatic mixed precision (AMP). This can provide significant speedup without any loss in accuracy.
+* Use option -B to scale batch size until GPU utilization reaches 100%. When using a larger batch size, it is recommended to use option -r to scale the learning rate by the square root of the batch size (1e-3 * sqrt(batch_size)).
+* When fine-tuning, it is recommended to use both mode not add as the network will rapidly unlearn missing labels in the new dataset.
+* If the new dataset is fairly dissimilar or your base model has been pretrained with ketos pretrain, use --warmup in conjunction with --freeze-backbone for one 1 or 2 epochs.
+* Upload your models to the model repository.
+
+Segmentation model training
+~~~~~~~~~~~~~~~~~~~~
+
+* The segmenter is fairly robust when it comes to hyperparameter choice.
+* Start by finetuning from the default model for a fixed number of epochs (50 for reasonably sized datasets) with a cosine schedule.
+* Segmentation models' performance are difficult to evaluate. Pixel accuracy doesn't mean much because there are many more pixels that aren't part of a line or region than just background. Frequency-weighted IoU is good for overall performance, while mean IoU overrepresents rare classes. The best way to evaluate segmentation models is to look at the output on unlabelled data.
+* If you don't have rare classes you can use a fairly small validation set to make sure everything is converging and just visually validate on unlabelled data.
+
 Training data formats
 ---------------------
 
