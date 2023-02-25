@@ -79,9 +79,9 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
 @click.option('-d', '--device', show_default=True, default='cpu', help='Select device to use (cpu, cuda:0, cuda:1, ...)')
 @click.option('--precision',
               show_default=True,
-              default='16',
+              default='32',
               type=click.Choice(['64', '32', 'bf16', '16']),
-              help='Numerical precision to use for training. Default is 16-bit mixed precision.')
+              help='Numerical precision to use for training. Default is 32-bit single-point precision.')
 @click.option('--optimizer',
               show_default=True,
               default=RECOGNITION_PRETRAIN_HYPER_PARAMS['optimizer'],
