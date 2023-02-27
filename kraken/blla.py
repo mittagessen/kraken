@@ -51,7 +51,8 @@ logger = logging.getLogger(__name__)
 def compute_segmentation_map(im: PIL.Image.Image,
                              mask: Optional[np.ndarray] = None,
                              model: vgsl.TorchVGSLModel = None,
-                             device: str = 'cpu') -> Dict[str, Any]:
+                             device: str = 'cpu',
+                             autocast: bool = False) -> Dict[str, Any]:
     """
     Args:
         im: Input image
@@ -60,6 +61,7 @@ def compute_segmentation_map(im: PIL.Image.Image,
               detection.
         model: A TorchVGSLModel containing a segmentation model.
         device: The target device to run the neural network on.
+        autocast: Runs the model with automatic mixed precision
 
     Returns:
         A dictionary containing the heatmaps ('heatmap', torch.Tensor), class
@@ -107,9 +109,11 @@ def compute_segmentation_map(im: PIL.Image.Image,
         logger.info('Masking enabled in segmenter.')
         tensor_im[~transforms(mask).bool()] = 0
 
-    with torch.no_grad():
-        logger.debug('Running network forward pass')
-        o, _ = model.nn(tensor_im.unsqueeze(0).to(device))
+    with torch.autocast(device_type=device.split(":")[0], enabled=autocast):
+        with torch.no_grad():
+            logger.debug('Running network forward pass')
+            o, _ = model.nn(tensor_im.unsqueeze(0).to(device))
+
     logger.debug('Upsampling network output')
     o = F.interpolate(o, size=scal_im.shape)
     # remove padding
@@ -120,6 +124,8 @@ def compute_segmentation_map(im: PIL.Image.Image,
     scal_im = scal_im[padding[2]:padding[3], padding[0]:padding[1]]
 
     o = o.squeeze().cpu().numpy()
+    if autocast:  # Required by SciPy
+        o = o.astype(dtype="float32")
     scale = np.divide(im.size, o.shape[:0:-1])
 
     bounding_regions = model.user_metadata['bounding_regions'] if 'bounding_regions' in model.user_metadata else None
@@ -249,7 +255,8 @@ def segment(im: PIL.Image.Image,
             reading_order_fn: Callable = polygonal_reading_order,
             model: Union[List[vgsl.TorchVGSLModel], vgsl.TorchVGSLModel] = None,
             device: str = 'cpu',
-            raise_on_error: bool = False) -> Dict[str, Any]:
+            raise_on_error: bool = False,
+            autocast: bool = False) -> Dict[str, Any]:
     r"""
     Segments a page into text lines using the baseline segmenter.
 
@@ -272,6 +279,7 @@ def segment(im: PIL.Image.Image,
         device: The target device to run the neural network on.
         raise_on_error: Raises error instead of logging them when they are
                         not-blocking
+        autocast: Runs the model with automatic mixed precision
 
     Returns:
         A dictionary containing the text direction and under the key 'lines' a
@@ -322,7 +330,7 @@ def segment(im: PIL.Image.Image,
                    True: 'top',
                    False: 'bottom'}[net.user_metadata['topline']]
             logger.debug(f'Baseline location: {loc}')
-        rets = compute_segmentation_map(im, mask, net, device)
+        rets = compute_segmentation_map(im, mask, net, device, autocast=autocast)
         regions = vec_regions(**rets)
         # flatten regions for line ordering/fetch bounding regions
         line_regs = []

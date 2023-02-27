@@ -159,7 +159,7 @@ def segmenter(legacy, model, text_direction, scale, maxcolseps, black_colseps,
                                   mask=mask)
         else:
             res = blla.segment(im, text_direction, mask=mask, model=model, device=device,
-                               raise_on_error=ctx.meta['raise_failed'])
+                               raise_on_error=ctx.meta['raise_failed'], autocast=ctx.meta["autocast"])
     except Exception:
         if ctx.meta['raise_failed']:
             raise
@@ -303,8 +303,10 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore, input,
               help='Select device to use (cpu, cuda:0, cuda:1, ...)')
 @click.option('-r', '--raise-on-error/--no-raise-on-error', default=False, show_default=True,
               help='Raises the exception that caused processing to fail in the case of an error')
+@click.option('-2', '--autocast', default=False, show_default=True, flag_value=True,
+              help='On compatible devices, uses autocast for `segment` which lower the memory usage.')
 def cli(input, batch_input, suffix, verbose, format_type, pdf_format,
-        serializer, template, device, raise_on_error):
+        serializer, template, device, raise_on_error, autocast):
     """
     Base command for recognition functionality.
 
@@ -333,6 +335,7 @@ def cli(input, batch_input, suffix, verbose, format_type, pdf_format,
         ctx.meta['output_template'] = template
     ctx.meta['verbose'] = verbose
     ctx.meta['steps'] = []
+    ctx.meta["autocast"] = autocast
     log.set_logger(logger, level=30 - min(10 * verbose, 20))
 
 
