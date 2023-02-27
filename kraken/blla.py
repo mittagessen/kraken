@@ -123,9 +123,7 @@ def compute_segmentation_map(im: PIL.Image.Image,
     o = o[:, :, padding[2]:padding[3], padding[0]:padding[1]]
     scal_im = scal_im[padding[2]:padding[3], padding[0]:padding[1]]
 
-    o = o.squeeze().cpu().numpy()
-    if autocast:  # Required by SciPy
-        o = o.astype(dtype="float32")
+    o = o.squeeze().cpu().float().numpy()
     scale = np.divide(im.size, o.shape[:0:-1])
 
     bounding_regions = model.user_metadata['bounding_regions'] if 'bounding_regions' in model.user_metadata else None
