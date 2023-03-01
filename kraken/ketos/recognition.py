@@ -271,7 +271,6 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
 
     try:
         accelerator, device = to_ptl_device(device)
-        breakpoint()
     except Exception as e:
         raise click.BadOptionUsage('device', str(e))
 
