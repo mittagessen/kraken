@@ -39,6 +39,8 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
 
 @click.command('rotrain')
 @click.pass_context
+@click.option('-B', '--batch-size', show_default=True, type=click.INT,
+              default=RECOGNITION_PRETRAIN_HYPER_PARAMS['batch_size'], help='batch sample size')
 @click.option('-o', '--output', show_default=True, type=click.Path(), default='model', help='Output model file')
 @click.option('-i', '--load', show_default=True, type=click.Path(exists=True,
               readable=True), help='Load existing file to continue training')
@@ -139,7 +141,7 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
 @click.option('--reading-order', show_default=True, default=None,
               help='Select reading order to train. Defaults to `line_implicit`/`region_implicit`')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
-def rotrain(ctx, output, load, freq, quit, epochs, min_epochs, lag,
+def rotrain(ctx, batch_size, output, load, freq, quit, epochs, min_epochs, lag,
             min_delta, device, precision, optimizer, lrate, momentum,
             weight_decay, warmup, schedule, gamma, step_size, sched_patience,
             cos_max, partition, training_files, evaluation_files, workers,
@@ -169,7 +171,8 @@ def rotrain(ctx, output, load, freq, quit, epochs, min_epochs, lag,
 
     # populate hyperparameters from command line args
     hyper_params = READING_ORDER_HYPER_PARAMS.copy()
-    hyper_params.update({'freq': freq,
+    hyper_params.update({'batch_size': batch_size,
+                         'freq': freq,
                          'quit': quit,
                          'epochs': epochs,
                          'min_epochs': min_epochs,
