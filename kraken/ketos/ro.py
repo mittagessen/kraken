@@ -40,7 +40,7 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
 @click.command('rotrain')
 @click.pass_context
 @click.option('-B', '--batch-size', show_default=True, type=click.INT,
-              default=RECOGNITION_PRETRAIN_HYPER_PARAMS['batch_size'], help='batch sample size')
+              default=READING_ORDER_HYPER_PARAMS['batch_size'], help='batch sample size')
 @click.option('-o', '--output', show_default=True, type=click.Path(), default='model', help='Output model file')
 @click.option('-i', '--load', show_default=True, type=click.Path(exists=True,
               readable=True), help='Load existing file to continue training')
