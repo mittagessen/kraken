@@ -49,7 +49,9 @@ class ROModel(pl.LightningModule):
                  partition: Optional[float] = 0.9,
                  num_workers: int = 1,
                  format_type: Literal['alto', 'page', 'xml'] = 'xml',
-                 load_hyper_parameters: bool = False):
+                 load_hyper_parameters: bool = False,
+                 level: Literal['baselines', 'regions'] = 'baselines',
+                 reading_order: Optional[str] = None):
         """
         A LightningModule encapsulating the unsupervised pretraining setup for
         a text recognition model.
@@ -90,8 +92,17 @@ class ROModel(pl.LightningModule):
             np.random.shuffle(training_data)
             training_data = training_data[:int(partition*len(training_data))]
             evaluation_data = training_data[int(partition*len(training_data)):]
-        self.train_set = ROSet(training_data, mode=format_type)
-        self.val_set = ROSet(evaluation_data, mode=format_type, class_mapping=self.train_set.class_mapping)
+        train_set = ROSet(training_data,
+                          mode=format_type,
+                          level=level,
+                          ro_id=reading_order)
+        self.train_set = Subset(train_set, range(len(train_set)))
+        val_set = ROSet(evaluation_data,
+                        mode=format_type,
+                        class_mapping=train_set.class_mapping,
+                        level=level,
+                        ro_id=reading_order)
+        self.val_set = Subset(val_set, range(len(val_set)))
 
         if len(self.train_set) == 0 or len(self.val_set) == 0:
             raise ValueError('No valid training data was provided to the train '
@@ -106,11 +117,8 @@ class ROModel(pl.LightningModule):
 
         self.num_workers = num_workers
 
-        self.best_epoch = 0
-        self.best_metric = math.inf
-
         logger.info(f'Creating new RO model')
-        self.ro_net = torch.jit.script(MLP(self.train_set.get_feature_dim(), 128))
+        self.ro_net = torch.jit.script(MLP(train_set.get_feature_dim(), 128))
 
         if 'file_system' in torch.multiprocessing.get_all_sharing_strategies():
             logger.debug('Setting multiprocessing tensor sharing strategy to file_system')

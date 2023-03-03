@@ -155,4 +155,3 @@ class RichProgressBarTheme:
     time: Union[str, Style] = DEFAULT_STYLES['progress.elapsed']
     processing_speed: Union[str, Style] = DEFAULT_STYLES['progress.data.speed']
     metrics: Union[str, Style] = DEFAULT_STYLES['progress.description']
-

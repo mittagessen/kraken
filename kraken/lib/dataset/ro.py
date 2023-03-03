@@ -49,8 +49,8 @@ class ROSet(Dataset):
     """
     def __init__(self, files: Sequence[Union[PathLike, str]] = None,
                  mode: Optional[Literal['alto', 'page', 'xml']] = 'path',
-                 ro_type: Literal['region', 'line'] = 'line',
-                 ro_id: str = 'line_implicit',
+                 level: Literal['regions', 'baselines'] = 'baselines',
+                 ro_id: Optional[str] = None,
                  class_mapping: Optional[Dict[str, int]] = None):
         """
         Samples pairs lines/regions from XML files for training a reading order
@@ -61,11 +61,13 @@ class ROSet(Dataset):
                   mode the baseline paths and image data is retrieved from an
                   ALTO/PageXML file. In `None` mode data is iteratively added
                   through the `add` method.
-            ro_id: ID of the reading order to sample from.
+            ro_id: ID of the reading order to sample from. Defaults to
+                   `line_implicit`/`region_implicit`.
         """
         super().__init__()
 
         self._num_pairs = 0
+        self.failed_samples = []
         if class_mapping:
             self.class_mapping = class_mapping
             self.num_classes = len(class_mapping) + 1
@@ -90,12 +92,16 @@ class ROSet(Dataset):
             for file in files:
                 try:
                     doc = XMLPage(file, filetype=mode)
-                    if ro_type == 'line':
+                    if level == 'baselines':
+                        if not ro_id:
+                            ro_id = 'line_implicit'
                         order = doc.get_sorted_lines(ro_id)
-                    elif ro_type == 'region':
+                    elif level == 'regions':
+                        if not ro_id:
+                            ro_id = 'region_implicit'
                         order = doc.get_sorted_regions(ro_id)
                     else:
-                        raise ValueError(f'Invalid RO type {ro_type}')
+                        raise ValueError(f'Invalid RO type {level}')
                     # traverse RO and substitute features.
                     h,w  = Image.open(doc.imagename).size
                     sorted_lines = []
