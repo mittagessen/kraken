@@ -282,7 +282,6 @@ def pretrain(ctx, batch_size, pad, output, spec, load, freq, quit, epochs,
                             enable_progress_bar=True if not ctx.meta['verbose'] else False,
                             deterministic=ctx.meta['deterministic'],
                             failed_sample_threshold=failed_sample_threshold,
-                            pb_ignored_metrics=(),
                             **val_check_interval)
     trainer.fit(model, datamodule=data_module)
 

@@ -152,8 +152,7 @@ class KrakenTrainProgressBar(ProgressBarBase):
     def __init__(self,
                  refresh_rate: int = 1,
                  leave: bool = True,
-                 console_kwargs: Optional[Dict[str, Any]] = None,
-                 ignored_metrics=('loss', 'val_metric')) -> None:
+                 console_kwargs: Optional[Dict[str, Any]] = None) -> None:
         super().__init__()
         self._refresh_rate: int = refresh_rate
         self._leave: bool = leave
@@ -164,7 +163,6 @@ class KrakenTrainProgressBar(ProgressBarBase):
         self._reset_progress_bar_ids()
         self._metric_component = None
         self._progress_stopped: bool = False
-        self.ignored_metrics = ignored_metrics
 
     @property
     def refresh_rate(self) -> float:
@@ -341,8 +339,6 @@ class KrakenTrainProgressBar(ProgressBarBase):
 
     def _update_metrics(self, trainer, pl_module) -> None:
         metrics = self.get_metrics(trainer, pl_module)
-        for x in self.ignored_metrics:
-            metrics.pop(x, None)
         if self._metric_component:
             self._metric_component.update(metrics)
 

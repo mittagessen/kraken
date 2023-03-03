@@ -64,7 +64,6 @@ class KrakenTrainer(pl.Trainer):
                  enable_summary: bool = True,
                  min_epochs: int = 5,
                  max_epochs: int = 100,
-                 pb_ignored_metrics: Sequence[str] = ('loss', 'val_metric'),
                  move_metrics_to_cpu: bool = True,
                  freeze_backbone=-1,
                  failed_sample_threshold=10,
@@ -87,7 +86,7 @@ class KrakenTrainer(pl.Trainer):
             kwargs['callbacks'] = [kwargs['callbacks']]
 
         if enable_progress_bar:
-            progress_bar_cb = progress.KrakenTrainProgressBar(ignored_metrics=pb_ignored_metrics)
+            progress_bar_cb = progress.KrakenTrainProgressBar()
             kwargs['callbacks'].append(progress_bar_cb)
 
         if enable_summary:

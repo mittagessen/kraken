@@ -26,7 +26,9 @@ import torch.nn.functional as F
 import pytorch_lightning as pl
 
 from os import PathLike
-from typing import Dict, Optional, Sequence, Union, Any, Literal
+from dataclasses import dataclass, field
+from torch.nn import Module
+from typing import Dict, Optional, Sequence, Union, Any, Literal, List
 
 from kraken.lib import vgsl, default_specs, layers
 from kraken.lib.dataset import ROSet
@@ -38,12 +40,26 @@ from torch.utils.data import DataLoader, random_split, Subset
 
 logger = logging.getLogger(__name__)
 
+@dataclass
+class DummyVGSLModel:
+    hyper_params: Dict[str, int] = field(default_factory=dict)
+    user_metadata: Dict[str, List] = field(default_factory=dict)
+    one_channel_mode: Literal['1', 'L']  = '1'
+    ptl_module: Module = None
+    model_type: str = 'unknown'
+
+    def __post_init__(self):
+        self.hyper_params: Dict[str, int] = {'completed_epochs': 0}
+        self.user_metadata: Dict[str, List] = {'accuracy': [], 'metrics': []}
+
+    def save_model(self, filename):
+        self.ptl_module.save_checkpoint(filename)
+
 
 class ROModel(pl.LightningModule):
     def __init__(self,
                  hyper_params: Dict[str, Any] = None,
                  output: str = 'model',
-                 model: Optional[Union[PathLike, str]] = None,
                  training_data: Union[Sequence[Union[PathLike, str]], Sequence[Dict[str, Any]]] = None,
                  evaluation_data: Optional[Union[Sequence[Union[PathLike, str]], Sequence[Dict[str, Any]]]] = None,
                  partition: Optional[float] = 0.9,
@@ -69,20 +85,6 @@ class ROModel(pl.LightningModule):
         """
         super().__init__()
         hyper_params_ = default_specs.READING_ORDER_HYPER_PARAMS
-        if model:
-            logger.info(f'Loading existing model from {model} ')
-            self.nn = vgsl.TorchVGSLModel.load_model(model)
-
-            if self.nn.model_type not in [None, 'segmentation']:
-                raise ValueError(f'Model {model} is of type {self.nn.model_type} while `segmentation` is expected.')
-
-            if load_hyper_parameters:
-                hp = self.nn.hyper_params
-            else:
-                hp = {}
-            hyper_params_.update(hp)
-        else:
-            self.ro_net = None
 
         if hyper_params:
             hyper_params_.update(hyper_params)
@@ -111,7 +113,6 @@ class ROModel(pl.LightningModule):
         logger.info(f'Training set {len(self.train_set)} lines, validation set '
                     f'{len(self.val_set)} lines')
 
-        self.model = model
         self.output = output
         self.criterion = torch.nn.BCELoss()
 
@@ -124,7 +125,7 @@ class ROModel(pl.LightningModule):
             logger.debug('Setting multiprocessing tensor sharing strategy to file_system')
             torch.multiprocessing.set_sharing_strategy('file_system')
 
-        logger.info('Encoding training set')
+        self.nn = DummyVGSLModel(ptl_module=self)
 
     def forward(self, x):
         return self.ro_net(x)
@@ -133,7 +134,7 @@ class ROModel(pl.LightningModule):
         x, y = batch['sample'], batch['target']
         yhat = self.ro_net(x)
         loss = self.criterion(yhat.squeeze(), y)
-        self.log('loss', loss)
+        self.log('val_metric', loss)
         return loss
 
     def training_step(self, batch, batch_idx):
@@ -160,3 +161,6 @@ class ROModel(pl.LightningModule):
                           batch_size=self.hparams.batch_size,
                           num_workers=self.num_workers,
                           pin_memory=True)
+
+    def save_checkpoint(self, filename):
+        self.trainer.save_checkpoint(filename)
