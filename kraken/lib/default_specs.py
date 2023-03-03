@@ -19,6 +19,29 @@ Default VGSL specs and hyperparameters
 SEGMENTATION_SPEC = '[1,1800,0,3 Cr7,7,64,2,2 Gn32 Cr3,3,128,2,2 Gn32 Cr3,3,128 Gn32 Cr3,3,256 Gn32 Cr3,3,256 Gn32 Lbx32 Lby32 Cr1,1,32 Gn32 Lby32 Lbx32]' # NOQA
 RECOGNITION_SPEC = '[1,120,0,1 Cr3,13,32 Do0.1,2 Mp2,2 Cr3,13,32 Do0.1,2 Mp2,2 Cr3,9,64 Do0.1,2 Mp2,2 Cr3,9,64 Do0.1,2 S1(1x0)1,3 Lbx200 Do0.1,2 Lbx200 Do0.1,2 Lbx200 Do]' # NOQA
 
+READING_ORDER_HYPER_PARAMS = {'lrate': 0.001,
+                              'freq': 1.0,
+                              'batch_size': 15000,
+                              'epochs': 3000,
+                              'lag': 300,
+                              'quit': 'early',
+                              'optimizer': 'Adam',
+                              'momentum': 0.9,
+                              'weight_decay': 0.01,
+                              'schedule': 'cosine',
+                              'completed_epochs': 0,
+                              # lr scheduler params
+                              # step/exp decay
+                              'step_size': 10,
+                              'gamma': 0.1,
+                              # reduce on plateau
+                              'rop_factor': 0.1,
+                              'rop_patience': 5,
+                              # cosine
+                              'cos_t_max': 100,
+                              'warmup': 0,
+                              }
+
 RECOGNITION_PRETRAIN_HYPER_PARAMS = {'pad': 16,
                                      'freq': 1.0,
                                      'batch_size': 64,

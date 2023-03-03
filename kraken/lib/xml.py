@@ -725,6 +725,8 @@ class XMLPage(object):
             valid_tr_lo = True
 
             for region in regions:
+                if not any([True if region.tag.endswith(k) else False for k in page_regions.keys()]):
+                    continue
                 coords = region.find('./{*}Coords')
                 if coords is not None and not coords.get('points').isspace() and len(coords.get('points')):
                     try:
@@ -841,8 +843,6 @@ class XMLPage(object):
                # UnorderedGroup at top-level => treated as multiple reading orders
                if len(reading_orders) == 1 and reading_orders[0].tag.endswith('UnorderedGroup'):
                     reading_orders = reading_orders.getchildren()
-               else:
-                   reading_orders = [reading_orders]
                def _parse_group(el):
                    _ro = []
                    if el.tag.endswith('UnorderedGroup'):
@@ -888,7 +888,7 @@ class XMLPage(object):
         def _traverse_ro(el):
             _ro = []
             if isinstance(el, list):
-                _ro.append([_traverse_ro(x) for x in el])
+                _ro = [_traverse_ro(x) for x in el]
             else:
                 # if line directly append to ro
                 if el in self.lines:
@@ -915,7 +915,7 @@ class XMLPage(object):
         def _traverse_ro(el):
             _ro = []
             if isinstance(el, list):
-                _ro.append([_traverse_ro(x) for x in el])
+                _ro = [_traverse_ro(x) for x in el]
             else:
                 # if region directly append to ro
                 if el in regions.keys():
