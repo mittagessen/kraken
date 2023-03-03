@@ -84,11 +84,9 @@ class ROModel(pl.LightningModule):
             **kwargs: Setup parameters, i.e. CLI parameters of the train() command.
         """
         super().__init__()
-        hyper_params_ = default_specs.READING_ORDER_HYPER_PARAMS
-
+        self.hyper_params = default_specs.READING_ORDER_HYPER_PARAMS
         if hyper_params:
-            hyper_params_.update(hyper_params)
-        self.save_hyperparameters(hyper_params_)
+            self.hyper_params.update(hyper_params)
 
         if not evaluation_data:
             np.random.shuffle(training_data)
@@ -118,6 +116,9 @@ class ROModel(pl.LightningModule):
 
         self.num_workers = num_workers
 
+        self.best_epoch = -1
+        self.best_metric = torch.inf
+
         logger.info(f'Creating new RO model')
         self.ro_net = torch.jit.script(MLP(train_set.get_feature_dim(), 128))
 
@@ -126,6 +127,8 @@ class ROModel(pl.LightningModule):
             torch.multiprocessing.set_sharing_strategy('file_system')
 
         self.nn = DummyVGSLModel(ptl_module=self)
+
+        self.save_hyperparameters()
 
     def forward(self, x):
         return self.ro_net(x)
@@ -137,6 +140,15 @@ class ROModel(pl.LightningModule):
         self.log('val_metric', loss)
         return loss
 
+    def validation_epoch_end(self, outputs):
+        val_metric = np.mean([x.cpu() for x in outputs])
+        if val_metric < self.best_metric:
+            logger.debug(f'Updating best metric from {self.best_metric} ({self.best_epoch}) to {val_metric} ({self.current_epoch})')
+            self.best_epoch = self.current_epoch
+            self.best_metric = val_metric
+        logger.info(f'validation run: val_metric {val_metric}')
+        self.log('val_metric', val_metric, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+
     def training_step(self, batch, batch_idx):
         x, y = batch['sample'], batch['target']
         yhat = self.ro_net(x)
@@ -145,20 +157,20 @@ class ROModel(pl.LightningModule):
         return loss
 
     def configure_optimizers(self):
-        return _configure_optimizer_and_lr_scheduler(self.hparams,
+        return _configure_optimizer_and_lr_scheduler(self.hparams.hyper_params,
                                                      self.ro_net.parameters(),
                                                      len_train_set=len(self.train_set),
                                                      loss_tracking_mode='min')
 
     def train_dataloader(self):
         return DataLoader(self.train_set,
-                          batch_size=self.hparams.batch_size,
+                          batch_size=self.hyper_params['batch_size'],
                           num_workers=self.num_workers,
                           pin_memory=True)
 
     def val_dataloader(self):
         return DataLoader(self.val_set,
-                          batch_size=self.hparams.batch_size,
+                          batch_size=self.hyper_params['batch_size'],
                           num_workers=self.num_workers,
                           pin_memory=True)
 
