@@ -142,7 +142,7 @@ option                                                  action
 -F, \--savefreq                                         Model save frequency in epochs during
                                                         training
 -q, \--quit                                             Stop condition for training. Set to `early`
-                                                        for early stopping (default) or `dumb` for fixed
+                                                        for early stopping (default) or `fixed` for fixed
                                                         number of epochs.
 -N, \--epochs                                           Number of epochs to train for.
 \--min-epochs                                           Minimum number of epochs to train for when using early stopping.

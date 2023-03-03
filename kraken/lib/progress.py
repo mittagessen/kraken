@@ -248,7 +248,7 @@ class KrakenTrainProgressBar(ProgressBarBase):
 
         total_batches = total_train_batches + total_val_batches
 
-        train_description = f"stage {trainer.current_epoch}/{trainer.max_epochs if pl_module.hparams.quit == 'dumb' else '∞'}"
+        train_description = f"stage {trainer.current_epoch}/{trainer.max_epochs if pl_module.hparams.quit == 'fixed' else '∞'}"
         if len(self.validation_description) > len(train_description):
             # Padding is required to avoid flickering due of uneven lengths of "Epoch X"
             # and "Validation" Bar description
