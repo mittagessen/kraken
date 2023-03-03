@@ -817,6 +817,85 @@ def is_in_region(line, region) -> bool:
     return region.contains(l_obj)
 
 
+def neural_reading_order(lines: Sequence[Tuple[List[Tuple[int, int]], List[Tuple[int, int]]]],
+                         im_size: Tuple[int, int],
+                         model):
+    """
+    Given a list of baselines and regions, calculates the correct reading order
+    and applies it to the input.
+
+    Args:
+        lines: List of tuples containing the baseline and its polygonization.
+        model: torch Module for 
+
+    Returns:
+        A reordered input.
+    """
+    # construct all possible pairs
+    h, w = im_size
+    features = []
+    for i in lines:
+        for j in lines:
+            if i == j and len(children) != 1:
+                continue
+            line_coords_i = np.array(i) / (w, h)
+            line_center_i = np.mean(line_coords_i, axis=0)
+            line_coords_j = np.array(j) / (w, h)
+            line_center_j = np.mean(line_coords_j, axis=0)
+            features.append(torch.cat((cl_i,
+                                       torch.tensor(line_center_i, dtype=torch.float),  # lin
+                                       torch.tensor(line_coords_i[0, :], dtype=torch.float),
+                                       torch.tensor(line_coords_i[-1, :], dtype=torch.float),
+                                       cl_j,
+                                       torch.tensor(line_center_j, dtype=torch.float),  # lin
+                                       torch.tensor(line_coords_j[0, :], dtype=torch.float),
+                                       torch.tensor(line_coords_j[-1, :], dtype=torch.float))))
+    features = torch.cat(features)
+    output = model(features)
+    order = torch.zeros((len(lines), len(lines)))
+    idx = 0
+    for i in enumerate(lines):
+        for j in enumerate(lines):
+            order[i, j] = output[idx]
+            idx += 1
+    # decode order relation matrix 
+    path = _greedy_order_decoder(order)
+    return ordered_lines
+
+
+def _greedy_order_decoder(P):
+    """
+    A greedy decoder of order-relation matrix. For each position in the
+    reading order we select the most probable one, then move to the next
+    position. Most probable for position:
+    z^{\star}_t = \argmax_{(s,\nu) \ni z^{\star}}
+        \prod_{(s',\nu') \in z^\star}{\tilde{P}(Y=1\mid s',s)}
+        \times \prod_{\substack{(s'',\nu'') \ni z^\star\\
+         s'' \ne s}}{\tilde{P}(r=0\mid s'',s)}, 1\le t \le n
+    """
+    A = P + torch.finfo(torch.float).eps
+    N = P.shape[0]
+    A = (A + (1-A).T)/2
+    for i in range(A.shape[0]):
+        A[i,i] = torch.finfo(torch.float).eps
+    best_path = []
+    #--- use log(p(R\mid s',s)) to shift multiplication to sum
+    lP = torch.log(A)
+    for i in range(N):
+        lP[i,i] = 0
+    for t in range(N):
+        #print(lP)
+        #print("----------------------")
+        for i in range(N):
+            idx = torch.argmax(lP.sum(axis=1))
+            if idx not in best_path:
+                best_path.append(idx)
+                lP[idx,:] = lP[:,idx]
+                lP[:,idx] = 0
+                break
+    return best_path
+
+
 def scale_regions(regions: Sequence[Tuple[List[int], List[int]]],
                   scale: Union[float, Tuple[float, float]]) -> Sequence[Tuple[List, List]]:
     """
