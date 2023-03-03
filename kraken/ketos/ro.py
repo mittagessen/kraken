@@ -209,16 +209,25 @@ def rotrain(ctx, output, load, freq, quit, epochs, min_epochs, lag,
     else:
         val_check_interval = {'val_check_interval': hyper_params['freq']}
 
-    model = ROModel(hyper_params,
-                    output=output,
-                    training_data=ground_truth,
-                    evaluation_data=evaluation_files,
-                    partition=partition,
-                    num_workers=workers,
-                    load_hyper_parameters=load_hyper_parameters,
-                    format_type=format_type,
-                    level=level,
-                    reading_order=reading_order)
+    if load:
+        model = ROModel.load_from_checkpoint(load,
+                                             training_data=ground_truth,
+                                             evaluation_data=evaluation_files,
+                                             partition=partition,
+                                             num_workers=workers,
+                                             load_hyper_parameters=load_hyper_parameters,
+                                             format_type=format_type)
+    else:
+        model = ROModel(hyper_params,
+                        output=output,
+                        training_data=ground_truth,
+                        evaluation_data=evaluation_files,
+                        partition=partition,
+                        num_workers=workers,
+                        load_hyper_parameters=load_hyper_parameters,
+                        format_type=format_type,
+                        level=level,
+                        reading_order=reading_order)
 
     message(f'Training RO on following {level} types:')
     for k, v in model.train_set.dataset.class_mapping.items():
