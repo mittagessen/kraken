@@ -211,7 +211,6 @@ def rotrain(ctx, output, load, freq, quit, epochs, min_epochs, lag,
 
     model = ROModel(hyper_params,
                     output=output,
-                    model=load,
                     training_data=ground_truth,
                     evaluation_data=evaluation_files,
                     partition=partition,
