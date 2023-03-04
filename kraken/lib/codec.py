@@ -65,6 +65,7 @@ class PytorchCodec(object):
             self.c2l = {k: [v] for v, k in enumerate(sorted(charset), start=1)}
         self.c_sorted = sorted(self.c2l.keys(), key=len, reverse=True)
         self.l2c = {tuple(v): k for k, v in self.c2l.items()}  # type: Dict[Tuple[int], str]
+        self.l2c_single = {k[0]: v for k, v in self.l2c.items() if len(k) == 1}
         self.strict = strict
         if not self.is_valid:
             raise KrakenCodecException('Codec is not valid (non-singular/non-prefix free).')
@@ -157,15 +158,24 @@ class PytorchCodec(object):
         idx = 0
         while idx < len(labels):
             decodable_suffix = False
-            for code in self.l2c.keys():
-                if code == labels[idx:idx+len(code)]:
-                    decoded.extend([(c, s, e, u) for c, s, e, u in zip(self.l2c[code],
-                                                                       len(self.l2c[code]) * [start[idx]],
-                                                                       len(self.l2c[code]) * [end[idx + len(code) - 1]],
-                                                                       len(self.l2c[code]) * [np.mean(con[idx:idx + len(code)])])])
-                    idx += len(code)
-                    decodable_suffix = True
-                    break
+            if int(labels[idx]) in self.l2c_single:
+                code = self.l2c_single[int(labels[idx])]
+                decoded.extend([(c, s, e, u) for c, s, e, u in zip(code,
+                                                                    len(code) * [start[idx]],
+                                                                    len(code) * [end[idx]],
+                                                                    len(code) * [con[idx]])])
+                idx += 1
+                decodable_suffix = True
+            else:
+                for code in self.l2c.keys():
+                    if code == labels[idx:idx+len(code)]:
+                        decoded.extend([(c, s, e, u) for c, s, e, u in zip(self.l2c[code],
+                                                                           len(self.l2c[code]) * [start[idx]],
+                                                                           len(self.l2c[code]) * [end[idx + len(code) - 1]],
+                                                                           len(self.l2c[code]) * [np.mean(con[idx:idx + len(code)])])])
+                        idx += len(code)
+                        decodable_suffix = True
+                        break
             if not decodable_suffix:
                 if self.strict:
                     raise KrakenEncodeException(f'Non-decodable sequence {labels[idx:idx+5]}... encountered.')
