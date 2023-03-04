@@ -65,11 +65,10 @@ class PytorchCodec(object):
             self.c2l = {k: [v] for v, k in enumerate(sorted(charset), start=1)}
         self.c_sorted = sorted(self.c2l.keys(), key=len, reverse=True)
         self.l2c = {tuple(v): k for k, v in self.c2l.items()}  # type: Dict[Tuple[int], str]
+        self.l2c_single = {k[0]: v for k, v in self.l2c.items() if len(k) == 1}
         self.strict = strict
         if not self.is_valid:
             raise KrakenCodecException('Codec is not valid (non-singular/non-prefix free).')
-        
-        self.l2c_single = {k[0]: v for k, v in self.l2c.items() if len(k) == 1}
 
     def __len__(self) -> int:
         """
@@ -164,7 +163,7 @@ class PytorchCodec(object):
                 decoded.extend([(c, s, e, u) for c, s, e, u in zip(code,
                                                                     len(code) * [start[idx]],
                                                                     len(code) * [end[idx]],
-                                                                    len(code) * [np.mean(con[idx:idx + 1])])])
+                                                                    len(code) * [con[idx]])])
                 idx += 1
                 decodable_suffix = True
             else:
