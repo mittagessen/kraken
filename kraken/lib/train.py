@@ -522,55 +522,39 @@ class RecognitionModel(pl.LightningModule):
 
                 try:
                     self.train_set.dataset.encode(codec)
-                    self.val_set.dataset.encode(self.train_set.dataset.codec)
-                    self.val_codec = self.val_set.dataset.codec
                 except KrakenEncodeException:
                     alpha_diff = set(self.train_set.dataset.alphabet).difference(
-                        set(codec.c2l.keys())
-                    )
-                    alpha_diff_val = set(self.val_set.dataset.alphabet).difference(
                         set(codec.c2l.keys())
                     )
                     if self.resize == 'fail':
                         raise KrakenInputException(f'Training data and model codec alphabets mismatch: {alpha_diff}')
                     elif self.resize == 'add':
                         logger.info(f'Resizing codec to include '
-                                    f'{len(alpha_diff.union(alpha_diff_val))} new code points')
+                                    f'{len(alpha_diff)} new code points')
                         # Construct two codecs:
                         # 1. training codec containing only the vocabulary in the training dataset
                         # 2. validation codec = training codec + validation set vocabulary
                         # This keep the codec in the model from being 'polluted' by non-trained characters.
                         train_codec = codec.add_labels(alpha_diff)
-                        val_codec = train_codec.add_labels(alpha_diff.difference(alpha_diff_val))
-
                         self.nn.add_codec(train_codec)
                         logger.info(f'Resizing last layer in network to {codec.max_label+1} outputs')
                         self.nn.resize_output(codec.max_label + 1)
                         self.train_set.dataset.encode(train_codec)
-                        self.val_set.dataset.encode(val_codec)
-                        self.val_codec = val_codec
                     elif self.resize == 'both':
                         logger.info(f'Resizing network or given codec to '
-                                    f'{len(self.train_set.dataset.alphabet)+len(self.val_set.dataset.alphabet)} '
+                                    f'{len(self.train_set.dataset.alphabet) '
                                     f'code sequences')
                         # same codec procedure as above, just with merging.
                         self.train_set.dataset.encode(None)
                         train_codec, del_labels = codec.merge(self.train_set.dataset.codec)
-                        val_diff = set(self.val_set.dataset.alphabet).difference(
-                            set(train_codec.c2l.keys())
-                        )
-                        val_codec = train_codec.add_labels(val_diff)
                         # Switch codec.
                         self.nn.add_codec(train_codec)
                         logger.info(f'Deleting {len(del_labels)} output classes from network '
                                     f'({len(codec)-len(del_labels)} retained)')
                         self.nn.resize_output(train_codec.max_label + 1, del_labels)
                         self.train_set.dataset.encode(train_codec)
-                        self.val_set.dataset.encode(val_codec)
-                        self.val_codec = val_codec
                     else:
                         raise ValueError(f'invalid resize parameter value {self.resize}')
-
                 self.nn.codec.strict = False
             else:
                 self.train_set.dataset.encode(self.codec)
@@ -580,13 +564,15 @@ class RecognitionModel(pl.LightningModule):
                 # initialize weights
                 self.nn.init_weights()
                 self.nn.add_codec(self.train_set.dataset.codec)
-                # same procedure as above
-                val_diff = set(self.val_set.dataset.alphabet).difference(
-                    set(self.train_set.dataset.codec.c2l.keys())
-                )
-                val_codec = self.nn.codec.add_labels(val_diff)
-                self.val_set.dataset.encode(val_codec)
-                self.val_codec = val_codec
+
+            val_diff = set(self.val_set.dataset.alphabet).difference(
+                set(self.train_set.dataset.codec.c2l.keys())
+            )
+            logger.info(f'Adding {len(val_diff)} dummy labels to validation set codec.')
+
+            val_codec = self.nn.codec.add_labels(val_diff)
+            self.val_set.dataset.encode(val_codec)
+            self.val_codec = val_codec
 
             if self.nn.one_channel_mode and self.train_set.dataset.im_mode != self.nn.one_channel_mode:
                 logger.warning(f'Neural network has been trained on mode {self.nn.one_channel_mode} images, '
