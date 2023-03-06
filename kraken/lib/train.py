@@ -522,6 +522,8 @@ class RecognitionModel(pl.LightningModule):
 
                 try:
                     self.train_set.dataset.encode(codec)
+                    self.val_set.dataset.encode(self.train_set.dataset.codec)
+                    self.val_codec = self.val_set.dataset.codec
                 except KrakenEncodeException:
                     alpha_diff = set(self.train_set.dataset.alphabet).difference(
                         set(codec.c2l.keys())
