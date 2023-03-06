@@ -26,13 +26,17 @@ import torch.nn.functional as F
 import pytorch_lightning as pl
 
 from os import PathLike
+from torch.optim import lr_scheduler
 from dataclasses import dataclass, field
 from torch.nn import Module
 from typing import Dict, Optional, Sequence, Union, Any, Literal, List
 
+from pytorch_lightning.callbacks import EarlyStopping, LearningRateMonitor
+
 from kraken.lib import vgsl, default_specs, layers
-from kraken.lib.dataset import ROSet
+from kraken.lib.dataset import PairWiseROSet, PageWiseROSet
 from kraken.lib.train import _configure_optimizer_and_lr_scheduler
+from kraken.lib.segmentation import _greedy_order_decoder
 from kraken.lib.ro.layers import MLP
 
 from torch.utils.data import DataLoader, random_split, Subset
@@ -54,6 +58,10 @@ class DummyVGSLModel:
 
     def save_model(self, filename):
         self.ptl_module.save_checkpoint(filename)
+
+
+def spearman_footrule_distance(s, t):
+    return (s - t).abs().sum() / (0.5 * (len(s) ** 2 - (len(s) % 2)))
 
 
 class ROModel(pl.LightningModule):
@@ -92,16 +100,16 @@ class ROModel(pl.LightningModule):
             np.random.shuffle(training_data)
             training_data = training_data[:int(partition*len(training_data))]
             evaluation_data = training_data[int(partition*len(training_data)):]
-        train_set = ROSet(training_data,
-                          mode=format_type,
-                          level=level,
-                          ro_id=reading_order)
+        train_set = PairWiseROSet(training_data,
+                                  mode=format_type,
+                                  level=level,
+                                  ro_id=reading_order)
         self.train_set = Subset(train_set, range(len(train_set)))
-        val_set = ROSet(evaluation_data,
-                        mode=format_type,
-                        class_mapping=train_set.class_mapping,
-                        level=level,
-                        ro_id=reading_order)
+        val_set = PageWiseROSet(evaluation_data,
+                                mode=format_type,
+                                class_mapping=train_set.class_mapping,
+                                level=level,
+                                ro_id=reading_order)
         self.val_set = Subset(val_set, range(len(val_set)))
 
         if len(self.train_set) == 0 or len(self.val_set) == 0:
@@ -134,20 +142,34 @@ class ROModel(pl.LightningModule):
         return self.ro_net(x)
 
     def validation_step(self, batch, batch_idx):
-        x, y = batch['sample'], batch['target']
-        yhat = self.ro_net(x)
-        loss = self.criterion(yhat.squeeze(), y)
-        self.log('val_metric', loss)
-        return loss
+        xs, ys, num_lines = batch['sample'], batch['target'], batch['num_lines']
+        yhat = self.ro_net(xs).squeeze()
+        order = torch.zeros((num_lines, num_lines))
+        idx = 0
+        for i in range(num_lines):
+            for j in range(num_lines):
+                if i != j:
+                    order[i, j] = yhat[idx]
+                    idx += 1
+        path = _greedy_order_decoder(order)
+        spearman_dist = spearman_footrule_distance(torch.tensor(range(num_lines)), path)
+        self.log('val_spearman', spearman_dist)
+        loss = self.criterion(yhat, ys.squeeze())
+        self.log('val_loss', loss)
+        return {'val_spearman': spearman_dist, 'val_loss': loss}
 
     def validation_epoch_end(self, outputs):
-        val_metric = np.mean([x.cpu() for x in outputs])
+        val_metric = np.mean([x['val_spearman'].cpu() for x in outputs])
+        val_loss = np.mean([x['val_loss'].cpu() for x in outputs])
+
         if val_metric < self.best_metric:
             logger.debug(f'Updating best metric from {self.best_metric} ({self.best_epoch}) to {val_metric} ({self.current_epoch})')
             self.best_epoch = self.current_epoch
             self.best_metric = val_metric
-        logger.info(f'validation run: val_metric {val_metric}')
-        self.log('val_metric', val_metric, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+        logger.info(f'validation run: val_spearman {val_metric} val_loss {val_loss}')
+        self.log('val_spearman', val_metric, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+        self.log('val_metric', val_metric, on_step=False, on_epoch=True, prog_bar=False, logger=True)
+        self.log('val_loss', val_loss, on_step=False, on_epoch=True, prog_bar=True, logger=True)
 
     def training_step(self, batch, batch_idx):
         x, y = batch['sample'], batch['target']
@@ -155,12 +177,6 @@ class ROModel(pl.LightningModule):
         loss = self.criterion(yhat.squeeze(), y)
         self.log('loss', loss)
         return loss
-
-    def configure_optimizers(self):
-        return _configure_optimizer_and_lr_scheduler(self.hparams.hyper_params,
-                                                     self.ro_net.parameters(),
-                                                     len_train_set=len(self.train_set),
-                                                     loss_tracking_mode='min')
 
     def train_dataloader(self):
         return DataLoader(self.train_set,
@@ -170,9 +186,58 @@ class ROModel(pl.LightningModule):
 
     def val_dataloader(self):
         return DataLoader(self.val_set,
-                          batch_size=self.hyper_params['batch_size'],
+                          batch_size=1,
                           num_workers=self.num_workers,
                           pin_memory=True)
 
     def save_checkpoint(self, filename):
         self.trainer.save_checkpoint(filename)
+
+    def configure_callbacks(self):
+        callbacks = []
+        if self.hparams.hyper_params['quit'] == 'early':
+            callbacks.append(EarlyStopping(monitor='val_metric',
+                                           mode='min',
+                                           patience=self.hparams.hyper_params['lag'],
+                                           stopping_threshold=0.0))
+        if self.hparams.hyper_params['pl_logger']:
+            callbacks.append(LearningRateMonitor(logging_interval='step'))
+        return callbacks
+
+    # configuration of optimizers and learning rate schedulers
+    # --------------------------------------------------------
+    #
+    # All schedulers are created internally with a frequency of step to enable
+    # batch-wise learning rate warmup. In lr_scheduler_step() calls to the
+    # scheduler are then only performed at the end of the epoch.
+    def configure_optimizers(self):
+        return _configure_optimizer_and_lr_scheduler(self.hparams.hyper_params,
+                                                     self.ro_net.parameters(),
+                                                     len_train_set=len(self.train_set),
+                                                     loss_tracking_mode='min')
+
+    def optimizer_step(self, epoch, batch_idx, optimizer, optimizer_idx,
+                       optimizer_closure, on_tpu=False, using_native_amp=False,
+                       using_lbfgs=False):
+        # update params
+        optimizer.step(closure=optimizer_closure)
+
+        # linear warmup between 0 and the initial learning rate `lrate` in `warmup`
+        # steps.
+        if self.hparams.hyper_params['warmup'] and self.trainer.global_step < self.hparams.hyper_params['warmup']:
+            lr_scale = min(1.0, float(self.trainer.global_step + 1) / self.hparams.hyper_params['warmup'])
+            for pg in optimizer.param_groups:
+                pg["lr"] = lr_scale * self.hparams.hyper_params['lrate']
+
+    def lr_scheduler_step(self, scheduler, optimizer_idx, metric):
+        if not self.hparams.hyper_params['warmup'] or self.trainer.global_step >= self.hparams.hyper_params['warmup']:
+            # step OneCycleLR each batch if not in warmup phase
+            if isinstance(scheduler, lr_scheduler.OneCycleLR):
+                scheduler.step()
+            # step every other scheduler epoch-wise
+            elif self.trainer.is_last_batch:
+                if metric is None:
+                    scheduler.step()
+                else:
+                    scheduler.step(metric)
+

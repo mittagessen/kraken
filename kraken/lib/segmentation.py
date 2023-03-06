@@ -16,6 +16,7 @@
 Processing for baseline segmenter output
 """
 import PIL
+import torch
 import logging
 import numpy as np
 import shapely.geometry as geom
@@ -33,7 +34,7 @@ from shapely.validation import explain_validity
 
 from skimage import draw, filters
 from skimage.graph import MCP_Connect
-from skimage.filters import apply_hysteresis_threshold, sobel
+from skimage.filters import sobel
 from skimage.measure import approximate_polygon, subdivide_polygon, regionprops, label
 from skimage.morphology import skeletonize
 from skimage.transform import PiecewiseAffineTransform, SimilarityTransform, AffineTransform, warp
@@ -50,7 +51,6 @@ from scipy.ndimage import gaussian_filter
 logger = logging.getLogger('kraken')
 
 __all__ = ['reading_order',
-           'denoising_hysteresis_thresh',
            'vectorize_lines',
            'calculate_polygonal_environment',
            'polygonal_reading_order',
@@ -129,11 +129,6 @@ def topsort(order: np.ndarray) -> List[int]:
     for k in range(n):
         _visit(k)
     return L
-
-
-def denoising_hysteresis_thresh(im, low, high, sigma):
-    im = gaussian_filter(im, sigma)
-    return apply_hysteresis_threshold(im, low, high)
 
 
 def moore_neighborhood(current, backtrack):
@@ -879,13 +874,11 @@ def _greedy_order_decoder(P):
     for i in range(A.shape[0]):
         A[i,i] = torch.finfo(torch.float).eps
     best_path = []
-    #--- use log(p(R\mid s',s)) to shift multiplication to sum
+    # use log(p(R\mid s',s)) to shift multiplication to sum
     lP = torch.log(A)
     for i in range(N):
         lP[i,i] = 0
     for t in range(N):
-        #print(lP)
-        #print("----------------------")
         for i in range(N):
             idx = torch.argmax(lP.sum(axis=1))
             if idx not in best_path:
@@ -893,7 +886,7 @@ def _greedy_order_decoder(P):
                 lP[idx,:] = lP[:,idx]
                 lP[:,idx] = 0
                 break
-    return best_path
+    return torch.tensor(best_path)
 
 
 def scale_regions(regions: Sequence[Tuple[List[int], List[int]]],

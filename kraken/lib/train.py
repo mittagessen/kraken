@@ -650,13 +650,13 @@ class RecognitionModel(pl.LightningModule):
 
         # linear warmup between 0 and the initial learning rate `lrate` in `warmup`
         # steps.
-        if self.hparams.hyper_params.warmup and self.trainer.global_step < self.hparams.hyper_params.warmup:
-            lr_scale = min(1.0, float(self.trainer.global_step + 1) / self.hparams.hyper_params.warmup)
+        if self.hparams.hyper_params['warmup'] and self.trainer.global_step < self.hparams.hyper_params['warmup']:
+            lr_scale = min(1.0, float(self.trainer.global_step + 1) / self.hparams.hyper_params['warmup'])
             for pg in optimizer.param_groups:
-                pg["lr"] = lr_scale * self.hparams.hyper_params.lrate
+                pg["lr"] = lr_scale * self.hparams.hyper_params['lrate']
 
     def lr_scheduler_step(self, scheduler, optimizer_idx, metric):
-        if not self.hparams.hyper_params.warmup or self.trainer.global_step >= self.hparams.hyper_params.warmup:
+        if not self.hparams.hyper_params['warmup'] or self.trainer.global_step >= self.hparams.hyper_params['warmup']:
             # step OneCycleLR each batch if not in warmup phase
             if isinstance(scheduler, lr_scheduler.OneCycleLR):
                 scheduler.step()
@@ -889,7 +889,7 @@ class SegmentationModel(pl.LightningModule):
         self.log('val_mean_acc', mean_accuracy, on_step=False, on_epoch=True, prog_bar=True, logger=True)
         self.log('val_mean_iu', mean_iu, on_step=False, on_epoch=True, prog_bar=True, logger=True)
         self.log('val_freq_iu', freq_iu, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-        self.log('val_metric', mean_iu, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+        self.log('val_metric', mean_iu, on_step=False, on_epoch=True, prog_bar=False, logger=True)
 
         self.val_px_accuracy.reset()
         self.val_mean_accuracy.reset()
