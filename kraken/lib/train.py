@@ -542,7 +542,7 @@ class RecognitionModel(pl.LightningModule):
                         self.train_set.dataset.encode(train_codec)
                     elif self.resize == 'both':
                         logger.info(f'Resizing network or given codec to '
-                                    f'{len(self.train_set.dataset.alphabet) '
+                                    f'{len(self.train_set.dataset.alphabet)} '
                                     f'code sequences')
                         # same codec procedure as above, just with merging.
                         self.train_set.dataset.encode(None)
