@@ -25,6 +25,7 @@ requirements:
      - cudatoolkit
      - jsonschema
      - scikit-image>=0.17.0,<=0.19.3
+     - scikit-learn>=1.2.1
      - shapely==1.8.5
      - pyvips
      - conda-forge::coremltools
