@@ -120,7 +120,7 @@ class ROModel(pl.LightningModule):
                     f'{len(self.val_set)} lines')
 
         self.output = output
-        self.criterion = torch.nn.BCELoss()
+        self.criterion = torch.nn.BCEWithLogitsLoss()
 
         self.num_workers = num_workers
 
@@ -139,11 +139,12 @@ class ROModel(pl.LightningModule):
         self.save_hyperparameters()
 
     def forward(self, x):
-        return self.ro_net(x)
+        return F.sigmoid(self.ro_net(x))
 
     def validation_step(self, batch, batch_idx):
         xs, ys, num_lines = batch['sample'], batch['target'], batch['num_lines']
-        yhat = self.ro_net(xs).squeeze()
+        logits = self.ro_net(xs).squeeze()
+        yhat = F.sigmoid(logits)
         order = torch.zeros((num_lines, num_lines))
         idx = 0
         for i in range(num_lines):
@@ -154,7 +155,7 @@ class ROModel(pl.LightningModule):
         path = _greedy_order_decoder(order)
         spearman_dist = spearman_footrule_distance(torch.tensor(range(num_lines)), path)
         self.log('val_spearman', spearman_dist)
-        loss = self.criterion(yhat, ys.squeeze())
+        loss = self.criterion(probits, ys.squeeze())
         self.log('val_loss', loss)
         return {'val_spearman': spearman_dist, 'val_loss': loss}
 
@@ -173,8 +174,8 @@ class ROModel(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         x, y = batch['sample'], batch['target']
-        yhat = self.ro_net(x)
-        loss = self.criterion(yhat.squeeze(), y)
+        logits = self.ro_net(x)
+        loss = self.criterion(logits.squeeze(), y)
         self.log('loss', loss)
         return loss
 
