@@ -155,7 +155,7 @@ class ROModel(pl.LightningModule):
         path = _greedy_order_decoder(order)
         spearman_dist = spearman_footrule_distance(torch.tensor(range(num_lines)), path)
         self.log('val_spearman', spearman_dist)
-        loss = self.criterion(probits, ys.squeeze())
+        loss = self.criterion(logits, ys.squeeze())
         self.log('val_loss', loss)
         return {'val_spearman': spearman_dist, 'val_loss': loss}
 
