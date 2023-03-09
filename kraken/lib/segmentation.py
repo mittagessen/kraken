@@ -821,7 +821,7 @@ def neural_reading_order(lines: Sequence[Tuple[List[Tuple[int, int]], List[Tuple
 
     Args:
         lines: List of tuples containing the baseline and its polygonization.
-        model: torch Module for 
+        model: torch Module for
 
     Returns:
         A reordered input.
