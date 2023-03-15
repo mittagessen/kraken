@@ -159,7 +159,7 @@ def build_binary_dataset(files: Optional[List[Union[str, PathLike, Dict]]] = Non
         for doc in files:
             try:
                 data = parse_fn(doc)
-            except KrakenInputException:
+            except (FileNotFoundError, KrakenInputException):
                 logger.warning(f'Invalid input file {doc}')
                 continue
             try:
