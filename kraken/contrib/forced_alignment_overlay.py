@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """
 Draws a transparent overlay of the forced alignment output over the input
-image. Needs OpenFST bindings installed.
+image.
 """
 import re
 import os

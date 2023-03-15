@@ -19,8 +19,7 @@ align
 ~~~~~
 
 A character alignment module using a network output lattice and ground truth to
-accuractely determine grapheme locations in input data. Requires OpenFST and
-either the official python bindings or pywrapfst.
+accuractely determine grapheme locations in input data.
 """
 import torch
 import logging
