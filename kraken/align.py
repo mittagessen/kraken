@@ -89,7 +89,11 @@ def forced_align(doc: Dict[str, Any], model: TorchSeqRecognizer, base_dir: Optio
         records.append(rpred.BaselineOCRRecord(pred, pos, conf, line, display_order=True))
     return records
 
-
+"""
+Copied from the forced alignment with Wav2Vec2 tutorial of pytorch available
+at:
+https://github.com/pytorch/audio/blob/main/examples/tutorials/forced_alignment_tutorial.py
+"""
 @dataclass
 class Point:
     token_index: int
