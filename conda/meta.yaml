@@ -16,21 +16,21 @@ requirements:
      - regex
      - requests
      - click>=8.1
-     - numpy<=1.23.99
+     - numpy~=1.23.0
      - pillow>=9.2.0
      - scipy
-     - jinja2>=3.0
+     - jinja2~=3.0
      - torchvision
      - pytorch>=1.12.0
      - cudatoolkit
      - jsonschema
      - scikit-image>=0.17.0,<=0.19.3
-     - scikit-learn>=1.2.1
+     - scikit-learn~=1.2.1
      - shapely==1.8.5
      - pyvips
      - conda-forge::coremltools
      - pyarrow
-     - pytorch-lightning>=1.7
+     - pytorch-lightning~=2.0
      - torchmetrics>=0.10.0
      - albumentations
      - rich
