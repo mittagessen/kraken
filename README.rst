@@ -156,7 +156,7 @@ kraken is developed at the `École Pratique des Hautes Études <http://ephe.fr>`
 
    .. container::
 
-      .. image:: https://www.gouvernement.fr/sites/default/files/styles/illustration-centre/public/contenu/illustration/2018/10/logo_investirlavenir_rvb.png
+      .. image:: https://projet.biblissima.fr/sites/default/files/2021-11/biblissima-baseline-sombre.png
          :width: 100
          :alt: Received funding from the Programme d’investissements d’Avenir
 
@@ -164,6 +164,6 @@ kraken is developed at the `École Pratique des Hautes Études <http://ephe.fr>`
 
         Ce travail a bénéficié d’une aide de l’État gérée par l’Agence Nationale de la
         Recherche au titre du Programme d’Investissements d’Avenir portant la référence
-        ANR-21-ESRE-0005.
+        ANR-21-ESRE-0005 (Biblissima+).
 
 
