@@ -156,7 +156,7 @@ kraken is developed at the `École Pratique des Hautes Études <http://ephe.fr>`
 
    .. container::
 
-      .. image:: https://projet.biblissima.fr/sites/default/files/2021-11/biblissima-baseline-sombre.png
+      .. image:: https://projet.biblissima.fr/sites/default/files/2021-11/biblissima-baseline-sombre-ia.png
          :width: 400
          :alt: Received funding from the Programme d’investissements d’Avenir
 
