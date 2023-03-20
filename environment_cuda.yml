@@ -14,7 +14,7 @@ dependencies:
   - scipy
   - jinja2~=3.0
   - conda-forge::torchvision
-  - conda-forge::pytorch>=1.7.1,<1.14
+  - conda-forge::pytorch>=1.11,<1.14
   - cudatoolkit>=9.2
   - jsonschema
   - scikit-learn~=1.2.1

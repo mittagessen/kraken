@@ -160,8 +160,6 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
               show_default=True,
               default=RECOGNITION_PRETRAIN_HYPER_PARAMS['augment'],
               help='Enable image augmentation')
-@click.option('--failed-sample-threshold', show_default=True, default=10,
-              help='Abort if more than `n` samples fail to load.')
 @click.option('-mw', '--mask-width', show_default=True,
               default=RECOGNITION_PRETRAIN_HYPER_PARAMS['mask_width'],
               help='Width of sampled masks at scale of the sampled tensor, e.g. '
@@ -185,7 +183,7 @@ def pretrain(ctx, batch_size, pad, output, spec, load, freq, quit, epochs,
              weight_decay, warmup, schedule, gamma, step_size, sched_patience,
              cos_max, partition, fixed_splits, training_files,
              evaluation_files, workers, load_hyper_parameters, repolygonize,
-             force_binarization, format_type, augment, failed_sample_threshold,
+             force_binarization, format_type, augment, 
              mask_probability, mask_width, num_negatives, logit_temp,
              ground_truth):
     """
@@ -281,7 +279,6 @@ def pretrain(ctx, batch_size, pad, output, spec, load, freq, quit, epochs,
                             min_epochs=hyper_params['min_epochs'],
                             enable_progress_bar=True if not ctx.meta['verbose'] else False,
                             deterministic=ctx.meta['deterministic'],
-                            failed_sample_threshold=failed_sample_threshold,
                             pb_ignored_metrics=(),
                             **val_check_interval)
     trainer.fit(model, datamodule=data_module)

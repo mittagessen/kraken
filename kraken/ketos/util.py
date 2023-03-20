@@ -55,7 +55,7 @@ def message(msg, **styles):
 
 def to_ptl_device(device: str) -> Tuple[str, Optional[List[int]]]:
     if any([device == x for x in ['cpu', 'mps']]):
-        return device, None
+        return device, 'auto'
     elif any([device.startswith(x) for x in ['tpu', 'cuda', 'hpu', 'ipu']]):
         dev, idx = device.split(':')
         if dev == 'cuda':

@@ -64,10 +64,7 @@ class KrakenTrainer(pl.Trainer):
                  enable_summary: bool = True,
                  min_epochs: int = 5,
                  max_epochs: int = 100,
-                 pb_ignored_metrics: Sequence[str] = ('loss', 'val_metric'),
-                 move_metrics_to_cpu: bool = True,
                  freeze_backbone=-1,
-                 failed_sample_threshold=10,
                  pl_logger: Optional[pl.loggers.logger.DummyLogger] = None,
                  log_dir: Optional[PathLike] = None,
                  *args,
@@ -82,12 +79,11 @@ class KrakenTrainer(pl.Trainer):
         kwargs['min_epochs'] = min_epochs
         kwargs['max_epochs'] = max_epochs
         kwargs['callbacks'] = ([] if 'callbacks' not in kwargs else kwargs['callbacks'])
-        kwargs['move_metrics_to_cpu'] = move_metrics_to_cpu
         if not isinstance(kwargs['callbacks'], list):
             kwargs['callbacks'] = [kwargs['callbacks']]
 
         if enable_progress_bar:
-            progress_bar_cb = progress.KrakenTrainProgressBar(ignored_metrics=pb_ignored_metrics)
+            progress_bar_cb = progress.KrakenTrainProgressBar()
             kwargs['callbacks'].append(progress_bar_cb)
 
         if enable_summary:
@@ -98,9 +94,6 @@ class KrakenTrainer(pl.Trainer):
 
         if freeze_backbone > 0:
             kwargs['callbacks'].append(KrakenFreezeBackbone(freeze_backbone))
-
-        if failed_sample_threshold > 0:
-            kwargs['callbacks'].append(FaultySampleStopping(failed_sample_threshold))
 
         kwargs['callbacks'].extend([KrakenSetOneChannelMode(), KrakenSaveModel()])
         super().__init__(*args, **kwargs)
@@ -164,35 +157,6 @@ class KrakenSetOneChannelMode(Callback):
             if im_mode in ['1', 'L']:
                 logger.info(f'Setting model one_channel_mode to {im_mode}.')
                 trainer.model.nn.one_channel_mode = im_mode
-
-
-class FaultySampleStopping(Callback):
-    """
-    Callback that aborts training if a preset number of samples failed to load
-    from the training/validation datasets.
-    """
-    def __init__(self, threshold:int = 10):
-        self.threshold = threshold
-
-    def on_train_batch_start(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule", batch, batch_idx) -> None:
-        ds = getattr(pl_module, 'train_set', None)
-        if not ds and trainer.datamodule:
-            ds = trainer.datamodule.train_set
-
-        if len(ds.dataset.failed_samples) > self.threshold:
-            logger.warning(f'At least {len(ds.dataset.failed_samples)} unloadable '
-                            'samples in training dataset. Aborting.')
-            trainer.should_stop = True
-
-    def on_validation_batch_start(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule", batch, batch_idx, dataloader_idx) -> None:
-        ds = getattr(pl_module, 'val_set', None)
-        if not ds and trainer.datamodule:
-            ds = trainer.datamodule.val_set
-
-        if len(ds.dataset.failed_samples) > self.threshold:
-            logger.warning(f'At least {len(ds.dataset.failed_samples)} unloadable '
-                            'samples in validation dataset. Aborting.')
-            trainer.should_stop = True
 
 
 class KrakenSaveModel(Callback):
@@ -486,8 +450,7 @@ class RecognitionModel(pl.LightningModule):
             idx += offset
         self.val_cer.update(pred, decoded_targets)
 
-    def validation_epoch_end(self, outputs):
-
+    def on_validation_epoch_end(self):
         self.val_cer.compute()
         accuracy = 1.0 - self.val_cer.compute()
 
@@ -632,9 +595,8 @@ class RecognitionModel(pl.LightningModule):
                                                      len_train_set=len(self.train_set),
                                                      loss_tracking_mode='max')
 
-    def optimizer_step(self, epoch, batch_idx, optimizer, optimizer_idx,
-                       optimizer_closure, on_tpu=False, using_native_amp=False,
-                       using_lbfgs=False):
+
+    def optimizer_step(self, epoch, batch_idx, optimizer, optimizer_closure):
         # update params
         optimizer.step(closure=optimizer_closure)
 
@@ -852,7 +814,7 @@ class SegmentationModel(pl.LightningModule):
         self.val_mean_iu.update(pred, y)
         self.val_freq_iu.update(pred, y)
 
-    def validation_epoch_end(self, outputs):
+    def on_validation_epoch_end(self):
 
         pixel_accuracy = self.val_px_accuracy.compute()
         mean_accuracy = self.val_mean_accuracy.compute()
@@ -1041,9 +1003,7 @@ class SegmentationModel(pl.LightningModule):
                                                      len_train_set=len(self.train_set),
                                                      loss_tracking_mode='max')
 
-    def optimizer_step(self, epoch, batch_idx, optimizer, optimizer_idx,
-                       optimizer_closure, on_tpu=False, using_native_amp=False,
-                       using_lbfgs=False):
+    def optimizer_step(self, epoch, batch_idx, optimizer, optimizer_closure):
         # update params
         optimizer.step(closure=optimizer_closure)
 

@@ -28,7 +28,7 @@ from functools import partial
 from torchvision import transforms
 from collections import Counter
 from torch.utils.data import Dataset
-from typing import Dict, List, Tuple, Callable, Optional, Any, Union
+from typing import Dict, List, Tuple, Callable, Optional, Any, Union, Literal
 
 from kraken.lib.util import is_bitonal
 from kraken.lib.codec import PytorchCodec
@@ -55,7 +55,7 @@ class ArrowIPCRecognitionDataset(Dataset):
                  normalization: Optional[str] = None,
                  whitespace_normalization: bool = True,
                  skip_empty_lines: bool = True,
-                 reorder: Union[bool, str] = True,
+                 reorder: Union[bool, Literal['L', 'R']] = True,
                  im_transforms: Callable[[Any], torch.Tensor] = transforms.Compose([]),
                  augmentation: bool = False,
                  split_filter: Optional[str] = None) -> None:
@@ -267,7 +267,7 @@ class PolygonGTDataset(Dataset):
                  normalization: Optional[str] = None,
                  whitespace_normalization: bool = True,
                  skip_empty_lines: bool = True,
-                 reorder: Union[bool, str] = True,
+                 reorder: Union[bool, Literal['L', 'R']] = True,
                  im_transforms: Callable[[Any], torch.Tensor] = transforms.Compose([]),
                  augmentation: bool = False) -> None:
         """

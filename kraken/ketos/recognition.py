@@ -178,8 +178,6 @@ logger = logging.getLogger('kraken')
               show_default=True,
               default=RECOGNITION_HYPER_PARAMS['augment'],
               help='Enable image augmentation')
-@click.option('--failed-sample-threshold', show_default=True, default=10,
-              help='Abort if more than `n` samples fail to load.')
 @click.option('--logger', 'pl_logger', show_default=True, type=click.Choice(['tensorboard']), default=None,
               help='Logger used by PyTorch Lightning to track metrics such as loss and accuracy.')
 @click.option('--log-dir', show_default=True, type=click.Path(exists=True, dir_okay=True, writable=True),
@@ -192,7 +190,7 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
           normalize_whitespace, codec, resize, reorder, base_dir,
           training_files, evaluation_files, workers, load_hyper_parameters,
           repolygonize, force_binarization, format_type, augment,
-          failed_sample_threshold, pl_logger, log_dir, ground_truth):
+          pl_logger, log_dir, ground_truth):
     """
     Trains a model from image-text pairs.
     """
@@ -303,7 +301,6 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
                             max_epochs=hyper_params['epochs'] if hyper_params['quit'] == 'dumb' else -1,
                             min_epochs=hyper_params['min_epochs'],
                             freeze_backbone=hyper_params['freeze_backbone'],
-                            failed_sample_threshold=failed_sample_threshold,
                             enable_progress_bar=True if not ctx.meta['verbose'] else False,
                             deterministic=ctx.meta['deterministic'],
                             pl_logger=pl_logger,
