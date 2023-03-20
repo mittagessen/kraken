@@ -65,7 +65,7 @@ jobs:
     name: Build and publish anaconda packages
     needs: lint_and_test
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
+      #    if: startsWith(github.ref, 'refs/tags/')
 
     steps:
       - uses: actions/checkout@v3
@@ -87,7 +87,7 @@ jobs:
         id: conda_validation
         run: |
           PACKAGE_PATHS=$(conda mambabuild . --output --check -c conda-forge | tail -n 1)
-          echo "{package_paths}={$PACKAGE_PATHS}" >> $GITHUB_OUTPUT
+          echo "package_paths=$PACKAGE_PATHS" >> $GITHUB_OUTPUT
       - name: run build
         shell: bash -l {0}
         run: conda mambabuild . -c conda-forge
