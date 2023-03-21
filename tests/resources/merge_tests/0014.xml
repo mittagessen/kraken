@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<alto xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xmlns="http://www.loc.gov/standards/alto/ns-v4#"
+      xsi:schemaLocation="http://www.loc.gov/standards/alto/ns-v4# http://www.loc.gov/standards/alto/v4/alto-4-2.xsd">
+  <Description>
+    <MeasurementUnit>pixel</MeasurementUnit>
+    <sourceImageInformation>
+      <fileName>0014.jpg</fileName>
+      
+    </sourceImageInformation>
+  </Description>
+  
+  <Tags>
+    <OtherTag ID="BT4" LABEL="Illustration" DESCRIPTION="block type Illustration"/><OtherTag ID="BT3" LABEL="Commentary" DESCRIPTION="block type Commentary"/><OtherTag ID="BT2" LABEL="Main" DESCRIPTION="block type Main"/><OtherTag ID="BT1" LABEL="Title" DESCRIPTION="block type Title"/>
+    
+  </Tags>
+  
+  <Layout>
+    <Page WIDTH="228"
+          HEIGHT="109"
+          PHYSICAL_IMG_NR="0"
+          ID="eSc_dummypage_">
+      <PrintSpace HPOS="0"
+                  VPOS="0"
+                  WIDTH="228"
+                  HEIGHT="109">
+        
+
+        
+        <TextBlock ID="eSc_dummyblock_">
+          
+          
+          <TextLine ID="eSc_line_0e5809e0"
+                    
+                    BASELINE="5 44 224 50" 
+                    HPOS="4"
+                    VPOS="41"
+                    WIDTH="219"
+                    HEIGHT="10">
+            <Shape><Polygon POINTS="4 43 4 44 9 45 9 45 9 45 13 44 15 44 22 44 77 46 80 46 80 46 80 46 80 46 89 46 93 47 96 47 107 48 107 48 111 47 116 47 123 47 127 48 130 48 131 48 135 48 142 48 150 49 154 49 154 49 156 49 160 48 171 48 175 49 175 49 175 49 179 49 183 49 189 50 190 50 223 51 223 49 223 48 217 47 217 47 208 48 208 48 207 48 197 46 193 46 193 46 189 47 188 47 182 47 178 47 173 46 173 46 170 47 166 47 164 46 159 45 159 45 153 46 151 46 150 46 143 45 128 44 128 44 123 45 118 45 117 45 117 45 116 45 115 45 85 45 80 44 80 44 80 44 80 44 76 44 72 44 33 43 26 42 25 42 14 41 14 41 14 41 9 42 4 41 4 43"/></Shape>
+	    <String CONTENT="Ꝙesãsͥ"
+                    HPOS="4"
+                    VPOS="41"
+                    WIDTH="219"
+                    HEIGHT="10"></String>
+          </TextLine>
+
+          
+          
+          <TextLine ID="eSc_line_d9c33ce2"
+                    
+                    BASELINE="20 73 197 72" 
+                    HPOS="19"
+                    VPOS="68"
+                    WIDTH="177"
+                    HEIGHT="6">
+            <Shape><Polygon POINTS="19 72 20 73 28 73 28 73 33 74 33 74 60 73 68 73 79 73 81 73 82 73 82 73 82 73 82 73 83 73 85 72 95 72 99 73 102 73 102 73 102 73 103 73 105 72 116 72 118 73 119 73 119 73 132 73 132 73 132 73 134 73 137 72 145 72 148 73 149 73 149 73 149 73 169 73 169 73 169 73 171 73 172 73 172 73 173 73 173 73 180 73 180 73 180 73 181 73 184 72 188 72 191 73 191 73 192 73 196 73 196 71 196 69 191 70 187 69 183 68 183 68 164 68 158 69 157 70 156 69 154 69 154 69 151 70 148 70 146 70 146 70 145 70 145 70 145 70 141 71 135 71 134 70 134 70 134 70 122 70 121 70 117 69 116 69 112 70 109 71 100 71 96 70 92 70 92 70 88 70 85 71 78 71 77 71 73 69 73 69 73 69 72 69 71 70 66 69 60 69 60 69 54 70 49 70 49 70 49 70 46 71 45 71 45 71 42 70 42 70 34 70 34 70 34 70 31 71 31 71 19 71 19 72"/></Shape>
+	    <String CONTENT="a9"
+                    HPOS="19"
+                    VPOS="68"
+                    WIDTH="177"
+                    HEIGHT="6"></String>
+          </TextLine>
+
+          
+        </TextBlock>
+        
+      </PrintSpace>
+    </Page>
+  </Layout>
+</alto>
