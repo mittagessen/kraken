@@ -831,7 +831,7 @@ def neural_reading_order(lines: Sequence[Tuple[List[Tuple[int, int]], List[Tuple
     features = []
     for i in lines:
         for j in lines:
-            if i == j and len(children) != 1:
+            if i == j and len(lines) != 1:
                 continue
             line_coords_i = np.array(i) / (w, h)
             line_center_i = np.mean(line_coords_i, axis=0)
@@ -855,7 +855,7 @@ def neural_reading_order(lines: Sequence[Tuple[List[Tuple[int, int]], List[Tuple
             idx += 1
     # decode order relation matrix 
     path = _greedy_order_decoder(order)
-    return ordered_lines
+    return path
 
 
 def _greedy_order_decoder(P):
