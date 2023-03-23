@@ -480,7 +480,7 @@ def parse_alto(filename: Union[str, PathLike]) -> Dict[str, Any]:
 
 class XMLPage(object):
 
-    type: Literal['baselines', 'bbox'] == 'baselines'
+    type: Literal['baselines', 'bbox'] = 'baselines'
     base_dir: Optional[Literal['L', 'R']] = None
     imagename: PathLike = None
     _orders: Dict[str, Dict[str, Any]] = None
@@ -945,7 +945,7 @@ class XMLPage(object):
         return {k: v for k, v in self._lines.items() if v['tags'].get(key) == value}
 
     def get_lines_by_split(self, split: Literal['train', 'validation', 'test']):
-        return {k: v for k, v in self._lines.items() if v['tags'].get(key) == split}
+        return {k: v for k, v in self._lines.items() if v['tags'].get('split') == split}
 
     @property
     def tags(self):
