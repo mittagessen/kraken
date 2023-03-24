@@ -57,7 +57,7 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
 @click.option('-r', '--deterministic/--no-deterministic', default=False,
               help="Enables deterministic training. If no seed is given and enabled the seed will be set to 42.")
 def cli(ctx, verbose, seed, deterministic):
-    ctx.meta['deterministic'] = deterministic
+    ctx.meta['deterministic'] = False if not deterministic else 'warn'
     if seed:
         from pytorch_lightning import seed_everything
         seed_everything(seed, workers=True)
