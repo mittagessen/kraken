@@ -55,7 +55,7 @@ def cli(format_type, model, repolygonize, files):
                     ds_table = pa.ipc.open_file(source).read_all()
                     raw_metadata = ds_table.schema.metadata
                     if not raw_metadata or b'lines' not in raw_metadata:
-                        raise ValueError(f'{file} does not contain a valid metadata record.')
+                        raise ValueError(f'{doc} does not contain a valid metadata record.')
                     metadata = json.loads(raw_metadata[b'lines'])
                     for idx in range(metadata['counts']['all']):
                         sample = ds_table.column('lines')[idx].as_py()
