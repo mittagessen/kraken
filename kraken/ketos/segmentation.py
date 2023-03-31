@@ -270,7 +270,6 @@ def segtrain(ctx, output, spec, line_width, pad, load, freq, quit, epochs,
                          'step_size': step_size,
                          'rop_patience': sched_patience,
                          'cos_t_max': cos_max,
-                         'pl_logger': pl_logger,
                          })
 
     # disable automatic partition when given evaluation set explicitly

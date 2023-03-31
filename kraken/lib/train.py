@@ -65,15 +65,10 @@ class KrakenTrainer(pl.Trainer):
                  min_epochs: int = 5,
                  max_epochs: int = 100,
                  freeze_backbone=-1,
-                 pl_logger: Optional[pl.loggers.logger.DummyLogger] = None,
+                 pl_logger: Union[pl.loggers.logger.Logger, str, None] = None,
                  log_dir: Optional[PathLike] = None,
                  *args,
                  **kwargs):
-        if pl_logger:
-            if pl_logger == 'tensorboard':
-                kwargs['logger'] = pl.loggers.TensorBoardLogger(log_dir)
-        else:
-            kwargs['logger'] = False
         kwargs['enable_checkpointing'] = False
         kwargs['enable_progress_bar'] = enable_progress_bar
         kwargs['min_epochs'] = min_epochs
@@ -81,6 +76,22 @@ class KrakenTrainer(pl.Trainer):
         kwargs['callbacks'] = ([] if 'callbacks' not in kwargs else kwargs['callbacks'])
         if not isinstance(kwargs['callbacks'], list):
             kwargs['callbacks'] = [kwargs['callbacks']]
+
+        if pl_logger:
+            if 'logger' in kwargs and isinstance(kwargs['logger'], pl.loggers.logger.Logger):
+                logger.debug('Experiment logger has been provided outside KrakenTrainer as `logger`')
+            elif isinstance(pl_logger, pl.loggers.logger.Logger):
+                logger.debug('Experiment logger has been provided outside KrakenTrainer as `pl_logger`')
+                kwargs['logger'] = pl_logger
+            elif pl_logger == 'tensorboard':
+                logger.debug('Creating default experiment logger')
+                kwargs['logger'] = pl.loggers.TensorBoardLogger(log_dir)
+            else:
+                logger.error('`pl_logger` was set, but %s is not an accepted value', pl_logger)
+                raise ValueError(f'{pl_logger} is not acceptable as logger')
+            kwargs['callbacks'].append(LearningRateMonitor(logging_interval='step'))
+        else:
+            kwargs['logger'] = False
 
         if enable_progress_bar:
             progress_bar_cb = progress.KrakenTrainProgressBar()
@@ -579,8 +590,6 @@ class RecognitionModel(pl.LightningModule):
                                            mode='max',
                                            patience=self.hparams.lag,
                                            stopping_threshold=1.0))
-        if self.hparams.pl_logger:
-            callbacks.append(LearningRateMonitor(logging_interval='step'))
         return callbacks
 
     # configuration of optimizers and learning rate schedulers
@@ -986,8 +995,6 @@ class SegmentationModel(pl.LightningModule):
                                            mode='max',
                                            patience=self.hparams.lag,
                                            stopping_threshold=1.0))
-        if self.hparams.pl_logger:
-            callbacks.append(LearningRateMonitor(logging_interval='step'))
 
         return callbacks
 
