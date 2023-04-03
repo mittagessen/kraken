@@ -105,6 +105,7 @@ class ROModel(pl.LightningModule):
                                   level=level,
                                   ro_id=reading_order)
         self.train_set = Subset(train_set, range(len(train_set)))
+        self.class_mapping = train_set.class_mapping
         val_set = PageWiseROSet(evaluation_data,
                                 mode=format_type,
                                 class_mapping=train_set.class_mapping,
