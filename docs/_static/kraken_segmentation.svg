@@ -179,7 +179,7 @@
   </g>
   <a
      id="a203"
-     xlink:href="http://kraken.re/master/api_docs.html#kraken.blla.compute_segmentation_map">
+     xlink:href="http://kraken.re/main/api_docs.html#kraken.blla.compute_segmentation_map">
     <g
        id="g201">
       <g
@@ -259,7 +259,7 @@
   </g>
   <a
      id="a4700"
-     xlink:href="http://kraken.re/master/api_docs.html#kraken.lib.segmentation.calculate_polygonal_environment">
+     xlink:href="http://kraken.re/main/api_docs.html#kraken.lib.segmentation.calculate_polygonal_environment">
     <g
        id="g4698">
       <g
@@ -307,7 +307,7 @@
   </a>
   <a
      id="a4682"
-     xlink:href="http://kraken.re/master/api_docs.html#kraken.lib.segmentation.vectorize_lines">
+     xlink:href="http://kraken.re/main/api_docs.html#kraken.lib.segmentation.vectorize_lines">
     <g
        id="g4671">
       <g
@@ -508,7 +508,7 @@
   </g>
   <a
      id="a4717"
-     xlink:href="http://kraken.re/master/api_docs.html#kraken.lib.segmentation.polygonal_reading_order">
+     xlink:href="http://kraken.re/main/api_docs.html#kraken.lib.segmentation.polygonal_reading_order">
     <g
        id="g4715">
       <g
@@ -677,7 +677,7 @@
   </g>
   <a
      id="a4919"
-     xlink:href="http://kraken.re/master/ketos.html#segmentation-training">
+     xlink:href="http://kraken.re/main/ketos.html#segmentation-training">
     <g
        transform="translate(495.9220779220758 10) rotate(0 45.5 13)"
        id="g4506">
@@ -697,7 +697,7 @@
      id="g203">
     <a
        id="a218"
-       xlink:href="http://kraken.re/master/advanced.html#page-segmentation-and-script-detection">
+       xlink:href="http://kraken.re/main/advanced.html#page-segmentation-and-script-detection">
       <g
          id="g216">
         <g
@@ -783,7 +783,7 @@
   </g>
   <a
      id="a4673"
-     xlink:href="http://kraken.re/master/api_docs.html#kraken.lib.segmentation.vectorize_regions">
+     xlink:href="http://kraken.re/main/api_docs.html#kraken.lib.segmentation.vectorize_regions">
     <g
        id="g4662">
       <g

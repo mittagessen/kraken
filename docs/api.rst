@@ -147,9 +147,9 @@ needs by calling the respective functions in :mod:`kraken.lib.segmentation`. As
 part of the sub-library the API is not guaranteed to be stable but it generally
 does not change much. Examples of more fine-grained use of the segmentation API
 can be found in `contrib/repolygonize.py
-<https://github.com/mittagessen/kraken/blob/master/kraken/contrib/repolygonize.py>`_
+<https://github.com/mittagessen/kraken/blob/main/kraken/contrib/repolygonize.py>`_
 and `contrib/segmentation_overlay.py
-<https://github.com/mittagessen/kraken/blob/master/kraken/contrib/segmentation_overlay.py>`_.
+<https://github.com/mittagessen/kraken/blob/main/kraken/contrib/segmentation_overlay.py>`_.
 
 Recognition
 -----------

@@ -78,7 +78,7 @@ author = u'mittagessen'
 # built documents.
 #
 # The short X.Y version.
-pipe = Popen('git describe --tags --always master', stdout=PIPE, shell=True)
+pipe = Popen('git describe --tags --always main', stdout=PIPE, shell=True)
 version = pipe.stdout.read().decode('utf-8')
 release = version
 
@@ -316,5 +316,5 @@ texinfo_documents = [
 # If true, do not generate a @detailmenu in the "Top" node's menu.
 #texinfo_no_detailmenu = False
 
-smv_branch_whitelist = r'master'
+smv_branch_whitelist = r'main'
 smv_tag_whitelist = r'^[2-9]\.\d+(\.0)?$'

@@ -51,7 +51,7 @@ or install `pyvips` manually with conda:
   $ conda install -c conda-forge pyvips
 
 Conda environment files are provided which for the seamless installation of the
-master branch as well:
+main branch as well:
 
 ::
 
@@ -141,7 +141,7 @@ kraken is developed at the `École Pratique des Hautes Études <http://ephe.fr>`
 
    .. container::
 
-        .. image:: https://raw.githubusercontent.com/mittagessen/kraken/master/docs/_static/normal-reproduction-low-resolution.jpg
+        .. image:: https://raw.githubusercontent.com/mittagessen/kraken/main/docs/_static/normal-reproduction-low-resolution.jpg
           :width: 100
           :alt: Co-financed by the European Union
 

@@ -202,7 +202,7 @@ License
 =======
 
 ``Kraken`` is provided under the terms and conditions of the `Apache 2.0
-License <https://github.com/mittagessen/kraken/blob/master/LICENSE>`_.
+License <https://github.com/mittagessen/kraken/blob/main/LICENSE>`_.
 
 Funding
 =======

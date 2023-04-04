@@ -28,7 +28,7 @@ environment for kraken:
 
 .. code-block:: console
 
-   $ wget https://raw.githubusercontent.com/mittagessen/kraken/master/environment.yml
+   $ wget https://raw.githubusercontent.com/mittagessen/kraken/main/environment.yml
    $ conda env create -f environment.yml
 
 Each time you want to use the kraken environment in a shell is has to be

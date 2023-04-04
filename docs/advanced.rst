@@ -100,7 +100,7 @@ Custom templates can be loaded with the `--template` option:
 The data objects used by the templates are considered internal to kraken and
 can change from time to time. The best way to get some orientation when writing
 a new template from scratch is to have a look at the existing templates `here
-<https://github.com/mittagessen/kraken/tree/master/kraken/templates>`_.
+<https://github.com/mittagessen/kraken/tree/main/kraken/templates>`_.
         
 Binarization
 ------------

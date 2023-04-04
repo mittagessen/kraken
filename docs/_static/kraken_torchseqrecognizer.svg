@@ -58,7 +58,7 @@
   </g>
   <a
      id="a394"
-     xlink:href="http://kraken.re/master/api_docs.html#kraken.rpred.TorchSeqRecognizer">
+     xlink:href="http://kraken.re/main/api_docs.html#kraken.rpred.TorchSeqRecognizer">
     <g
        transform="translate(87.5 10) rotate(0 100 26)"
        id="g14">
@@ -86,7 +86,7 @@
   </a>
   <a
      id="a356"
-     xlink:href="http://kraken.re/master/api_docs.html#kraken.lib.codec.PytorchCodec">
+     xlink:href="http://kraken.re/main/api_docs.html#kraken.lib.codec.PytorchCodec">
     <g
        id="g354">
       <g
@@ -124,7 +124,7 @@
   </a>
   <a
      id="a371"
-     xlink:href="http://kraken.re/master/api_docs.html#kraken.lib.models.TorchVGSLModel.user_metadata">
+     xlink:href="http://kraken.re/main/api_docs.html#kraken.lib.models.TorchVGSLModel.user_metadata">
     <g
        id="g369">
       <g
@@ -162,7 +162,7 @@
   </a>
   <a
      id="a386"
-     xlink:href="http://kraken.re/master/api_docs.html#module-kraken.lib.ctc_decoder">
+     xlink:href="http://kraken.re/main/api_docs.html#module-kraken.lib.ctc_decoder">
     <g
        id="g384">
       <g
@@ -200,7 +200,7 @@
   </a>
   <a
      id="a341"
-     xlink:href="http://kraken.re/master/api_docs.html#kraken.lib.models.TorchVGSLModel">
+     xlink:href="http://kraken.re/main/api_docs.html#kraken.lib.models.TorchVGSLModel">
     <g
        id="g339">
       <g
