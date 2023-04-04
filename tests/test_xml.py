@@ -27,7 +27,6 @@ class TestXMLParser(unittest.TestCase):
         doc = xml.XMLPage(self.page_doc, filetype='page')
         self.assertEqual(len(doc.baselines), 97)
         self.assertEqual(len([item for x in doc.regions.values() for item in x]), 4)
-        self.assertEqual(
 
     def test_alto_parsing(self):
         """
