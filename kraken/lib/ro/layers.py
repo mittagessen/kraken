@@ -1,6 +1,7 @@
 """
 Layers for VGSL models
 """
+import torch
 from torch import nn
 
 # all tensors are ordered NCHW, the "feature" dimension is C, so the output of

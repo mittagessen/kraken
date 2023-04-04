@@ -36,7 +36,7 @@ from kraken.lib.xml import parse_alto, parse_page, parse_xml, XMLPage
 
 from kraken.lib.exceptions import KrakenInputException
 
-__all__ = ['BaselineSet']
+__all__ = ['PairWiseROSet', 'PageWiseROSet']
 
 import logging
 
