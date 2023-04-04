@@ -26,9 +26,9 @@ from lxml import etree
 from PIL import Image
 from typing import Union, Dict, Any, Sequence, Tuple, Literal, Optional, List
 
-from os import PathLike
 from collections import defaultdict
 from kraken.lib.segmentation import calculate_polygonal_environment
+from kraken.lib.exceptions import KrakenInputException
 
 logger = logging.getLogger(__name__)
 
@@ -478,6 +478,7 @@ def parse_alto(filename: Union[str, PathLike]) -> Dict[str, Any]:
             data['tags'] = False
         return data
 
+
 class XMLPage(object):
 
     type: Literal['baselines', 'bbox'] = 'baselines'
@@ -545,10 +546,6 @@ class XMLPage(object):
             y_min = int(float(ps.get('VPOS')))
             width = int(float(ps.get('WIDTH')))
             height = int(float(ps.get('HEIGHT')))
-            page_boundary = [(x_min, y_min),
-                             (x_min, y_min + height),
-                             (x_min + width, y_min + height),
-                             (x_min + width, y_min)]
 
             # parse tagrefs
             cls_map = {}
@@ -642,7 +639,6 @@ class XMLPage(object):
                     self._orders['line_implicit']['order'].append(line.get('ID'))
 
             self._regions = region_data
-
 
             if len(self._tag_set) > 1:
                 self.has_tags = True
@@ -839,26 +835,28 @@ class XMLPage(object):
             # parse explicit reading orders if they exist
             ro_el = doc.find('.//{*}ReadingOrder')
             if ro_el is not None:
-               reading_orders = ro_el.getchildren()
-               # UnorderedGroup at top-level => treated as multiple reading orders
-               if len(reading_orders) == 1 and reading_orders[0].tag.endswith('UnorderedGroup'):
+                reading_orders = ro_el.getchildren()
+                # UnorderedGroup at top-level => treated as multiple reading orders
+                if len(reading_orders) == 1 and reading_orders[0].tag.endswith('UnorderedGroup'):
                     reading_orders = reading_orders.getchildren()
-               def _parse_group(el):
-                   _ro = []
-                   if el.tag.endswith('UnorderedGroup'):
-                       _ro = [_parse_group(x) for x in el.iterchildren()]
-                       is_total = False
-                   elif el.tag.endswith('OrderedGroup'):
-                       _ro.extend(_parse_group(x) for x in el.iterchildren())
-                   else:
-                       return el.get('regionRef')
-                   return _ro
 
-               for ro in reading_orders:
-                   is_total = True
-                   self._orders[ro.get('id')] = {'order': _parse_group(ro),
-                                                 'is_total': is_total,
-                                                 'description': ro.get('caption') if ro.get('caption') else ''}
+                def _parse_group(el):
+
+                    _ro = []
+                    if el.tag.endswith('UnorderedGroup'):
+                        _ro = [_parse_group(x) for x in el.iterchildren()]
+                        is_total = False
+                    elif el.tag.endswith('OrderedGroup'):
+                        _ro.extend(_parse_group(x) for x in el.iterchildren())
+                    else:
+                        return el.get('regionRef')
+                    return _ro
+
+                for ro in reading_orders:
+                    is_total = True
+                    self._orders[ro.get('id')] = {'order': _parse_group(ro),
+                                                  'is_total': is_total,
+                                                  'description': ro.get('caption') if ro.get('caption') else ''}
 
         if len(self._tag_set) > 1:
             self.has_tags = True
@@ -885,6 +883,7 @@ class XMLPage(object):
         """
         if ro not in self.reading_orders:
             raise ValueError(f'Unknown reading order {ro}')
+
         def _traverse_ro(el):
             _ro = []
             if isinstance(el, list):
