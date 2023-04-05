@@ -245,7 +245,6 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
                          'normalization': normalization,
                          'normalize_whitespace': normalize_whitespace,
                          'augment': augment,
-                         'pl_logger': pl_logger,
                          })
 
     # disable automatic partition when given evaluation set explicitly
