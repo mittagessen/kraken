@@ -44,7 +44,7 @@ install(suppress=[click])
 
 APP_NAME = 'kraken'
 SEGMENTATION_DEFAULT_MODEL = pkg_resources.resource_filename(__name__, 'blla.mlmodel')
-DEFAULT_MODEL = ['en_default.mlmodel']
+DEFAULT_MODEL = ['en_best.mlmodel']
 LEGACY_MODEL_DIR = '/usr/local/share/ocropus'
 
 # raise default max image size to 20k * 20k pixels
