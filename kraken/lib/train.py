@@ -483,6 +483,12 @@ class RecognitionModel(pl.LightningModule):
     def setup(self, stage: Optional[str] = None):
         # finalize models in case of appending/loading
         if stage in [None, 'fit']:
+            
+            # Log a few sample images before the datasets are encoded
+            for i in range(min(len(self.train_set), 16)):
+                sample = self.train_set[i]
+                self.logger.experiment.add_image(f'train_set sample #{i}: {sample["target"]}', sample['image'])
+            
             if self.append:
                 self.train_set.dataset.encode(self.codec)
                 # now we can create a new model
