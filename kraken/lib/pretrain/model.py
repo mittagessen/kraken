@@ -384,9 +384,7 @@ class RecognitionPretrainModel(pl.LightningModule):
                                                      len_train_set=self.len_train_set,
                                                      loss_tracking_mode='min')
 
-    def optimizer_step(self, epoch, batch_idx, optimizer, optimizer_idx,
-                       optimizer_closure, on_tpu=False, using_native_amp=False,
-                       using_lbfgs=False):
+    def optimizer_step(self, epoch, batch_idx, optimizer, optimizer_closure):
         # update params
         optimizer.step(closure=optimizer_closure)
 
@@ -397,7 +395,7 @@ class RecognitionPretrainModel(pl.LightningModule):
             for pg in optimizer.param_groups:
                 pg["lr"] = lr_scale * self.hparams.lrate
 
-    def lr_scheduler_step(self, scheduler, optimizer_idx, metric):
+    def lr_scheduler_step(self, scheduler, metric):
         if not self.hparams.warmup or self.trainer.global_step >= self.hparams.warmup:
             # step OneCycleLR each batch if not in warmup phase
             if isinstance(scheduler, lr_scheduler.OneCycleLR):

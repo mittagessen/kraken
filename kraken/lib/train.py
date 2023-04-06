@@ -128,7 +128,7 @@ class KrakenFreezeBackbone(BaseFinetuning):
     def freeze_before_training(self, pl_module):
         pass
 
-    def finetune_function(self, pl_module, current_epoch, optimizer, optimizer_idx):
+    def finetune_function(self, pl_module, current_epoch, optimizer):
         pass
 
     def on_train_start(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule") -> None:
@@ -139,9 +139,7 @@ class KrakenFreezeBackbone(BaseFinetuning):
         Called for each training batch.
         """
         if trainer.global_step == self.unfreeze_at_iteration:
-            from pytorch_lightning.loops.utilities import _get_active_optimizers
-
-            for opt_idx, optimizer in _get_active_optimizers(trainer.optimizers, trainer.optimizer_frequencies, 0):
+            for opt_idx, optimizer in enumerate(trainer.optimizers):
                 num_param_groups = len(optimizer.param_groups)
                 self.unfreeze_and_add_param_group(modules=pl_module.net[:-1],
                                                   optimizer=optimizer,
@@ -616,7 +614,7 @@ class RecognitionModel(pl.LightningModule):
             for pg in optimizer.param_groups:
                 pg["lr"] = lr_scale * self.hparams.lrate
 
-    def lr_scheduler_step(self, scheduler, optimizer_idx, metric):
+    def lr_scheduler_step(self, scheduler, metric):
         if not self.hparams.warmup or self.trainer.global_step >= self.hparams.warmup:
             # step OneCycleLR each batch if not in warmup phase
             if isinstance(scheduler, lr_scheduler.OneCycleLR):
@@ -1021,7 +1019,7 @@ class SegmentationModel(pl.LightningModule):
             for pg in optimizer.param_groups:
                 pg["lr"] = lr_scale * self.hparams.lrate
 
-    def lr_scheduler_step(self, scheduler, optimizer_idx, metric):
+    def lr_scheduler_step(self, scheduler, metric):
         if not self.hparams.warmup or self.trainer.global_step >= self.hparams.warmup:
             # step OneCycleLR each batch if not in warmup phase
             if isinstance(scheduler, lr_scheduler.OneCycleLR):
