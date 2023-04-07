@@ -480,9 +480,10 @@ class RecognitionModel(pl.LightningModule):
         if stage in [None, 'fit']:
             
             # Log a few sample images before the datasets are encoded
-            for i in range(min(len(self.train_set), 16)):
-                sample = self.train_set[i]
-                self.logger.experiment.add_image(f'train_set sample #{i}: {sample["target"]}', sample['image'])
+            if self.logger:
+                for i in range(min(len(self.train_set), 16)):
+                    sample = self.train_set[np.randint(len(self.train_set))]
+                    self.logger.experiment.add_image(f'train_set sample #{i}: {sample["target"]}', sample['image'])
             
             if self.append:
                 self.train_set.dataset.encode(self.codec)
