@@ -482,7 +482,7 @@ class RecognitionModel(pl.LightningModule):
             # Log a few sample images before the datasets are encoded
             if self.logger:
                 for i in range(min(len(self.train_set), 16)):
-                    sample = self.train_set[np.randint(len(self.train_set))]
+                    sample = self.train_set[np.random.randint(len(self.train_set))]
                     self.logger.experiment.add_image(f'train_set sample #{i}: {sample["target"]}', sample['image'])
             
             if self.append:
