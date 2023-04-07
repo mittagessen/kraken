@@ -129,7 +129,7 @@ class PytorchCodec(object):
                     encodable_suffix = True
                     break
             
-            if s[idx] in self.c2l:
+            if not encodable_suffix and s[idx] in self.c2l:
                 labels.extend(self.c2l[s[idx]])
                 idx += 1
                 encodable_suffix = True
