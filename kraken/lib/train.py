@@ -26,7 +26,7 @@ import pytorch_lightning as pl
 from os import PathLike
 from functools import partial
 from torch.multiprocessing import Pool
-from torchmetrics import CharErrorRate
+from torchmetrics import CharErrorRate, WordErrorRate
 from torchmetrics.classification import MultilabelAccuracy, MultilabelJaccardIndex
 from torch.optim import lr_scheduler
 from typing import Callable, Dict, Optional, Sequence, Union, Any, Literal
@@ -392,6 +392,7 @@ class RecognitionModel(pl.LightningModule):
         logger.info('Encoding training set')
 
         self.val_cer = CharErrorRate()
+        self.val_wer = WerErrorRate()
 
     def _build_dataset(self,
                        DatasetClass,
@@ -458,10 +459,14 @@ class RecognitionModel(pl.LightningModule):
             decoded_targets.append(''.join([x[0] for x in self.val_codec.decode([(x, 0, 0, 0) for x in batch['target'][idx:idx+offset]])]))
             idx += offset
         self.val_cer.update(pred, decoded_targets)
+        self.val_wer.update(pred, decoded_targets)
 
     def on_validation_epoch_end(self):
         self.val_cer.compute()
+        self.val_wer.compute()
+
         accuracy = 1.0 - self.val_cer.compute()
+        word_accuracy = 1.0 - self.val_cer.compute()
 
         if accuracy > self.best_metric:
             logger.debug(f'Updating best metric from {self.best_metric} ({self.best_epoch}) to {accuracy} ({self.current_epoch})')
@@ -469,6 +474,7 @@ class RecognitionModel(pl.LightningModule):
             self.best_metric = accuracy
         logger.info(f'validation run: total chars {self.val_cer.total} errors {self.val_cer.errors} accuracy {accuracy}')
         self.log('val_accuracy', accuracy, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+        self.log('val_word_accuracy', word_accuracy, on_step=False, on_epoch=True, prog_bar=True, logger=True)
         self.log('val_metric', accuracy, on_step=False, on_epoch=True, prog_bar=False, logger=False)
         self.val_cer.reset()
 
