@@ -12,6 +12,7 @@ base_model = _here.joinpath(Path("./resources/merge_tests/merge_codec_nfd.mlmode
 training_data = [str(_here.joinpath(Path("./resources/merge_tests/merger.arrow")))]
 xml_data = [str(_here.joinpath(Path("./resources/merge_tests/0014.xml")))]
 
+
 class TestMerging(TestCase):
     """
     Testing merging and fine-tuning models with previous codecs
@@ -45,9 +46,9 @@ class TestMerging(TestCase):
         with self.assertRaises(KrakenInputException) as E:
             model.setup("fit")
 
-    def test_merging_both(self):
-        """ Asserts that both, which only takes into account new data, works as intended """
-        model = self._get_model(resize="both")
+    def test_merging_new(self):
+        """ Asserts that new, which only takes into account new data, works as intended """
+        model = self._get_model(resize="new")
         model.setup("fit")
         self.assertEqual(
             model.nn.codec.encode("1").shape, (0, ),
@@ -55,18 +56,18 @@ class TestMerging(TestCase):
         )
         self.assertEqual(
             model.nn.codec.encode("9").shape, (1, ),
-            "9 is known to the new dataset and should be encoded through `both`"
+            "9 is known to the new dataset and should be encoded through `new`"
         )
         self.assertEqual(
             model.nn.codec.encode("x").shape, (0, ),
-            "x is known to the loaded model and shouldn't be encoded through `both`"
+            "x is known to the loaded model and shouldn't be encoded through `new`"
         )
 
-    def test_merging_add(self):
-        """ Asserts that add, which only takes into account both the original codec and the new data,
+    def test_merging_union(self):
+        """ Asserts that union, which only takes into account new the original codec and the new data,
             works as intended
         """
-        model = self._get_model(resize="add")
+        model = self._get_model(resize="union")
         model.setup("fit")
         self.assertEqual(
             model.nn.codec.encode("1").shape, (0, ),
@@ -74,18 +75,18 @@ class TestMerging(TestCase):
         )
         self.assertEqual(
             model.nn.codec.encode("9").shape, (1, ),
-            "9 is known to the new dataset and should be encoded through `both`"
+            "9 is known to the new dataset and should be encoded through `new`"
         )
         self.assertEqual(
             model.nn.codec.encode("x").shape, (1, ),
-            "x is known to the loaded model and should be encoded through `both`"
+            "x is known to the loaded model and should be encoded through `new`"
         )
         
-    def test_merging_add_with_nfd(self):
-        """ Asserts that add, which only takes into account both the original codec and the new data,
+    def test_merging_union_with_nfd(self):
+        """ Asserts that union, which only takes into account new the original codec and the new data,
             works as intended
         """
-        model = self._get_model(resize="add", new_hyp_params={"normalization": "NFD"})
+        model = self._get_model(resize="union", new_hyp_params={"normalization": "NFD"})
         model.setup("fit")
         self.assertEqual(
             model.nn.codec.encode("1").shape, (0, ),
@@ -93,29 +94,29 @@ class TestMerging(TestCase):
         )
         self.assertEqual(
             model.nn.codec.encode("9").shape, (1, ),
-            "9 is known to the new dataset and should be encoded through `add`"
+            "9 is known to the new dataset and should be encoded through `union`"
         )
         self.assertEqual(
             model.nn.codec.encode("x").shape, (1, ),
-            "x is known to the loaded model and should be encoded through `add`"
+            "x is known to the loaded model and should be encoded through `union`"
         )
         self.assertEqual(
             model.nn.codec.encode("ẽ").shape, (0, ),
-            "ẽ (unnormalized) should not work in `add` mode because it should be split in two"
+            "ẽ (unnormalized) should not work in `union` mode because it should be split in two"
         )
         self.assertEqual(
             model.nn.codec.encode(normalize("NFD", "ẽ")).shape, (2, ),
-            "ẽ should work in `add` mode because it should be split in two and is in the training data"
+            "ẽ should work in `union` mode because it should be split in two and is in the training data"
         )
         self.assertEqual(
             model.nn.codec.encode(normalize("NFD", "Ũ")).shape, (2, ),
-            "Ũ should work in `add` mode because it should be split in two and is in the training data and the "
+            "Ũ should work in `union` mode because it should be split in two and is in the training data and the "
             "original model"
         )
 
-    def test_merging_both_with_NFD(self):
-        """ Asserts that both, which only takes into account new data, works as intended """
-        model = self._get_model(resize="both")
+    def test_merging_new_with_NFD(self):
+        """ Asserts that new, which only takes into account new data, works as intended """
+        model = self._get_model(resize="new", new_hyp_params={"normalization": "NFD"})
         model.setup("fit")
         self.assertEqual(
             model.nn.codec.encode("1").shape, (0, ),
@@ -123,28 +124,29 @@ class TestMerging(TestCase):
         )
         self.assertEqual(
             model.nn.codec.encode("9").shape, (1, ),
-            "9 is known to the new dataset and should be encoded through `both`"
+            "9 is known to the new dataset and should be encoded through `new`"
         )
         self.assertEqual(
             model.nn.codec.encode("x").shape, (0, ),
-            "x is known to the loaded model and shouldn't be encoded through `both`"
+            "x is only known to the loaded model and shouldn't be encoded through `new`"
         )
         self.assertEqual(
             model.nn.codec.encode("ẽ").shape, (0, ),
-            "ẽ (unnormalized) should not work in `both` mode because it should be split in two"
+            "ẽ (unnormalized) should not work in `new` mode because it should be split in two"
         )
         self.assertEqual(
             model.nn.codec.encode(normalize("NFD", "ẽ")).shape, (2, ),
-            "ẽ should work in `both` mode because it should be split in two and is in the training data"
+            "ẽ should work in `new` mode because it should be split in two and is in the training data"
         )
         self.assertEqual(
             model.nn.codec.encode(normalize("NFD", "Ũ")).shape, (1, ),
-            "Ũ should not work in `add` mode because it should be split in two and U is only in the original model"
+            "Ũ should not work in `union` mode because it should be split in two and U is only in the original model"
         )
 
-    def test_merging_both_with_NFD_two_different_kind_of_dataset(self):
-        """ Asserts that both, which only takes into account new data, works as intended, including with XML Dataset """
-        model = self._get_model(resize="both", format_type="xml", training_data=xml_data)
+    def test_merging_new_with_NFD_two_different_kind_of_dataset(self):
+        """ Asserts that new, which only takes into account new data, works as intended, including with XML Dataset """
+        model = self._get_model(resize="new", format_type="xml",
+                                training_data=xml_data, new_hyp_params={"normalization": "NFD"})
         model.setup("fit")
         self.assertEqual(
             model.nn.codec.encode("1").shape, (0, ),
@@ -152,32 +154,33 @@ class TestMerging(TestCase):
         )
         self.assertEqual(
             model.nn.codec.encode("9").shape, (1, ),
-            "9 is known to the new dataset and should be encoded through `both`"
+            "9 is known to the new dataset and should be encoded through `new`"
         )
         self.assertEqual(
             model.nn.codec.encode("x").shape, (0, ),
-            "x is known to the loaded model and shouldn't be encoded through `both`"
+            "x is known to the loaded model and shouldn't be encoded through `new`"
         )
         self.assertEqual(
             model.nn.codec.encode("ẽ").shape, (0, ),
-            "ẽ (unnormalized) should not work in `both` mode because it should be split in two"
+            "ẽ (unnormalized) should not work in `new` mode because it should be split in two"
         )
         self.assertEqual(
             model.nn.codec.encode(normalize("NFD", "ẽ")).shape, (2, ),
-            "ẽ should work in `both` mode because it should be split in two and is in the training data"
+            "ẽ should work in `new` mode because it should be split in two and is in the training data"
         )
         self.assertEqual(
             model.nn.codec.encode(normalize("NFD", "Ũ")).shape, (1, ),
-            "Ũ should not work in `both` mode because it should be split in two and U is only in the original model"
+            "Ũ should not work in `new` mode because it should be split in two and U is only in the original model"
         )
         self.assertEqual(
             model.nn.codec.encode(normalize("NFD", "ã")).shape, (2, ),
-            "ã should work in `both` mode because it should be split in two"
+            "ã should work in `new` mode because it should be split in two"
         )
 
-    def test_merging_add_with_NFD_two_different_kind_of_dataset(self):
-        """ Asserts that add works as intended, including with XML Dataset """
-        model = self._get_model(resize="add", format_type="xml", training_data=xml_data)
+    def test_merging_union_with_NFD_two_different_kind_of_dataset(self):
+        """ Asserts that union works as intended, including with XML Dataset """
+        model = self._get_model(resize="union", format_type="xml",
+                                training_data=xml_data, new_hyp_params={"normalization": "NFD"})
         model.setup("fit")
         self.assertEqual(
             model.nn.codec.encode("1").shape, (0, ),
@@ -185,26 +188,26 @@ class TestMerging(TestCase):
         )
         self.assertEqual(
             model.nn.codec.encode("9").shape, (1, ),
-            "9 is known to the new dataset and should be encoded through `add`"
+            "9 is known to the new dataset and should be encoded through `union`"
         )
         self.assertEqual(
             model.nn.codec.encode("x").shape, (1, ),
-            "x is known to the loaded model and should be encoded through `add`"
+            "x is known to the loaded model and should be encoded through `union`"
         )
         self.assertEqual(
             model.nn.codec.encode("ẽ").shape, (0, ),
-            "ẽ (unnormalized) should not work in `add`+NFD mode because it should be split in two"
+            "ẽ (unnormalized) should not work in `union`+NFD mode because it should be split in two"
         )
         self.assertEqual(
             model.nn.codec.encode(normalize("NFD", "ẽ")).shape, (2, ),
-            "ẽ should work in `add` mode because it should be split in two and is in the training data"
+            "ẽ should work in `union` mode because it should be split in two and is in the training data"
         )
         self.assertEqual(
             model.nn.codec.encode(normalize("NFD", "Ũ")).shape, (2, ),
-            "Ũ should work in `add` mode because it should be split in two and U is in the original model"
+            "Ũ should work in `union` mode because it should be split in two and U is in the original model"
         )
         self.assertEqual(
             model.nn.codec.encode(normalize("NFD", "ã")).shape, (2, ),
-            "ã should work in `add` mode because it should be split in two"
+            "ã should work in `union` mode because it should be split in two"
         )
 

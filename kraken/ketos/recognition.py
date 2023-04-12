@@ -134,9 +134,14 @@ logger = logging.getLogger('kraken')
               default=RECOGNITION_HYPER_PARAMS['normalize_whitespace'], help='Normalizes unicode whitespace')
 @click.option('-c', '--codec', show_default=True, default=None, type=click.File(mode='r', lazy=True),
               help='Load a codec JSON definition (invalid if loading existing model)')
-@click.option('--resize', show_default=True, default='fail', type=click.Choice(['add', 'both', 'fail']),
-              help='Codec/output layer resizing option. If set to `add` code '
-                   'points will be added, `both` will set the layer to match exactly '
+@click.option('--resize', show_default=True, default='fail',
+              type=click.Choice([
+                  'add', 'union',  # Deprecation: `add` is deprecated, `union` is the new value
+                  'both', 'new',  # Deprecation: `both` is deprecated, `new` is the new value
+                  'fail'
+              ]),
+              help='Codec/output layer resizing option. If set to `union` code '
+                   'points will be added, `new` will set the layer to match exactly '
                    'the training data, `fail` will abort if training data and model '
                    'codec do not match.')
 @click.option('--reorder/--no-reorder', show_default=True, default=True, help='Reordering of code points to display order')
@@ -309,7 +314,7 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
         trainer.fit(model)
     except KrakenInputException as e:
         if e.args[0].startswith('Training data and model codec alphabets mismatch') and resize == 'fail':
-            raise click.BadOptionUsage('resize', 'Mismatched training data for loaded model. Set option `--resize` to `add` or `both`')
+            raise click.BadOptionUsage('resize', 'Mismatched training data for loaded model. Set option `--resize` to `new` or `add`')
         else:
             raise e
 

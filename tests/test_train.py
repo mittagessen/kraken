@@ -50,9 +50,9 @@ class TestKrakenTrainer(unittest.TestCase):
         with raises(KrakenInputException):
             module.setup()
 
-    def test_krakentrainer_rec_box_load_add(self):
+    def test_krakentrainer_rec_box_load_union(self):
         """
-        Tests that adaptation works in add mode.
+        Tests that adaptation works in `union` mode.
         """
         training_data = self.box_lines
         evaluation_data = self.box_lines
@@ -60,16 +60,16 @@ class TestKrakenTrainer(unittest.TestCase):
                                   model=self.model,
                                   training_data=training_data,
                                   evaluation_data=evaluation_data,
-                                  resize='add')
+                                  resize='union')
         module.setup()
         self.assertEqual(module.nn.seg_type, 'bbox')
         self.assertIsInstance(module.train_set.dataset, kraken.lib.dataset.GroundTruthDataset)
         trainer = KrakenTrainer(max_steps=1)
         self.assertEqual(module.nn.named_spec[-1].split("c")[-1], '19')
 
-    def test_krakentrainer_rec_box_load_both(self):
+    def test_krakentrainer_rec_box_load_new(self):
         """
-        Tests that adaptation works in both mode.
+        Tests that adaptation works in `new` mode.
         """
         training_data = self.box_lines
         evaluation_data = self.box_lines
@@ -77,7 +77,7 @@ class TestKrakenTrainer(unittest.TestCase):
                                   model=self.model,
                                   training_data=training_data,
                                   evaluation_data=evaluation_data,
-                                  resize='both')
+                                  resize='new')
         module.setup()
         self.assertEqual(module.nn.seg_type, 'bbox')
         self.assertIsInstance(module.train_set.dataset, kraken.lib.dataset.GroundTruthDataset)
@@ -113,28 +113,28 @@ class TestKrakenTrainer(unittest.TestCase):
         with raises(KrakenInputException):
             module.setup()
 
-    def test_krakentrainer_rec_bl_load_add(self):
+    def test_krakentrainer_rec_bl_load_union(self):
         training_data = [self.xml]
         evaluation_data = [self.xml]
         module = RecognitionModel(format_type='xml',
                                   model=self.model,
                                   training_data=training_data,
                                   evaluation_data=evaluation_data,
-                                  resize='add')
+                                  resize='union')
         module.setup()
         self.assertEqual(module.nn.seg_type, 'baselines')
         self.assertIsInstance(module.train_set.dataset, kraken.lib.dataset.PolygonGTDataset)
         trainer = KrakenTrainer(max_steps=1)
         self.assertEqual(module.nn.named_spec[-1].split("c")[-1], '60')
 
-    def test_krakentrainer_rec_bl_load_both(self):
+    def test_krakentrainer_rec_bl_load_new(self):
         training_data = [self.xml]
         evaluation_data = [self.xml]
         module = RecognitionModel(format_type='xml',
                                   model=self.model,
                                   training_data=training_data,
                                   evaluation_data=evaluation_data,
-                                  resize='both')
+                                  resize='new')
         module.setup()
         self.assertEqual(module.nn.seg_type, 'baselines')
         self.assertIsInstance(module.train_set.dataset, kraken.lib.dataset.PolygonGTDataset)

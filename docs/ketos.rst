@@ -25,7 +25,7 @@ Recognition model training
 * Increase the amount of --workers to speedup data loading. This is essential when you use the --augment option.
 * When using an Nvidia GPU, set the --precision option to 16 to use automatic mixed precision (AMP). This can provide significant speedup without any loss in accuracy.
 * Use option -B to scale batch size until GPU utilization reaches 100%. When using a larger batch size, it is recommended to use option -r to scale the learning rate by the square root of the batch size (1e-3 * sqrt(batch_size)).
-* When fine-tuning, it is recommended to use both mode not add as the network will rapidly unlearn missing labels in the new dataset.
+* When fine-tuning, it is recommended to use `new` mode not `union` as the network will rapidly unlearn missing labels in the new dataset.
 * If the new dataset is fairly dissimilar or your base model has been pretrained with ketos pretrain, use --warmup in conjunction with --freeze-backbone for one 1 or 2 epochs.
 * Upload your models to the model repository.
 
@@ -159,7 +159,7 @@ option                                                  action
 -u, \--normalization                                    Ground truth Unicode normalization. One of NFC, NFKC, NFD, NFKD.
 -c, \--codec                                            Load a codec JSON definition (invalid if loading existing model)
 \--resize                                               Codec/output layer resizing option. If set
-                                                        to `add` code points will be added, `both`
+                                                        to `union` code points will be added, `new`
                                                         will set the layer to match exactly the
                                                         training data, `fail` will abort if training
                                                         data and model codec do not match. Only valid when refining an existing model.
@@ -263,15 +263,15 @@ an exact match. Otherwise an error will be raised:
         Network codec not compatible with training set
         [0.8620] Training data and model codec alphabets mismatch: {'ٓ', '؟', '!', 'ص', '،', 'ذ', 'ة', 'ي', 'و', 'ب', 'ز', 'ح', 'غ', '~', 'ف', ')', 'د', 'خ', 'م', '»', 'ع', 'ى', 'ق', 'ش', 'ا', 'ه', 'ك', 'ج', 'ث', '(', 'ت', 'ظ', 'ض', 'ل', 'ط', '؛', 'ر', 'س', 'ن', 'ء', 'ٔ', '«', 'ـ', 'ٕ'} 
         
-There are two modes dealing with mismatching alphabets, ``add`` and ``both``.
-``add`` resizes the output layer and codec of the loaded model to include all
-characters in the new training set without removing any characters. ``both``
+There are two modes dealing with mismatching alphabets, ``union`` and ``new``.
+``union`` resizes the output layer and codec of the loaded model to include all
+characters in the new training set without removing any characters. ``new``
 will make the resulting model an exact match with the new training set by both
 removing unused characters from the model and adding new ones.
 
 .. code-block:: console
 
-        $ ketos -v train --resize add -i model_5.mlmodel syr/*.png
+        $ ketos -v train --resize union -i model_5.mlmodel syr/*.png
         ...
         [0.7943] Training set 788 lines, validation set 88 lines, alphabet 50 symbols
         ...
@@ -284,7 +284,7 @@ recognize 52 different characters after sufficient additional training.
 
 .. code-block:: console
 
-        $ ketos -v train --resize both -i model_5.mlmodel syr/*.png
+        $ ketos -v train --resize new -i model_5.mlmodel syr/*.png
         ...
         [0.7593] Training set 788 lines, validation set 88 lines, alphabet 49 symbols
         ...
@@ -292,7 +292,7 @@ recognize 52 different characters after sufficient additional training.
         [0.8344] Deleting 2 output classes from network (46 retained)
         ...
 
-In ``both`` mode 2 of the original characters were removed and 3 new ones were added.
+In ``new`` mode 2 of the original characters were removed and 3 new ones were added.
 
 Slicing
 ~~~~~~~
@@ -547,7 +547,7 @@ Fine tuning/transfer learning with last layer adaptation and slicing:
 
 .. code-block:: console
 
-        $ ketos segtrain --resize both -i segmodel_best.mlmodel training_data/*.xml
+        $ ketos segtrain --resize new -i segmodel_best.mlmodel training_data/*.xml
         $ ketos segtrain -i segmodel_best.mlmodel --append 7 -s '[Cr3,3,64 Do0.1]' training_data/*.xml
 
 In addition there are a couple of specific options that allow filtering of
