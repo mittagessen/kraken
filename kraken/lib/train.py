@@ -218,7 +218,7 @@ class RecognitionModel(pl.LightningModule):
             **kwargs: Setup parameters, i.e. CLI parameters of the train() command.
         """
         super().__init__()
-        hyper_params_ = default_specs.RECOGNITION_HYPER_PARAMS
+        hyper_params_ = default_specs.RECOGNITION_HYPER_PARAMS.copy()
         if model:
             logger.info(f'Loading existing model from {model} ')
             self.nn = vgsl.TorchVGSLModel.load_model(model)
@@ -696,7 +696,7 @@ class SegmentationModel(pl.LightningModule):
         self.bounding_regions = bounding_regions
         self.topline = topline
 
-        hyper_params_ = default_specs.SEGMENTATION_HYPER_PARAMS
+        hyper_params_ = default_specs.SEGMENTATION_HYPER_PARAMS.copy()
 
         if model:
             logger.info(f'Loading existing model from {model}')
