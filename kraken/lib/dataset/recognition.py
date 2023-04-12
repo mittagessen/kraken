@@ -305,6 +305,8 @@ class PolygonGTDataset(Dataset):
             else:
                 self.text_transforms.append(F_t.text_reorder)
         if augmentation:
+            import cv2
+            cv2.setNumThreads(0)
             from albumentations import (
                 Compose, ToFloat, OneOf, MotionBlur, MedianBlur, Blur,
                 ShiftScaleRotate, OpticalDistortion, ElasticTransform,
@@ -496,6 +498,8 @@ class GroundTruthDataset(Dataset):
             else:
                 self.text_transforms.append(F_t.text_reorder)
         if augmentation:
+            import cv2
+            cv2.setNumThreads(0)
             from albumentations import (
                 Compose, ToFloat, OneOf, MotionBlur, MedianBlur, Blur,
                 ShiftScaleRotate, OpticalDistortion, ElasticTransform,
@@ -508,7 +512,7 @@ class GroundTruthDataset(Dataset):
                                     MedianBlur(blur_limit=3, p=0.1),
                                     Blur(blur_limit=3, p=0.1),
                                 ], p=0.2),
-                                ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.2, rotate_limit=45, p=0.2),
+                                ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.2, rotate_limit=3, p=0.2),
                                 OneOf([
                                     OpticalDistortion(p=0.3),
                                     ElasticTransform(p=0.1),
