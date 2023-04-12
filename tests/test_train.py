@@ -127,7 +127,7 @@ class TestKrakenTrainer(unittest.TestCase):
         self.assertEqual(module.nn.seg_type, 'baselines')
         self.assertIsInstance(module.train_set.dataset, kraken.lib.dataset.PolygonGTDataset)
         trainer = KrakenTrainer(max_steps=1)
-        self.assertEqual(module.nn.named_spec[-1].split("c")[-1], '60')
+        self.assertEqual(module.nn.named_spec[-1].split("c")[-1], '57')
 
     def test_krakentrainer_rec_bl_load_new(self):
         training_data = [self.xml]
@@ -141,7 +141,7 @@ class TestKrakenTrainer(unittest.TestCase):
         self.assertEqual(module.nn.seg_type, 'baselines')
         self.assertIsInstance(module.train_set.dataset, kraken.lib.dataset.PolygonGTDataset)
         trainer = KrakenTrainer(max_steps=1)
-        self.assertEqual(module.nn.named_spec[-1].split("c")[-1], '60')
+        self.assertEqual(module.nn.named_spec[-1].split("c")[-1], '57')
 
     def test_krakentrainer_rec_bl_append(self):
         training_data = [self.xml]
