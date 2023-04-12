@@ -94,7 +94,7 @@ class KrakenTrainer(pl.Trainer):
             kwargs['logger'] = False
 
         if enable_progress_bar:
-            progress_bar_cb = progress.KrakenTrainProgressBar()
+            progress_bar_cb = progress.KrakenTrainProgressBar(leave=True)
             kwargs['callbacks'].append(progress_bar_cb)
 
         if enable_summary:
