@@ -53,6 +53,8 @@ class TestKrakenTrainer(unittest.TestCase):
     def test_krakentrainer_rec_box_load_union(self):
         """
         Tests that adaptation works in `union` mode.
+
+        The dataset brings 15 new characters. Input model had 3. There is one spec. char to account for.
         """
         training_data = self.box_lines
         evaluation_data = self.box_lines
@@ -61,7 +63,7 @@ class TestKrakenTrainer(unittest.TestCase):
                                   training_data=training_data,
                                   evaluation_data=evaluation_data,
                                   resize='union')
-        module.setup()
+        module.setup("fit")
         self.assertEqual(module.nn.seg_type, 'bbox')
         self.assertIsInstance(module.train_set.dataset, kraken.lib.dataset.GroundTruthDataset)
         trainer = KrakenTrainer(max_steps=1)
@@ -78,7 +80,7 @@ class TestKrakenTrainer(unittest.TestCase):
                                   training_data=training_data,
                                   evaluation_data=evaluation_data,
                                   resize='new')
-        module.setup()
+        module.setup("fit")
         self.assertEqual(module.nn.seg_type, 'bbox')
         self.assertIsInstance(module.train_set.dataset, kraken.lib.dataset.GroundTruthDataset)
         trainer = KrakenTrainer(max_steps=1)

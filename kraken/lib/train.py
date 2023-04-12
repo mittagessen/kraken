@@ -516,8 +516,8 @@ class RecognitionModel(pl.LightningModule):
                         # This keep the codec in the model from being 'polluted' by non-trained characters.
                         train_codec = codec.add_labels(alpha_diff)
                         self.nn.add_codec(train_codec)
-                        logger.info(f'Resizing last layer in network to {codec.max_label+1} outputs')
-                        self.nn.resize_output(codec.max_label + 1)
+                        logger.info(f'Resizing last layer in network to {train_codec.max_label+1} outputs')
+                        self.nn.resize_output(train_codec.max_label + 1)
                         self.train_set.dataset.encode(train_codec)
                     elif self.resize == 'new':
                         logger.info(f'Resizing network or given codec to '
@@ -535,6 +535,7 @@ class RecognitionModel(pl.LightningModule):
                     else:
                         raise ValueError(f'invalid resize parameter value {self.resize}')
                 self.nn.codec.strict = False
+                self.spec = self.nn.spec
             else:
                 self.train_set.dataset.encode(self.codec)
                 logger.info(f'Creating new model {self.spec} with {self.train_set.dataset.codec.max_label+1} outputs')
