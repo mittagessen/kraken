@@ -466,7 +466,7 @@ class RecognitionModel(pl.LightningModule):
         self.val_wer.compute()
 
         accuracy = 1.0 - self.val_cer.compute()
-        word_accuracy = 1.0 - self.val_cer.compute()
+        word_accuracy = 1.0 - self.val_wer.compute()
 
         if accuracy > self.best_metric:
             logger.debug(f'Updating best metric from {self.best_metric} ({self.best_epoch}) to {accuracy} ({self.current_epoch})')
