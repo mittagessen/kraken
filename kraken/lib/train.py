@@ -392,7 +392,7 @@ class RecognitionModel(pl.LightningModule):
         logger.info('Encoding training set')
 
         self.val_cer = CharErrorRate()
-        self.val_wer = WerErrorRate()
+        self.val_wer = WordErrorRate()
 
     def _build_dataset(self,
                        DatasetClass,
