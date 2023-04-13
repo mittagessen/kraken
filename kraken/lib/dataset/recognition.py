@@ -37,7 +37,8 @@ from kraken.lib.exceptions import KrakenInputException, KrakenEncodeException
 
 from kraken.lib import functional_im_transforms as F_t
 
-__all__ = ['ArrowIPCRecognitionDataset',
+__all__ = ['DefaultAugmenter',
+           'ArrowIPCRecognitionDataset',
            'PolygonGTDataset',
            'GroundTruthDataset']
 
