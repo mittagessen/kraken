@@ -54,10 +54,12 @@ class DefaultAugmenter():
         from albumentations import (
             Compose, ToFloat, OneOf, MotionBlur, MedianBlur, Blur,
             ShiftScaleRotate, OpticalDistortion, ElasticTransform,
+            PixelDropout
             )
         
         self._transforms = Compose([
                                     ToFloat(),
+                                    PixelDropout(p=0.2),
                                     OneOf([
                                         MotionBlur(p=0.2),
                                         MedianBlur(blur_limit=3, p=0.1),
@@ -66,12 +68,13 @@ class DefaultAugmenter():
                                     ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.2, rotate_limit=3, p=0.2),
                                     OneOf([
                                         OpticalDistortion(p=0.3),
-                                        ElasticTransform(p=0.1),
+                                        ElasticTransform(alpha=64, sigma=25, alpha_affine=0.25, p=0.1),
                                     ], p=0.2),
                                    ], p=0.5)
+        self.counter = 0
     
     def __call__(self, image):
-        return self._transforms(image)
+        return self._transforms(image=image)
 
 class ArrowIPCRecognitionDataset(Dataset):
     """
