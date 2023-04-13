@@ -71,7 +71,6 @@ class DefaultAugmenter():
                                         ElasticTransform(alpha=64, sigma=25, alpha_affine=0.25, p=0.1),
                                     ], p=0.2),
                                    ], p=0.5)
-        self.counter = 0
     
     def __call__(self, image):
         return self._transforms(image=image)
