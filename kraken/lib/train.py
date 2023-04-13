@@ -497,8 +497,10 @@ class RecognitionModel(pl.LightningModule):
         # finalize models in case of appending/loading
         if stage in [None, 'fit']:
             
-            # Log a few sample images before the datasets are encoded
-            if self.logger:
+            # Log a few sample images before the datasets are encoded.
+            # This is only possible for Arrow datasets, because the
+            # other dataset types can only be accessed after encoding
+            if self.logger and isinstance(self.train_set.dataset, ArrowIPCRecognitionDataset) :
                 for i in range(min(len(self.train_set), 16)):
                     idx = np.random.randint(len(self.train_set))
                     sample = self.train_set[idx]
