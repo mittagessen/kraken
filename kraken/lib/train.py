@@ -609,16 +609,13 @@ class RecognitionModel(pl.LightningModule):
                           collate_fn=collate_sequences)
 
     def val_dataloader(self):
-        generator = torch.Generator()
-        generator.manual_seed(42)
         return DataLoader(self.val_set,
                           shuffle=False,
                           batch_size=self.hparams.batch_size,
                           num_workers=self.num_workers,
                           pin_memory=True,
                           collate_fn=collate_sequences,
-                          worker_init_fn=_validation_worker_init_fn,
-                          generator=generator)
+                          worker_init_fn=_validation_worker_init_fn)
 
     def configure_callbacks(self):
         callbacks = []
