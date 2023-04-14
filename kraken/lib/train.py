@@ -19,7 +19,6 @@ import re
 import torch
 import logging
 import warnings
-import random
 import numpy as np
 import torch.nn.functional as F
 import pytorch_lightning as pl
@@ -60,9 +59,14 @@ def _star_fun(fun, kwargs):
 
 def _validation_worker_init_fn(worker_id):
     """ Fix random seeds so that augmentation always produces the same
-        results when validating. """
-    np.random.seed(42)
-    random.seed(42)
+        results when validating. Temporarily increase the logging level
+        for lightning because otherwise it will display a message
+        at info level about the seed being changed. """
+    from pytorch_lightning import seed_everything
+    level = logging.getLogger("lightning_fabric.utilities.seed").level
+    logging.getLogger("lightning_fabric.utilities.seed").setLevel(logging.WARN)
+    seed_everything(42)
+    logging.getLogger("lightning_fabric.utilities.seed").setLevel(level)
 
 class KrakenTrainer(pl.Trainer):
     def __init__(self,
