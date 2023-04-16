@@ -201,3 +201,41 @@ class TestKrakenTrainer(unittest.TestCase):
         self.assertEqual(module.nn.seg_type, 'baselines')
         self.assertIsInstance(module.train_set.dataset, kraken.lib.dataset.PolygonGTDataset)
         trainer = KrakenTrainer(max_steps=1)
+    
+    def test_krakentrainer_rec_bl_augment(self):
+        """
+        Test that augmentation is added if specified.
+        """
+        training_data = [self.xml]
+        evaluation_data = [self.xml]
+        module = RecognitionModel(format_type='xml',
+                                  training_data=training_data,
+                                  evaluation_data=evaluation_data)
+        module.setup()
+        self.assertEqual(module.train_set.dataset.aug, None)
+        
+        module = RecognitionModel({'augment': True},
+                                  format_type='xml',
+                                  training_data=training_data,
+                                  evaluation_data=evaluation_data)
+        module.setup()
+        self.assertIsInstance(module.train_set.dataset.aug, kraken.lib.dataset.recognition.DefaultAugmenter)
+    
+    def test_krakentrainer_rec_box_augment(self):
+        """
+        Test that augmentation is added if specified.
+        """
+        training_data = self.box_lines
+        evaluation_data = self.box_lines
+        module = RecognitionModel(format_type='path',
+                                  training_data=training_data,
+                                  evaluation_data=evaluation_data)
+        module.setup()
+        self.assertEqual(module.train_set.dataset.aug, None)
+        
+        module = RecognitionModel({'augment': True},
+                                  format_type='path',
+                                  training_data=training_data,
+                                  evaluation_data=evaluation_data)
+        module.setup()
+        self.assertIsInstance(module.train_set.dataset.aug, kraken.lib.dataset.recognition.DefaultAugmenter)

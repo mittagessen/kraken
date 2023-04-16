@@ -37,7 +37,8 @@ from kraken.lib.exceptions import KrakenInputException, KrakenEncodeException
 
 from kraken.lib import functional_im_transforms as F_t
 
-__all__ = ['ArrowIPCRecognitionDataset',
+__all__ = ['DefaultAugmenter',
+           'ArrowIPCRecognitionDataset',
            'PolygonGTDataset',
            'GroundTruthDataset']
 
@@ -45,6 +46,34 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
+class DefaultAugmenter():
+    def __init__(self):
+        import cv2
+        cv2.setNumThreads(0)
+        from albumentations import (
+            Compose, ToFloat, OneOf, MotionBlur, MedianBlur, Blur,
+            ShiftScaleRotate, OpticalDistortion, ElasticTransform,
+            PixelDropout
+            )
+        
+        self._transforms = Compose([
+                                    ToFloat(),
+                                    PixelDropout(p=0.2),
+                                    OneOf([
+                                        MotionBlur(p=0.2),
+                                        MedianBlur(blur_limit=3, p=0.1),
+                                        Blur(blur_limit=3, p=0.1),
+                                    ], p=0.2),
+                                    ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.2, rotate_limit=3, p=0.2),
+                                    OneOf([
+                                        OpticalDistortion(p=0.3),
+                                        ElasticTransform(alpha=64, sigma=25, alpha_affine=0.25, p=0.1),
+                                    ], p=0.2),
+                                   ], p=0.5)
+    
+    def __call__(self, image):
+        return self._transforms(image=image)
 
 class ArrowIPCRecognitionDataset(Dataset):
     """
@@ -101,26 +130,7 @@ class ArrowIPCRecognitionDataset(Dataset):
             else:
                 self.text_transforms.append(F_t.text_reorder)
         if augmentation:
-            import cv2
-            cv2.setNumThreads(0)
-            from albumentations import (
-                Compose, ToFloat, OneOf, MotionBlur, MedianBlur, Blur,
-                ShiftScaleRotate, OpticalDistortion, ElasticTransform,
-                )
-
-            self.aug = Compose([
-                                ToFloat(),
-                                OneOf([
-                                    MotionBlur(p=0.2),
-                                    MedianBlur(blur_limit=3, p=0.1),
-                                    Blur(blur_limit=3, p=0.1),
-                                ], p=0.2),
-                                ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.2, rotate_limit=3, p=0.2),
-                                OneOf([
-                                    OpticalDistortion(p=0.3),
-                                    ElasticTransform(p=0.1),
-                                ], p=0.2),
-                               ], p=0.5)
+            self.aug = DefaultAugmenter()
 
         self.im_mode = self.transforms.mode
 
@@ -305,26 +315,7 @@ class PolygonGTDataset(Dataset):
             else:
                 self.text_transforms.append(F_t.text_reorder)
         if augmentation:
-            import cv2
-            cv2.setNumThreads(0)
-            from albumentations import (
-                Compose, ToFloat, OneOf, MotionBlur, MedianBlur, Blur,
-                ShiftScaleRotate, OpticalDistortion, ElasticTransform,
-                )
-
-            self.aug = Compose([
-                                ToFloat(),
-                                OneOf([
-                                    MotionBlur(p=0.2),
-                                    MedianBlur(blur_limit=3, p=0.1),
-                                    Blur(blur_limit=3, p=0.1),
-                                ], p=0.2),
-                                ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.2, rotate_limit=3, p=0.2),
-                                OneOf([
-                                    OpticalDistortion(p=0.3),
-                                    ElasticTransform(p=0.1),
-                                ], p=0.2),
-                               ], p=0.5)
+            self.aug = DefaultAugmenter()
 
         self.im_mode = '1'
 
@@ -498,26 +489,7 @@ class GroundTruthDataset(Dataset):
             else:
                 self.text_transforms.append(F_t.text_reorder)
         if augmentation:
-            import cv2
-            cv2.setNumThreads(0)
-            from albumentations import (
-                Compose, ToFloat, OneOf, MotionBlur, MedianBlur, Blur,
-                ShiftScaleRotate, OpticalDistortion, ElasticTransform,
-                )
-
-            self.aug = Compose([
-                                ToFloat(),
-                                OneOf([
-                                    MotionBlur(p=0.2),
-                                    MedianBlur(blur_limit=3, p=0.1),
-                                    Blur(blur_limit=3, p=0.1),
-                                ], p=0.2),
-                                ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.2, rotate_limit=3, p=0.2),
-                                OneOf([
-                                    OpticalDistortion(p=0.3),
-                                    ElasticTransform(p=0.1),
-                                ], p=0.2),
-                               ], p=0.5)
+            self.aug = DefaultAugmenter()
 
         self.im_mode = '1'
 

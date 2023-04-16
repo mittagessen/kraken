@@ -160,15 +160,13 @@ class BaselineSet(Dataset):
             import cv2
             cv2.setNumThreads(0)
             from albumentations import (
-                Compose, ToFloat, RandomRotate90, Flip, OneOf, MotionBlur, MedianBlur, Blur,
+                Compose, ToFloat, OneOf, MotionBlur, MedianBlur, Blur,
                 ShiftScaleRotate, OpticalDistortion, ElasticTransform,
                 HueSaturationValue,
                 )
 
             self.aug = Compose([
                                 ToFloat(),
-                                RandomRotate90(),
-                                Flip(),
                                 OneOf([
                                     MotionBlur(p=0.2),
                                     MedianBlur(blur_limit=3, p=0.1),
