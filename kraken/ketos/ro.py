@@ -265,7 +265,7 @@ def rotrain(ctx, batch_size, output, load, freq, quit, epochs, min_epochs, lag,
 @click.option('-o', '--output', show_default=True, type=click.Path(), default='combined_seg.mlmodel', help='Combined output model file')
 @click.option('-r', '--ro-model', show_default=True, type=click.Path(exists=True, readable=True), help='Reading order model to load into segmentation model')
 @click.option('-i', '--seg-model', show_default=True, type=click.Path(exists=True, readable=True), help='Segmentation model to load')
-def rotrain(ctx, output, ro_model, seg_model):
+def roadd(ctx, output, ro_model, seg_model):
     """
     Combines a reading order model with a segmentation model.
     """
@@ -288,5 +288,6 @@ def rotrain(ctx, output, ro_model, seg_model):
         raise click.UsageError(f'Model {seg_model} and {ro_model} class mappings mismatch.')
 
     seg_net.aux_layers = {'ro_model': ro_net.ro_net}
+    seg_net.user_metadata['ro_class_mapping'] = ro_net.class_mapping
     message(f'Saving combined model to {output}')
     seg_net.save_model(output)

@@ -23,6 +23,7 @@ class MLP(nn.Module):
         self.fc2 = nn.Linear(hidden_size, 1)
         self.feature_size = feature_size
         self.hidden_size = hidden_size
+        self.class_mapping = None
 
     def forward(self, x):
         x = self.fc1(x)

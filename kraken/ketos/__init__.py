@@ -34,7 +34,7 @@ from .recognition import train, test
 from .repo import publish
 from .segmentation import segtrain, segtest
 from .transcription import extract, transcription
-from .ro import rotrain
+from .ro import rotrain, roadd
 
 APP_NAME = 'kraken'
 
@@ -78,6 +78,7 @@ cli.add_command(segtrain)
 cli.add_command(segtest)
 cli.add_command(publish)
 cli.add_command(rotrain)
+cli.add_command(roadd)
 
 # deprecated commands
 cli.add_command(line_generator)

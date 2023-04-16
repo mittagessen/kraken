@@ -29,6 +29,7 @@ import shapely.geometry as geom
 import torch.nn.functional as F
 import torchvision.transforms as tf
 
+from functools import partial
 from typing import Optional, Dict, Callable, Union, List, Any, Tuple
 
 from scipy.ndimage import gaussian_filter
@@ -38,6 +39,7 @@ from kraken.lib import vgsl, dataset
 from kraken.lib.util import is_bitonal, get_im_str
 from kraken.lib.exceptions import KrakenInputException, KrakenInvalidModelException
 from kraken.lib.segmentation import (polygonal_reading_order,
+                                     neural_reading_order,
                                      vectorize_lines, vectorize_regions,
                                      scale_polygonal_lines,
                                      calculate_polygonal_environment,
@@ -73,8 +75,6 @@ def compute_segmentation_map(im: PIL.Image.Image,
     Raises:
         KrakenInputException: When given an invalid mask.
     """
-    im_str = get_im_str(im)
-    logger.info(f'Segmenting {im_str}')
 
     if model.input[1] == 1 and model.one_channel_mode == '1' and not is_bitonal(im):
         logger.warning('Running binary model on non-binary input image '
@@ -250,7 +250,7 @@ def vec_lines(heatmap: torch.Tensor,
 def segment(im: PIL.Image.Image,
             text_direction: str = 'horizontal-lr',
             mask: Optional[np.ndarray] = None,
-            reading_order_fn: Callable = polygonal_reading_order,
+            reading_order_fn: Optional[Callable] = None,
             model: Union[List[vgsl.TorchVGSLModel], vgsl.TorchVGSLModel] = None,
             device: str = 'cpu',
             raise_on_error: bool = False,
@@ -271,7 +271,15 @@ def segment(im: PIL.Image.Image,
               detection.
         reading_order_fn: Function to determine the reading order.  Has to
                           accept a list of tuples (baselines, polygon) and a
-                          text direction (`lr` or `rl`).
+                          text direction (`lr` or `rl`). If None is given it
+                          defaults to either
+                          :func:`kraken.lib.segmentation.polygonal_reading_order`
+                          or
+                          :func:`kraken.lib.segmentation.neural_reading_order`
+                          depending on the presence of a neural reading order
+                          net in the segmentation model. If multiple
+                          segmentation models are given and more than one
+                          contains an RO net the first one will be used.
         model: One or more TorchVGSLModel containing a segmentation model. If
                none is given a default model will be loaded.
         device: The target device to run the neural network on.
@@ -313,6 +321,18 @@ def segment(im: PIL.Image.Image,
     if isinstance(model, vgsl.TorchVGSLModel):
         model = [model]
 
+    # determine which reading order function to use
+    if not reading_order_fn:
+        reading_order_fn = polygonal_reading_order
+        for x in model:
+            if 'ro_model' in x.aux_layers:
+                logger.info(f'Using reading order model found in segmentation model {x}.')
+                reading_order_fn = partial(neural_reading_order,
+                                           model=x.aux_layers['ro_model'],
+                                           im_size=im.size,
+                                           class_mapping=x.user_metadata['ro_class_mapping'])
+                break
+
     for nn in model:
         if nn.model_type != 'segmentation':
             raise KrakenInvalidModelException(f'Invalid model type {nn.model_type} for {nn}')
@@ -340,6 +360,7 @@ def segment(im: PIL.Image.Image,
         # convert back to net scale
         suppl_obj = scale_regions(suppl_obj, 1/rets['scale'])
         line_regs = scale_regions(line_regs, 1/rets['scale'])
+
         lines = vec_lines(**rets,
                           regions=line_regs,
                           reading_order_fn=reading_order_fn,

@@ -20,6 +20,7 @@ import torch
 import logging
 import numpy as np
 import shapely.geometry as geom
+import torch.nn.functional as F
 
 from collections import defaultdict
 
@@ -814,8 +815,11 @@ def is_in_region(line, region) -> bool:
 
 
 def neural_reading_order(lines: Sequence[Tuple[List[Tuple[int, int]], List[Tuple[int, int]]]],
-                         im_size: Tuple[int, int],
-                         model):
+                         text_direction: str = 'lr',
+                         regions: Optional[Sequence[List[Tuple[int, int]]]] = None,
+                         im_size: Tuple[int, int] = None,
+                         model: 'TorchVGSLModel' = None,
+                         class_mapping: Dict[str, int] = None) -> Sequence[Tuple[List[Tuple[int, int]], List[Tuple[int, int]]]]:
     """
     Given a list of baselines and regions, calculates the correct reading order
     and applies it to the input.
@@ -834,14 +838,14 @@ def neural_reading_order(lines: Sequence[Tuple[List[Tuple[int, int]], List[Tuple
         for j in lines:
             if i == j and len(lines) != 1:
                 continue
-            num_classes = len(model.class_mapping) + 1
+            num_classes = len(class_mapping) + 1
             cl_i = torch.zeros(num_classes, dtype=torch.float)
             cl_j = torch.zeros(num_classes, dtype=torch.float)
-            cl_i[model.class_mapping.get(i['tags']['type'], 0)] = 1
-            cl_j[model.class_mapping.get(j['tags']['type'], 0)] = 1
-            line_coords_i = np.array(i['baseline']) / (w, h)
+            cl_i[class_mapping.get(i[0], 0)] = 1
+            cl_j[class_mapping.get(j[0], 0)] = 1
+            line_coords_i = np.array(i[1]) / (w, h)
             line_center_i = np.mean(line_coords_i, axis=0)
-            line_coords_j = np.array(j['baseline']) / (w, h)
+            line_coords_j = np.array(j[1]) / (w, h)
             line_center_j = np.mean(line_coords_j, axis=0)
             features.append(torch.cat((cl_i,
                                        torch.tensor(line_center_i, dtype=torch.float),  # lin
@@ -851,17 +855,22 @@ def neural_reading_order(lines: Sequence[Tuple[List[Tuple[int, int]], List[Tuple
                                        torch.tensor(line_center_j, dtype=torch.float),  # lin
                                        torch.tensor(line_coords_j[0, :], dtype=torch.float),
                                        torch.tensor(line_coords_j[-1, :], dtype=torch.float))))
-    features = torch.cat(features)
-    output = model(features)
+    features = torch.stack(features)
+    output = F.sigmoid(model(features))
+
     order = torch.zeros((len(lines), len(lines)))
     idx = 0
-    for i in enumerate(lines):
-        for j in enumerate(lines):
+    for i in range(len(lines)):
+        for j in range(len(lines)):
+            if i == j and len(lines) != 1:
+                continue
             order[i, j] = output[idx]
             idx += 1
     # decode order relation matrix
     path = _greedy_order_decoder(order)
-    return path
+    # reorder lines
+    lines = [lines[idx] for idx in path]
+    return lines
 
 
 def _greedy_order_decoder(P):
