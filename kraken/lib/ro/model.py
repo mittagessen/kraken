@@ -129,7 +129,7 @@ class ROModel(pl.LightningModule):
         self.best_metric = torch.inf
 
         logger.info(f'Creating new RO model')
-        self.ro_net = torch.jit.script(MLP(train_set.get_feature_dim(), train_set.get_feature_dim() * 2))
+        self.ro_net = MLP(train_set.get_feature_dim(), train_set.get_feature_dim() * 2)
 
         if 'file_system' in torch.multiprocessing.get_all_sharing_strategies():
             logger.debug('Setting multiprocessing tensor sharing strategy to file_system')

@@ -258,3 +258,35 @@ def rotrain(ctx, batch_size, output, load, freq, quit, epochs, min_epochs, lag,
         logger.info('Moving best model {0}_{1}.mlmodel ({2}) to {0}_best.mlmodel'.format(
             output, model.best_epoch, model.best_metric))
         shutil.copy(f'{output}_{model.best_epoch}.mlmodel', f'{output}_best.mlmodel')
+
+
+@click.command('roadd')
+@click.pass_context
+@click.option('-o', '--output', show_default=True, type=click.Path(), default='combined_seg.mlmodel', help='Combined output model file')
+@click.option('-r', '--ro-model', show_default=True, type=click.Path(exists=True, readable=True), help='Reading order model to load into segmentation model')
+@click.option('-i', '--seg-model', show_default=True, type=click.Path(exists=True, readable=True), help='Segmentation model to load')
+def rotrain(ctx, output, ro_model, seg_model):
+    """
+    Combines a reading order model with a segmentation model.
+    """
+    from kraken.lib import vgsl
+    from kraken.lib.ro import ROModel
+    from kraken.lib.train import KrakenTrainer
+
+    message(f'Adding {ro_model} reading order model to {seg_model}.')
+    ro_net = ROModel.load_from_checkpoint(ro_model)
+    message('Line classes known to RO model:')
+    for k, v in ro_net.class_mapping.items():
+        message(f'  {k}\t{v}')
+    seg_net = vgsl.TorchVGSLModel.load_model(seg_model)
+    if seg_net.model_type != 'segmentation':
+        raise click.UsageError(f'Model {seg_model} is invalid {seg_net.model_type} model (expected `segmentation`).')
+    message('Line classes known to segmentation model:')
+    for k, v in seg_net.user_metadata['class_mapping']['baselines'].items():
+        message(f'  {k}\t{v}')
+    if ro_net.class_mapping.keys() != seg_net.user_metadata['class_mapping']['baselines'].keys():
+        raise click.UsageError(f'Model {seg_model} and {ro_model} class mappings mismatch.')
+
+    seg_net.aux_layers = {'ro_model': ro_net.ro_net}
+    message(f'Saving combined model to {output}')
+    seg_net.save_model(output)
