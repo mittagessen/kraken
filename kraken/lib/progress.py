@@ -148,7 +148,7 @@ class RichProgressBarTheme:
     """
 
     description: Union[str, Style] = DEFAULT_STYLES['progress.description']
-    progress_bar: Union[str, Style] = DEFAULT_STYLES['bar.back']
+    progress_bar: Union[str, Style] = DEFAULT_STYLES['bar.complete']
     progress_bar_finished: Union[str, Style] = DEFAULT_STYLES['bar.finished']
     progress_bar_pulse: Union[str, Style] = DEFAULT_STYLES['bar.pulse']
     batch_progress: Union[str, Style] = DEFAULT_STYLES['progress.description']

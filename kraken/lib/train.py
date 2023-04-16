@@ -26,7 +26,7 @@ import pytorch_lightning as pl
 from os import PathLike
 from functools import partial
 from torch.multiprocessing import Pool
-from torchmetrics import CharErrorRate
+from torchmetrics import CharErrorRate, WordErrorRate
 from torchmetrics.classification import MultilabelAccuracy, MultilabelJaccardIndex
 from torch.optim import lr_scheduler
 from typing import Callable, Dict, Optional, Sequence, Union, Any, Literal
@@ -409,6 +409,7 @@ class RecognitionModel(pl.LightningModule):
         logger.info('Encoding training set')
 
         self.val_cer = CharErrorRate()
+        self.val_wer = WordErrorRate()
 
     def _build_dataset(self,
                        DatasetClass,
@@ -475,17 +476,18 @@ class RecognitionModel(pl.LightningModule):
             decoded_targets.append(''.join([x[0] for x in self.val_codec.decode([(x, 0, 0, 0) for x in batch['target'][idx:idx+offset]])]))
             idx += offset
         self.val_cer.update(pred, decoded_targets)
-        
+        self.val_wer.update(pred, decoded_targets)
+
         if self.logger and self.trainer.state.stage != 'sanity_check' and self.hparams.batch_size * batch_idx < 16:
             for i in range(self.hparams.batch_size):
                 count = self.hparams.batch_size * batch_idx + i
                 if count < 16:
                     self.logger.experiment.add_image(f'Validation #{count}, target: {decoded_targets[i]}', batch['image'][i], self.global_step, dataformats="CHW")
                     self.logger.experiment.add_text(f'Validation #{count}, target: {decoded_targets[i]}', pred[i], self.global_step)
-    
+
     def on_validation_epoch_end(self):
-        self.val_cer.compute()
         accuracy = 1.0 - self.val_cer.compute()
+        word_accuracy = 1.0 - self.val_wer.compute()
 
         if accuracy > self.best_metric:
             logger.debug(f'Updating best metric from {self.best_metric} ({self.best_epoch}) to {accuracy} ({self.current_epoch})')
@@ -493,14 +495,15 @@ class RecognitionModel(pl.LightningModule):
             self.best_metric = accuracy
         logger.info(f'validation run: total chars {self.val_cer.total} errors {self.val_cer.errors} accuracy {accuracy}')
         self.log('val_accuracy', accuracy, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+        self.log('val_word_accuracy', word_accuracy, on_step=False, on_epoch=True, prog_bar=True, logger=True)
         self.log('val_metric', accuracy, on_step=False, on_epoch=True, prog_bar=False, logger=False)
         self.val_cer.reset()
-
+        self.val_wer.reset()
 
     def setup(self, stage: Optional[str] = None):
         # finalize models in case of appending/loading
         if stage in [None, 'fit']:
-            
+
             # Log a few sample images before the datasets are encoded.
             # This is only possible for Arrow datasets, because the
             # other dataset types can only be accessed after encoding
@@ -509,7 +512,7 @@ class RecognitionModel(pl.LightningModule):
                     idx = np.random.randint(len(self.train_set))
                     sample = self.train_set[idx]
                     self.logger.experiment.add_image(f'train_set sample #{i}: {sample["target"]}', sample['image'])
-            
+
             if self.append:
                 self.train_set.dataset.encode(self.codec)
                 # now we can create a new model
