@@ -137,6 +137,9 @@ class ROModel(pl.LightningModule):
 
         self.nn = DummyVGSLModel(ptl_module=self)
 
+        self.val_losses = []
+        self.val_spearman = []
+
         self.save_hyperparameters()
 
     def forward(self, x):
@@ -157,12 +160,14 @@ class ROModel(pl.LightningModule):
         spearman_dist = spearman_footrule_distance(torch.tensor(range(num_lines)), path)
         self.log('val_spearman', spearman_dist)
         loss = self.criterion(logits, ys.squeeze())
-        self.log('val_loss', loss)
-        return {'val_spearman': spearman_dist, 'val_loss': loss}
+        self.val_losses.append(loss.cpu())
+        self.val_spearman.append(spearman_dist.cpu())
 
-    def validation_epoch_end(self, outputs):
-        val_metric = np.mean([x['val_spearman'].cpu() for x in outputs])
-        val_loss = np.mean([x['val_loss'].cpu() for x in outputs])
+    def on_validation_epoch_end(self):
+        val_metric = np.mean(self.val_spearman)
+        val_loss = np.mean(self.val_losses)
+        self.val_spearman.clear()
+        self.val_losses.clear()
 
         if val_metric < self.best_metric:
             logger.debug(f'Updating best metric from {self.best_metric} ({self.best_epoch}) to {val_metric} ({self.current_epoch})')
@@ -218,9 +223,7 @@ class ROModel(pl.LightningModule):
                                                      len_train_set=len(self.train_set),
                                                      loss_tracking_mode='min')
 
-    def optimizer_step(self, epoch, batch_idx, optimizer, optimizer_idx,
-                       optimizer_closure, on_tpu=False, using_native_amp=False,
-                       using_lbfgs=False):
+    def optimizer_step(self, epoch, batch_idx, optimizer, optimizer_closure):
         # update params
         optimizer.step(closure=optimizer_closure)
 
@@ -231,7 +234,7 @@ class ROModel(pl.LightningModule):
             for pg in optimizer.param_groups:
                 pg["lr"] = lr_scale * self.hparams.hyper_params['lrate']
 
-    def lr_scheduler_step(self, scheduler, optimizer_idx, metric):
+    def lr_scheduler_step(self, scheduler, metric):
         if not self.hparams.hyper_params['warmup'] or self.trainer.global_step >= self.hparams.hyper_params['warmup']:
             # step OneCycleLR each batch if not in warmup phase
             if isinstance(scheduler, lr_scheduler.OneCycleLR):

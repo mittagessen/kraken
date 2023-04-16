@@ -128,7 +128,7 @@ class KrakenTrainProgressBar(RichProgressBar):
 
     def _get_train_description(self, current_epoch: int) -> str:
         return f"stage {current_epoch}/" \
-               f"{self.trainer.max_epochs if self.trainer.model.hparams['quit'] == 'fixed' else '∞'}"
+               f"{self.trainer.max_epochs if self.trainer.model.hparams.hyper_params['quit'] == 'fixed' else '∞'}"
 
 @dataclass
 class RichProgressBarTheme:
