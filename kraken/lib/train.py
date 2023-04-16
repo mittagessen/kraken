@@ -201,7 +201,7 @@ class RecognitionModel(pl.LightningModule):
                  force_binarization: bool = False,
                  format_type: Literal['path', 'alto', 'page', 'xml', 'binary'] = 'path',
                  codec: Optional[Dict] = None,
-                 resize: Literal['fail', 'add', 'both'] = 'fail'):
+                 resize: Literal['fail', 'both', 'new', 'add', 'union'] = 'fail'):
         """
         A LightningModule encapsulating the training setup for a text
         recognition model.
@@ -218,7 +218,7 @@ class RecognitionModel(pl.LightningModule):
             **kwargs: Setup parameters, i.e. CLI parameters of the train() command.
         """
         super().__init__()
-        hyper_params_ = default_specs.RECOGNITION_HYPER_PARAMS
+        hyper_params_ = default_specs.RECOGNITION_HYPER_PARAMS.copy()
         if model:
             logger.info(f'Loading existing model from {model} ')
             self.nn = vgsl.TorchVGSLModel.load_model(model)
@@ -242,6 +242,13 @@ class RecognitionModel(pl.LightningModule):
         self.append = append
         self.model = model
         self.num_workers = num_workers
+        if resize == "add":
+            resize = "union"
+            warnings.warn("'add' value for resize has been deprecated. Use 'union' instead.", DeprecationWarning)
+        elif resize == "both":
+            resize = "new"
+            warnings.warn("'both' value for resize has been deprecated. Use 'new' instead.", DeprecationWarning)
+
         self.resize = resize
         self.format_type = format_type
         self.output = output
@@ -487,8 +494,8 @@ class RecognitionModel(pl.LightningModule):
             elif self.model:
                 self.spec = self.nn.spec
 
-                # prefer explicitly given codec over network codec if mode is 'both'
-                codec = self.codec if (self.codec and self.resize == 'both') else self.nn.codec
+                # prefer explicitly given codec over network codec if mode is 'new'
+                codec = self.codec if (self.codec and self.resize == 'new') else self.nn.codec
 
                 codec.strict = True
 
@@ -500,7 +507,7 @@ class RecognitionModel(pl.LightningModule):
                     )
                     if self.resize == 'fail':
                         raise KrakenInputException(f'Training data and model codec alphabets mismatch: {alpha_diff}')
-                    elif self.resize == 'add':
+                    elif self.resize == 'union':
                         logger.info(f'Resizing codec to include '
                                     f'{len(alpha_diff)} new code points')
                         # Construct two codecs:
@@ -509,10 +516,10 @@ class RecognitionModel(pl.LightningModule):
                         # This keep the codec in the model from being 'polluted' by non-trained characters.
                         train_codec = codec.add_labels(alpha_diff)
                         self.nn.add_codec(train_codec)
-                        logger.info(f'Resizing last layer in network to {codec.max_label+1} outputs')
-                        self.nn.resize_output(codec.max_label + 1)
+                        logger.info(f'Resizing last layer in network to {train_codec.max_label+1} outputs')
+                        self.nn.resize_output(train_codec.max_label + 1)
                         self.train_set.dataset.encode(train_codec)
-                    elif self.resize == 'both':
+                    elif self.resize == 'new':
                         logger.info(f'Resizing network or given codec to '
                                     f'{len(self.train_set.dataset.alphabet)} '
                                     f'code sequences')
@@ -528,6 +535,7 @@ class RecognitionModel(pl.LightningModule):
                     else:
                         raise ValueError(f'invalid resize parameter value {self.resize}')
                 self.nn.codec.strict = False
+                self.spec = self.nn.spec
             else:
                 self.train_set.dataset.encode(self.codec)
                 logger.info(f'Creating new model {self.spec} with {self.train_set.dataset.codec.max_label+1} outputs')
@@ -649,7 +657,7 @@ class SegmentationModel(pl.LightningModule):
                  merge_regions: Optional[Dict[str, str]] = None,
                  merge_baselines: Optional[Dict[str, str]] = None,
                  bounding_regions: Optional[Sequence[str]] = None,
-                 resize: Literal['fail', 'both', 'add'] = 'fail',
+                 resize: Literal['fail', 'both', 'new', 'add', 'union'] = 'fail',
                  topline: Union[bool, None] = False):
         """
         A LightningModule encapsulating the training setup for a page
@@ -674,13 +682,21 @@ class SegmentationModel(pl.LightningModule):
 
         self.model = model
         self.num_workers = num_workers
+
+        if resize == "add":
+            resize = "union"
+            warnings.warn("'add' value for resize has been deprecated. Use 'union' instead.", DeprecationWarning)
+        elif resize == "both":
+            resize = "new"
+            warnings.warn("'both' value for resize has been deprecated. Use 'new' instead.", DeprecationWarning)
         self.resize = resize
+
         self.format_type = format_type
         self.output = output
         self.bounding_regions = bounding_regions
         self.topline = topline
 
-        hyper_params_ = default_specs.SEGMENTATION_HYPER_PARAMS
+        hyper_params_ = default_specs.SEGMENTATION_HYPER_PARAMS.copy()
 
         if model:
             logger.info(f'Loading existing model from {model}')
@@ -868,7 +884,7 @@ class SegmentationModel(pl.LightningModule):
 
                     if self.resize == 'fail':
                         raise ValueError(f'Training data and model class mapping differ (bl: {bl_diff}, regions: {regions_diff}')
-                    elif self.resize == 'add':
+                    elif self.resize == 'union':
                         new_bls = self.train_set.dataset.class_mapping['baselines'].keys() - self.nn.user_metadata['class_mapping']['baselines'].keys()
                         new_regions = self.train_set.dataset.class_mapping['regions'].keys() - self.nn.user_metadata['class_mapping']['regions'].keys()
                         cls_idx = max(max(self.nn.user_metadata['class_mapping']['baselines'].values()) if self.nn.user_metadata['class_mapping']['baselines'] else -1,
@@ -881,7 +897,7 @@ class SegmentationModel(pl.LightningModule):
                         for c in new_regions:
                             cls_idx += 1
                             self.nn.user_metadata['class_mapping']['regions'][c] = cls_idx
-                    elif self.resize == 'both':
+                    elif self.resize == 'new':
                         logger.info('Fitting network exactly to training set.')
                         new_bls = self.train_set.dataset.class_mapping['baselines'].keys() - self.nn.user_metadata['class_mapping']['baselines'].keys()
                         new_regions = self.train_set.dataset.class_mapping['regions'].keys() - self.nn.user_metadata['class_mapping']['regions'].keys()
