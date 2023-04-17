@@ -28,7 +28,7 @@ requirements:
      - scikit-learn~=1.2.1
      - shapely==1.8.5
      - pyvips
-     - conda-forge::coremltools
+     - coremltools
      - pyarrow
      - pytorch-lightning~=2.0
      - torchmetrics>=0.10.0
