@@ -134,7 +134,7 @@ jobs:
     needs: lint_and_test
     runs-on: ubuntu-latest
     if: |
-      github.ref == 'refs/heads/master' ||
+      github.ref == 'refs/heads/main' ||
       startsWith(github.ref, 'refs/tags/')
 
     steps:
