@@ -19,7 +19,7 @@ dependencies:
   - jsonschema
   - scikit-learn~=1.2.1
   - scikit-image>=0.17.0,<=0.19.3
-  - shapely==1.8.5
+  - shapely~=1.8.5
   - pyvips
   - imagemagick>=7.1.0
   - pyarrow
