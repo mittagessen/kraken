@@ -53,8 +53,8 @@ def _extract_line(xml_record, skip_empty_lines: bool = True):
     for idx, rec in enumerate(recs):
         try:
             line_im, line = next(extract_polygons(im, {**xml_record, seg_key: [rec]}))
-        except KrakenInputException:
-            logger.warning(f'Invalid line {idx} in {im.filename}')
+        except KrakenInputException as e:
+            logger.warning(f'Invalid line {idx} in {im.filename}: {e}')
             continue
         except Exception as e:
             logger.warning(f'Unexpected exception {e} from line {idx} in {im.filename}')
