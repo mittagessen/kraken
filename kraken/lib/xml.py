@@ -32,7 +32,7 @@ from kraken.lib.exceptions import KrakenInputException
 
 logger = logging.getLogger(__name__)
 
-__all__ = ['parse_xml', 'parse_page', 'parse_alto', 'preparse_xml_data']
+__all__ = ['XMLPage', 'parse_xml', 'parse_page', 'parse_alto', 'preparse_xml_data']
 
 # fallback mapping between PAGE region types and tags
 page_regions = {'TextRegion': 'text',

@@ -21,6 +21,7 @@ Command line drivers for recognition functionality.
 import os
 import warnings
 import logging
+import dataclasses
 import pkg_resources
 
 from typing import Dict, Union, List, cast, Any, IO, Callable
@@ -57,15 +58,9 @@ def message(msg: str, **styles) -> None:
 
 
 def get_input_parser(type_str: str) -> Callable[[str], Dict[str, Any]]:
-    if type_str == 'alto':
-        from kraken.lib.xml import parse_alto
-        return parse_alto
-    elif type_str == 'page':
-        from kraken.lib.xml import parse_page
-        return parse_page
-    elif type_str == 'xml':
-        from kraken.lib.xml import parse_xml
-        return parse_xml
+    if type_str in ['alto', 'page', 'xml']:
+        from kraken.lib.xml import XMLPage
+        return XMLPage
     elif type_str == 'image':
         return Image.open
 
@@ -78,7 +73,7 @@ def binarizer(threshold, zoom, escale, border, perc, range, low, high, input, ou
     ctx = click.get_current_context()
     if ctx.meta['first_process']:
         if ctx.meta['input_format_type'] != 'image':
-            input = get_input_parser(ctx.meta['input_format_type'])(input)['image']
+            input = get_input_parser(ctx.meta['input_format_type'])(input).imagename
         ctx.meta['first_process'] = False
     else:
         raise click.UsageError('Binarization has to be the initial process.')
@@ -131,7 +126,7 @@ def segmenter(legacy, model, text_direction, scale, maxcolseps, black_colseps,
 
     if ctx.meta['first_process']:
         if ctx.meta['input_format_type'] != 'image':
-            input = get_input_parser(ctx.meta['input_format_type'])(input)['image']
+            input = get_input_parser(ctx.meta['input_format_type'])(input).imagename
         ctx.meta['first_process'] = False
 
     if 'base_image' not in ctx.meta:
@@ -179,7 +174,7 @@ def segmenter(legacy, model, text_direction, scale, maxcolseps, black_colseps,
     else:
         with click.open_file(output, 'w') as fp:
             fp = cast(IO[Any], fp)
-            json.dump(res, fp)
+            json.dump(dataclasses.asdict(res), fp)
     message('\u2713', fg='green')
 
 
@@ -203,7 +198,12 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore, input,
             if doc['base_dir'] and bidi_reordering is True:
                 message(f'Setting base text direction for BiDi reordering to {doc["base_dir"]} (from XML input file)')
                 bidi_reordering = doc['base_dir']
-            bounds = doc
+            bounds = {'text_direction': 'horizontal-lr',
+                      'tags': True,
+                      'lines': doc.get_sorted_lines(),
+                      'regions': doc.get_sorted_regions(),
+                      'type': 'baselines',
+                      'image': doc.imagename}
     try:
         im = Image.open(ctx.meta['base_image'])
     except IOError as e:

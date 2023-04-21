@@ -22,6 +22,7 @@ import numpy as np
 import shapely.geometry as geom
 import torch.nn.functional as F
 
+from dataclasses import dataclass
 from collections import defaultdict
 
 from PIL import Image
@@ -40,7 +41,7 @@ from skimage.measure import approximate_polygon, subdivide_polygon, regionprops,
 from skimage.morphology import skeletonize
 from skimage.transform import PiecewiseAffineTransform, SimilarityTransform, AffineTransform, warp
 
-from typing import List, Tuple, Union, Dict, Any, Sequence, Optional
+from typing import List, Tuple, Union, Dict, Any, Sequence, Optional, Literal
 
 from kraken.lib import default_specs
 from kraken.lib.exceptions import KrakenInputException
@@ -59,10 +60,21 @@ __all__ = ['reading_order',
            'scale_polygonal_lines',
            'scale_regions',
            'compute_polygon_section',
-           'extract_polygons']
+           'extract_polygons',
+           'Segmentation']
 
 
-def reading_order(lines: Sequence[Tuple[slice, slice]], text_direction: str = 'lr') -> np.ndarray:
+@dataclass
+class Segmentation:
+    type: Literal['baselines', 'bbox']
+    text_direction: Literal['horizontal-lr', 'horizontal-rl', 'vertical-lr', 'vertical-rl']
+    script_detection: bool
+    lines: List
+    regions: Dict[str, List]
+    line_orders: List[List[int]]
+
+
+def reading_order(lines: Sequence[Tuple[slice, slice]], text_direction: Literal['lr', 'rl'] = 'lr') -> np.ndarray:
     """Given the list of lines (a list of 2D slices), computes
     the partial reading order.  The output is a binary 2D array
     such that order[i,j] is true if line i comes before line j
@@ -737,9 +749,9 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
     return polygons
 
 
-def polygonal_reading_order(lines: Sequence[Tuple[List[Tuple[int, int]], List[Tuple[int, int]]]],
-                            text_direction: str = 'lr',
-                            regions: Optional[Sequence[List[Tuple[int, int]]]] = None) -> Sequence[Tuple[List[Tuple[int, int]], List[Tuple[int, int]]]]:
+def polygonal_reading_order(lines: Sequence[Dict],
+                            text_direction: Literal['lr', 'rl'] = 'lr',
+                            regions: Optional[Sequence[List[Tuple[int, int]]]] = None) -> Sequence[int]:
     """
     Given a list of baselines and regions, calculates the correct reading order
     and applies it to the input.
@@ -752,8 +764,10 @@ def polygonal_reading_order(lines: Sequence[Tuple[List[Tuple[int, int]], List[Tu
                               Can be 'lr' or 'rl'
 
     Returns:
-        A reordered input.
+        The indices of the ordered input.
     """
+    lines = [(line['tags']['type'], line['baseline'], line['boundary']) for line in lines]
+
     bounds = []
     if regions is not None:
         r = [geom.Polygon(reg) for reg in regions]
@@ -789,13 +803,13 @@ def polygonal_reading_order(lines: Sequence[Tuple[List[Tuple[int, int]], List[Tu
     lsort = topsort(order)
     sidz = sorted(indizes.keys())
     lsort = [sidz[i] for i in lsort]
-    ordered_lines = []
+    ordered_idxs = []
     for i in lsort:
         if indizes[i][0] == 'line':
-            ordered_lines.append(indizes[i][1])
+            ordered_idxs.append(i)
         else:
-            ordered_lines.extend(lines[x] for x in intra_region_order[indizes[i][1]])
-    return ordered_lines
+            ordered_idxs.extend(intra_region_order[indizes[i][1]])
+    return ordered_idxs
 
 
 def is_in_region(line, region) -> bool:
@@ -814,12 +828,12 @@ def is_in_region(line, region) -> bool:
     return region.contains(l_obj)
 
 
-def neural_reading_order(lines: Sequence[Tuple[List[Tuple[int, int]], List[Tuple[int, int]]]],
+def neural_reading_order(lines: Sequence[Dict],
                          text_direction: str = 'lr',
                          regions: Optional[Sequence[List[Tuple[int, int]]]] = None,
                          im_size: Tuple[int, int] = None,
                          model: 'TorchVGSLModel' = None,
-                         class_mapping: Dict[str, int] = None) -> Sequence[Tuple[List[Tuple[int, int]], List[Tuple[int, int]]]]:
+                         class_mapping: Dict[str, int] = None) -> Sequence[int]:
     """
     Given a list of baselines and regions, calculates the correct reading order
     and applies it to the input.
@@ -829,8 +843,9 @@ def neural_reading_order(lines: Sequence[Tuple[List[Tuple[int, int]], List[Tuple
         model: torch Module for
 
     Returns:
-        A reordered input.
+        The indices of the ordered input.
     """
+    lines = [(line['tags']['type'], line['baseline'], line['boundary']) for line in lines]
     # construct all possible pairs
     h, w = im_size
     features = []
@@ -868,9 +883,7 @@ def neural_reading_order(lines: Sequence[Tuple[List[Tuple[int, int]], List[Tuple
             idx += 1
     # decode order relation matrix
     path = _greedy_order_decoder(order)
-    # reorder lines
-    lines = [lines[idx] for idx in path]
-    return lines
+    return path
 
 
 def _greedy_order_decoder(P):

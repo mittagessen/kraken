@@ -29,7 +29,7 @@ from scipy.ndimage.filters import (gaussian_filter, uniform_filter,
 from kraken.lib import morph, sl
 from kraken.lib.util import pil2array, is_bitonal, get_im_str
 from kraken.lib.exceptions import KrakenInputException
-from kraken.lib.segmentation import reading_order, topsort
+from kraken.lib.segmentation import reading_order, topsort, Segmentation
 
 
 __all__ = ['segment']
@@ -424,6 +424,9 @@ def segment(im,
         pad = (pad, pad)
     lines = [(max(x[0]-pad[0], 0), x[1], min(x[2]+pad[1], im.size[0]), x[3]) for x in lines]
 
-    return {'text_direction': text_direction,
-            'boxes': rotate_lines(lines, 360-angle, offset).tolist(),
-            'script_detection': False}
+    return Segmentation(text_direction=text_direction,
+                        type='bbox',
+                        regions=None,
+                        line_orders=None,
+                        lines=rotate_lines(lines, 360-angle, offset).tolist(),
+                        script_detection=False)

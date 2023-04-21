@@ -25,7 +25,7 @@ from collections import Counter
 
 from kraken.rpred import BaselineOCRRecord, BBoxOCRRecord, ocr_record
 from kraken.lib.util import make_printable
-from kraken.lib.segmentation import is_in_region
+from kraken.lib.segmentation import is_in_region, Segmentation
 
 from typing import Union, List, Tuple, Iterable, Optional, Sequence, Dict, Any, Literal
 
@@ -246,7 +246,7 @@ def serialize(records: Sequence[ocr_record],
     return tmpl.render(page=page, metadata=metadata)
 
 
-def serialize_segmentation(segresult: Dict[str, Any],
+def serialize_segmentation(segresult: Segmentation,
                            image_name: Union[PathLike, str] = None,
                            image_size: Tuple[int, int] = (0, 0),
                            template: Union[PathLike, str] = 'alto',
@@ -266,18 +266,18 @@ def serialize_segmentation(segresult: Dict[str, Any],
     Returns:
             (str) rendered template.
     """
-    if 'type' in segresult and segresult['type'] == 'baselines':
-        records = [BaselineOCRRecord('', (), (), bl) for bl in segresult['lines']]
+    if segresult.type == 'baselines':
+        records = [BaselineOCRRecord('', (), (), bl) for bl in segresult.lines]
     else:
         records = []
-        for line in segresult['boxes']:
+        for line in segresult.lines:
             xmin, xmax = min(line[::2]), max(line[::2])
             ymin, ymax = min(line[1::2]), max(line[1::2])
             records.append(BBoxOCRRecord('', (), (), ((xmin, ymin), (xmin, ymax), (xmax, ymax), (xmax, ymin))))
     return serialize(records,
                      image_name=image_name,
                      image_size=image_size,
-                     regions=segresult['regions'] if 'regions' in segresult else None,
+                     regions=segresult.regions,
                      template=template,
                      template_source=template_source,
                      processing_steps=processing_steps)

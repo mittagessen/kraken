@@ -29,8 +29,7 @@ import shapely.geometry as geom
 import torch.nn.functional as F
 import torchvision.transforms as tf
 
-from functools import partial
-from typing import Optional, Dict, Callable, Union, List, Any, Tuple
+from typing import Optional, Dict, Callable, Union, List, Any, Tuple, Literal
 
 from scipy.ndimage import gaussian_filter
 from skimage.filters import sobel
@@ -38,7 +37,8 @@ from skimage.filters import sobel
 from kraken.lib import vgsl, dataset
 from kraken.lib.util import is_bitonal, get_im_str
 from kraken.lib.exceptions import KrakenInputException, KrakenInvalidModelException
-from kraken.lib.segmentation import (polygonal_reading_order,
+from kraken.lib.segmentation import (Segmentation,
+                                     polygonal_reading_order,
                                      neural_reading_order,
                                      vectorize_lines, vectorize_regions,
                                      scale_polygonal_lines,
@@ -163,7 +163,6 @@ def vec_lines(heatmap: torch.Tensor,
               cls_map: Dict[str, Dict[str, int]],
               scale: float,
               text_direction: str = 'horizontal-lr',
-              reading_order_fn: Callable = polygonal_reading_order,
               regions: List[np.ndarray] = None,
               scal_im: np.ndarray = None,
               suppl_obj: List[np.ndarray] = None,
@@ -181,7 +180,6 @@ def vec_lines(heatmap: torch.Tensor,
         scale: Scaling factor between heatmap and unscaled input image.
         text_direction: Text directions used as hints in the reading order
                         algorithm.
-        reading_order_fn: Reading order calculation function.
         regions: Regions to be used as boundaries during polygonization and
                  atomic blocks during reading order determination for lines
                  contained within.
@@ -242,15 +240,13 @@ def vec_lines(heatmap: torch.Tensor,
     logger.debug('Scaling vectorized lines')
     sc = scale_polygonal_lines([x[1:] for x in lines], scale)
     lines = list(zip([x[0] for x in lines], [x[0] for x in sc], [x[1] for x in sc]))
-    logger.debug('Reordering baselines')
-    lines = reading_order_fn(lines=lines, regions=regions, text_direction=text_direction[-2:])
     return [{'tags': {'type': bl_type}, 'baseline': bl, 'boundary': pl} for bl_type, bl, pl in lines]
 
 
 def segment(im: PIL.Image.Image,
-            text_direction: str = 'horizontal-lr',
+            text_direction: Literal['horizontal-lr', 'horizontal-rl', 'vertical-lr', 'vertical-rl'] = 'horizontal-lr',
             mask: Optional[np.ndarray] = None,
-            reading_order_fn: Optional[Callable] = None,
+            reading_order_fn: Callable = polygonal_reading_order,
             model: Union[List[vgsl.TorchVGSLModel], vgsl.TorchVGSLModel] = None,
             device: str = 'cpu',
             raise_on_error: bool = False,
@@ -271,15 +267,7 @@ def segment(im: PIL.Image.Image,
               detection.
         reading_order_fn: Function to determine the reading order.  Has to
                           accept a list of tuples (baselines, polygon) and a
-                          text direction (`lr` or `rl`). If None is given it
-                          defaults to either
-                          :func:`kraken.lib.segmentation.polygonal_reading_order`
-                          or
-                          :func:`kraken.lib.segmentation.neural_reading_order`
-                          depending on the presence of a neural reading order
-                          net in the segmentation model. If multiple
-                          segmentation models are given and more than one
-                          contains an RO net the first one will be used.
+                          text direction (`lr` or `rl`).
         model: One or more TorchVGSLModel containing a segmentation model. If
                none is given a default model will be loaded.
         device: The target device to run the neural network on.
@@ -288,31 +276,36 @@ def segment(im: PIL.Image.Image,
         autocast: Runs the model with automatic mixed precision
 
     Returns:
-        A dictionary containing the text direction and under the key 'lines' a
-        list of reading order sorted baselines (polylines) and their respective
-        polygonal boundaries. The last and first point of each boundary polygon
-        are connected.
+        A :class:`kraken.lib.blla.Segmentation` class containing reading order
+        sorted baselines (polylines) and their respective polygonal boundaries.
+        The format of the line and region records is shown below.  The last and
+        first point of each boundary polygon are connected.
 
         .. code-block::
            :force:
 
-            {'text_direction': '$dir',
-             'type': 'baseline',
-             'lines': [
-                {'baseline': [[x0, y0], [x1, y1], ..., [x_n, y_n]], 'boundary': [[x0, y0, x1, y1], ... [x_m, y_m]]},
-                {'baseline': [[x0, ...]], 'boundary': [[x0, ...]]}
-              ]
-              'regions': [
-                {'region': [[x0, y0], [x1, y1], ..., [x_n, y_n]], 'type': 'image'},
-                {'region': [[x0, ...]], 'type': 'text'}
-              ]
-            }
+           'lines': [
+              {'baseline': [[x0, y0], [x1, y1], ..., [x_n, y_n]], 'boundary': [[x0, y0, x1, y1], ... [x_m, y_m]]},
+              {'baseline': [[x0, ...]], 'boundary': [[x0, ...]]}
+            ]
+            'regions': [
+              {'region': [[x0, y0], [x1, y1], ..., [x_n, y_n]], 'type': 'image'},
+              {'region': [[x0, ...]], 'type': 'text'}
+            ]
 
     Raises:
         KrakenInvalidModelException: if the given model is not a valid
                                      segmentation model.
         KrakenInputException: if the mask is not bitonal or does not match the
                               image size.
+
+    Notes:
+        Multi-model operation is most useful for combining one or more region
+        detection models and one text line model. Detected lines from all
+        models are simply combined without any merging or duplicate detection
+        so the chance of the same line appearing multiple times in the output
+        are high. In addition, neural reading order determination is disabled
+        when more than one model outputs lines.
     """
     if model is None:
         logger.info('No segmentation model given. Loading default model.')
@@ -320,18 +313,6 @@ def segment(im: PIL.Image.Image,
 
     if isinstance(model, vgsl.TorchVGSLModel):
         model = [model]
-
-    # determine which reading order function to use
-    if not reading_order_fn:
-        reading_order_fn = polygonal_reading_order
-        for x in model:
-            if 'ro_model' in x.aux_layers:
-                logger.info(f'Using reading order model found in segmentation model {x}.')
-                reading_order_fn = partial(neural_reading_order,
-                                           model=x.aux_layers['ro_model'],
-                                           im_size=im.size,
-                                           class_mapping=x.user_metadata['ro_class_mapping'])
-                break
 
     for nn in model:
         if nn.model_type != 'segmentation':
@@ -342,6 +323,12 @@ def segment(im: PIL.Image.Image,
     im_str = get_im_str(im)
     logger.info(f'Segmenting {im_str}')
 
+    lines = []
+    order = None
+    regions = {}
+    multi_lines = False
+    # flag to indicate that multiple models produced line output -> disable
+    # neural reading order
     for net in model:
         if 'topline' in net.user_metadata:
             loc = {None: 'center',
@@ -349,11 +336,12 @@ def segment(im: PIL.Image.Image,
                    False: 'bottom'}[net.user_metadata['topline']]
             logger.debug(f'Baseline location: {loc}')
         rets = compute_segmentation_map(im, mask, net, device, autocast=autocast)
-        regions = vec_regions(**rets)
+        _regions = vec_regions(**rets)
+
         # flatten regions for line ordering/fetch bounding regions
         line_regs = []
         suppl_obj = []
-        for cls, regs in regions.items():
+        for cls, regs in _regions.items():
             line_regs.extend(regs)
             if rets['bounding_regions'] is not None and cls in rets['bounding_regions']:
                 suppl_obj.extend(regs)
@@ -361,21 +349,48 @@ def segment(im: PIL.Image.Image,
         suppl_obj = scale_regions(suppl_obj, 1/rets['scale'])
         line_regs = scale_regions(line_regs, 1/rets['scale'])
 
-        lines = vec_lines(**rets,
-                          regions=line_regs,
-                          reading_order_fn=reading_order_fn,
-                          text_direction=text_direction,
-                          suppl_obj=suppl_obj,
-                          topline=net.user_metadata['topline'] if 'topline' in net.user_metadata else False,
-                          raise_on_error=raise_on_error)
+        _lines = vec_lines(**rets,
+                           regions=line_regs,
+                           text_direction=text_direction,
+                           suppl_obj=suppl_obj,
+                           topline=net.user_metadata['topline'] if 'topline' in net.user_metadata else False,
+                           raise_on_error=raise_on_error)
+
+        if 'ro_model' in net.aux_layers:
+            logger.info(f'Using reading order model found in segmentation model {net}.')
+            _order = neural_reading_order(lines=_lines,
+                                          regions=regions,
+                                          text_direction=text_direction[-2:],
+                                          model=net.aux_layers['ro_model'],
+                                          im_size=im.size,
+                                          class_mapping=net.user_metadata['ro_class_mapping'])
+        else:
+            _order = None
+
+        if _lines and lines or multi_lines:
+            multi_lines = True
+            order = None
+            logger.warning('Multiple models produced line output. This is '
+                           'likely unintended. Suppressing neural reading '
+                           'order.')
+        else:
+            order = _order
+
+        lines.extend(_lines)
+
+    # reorder lines
+    logger.debug(f'Reordering baselines with main RO function {reading_order_fn}.')
+    basic_lo = reading_order_fn(lines=lines, regions=regions, text_direction=text_direction[-2:])
+    lines = [lines[idx] for idx in basic_lo]
 
     if len(rets['cls_map']['baselines']) > 1:
         script_detection = True
     else:
         script_detection = False
 
-    return {'text_direction': text_direction,
-            'type': 'baselines',
-            'lines': lines,
-            'regions': regions,
-            'script_detection': script_detection}
+    return Segmentation(text_direction=text_direction,
+                        type='baselines',
+                        lines=lines,
+                        regions=regions,
+                        script_detection=script_detection,
+                        line_orders=[order])
