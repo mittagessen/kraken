@@ -380,7 +380,7 @@ class RecognitionPretrainModel(pl.LightningModule):
         if ce < self.best_metric:
             logger.debug(f'Updating best metric from {self.best_metric} ({self.best_epoch}) to {ce} ({self.current_epoch})')
             self.best_epoch = self.current_epoch
-            self.best_metric = accuracy
+            self.best_metric = ce
         logger.info(f'validation run: cross_enctropy: {ce}')
         self.log('val_ce', ce, on_step=False, on_epoch=True, prog_bar=True, logger=True)
 
