@@ -32,6 +32,7 @@ import re
 import math
 import torch
 import logging
+import numpy as np
 import torch.nn.functional as F
 import pytorch_lightning as pl
 
@@ -287,6 +288,8 @@ class RecognitionPretrainModel(pl.LightningModule):
         self.best_epoch = 0
         self.best_metric = math.inf
 
+        self.val_ce = []
+
         spec = spec.strip()
         if spec[0] != '[' or spec[-1] != ']':
             raise ValueError(f'VGSL spec {spec} not bracketed')
@@ -367,7 +370,19 @@ class RecognitionPretrainModel(pl.LightningModule):
                     _min = logits.argmin(-1) == 0
                     both = _max & _min
                     corr = _max.long().sum().item() - both.long().sum().item()
+            self.val_ce.append(loss.cpu())
             self.log('CE', loss, on_step=True, on_epoch=True)
+
+    def on_validation_epoch_end(self):
+        ce = np.mean(self.val_ce)
+        self.val_ce.clear()
+
+        if ce < self.best_metric:
+            logger.debug(f'Updating best metric from {self.best_metric} ({self.best_epoch}) to {ce} ({self.current_epoch})')
+            self.best_epoch = self.current_epoch
+            self.best_metric = accuracy
+        logger.info(f'validation run: cross_enctropy: {ce}')
+        self.log('val_ce', ce, on_step=False, on_epoch=True, prog_bar=True, logger=True)
 
     def training_step(self, batch, batch_idx):
         o = self._step(batch, batch_idx)
