@@ -30,7 +30,7 @@ from typing import List, Tuple, Optional, Generator, Union, Dict, Sequence
 
 from kraken.lib.util import get_im_str, is_bitonal
 from kraken.lib.models import TorchSeqRecognizer
-from kraken.lib.segmentation import extract_polygons, compute_polygon_section
+from kraken.lib.segmentation import extract_polygons, compute_polygon_section, Segmentation
 from kraken.lib.exceptions import KrakenInputException
 from kraken.lib.dataset import ImageInputTransforms
 
@@ -401,7 +401,7 @@ class mm_rpred(object):
     def __init__(self,
                  nets: Dict[str, TorchSeqRecognizer],
                  im: Image.Image,
-                 bounds: dict,
+                 bounds: Segmentation,
                  pad: int = 16,
                  bidi_reordering: Union[bool, str] = True,
                  tags_ignore: Optional[List[str]] = None) -> Generator[ocr_record, None, None]:
@@ -413,20 +413,18 @@ class mm_rpred(object):
         these lines.
 
         Args:
-            nets (dict): A dict mapping tag values to TorchSegRecognizer
-                         objects. Recommended to be an defaultdict.
-            im (PIL.Image.Image): Image to extract text from
-            bounds (dict): A dictionary containing a 'boxes' entry
-                            with a list of lists of coordinates (script, (x0, y0,
-                            x1, y1)) of a text line in the image and an entry
-                            'text_direction' containing
-                            'horizontal-lr/rl/vertical-lr/rl'.
-            pad (int): Extra blank padding to the left and right of text line
-            bidi_reordering (bool|str): Reorder classes in the ocr_record according to
-                                        the Unicode bidirectional algorithm for
-                                        correct display. Set to L|R to
-                                        override default text direction.
-            tags_ignore (list): List of tag values to ignore during recognition
+            nets: A dict mapping tag values to TorchSegRecognizer objects.
+                  Recommended to be an defaultdict.
+            im: Image to extract text from
+            bounds: A Segmentation data class containing either bounding box or
+                    baseline type segmentation.
+            pad: Extra blank padding to the left and right of text line
+            bidi_reordering: Reorder classes in the ocr_record according to the
+                             Unicode bidirectional algorithm for correct
+                             display. Set to L|R to override default text
+                             direction.
+            tags_ignore: List of tag values to ignore during recognition
+
         Yields:
             An ocr_record containing the recognized text, absolute character
             positions, and confidence values for each character.
@@ -445,36 +443,35 @@ class mm_rpred(object):
         if not tags_ignore:
             tags_ignore = []
 
-        if ('type' in bounds and bounds['type'] not in seg_types) or len(seg_types) > 1:
+        if bounds.type not in seg_types or len(seg_types) > 1:
             logger.warning(f'Recognizers with segmentation types {seg_types} will be '
-                           f'applied to segmentation of type {bounds["type"] if "type" in bounds else None}. '
+                           f'applied to segmentation of type {bounds.type}. '
                            f'This will likely result in severely degraded performace')
         one_channel_modes = set(recognizer.nn.one_channel_mode for recognizer in nets.values())
         if '1' in one_channel_modes and len(one_channel_modes) > 1:
             raise KrakenInputException('Mixing binary and non-binary recognition models is not supported.')
         elif '1' in one_channel_modes and not is_bitonal(im):
             logger.warning('Running binary models on non-binary input image '
-                           '(mode {}). This will result in severely degraded '
-                           'performance'.format(im.mode))
-        if 'type' in bounds and bounds['type'] == 'baselines':
+                           f'(mode {im.mode}). This will result in severely degraded '
+                           'performance')
+
+        self.len = len(bounds.lines)
+        self.line_iter = iter(bounds.lines)
+
+        if bounds.type == 'baselines':
             valid_norm = False
-            self.len = len(bounds['lines'])
-            self.seg_key = 'lines'
             self.next_iter = self._recognize_baseline_line
-            self.line_iter = iter(bounds['lines'])
             tags = set()
-            for x in bounds['lines']:
+            for x in bounds.lines:
                 tags.update(x['tags'].values())
         else:
             valid_norm = True
-            self.len = len(bounds['boxes'])
             self.seg_key = 'boxes'
             self.next_iter = self._recognize_box_line
-            self.line_iter = iter(bounds['boxes'])
-            tags = set(x[0] for line in bounds['boxes'] for x in line)
+            tags = set(x[0] for line in bounds.lines for x in line)
 
         im_str = get_im_str(im)
-        logger.info('Running {} multi-script recognizers on {} with {} lines'.format(len(nets), im_str, self.len))
+        logger.info(f'Running {len(nets)} multi-script recognizers on {im_str} with {self.len} lines')
 
         filtered_tags = []
         miss = []
@@ -486,12 +483,12 @@ class mm_rpred(object):
         tags = filtered_tags
 
         if miss:
-            raise KrakenInputException('Missing models for tags {}'.format(set(miss)))
+            raise KrakenInputException(f'Missing models for tags {set(miss)}')
 
         # build dictionary for line preprocessing
         self.ts = {}
         for tag in tags:
-            logger.debug('Loading line transforms for {}'.format(tag))
+            logger.debug(f'Loading line transforms for {tag}')
             network = nets[tag]
             batch, channels, height, width = network.nn.input
             self.ts[tag] = ImageInputTransforms(batch, height, width, channels, (pad, 0), valid_norm)
@@ -554,7 +551,7 @@ class mm_rpred(object):
             conf = []
 
             for _, start, end, c in preds:
-                if self.bounds['text_direction'].startswith('horizontal'):
+                if self.bounds.text_direction.startswith('horizontal'):
                     xmin = coords[0] + self._scale_val(start, 0, self.box.size[0])
                     xmax = coords[0] + self._scale_val(end, 0, self.box.size[0])
                     pos.append([[xmin, coords[1]], [xmin, coords[3]], [xmax, coords[3]], [xmax, coords[1]]])
@@ -631,7 +628,7 @@ class mm_rpred(object):
 
     def __next__(self):
         bound = self.bounds
-        bound[self.seg_key] = [next(self.line_iter)]
+        setattr(bound, self.seg_key, [next(self.line_iter)])
         return self.next_iter(bound)
 
     def __iter__(self):
@@ -646,39 +643,35 @@ class mm_rpred(object):
 
 def rpred(network: TorchSeqRecognizer,
           im: Image.Image,
-          bounds: dict,
+          bounds: Segmentation,
           pad: int = 16,
           bidi_reordering: Union[bool, str] = True) -> Generator[ocr_record, None, None]:
     """
     Uses a TorchSeqRecognizer and a segmentation to recognize text
 
     Args:
-        network (kraken.lib.models.TorchSeqRecognizer): A TorchSegRecognizer
-                                                        object
-        im (PIL.Image.Image): Image to extract text from
-        bounds (dict): A dictionary containing a 'boxes' entry with a list of
-                       coordinates (x0, y0, x1, y1) of a text line in the image
-                       and an entry 'text_direction' containing
-                       'horizontal-lr/rl/vertical-lr/rl'.
-        pad (int): Extra blank padding to the left and right of text line.
-                   Auto-disabled when expected network inputs are incompatible
-                   with padding.
-        bidi_reordering (bool|str): Reorder classes in the ocr_record according to
-                                    the Unicode bidirectional algorithm for correct
-                                    display. Set to L|R to change base text
-                                    direction.
+        network: A TorchSegRecognizer object
+        im: Image to extract text from
+        bounds: A Segmentation class instance containing either a baseline or bbox segmentation.
+        pad: Extra blank padding to the left and right of text line.
+             Auto-disabled when expected network inputs are incompatible with
+             padding.
+        bidi_reordering: Reorder classes in the ocr_record according to the
+                         Unicode bidirectional algorithm for correct display.
+                         Set to L|R to change base text direction.
+
     Yields:
         An ocr_record containing the recognized text, absolute character
         positions, and confidence values for each character.
     """
     bounds = copy.deepcopy(bounds)
-    if 'boxes' in bounds:
-        boxes = bounds['boxes']
+    if bounds.type == 'bbox':
+        boxes = bounds.lines
         rewrite_boxes = []
         for box in boxes:
             rewrite_boxes.append([('default', box)])
-        bounds['boxes'] = rewrite_boxes
-        bounds['script_detection'] = True
+        bounds.lines = rewrite_boxes
+        bounds.script_detection = True
     return mm_rpred(defaultdict(lambda: network), im, bounds, pad, bidi_reordering)
 
 
@@ -693,4 +686,4 @@ def _resolve_tags_to_model(tags: Sequence[Dict[str, str]],
             return tag, model_map[tag]
     if default:
         return next(tags.values()), default
-    raise KrakenInputException('No model for tags {}'.format(tags))
+    raise KrakenInputException(f'No model for tags {tags}')
