@@ -33,7 +33,7 @@ from typing import Dict, List, Tuple, Sequence, Callable, Any, Union, Literal, O
 
 from skimage.draw import polygon
 
-from kraken.lib.xml import parse_alto, parse_page, parse_xml
+from kraken.lib.xml import XMLPage
 
 from kraken.lib.exceptions import KrakenInputException
 
@@ -103,32 +103,25 @@ class BaselineSet(Dataset):
         self.valid_baselines = valid_baselines
         self.valid_regions = valid_regions
         if mode in ['alto', 'page', 'xml']:
-            if mode == 'alto':
-                fn = parse_alto
-            elif mode == 'page':
-                fn = parse_page
-            elif mode == 'xml':
-                fn = parse_xml
             im_paths = []
             self.targets = []
             for img in imgs:
                 try:
-                    data = fn(img)
-                    im_paths.append(data['image'])
+                    data = XMLPage(img)
+                    im_paths.append(data.imagename)
                     lines = defaultdict(list)
-                    for line in data['lines']:
+                    for line in data.get_sorted_lines():
                         if valid_baselines is None or set(line['tags'].values()).intersection(valid_baselines):
                             tags = set(line['tags'].values()).intersection(valid_baselines) if valid_baselines else line['tags'].values()
                             for tag in tags:
                                 lines[self.mbl_dict.get(tag, tag)].append(line['baseline'])
                                 self.class_stats['baselines'][self.mbl_dict.get(tag, tag)] += 1
                     regions = defaultdict(list)
-                    for k, v in data['regions'].items():
+                    for k, v in data.regions.items():
                         if valid_regions is None or k in valid_regions:
                             regions[self.mreg_dict.get(k, k)].extend(v)
                             self.class_stats['regions'][self.mreg_dict.get(k, k)] += len(v)
-                    data['regions'] = regions
-                    self.targets.append({'baselines': lines, 'regions': data['regions']})
+                    self.targets.append({'baselines': lines, 'regions': regions})
                 except KrakenInputException as e:
                     logger.warning(e)
                     continue
