@@ -32,7 +32,7 @@ from collections import defaultdict
 from torch.utils.data import Dataset
 from typing import Dict, List, Tuple, Sequence, Callable, Any, Union, Literal, Optional
 
-from kraken.lib.xml import parse_alto, parse_page, parse_xml, XMLPage
+from kraken.lib.xml import XMLPage
 
 from kraken.lib.exceptions import KrakenInputException
 
