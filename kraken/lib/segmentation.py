@@ -67,6 +67,7 @@ __all__ = ['reading_order',
 @dataclass
 class Segmentation:
     type: Literal['baselines', 'bbox']
+    imagename: str
     text_direction: Literal['horizontal-lr', 'horizontal-rl', 'vertical-lr', 'vertical-rl']
     script_detection: bool
     lines: List
@@ -1046,29 +1047,20 @@ def compute_polygon_section(baseline: Sequence[Tuple[int, int]],
     return tuple(o)
 
 
-def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image.Image:
+def extract_polygons(im: Image.Image, bounds: Segmentation) -> Image.Image:
     """
     Yields the subimages of image im defined in the list of bounding polygons
     with baselines preserving order.
 
     Args:
         im: Input image
-        bounds: A list of dicts in baseline::
-
-                    {'type': 'baselines',
-                     'lines': [{'baseline': [[x_0, y_0], ... [x_n, y_n]],
-                                'boundary': [[x_0, y_0], ... [x_n, y_n]]},
-                               ....]
-                    }
-
-                or bounding box format::
-
-                    {'boxes': [[x_0, y_0, x_1, y_1], ...], 'text_direction': 'horizontal-lr'}
+        bounds: A Segmentation class containing a boundig box or baseline
+                segmentation.
 
     Yields:
         The extracted subimage
     """
-    if 'type' in bounds and bounds['type'] == 'baselines':
+    if bounds.type == 'baselines':
         # select proper interpolation scheme depending on shape
         if im.mode == '1':
             order = 0
@@ -1077,7 +1069,7 @@ def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image.Image:
             order = 1
         im = np.array(im)
 
-        for line in bounds['lines']:
+        for line in bounds.lines:
             if line['boundary'] is None:
                 raise KrakenInputException('No boundary given for line')
             pl = np.array(line['boundary'])
@@ -1166,11 +1158,11 @@ def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image.Image:
                 i = Image.fromarray(o.astype('uint8'))
             yield i.crop(i.getbbox()), line
     else:
-        if bounds['text_direction'].startswith('vertical'):
+        if bounds.text_direction.startswith('vertical'):
             angle = 90
         else:
             angle = 0
-        for box in bounds['boxes']:
+        for box in bounds.lines:
             if isinstance(box, tuple):
                 box = list(box)
             if (box < [0, 0, 0, 0] or box[::2] >= [im.size[0], im.size[0]] or
