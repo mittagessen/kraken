@@ -69,7 +69,7 @@ can be selected. Per default `ALTO <http://www.loc.gov/standards/alto/>`_,
 `PageXML <https://en.wikipedia.org/wiki/PAGE_(XML)>`_, `hOCR
 <http://hocr.info>`_, and abbyyXML containing additional metadata such as
 bounding boxes and confidences are implemented. In addition, custom `jinja
-<https://jinja.palletsprojects.com>`_ templates can be loaded to crate
+<https://jinja.palletsprojects.com>`_ templates can be loaded to create
 individualised output such as TEI.
 
 Output formats are selected on the main `kraken` command and apply to the last
@@ -268,7 +268,7 @@ for left-to-right or `rl` for right-to-left).
         automatically with the inline text direction through the BiDi algorithm
         but can't infer the principal text direction automatically as it is
         determined by factors like layout, type of document, primary script in
-        the document, and other factors. The differents types of text
+        the document, and other factors. The different types of text
         directionality and their relation can be confusing, the `W3C writing
         mode <https://www.w3.org/TR/css-writing-modes-3/>`_ document explains
         the fundamentals, although the model used in Kraken differs slightly.
