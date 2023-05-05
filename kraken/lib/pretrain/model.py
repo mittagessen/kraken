@@ -287,6 +287,7 @@ class RecognitionPretrainModel(pl.LightningModule):
 
         self.best_epoch = 0
         self.best_metric = math.inf
+        self.best_model = None
 
         self.val_ce = []
 

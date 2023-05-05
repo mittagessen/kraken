@@ -189,8 +189,9 @@ class KrakenSaveModel(Callback):
             trainer.model.nn.user_metadata['accuracy'].append((trainer.global_step, metric))
             trainer.model.nn.user_metadata['metrics'].append((trainer.global_step, {k: float(v) for k, v in trainer.logged_metrics.items()}))
 
-            logger.info('Saving to {}_{}'.format(trainer.model.output, trainer.current_epoch))
+            logger.info('Saving to {}_{}.mlmodel'.format(trainer.model.output, trainer.current_epoch))
             trainer.model.nn.save_model(f'{trainer.model.output}_{trainer.current_epoch}.mlmodel')
+            trainer.model.best_model = f'{trainer.model.output}_{trainer.model.best_epoch}.mlmodel'
 
 
 class RecognitionModel(pl.LightningModule):
@@ -263,8 +264,9 @@ class RecognitionModel(pl.LightningModule):
         self.format_type = format_type
         self.output = output
 
-        self.best_epoch = 0
+        self.best_epoch = -1
         self.best_metric = 0.0
+        self.best_model = None
 
         DatasetClass = GroundTruthDataset
         valid_norm = True
@@ -708,8 +710,9 @@ class SegmentationModel(pl.LightningModule):
 
         super().__init__()
 
-        self.best_epoch = 0
+        self.best_epoch = -1
         self.best_metric = 0.0
+        self.best_model = None
 
         self.model = model
         self.num_workers = num_workers
