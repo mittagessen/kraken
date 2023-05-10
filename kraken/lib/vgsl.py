@@ -707,6 +707,34 @@ class TorchVGSLModel(object):
             logger.debug('{}\t\tlinear\taugmented {} out {}'.format(self.idx, aug, m.group('out')))
             return lin.get_shape(input), [VGSLBlock(blocks[idx], m.group(1), m.group('name'), self.idx)], lin
 
+    def _bracket_count(self, block: str) -> int:
+        rst = 0
+        for c in block:
+            if c == "[":
+                rst += 1
+            elif c != "(":
+                break
+        for c in block[::-1]:
+            if c == "]":
+                rst -= 1
+            elif c != ")":
+                break
+        return rst
+    
+    def _parenthesis_count(self, block: str) -> int:
+        rst = 0
+        for c in block:
+            if c == "(":
+                rst += 1
+            elif c != "[":
+                break
+        for c in block[::-1]:
+            if c == ")":
+                rst -= 1
+            elif c != "]":
+                break
+        return rst
+
     def build_series(self,
                      input: Tuple[int, int, int, int],
                      blocks: List[str],
@@ -725,12 +753,9 @@ class TorchVGSLModel(object):
         # multiple layers in serial block
         block_depth = 0
         for bl_idx, block in enumerate(blocks[idx:]):
-            if block[0] == '[':
-                block_depth += 1
-            if block[-1] == ']':
-                block_depth -= 1
-                if block_depth == 0:
-                    break
+            block_depth += self._bracket_count(block)
+            if block_depth == 0:
+                break
         if block_depth:
             raise ValueError('Unbalanced parentheses in VGSL spec')
         named_spec, nn, oshape = self._parse(input, [blocks[idx][1:]] + blocks[idx+1:idx+bl_idx] + [blocks[idx+bl_idx][:-1]], target_output_shape=target_output_shape)
@@ -755,12 +780,9 @@ class TorchVGSLModel(object):
             return oshape, named_spec, nn
         block_depth = 0
         for bl_idx, block in enumerate(blocks[idx:]):
-            if block[0] == '(':
-                block_depth += 1
-            if block[-1] == ')':
-                block_depth -= 1
-                if block_depth == 0:
-                    break
+            block_depth += self._parenthesis_count(block)
+            if block_depth == 0:
+                break
         if block_depth:
             raise ValueError('Unbalanced parentheses in VGSL spec')
         named_spec, nn, oshape = self._parse(input, [blocks[idx][1:]] + blocks[idx+1:idx+bl_idx] + [blocks[idx+bl_idx][:-1]], parallel=True, target_output_shape=target_output_shape)
