@@ -5,6 +5,13 @@ from typing import Literal, List, Dict, Sequence, Union, Optional, Tuple
 from dataclasses import dataclass, asdict
 from abc import ABC, abstractmethod
 
+__all__ = ['BaselineLine',
+           'BBoxLine',
+           'Segmentation',
+           'ocr_record',
+           'BaselineOCRRecord',
+           'BBoxOCRRecord']
+
 
 @dataclass
 class BaselineLine:
