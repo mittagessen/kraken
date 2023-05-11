@@ -823,9 +823,14 @@ class ActConv2D(Module):
         Sets the weight of an initialized model from a CoreML protobuf spec.
         """
         conv = [x for x in spec.neuralNetwork.layers if x.name == '{}_conv'.format(name)][0].convolution
-        self.co.weight = torch.nn.Parameter(torch.Tensor(conv.weights.floatValue).view(self.out_channels,
-                                                                                       self.in_channels,
-                                                                                       *self.kernel_size))
+        if self.transposed:
+            self.co.weight = torch.nn.Parameter(torch.Tensor(conv.weights.floatValue).view(self.in_channels,
+                                                                                           self.out_channels,
+                                                                                           *self.kernel_size))
+        else:
+            self.co.weight = torch.nn.Parameter(torch.Tensor(conv.weights.floatValue).view(self.out_channels,
+                                                                                           self.in_channels,
+                                                                                           *self.kernel_size))
         self.co.bias = torch.nn.Parameter(torch.Tensor(conv.bias.floatValue))
 
     def serialize(self, name: str, input: str, builder) -> str:
@@ -834,6 +839,7 @@ class ActConv2D(Module):
         """
         conv_name = '{}_conv'.format(name)
         act_name = '{}_act'.format(name)
+        W = self.co.weight.permute(2, 3, 0, 1).data.numpy() if self.transposed else self.co.weight.permute(2, 3, 1, 0).data.numpy()
         builder.add_convolution(name=conv_name,
                                 kernel_channels=self.in_channels,
                                 output_channels=self.out_channels,
@@ -843,7 +849,7 @@ class ActConv2D(Module):
                                 stride_width=self.stride[1],
                                 border_mode='same',
                                 groups=1,
-                                W=self.co.weight.permute(2, 3, 1, 0).data.numpy(),
+                                W=W,
                                 b=self.co.bias.data.numpy(),
                                 has_bias=True,
                                 is_deconv=self.transposed,
