@@ -498,7 +498,7 @@ class RecognitionModel(pl.LightningModule):
         logger.info(f'validation run: total chars {self.val_cer.total} errors {self.val_cer.errors} accuracy {accuracy}')
         self.log('val_accuracy', accuracy, on_step=False, on_epoch=True, prog_bar=True, logger=True)
         self.log('val_word_accuracy', word_accuracy, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-        self.log('val_metric', accuracy, on_step=False, on_epoch=True, prog_bar=False, logger=False)
+        self.log('val_metric', accuracy, on_step=False, on_epoch=True, prog_bar=False, logger=True)
         self.val_cer.reset()
         self.val_wer.reset()
 
