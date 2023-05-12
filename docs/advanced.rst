@@ -9,7 +9,7 @@ lines from an image), recognition (feeding text lines images into a
 classifier), and finally serialization of results into an appropriate format
 such as ALTO or PageXML.
 
-Input and Outputs 
+Input and Outputs
 -----------------
 
 Kraken inputs and their outputs can be defined in multiple ways. The most
@@ -91,17 +91,17 @@ The currently available format switches are:
         $ kraken -h -i ... ... # hOCR output
         $ kraken -y -i ... ... # abbyyXML output
 
-Custom templates can be loaded with the `--template` option:
+Custom templates can be loaded with the ``--template`` option:
 
 .. code-block:: console
 
-        $ kraken --template /my/awesome/template.tmpl -i ... ... 
+        $ kraken --template /my/awesome/template.tmpl -i ... ...
 
 The data objects used by the templates are considered internal to kraken and
 can change from time to time. The best way to get some orientation when writing
 a new template from scratch is to have a look at the existing templates `here
 <https://github.com/mittagessen/kraken/tree/main/kraken/templates>`_.
-        
+
 Binarization
 ------------
 
@@ -123,18 +123,18 @@ binarize any image that is thrown at it.
 
 Available parameters are:
 
-===========     ====
+============    ====
 option          type
-===========     ==== 
---threshold     FLOAT
---zoom          FLOAT
---escale        FLOAT
---border        FLOAT
---perc          INTEGER RANGE
---range         INTEGER
---low           INTEGER RANGE
---high          INTEGER RANGE
-===========     ====
+============    ====
+\--threshold    FLOAT
+\--zoom         FLOAT
+\--escale       FLOAT
+\--border       FLOAT
+\--perc         INTEGER RANGE
+\--range        INTEGER
+\--low          INTEGER RANGE
+\--high         INTEGER RANGE
+============    ====
 
 To binarize a image:
 
@@ -155,21 +155,21 @@ To binarize a image:
                 Binarizing	[06/24/22 09:56:23] WARNING  jpeg does not support 1bpp images. Forcing to png.
                 ✓
 
-Page Segmentation 
+Page Segmentation
 -----------------
 
 The `segment` subcommand accesses page segmentation into lines and regions with
 the two layout analysis methods implemented: the trainable baseline segmenter
 that is capable of detecting both lines of different types and regions and a
-legacy non-trainable segmenter that produces bounding boxes. 
+legacy non-trainable segmenter that produces bounding boxes.
 
 Universal parameters of either segmenter are:
 
 =============================================== ======
 option                                          action
 =============================================== ======
--d, --text-direction                            Sets principal text direction. Valid values are `horizontal-lr`, `horizontal-rl`, `vertical-lr`, and `vertical-rl`.
--m, --mask                                      Segmentation mask suppressing page areas for line detection. A simple black and white mask image where 0-valued (black) areas are ignored for segmentation purposes.
+-d, \--text-direction                           Sets principal text direction. Valid values are `horizontal-lr`, `horizontal-rl`, `vertical-lr`, and `vertical-rl`.
+-m, \--mask                                     Segmentation mask suppressing page areas for line detection. A simple black and white mask image where 0-valued (black) areas are ignored for segmentation purposes.
 =============================================== ======
 
 Baseline Segmentation
@@ -192,7 +192,7 @@ and text line ordering. The final output can be visualized as:
 
 .. image:: _static/blla_output.jpg
   :width: 800
-  :alt: BLLA final output 
+  :alt: BLLA final output
 
 The primary determinant of segmentation quality is the segmentation model
 employed. There is a default model that works reasonably well on printed and
@@ -241,17 +241,17 @@ Available specific parameters are:
 =============================================== ======
 option                                          action
 =============================================== ======
---scale FLOAT                                   Estimate of the average line height on the page
--m, --maxcolseps                                Maximum number of columns in the input document. Set to `0` for uni-column layouts.
--b, --black-colseps / -w, --white-colseps       Switch to black column separators.
--r, --remove-hlines / -l, --hlines              Disables prefiltering of small horizontal lines. Improves segmenter output on some Arabic texts.
--p, --pad                                       Adds left and right padding around lines in the output.
+\--scale FLOAT                                  Estimate of the average line height on the page
+-m, \--maxcolseps                               Maximum number of columns in the input document. Set to `0` for uni-column layouts.
+-b, \--black-colseps / -w, \--white-colseps     Switch to black column separators.
+-r, \--remove-hlines / -l, \--hlines            Disables prefiltering of small horizontal lines. Improves segmenter output on some Arabic texts.
+-p, \--pad                                      Adds left and right padding around lines in the output.
 =============================================== ======
 
 Principal Text Direction
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-The principal text direction selected with the `-d/--text-direction` is a
+The principal text direction selected with the ``-d/--text-direction`` is a
 switch used in the reading order heuristic to determine the order of text
 blocks (regions) and individual lines. It roughly corresponds to the `block
 flow direction
@@ -309,7 +309,7 @@ With these explications there are four different text directions available:
 =============================================== ======
 Text Direction                                  Examples
 =============================================== ======
-horizontal-lr                                   Latin script texts, Mixed LTR/RTL docs with principal LTR script 
+horizontal-lr                                   Latin script texts, Mixed LTR/RTL docs with principal LTR script
 horizontal-rl                                   Arabic script texts, Mixed LTR/RTL docs with principal RTL script
 vertical-lr                                     Vertical script texts read from left-to-right.
 vertical-rl                                     Vertical script texts read from right-to-left.
@@ -335,7 +335,7 @@ Model Repository
 There is a semi-curated `repository
 <https://zenodo.org/communities/ocr_models>`_ of freely licensed recognition
 models that can be interacted with from the command line using a few
-subcommands. 
+subcommands.
 
 Querying and Model Retrieval
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -438,7 +438,7 @@ Recognition
 Recognition requires a grey-scale or binarized image, a page segmentation for
 that image, and a model file. In particular there is no requirement to use the
 page segmentation algorithm contained in the ``segment`` subcommand or the
-binarization provided by kraken. 
+binarization provided by kraken.
 
 Multi-script recognition is possible by supplying a script-annotated
 segmentation and a mapping between scripts and models:
@@ -458,5 +458,3 @@ possible to define a fallback model that other text will be fed to:
 It is also possible to disable recognition on a particular script by mapping to
 the special model keyword `ignore`. Ignored lines will still be serialized but
 will not contain any recognition results.
-
-
