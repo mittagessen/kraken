@@ -92,7 +92,7 @@ class TorchVGSLModel(object):
         Args:
             spec: Model definition similar to tesseract as follows:
                   ============ FUNCTIONAL OPS ============
-                  C[T](s|t|r|l|rl|m)[{name}]<y>,<x>,<d>[,<y_stride>,<x_stride>]
+                  C[T](s|t|r|l|rl|m)[{name}]<y>,<x>,<d>[,<y_stride>,<x_stride>][,<y_dilation>,<x_dilation>]
                     Convolves using a y,x window, with no shrinkage, SAME
                     infill, d outputs, with s|t|r|l|m non-linear layer,
                     T for transposed convolution.
@@ -594,7 +594,7 @@ class TorchVGSLModel(object):
         Builds a 2D convolution layer.
         """
         pattern = re.compile(r'(?P<type>C)(?P<trans>T)?(?P<nl>s|t|r|l|lr|m)(?P<name>{\w+})?(\d+),'
-                             r'(\d+),(?P<out>\d+)(,(?P<stride_y>\d+),(?P<stride_x>\d+))?')
+                             r'(\d+),(?P<out>\d+)(,(?P<stride_y>\d+),(?P<stride_x>\d+))?(,(?P<dilation_y>\d+),(?P<dilation_x>\d+))?')
         m = pattern.match(blocks[idx])
         if not m:
             return None, None, None
@@ -602,11 +602,12 @@ class TorchVGSLModel(object):
         kernel_size = (int(m.group(5)), int(m.group(6)))
         filters = int(m.group('out'))
         stride = (int(m.group('stride_y')), int(m.group('stride_x'))) if m.group('stride_x') else (1, 1)
+        dilation = (int(m.group('dilation_y')), int(m.group('dilation_x'))) if m.group('dilation_x') else (1, 1)
         nl = m.group('nl')
-        fn = layers.ActConv2D(input[1], filters, kernel_size, stride, nl, transposed)
+        fn = layers.ActConv2D(input[1], filters, kernel_size, stride, nl, dilation, transposed)
         self.idx += 1
         logger.debug(f'{self.idx}\t\t{"transposed " if transposed else ""}conv\tkernel {kernel_size[0]} x {kernel_size[1]} '
-                     f'filters {filters} stride {stride} activation {nl}')
+                     f'filters {filters} stride {stride} dilation {dilation} activation {nl}')
         return fn.get_shape(input, target_output_shape), [VGSLBlock(blocks[idx], m.group('type'), m.group('name'), self.idx)], fn
 
     def build_maxpool(self,

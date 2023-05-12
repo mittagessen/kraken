@@ -746,13 +746,14 @@ class ActConv2D(Module):
     dropped columns.
     """
 
-    def __init__(self, in_channels: int, out_channels: int, kernel_size: Tuple[int, int], stride: Tuple[int, int], nl: str = 'l', transposed: bool = False) -> None:
+    def __init__(self, in_channels: int, out_channels: int, kernel_size: Tuple[int, int], stride: Tuple[int, int], nl: str = 'l', dilation: Tuple[int, int] = (1, 1), transposed: bool = False) -> None:
         super().__init__()
         self.in_channels = in_channels
         self.kernel_size = kernel_size
         self.out_channels = out_channels
         self.stride = stride
-        self.padding = tuple((k - 1) // 2 for k in kernel_size)
+        self.dilation = dilation
+        self.padding = tuple((dilation[i] * (kernel_size[i] - 1)) // 2 for i in range(2))
         self.transposed = transposed
         
         if nl == 's':
@@ -776,10 +777,10 @@ class ActConv2D(Module):
         
         if self.transposed:
             self.co = torch.nn.ConvTranspose2d(in_channels, out_channels, kernel_size,
-                                  stride=stride, padding=self.padding)
+                                  stride=stride, padding=self.padding, dilation=self.dilation)
         else:
             self.co = torch.nn.Conv2d(in_channels, out_channels, kernel_size,
-                                      stride=stride, padding=self.padding)
+                                      stride=stride, padding=self.padding, dilation=self.dilation)
 
     def forward(self, inputs: torch.Tensor, seq_len: Optional[torch.Tensor] = None, output_shape: Optional[Tuple[int, int]] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         if self.transposed:
@@ -793,18 +794,21 @@ class ActConv2D(Module):
         if seq_len is not None:
             if self.transposed:
                 seq_len = torch.floor(
-                    ((seq_len - 1) * self.stride[1] - 2 * self.padding[1] + self.kernel_size[1]))
+                    ((seq_len - 1) * self.stride[1]\
+                        - 2 * self.padding[1]\
+                        + self.dilation[1] * (self.kernel_size[1] - 1)
+                        + 1))
             else:
                 seq_len = torch.clamp(torch.floor(
-                    (seq_len+2*self.padding[1]-(self.kernel_size[1]-1)-1).float()/self.stride[1]+1), min=1).int()
+                    (seq_len+2*self.padding[1]-self.dilation[1]*(self.kernel_size[1]-1)-1).float()/self.stride[1]+1), min=1).int()
         return o, seq_len
 
     def get_shape(self, input: Tuple[int, int, int, int], target_shape: Optional[Tuple[int, int, int, int]] = None) -> Tuple[int, int, int, int]:
         if self.transposed:
             """ For transposed convolution, there is some flexibilty. """
-            min_y = int((input[2] - 1) * self.stride[0] - 2 * self.padding[0] + self.kernel_size[0] if input[2] != 0 else 0)
+            min_y = int((input[2] - 1) * self.stride[0] - 2 * self.padding[0] + self.dilation[0] * (self.kernel_size[0] - 1) + 1 if input[2] != 0 else 0)
             target_y = min_y if not target_shape or target_shape[2] == 0 else target_shape[2]
-            min_x = int((input[3] - 1) * self.stride[1] - 2 * self.padding[1] + self.kernel_size[1] if input[3] != 0 else 0)
+            min_x = int((input[3] - 1) * self.stride[1] - 2 * self.padding[1] + self.dilation[1] * (self.kernel_size[1] - 1) + 1 if input[3] != 0 else 0)
             target_x = min_x if not target_shape or target_shape[3] == 0 else target_shape[3]
             self.output_shape = (input[0],
                                  self.out_channels,
@@ -813,9 +817,9 @@ class ActConv2D(Module):
         else:
             self.output_shape = (input[0],
                              self.out_channels,
-                             int(max(np.floor((input[2]+2*self.padding[0]-(self.kernel_size[0]-1)-1) /
+                             int(max(np.floor((input[2]+2*self.padding[0]-self.dilation[0]*(self.kernel_size[0]-1)-1) /
                                  self.stride[0]+1), 1) if input[2] != 0 else 0),
-                             int(max(np.floor((input[3]+2*self.padding[1]-(self.kernel_size[1]-1)-1)/self.stride[1]+1), 1) if input[3] != 0 else 0))
+                             int(max(np.floor((input[3]+2*self.padding[1]-self.dilation[1]*(self.kernel_size[1]-1)-1)/self.stride[1]+1), 1) if input[3] != 0 else 0))
         return self.output_shape
 
     def deserialize(self, name: str, spec) -> None:
@@ -847,6 +851,7 @@ class ActConv2D(Module):
                                 width=self.kernel_size[1],
                                 stride_height=self.stride[0],
                                 stride_width=self.stride[1],
+                                dilation_factors=self.dilation,
                                 border_mode='same',
                                 groups=1,
                                 W=W,
