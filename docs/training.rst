@@ -460,4 +460,4 @@ The downloaded model can then be used for recognition by the name shown in its m
 
         $ kraken -i INPUT_IMAGE OUTPUT_FILE binarize segment ocr -m arabic-alam-al-kutub.mlmodel
 
-For more documentation see the kraken `website <http://kraken.re>`_.
+For more documentation see the kraken `website <https://kraken.re>`_.
