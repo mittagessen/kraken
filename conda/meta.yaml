@@ -35,6 +35,6 @@ requirements:
      - albumentations
      - rich
 about:
-  home: http://kraken.re
+  home: https://kraken.re
   license: APACHE
   summary: 'OCR/HTR engine for all the languages'

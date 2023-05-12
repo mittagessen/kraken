@@ -767,7 +767,7 @@
   </g>
   <a
      id="a3524"
-     xlink:href="http://kraken.re/main/api_docs.html#kraken.lib.vgsl.TorchVGSLModel">
+     xlink:href="https://kraken.re/main/api_docs.html#kraken.lib.vgsl.TorchVGSLModel">
     <g
        transform="translate(410.14772727272737 133.07575757575813) rotate(0 31 26)"
        id="g3470">
@@ -867,7 +867,7 @@
   </g>
   <a
      id="a3529"
-     xlink:href="http://kraken.re/main/api_docs.html#module-kraken.lib.ctc_decoder">
+     xlink:href="https://kraken.re/main/api_docs.html#module-kraken.lib.ctc_decoder">
     <g
        transform="translate(896.9999999999999 133.07575757575813) rotate(0 37 26)"
        id="g3500">
@@ -895,7 +895,7 @@
   </a>
   <a
      id="a3534"
-     xlink:href="http://kraken.re/main/api_docs.html#kraken.lib.codec.PytorchCodec">
+     xlink:href="https://kraken.re/main/api_docs.html#kraken.lib.codec.PytorchCodec">
     <g
        transform="translate(1179.7499999999998 158.07575757575813) rotate(0 28 13)"
        id="g3504">

@@ -119,7 +119,7 @@ information.
 Documentation
 =============
 
-Have a look at the `docs <http://kraken.re>`_
+Have a look at the `docs <https://kraken.re>`_
 
 Related Software
 ================
@@ -135,7 +135,7 @@ experience on applying kraken on a wide variety of material.
 Funding
 =======
 
-kraken is developed at the `École Pratique des Hautes Études <http://ephe.fr>`_, `Université PSL <http://www.psl.eu>`_.
+kraken is developed at the `École Pratique des Hautes Études <https://www.ephe.psl.eu>`_, `Université PSL <https://www.psl.eu>`_.
 
 .. container:: twocol
 
