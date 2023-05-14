@@ -105,12 +105,38 @@ A model with arbitrary sized color image input, an initial summarizing
 recurrent layer to squash the height to 64, followed by 2 bi-directional
 recurrent layers and a linear projection.
 
+.. code-block:: console
+
+        [1,1800,0,3 Cr3,3,32 Gn8 (I [Cr3,3,64,2,2 Gn8 CTr3,3,32,2,2]) Cr3,3,32 O2l8]
+
+        layer		type	params
+        0		conv	kernel 3 x 3 filters 32 activation r
+        1		groupnorm	8 groups
+        2		parallel	execute 2.0 and 2.1 in parallel
+        2.0		identity
+        2.1		serial	exectute 2.1.0 to 2.1.2 in sequence
+        2.1.0		conv	kernel 3 x 3 stride 2 x 2 filters 64 activation r
+        2.1.1		groupnorm	8 groups
+        2.1.2		transposed convolution	kernel 3 x 3 stride 2 x 2 filters 2 activation r
+        3		conv	kernel 3 x 3 stride 1 x 1 filters 32 activation r
+        4		linear	activation sigmoid
+
+A model that outputs heatmaps with 8 feature dimensions, taking color images with
+height normalized to 1800 pixels as its input. It uses a strided convolution
+to first scale the image down, and then a transposed convolution to transform
+the image back to its original size. This is done in a parallel block, where the
+other branch simply passes through the output of the first convolution layer.
+The input of the last convolutional layer is then the output of the two branches
+of the parallel block concatenated, i.e. the output of the first
+convolutional layer together with the ouput of the transposed convolutional layer,
+giving `32 + 32 = 64` feature dimensions. 
+
 Convolutional Layers
 --------------------
 
 .. code-block:: console
 
-        C[{name}](s|t|r|l|m)[{name}]<y>,<x>,<d>[,<stride_y>,<stride_x>]
+        C[T][{name}](s|t|r|l|m)[{name}]<y>,<x>,<d>[,<stride_y>,<stride_x>][,<dilation_y>,<dilation_x>]
         s = sigmoid
         t = tanh
         r = relu
@@ -118,8 +144,16 @@ Convolutional Layers
         m = softmax
 
 Adds a 2D convolution with kernel size `(y, x)` and `d` output channels, applying
-the selected nonlinearity. The stride can be adjusted with the optional last
-two parameters.
+the selected nonlinearity. Stride and dilation can be adjusted with the optional last
+two parameters. `T` gives a transposed convolution. For transposed convolutions,
+several output sizes are possible for the same configuration. The system
+will try to match the output size of the different branches of parallel
+blocks, however, this will only work if the transposed convolution directly
+proceeds the confluence of the parallel branches, and if the branches with
+fixed output size come first in the definition of the parallel block. Hence,
+out of `(I [Cr3,3,8,2,2 CTr3,3,8,2,2])`, `([Cr3,3,8,2,2 CTr3,3,8,2,2] I)`
+and `(I [Cr3,3,8,2,2 CTr3,3,8,2,2 Gn8])` only the first variant will
+behave correctly.
 
 Recurrent Layers
 ----------------
