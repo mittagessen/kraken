@@ -52,8 +52,7 @@
      "description": {
        "$id": "#/properties/description",
        "type": "string",
-       "title": "A long-form description of the model.",
-       "pattern": "^(.*)$"
+       "title": "A long-form description of the model."
      },
      "accuracy": {
        "$id": "#/properties/accuracy",
