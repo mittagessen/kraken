@@ -400,13 +400,13 @@ def segment(im: PIL.Image.Image,
         for reg in rgs:
             _shp_regs[reg.id] = geom.Polygon(reg.boundary)
 
-    for idx, line in enumerate(lines):
+    for line in lines:
         line_regs = []
         for reg_id, reg in _shp_regs.items():
             mid_point = geom.LineString(line[1]).interpolate(0.5, normalized=True)
             if reg.contains(mid_point):
                 line_regs.append(reg_id)
-        blls.append(BaselineLine(id=f'line_{idx}', baseline=line[1], boundary=line[2], tags={'type': line[0]}, regions=line_regs))
+        blls.append(BaselineLine(id=uuid.uuid4(), baseline=line[1], boundary=line[2], tags={'type': line[0]}, regions=line_regs))
 
     return Segmentation(text_direction=text_direction,
                         type='baselines',
