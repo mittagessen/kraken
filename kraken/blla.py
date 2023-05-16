@@ -21,6 +21,7 @@ line recognizer uses the baseline paradigm.
 """
 
 import PIL
+import uuid
 import torch
 import logging
 import numpy as np
@@ -37,8 +38,7 @@ from skimage.filters import sobel
 from kraken.lib import vgsl, dataset
 from kraken.lib.util import is_bitonal, get_im_str
 from kraken.lib.exceptions import KrakenInputException, KrakenInvalidModelException
-from kraken.lib.segmentation import (Segmentation,
-                                     polygonal_reading_order,
+from kraken.lib.segmentation import (polygonal_reading_order,
                                      neural_reading_order,
                                      vectorize_lines, vectorize_regions,
                                      scale_polygonal_lines,
@@ -134,7 +134,7 @@ def compute_segmentation_map(im: PIL.Image.Image,
             'scal_im': scal_im}
 
 
-def vec_regions(heatmap: torch.Tensor, cls_map: Dict, scale: float, **kwargs) -> Dict[str, List[List[Tuple[int, int]]]]:
+def vec_regions(heatmap: torch.Tensor, cls_map: Dict, scale: float, **kwargs) -> Dict[str, List[Region]]:
     """
     Computes regions from a stack of heatmaps, a class mapping, and scaling
     factor.
@@ -154,8 +154,8 @@ def vec_regions(heatmap: torch.Tensor, cls_map: Dict, scale: float, **kwargs) ->
     for region_type, idx in cls_map['regions'].items():
         logger.debug(f'Vectorizing regions of type {region_type}')
         regions[region_type] = vectorize_regions(heatmap[idx])
-    for reg_id, regs in regions.items():
-        regions[reg_id] = scale_regions(regs, scale)
+    for reg_type, regs in regions.items():
+        regions[reg_type] = [Region(id=uuid.uuid4(), boundary=x, tags={'type': reg_type}) for x in scale_regions(regs, scale)]
     return regions
 
 
@@ -218,6 +218,7 @@ def vec_lines(heatmap: torch.Tensor,
 
     lines = []
     reg_pols = [geom.Polygon(x) for x in regions]
+    line_regs = []
     for bl_idx in range(len(baselines)):
         bl = baselines[bl_idx]
         mid_point = geom.LineString(bl[1]).interpolate(0.5, normalized=True)
@@ -226,7 +227,6 @@ def vec_lines(heatmap: torch.Tensor,
         for reg_idx, reg_pol in enumerate(reg_pols):
             if reg_pol.contains(mid_point):
                 suppl_obj.append(regions[reg_idx])
-
         pol = calculate_polygonal_environment(
             baselines=[bl[1]],
             im_feats=im_feats,
@@ -239,7 +239,7 @@ def vec_lines(heatmap: torch.Tensor,
 
     logger.debug('Scaling vectorized lines')
     sc = scale_polygonal_lines([x[1:] for x in lines], scale)
-    lines = list(zip([x[0] for x in lines], [x[0] for x in sc], [x[1] for x in sc]))
+    lines = list(zip([x[0] for x in lines], [x[0] for x in sc], [x[1] for x in sc], line_regs))
     return [{'tags': {'type': bl_type}, 'baseline': bl, 'boundary': pl} for bl_type, bl, pl in lines]
 
 
@@ -250,7 +250,7 @@ def segment(im: PIL.Image.Image,
             model: Union[List[vgsl.TorchVGSLModel], vgsl.TorchVGSLModel] = None,
             device: str = 'cpu',
             raise_on_error: bool = False,
-            autocast: bool = False) -> Dict[str, Any]:
+            autocast: bool = False) -> Segmentation:
     r"""
     Segments a page into text lines using the baseline segmenter.
 
@@ -337,6 +337,10 @@ def segment(im: PIL.Image.Image,
             logger.debug(f'Baseline location: {loc}')
         rets = compute_segmentation_map(im, mask, net, device, autocast=autocast)
         _regions = vec_regions(**rets)
+        for reg_key, reg_val in vec_regions(**rets).items():
+            if reg_key not in regions:
+                regions[reg_key] = []
+            regions[reg_key].extend(reg_val)
 
         # flatten regions for line ordering/fetch bounding regions
         line_regs = []
@@ -346,8 +350,8 @@ def segment(im: PIL.Image.Image,
             if rets['bounding_regions'] is not None and cls in rets['bounding_regions']:
                 suppl_obj.extend(regs)
         # convert back to net scale
-        suppl_obj = scale_regions(suppl_obj, 1/rets['scale'])
-        line_regs = scale_regions(line_regs, 1/rets['scale'])
+        suppl_obj = scale_regions([x.boundary for x in suppl_obj], 1/rets['scale'])
+        line_regs = scale_regions([x.boundary for x in line_regs], 1/rets['scale'])
 
         _lines = vec_lines(**rets,
                            regions=line_regs,
@@ -359,7 +363,7 @@ def segment(im: PIL.Image.Image,
         if 'ro_model' in net.aux_layers:
             logger.info(f'Using reading order model found in segmentation model {net}.')
             _order = neural_reading_order(lines=_lines,
-                                          regions=regions,
+                                          regions=_regions,
                                           text_direction=text_direction[-2:],
                                           model=net.aux_layers['ro_model'],
                                           im_size=im.size,
@@ -388,9 +392,25 @@ def segment(im: PIL.Image.Image,
     else:
         script_detection = False
 
+    # create objects and assign IDs
+    blls = []
+    reg_idx = 0
+    _shp_regs = {}
+    for reg_type, rgs in regions.items():
+        for reg in rgs:
+            _shp_regs[reg.id] = geom.Polygon(reg.boundary)
+
+    for idx, line in enumerate(lines):
+        line_regs = []
+        for reg_id, reg in _shp_regs.items():
+            mid_point = geom.LineString(line[1]).interpolate(0.5, normalized=True)
+            if reg.contains(mid_point):
+                line_regs.append(reg_id)
+        blls.append(BaselineLine(id=f'line_{idx}', baseline=line[1], boundary=line[2], tags={'type': line[0]}, regions=line_regs))
+
     return Segmentation(text_direction=text_direction,
                         type='baselines',
-                        lines=lines,
-                        regions=regions,
+                        lines=blls,
+                        regions=_regs,
                         script_detection=script_detection,
                         line_orders=[order])

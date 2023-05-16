@@ -22,7 +22,6 @@ import numpy as np
 import shapely.geometry as geom
 import torch.nn.functional as F
 
-from dataclasses import dataclass
 from collections import defaultdict
 
 from PIL import Image
@@ -43,6 +42,7 @@ from skimage.transform import PiecewiseAffineTransform, SimilarityTransform, Aff
 
 from typing import List, Tuple, Union, Dict, Any, Sequence, Optional, Literal
 
+from kraken.containers import Segmentation, BaselineLine, BBoxLine
 from kraken.lib import default_specs
 from kraken.lib.exceptions import KrakenInputException
 
@@ -60,19 +60,7 @@ __all__ = ['reading_order',
            'scale_polygonal_lines',
            'scale_regions',
            'compute_polygon_section',
-           'extract_polygons',
-           'Segmentation']
-
-
-@dataclass
-class Segmentation:
-    type: Literal['baselines', 'bbox']
-    imagename: str
-    text_direction: Literal['horizontal-lr', 'horizontal-rl', 'vertical-lr', 'vertical-rl']
-    script_detection: bool
-    lines: List
-    regions: Dict[str, List]
-    line_orders: List[List[int]]
+           'extract_polygons']
 
 
 def reading_order(lines: Sequence[Tuple[slice, slice]], text_direction: Literal['lr', 'rl'] = 'lr') -> np.ndarray:

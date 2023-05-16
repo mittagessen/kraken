@@ -24,7 +24,9 @@ class BaselineLine:
     base_dir: Optional[Literal['L', 'R']] = None
     type: str = 'baselines'
     image: Optional[PIL.Image.Image] = None
-
+    tags: Optional[Dict[str, str]] = None
+    split: Optional[Literal['train', 'validation', 'test'] = None
+    regions: Optional[List[str]] = None
 
 @dataclass
 class BBoxLine:
@@ -39,6 +41,20 @@ class BBoxLine:
     base_dir: Optional[Literal['L', 'R']] = None
     type: str = 'bbox'
     image: Optional[PIL.Image.Image] = None
+    tags: Optional[Dict[str, str]] = None
+    split: Optional[Literal['train', 'validation', 'test'] = None
+    regions: Optional[List[str]] = None
+
+
+@dataclass
+class Region:
+    """
+
+    """
+    id: str
+    boundary: List[Tuple[int, int]]
+    image: Optional[PIL.Image.Image] = None
+    tags: Optional[Dict[str, str]] = None
 
 
 @dataclass
@@ -51,7 +67,7 @@ class Segmentation:
     text_direction: Literal['horizontal-lr', 'horizontal-rl', 'vertical-lr', 'vertical-rl']
     script_detection: bool
     lines: Sequence[Union[BaselineLine, BBoxLine]]
-    regions: Dict[str, List]
+    regions: Dict[str, List[Region]]
     line_orders: List[List[int]]
 
 
@@ -276,7 +292,10 @@ class BaselineOCRRecord(ocr_record, BaselineLine):
                             boundary=self.boundary,
                             text=self.text,
                             base_dir=self._line_base_dir,
-                            image=self.image)
+                            image=self.image,
+                            tags=self.tags,
+                            split=self.split,
+                            region=self.region)
         rec = BaselineOCRRecord(prediction=prediction,
                                 cuts=cuts,
                                 confidences=confidences,
@@ -412,7 +431,10 @@ class BBoxOCRRecord(ocr_record, BBoxLine):
                         bbox=self.bbox,
                         text=self.text,
                         base_dir=self._line_base_dir,
-                        image=self.image)
+                        image=self.image,
+                        tags=self.tags,
+                        split=self.split,
+                        region=self.region)
         rec = BBoxOCRRecord(prediction=prediction,
                                 cuts=cuts,
                                 confidences=confidences,
