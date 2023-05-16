@@ -25,7 +25,7 @@ class BaselineLine:
     type: str = 'baselines'
     image: Optional[PIL.Image.Image] = None
     tags: Optional[Dict[str, str]] = None
-    split: Optional[Literal['train', 'validation', 'test'] = None
+    split: Optional[Literal['train', 'validation', 'test']] = None
     regions: Optional[List[str]] = None
 
 @dataclass
@@ -42,9 +42,9 @@ class BBoxLine:
     type: str = 'bbox'
     image: Optional[PIL.Image.Image] = None
     tags: Optional[Dict[str, str]] = None
-    split: Optional[Literal['train', 'validation', 'test'] = None
+    split: Optional[Literal['train', 'validation', 'test']] = None
     regions: Optional[List[str]] = None
-
+    text_direction: Literal['horizontal-lr', 'horizontal-rl', 'vertical-lr', 'vertical-rl'] = 'horizontal-lr'
 
 @dataclass
 class Region:
@@ -68,7 +68,7 @@ class Segmentation:
     script_detection: bool
     lines: Sequence[Union[BaselineLine, BBoxLine]]
     regions: Dict[str, List[Region]]
-    line_orders: List[List[int]]
+    line_orders: Optional[List[List[int]]] = None
 
 
 class ocr_record(ABC):
@@ -225,7 +225,7 @@ class BaselineOCRRecord(ocr_record, BaselineLine):
     def cuts(self) -> Sequence[Tuple[int, int]]:
         return tuple([compute_polygon_section(self.baseline, self.line, cut[0], cut[1]) for cut in self._cuts])
 
-    def logical_order(self, base_dir: Optional[str] = None) -> 'BaselineOCRRecord':
+    def logical_order(self, base_dir: Optional[Literal['L', 'R']] = None) -> 'BaselineOCRRecord':
         """
         Returns the OCR record in Unicode logical order, i.e. in the order the
         characters in the line would be read by a human.
@@ -241,7 +241,7 @@ class BaselineOCRRecord(ocr_record, BaselineLine):
         else:
             return self
 
-    def display_order(self, base_dir: Optional[str] = None) -> 'BaselineOCRRecord':
+    def display_order(self, base_dir: Optional[Literal['L', 'R']] = None) -> 'BaselineOCRRecord':
         """
         Returns the OCR record in Unicode display order, i.e. ordered from left
         to right inside the line.
@@ -257,7 +257,7 @@ class BaselineOCRRecord(ocr_record, BaselineLine):
         else:
             return self._reorder(base_dir)
 
-    def _reorder(self, base_dir: Optional[str] = None) -> 'BaselineOCRRecord':
+    def _reorder(self, base_dir: Optional[Literal['L', 'R']] = None) -> 'BaselineOCRRecord':
         """
         Reorder the record using the BiDi algorithm.
         """
@@ -312,14 +312,15 @@ class BBoxOCRRecord(ocr_record, BBoxLine):
     """
     type = 'bbox'
 
-    def __init__(self, prediction: str,
+    def __init__(self,
+                 prediction: str,
                  cuts: Sequence[Tuple[Tuple[int, int],
                                       Tuple[int, int],
                                       Tuple[int, int],
                                       Tuple[int, int]]],
                  confidences: Sequence[float],
                  line: BBoxLine,
-                 base_dir: Optional['L', 'R'],
+                 base_dir: Optional[Literal['L', 'R']],
                  display_order: bool = True) -> None:
         if line.type != 'bbox':
             raise TypeError('Invalid argument type (non-bbox line)')

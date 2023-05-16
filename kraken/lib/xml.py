@@ -27,7 +27,7 @@ from PIL import Image
 from typing import Union, Dict, Any, Sequence, Tuple, Literal, Optional, List
 
 from collections import defaultdict
-from kraken.containers import BaselineLine
+from kraken.containers import Segmentation, BaselineLine
 from kraken.lib.segmentation import calculate_polygonal_environment
 from kraken.lib.exceptions import KrakenInputException
 
@@ -584,3 +584,15 @@ class XMLPage(object):
 
     def __repr__(self):
         return f'XMLPage(filename={self.filename}, filetype={self.filetype})'
+
+    def to_container(self) -> Segmentation:
+        """
+        Returns a Segmentation object.
+        """
+        return Segmentation(type='baselines',
+                            imagename=self.imagename,
+                            text_direction='horizontal_lr',
+                            script_detection=True,
+                            lines=self.get_sorted_lines(),
+                            regions=self._regions,
+                            line_orders=None)
