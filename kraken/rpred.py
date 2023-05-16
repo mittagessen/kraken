@@ -109,14 +109,13 @@ class mm_rpred(object):
         if bounds.type == 'baselines':
             valid_norm = False
             self.next_iter = self._recognize_baseline_line
-            tags = set()
-            for x in bounds.lines:
-                tags.update(x['tags'].values())
         else:
             valid_norm = True
-            self.seg_key = 'boxes'
             self.next_iter = self._recognize_box_line
-            tags = set(x[0] for line in bounds.lines for x in line)
+
+        tags = set()
+        for x in bounds.lines:
+            tags.update(x.tags.values())
 
         im_str = get_im_str(im)
         logger.info(f'Running {len(nets)} multi-script recognizers on {im_str} with {self.len} lines')
@@ -149,70 +148,75 @@ class mm_rpred(object):
         self.tags_ignore = tags_ignore
 
     def _recognize_box_line(self, line):
-        flat_box = [point for box in line['boxes'][0] for point in box[1]]
+        flat_box = [point for box in line.bbox for point in box]
         xmin, xmax = min(flat_box[::2]), max(flat_box[::2])
         ymin, ymax = min(flat_box[1::2]), max(flat_box[1::2])
         line_bbox = ((xmin, ymin), (xmin, ymax), (xmax, ymax), (xmax, ymin))
         prediction = ''
         cuts = []
         confidences = []
-        for tag, (box, coords) in zip(map(lambda x: x[0], line['boxes'][0]),
-                                      extract_polygons(self.im, {'text_direction': line['text_direction'],
-                                                                 'boxes': map(lambda x: x[1], line['boxes'][0])})):
-            self.box = box
-            # skip if tag is set to ignore
-            if self.tags_ignore is not None and tag in self.tags_ignore:
-                logger.warning(f'Ignoring {tag} line segment.')
-                continue
-            # check if boxes are non-zero in any dimension
-            if 0 in box.size:
-                logger.warning(f'bbox {coords} with zero dimension. Emitting empty record.')
-                return BBoxOCRRecord('', (), (), coords)
-            # try conversion into tensor
-            try:
-                logger.debug('Preparing run.')
-                line = self.ts[tag](box)
-            except Exception:
-                logger.warning(f'Conversion of line {coords} failed. Emitting empty record..')
-                return BBoxOCRRecord('', (), (), coords)
+        line.text_direction = self.bounds.text_direction
 
-            # check if line is non-zero
-            if line.max() == line.min():
-                logger.warning('Empty run. Emitting empty record.')
-                return BBoxOCRRecord('', (), (), coords)
+        if self.tags_ignore is not None:
+            for tag in line.tags.values():
+                if tag in self.tags_ignore:
+                    logger.info(f'Ignoring line segment with tags {line.tags} based on {tag}.')
+                    return BaselineOCRRecord('', [], [], line)
 
-            _, net = self._resolve_tags_to_model({'type': tag}, self.nets)
+        tag, net = self._resolve_tags_to_model(line.tags, self.nets)
 
-            logger.debug(f'Forward pass with model {tag}.')
-            preds = net.predict(line.unsqueeze(0))[0]
+        box, coords = next(extract_polygons(self.im, line))
+        self.box = box
 
-            # calculate recognized LSTM locations of characters
-            logger.debug('Convert to absolute coordinates')
-            # calculate recognized LSTM locations of characters
-            # scale between network output and network input
-            self.net_scale = line.shape[2]/net.outputs.shape[2]
-            # scale between network input and original line
-            self.in_scale = box.size[0]/(line.shape[2]-2*self.pad)
+        # check if boxes are non-zero in any dimension
+        if 0 in box.size:
+            logger.warning(f'bbox {line} with zero dimension. Emitting empty record.')
+            return BBoxOCRRecord('', (), (), line)
+        # try conversion into tensor
+        try:
+            logger.debug('Preparing run.')
+            ts_box = self.ts[tag](box)
+        except Exception:
+            logger.warning(f'Conversion of line {line} failed. Emitting empty record..')
+            return BBoxOCRRecord('', (), (), line)
 
-            pred = ''.join(x[0] for x in preds)
-            pos = []
-            conf = []
+        # check if line is non-zero
+        if ts_box.max() == ts_box.min():
+            logger.warning('Empty run. Emitting empty record.')
+            return BBoxOCRRecord('', (), (), line)
 
-            for _, start, end, c in preds:
-                if self.bounds.text_direction.startswith('horizontal'):
-                    xmin = coords[0] + self._scale_val(start, 0, self.box.size[0])
-                    xmax = coords[0] + self._scale_val(end, 0, self.box.size[0])
-                    pos.append([[xmin, coords[1]], [xmin, coords[3]], [xmax, coords[3]], [xmax, coords[1]]])
-                else:
-                    ymin = coords[1] + self._scale_val(start, 0, self.box.size[1])
-                    ymax = coords[1] + self._scale_val(end, 0, self.box.size[1])
-                    pos.append([[coords[0], ymin], [coords[2], ymin], [coords[2], ymax], [coords[0], ymax]])
-                conf.append(c)
-            prediction += pred
-            cuts.extend(pos)
-            confidences.extend(conf)
+        _, net = self._resolve_tags_to_model({'type': tag}, self.nets)
 
-        rec = BBoxOCRRecord(prediction, cuts, confidences, line_bbox)
+        logger.debug(f'Forward pass with model {tag}.')
+        preds = net.predict(ts_box.unsqueeze(0))[0]
+
+        # calculate recognized LSTM locations of characters
+        logger.debug('Convert to absolute coordinates')
+        # calculate recognized LSTM locations of characters
+        # scale between network output and network input
+        self.net_scale = ts_box.shape[2]/net.outputs.shape[2]
+        # scale between network input and original line
+        self.in_scale = box.size[0]/(ts_box.shape[2]-2*self.pad)
+
+        pred = ''.join(x[0] for x in preds)
+        pos = []
+        conf = []
+
+        for _, start, end, c in preds:
+            if self.bounds.text_direction.startswith('horizontal'):
+                xmin = coords[0] + self._scale_val(start, 0, self.box.size[0])
+                xmax = coords[0] + self._scale_val(end, 0, self.box.size[0])
+                pos.append([[xmin, coords[1]], [xmin, coords[3]], [xmax, coords[3]], [xmax, coords[1]]])
+            else:
+                ymin = coords[1] + self._scale_val(start, 0, self.box.size[1])
+                ymax = coords[1] + self._scale_val(end, 0, self.box.size[1])
+                pos.append([[coords[0], ymin], [coords[2], ymin], [coords[2], ymax], [coords[0], ymax]])
+            conf.append(c)
+        prediction += pred
+        cuts.extend(pos)
+        confidences.extend(conf)
+
+        rec = BBoxOCRRecord(prediction, cuts, confidences, line)
         if self.bidi_reordering:
             logger.debug('BiDi reordering record.')
             return rec.logical_order(base_dir=self.bidi_reordering if self.bidi_reordering in ('L', 'R') else None)
@@ -222,41 +226,41 @@ class mm_rpred(object):
 
     def _recognize_baseline_line(self, line):
         if self.tags_ignore is not None:
-            for tag in line['lines'][0]['tags'].values():
+            for tag in line.tags.values():
                 if tag in self.tags_ignore:
-                    logger.info(f'Ignoring line segment with tags {line["lines"][0]["tags"]} based on {tag}.')
-                    return BaselineOCRRecord('', [], [], line['lines'][0])
+                    logger.info(f'Ignoring line segment with tags {line.tags} based on {tag}.')
+                    return BaselineOCRRecord('', [], [], line)
 
         try:
             box, coords = next(extract_polygons(self.im, line))
         except KrakenInputException as e:
             logger.warning(f'Extracting line failed: {e}')
-            return BaselineOCRRecord('', [], [], line['lines'][0])
+            return BaselineOCRRecord('', [], [], line)
 
         self.box = box
 
-        tag, net = self._resolve_tags_to_model(coords['tags'], self.nets)
+        tag, net = self._resolve_tags_to_model(line.tags, self.nets)
         # check if boxes are non-zero in any dimension
         if 0 in box.size:
-            logger.warning(f'bbox {coords} with zero dimension. Emitting empty record.')
-            return BaselineOCRRecord('', [], [], coords)
+            logger.warning(f'{line} with zero dimension. Emitting empty record.')
+            return BaselineOCRRecord('', [], [], line)
         # try conversion into tensor
         try:
-            line = self.ts[tag](box)
+            ts_box = self.ts[tag](box)
         except Exception as e:
             logger.warning(f'Tensor conversion failed with {e}. Emitting empty record.')
-            return BaselineOCRRecord('', [], [], coords)
+            return BaselineOCRRecord('', [], [], line)
         # check if line is non-zero
-        if line.max() == line.min():
+        if ts_box.max() == ts_box.min():
             logger.warning('Empty line after tensor conversion. Emitting empty record.')
-            return BaselineOCRRecord('', [], [], coords)
+            return BaselineOCRRecord('', [], [], line)
 
-        preds = net.predict(line.unsqueeze(0))[0]
+        preds = net.predict(ts_box.unsqueeze(0))[0]
         # calculate recognized LSTM locations of characters
         # scale between network output and network input
-        self.net_scale = line.shape[2]/net.outputs.shape[2]
+        self.net_scale = ts_box.shape[2]/net.outputs.shape[2]
         # scale between network input and original line
-        self.in_scale = box.size[0]/(line.shape[2]-2*self.pad)
+        self.in_scale = box.size[0]/(ts_box.shape[2]-2*self.pad)
 
         # XXX: fix bounding box calculation ocr_record for multi-codepoint labels.
         pred = ''.join(x[0] for x in preds)
@@ -266,7 +270,7 @@ class mm_rpred(object):
             pos.append((self._scale_val(start, 0, self.box.size[0]),
                         self._scale_val(end, 0, self.box.size[0])))
             conf.append(c)
-        rec = BaselineOCRRecord(pred, pos, conf, coords)
+        rec = BaselineOCRRecord(pred, pos, conf, line)
         if self.bidi_reordering:
             logger.debug('BiDi reordering record.')
             return rec.logical_order(base_dir=self.bidi_reordering if self.bidi_reordering in ('L', 'R') else None)
@@ -276,8 +280,7 @@ class mm_rpred(object):
 
     def __next__(self):
         bound = self.bounds
-        setattr(bound, self.seg_key, [next(self.line_iter)])
-        return self.next_iter(bound)
+        return self.next_iter(next(self.line_iter))
 
     def __iter__(self):
         return self
@@ -312,14 +315,6 @@ def rpred(network: TorchSeqRecognizer,
         An ocr_record containing the recognized text, absolute character
         positions, and confidence values for each character.
     """
-    bounds = copy.deepcopy(bounds)
-    if bounds.type == 'bbox':
-        boxes = bounds.lines
-        rewrite_boxes = []
-        for box in boxes:
-            rewrite_boxes.append([('default', box)])
-        bounds.lines = rewrite_boxes
-        bounds.script_detection = True
     return mm_rpred(defaultdict(lambda: network), im, bounds, pad, bidi_reordering)
 
 
