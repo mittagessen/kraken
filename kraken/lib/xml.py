@@ -27,7 +27,7 @@ from PIL import Image
 from typing import Union, Dict, Any, Sequence, Tuple, Literal, Optional, List
 
 from collections import defaultdict
-from kraken.containers import Segmentation, BaselineLine
+from kraken.containers import Segmentation, BaselineLine, Region
 from kraken.lib.segmentation import calculate_polygonal_environment
 from kraken.lib.exceptions import KrakenInputException
 
@@ -167,7 +167,7 @@ class XMLPage(object):
                 if rtype is None:
                     rtype = alto_regions[region.tag.split('}')[-1]]
                 region_id = region.get('ID')
-                region_data[rtype].append({'id': region_id, 'boundary': boundary})
+                region_data[rtype].append(Region(id=region_id, boundary=coords, tags={'type': rtype}))
                 # register implicit reading order
                 self._orders['region_implicit']['order'].append(region_id)
 
@@ -216,7 +216,7 @@ class XMLPage(object):
                                                                text=text,
                                                                tags=tags,
                                                                split=split_type,
-                                                               region=region_id)
+                                                               regions=[region_id])
                     # register implicit reading order
                     self._orders['line_implicit']['order'].append(line.get('ID'))
 
@@ -328,7 +328,7 @@ class XMLPage(object):
                 # fall back to default region type if nothing is given
                 if not rtype:
                     rtype = page_regions[region.tag.split('}')[-1]]
-                region_data[rtype].append({'id': region.get('id'), 'boundary': coords})
+                region_data[rtype].append(Region(id=region.get('id'), boundary=coords, tags={'type': rtype}))
                 # register implicit reading order
                 self._orders['region_implicit']['order'].append(region.get('id'))
 
@@ -392,7 +392,7 @@ class XMLPage(object):
                                                                text=text,
                                                                tags=tags,
                                                                split=split_type,
-                                                               region=region.get('id'))
+                                                               regions=[region.get('id')])
                     # register implicit reading order
                     self._orders['line_implicit']['order'].append(line.get('id'))
 
@@ -491,7 +491,7 @@ class XMLPage(object):
         if ro not in self.reading_orders:
             raise ValueError(f'Unknown reading order {ro}')
 
-        regions = {reg['id']: key for key, regs in self.regions.items() for reg in regs}
+        regions = {reg.id: key for key, regs in self.regions.items() for reg in regs}
 
         def _traverse_ro(el):
             _ro = []
@@ -500,7 +500,7 @@ class XMLPage(object):
             else:
                 # if region directly append to ro
                 if el in regions.keys():
-                    return [reg for reg in self.regions[regions[el]] if reg['id'] == el][0]
+                    return [reg for reg in self.regions[regions[el]] if reg.id == el][0]
                 else:
                     raise ValueError(f'Invalid reading order {ro}')
             return _ro
@@ -516,17 +516,17 @@ class XMLPage(object):
             raise ValueError(f'Unknown reading order {ro}')
         if self.reading_orders[ro]['is_total'] is False:
             raise ValueError('Fetching lines by region of a non-total order is not supported')
-        lines = [(id, line) for id, line in self._lines.items() if line['region'] == region]
+        lines = [(id, line) for id, line in self._lines.items() if line.regions[0] == region]
         for line in lines:
             if line[0] not in self.reading_orders[ro]['order']:
                 raise ValueError('Fetching lines by region is only possible for flat orders')
         return sorted(lines, key=lambda k: self.reading_orders[ro]['order'].index(k[0]))
 
     def get_lines_by_tag(self, key, value):
-        return {k: v for k, v in self._lines.items() if v['tags'].get(key) == value}
+        return {k: v for k, v in self._lines.items() if v.tags.get(key) == value}
 
     def get_lines_by_split(self, split: Literal['train', 'validation', 'test']):
-        return {k: v for k, v in self._lines.items() if v['tags'].get('split') == split}
+        return {k: v for k, v in self._lines.items() if v.tags.get('split') == split}
 
     @property
     def tags(self):
