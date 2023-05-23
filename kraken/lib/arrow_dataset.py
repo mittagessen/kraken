@@ -193,7 +193,7 @@ def build_binary_dataset(files: Optional[List[Union[str, PathLike, Dict]]] = Non
             lines = doc['lines']
         for line in lines:
             num_lines += 1
-            alphabet.update(line.text)
+            alphabet.update(line.text if format_type in ['xml', 'alto', 'page'] else line['text'])
 
     callback(0, num_lines)
 
