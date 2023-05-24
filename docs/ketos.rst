@@ -12,25 +12,25 @@ model finds baselines and regions on a page image. Recognition models convert
 text image lines found by the segmenter into digital text.
 
 Best practices
----------------------
+--------------
 
 Recognition model training
-~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 * The default architecture works well for decently sized datasets.
 * Use precompiled binary datasets and put them in a place where they can be memory mapped during training (local storage, not NFS or similar).
-* Use the --logger flag to track your training metrics across experiments using Tensorboard.
-* If the network doesn't converge before the early stopping aborts training, increase --min-epochs or --lag. Use the --logger option to inspect your training loss.
-* Use the flag --augment to activate data augmentation.
-* Increase the amount of --workers to speedup data loading. This is essential when you use the --augment option.
-* When using an Nvidia GPU, set the --precision option to 16 to use automatic mixed precision (AMP). This can provide significant speedup without any loss in accuracy.
+* Use the ``--logger`` flag to track your training metrics across experiments using Tensorboard.
+* If the network doesn't converge before the early stopping aborts training, increase ``--min-epochs`` or ``--lag``. Use the ``--logger`` option to inspect your training loss.
+* Use the flag ``--augment`` to activate data augmentation.
+* Increase the amount of ``--workers`` to speedup data loading. This is essential when you use the ``--augment`` option.
+* When using an Nvidia GPU, set the ``--precision`` option to 16 to use automatic mixed precision (AMP). This can provide significant speedup without any loss in accuracy.
 * Use option -B to scale batch size until GPU utilization reaches 100%. When using a larger batch size, it is recommended to use option -r to scale the learning rate by the square root of the batch size (1e-3 * sqrt(batch_size)).
 * When fine-tuning, it is recommended to use `new` mode not `union` as the network will rapidly unlearn missing labels in the new dataset.
-* If the new dataset is fairly dissimilar or your base model has been pretrained with ketos pretrain, use --warmup in conjunction with --freeze-backbone for one 1 or 2 epochs.
+* If the new dataset is fairly dissimilar or your base model has been pretrained with ketos pretrain, use ``--warmup`` in conjunction with ``--freeze-backbone`` for one 1 or 2 epochs.
 * Upload your models to the model repository.
 
 Segmentation model training
-~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 * The segmenter is fairly robust when it comes to hyperparameter choice.
 * Start by finetuning from the default model for a fixed number of epochs (50 for reasonably sized datasets) with a cosine schedule.
@@ -93,7 +93,7 @@ To realize this speedup the dataset has to be compiled first:
 
 if there are a lot of individual lines containing many lines this process can
 take a long time. It can easily be parallelized by specifying the number of
-separate parsing workers with the `--workers` option:
+separate parsing workers with the ``--workers`` option:
 
 .. code-block:: console
 
@@ -464,7 +464,7 @@ All data sources accepted by the supervised trainer are valid for pretraining
 but for performance reasons it is recommended to use pre-compiled binary
 datasets. One thing to keep in mind is that compilation filters out empty
 (non-transcribed) text lines per default which is undesirable for pretraining.
-With the `--keep-empty-lines` option all valid lines will be written to the
+With the ``--keep-empty-lines`` option all valid lines will be written to the
 dataset file:
 
 .. code-block:: console
@@ -645,21 +645,21 @@ differences from the ground truth for each of them.
 ======================================================= ======
 option                                                  action
 ======================================================= ======
--f, --format-type                                       Sets the test set data format.
+-f, \--format-type                                      Sets the test set data format.
                                                         Valid choices are 'path', 'xml' (default), 'alto', 'page', or binary.
                                                         In `alto`, `page`, and xml mode all data is extracted from XML files
                                                         containing both baselines and a link to source images.
                                                         In `path` mode arguments are image files sharing a prefix up to the last
                                                         extension with JSON `.path` files containing the baseline information.
                                                         In `binary` mode arguments are precompiled binary dataset files.
--m, --model                                             Model(s) to evaluate.
--e, --evaluation-files                                  File(s) with paths to evaluation data.
--d, --device                                            Select device to use.
---pad                                                   Left and right padding around lines.
+-m, \--model                                            Model(s) to evaluate.
+-e, \--evaluation-files                                 File(s) with paths to evaluation data.
+-d, \--device                                           Select device to use.
+\--pad                                                  Left and right padding around lines.
 ======================================================= ======
 
 Transcriptions are handed to the command in the same way as for the `train`
-command, either through a manifest with `-e/--evaluation-files` or by just
+command, either through a manifest with ``-e/--evaluation-files`` or by just
 adding a number of image files as the final argument:
 
 .. code-block:: console
@@ -733,5 +733,3 @@ adding a number of image files as the final argument:
 The report(s) contains character accuracy measured per script and a detailed
 list of confusions. When evaluating multiple models the last line of the output
 will the average accuracy and the standard deviation across all of them.
-
-

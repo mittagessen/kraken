@@ -20,10 +20,12 @@ Command line driver for dataset compilation
 """
 import click
 
+from .util import _validate_manifests
+
 
 @click.command('compile')
 @click.pass_context
-@click.option('-o', '--output', show_default=True, type=click.Path(), default='model', help='Output model file')
+@click.option('-o', '--output', show_default=True, type=click.Path(), default='dataset.arrow', help='Output model file')
 @click.option('--workers', show_default=True, default=1, help='Number of parallel workers for text line extraction.')
 @click.option('-f', '--format-type', type=click.Choice(['path', 'xml', 'alto', 'page']), default='xml', show_default=True,
               help='Sets the training data format. In ALTO and PageXML mode all '
@@ -31,6 +33,9 @@ import click
               'link to source images. In `path` mode arguments are image files '
               'sharing a prefix up to the last extension with JSON `.path` files '
               'containing the baseline information.')
+@click.option('-F', '--files', show_default=True, default=None, multiple=True,
+              callback=_validate_manifests, type=click.File(mode='r', lazy=True),
+              help='File(s) with additional paths to training data.')
 @click.option('--random-split', type=float, nargs=3, default=None, show_default=True,
               help='Creates a fixed random split of the input data with the '
               'proportions (train, validation, test). Overrides the save split option.')
@@ -51,12 +56,18 @@ import click
                    'output file. Larger batches require more transient memory '
                    'but slightly improve reading performance.')
 @click.argument('ground_truth', nargs=-1, type=click.Path(exists=True, dir_okay=False))
-def compile(ctx, output, workers, format_type, random_split, force_type, save_splits, skip_empty_lines, recordbatch_size, ground_truth):
+def compile(ctx, output, workers, format_type, files, random_split, force_type,
+            save_splits, skip_empty_lines, recordbatch_size, ground_truth):
     """
     Precompiles a binary dataset from a collection of XML files.
     """
     from .util import message
     from kraken.lib.progress import KrakenProgressBar
+
+    ground_truth = list(ground_truth)
+
+    if files:
+        ground_truth.extend(files)
 
     if not ground_truth:
         raise click.UsageError('No training data was provided to the compile command. Use the `ground_truth` argument.')

@@ -349,12 +349,14 @@ def segtrain(ctx, output, spec, line_width, pad, load, freq, quit, epochs,
 
     trainer.fit(model)
 
+    if model.best_epoch == -1:
+        logger.warning('Model did not improve during training.')
+        ctx.exit(1)
+
     if quit == 'early':
-        message('Moving best model {0}_{1}.mlmodel ({2}) to {0}_best.mlmodel'.format(
-            output, model.best_epoch, model.best_metric))
-        logger.info('Moving best model {0}_{1}.mlmodel ({2}) to {0}_best.mlmodel'.format(
-            output, model.best_epoch, model.best_metric))
-        shutil.copy(f'{output}_{model.best_epoch}.mlmodel', f'{output}_best.mlmodel')
+        message(f'Moving best model {model.best_model} ({model.best_metric}) to {output}_best.mlmodel')
+        logger.info(f'Moving best model {model.best_model} ({model.best_metric}) to {output}_best.mlmodel')
+        shutil.copy(f'{model.best_model}', f'{output}_best.mlmodel')
 
 
 @click.command('segtest')

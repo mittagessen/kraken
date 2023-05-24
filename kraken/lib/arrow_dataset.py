@@ -58,9 +58,10 @@ def _extract_line(xml_record, skip_empty_lines: bool = True):
                            script_detection=False,
                            line_orders=None)
         try:
-            line_im, line = next(extract_polygons(im, seg))
-        except KrakenInputException:
-            logger.warning(f'Invalid line {idx} in {im.filename}')
+            line_im, line = next(extract_polygons(im, {**xml_record, seg_key: [rec]}))
+        except KrakenInputException as e:
+            logger.warning(f'Invalid line {idx} in {im.filename}: {e}')
+        main
             continue
         except Exception as e:
             logger.warning(f'Unexpected exception {e} from line {idx} in {im.filename}')
@@ -162,7 +163,7 @@ def build_binary_dataset(files: Optional[List[Union[str, PathLike, Dict]]] = Non
         for doc in files:
             try:
                 data = parse_fn(doc)
-            except (FileNotFoundError, KrakenInputException):
+            except (FileNotFoundError, KrakenInputException, ValueError):
                 logger.warning(f'Invalid input file {doc}')
                 continue
             try:

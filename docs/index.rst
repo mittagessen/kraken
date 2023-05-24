@@ -207,7 +207,7 @@ License <https://github.com/mittagessen/kraken/blob/main/LICENSE>`_.
 Funding
 =======
 
-kraken is developed at the `École Pratique des Hautes Études <http://ephe.fr>`_, `Université PSL <http://www.psl.eu>`_.
+kraken is developed at the `École Pratique des Hautes Études <https://www.ephe.psl.eu>`_, `Université PSL <https://www.psl.eu>`_.
 
 
 .. container:: twocol
