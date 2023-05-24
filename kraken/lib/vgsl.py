@@ -138,7 +138,7 @@ class TorchVGSLModel(object):
                     self.build_dropout, self.build_maxpool, self.build_conv,
                     self.build_output, self.build_reshape, self.build_wav2vec2,
                     self.build_groupnorm, self.build_series,
-                    self.build_parallel]
+                    self.build_parallel, self.build_ro]
         self.codec = None  # type: Optional[PytorchCodec]
         self.criterion = None  # type: Any
         self.nn = layers.MultiParamSequential()
@@ -583,6 +583,25 @@ class TorchVGSLModel(object):
         self.idx += 1
         logger.debug(f'{self.idx}\t\twav2vec2\tmask width {mask_width}, prob '
                      f'{mask_prob}, negative samples {num_negatives}')
+        return fn.get_shape(input), [VGSLBlock(blocks[idx], m.group('type'), m.group('name'), self.idx)], fn
+
+    def build_ro(self,
+                 input: Tuple[int, int, int, int],
+                 blocks: List[str],
+                 idx: int) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
+        """
+        Builds a RO determination layer.
+        """
+        pattern = re.compile(r'(?P<type>RO)(?P<name>{\w+})(?P<feature_size>\d+),(?P<hidden_size>\d+)')
+        m = pattern.match(blocks[idx])
+        if not m:
+            return None, None, None
+        feature_size = int(m.group('feature_size'))
+        hidden_size = int(m.group('hidden_size'))
+        from kraken.lib import ro
+        fn = ro.layers.MLP(feature_size, hidden_size)
+        self.idx += 1
+        logger.debug(f'{self.idx}\t\tro\tfeatures {feature_size}, hidden_size {hidden_size}')
         return fn.get_shape(input), [VGSLBlock(blocks[idx], m.group('type'), m.group('name'), self.idx)], fn
 
     def build_conv(self,

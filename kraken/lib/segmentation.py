@@ -16,9 +16,11 @@
 Processing for baseline segmenter output
 """
 import PIL
+import torch
 import logging
 import numpy as np
 import shapely.geometry as geom
+import torch.nn.functional as F
 
 from collections import defaultdict
 
@@ -33,13 +35,14 @@ from shapely.validation import explain_validity
 
 from skimage import draw, filters
 from skimage.graph import MCP_Connect
-from skimage.filters import apply_hysteresis_threshold, sobel
+from skimage.filters import sobel
 from skimage.measure import approximate_polygon, subdivide_polygon, regionprops, label
 from skimage.morphology import skeletonize
 from skimage.transform import PiecewiseAffineTransform, SimilarityTransform, AffineTransform, warp
 
-from typing import List, Tuple, Union, Dict, Any, Sequence, Optional
+from typing import List, Tuple, Union, Dict, Any, Sequence, Optional, Literal
 
+from kraken.containers import Segmentation, BaselineLine, BBoxLine
 from kraken.lib import default_specs
 from kraken.lib.exceptions import KrakenInputException
 
@@ -50,7 +53,7 @@ from scipy.ndimage import gaussian_filter
 logger = logging.getLogger('kraken')
 
 __all__ = ['reading_order',
-           'denoising_hysteresis_thresh',
+           'neural_reading_order',
            'vectorize_lines',
            'calculate_polygonal_environment',
            'polygonal_reading_order',
@@ -60,7 +63,7 @@ __all__ = ['reading_order',
            'extract_polygons']
 
 
-def reading_order(lines: Sequence[Tuple[slice, slice]], text_direction: str = 'lr') -> np.ndarray:
+def reading_order(lines: Sequence[Tuple[slice, slice]], text_direction: Literal['lr', 'rl'] = 'lr') -> np.ndarray:
     """Given the list of lines (a list of 2D slices), computes
     the partial reading order.  The output is a binary 2D array
     such that order[i,j] is true if line i comes before line j
@@ -129,11 +132,6 @@ def topsort(order: np.ndarray) -> List[int]:
     for k in range(n):
         _visit(k)
     return L
-
-
-def denoising_hysteresis_thresh(im, low, high, sigma):
-    im = gaussian_filter(im, sigma)
-    return apply_hysteresis_threshold(im, low, high)
 
 
 def moore_neighborhood(current, backtrack):
@@ -740,9 +738,9 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
     return polygons
 
 
-def polygonal_reading_order(lines: Sequence[Tuple[List[Tuple[int, int]], List[Tuple[int, int]]]],
-                            text_direction: str = 'lr',
-                            regions: Optional[Sequence[List[Tuple[int, int]]]] = None) -> Sequence[Tuple[List[Tuple[int, int]], List[Tuple[int, int]]]]:
+def polygonal_reading_order(lines: Sequence[Dict],
+                            text_direction: Literal['lr', 'rl'] = 'lr',
+                            regions: Optional[Sequence[List[Tuple[int, int]]]] = None) -> Sequence[int]:
     """
     Given a list of baselines and regions, calculates the correct reading order
     and applies it to the input.
@@ -755,8 +753,10 @@ def polygonal_reading_order(lines: Sequence[Tuple[List[Tuple[int, int]], List[Tu
                               Can be 'lr' or 'rl'
 
     Returns:
-        A reordered input.
+        The indices of the ordered input.
     """
+    lines = [(line['tags']['type'], line['baseline'], line['boundary']) for line in lines]
+
     bounds = []
     if regions is not None:
         r = [geom.Polygon(reg) for reg in regions]
@@ -792,13 +792,13 @@ def polygonal_reading_order(lines: Sequence[Tuple[List[Tuple[int, int]], List[Tu
     lsort = topsort(order)
     sidz = sorted(indizes.keys())
     lsort = [sidz[i] for i in lsort]
-    ordered_lines = []
+    ordered_idxs = []
     for i in lsort:
         if indizes[i][0] == 'line':
-            ordered_lines.append(indizes[i][1])
+            ordered_idxs.append(i)
         else:
-            ordered_lines.extend(lines[x] for x in intra_region_order[indizes[i][1]])
-    return ordered_lines
+            ordered_idxs.extend(intra_region_order[indizes[i][1]])
+    return ordered_idxs
 
 
 def is_in_region(line, region) -> bool:
@@ -815,6 +815,97 @@ def is_in_region(line, region) -> bool:
     """
     l_obj = line.interpolate(0.5, normalized=True)
     return region.contains(l_obj)
+
+
+def neural_reading_order(lines: Sequence[Dict],
+                         text_direction: str = 'lr',
+                         regions: Optional[Sequence[List[Tuple[int, int]]]] = None,
+                         im_size: Tuple[int, int] = None,
+                         model: 'TorchVGSLModel' = None,
+                         class_mapping: Dict[str, int] = None) -> Sequence[int]:
+    """
+    Given a list of baselines and regions, calculates the correct reading order
+    and applies it to the input.
+
+    Args:
+        lines: List of tuples containing the baseline and its polygonization.
+        model: torch Module for
+
+    Returns:
+        The indices of the ordered input.
+    """
+    lines = [(line['tags']['type'], line['baseline'], line['boundary']) for line in lines]
+    # construct all possible pairs
+    h, w = im_size
+    features = []
+    for i in lines:
+        for j in lines:
+            if i == j and len(lines) != 1:
+                continue
+            num_classes = len(class_mapping) + 1
+            cl_i = torch.zeros(num_classes, dtype=torch.float)
+            cl_j = torch.zeros(num_classes, dtype=torch.float)
+            cl_i[class_mapping.get(i[0], 0)] = 1
+            cl_j[class_mapping.get(j[0], 0)] = 1
+            line_coords_i = np.array(i[1]) / (w, h)
+            line_center_i = np.mean(line_coords_i, axis=0)
+            line_coords_j = np.array(j[1]) / (w, h)
+            line_center_j = np.mean(line_coords_j, axis=0)
+            features.append(torch.cat((cl_i,
+                                       torch.tensor(line_center_i, dtype=torch.float),  # lin
+                                       torch.tensor(line_coords_i[0, :], dtype=torch.float),
+                                       torch.tensor(line_coords_i[-1, :], dtype=torch.float),
+                                       cl_j,
+                                       torch.tensor(line_center_j, dtype=torch.float),  # lin
+                                       torch.tensor(line_coords_j[0, :], dtype=torch.float),
+                                       torch.tensor(line_coords_j[-1, :], dtype=torch.float))))
+    features = torch.stack(features)
+    output = F.sigmoid(model(features))
+
+    order = torch.zeros((len(lines), len(lines)))
+    idx = 0
+    for i in range(len(lines)):
+        for j in range(len(lines)):
+            if i == j and len(lines) != 1:
+                continue
+            order[i, j] = output[idx]
+            idx += 1
+    # decode order relation matrix
+    path = _greedy_order_decoder(order)
+    return path
+
+
+def _greedy_order_decoder(P):
+    """
+    A greedy decoder of order-relation matrix. For each position in the
+    reading order we select the most probable one, then move to the next
+    position. Most probable for position:
+
+    .. math::
+        z^{\\star}_t = \\argmax_{(s,\\nu) \\ni z^{\\star}}
+        \\prod_{(s',\\nu') \\in z^\\star}{\\tilde{P}(Y=1\\mid s',s)}
+        \\times \\prod_{\\substack{(s'',\\nu'') \\ni z^\\star\\
+         s'' \\ne s}}{\\tilde{P}(r=0\\mid s'',s)}, 1\\le t \\le n
+    """
+    A = P + torch.finfo(torch.float).eps
+    N = P.shape[0]
+    A = (A + (1-A).T)/2
+    for i in range(A.shape[0]):
+        A[i, i] = torch.finfo(torch.float).eps
+    best_path = []
+    # use log(p(R\mid s',s)) to shift multiplication to sum
+    lP = torch.log(A)
+    for i in range(N):
+        lP[i, i] = 0
+    for t in range(N):
+        for i in range(N):
+            idx = torch.argmax(lP.sum(axis=1))
+            if idx not in best_path:
+                best_path.append(idx)
+                lP[idx, :] = lP[:, idx]
+                lP[:, idx] = 0
+                break
+    return torch.tensor(best_path)
 
 
 def scale_regions(regions: Sequence[Tuple[List[int], List[int]]],
@@ -944,29 +1035,20 @@ def compute_polygon_section(baseline: Sequence[Tuple[int, int]],
     return tuple(o)
 
 
-def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image.Image:
+def extract_polygons(im: Image.Image, bounds: Segmentation) -> Image.Image:
     """
     Yields the subimages of image im defined in the list of bounding polygons
     with baselines preserving order.
 
     Args:
         im: Input image
-        bounds: A list of dicts in baseline::
-
-                    {'type': 'baselines',
-                     'lines': [{'baseline': [[x_0, y_0], ... [x_n, y_n]],
-                                'boundary': [[x_0, y_0], ... [x_n, y_n]]},
-                               ....]
-                    }
-
-                or bounding box format::
-
-                    {'boxes': [[x_0, y_0, x_1, y_1], ...], 'text_direction': 'horizontal-lr'}
+        bounds: A Segmentation class containing a boundig box or baseline
+                segmentation.
 
     Yields:
         The extracted subimage
     """
-    if 'type' in bounds and bounds['type'] == 'baselines':
+    if bounds.type == 'baselines':
         # select proper interpolation scheme depending on shape
         if im.mode == '1':
             order = 0
@@ -975,11 +1057,11 @@ def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image.Image:
             order = 1
         im = np.array(im)
 
-        for line in bounds['lines']:
-            if line['boundary'] is None:
+        for line in bounds.lines:
+            if line.boundary is None:
                 raise KrakenInputException('No boundary given for line')
-            pl = np.array(line['boundary'])
-            baseline = np.array(line['baseline'])
+            pl = np.array(line.boundary)
+            baseline = np.array(line.baseline)
             c_min, c_max = int(pl[:, 0].min()), int(pl[:, 0].max())
             r_min, r_max = int(pl[:, 1].min()), int(pl[:, 1].max())
 
@@ -1064,11 +1146,11 @@ def extract_polygons(im: Image.Image, bounds: Dict[str, Any]) -> Image.Image:
                 i = Image.fromarray(o.astype('uint8'))
             yield i.crop(i.getbbox()), line
     else:
-        if bounds['text_direction'].startswith('vertical'):
+        if bounds.text_direction.startswith('vertical'):
             angle = 90
         else:
             angle = 0
-        for box in bounds['boxes']:
+        for box in bounds.lines:
             if isinstance(box, tuple):
                 box = list(box)
             if (box < [0, 0, 0, 0] or box[::2] >= [im.size[0], im.size[0]] or
