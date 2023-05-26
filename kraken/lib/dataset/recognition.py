@@ -56,7 +56,7 @@ class DefaultAugmenter():
             ShiftScaleRotate, OpticalDistortion, ElasticTransform,
             PixelDropout
             )
-        
+
         self._transforms = Compose([
                                     ToFloat(),
                                     PixelDropout(p=0.2),
@@ -71,7 +71,7 @@ class DefaultAugmenter():
                                         ElasticTransform(alpha=64, sigma=25, alpha_affine=0.25, p=0.1),
                                     ], p=0.2),
                                    ], p=0.5)
-    
+
     def __call__(self, image):
         return self._transforms(image=image)
 
@@ -186,7 +186,8 @@ class ArrowIPCRecognitionDataset(Dataset):
                     continue
             num_lines = np.count_nonzero(mask)
             logger.debug(f'Filtering out {np.count_nonzero(~mask)} empty lines')
-            ds_table = ds_table.filter(pa.array(mask))
+            if np.any(~mask):
+                ds_table = ds_table.filter(pa.array(mask))
             self.skip_empty_lines = True
         if not self.arrow_table:
             self.arrow_table = ds_table
