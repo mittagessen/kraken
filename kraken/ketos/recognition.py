@@ -464,7 +464,7 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
         ds_loader = DataLoader(ds,
                                batch_size=batch_size,
                                num_workers=workers,
-                               pin_memory=True,
+                               pin_memory=False,
                                collate_fn=collate_sequences)
 
         with KrakenProgressBar() as progress:
