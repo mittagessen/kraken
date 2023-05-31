@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 from setuptools import setup, find_packages
 
+
 requirements = []
 try:
     with open('requirements.txt') as f:
