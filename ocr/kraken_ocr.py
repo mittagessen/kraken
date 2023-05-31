@@ -15,14 +15,16 @@ class KrakenOCR:
 
     def img_preprocessing(self, im, inverse=False):
         """
-        Using the image binarization preprocessing on Kraken which they have not used.
+        im: input image
+        inverse: Default is False. If set to True, it will inverse the binary image to foreground = white and
+        background = black.
         """
 
-        binarize_image = nlbin(im)
+        binarized_image = nlbin(im)
         if inverse:
-            return ImageOps.invert(binarize_image)
+            return ImageOps.invert(binarized_image)
 
-        return binarize_image
+        return binarized_image
 
 
 if __name__ == "__main__":
