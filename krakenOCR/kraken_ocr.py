@@ -2,6 +2,7 @@ from kraken import blla
 from PIL import Image, ImageOps
 from kraken.binarization import nlbin
 from kraken.lib import vgsl
+from typing import List
 
 
 class KrakenOCR:
@@ -9,10 +10,10 @@ class KrakenOCR:
         self.blla = blla
         self.model = vgsl.TorchVGSLModel.load_model("blla.mlmodel")
 
-    def ocr(self, input_image):
-        preprocessed_image = nlbin(input_image)
+    def ocr(self, input_image: Image.Image) -> List:
+        # preprocessed_image = nlbin(input_image)
 
-        baseline_seg = self.blla.segment(im=preprocessed_image, model=self.model, device='cpu')  # Baseline segmenter
+        baseline_seg = self.blla.segment(im=input_image, model=self.model, device='cpu')  # Baseline segmenter
         return baseline_seg['lines']
 
 
