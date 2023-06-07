@@ -9,7 +9,7 @@ except IOError as e:
     print(e)
 
 setup(
-    name='krakenocr',
+    name='kraken',
     zip_safe=False,
     packages=find_packages(),
     package_dir={},
