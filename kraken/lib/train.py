@@ -33,7 +33,7 @@ from typing import Callable, Dict, Optional, Sequence, Union, Any, Literal
 from pytorch_lightning.callbacks import Callback, EarlyStopping, BaseFinetuning, LearningRateMonitor
 
 from kraken.lib import models, vgsl, default_specs, progress
-from kraken.lib.xml import preparse_xml_data
+# from kraken.lib.xml import preparse_xml_data
 from kraken.lib.util import make_printable
 from kraken.lib.codec import PytorchCodec
 from kraken.lib.dataset import (ArrowIPCRecognitionDataset, BaselineSet,
