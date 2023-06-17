@@ -28,6 +28,9 @@ class BaselineLine:
     split: Optional[Literal['train', 'validation', 'test']] = None
     regions: Optional[List[str]] = None
 
+    def __getitem__(self, item):
+        return getattr(self, item)
+
 @dataclass
 class BBoxLine:
     """
