@@ -9,6 +9,7 @@ import click
 import unicodedata
 from lxml import etree
 from itertools import cycle
+from unicodedata import normalize
 
 cmap = cycle([(230, 25, 75, 127),
               (60, 180, 75, 127),
@@ -80,11 +81,14 @@ def _repl_page(fname, cuts):
               'link to source images.')
 @click.option('-i', '--model', default=None, show_default=True, type=click.Path(exists=True),
               help='Transcription model to use.')
+@click.option('-u', '--normalization', show_default=True, type=click.Choice(['NFD', 'NFKD', 'NFC', 'NFKC']),
+              default=None,
+              help='Ground truth normalization')
 @click.option('-o', '--output', type=click.Choice(['xml', 'overlay']),
               show_default=True, default='overlay', help='Output mode. Either page or '
               'alto for xml output, overlay for image overlays.')
 @click.argument('files', nargs=-1)
-def cli(format_type, model, output, files):
+def cli(format_type, model, normalization, output, files):
     """
     A script producing overlays of lines and regions from either ALTO or
     PageXML files or run a model to do the same.
@@ -111,6 +115,9 @@ def cli(format_type, model, output, files):
     for doc in files:
         click.echo(f'Processing {doc} ', nl=False)
         data = fn(doc)
+        if normalization:
+            for line in data["lines"]:
+                line["text"] = normalize(normalization, line["text"])
         im = Image.open(data['image']).convert('RGBA')
         records = align.forced_align(data, net)
         if output == 'overlay':
