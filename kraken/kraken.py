@@ -46,7 +46,6 @@ install(suppress=[click])
 APP_NAME = 'kraken'
 SEGMENTATION_DEFAULT_MODEL = pkg_resources.resource_filename(__name__, 'blla.mlmodel')
 DEFAULT_MODEL = ['en_best.mlmodel']
-LEGACY_MODEL_DIR = '/usr/local/share/ocropus'
 
 # raise default max image size to 20k * 20k pixels
 Image.MAX_IMAGE_PIXELS = 20000 ** 2
@@ -581,14 +580,12 @@ def ocr(ctx, model, pad, reorder, base_dir, no_segmentation, text_direction, thr
     if reorder and base_dir != 'auto':
         reorder = base_dir
 
-    # first we try to find the model in the absolue path, then ~/.kraken, then
-    # LEGACY_MODEL_DIR
+    # first we try to find the model in the absolue path, then ~/.kraken
     nm = {}  # type: Dict[str, models.TorchSeqRecognizer]
     ign_tags = model.pop('ignore')
     for k, v in model.items():
         search = [v,
-                  os.path.join(click.get_app_dir(APP_NAME), v),
-                  os.path.join(LEGACY_MODEL_DIR, v)]
+                  os.path.join(click.get_app_dir(APP_NAME), v)]
         location = None
         for loc in search:
             if os.path.isfile(loc):

@@ -740,7 +740,7 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
 
 def polygonal_reading_order(lines: Sequence[Dict],
                             text_direction: Literal['lr', 'rl'] = 'lr',
-                            regions: Optional[Sequence[List[Tuple[int, int]]]] = None) -> Sequence[int]:
+                            regions: Optional[Sequence[geom.Polygon]] = None) -> Sequence[int]:
     """
     Given a list of baselines and regions, calculates the correct reading order
     and applies it to the input.
@@ -758,16 +758,14 @@ def polygonal_reading_order(lines: Sequence[Dict],
     lines = [(line['tags']['type'], line['baseline'], line['boundary']) for line in lines]
 
     bounds = []
-    if regions is not None:
-        r = [geom.Polygon(reg) for reg in regions]
-    else:
-        r = []
-    region_lines = [[] for _ in range(len(r))]
+    if regions is None:
+        regions = []
+    region_lines = [[] for _ in range(len(regions))]
     indizes = {}
     for line_idx, line in enumerate(lines):
         s_line = geom.LineString(line[1])
         in_region = False
-        for idx, reg in enumerate(r):
+        for idx, reg in enumerate(regions):
             if is_in_region(s_line, reg):
                 region_lines[idx].append((line_idx, (slice(s_line.bounds[1], s_line.bounds[3]),
                                                      slice(s_line.bounds[0], s_line.bounds[2]))))
@@ -778,8 +776,8 @@ def polygonal_reading_order(lines: Sequence[Dict],
                            slice(s_line.bounds[0], s_line.bounds[2])))
             indizes[line_idx] = ('line', line)
     # order everything in regions
-    intra_region_order = [[] for _ in range(len(r))]
-    for idx, reg in enumerate(r):
+    intra_region_order = [[] for _ in range(len(regions))]
+    for idx, reg in enumerate(regions):
         if len(region_lines[idx]) > 0:
             order = reading_order([x[1] for x in region_lines[idx]], text_direction)
             lsort = topsort(order)
@@ -819,7 +817,7 @@ def is_in_region(line, region) -> bool:
 
 def neural_reading_order(lines: Sequence[Dict],
                          text_direction: str = 'lr',
-                         regions: Optional[Sequence[List[Tuple[int, int]]]] = None,
+                         regions: Optional[Sequence[geom.Polygon]] = None,
                          im_size: Tuple[int, int] = None,
                          model: 'TorchVGSLModel' = None,
                          class_mapping: Dict[str, int] = None) -> Sequence[int]:

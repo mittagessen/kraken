@@ -36,7 +36,7 @@ from scipy.ndimage import gaussian_filter
 from skimage.filters import sobel
 
 from kraken.lib import vgsl, dataset
-from kraken.containers import Region, Segmentation
+from kraken.containers import Region, Segmentation, BaselineLine
 from kraken.lib.util import is_bitonal, get_im_str
 from kraken.lib.exceptions import KrakenInputException, KrakenInvalidModelException
 from kraken.lib.segmentation import (polygonal_reading_order,
@@ -44,6 +44,7 @@ from kraken.lib.segmentation import (polygonal_reading_order,
                                      vectorize_lines, vectorize_regions,
                                      scale_polygonal_lines,
                                      calculate_polygonal_environment,
+                                     is_in_region,
                                      scale_regions)
 
 __all__ = ['segment']
@@ -156,7 +157,7 @@ def vec_regions(heatmap: torch.Tensor, cls_map: Dict, scale: float, **kwargs) ->
         logger.debug(f'Vectorizing regions of type {region_type}')
         regions[region_type] = vectorize_regions(heatmap[idx])
     for reg_type, regs in regions.items():
-        regions[reg_type] = [Region(id=uuid.uuid4(), boundary=x, tags={'type': reg_type}) for x in scale_regions(regs, scale)]
+        regions[reg_type] = [Region(id=str(uuid.uuid4()), boundary=x, tags={'type': reg_type}) for x in scale_regions(regs, scale)]
     return regions
 
 
@@ -205,6 +206,7 @@ def vec_lines(heatmap: torch.Tensor,
              ...
             ]
     """
+
     st_sep = cls_map['aux']['_start_separator']
     end_sep = cls_map['aux']['_end_separator']
 
@@ -219,28 +221,25 @@ def vec_lines(heatmap: torch.Tensor,
 
     lines = []
     reg_pols = [geom.Polygon(x) for x in regions]
-    line_regs = []
     for bl_idx in range(len(baselines)):
         bl = baselines[bl_idx]
-        mid_point = geom.LineString(bl[1]).interpolate(0.5, normalized=True)
-
+        bl_ls = geom.LineString(bl[1])
         suppl_obj = [x[1] for x in baselines[:bl_idx] + baselines[bl_idx+1:]]
         for reg_idx, reg_pol in enumerate(reg_pols):
-            if reg_pol.contains(mid_point):
+            if is_in_region(bl_ls, reg_pol):
                 suppl_obj.append(regions[reg_idx])
-        pol = calculate_polygonal_environment(
-            baselines=[bl[1]],
-            im_feats=im_feats,
-            suppl_obj=suppl_obj,
-            topline=topline,
-            raise_on_error=raise_on_error
-        )
+        pol = calculate_polygonal_environment(baselines=[bl[1]],
+                                              im_feats=im_feats,
+                                              suppl_obj=suppl_obj,
+                                              topline=topline,
+                                              raise_on_error=raise_on_error)
         if pol[0] is not None:
             lines.append((bl[0], bl[1], pol[0]))
 
     logger.debug('Scaling vectorized lines')
     sc = scale_polygonal_lines([x[1:] for x in lines], scale)
-    lines = list(zip([x[0] for x in lines], [x[0] for x in sc], [x[1] for x in sc], line_regs))
+
+    lines = list(zip([x[0] for x in lines], [x[0] for x in sc], [x[1] for x in sc]))
     return [{'tags': {'type': bl_type}, 'baseline': bl, 'boundary': pl} for bl_type, bl, pl in lines]
 
 
@@ -383,11 +382,6 @@ def segment(im: PIL.Image.Image,
 
         lines.extend(_lines)
 
-    # reorder lines
-    logger.debug(f'Reordering baselines with main RO function {reading_order_fn}.')
-    basic_lo = reading_order_fn(lines=lines, regions=regions, text_direction=text_direction[-2:])
-    lines = [lines[idx] for idx in basic_lo]
-
     if len(rets['cls_map']['baselines']) > 1:
         script_detection = True
     else:
@@ -401,17 +395,23 @@ def segment(im: PIL.Image.Image,
         for reg in rgs:
             _shp_regs[reg.id] = geom.Polygon(reg.boundary)
 
+    # reorder lines
+    logger.debug(f'Reordering baselines with main RO function {reading_order_fn}.')
+    basic_lo = reading_order_fn(lines=lines, regions=_shp_regs.values(), text_direction=text_direction[-2:])
+    lines = [lines[idx] for idx in basic_lo]
+
     for line in lines:
         line_regs = []
         for reg_id, reg in _shp_regs.items():
-            mid_point = geom.LineString(line[1]).interpolate(0.5, normalized=True)
-            if reg.contains(mid_point):
+            line_ls = geom.LineString(line['baseline'])
+            if is_in_region(line_ls, reg):
                 line_regs.append(reg_id)
-        blls.append(BaselineLine(id=uuid.uuid4(), baseline=line[1], boundary=line[2], tags={'type': line[0]}, regions=line_regs))
+        blls.append(BaselineLine(id=str(uuid.uuid4()), baseline=line['baseline'], boundary=line['boundary'], tags=line['tags'], regions=line_regs))
 
     return Segmentation(text_direction=text_direction,
+                        imagename=getattr(im, 'filename', None),
                         type='baselines',
                         lines=blls,
-                        regions=_regs,
+                        regions=regions,
                         script_detection=script_detection,
                         line_orders=[order])
