@@ -1,7 +1,7 @@
 
 import PIL.Image
 
-from typing import Literal, List, Dict, Sequence, Union, Optional, Tuple
+from typing import Literal, List, Dict, Union, Optional, Tuple
 from dataclasses import dataclass, asdict
 from abc import ABC, abstractmethod
 
@@ -66,9 +66,14 @@ class Segmentation:
     imagename: str
     text_direction: Literal['horizontal-lr', 'horizontal-rl', 'vertical-lr', 'vertical-rl']
     script_detection: bool
-    lines: Sequence[Union[BaselineLine, BBoxLine]]
+    lines: List[Union[BaselineLine, BBoxLine]]
     regions: Dict[str, List[Region]]
     line_orders: Optional[List[List[int]]] = None
+
+    def __post_init__(self):
+        if len(self.lines) and not isinstance(self.lines[0], BBoxLine) and not isinstance(self.lines[0], BaselineLine):
+            line_cls = BBoxLine if self.type == 'bbox' else BaselineLine
+            self.lines = [line_cls(**line) for line in self.lines]
 
 
 class ocr_record(ABC):
@@ -79,11 +84,11 @@ class ocr_record(ABC):
 
     def __init__(self,
                  prediction: str,
-                 cuts: Sequence[Union[Tuple[int, int], Tuple[Tuple[int, int],
+                 cuts: List[Union[Tuple[int, int], Tuple[Tuple[int, int],
                                                              Tuple[int, int],
                                                              Tuple[int, int],
                                                              Tuple[int, int]]]],
-                 confidences: Sequence[float],
+                 confidences: List[float],
                  display_order: bool = True) -> None:
         self._prediction = prediction
         self._cuts = cuts
@@ -106,7 +111,7 @@ class ocr_record(ABC):
         return self._prediction
 
     @property
-    def cuts(self) -> Sequence:
+    def cuts(self) -> List:
         return self._cuts
 
     @property
@@ -119,7 +124,7 @@ class ocr_record(ABC):
 
     @abstractmethod
     def __next__(self) -> Tuple[str,
-                                Union[Sequence[Tuple[int, int]],
+                                Union[List[Tuple[int, int]],
                                       Tuple[Tuple[int, int],
                                             Tuple[int, int],
                                             Tuple[int, int],
@@ -166,8 +171,8 @@ class BaselineOCRRecord(ocr_record, BaselineLine):
     type = 'baselines'
 
     def __init__(self, prediction: str,
-                 cuts: Sequence[Tuple[int, int]],
-                 confidences: Sequence[float],
+                 cuts: List[Tuple[int, int]],
+                 confidences: List[float],
                  line: BaselineLine,
                  base_dir: Optional[Literal['L', 'R']] = None,
                  display_order: bool = True) -> None:
@@ -222,7 +227,7 @@ class BaselineOCRRecord(ocr_record, BaselineLine):
             raise TypeError('Invalid argument type')
 
     @property
-    def cuts(self) -> Sequence[Tuple[int, int]]:
+    def cuts(self) -> List[Tuple[int, int]]:
         return tuple([compute_polygon_section(self.baseline, self.line, cut[0], cut[1]) for cut in self._cuts])
 
     def logical_order(self, base_dir: Optional[Literal['L', 'R']] = None) -> 'BaselineOCRRecord':
@@ -314,11 +319,11 @@ class BBoxOCRRecord(ocr_record, BBoxLine):
 
     def __init__(self,
                  prediction: str,
-                 cuts: Sequence[Tuple[Tuple[int, int],
+                 cuts: List[Tuple[Tuple[int, int],
                                       Tuple[int, int],
                                       Tuple[int, int],
                                       Tuple[int, int]]],
-                 confidences: Sequence[float],
+                 confidences: List[float],
                  line: BBoxLine,
                  base_dir: Optional[Literal['L', 'R']],
                  display_order: bool = True) -> None:
