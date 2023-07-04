@@ -1,5 +1,6 @@
 
 import PIL.Image
+import bidi.algorithm as bd
 
 from typing import Literal, List, Dict, Union, Optional, Tuple
 from dataclasses import dataclass, asdict
@@ -300,7 +301,7 @@ class BaselineOCRRecord(ocr_record, BaselineLine):
                             image=self.image,
                             tags=self.tags,
                             split=self.split,
-                            region=self.region)
+                            regions=self.regions)
         rec = BaselineOCRRecord(prediction=prediction,
                                 cuts=cuts,
                                 confidences=confidences,

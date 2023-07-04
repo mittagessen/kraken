@@ -180,7 +180,9 @@ def segmenter(legacy, model, text_direction, scale, maxcolseps, black_colseps,
 def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore, input, output) -> None:
 
     import json
+    import uuid
 
+    from kraken.containers import Segmentation, BBoxLine
     from kraken import rpred
 
     ctx = click.get_current_context()
@@ -192,17 +194,11 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore, input,
     if ctx.meta['first_process']:
         if ctx.meta['input_format_type'] != 'image':
             doc = get_input_parser(ctx.meta['input_format_type'])(input)
-            ctx.meta['base_image'] = doc['image']
-            doc['text_direction'] = 'horizontal-lr'
-            if doc['base_dir'] and bidi_reordering is True:
-                message(f'Setting base text direction for BiDi reordering to {doc["base_dir"]} (from XML input file)')
-                bidi_reordering = doc['base_dir']
-            bounds = {'text_direction': 'horizontal-lr',
-                      'tags': True,
-                      'lines': doc.get_sorted_lines(),
-                      'regions': doc.get_sorted_regions(),
-                      'type': 'baselines',
-                      'image': doc.imagename}
+            ctx.meta['base_image'] = doc.imagename
+            if doc.base_dir and bidi_reordering is True:
+                message(f'Setting base text direction for BiDi reordering to {doc.base_dir} (from XML input file)')
+                bidi_reordering = doc.base_dir
+            bounds = doc.to_container()
     try:
         im = Image.open(ctx.meta['base_image'])
     except IOError as e:
@@ -212,14 +208,15 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore, input,
         with click.open_file(input, 'r') as fp:
             try:
                 fp = cast(IO[Any], fp)
-                bounds = json.load(fp)
+                bounds = Segmentation(**json.load(fp))
             except ValueError as e:
                 raise click.UsageError(f'{input} invalid segmentation: {str(e)}')
     elif not bounds:
         if no_segmentation:
-            bounds = {'script_detection': False,
-                      'text_direction': 'horizontal-lr',
-                      'boxes': [(0, 0) + im.size]}
+            bounds = Segmentation(type='bbox',
+                                  text_direction='horizontal-lr',
+                                  lines=[BBoxLine(id=uuid.uuid4(),
+                                                  bbox=((0, 0), (0, im.size[1]), im.size, (im.size[0], 0)))])
         else:
             raise click.UsageError('No line segmentation given. Add one with the input or run `segment` first.')
     elif no_segmentation:
@@ -227,7 +224,7 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore, input,
 
     tags = set()
     # script detection
-    if 'script_detection' in bounds and bounds['script_detection']:
+    if bounds.script_detection:
         it = rpred.mm_rpred(model, im, bounds, pad,
                             bidi_reordering=bidi_reordering,
                             tags_ignore=tags_ignore)
@@ -255,7 +252,7 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore, input,
                                              image_size=Image.open(ctx.meta['base_image']).size,
                                              writing_mode=ctx.meta['text_direction'],
                                              scripts=tags,
-                                             regions=bounds['regions'] if 'regions' in bounds else None,
+                                             regions=bounds.regions,
                                              template=ctx.meta['output_template'],
                                              template_source='custom' if ctx.meta['output_mode'] == 'template' else 'native',
                                              processing_steps=ctx.meta['steps']))

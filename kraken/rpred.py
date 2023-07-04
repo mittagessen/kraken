@@ -19,6 +19,7 @@ kraken.rpred
 Generators for recognition on lines images.
 """
 import logging
+import dataclasses
 import numpy as np
 import bidi.algorithm as bd
 
@@ -47,12 +48,12 @@ class mm_rpred(object):
     Multi-model version of kraken.rpred.rpred
     """
     def __init__(self,
-                 nets: Dict[str, TorchSeqRecognizer],
+                 nets: Dict[Tuple[str, str], TorchSeqRecognizer],
                  im: Image.Image,
                  bounds: Segmentation,
                  pad: int = 16,
                  bidi_reordering: Union[bool, str] = True,
-                 tags_ignore: Optional[List[str]] = None) -> Generator[ocr_record, None, None]:
+                 tags_ignore: Optional[List[Tuple[str, str]]] = None) -> Generator[ocr_record, None, None]:
         """
         Multi-model version of kraken.rpred.rpred.
 
@@ -61,8 +62,8 @@ class mm_rpred(object):
         these lines.
 
         Args:
-            nets: A dict mapping tag values to TorchSegRecognizer objects.
-                  Recommended to be an defaultdict.
+            nets: A dict mapping tag key-value pairs to TorchSegRecognizer
+                  objects. Recommended to be an defaultdict.
             im: Image to extract text from
             bounds: A Segmentation data class containing either bounding box or
                     baseline type segmentation.
@@ -71,7 +72,8 @@ class mm_rpred(object):
                              Unicode bidirectional algorithm for correct
                              display. Set to L|R to override default text
                              direction.
-            tags_ignore: List of tag values to ignore during recognition
+            tags_ignore: List of tag key-value pairs to ignore during
+                         recognition
 
         Yields:
             An ocr_record containing the recognized text, absolute character
@@ -115,7 +117,7 @@ class mm_rpred(object):
 
         tags = set()
         for x in bounds.lines:
-            tags.update(x.tags.values())
+            tags.update(x.tags.items())
 
         im_str = get_im_str(im)
         logger.info(f'Running {len(nets)} multi-script recognizers on {im_str} with {self.len} lines')
@@ -231,8 +233,10 @@ class mm_rpred(object):
                     logger.info(f'Ignoring line segment with tags {line.tags} based on {tag}.')
                     return BaselineOCRRecord('', [], [], line)
 
+        seg = dataclasses.replace(self.bounds, lines=[line])
+
         try:
-            box, coords = next(extract_polygons(self.im, line))
+            box, coords = next(extract_polygons(self.im, seg))
         except KrakenInputException as e:
             logger.warning(f'Extracting line failed: {e}')
             return BaselineOCRRecord('', [], [], line)
@@ -279,7 +283,6 @@ class mm_rpred(object):
             return rec.display_order(None)
 
     def __next__(self):
-        bound = self.bounds
         return self.next_iter(next(self.line_iter))
 
     def __iter__(self):
@@ -319,12 +322,12 @@ def rpred(network: TorchSeqRecognizer,
 
 
 def _resolve_tags_to_model(tags: Sequence[Dict[str, str]],
-                           model_map: Dict[str, TorchSeqRecognizer],
+                           model_map: Dict[Tuple[str, str], TorchSeqRecognizer],
                            default: Optional[TorchSeqRecognizer] = None) -> TorchSeqRecognizer:
     """
     Resolves a sequence of tags
     """
-    for tag in tags.values():
+    for tag in tags.items():
         if tag in model_map:
             return tag, model_map[tag]
     if default:
