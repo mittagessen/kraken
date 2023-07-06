@@ -458,9 +458,7 @@ def binarize(ctx, threshold, zoom, escale, border, perc, range, low, high):
 
 @cli.command('segment')
 @click.pass_context
-@click.option('-i', '--model',
-              default=None,
-              show_default=True, type=click.Path(exists=True),
+@click.option('-i', '--model', default=None, show_default=True,
               help='Baseline detection model to use')
 @click.option('-x/-bl', '--boxes/--baseline', default=True, show_default=True,
               help='Switch between legacy box segmenter and neural baseline segmenter')
@@ -497,10 +495,21 @@ def segment(ctx, model, boxes, text_direction, scale, maxcolseps,
                                   'settings': {'model': os.path.basename(model),
                                                'text_direction': text_direction}})
 
+        # first try to find the segmentation model by its given name,
+        # then look in the kraken config folder
+        location = None
+        search = [model, os.path.join(click.get_app_dir(APP_NAME), model)]
+        for loc in search:
+            if os.path.isfile(loc):
+                location = loc
+                break
+        if not location:
+            raise click.BadParameter(f'No model for {model} found')
+
         from kraken.lib.vgsl import TorchVGSLModel
         message(f'Loading ANN {model}\t', nl=False)
         try:
-            model = TorchVGSLModel.load_model(model)
+            model = TorchVGSLModel.load_model(location)
             model.to(ctx.meta['device'])
         except Exception:
             if ctx.meta['raise_failed']:
@@ -581,8 +590,8 @@ def ocr(ctx, model, pad, reorder, base_dir, no_segmentation, text_direction, thr
     if reorder and base_dir != 'auto':
         reorder = base_dir
 
-    # first we try to find the model in the absolue path, then ~/.kraken, then
-    # LEGACY_MODEL_DIR
+    # first try to find the OCR model by its given name, then
+    # in the kraken config folder, then in LEGACY_MODEL_DIR
     nm = {}  # type: Dict[str, models.TorchSeqRecognizer]
     ign_tags = model.pop('ignore')
     for k, v in model.items():
