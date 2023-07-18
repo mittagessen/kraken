@@ -114,7 +114,6 @@ def serialize(results: Segmentation,
             'scripts': scripts,
             'date': datetime.datetime.now(datetime.timezone.utc).isoformat(),
             'base_dir': [rec.base_dir for rec in results.lines][0] if len(results.lines) else None,
-            'line_orders': results.line_orders,
             'seg_type': results.type}  # type: dict
     metadata = {'processing_steps': processing_steps,
                 'version': get_distribution('kraken').version}
@@ -129,6 +128,12 @@ def serialize(results: Segmentation,
             types.extend((k, v) for k, v in line.tags.items())
     page['line_types'] = list(set(types))
     page['region_types'] =[list(results.regions.keys())]
+
+    # map reading orders indices to line IDs
+    ros = []
+    for ro in results.line_orders:
+        ros.append([results.lines[idx].id for idx in ro])
+    page['line_orders'] = ros
 
     # build region ID to region dict
     reg_dict = {}
