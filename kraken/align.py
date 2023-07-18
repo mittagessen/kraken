@@ -23,6 +23,7 @@ accuractely determine grapheme locations in input data.
 """
 import torch
 import logging
+import dataclasses
 import numpy as np
 
 from PIL import Image
@@ -31,8 +32,9 @@ from bidi.algorithm import get_display
 from dataclasses import dataclass
 from typing import List, Dict, Any, Optional, Literal
 
-from kraken import rpred
+from kraken import rpred, containers
 from kraken.lib.codec import PytorchCodec
+from kraken.lib.xml import XMLPage
 from kraken.lib.models import TorchSeqRecognizer
 from kraken.lib.exceptions import KrakenInputException, KrakenEncodeException
 from kraken.lib.segmentation import compute_polygon_section
@@ -40,7 +42,7 @@ from kraken.lib.segmentation import compute_polygon_section
 logger = logging.getLogger('kraken')
 
 
-def forced_align(doc: Dict[str, Any], model: TorchSeqRecognizer, base_dir: Optional[Literal['L', 'R']] = None) -> List[rpred.ocr_record]:
+def forced_align(doc: Segmentation, model: TorchSeqRecognizer, base_dir: Optional[Literal['L', 'R']] = None) -> containers.Segmentation:
     """
     Performs a forced character alignment of text with recognition model
     output activations.
@@ -50,28 +52,26 @@ def forced_align(doc: Dict[str, Any], model: TorchSeqRecognizer, base_dir: Optio
         model: Recognition model to use for alignment.
 
     Returns:
-        A list of kraken.rpred.ocr_record.
+        A Segmentation object where the record's contain the aligned text.
     """
-    im = Image.open(doc['image'])
+    im = Image.open(doc.imagename)
     predictor = rpred.rpred(model, im, doc)
-    if 'type' in predictor.bounds and predictor.bounds['type'] == 'baselines':
-        rec_class = rpred.BaselineOCRRecord
 
     records = []
 
     # enable training mode in last layer to get log_softmax output
     model.nn.nn[-1].training = True
 
-    for idx, line in enumerate(doc['lines']):
+    for idx, line in enumerate(doc.lines):
         # convert text to display order
-        do_text = get_display(line['text'], base_dir=base_dir)
+        do_text = get_display(line.text, base_dir=base_dir)
         # encode into labels, ignoring unencodable sequences
         labels = model.codec.encode(do_text).long()
         next(predictor)
         if model.outputs.shape[2] < 2*len(labels):
             logger.warning(f'Could not align line {idx}. Output sequence length {model.outputs.shape[2]} < '
-                           f'{2*len(labels)} (length of "{line["text"]}" after encoding).')
-            records.append(rpred.BaselineOCRRecord('', [], [], line))
+                           f'{2*len(labels)} (length of "{line.text}" after encoding).')
+            records.append(containers.BaselineOCRRecord('', [], [], line))
             continue
         emission = torch.tensor(model.outputs).squeeze().T
         trellis = get_trellis(emission, labels)
@@ -85,8 +85,9 @@ def forced_align(doc: Dict[str, Any], model: TorchSeqRecognizer, base_dir: Optio
             pos.append((predictor._scale_val(seg.start, 0, predictor.box.size[0]),
                         predictor._scale_val(seg.end, 0, predictor.box.size[0])))
             conf.append(seg.score)
-        records.append(rpred.BaselineOCRRecord(pred, pos, conf, line, display_order=True))
-    return records
+        records.append(containers.BaselineOCRRecord(pred, pos, conf, line, display_order=True))
+    return dataclasses.replace(doc, lines=records)
+
 
 """
 Copied from the forced alignment with Wav2Vec2 tutorial of pytorch available

@@ -1,17 +1,33 @@
 
 import PIL.Image
+import numpy as np
 import bidi.algorithm as bd
 
+from os import PathLike
 from typing import Literal, List, Dict, Union, Optional, Tuple
 from dataclasses import dataclass, asdict
 from abc import ABC, abstractmethod
+
+from kraken.lib.segmentation import compute_polygon_section
 
 __all__ = ['BaselineLine',
            'BBoxLine',
            'Segmentation',
            'ocr_record',
            'BaselineOCRRecord',
-           'BBoxOCRRecord']
+           'BBoxOCRRecord',
+           'ProcessingStep']
+
+
+@dataclass
+class ProcessingStep:
+    """
+    A processing step in the recognition pipeline.
+    """
+    id: str
+    category: Literal['preprocessing', 'processing', 'postprocessing']
+    description: str
+    settings: Dict[str, Union[Dict, str, float, int, bool]]
 
 
 @dataclass
@@ -29,8 +45,6 @@ class BaselineLine:
     split: Optional[Literal['train', 'validation', 'test']] = None
     regions: Optional[List[str]] = None
 
-    def __getitem__(self, item):
-        return getattr(self, item)
 
 @dataclass
 class BBoxLine:
@@ -50,6 +64,7 @@ class BBoxLine:
     regions: Optional[List[str]] = None
     text_direction: Literal['horizontal-lr', 'horizontal-rl', 'vertical-lr', 'vertical-rl'] = 'horizontal-lr'
 
+
 @dataclass
 class Region:
     """
@@ -64,10 +79,14 @@ class Region:
 @dataclass
 class Segmentation:
     """
+    A container class for segmentation or recognition results.
 
+    In order to allow easy JSON de-/serialization, nested classes for lines
+    (BaselineLine/BBoxLine) and regions (Region) are reinstantiated from their
+    dictionaries.
     """
     type: Literal['baselines', 'bbox']
-    imagename: str
+    imagename: Union[str, PathLike]
     text_direction: Literal['horizontal-lr', 'horizontal-rl', 'vertical-lr', 'vertical-rl']
     script_detection: bool
     lines: List[Union[BaselineLine, BBoxLine]]
@@ -78,6 +97,11 @@ class Segmentation:
         if len(self.lines) and not isinstance(self.lines[0], BBoxLine) and not isinstance(self.lines[0], BaselineLine):
             line_cls = BBoxLine if self.type == 'bbox' else BaselineLine
             self.lines = [line_cls(**line) for line in self.lines]
+        if len(self.regions) and not isinstance(next(iter(self.regions.values()))[0], Region):
+            regs = {}
+            for k, v in self.regions.items():
+                regs[k] = [Region(**reg) for reg in v]
+            self.regions = regs
 
 
 class ocr_record(ABC):
@@ -195,7 +219,7 @@ class BaselineOCRRecord(ocr_record, BaselineLine):
             self.idx += 1
             return (self.prediction[self.idx],
                     compute_polygon_section(self.baseline,
-                                            self.line,
+                                            self.boundary,
                                             self.cuts[self.idx][0],
                                             self.cuts[self.idx][1]),
                     self.confidences[self.idx])
@@ -217,7 +241,7 @@ class BaselineOCRRecord(ocr_record, BaselineLine):
             prediction = ''.join([x[0] for x in recs])
             flat_offsets = sum((tuple(x[1]) for x in recs), ())
             cut = compute_polygon_section(self.baseline,
-                                          self.line,
+                                          self.boundary,
                                           min(flat_offsets),
                                           max(flat_offsets))
             confidence = np.mean([x[2] for x in recs])
@@ -225,14 +249,14 @@ class BaselineOCRRecord(ocr_record, BaselineLine):
         elif isinstance(key, int):
             pred, cut, confidence = self._get_raw_item(key)
             return (pred,
-                    compute_polygon_section(self.baseline, self.line, cut[0], cut[1]),
+                    compute_polygon_section(self.baseline, self.boundary, cut[0], cut[1]),
                     confidence)
         else:
             raise TypeError('Invalid argument type')
 
     @property
     def cuts(self) -> List[Tuple[int, int]]:
-        return tuple([compute_polygon_section(self.baseline, self.line, cut[0], cut[1]) for cut in self._cuts])
+        return tuple([compute_polygon_section(self.baseline, self.boundary, cut[0], cut[1]) for cut in self._cuts])
 
     def logical_order(self, base_dir: Optional[Literal['L', 'R']] = None) -> 'BaselineOCRRecord':
         """

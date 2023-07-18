@@ -27,11 +27,12 @@ from typing import Tuple, List, Callable, Optional, Dict, Any, Union
 from scipy.ndimage.filters import (gaussian_filter, uniform_filter,
                                    maximum_filter)
 
+from kraken.containers import Segmentation, BBoxLine
+
 from kraken.lib import morph, sl
 from kraken.lib.util import pil2array, is_bitonal, get_im_str
 from kraken.lib.exceptions import KrakenInputException
-from kraken.lib.segmentation import reading_order, topsort, Segmentation, BBoxLine
-
+from kraken.lib.segmentation import reading_order, topsort
 
 __all__ = ['segment']
 

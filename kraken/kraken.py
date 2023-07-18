@@ -181,6 +181,7 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore, input,
 
     import json
     import uuid
+    import dataclasses
 
     from kraken.containers import Segmentation, BBoxLine
     from kraken import rpred
@@ -239,6 +240,7 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore, input,
         for pred in it:
             preds.append(pred)
             progress.update(pred_task, advance=1)
+    results = dataclasses.replace(it.bounds, lines=preds, imagename=ctx.meta['base_image'])
 
     ctx = click.get_current_context()
     with click.open_file(output, 'w', encoding='utf-8') as fp:
@@ -247,12 +249,10 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore, input,
         logger.info('Serializing as {} into {}'.format(ctx.meta['output_mode'], output))
         if ctx.meta['output_mode'] != 'native':
             from kraken import serialization
-            fp.write(serialization.serialize(records=preds,
-                                             image_name=ctx.meta['base_image'],
+            fp.write(serialization.serialize(results=results,
                                              image_size=Image.open(ctx.meta['base_image']).size,
                                              writing_mode=ctx.meta['text_direction'],
                                              scripts=tags,
-                                             regions=bounds.regions,
                                              template=ctx.meta['output_template'],
                                              template_source='custom' if ctx.meta['output_mode'] == 'template' else 'native',
                                              processing_steps=ctx.meta['steps']))

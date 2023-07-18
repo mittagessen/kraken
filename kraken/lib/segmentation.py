@@ -42,7 +42,6 @@ from skimage.transform import PiecewiseAffineTransform, SimilarityTransform, Aff
 
 from typing import List, Tuple, Union, Dict, Any, Sequence, Optional, Literal
 
-from kraken.containers import Segmentation, BaselineLine, BBoxLine
 from kraken.lib import default_specs
 from kraken.lib.exceptions import KrakenInputException
 
@@ -1033,7 +1032,7 @@ def compute_polygon_section(baseline: Sequence[Tuple[int, int]],
     return tuple(o)
 
 
-def extract_polygons(im: Image.Image, bounds: Segmentation) -> Image.Image:
+def extract_polygons(im: Image.Image, bounds: 'kraken.containers.Segmentation') -> Image.Image:
     """
     Yields the subimages of image im defined in the list of bounding polygons
     with baselines preserving order.

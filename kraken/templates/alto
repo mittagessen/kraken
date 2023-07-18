@@ -49,7 +49,7 @@
         </sourceImageInformation>
         {% if metadata.processing_steps %}
         {% for step in metadata.processing_steps %}
-        <Processing ID="OCR_{{ loop.index }}">
+        <Processing ID="OCR_{{ step.id }}">
             <processingCategory>{{ proc_type_table[step.category] }}</processingCategory>
             <processingStepDescription>{{ step.description }}</processingStepDescription>
             <processingStepSettings>{% for k, v in step.settings.items() %}{{k}}: {{v}}; {% endfor %}</processingStepSettings>
@@ -71,8 +71,11 @@
         {% endif %}
     </Description>
     <Tags>
-    {% for reg_type in page.types %}
-        <OtherTag ID="TYPE_{{ loop.index }}" LABEL="{{ reg_type }}"/>
+    {% for type, label in page.line_types %}
+        <OtherTag DESCRIPTION="line type" ID="TYPE_{{ loop.index }}" TYPE={{ type }} LABEL="{{ label }}"/>
+    {% endfor %}
+    {% for label in page.region_types %}
+        <OtherTag DESCRIPTION="region type" ID="TYPE_{{ loop.index }}" TYPE={{ type }} LABEL="{{ label }}"/>
     {% endfor %}
     </Tags>
     <Layout>

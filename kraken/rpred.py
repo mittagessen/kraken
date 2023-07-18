@@ -21,18 +21,16 @@ Generators for recognition on lines images.
 import logging
 import dataclasses
 import numpy as np
-import bidi.algorithm as bd
 
-from abc import ABC, abstractmethod
 from PIL import Image
 from functools import partial
 from collections import defaultdict
 from typing import List, Tuple, Optional, Generator, Union, Dict, Sequence
 
-from kraken.containers import BaselineOCRRecord, BBoxOCRRecord, ocr_record
+from kraken.containers import BaselineOCRRecord, BBoxOCRRecord, ocr_record, Segmentation
 from kraken.lib.util import get_im_str, is_bitonal
 from kraken.lib.models import TorchSeqRecognizer
-from kraken.lib.segmentation import extract_polygons, compute_polygon_section, Segmentation
+from kraken.lib.segmentation import extract_polygons
 from kraken.lib.exceptions import KrakenInputException
 from kraken.lib.dataset import ImageInputTransforms
 
