@@ -11,7 +11,7 @@ dependencies:
   - click>=8.1
   - numpy~=1.23
   - pillow>=9.2.0
-  - scipy
+  - scipy~=1.10.1
   - jinja2~=3.0
   - conda-forge::torchvision
   - conda-forge::pytorch>=1.11,<1.14
