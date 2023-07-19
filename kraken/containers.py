@@ -23,6 +23,12 @@ __all__ = ['BaselineLine',
 class ProcessingStep:
     """
     A processing step in the recognition pipeline.
+
+    Attributes:
+        id: Unique identifier
+        category: Category of processing step that has been performat.
+        description: Natural-language description of the process.
+        settings: Dict describing the parameters of the processing step.
     """
     id: str
     category: Literal['preprocessing', 'processing', 'postprocessing']
@@ -33,6 +39,26 @@ class ProcessingStep:
 @dataclass
 class BaselineLine:
     """
+    Baseline-type line record.
+
+    A container class for a single line in baseline + bounding polygon format,
+    optionally containing a transcription, tags, or associated regions.
+
+    Attributes:
+        id: Unique identifier
+        baseline: List of tuples `(x_n, y_n)` defining the baseline.
+        boundary: List of tuples `(x_n, y_n)` defining the bounding polygon of
+                  the line. The first and last points should be identical.
+        text: Transcription of this line.
+        base_dir: An optional string defining the base direction (also called
+                  paragraph direction) for the BiDi algorithm. Valid values are
+                  'L' or 'R'. If None is given the default auto-resolution will
+                  be used.
+        image: Image object of this line.
+        tags: A dict mapping types to values.
+        split: Defines whether this line is in the `train`, `validation`, or
+               `test` set during training.
+        regions: A list of identifiers of regions the line is associated with.
     """
     id: str
     baseline: List[Tuple[int, int]]
@@ -49,6 +75,27 @@ class BaselineLine:
 @dataclass
 class BBoxLine:
     """
+    Bounding box-type line record.
+
+    A container class for a single line in axis-aligned bounding box format,
+    optionally containing a transcription, tags, or associated regions.
+
+    Attributes:
+        id: Unique identifier
+        bbox: Tuple in form `((x0, y0), (x1, y0), (x1, y1), (x0, y1))` defining
+              the bounding box.
+        text: Transcription of this line.
+        base_dir: An optional string defining the base direction (also called
+                  paragraph direction) for the BiDi algorithm. Valid values are
+                  'L' or 'R'. If None is given the default auto-resolution will
+                  be used.
+        image: Image object of this line.
+        tags: A dict mapping types to values.
+        split: Defines whether this line is in the `train`, `validation`, or
+               `test` set during training.
+        regions: A list of identifiers of regions the line is associated with.
+        text_direction: Sets the principal orientation (of the line) and
+                        reading direction (of the document).
     """
     id: str
     bbox: Tuple[Tuple[int, int],
@@ -68,7 +115,14 @@ class BBoxLine:
 @dataclass
 class Region:
     """
+    Container class of a single polygonal region.
 
+    Attributes:
+        id: Unique identifier
+        boundary: List of tuples `(x_n, y_n)` defining the bounding polygon of
+                  the region. The first and last points should be identical.
+        image: Image object containing the region.
+        tags: A dict mapping types to values.
     """
     id: str
     boundary: List[Tuple[int, int]]
@@ -84,6 +138,22 @@ class Segmentation:
     In order to allow easy JSON de-/serialization, nested classes for lines
     (BaselineLine/BBoxLine) and regions (Region) are reinstantiated from their
     dictionaries.
+
+    Attributes:
+        type: Field indicating if baselines
+              (:class:`kraken.containers.BaselineLine`) or bbox
+              (:class:`kraken.containers.BBoxLine`) line records are in the
+              segmentation.
+        imagename: Path to the image associated with the segmentation.
+        text_direction: Sets the principal orientation (of the line), i.e.
+                        horizontal/vertical, and reading direction (of the
+                        document), i.e. lr/rl.
+        script_detection: Flag indicating if the line records have tags.
+        lines: List of line records. Records are expected to be in a valid
+               reading order.
+        regions: Dict mapping types to lists of regions.
+        line_orders: List of alternative reading orders for the segmentation.
+                     Each reading order is a list of line indices.
     """
     type: Literal['baselines', 'bbox']
     imagename: Union[str, PathLike]
@@ -185,6 +255,16 @@ class BaselineOCRRecord(ocr_record, BaselineLine):
               as a list of tuples [(x0, y0), (x1, y2), ...].
         confidences: A list of floats indicating the confidence value of each
                      code point.
+        base_dir: An optional string defining the base direction (also called
+                  paragraph direction) for the BiDi algorithm. Valid values are
+                  'L' or 'R'. If None is given the default auto-resolution will
+                  be used.
+        display_order: Flag indicating the order of the code points in the
+                       prediction. In display order (`True`) the n-th code
+                       point in the string corresponds to the n-th leftmost
+                       code point, in logical order (`False`) the n-th code
+                       point corresponds to the n-th read code point. See [UAX
+                       #9](https://unicode.org/reports/tr9) for more details.
 
     Notes:
         When slicing the record the behavior of the cuts is changed from
@@ -342,6 +422,34 @@ class BBoxOCRRecord(ocr_record, BBoxLine):
     """
     A record object containing the recognition result of a single line in
     bbox format.
+
+    Attributes:
+        type: 'bbox' to indicate a bounding box record
+        prediction: The text predicted by the network as one continuous string.
+        cuts: The absolute bounding polygons for each code point in prediction
+              as a list of 4-tuples `((x0, y0), (x1, y0), (x1, y1), (x0, y1))`.
+        confidences: A list of floats indicating the confidence value of each
+                     code point.
+        base_dir: An optional string defining the base direction (also called
+                  paragraph direction) for the BiDi algorithm. Valid values are
+                  'L' or 'R'. If None is given the default auto-resolution will
+                  be used.
+        display_order: Flag indicating the order of the code points in the
+                       prediction. In display order (`True`) the n-th code
+                       point in the string corresponds to the n-th leftmost
+                       code point, in logical order (`False`) the n-th code
+                       point corresponds to the n-th read code point. See [UAX
+                       #9](https://unicode.org/reports/tr9) for more details.
+
+    Notes:
+        When slicing the record the behavior of the cuts is changed from
+        earlier versions of kraken. Instead of returning per-character bounding
+        polygons a single polygons section of the line bounding polygon
+        starting at the first and extending to the last code point emitted by
+        the network is returned. This aids numerical stability when computing
+        aggregated bounding polygons such as for words. Individual code point
+        bounding polygons are still accessible through the `cuts` attribute or
+        by iterating over the record code point by code point.
     """
     type = 'bbox'
 
@@ -468,13 +576,13 @@ class BBoxOCRRecord(ocr_record, BBoxLine):
                         image=self.image,
                         tags=self.tags,
                         split=self.split,
-                        region=self.region)
+                        regions=self.regions)
         rec = BBoxOCRRecord(prediction=prediction,
-                                cuts=cuts,
-                                confidences=confidences,
-                                line=line,
-                                base_dir=base_dir,
-                                display_order=not self._display_order)
+                            cuts=cuts,
+                            confidences=confidences,
+                            line=line,
+                            base_dir=base_dir,
+                            display_order=not self._display_order)
         return rec
 
 

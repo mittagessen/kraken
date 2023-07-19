@@ -32,7 +32,8 @@ from bidi.algorithm import get_display
 from dataclasses import dataclass
 from typing import List, Dict, Any, Optional, Literal
 
-from kraken import rpred, containers
+from kraken import rpred
+from kraken.containers import Segmentation, BaselineOCRRecord
 from kraken.lib.codec import PytorchCodec
 from kraken.lib.xml import XMLPage
 from kraken.lib.models import TorchSeqRecognizer
@@ -42,7 +43,7 @@ from kraken.lib.segmentation import compute_polygon_section
 logger = logging.getLogger('kraken')
 
 
-def forced_align(doc: Segmentation, model: TorchSeqRecognizer, base_dir: Optional[Literal['L', 'R']] = None) -> containers.Segmentation:
+def forced_align(doc: Segmentation, model: TorchSeqRecognizer, base_dir: Optional[Literal['L', 'R']] = None) -> Segmentation:
     """
     Performs a forced character alignment of text with recognition model
     output activations.
@@ -71,7 +72,7 @@ def forced_align(doc: Segmentation, model: TorchSeqRecognizer, base_dir: Optiona
         if model.outputs.shape[2] < 2*len(labels):
             logger.warning(f'Could not align line {idx}. Output sequence length {model.outputs.shape[2]} < '
                            f'{2*len(labels)} (length of "{line.text}" after encoding).')
-            records.append(containers.BaselineOCRRecord('', [], [], line))
+            records.append(BaselineOCRRecord('', [], [], line))
             continue
         emission = torch.tensor(model.outputs).squeeze().T
         trellis = get_trellis(emission, labels)
@@ -85,7 +86,7 @@ def forced_align(doc: Segmentation, model: TorchSeqRecognizer, base_dir: Optiona
             pos.append((predictor._scale_val(seg.start, 0, predictor.box.size[0]),
                         predictor._scale_val(seg.end, 0, predictor.box.size[0])))
             conf.append(seg.score)
-        records.append(containers.BaselineOCRRecord(pred, pos, conf, line, display_order=True))
+        records.append(BaselineOCRRecord(pred, pos, conf, line, display_order=True))
     return dataclasses.replace(doc, lines=records)
 
 
