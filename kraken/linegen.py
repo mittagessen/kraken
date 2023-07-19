@@ -38,8 +38,6 @@ from scipy.ndimage.morphology import distance_transform_cdt, binary_closing
 from scipy.ndimage.interpolation import affine_transform, geometric_transform
 from PIL import Image, ImageOps
 
-from typing import AnyStr
-
 import logging
 import ctypes
 import ctypes.util
@@ -104,7 +102,7 @@ class ensureBytes(object):
     bytes.
     """
     @classmethod
-    def from_param(cls, value: AnyStr) -> bytes:
+    def from_param(cls, value: str) -> bytes:
         if isinstance(value, bytes):
             return value
         else:

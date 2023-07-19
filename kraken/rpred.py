@@ -304,7 +304,8 @@ def rpred(network: TorchSeqRecognizer,
     Args:
         network: A TorchSegRecognizer object
         im: Image to extract text from
-        bounds: A Segmentation class instance containing either a baseline or bbox segmentation.
+        bounds: A Segmentation class instance containing either a baseline or
+                bbox segmentation.
         pad: Extra blank padding to the left and right of text line.
              Auto-disabled when expected network inputs are incompatible with
              padding.

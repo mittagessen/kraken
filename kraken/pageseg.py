@@ -19,6 +19,7 @@ kraken.pageseg
 
 Layout analysis methods.
 """
+import PIL
 import uuid
 import logging
 import numpy as np
@@ -303,7 +304,7 @@ def rotate_lines(lines: np.ndarray, angle: float, offset: int) -> np.ndarray:
     return np.column_stack((x.flatten(), y.flatten())).reshape(-1, 4)
 
 
-def segment(im,
+def segment(im: PIL.Image.Image,
             text_direction: str = 'horizontal-lr',
             scale: Optional[float] = None,
             maxcolseps: float = 2,
@@ -311,7 +312,7 @@ def segment(im,
             no_hlines: bool = True,
             pad: Union[int, Tuple[int, int]] = 0,
             mask: Optional[np.ndarray] = None,
-            reading_order_fn: Callable = reading_order) -> Dict[str, Any]:
+            reading_order_fn: Callable = reading_order) -> Segmentation:
     """
     Segments a page into text lines.
 
@@ -338,12 +339,9 @@ def segment(im,
                           direction in (`rl`, `lr`).
 
     Returns:
-        A dictionary containing the text direction and a list of reading order
-        sorted bounding boxes under the key 'boxes':
-
-        .. code-block::
-
-            {'text_direction': '$dir', 'boxes': [(x1, y1, x2, y2),...]}
+        A :class:`kraken.containers.Segmentation` class containing reading
+        order sorted bounding box-type lines as
+        :class:`kraken.containers.BBoxLine` records.
 
     Raises:
         KrakenInputException: if the input image is not binarized or the text
