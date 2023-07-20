@@ -28,8 +28,9 @@ from functools import partial
 from collections import Counter
 from typing import Optional, List, Union, Callable, Tuple, Dict
 from multiprocessing import Pool
+from kraken.containers import Segmentation
 from kraken.lib import functional_im_transforms as F_t
-from kraken.lib.segmentation import extract_polygons, Segmentation
+from kraken.lib.segmentation import extract_polygons
 from kraken.lib.xml import XMLPage
 from kraken.lib.util import is_bitonal, make_printable
 from kraken.lib.exceptions import KrakenInputException
