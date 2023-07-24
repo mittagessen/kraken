@@ -85,10 +85,8 @@ def cli(format_type, topline, files):
                 doc.write(fp, encoding='UTF-8', xml_declaration=True)
 
     if format_type == 'page':
-        parse_fn = xml.parse_page
         repl_fn = _repl_page
     else:
-        parse_fn = xml.parse_alto
         repl_fn = _repl_alto
 
     topline = {'topline': True,
@@ -97,11 +95,11 @@ def cli(format_type, topline, files):
 
     for doc in files:
         click.echo(f'Processing {doc} ')
-        seg = parse_fn(doc)
-        im = Image.open(seg['image']).convert('L')
+        seg = xml.XMLPage(doc).to_container()
+        im = Image.open(seg.imagename).convert('L')
         baselines = []
-        for x in seg['lines']:
-            bl = x['baseline'] if x['baseline'] is not None else [0, 0]
+        for x in seg.lines:
+            bl = x.baseline if x.baseline is not None else [0, 0]
             baselines.append(bl)
         o = calculate_polygonal_environment(im, baselines, scale=(1800, 0), topline=topline)
         repl_fn(doc, o)
