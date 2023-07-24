@@ -71,6 +71,8 @@ class BaselineLine:
     split: Optional[Literal['train', 'validation', 'test']] = None
     regions: Optional[List[str]] = None
 
+    def __getitem__(self, key: Union[int, slice]):
+        return getattr(self, key)
 
 @dataclass
 class BBoxLine:
