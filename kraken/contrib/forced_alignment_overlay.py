@@ -35,7 +35,7 @@ def _repl_alto(fname, cuts):
         doc = etree.parse(fp)
         lines = doc.findall('.//{*}TextLine')
         char_idx = 0
-        for line, line_cuts in zip(lines, cuts):
+        for line, line_cuts in zip(lines, cuts.lines):
             idx = 0
             for el in line:
                 if el.tag.endswith('Shape'):
@@ -65,7 +65,7 @@ def _repl_page(fname, cuts):
     with open(fname, 'rb') as fp:
         doc = etree.parse(fp)
         lines = doc.findall('.//{*}TextLine')
-        for line, line_cuts in zip(lines, cuts):
+        for line, line_cuts in zip(lines, cuts.lines):
             glyphs = line.findall('../{*}Glyph/{*}Coords')
             for glyph, cut in zip(glyphs, line_cuts):
                 glyph.attrib['points'] = ' '.join([','.join([str(x) for x in pt]) for pt in cut])
@@ -96,34 +96,33 @@ def cli(format_type, model, output, files):
 
     from PIL import Image, ImageDraw
 
-    from kraken.lib import models, xml
+    from kraken.lib.xml import XMLPage
+    from kraken.lib import models
     from kraken import align
 
     if format_type == 'alto':
-        fn = xml.parse_alto
         repl_fn = _repl_alto
     else:
-        fn = xml.parse_page
         repl_fn = _repl_page
     click.echo(f'Loading model {model}')
     net = models.load_any(model)
 
     for doc in files:
         click.echo(f'Processing {doc} ', nl=False)
-        data = fn(doc)
-        im = Image.open(data['image']).convert('RGBA')
-        records = align.forced_align(data, net)
+        data = XMLPage(doc)
+        im = Image.open(data.imagename).convert('RGBA')
+        result = align.forced_align(data.to_container, net)
         if output == 'overlay':
             tmp = Image.new('RGBA', im.size, (0, 0, 0, 0))
             draw = ImageDraw.Draw(tmp)
-            for record in records:
+            for record in result.lines:
                 for pol in record.cuts:
                     c = next(cmap)
                     draw.polygon([tuple(x) for x in pol], fill=c, outline=c[:3])
             base_image = Image.alpha_composite(im, tmp)
             base_image.save(f'high_{os.path.basename(doc)}_algn.png')
         else:
-            repl_fn(doc, records)
+            repl_fn(doc, result)
         click.secho('\u2713', fg='green')
 
 
