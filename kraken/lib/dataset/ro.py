@@ -108,12 +108,12 @@ class PairWiseROSet(Dataset):
                     w, h = Image.open(doc.imagename).size
                     sorted_lines = []
                     for line in order:
-                        line_coords = np.array(line['baseline']) / (w, h)
+                        line_coords = np.array(line.baseline) / (w, h)
                         line_center = np.mean(line_coords, axis=0)
                         cl = torch.zeros(self.num_classes, dtype=torch.float)
                         # if class is not in class mapping default to None class (idx 0)
-                        cl[self.class_mapping.get(line['tags']['type'], 0)] = 1
-                        line_data = {'type': line['tags']['type'],
+                        cl[self.class_mapping.get(line.tags['type'], 0)] = 1
+                        line_data = {'type': line.tags['type'],
                                      'features': torch.cat((cl,  # one hot encoded line type
                                                             torch.tensor(line_center, dtype=torch.float),  # line center
                                                             torch.tensor(line_coords[0, :], dtype=torch.float),  # start_point coord
@@ -121,9 +121,11 @@ class PairWiseROSet(Dataset):
                                                           ))
                                     }
                         sorted_lines.append(line_data)
-                    self.data.append(sorted_lines)
-                    self._num_pairs += int(factorial(len(sorted_lines))/factorial(len(sorted_lines)-2))
-
+                    if len(sorted_lines) > 1:
+                        self.data.append(sorted_lines)
+                        self._num_pairs += int(factorial(len(sorted_lines))/factorial(len(sorted_lines)-2))
+                    else:
+                        logger.info(f'Page {doc} has less than 2 lines. Skipping')
                 except KrakenInputException as e:
                     logger.warning(e)
                     continue
@@ -212,12 +214,12 @@ class PageWiseROSet(Dataset):
                     w, h = Image.open(doc.imagename).size
                     sorted_lines = []
                     for line in order:
-                        line_coords = np.array(line['baseline']) / (w, h)
+                        line_coords = np.array(line.baseline) / (w, h)
                         line_center = np.mean(line_coords, axis=0)
                         cl = torch.zeros(self.num_classes, dtype=torch.float)
                         # if class is not in class mapping default to None class (idx 0)
-                        cl[self.class_mapping.get(line['tags']['type'], 0)] = 1
-                        line_data = {'type': line['tags']['type'],
+                        cl[self.class_mapping.get(line.tags['type'], 0)] = 1
+                        line_data = {'type': line.tags['type'],
                                      'features': torch.cat((cl,  # one hot encoded line type
                                                             torch.tensor(line_center, dtype=torch.float),  # line center
                                                             torch.tensor(line_coords[0, :], dtype=torch.float),  # start_point coord
@@ -225,7 +227,10 @@ class PageWiseROSet(Dataset):
                                                           ))
                                     }
                         sorted_lines.append(line_data)
-                    self.data.append(sorted_lines)
+                    if len(sorted_lines) > 1:
+                        self.data.append(sorted_lines)
+                    else:
+                        logger.info(f'Page {doc} has less than 2 lines. Skipping')
                 except KrakenInputException as e:
                     logger.warning(e)
                     continue
