@@ -119,7 +119,7 @@ information.
 Documentation
 =============
 
-Have a look at the `docs <https://kraken.re>`_
+Have a look at the `docs <https://kraken.re>`_.
 
 Related Software
 ================
