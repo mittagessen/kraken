@@ -54,7 +54,7 @@ class BaselineLine:
                   paragraph direction) for the BiDi algorithm. Valid values are
                   'L' or 'R'. If None is given the default auto-resolution will
                   be used.
-        image: Image object of this line.
+        imagename: Path to the image associated with the line.
         tags: A dict mapping types to values.
         split: Defines whether this line is in the `train`, `validation`, or
                `test` set during training.
@@ -66,7 +66,7 @@ class BaselineLine:
     text: Optional[str] = None
     base_dir: Optional[Literal['L', 'R']] = None
     type: str = 'baselines'
-    image: Optional[PIL.Image.Image] = None
+    imagename: Optional[Union[str, PathLike]] = None
     tags: Optional[Dict[str, str]] = None
     split: Optional[Literal['train', 'validation', 'test']] = None
     regions: Optional[List[str]] = None
@@ -89,7 +89,7 @@ class BBoxLine:
                   paragraph direction) for the BiDi algorithm. Valid values are
                   'L' or 'R'. If None is given the default auto-resolution will
                   be used.
-        image: Image object of this line.
+        imagename: Path to the image associated with the line..
         tags: A dict mapping types to values.
         split: Defines whether this line is in the `train`, `validation`, or
                `test` set during training.
@@ -105,7 +105,7 @@ class BBoxLine:
     text: Optional[str] = None
     base_dir: Optional[Literal['L', 'R']] = None
     type: str = 'bbox'
-    image: Optional[PIL.Image.Image] = None
+    imagename: Optional[Union[str, PathLike]] = None
     tags: Optional[Dict[str, str]] = None
     split: Optional[Literal['train', 'validation', 'test']] = None
     regions: Optional[List[str]] = None
@@ -121,12 +121,12 @@ class Region:
         id: Unique identifier
         boundary: List of tuples `(x_n, y_n)` defining the bounding polygon of
                   the region. The first and last points should be identical.
-        image: Image object containing the region.
+        imagename: Path to the image associated with the region.
         tags: A dict mapping types to values.
     """
     id: str
     boundary: List[Tuple[int, int]]
-    image: Optional[PIL.Image.Image] = None
+    imagename: Optional[Union[str, PathLike]] = None
     tags: Optional[Dict[str, str]] = None
 
 
