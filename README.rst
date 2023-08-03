@@ -105,7 +105,14 @@ To segment an image (binarized or not) with the new baseline segmenter:
 ::
 
   $ kraken -i image.tif lines.json segment -bl
- 
+
+
+To visualize the results of the line segmenter (lines and baselines):
+
+::
+
+  $ python linevis.py --lb 1 -i image.jpg -o output.jpg -f lines.json
+
 
 To segment and OCR an image using the default model(s):
 
