@@ -90,7 +90,7 @@ def _validate_merging(ctx, param, value):
 @click.option('--lag',
               show_default=True,
               default=SEGMENTATION_HYPER_PARAMS['lag'],
-              help='Number of evaluations (--report frequence) to wait before stopping training without improvement')
+              help='Number of evaluations (--report frequency) to wait before stopping training without improvement')
 @click.option('--min-delta',
               show_default=True,
               default=SEGMENTATION_HYPER_PARAMS['min_delta'],

@@ -805,7 +805,7 @@ class ActConv2D(Module):
 
     def get_shape(self, input: Tuple[int, int, int, int], target_shape: Optional[Tuple[int, int, int, int]] = None) -> Tuple[int, int, int, int]:
         if self.transposed:
-            """ For transposed convolution, there is some flexibilty. """
+            """ For transposed convolution, there is some flexibility. """
             min_y = int((input[2] - 1) * self.stride[0] - 2 * self.padding[0] + self.dilation[0] * (self.kernel_size[0] - 1) + 1 if input[2] != 0 else 0)
             target_y = min_y if not target_shape or target_shape[2] == 0 else target_shape[2]
             min_x = int((input[3] - 1) * self.stride[1] - 2 * self.padding[1] + self.dilation[1] * (self.kernel_size[1] - 1) + 1 if input[3] != 0 else 0)
