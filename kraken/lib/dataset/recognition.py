@@ -30,6 +30,7 @@ from collections import Counter
 from torch.utils.data import Dataset
 from typing import Dict, List, Tuple, Callable, Optional, Any, Union, Literal
 
+from kraken.containers import BaselineLine, BBoxLine, Segmentation
 from kraken.lib.util import is_bitonal
 from kraken.lib.codec import PytorchCodec
 from kraken.lib.segmentation import extract_polygons
@@ -353,7 +354,7 @@ class PolygonGTDataset(Dataset):
             except ValueError as e:
                 logger.warning(e)
 
-    def add_line(self, line: BaselineLine)
+    def add_line(self, line: BaselineLine):
         """
         Adds a line to the dataset.
 
@@ -445,8 +446,7 @@ class GroundTruthDataset(Dataset):
 
     All data is cached in memory.
     """
-    def __init__(self, split: Callable[[Union[PathLike, str]], str] = F_t.default_split,
-                 suffix: str = '.gt.txt',
+    def __init__(self,
                  normalization: Optional[str] = None,
                  whitespace_normalization: bool = True,
                  skip_empty_lines: bool = True,
@@ -457,10 +457,6 @@ class GroundTruthDataset(Dataset):
         Reads a list of image-text pairs and creates a ground truth set.
 
         Args:
-            split: Function for generating the base name without
-                   extensions from paths
-            suffix: Suffix to attach to image base name for text
-                    retrieval
             mode: Image color space. Either RGB (color) or L
                   (grayscale/bw). Only L is compatible with vertical
                   scaling/dewarping.
@@ -479,8 +475,6 @@ class GroundTruthDataset(Dataset):
                            tensor suitable for forward passes.
             augmentation: Enables augmentation.
         """
-        self.suffix = suffix
-        self.split = partial(F_t.suffix_split, split=split, suffix=suffix)
         self._images = []  # type:  Union[List[Image], List[torch.Tensor]]
         self._gt = []  # type:  List[str]
         self.alphabet = Counter()  # type: Counter
@@ -540,7 +534,7 @@ class GroundTruthDataset(Dataset):
             except ValueError as e:
                 logger.warning(e)
 
-    def add_line(self, line: BBoxLine)
+    def add_line(self, line: BBoxLine):
         """
         Adds a line to the dataset.
 

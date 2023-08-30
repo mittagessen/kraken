@@ -384,7 +384,7 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
 
     from kraken.serialization import render_report
     from kraken.lib import models
-    from kraken.lib.xml import preparse_xml_data
+    from kraken.lib.xml import XMLPage
     from kraken.lib.dataset import (global_align, compute_confusions,
                                     PolygonGTDataset, GroundTruthDataset,
                                     ImageInputTransforms,
@@ -413,7 +413,7 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
     if format_type in ['xml', 'page', 'alto']:
         if repolygonize:
             message('Repolygonizing data')
-        test_set = preparse_xml_data(test_set, format_type, repolygonize)
+        test_set = [{'page': XMLPage(file, filetype=format_type).to_container()} for file in test_set]
         valid_norm = False
         DatasetClass = PolygonGTDataset
     elif format_type == 'binary':
