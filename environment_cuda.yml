@@ -24,7 +24,7 @@ dependencies:
   - imagemagick>=7.1.0
   - pyarrow
   - conda-forge::pytorch-lightning~=2.0.0
-  - conda-forge::torchmetrics>=0.10.0
+  - conda-forge::torchmetrics>=1.1.0
   - pip
   - albumentations
   - rich

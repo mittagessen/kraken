@@ -31,7 +31,7 @@ requirements:
      - coremltools
      - pyarrow
      - pytorch-lightning~=2.0
-     - torchmetrics>=0.10.0
+     - torchmetrics>=1.1.0
      - albumentations
      - rich
 about:

@@ -26,8 +26,8 @@ import pytorch_lightning as pl
 from os import PathLike
 from functools import partial
 from torch.multiprocessing import Pool
-from torchmetrics import CharErrorRate, WordErrorRate
 from torchmetrics.classification import MultilabelAccuracy, MultilabelJaccardIndex
+from torchmetrics.text import CharErrorRate, WordErrorRate
 from torch.optim import lr_scheduler
 from typing import Callable, Dict, Optional, Sequence, Union, Any, Literal
 from pytorch_lightning.callbacks import Callback, EarlyStopping, BaseFinetuning, LearningRateMonitor
