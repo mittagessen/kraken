@@ -70,7 +70,7 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
 @click.option('--lag',
               show_default=True,
               default=RECOGNITION_PRETRAIN_HYPER_PARAMS['lag'],
-              help='Number of evaluations (--report frequence) to wait before stopping training without improvement')
+              help='Number of evaluations (--report frequency) to wait before stopping training without improvement')
 @click.option('--min-delta',
               show_default=True,
               default=RECOGNITION_PRETRAIN_HYPER_PARAMS['min_delta'],

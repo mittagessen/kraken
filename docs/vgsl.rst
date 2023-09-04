@@ -114,7 +114,7 @@ recurrent layers and a linear projection.
         1		groupnorm	8 groups
         2		parallel	execute 2.0 and 2.1 in parallel
         2.0		identity
-        2.1		serial	exectute 2.1.0 to 2.1.2 in sequence
+        2.1		serial	execute 2.1.0 to 2.1.2 in sequence
         2.1.0		conv	kernel 3 x 3 stride 2 x 2 filters 64 activation r
         2.1.1		groupnorm	8 groups
         2.1.2		transposed convolution	kernel 3 x 3 stride 2 x 2 filters 2 activation r
@@ -128,7 +128,7 @@ the image back to its original size. This is done in a parallel block, where the
 other branch simply passes through the output of the first convolution layer.
 The input of the last convolutional layer is then the output of the two branches
 of the parallel block concatenated, i.e. the output of the first
-convolutional layer together with the ouput of the transposed convolutional layer,
+convolutional layer together with the output of the transposed convolutional layer,
 giving `32 + 32 = 64` feature dimensions. 
 
 Convolutional Layers
