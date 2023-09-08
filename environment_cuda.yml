@@ -28,6 +28,7 @@ dependencies:
   - pip
   - albumentations
   - rich
+  - threadpoolctl
   - pip:
     - coremltools~=6.0
     - file:.

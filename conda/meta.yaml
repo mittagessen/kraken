@@ -34,6 +34,7 @@ requirements:
      - torchmetrics>=1.1.0
      - albumentations
      - rich
+     - threadpoolctl
 about:
   home: https://kraken.re
   license: APACHE
