@@ -398,8 +398,12 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
     nn = {}
     for p in model:
         message('Loading model {}\t'.format(p), nl=False)
-        nn[p] = models.load_any(p)
+        nn[p] = models.load_any(p, device)
         message('\u2713', fg='green')
+
+    pin_ds_mem = False
+    if device != 'cpu':
+        pin_ds_mem = True
 
     test_set = list(test_set)
 
@@ -464,7 +468,7 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
         ds_loader = DataLoader(ds,
                                batch_size=batch_size,
                                num_workers=workers,
-                               pin_memory=True,
+                               pin_memory=pin_ds_mem,
                                collate_fn=collate_sequences)
 
         with KrakenProgressBar() as progress:
