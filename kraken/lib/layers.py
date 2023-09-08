@@ -2,13 +2,18 @@
 Layers for VGSL models
 """
 import torch
+import logging
 import numpy as np
 
 from typing import List, Tuple, Optional, Iterable
 from torch.nn import Module, Sequential
 from torch.nn import functional as F
 from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
+
+logger = logging.getLogger('coremltools')
+logger.setLevel(logging.ERROR)
 from coremltools.proto import NeuralNetwork_pb2
+logger.setLevel(logging.WARNING)
 
 # all tensors are ordered NCHW, the "feature" dimension is C, so the output of
 # an LSTM will be put into C same as the filters of a CNN.
