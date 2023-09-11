@@ -35,9 +35,15 @@ way. The first is batch processing:
 which expands the `glob expression
 <https://en.wikipedia.org/wiki/Glob_(programming)>`_ in kraken internally and
 appends the suffix defined with `-o` to each output file. An input file
-`xyz.png` will therefore produce an output file `xyz.png.ocr.txt`. A second way
-is to input multi-image files directly. These can be either in PDF, TIFF, or
-JPEG2000 format and are specified like:
+`xyz.png` will therefore produce an output file `xyz.png.ocr.txt`. `-I` batch
+inputs can also be specified multiple times:
+
+.. code-block:: console
+
+        $ kraken -I '*.png' -I '*.jpg' -I '*.tif' -o ocr.txt segment ...
+
+A second way is to input multi-image files directly. These can be either in
+PDF, TIFF, or JPEG2000 format and are specified like:
 
 .. code-block:: console
 
