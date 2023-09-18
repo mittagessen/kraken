@@ -32,6 +32,7 @@ requirements:
      - pyarrow
      - pytorch-lightning~=2.0
      - torchmetrics>=0.10.0
+     - conda-forge::threadpoolctl~=3.2.0
      - albumentations
      - rich
 about:

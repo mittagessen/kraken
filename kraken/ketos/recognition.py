@@ -23,6 +23,7 @@ import logging
 import pathlib
 
 from typing import List
+from threadpoolctl import threadpool_limits
 
 from kraken.lib.exceptions import KrakenInputException
 from kraken.lib.default_specs import RECOGNITION_HYPER_PARAMS, RECOGNITION_SPEC
@@ -155,7 +156,8 @@ logger = logging.getLogger('kraken')
 @click.option('-e', '--evaluation-files', show_default=True, default=None, multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
-@click.option('--workers', show_default=True, default=1, help='Number of OpenMP threads and workers when running on CPU.')
+@click.option('--workers', show_default=True, default=1, type=click.IntRange(1), help='Number of worker processes.')
+@click.option('--threads', show_default=True, default=1, type=click.IntRange(1), help='Maximum size of OpenMP/BLAS thread pool.')
 @click.option('--load-hyper-parameters/--no-load-hyper-parameters', show_default=True, default=False,
               help='When loading an existing model, retrieve hyperparameters from the model')
 @click.option('--repolygonize/--no-repolygonize', show_default=True,
@@ -310,7 +312,8 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
                             log_dir=log_dir,
                             **val_check_interval)
     try:
-        trainer.fit(model)
+        with threadpool_limits(limits=threads):
+            trainer.fit(model)
     except KrakenInputException as e:
         if e.args[0].startswith('Training data and model codec alphabets mismatch') and resize == 'fail':
             raise click.BadOptionUsage('resize', 'Mismatched training data for loaded model. Set option `--resize` to `new` or `add`')
@@ -337,7 +340,12 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
 @click.option('-d', '--device', show_default=True, default='cpu', help='Select device to use (cpu, cuda:0, cuda:1, ...)')
 @click.option('--pad', show_default=True, type=click.INT, default=16, help='Left and right '
               'padding around lines')
-@click.option('--workers', show_default=True, default=1, help='Number of OpenMP threads when running on CPU.')
+@click.option('--workers', show_default=True, default=1,
+              type=click.IntRange(1),
+              help='Number of worker processes when running on CPU.')
+@click.option('--threads', show_default=True, default=1,
+              type=click.IntRange(1),
+              help='Max size of thread pools for OpenMP/BLAS operations.')
 @click.option('--reorder/--no-reorder', show_default=True, default=True, help='Reordering of code points to display order')
 @click.option('--base-dir', show_default=True, default='auto',
               type=click.Choice(['L', 'R', 'auto']), help='Set base text '
@@ -370,8 +378,8 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
               'collections of pre-extracted text line images.')
 @click.argument('test_set', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
-         reorder, base_dir, normalization, normalize_whitespace, repolygonize,
-         force_binarization, format_type, test_set):
+         threads, reorder, base_dir, normalization, normalize_whitespace,
+         repolygonize, force_binarization, format_type, test_set):
     """
     Evaluate on a test set.
     """
@@ -401,8 +409,6 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
 
     test_set = list(test_set)
 
-    # set number of OpenMP threads
-    next(iter(nn.values())).nn.set_num_threads(1)
 
     if evaluation_files:
         test_set.extend(evaluation_files)
@@ -439,62 +445,64 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
         reorder = base_dir
 
     acc_list = []
-    for p, net in nn.items():
-        algn_gt: List[str] = []
-        algn_pred: List[str] = []
-        chars = 0
-        error = 0
-        message('Evaluating {}'.format(p))
-        logger.info('Evaluating {}'.format(p))
-        batch, channels, height, width = net.nn.input
-        ts = ImageInputTransforms(batch, height, width, channels, (pad, 0), valid_norm, force_binarization)
-        ds = DatasetClass(normalization=normalization,
-                          whitespace_normalization=normalize_whitespace,
-                          reorder=reorder,
-                          im_transforms=ts)
-        for line in test_set:
-            try:
-                ds.add(**line)
-            except KrakenInputException as e:
-                logger.info(e)
-        # don't encode validation set as the alphabets may not match causing encoding failures
-        ds.no_encode()
-        ds_loader = DataLoader(ds,
-                               batch_size=batch_size,
-                               num_workers=workers,
-                               pin_memory=True,
-                               collate_fn=collate_sequences)
 
-        with KrakenProgressBar() as progress:
-            batches = len(ds_loader)
-            pred_task = progress.add_task('Evaluating', total=batches, visible=True if not ctx.meta['verbose'] else False)
-
-            for batch in ds_loader:
-                im = batch['image']
-                text = batch['target']
-                lens = batch['seq_lens']
+    with threadpool_limits(limits=threads):
+        for p, net in nn.items():
+            algn_gt: List[str] = []
+            algn_pred: List[str] = []
+            chars = 0
+            error = 0
+            message('Evaluating {}'.format(p))
+            logger.info('Evaluating {}'.format(p))
+            batch, channels, height, width = net.nn.input
+            ts = ImageInputTransforms(batch, height, width, channels, (pad, 0), valid_norm, force_binarization)
+            ds = DatasetClass(normalization=normalization,
+                              whitespace_normalization=normalize_whitespace,
+                              reorder=reorder,
+                              im_transforms=ts)
+            for line in test_set:
                 try:
-                    pred = net.predict_string(im, lens)
-                    for x, y in zip(pred, text):
-                        chars += len(y)
-                        c, algn1, algn2 = global_align(y, x)
-                        algn_gt.extend(algn1)
-                        algn_pred.extend(algn2)
-                        error += c
-                except FileNotFoundError as e:
-                    batches -= 1
-                    progress.update(pred_task, total=batches)
-                    logger.warning('{} {}. Skipping.'.format(e.strerror, e.filename))
+                    ds.add(**line)
                 except KrakenInputException as e:
-                    batches -= 1
-                    progress.update(pred_task, total=batches)
-                    logger.warning(str(e))
-                progress.update(pred_task, advance=1)
+                    logger.info(e)
+            # don't encode validation set as the alphabets may not match causing encoding failures
+            ds.no_encode()
+            ds_loader = DataLoader(ds,
+                                   batch_size=batch_size,
+                                   num_workers=workers,
+                                   pin_memory=True,
+                                   collate_fn=collate_sequences)
 
-        acc_list.append((chars - error) / chars)
-        confusions, scripts, ins, dels, subs = compute_confusions(algn_gt, algn_pred)
-        rep = render_report(p, chars, error, confusions, scripts, ins, dels, subs)
-        logger.info(rep)
-        message(rep)
+            with KrakenProgressBar() as progress:
+                batches = len(ds_loader)
+                pred_task = progress.add_task('Evaluating', total=batches, visible=True if not ctx.meta['verbose'] else False)
+
+                for batch in ds_loader:
+                    im = batch['image']
+                    text = batch['target']
+                    lens = batch['seq_lens']
+                    try:
+                        pred = net.predict_string(im, lens)
+                        for x, y in zip(pred, text):
+                            chars += len(y)
+                            c, algn1, algn2 = global_align(y, x)
+                            algn_gt.extend(algn1)
+                            algn_pred.extend(algn2)
+                            error += c
+                    except FileNotFoundError as e:
+                        batches -= 1
+                        progress.update(pred_task, total=batches)
+                        logger.warning('{} {}. Skipping.'.format(e.strerror, e.filename))
+                    except KrakenInputException as e:
+                        batches -= 1
+                        progress.update(pred_task, total=batches)
+                        logger.warning(str(e))
+                    progress.update(pred_task, advance=1)
+
+            acc_list.append((chars - error) / chars)
+            confusions, scripts, ins, dels, subs = compute_confusions(algn_gt, algn_pred)
+            rep = render_report(p, chars, error, confusions, scripts, ins, dels, subs)
+            logger.info(rep)
+            message(rep)
     logger.info('Average accuracy: {:0.2f}%, (stddev: {:0.2f})'.format(np.mean(acc_list) * 100, np.std(acc_list) * 100))
     message('Average accuracy: {:0.2f}%, (stddev: {:0.2f})'.format(np.mean(acc_list) * 100, np.std(acc_list) * 100))

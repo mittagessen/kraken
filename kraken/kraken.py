@@ -28,7 +28,6 @@ from PIL import Image
 from pathlib import Path
 from functools import partial
 from rich.traceback import install
-from threadpoolctl import threadpool_limits
 from typing import Dict, Union, List, cast, Any, IO, Callable
 
 import click
@@ -335,6 +334,7 @@ def cli(input, batch_input, suffix, verbose, format_type, pdf_format,
     ctx.meta['verbose'] = verbose
     ctx.meta['steps'] = []
     ctx.meta["autocast"] = autocast
+    ctx.meta['threads'] = threads
     log.set_logger(logger, level=30 - min(10 * verbose, 20))
 
 
@@ -348,6 +348,7 @@ def process_pipeline(subcommands, input, batch_input, suffix, verbose, format_ty
     import uuid
     import tempfile
 
+    from threadpoolctl import threadpool_limits
     from kraken.lib.progress import KrakenProgressBar
 
     ctx = click.get_current_context()
@@ -414,7 +415,8 @@ def process_pipeline(subcommands, input, batch_input, suffix, verbose, format_ty
             for idx, (task, input, output) in enumerate(zip(subcommands, fc, fc[1:])):
                 if len(fc) - 2 == idx:
                     ctx.meta['last_process'] = True
-                task(input=input, output=output)
+                with threadpool_limits(limits=ctx.meta['threads']):
+                    task(input=input, output=output)
         except Exception as e:
             logger.error(f'Failed processing {io_pair[0]}: {str(e)}')
             if ctx.meta['raise_failed']:
