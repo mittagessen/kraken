@@ -24,7 +24,6 @@ import pathlib
 
 from typing import List
 
-from kraken.lib.progress import KrakenProgressBar
 from kraken.lib.exceptions import KrakenInputException
 from kraken.lib.default_specs import RECOGNITION_HYPER_PARAMS, RECOGNITION_SPEC
 from .util import _validate_manifests, _expand_gt, message, to_ptl_device
@@ -390,6 +389,7 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
                                     ImageInputTransforms,
                                     ArrowIPCRecognitionDataset,
                                     collate_sequences)
+    from kraken.lib.progress import KrakenProgressBar
 
     logger.info('Building test set from {} line images'.format(len(test_set) + len(evaluation_files)))
 

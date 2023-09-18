@@ -24,7 +24,6 @@ import logging
 
 from PIL import Image
 
-from kraken.lib.progress import KrakenProgressBar
 from kraken.lib.exceptions import KrakenInputException
 from kraken.lib.default_specs import SEGMENTATION_HYPER_PARAMS, SEGMENTATION_SPEC
 
@@ -230,6 +229,7 @@ def segtrain(ctx, output, spec, line_width, pad, load, freq, quit, epochs,
     import shutil
 
     from kraken.lib.train import SegmentationModel, KrakenTrainer
+    from kraken.lib.progress import KrakenProgressBar
 
     if resize != 'fail' and not load:
         raise click.BadOptionUsage('resize', 'resize option requires loading an existing model')

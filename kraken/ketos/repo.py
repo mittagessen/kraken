@@ -22,8 +22,6 @@ import os
 import click
 import logging
 
-from kraken.lib.progress import KrakenDownloadProgressBar
-
 from .util import message
 
 logging.captureWarnings(True)
@@ -52,6 +50,7 @@ def publish(ctx, metadata, access_token, private, model):
 
     from kraken import repo
     from kraken.lib import models
+    from kraken.lib.progress import KrakenDownloadProgressBar
 
     with pkg_resources.resource_stream('kraken', 'metadata.schema.json') as fp:
         schema = json.load(fp)

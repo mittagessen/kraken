@@ -25,7 +25,6 @@ import logging
 from PIL import Image
 from typing import Dict
 
-from kraken.lib.progress import KrakenProgressBar
 from kraken.lib.exceptions import KrakenInputException
 from kraken.lib.default_specs import READING_ORDER_HYPER_PARAMS
 
@@ -152,8 +151,9 @@ def rotrain(ctx, batch_size, output, load, freq, quit, epochs, min_epochs, lag,
     """
     import shutil
 
-    from kraken.lib.train import KrakenTrainer
     from kraken.lib.ro import ROModel
+    from kraken.lib.train import KrakenTrainer
+    from kraken.lib.progress import KrakenProgressBar
 
     if not (0 <= freq <= 1) and freq % 1.0 != 0:
         raise click.BadOptionUsage('freq', 'freq needs to be either in the interval [0,1.0] or a positive integer.')

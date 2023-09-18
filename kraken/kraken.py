@@ -24,16 +24,16 @@ import logging
 import dataclasses
 import pkg_resources
 
-from typing import Dict, Union, List, cast, Any, IO, Callable
-from pathlib import Path
-from rich.traceback import install
-from functools import partial
 from PIL import Image
+from pathlib import Path
+from functools import partial
+from rich.traceback import install
+from threadpoolctl import threadpool_limits
+from typing import Dict, Union, List, cast, Any, IO, Callable
 
 import click
 
 from kraken.lib import log
-from kraken.lib.progress import KrakenProgressBar, KrakenDownloadProgressBar
 
 warnings.simplefilter('ignore', UserWarning)
 
@@ -118,8 +118,7 @@ def segmenter(legacy, model, text_direction, scale, maxcolseps, black_colseps,
               remove_hlines, pad, mask, device, input, output) -> None:
     import json
 
-    from kraken import pageseg
-    from kraken import blla
+    from kraken import blla, pageseg
 
     ctx = click.get_current_context()
 
@@ -183,8 +182,10 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore, input,
     import uuid
     import dataclasses
 
-    from kraken.containers import Segmentation, BBoxLine
     from kraken import rpred
+    from kraken.containers import Segmentation, BBoxLine
+
+    from kraken.lib.progress import KrakenProgressBar
 
     ctx = click.get_current_context()
 
@@ -301,8 +302,10 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore, input,
               help='Raises the exception that caused processing to fail in the case of an error')
 @click.option('-2', '--autocast', default=False, show_default=True, flag_value=True,
               help='On compatible devices, uses autocast for `segment` which lower the memory usage.')
+@click.option('--threads', default=1, show_default=True, type=click.IntRange(1),
+              help='Size of thread pools for intra-op parallelization')
 def cli(input, batch_input, suffix, verbose, format_type, pdf_format,
-        serializer, template, device, raise_on_error, autocast):
+        serializer, template, device, raise_on_error, autocast, threads):
     """
     Base command for recognition functionality.
 
@@ -344,6 +347,8 @@ def process_pipeline(subcommands, input, batch_input, suffix, verbose, format_ty
     import glob
     import uuid
     import tempfile
+
+    from kraken.lib.progress import KrakenProgressBar
 
     ctx = click.get_current_context()
 
@@ -563,9 +568,7 @@ def _validate_mm(ctx, param, value):
               show_default=True,
               type=click.Choice(['horizontal-tb', 'vertical-lr', 'vertical-rl']),
               help='Sets principal text direction in serialization output')
-@click.option('--threads', default=1, show_default=True, type=click.IntRange(1),
-              help='Number of threads to use for OpenMP parallelization.')
-def ocr(ctx, model, pad, reorder, base_dir, no_segmentation, text_direction, threads):
+def ocr(ctx, model, pad, reorder, base_dir, no_segmentation, text_direction):
     """
     Recognizes text in line images.
     """
@@ -607,8 +610,6 @@ def ocr(ctx, model, pad, reorder, base_dir, no_segmentation, text_direction, thr
         nn = defaultdict(lambda: nm['default'])  # type: Dict[str, models.TorchSeqRecognizer]
         nn.update(nm)
         nm = nn
-    # thread count is global so setting it once is sufficient
-    nm[k].nn.set_num_threads(threads)
 
     ctx.meta['steps'].append({'category': 'processing',
                               'description': 'Text line recognition',
@@ -661,6 +662,7 @@ def list_models(ctx):
     Lists models in the repository.
     """
     from kraken import repo
+    from kraken.lib.progress import KrakenProgressBar
 
     with KrakenProgressBar() as progress:
         download_task = progress.add_task('Retrieving model list', total=0, visible=True if not ctx.meta['verbose'] else False)
@@ -678,6 +680,7 @@ def get(ctx, model_id):
     Retrieves a model from the repository.
     """
     from kraken import repo
+    from kraken.lib.progress import KrakenDownloadProgressBar
 
     try:
         os.makedirs(click.get_app_dir(APP_NAME))
