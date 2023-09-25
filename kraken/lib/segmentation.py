@@ -27,7 +27,7 @@ from collections import defaultdict
 from PIL import Image
 
 from scipy.ndimage import maximum_filter, binary_erosion
-from scipy.ndimage.morphology import distance_transform_cdt
+from scipy.ndimage import distance_transform_cdt
 from scipy.spatial.distance import pdist, squareform
 
 from shapely.ops import nearest_points, unary_union

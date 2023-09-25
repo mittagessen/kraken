@@ -4,7 +4,7 @@ import numpy as np
 import bidi.algorithm as bd
 
 from os import PathLike
-from typing import Literal, List, Dict, Union, Optional, Tuple
+from typing import Literal, List, Dict, Union, Optional, Tuple, Any
 from dataclasses import dataclass, asdict
 from abc import ABC, abstractmethod
 
@@ -281,12 +281,14 @@ class BaselineOCRRecord(ocr_record, BaselineLine):
     def __init__(self, prediction: str,
                  cuts: List[Tuple[int, int]],
                  confidences: List[float],
-                 line: BaselineLine,
+                 line: Union[BaselineLine, Dict[str, Any]],
                  base_dir: Optional[Literal['L', 'R']] = None,
                  display_order: bool = True) -> None:
-        if line.type != 'baselines':
+        if not isinstance(line, dict):
+            line = asdict(line)
+        if line['type'] != 'baselines':
             raise TypeError('Invalid argument type (non-baseline line)')
-        BaselineLine.__init__(self, **asdict(line))
+        BaselineLine.__init__(self, **line)
         self._line_base_dir = self.base_dir
         self.base_dir = base_dir
         ocr_record.__init__(self, prediction, cuts, confidences, display_order)
@@ -460,12 +462,14 @@ class BBoxOCRRecord(ocr_record, BBoxLine):
                                       Tuple[int, int],
                                       Tuple[int, int]]],
                  confidences: List[float],
-                 line: BBoxLine,
-                 base_dir: Optional[Literal['L', 'R']],
+                 line: Union[BBoxLine, Dict[str, Any]],
+                 base_dir: Optional[Literal['L', 'R']] = None,
                  display_order: bool = True) -> None:
-        if line.type != 'bbox':
+        if not isinstance(line, dict):
+            line = asdict(line)
+        if line['type'] != 'bbox':
             raise TypeError('Invalid argument type (non-bbox line)')
-        BBoxLine.__init__(self, **asdict(line))
+        BBoxLine.__init__(self, **line)
         self._line_base_dir = self.base_dir
         self.base_dir = base_dir
         ocr_record.__init__(self, prediction, cuts, confidences, display_order)

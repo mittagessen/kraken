@@ -25,7 +25,7 @@ class TestXMLParser(unittest.TestCase):
         Test parsing of PAGE XML files with reading order.
         """
         doc = xml.XMLPage(self.page_doc, filetype='page')
-        self.assertEqual(len(doc.baselines), 97)
+        self.assertEqual(len(doc.get_sorted_lines()), 97)
         self.assertEqual(len([item for x in doc.regions.values() for item in x]), 4)
 
     def test_alto_parsing(self):
