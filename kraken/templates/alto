@@ -49,7 +49,7 @@
         </sourceImageInformation>
         {% if metadata.processing_steps %}
         {% for step in metadata.processing_steps %}
-        <Processing ID="OCR_{{ loop.index }}">
+        <Processing ID="OCR_{{ step.id }}">
             <processingCategory>{{ proc_type_table[step.category] }}</processingCategory>
             <processingStepDescription>{{ step.description }}</processingStepDescription>
             <processingStepSettings>{% for k, v in step.settings.items() %}{{k}}: {{v}}; {% endfor %}</processingStepSettings>
@@ -71,10 +71,34 @@
         {% endif %}
     </Description>
     <Tags>
-    {% for reg_type in page.types %}
-        <OtherTag ID="TYPE_{{ loop.index }}" LABEL="{{ reg_type }}"/>
+    {% for type, label in page.line_types %}
+        <OtherTag DESCRIPTION="line type" ID="TYPE_{{ loop.index }}" TYPE={{ type }} LABEL="{{ label }}"/>
+    {% endfor %}
+    {% for label in page.region_types %}
+        <OtherTag DESCRIPTION="region type" ID="TYPE_{{ loop.index }}" TYPE={{ type }} LABEL="{{ label }}"/>
     {% endfor %}
     </Tags>
+    {% if len(page.line_orders) > 0 %}
+    <ReadingOrder>
+        {% if len(page.line_orders) == 1 %}
+        <OrderedGroup ID="ro_0">
+           {% for id in page.line_orders[0] %}
+           <ElementRef ID="o_{{ loop.index }}" REF="{{ id }}"/>
+           {% endfor %}
+        </OrderedGroup>
+        {% else %}
+        <UnorderedGroup>
+        {% for ro in page.line_orders %}
+           <OrderedGroup ID="ro_{{ loop.index }}">
+           {% for id in ro %}
+               <ElementRef ID="o_{{ loop.index }}" REF="{{ id }}"/>
+           {% endfor %}
+           </OrderedGroup>
+	{% endfor %}
+        </UnorderedGroup>
+        {% endif %}
+    </ReadingOrder>
+    {% endif %}
     <Layout>
         <Page WIDTH="{{ page.size[0] }}" HEIGHT="{{ page.size[1] }}" PHYSICAL_IMG_NR="0" ID="page_0">
             <PrintSpace HPOS="0" VPOS="0" WIDTH="{{ page.size[0] }}" HEIGHT="{{ page.size[1] }}">

@@ -2,8 +2,11 @@
 API Reference
 *************
 
+Segmentation
+============
+
 kraken.blla module
-==================
+------------------
 
 .. note::
 
@@ -14,7 +17,7 @@ kraken.blla module
 .. autoapifunction:: kraken.blla.segment
 
 kraken.pageseg module
-=====================
+---------------------
 
 .. note::
 
@@ -24,22 +27,22 @@ kraken.pageseg module
 
 .. autoapifunction:: kraken.pageseg.segment
 
-kraken.rpred module
-===================
+Recognition
+===========
 
-.. autoapifunction:: kraken.rpred.bidi_record
+kraken.rpred module
+-------------------
 
 .. autoapiclass:: kraken.rpred.mm_rpred
         :members:
 
-.. autoapiclass:: kraken.rpred.ocr_record
-        :members:
-
 .. autoapifunction:: kraken.rpred.rpred
 
+Serialization
+=============
 
 kraken.serialization module
-===========================
+---------------------------
 
 .. autoapifunction:: kraken.serialization.render_report
 
@@ -47,143 +50,68 @@ kraken.serialization module
 
 .. autoapifunction:: kraken.serialization.serialize_segmentation
 
-kraken.lib.models module
-========================
+Default templates
+-----------------
 
-.. autoapiclass:: kraken.lib.models.TorchSeqRecognizer
-    :members:
+ALTO 4.4
+^^^^^^^^
 
-.. autoapifunction:: kraken.lib.models.load_any
+.. literalinclude:: ../../templates/alto
+        :language: xml+jinja
 
-kraken.lib.vgsl module
+PageXML
+^^^^^^^
+
+.. literalinclude:: ../../templates/alto
+        :language: xml+jinja
+
+hOCR
+^^^^
+
+.. literalinclude:: ../../templates/alto
+        :language: xml+jinja
+
+ABBYY XML
+^^^^^^^^^
+
+.. literalinclude:: ../../templates/abbyyxml
+        :language: xml+jinja
+
+Containers and Helpers
 ======================
 
-.. autoapiclass:: kraken.lib.vgsl.TorchVGSLModel
-    :members:
-
-kraken.lib.xml module
-=====================
-
-.. autoapifunction:: kraken.lib.xml.parse_xml
-
-.. autoapifunction:: kraken.lib.xml.parse_page
-
-.. autoapifunction:: kraken.lib.xml.parse_alto
-
 kraken.lib.codec module
-=======================
+-----------------------
 
 .. autoapiclass:: kraken.lib.codec.PytorchCodec
     :members:
 
-kraken.lib.train module
-=======================
+kraken.containers module
+------------------------
 
-Training Schedulers
--------------------
+.. autoapiclass:: kraken.containers.Segmentation
+        :members:
 
-.. autoapiclass:: kraken.lib.train.TrainScheduler
-    :members:
+.. autoapiclass:: kraken.containers.BaselineLine
+        :members:
 
-.. autoapiclass:: kraken.lib.train.annealing_step
-    :members:
+.. autoapiclass:: kraken.containers.BBoxLine
+        :members:
 
-.. autoapiclass:: kraken.lib.train.annealing_const
-    :members:
+.. autoapiclass:: kraken.containers.ocr_record
+        :members:
 
-.. autoapiclass:: kraken.lib.train.annealing_exponential
-    :members:
+.. autoapiclass:: kraken.containers.BaselineOCRRecord
+        :members:
 
-.. autoapiclass:: kraken.lib.train.annealing_reduceonplateau
-    :members:
+.. autoapiclass:: kraken.containers.BBoxOCRRecord
+        :members:
 
-.. autoapiclass:: kraken.lib.train.annealing_cosine
-    :members:
-
-.. autoapiclass:: kraken.lib.train.annealing_onecycle
-    :members:
-
-Training Stoppers
------------------
-
-.. autoapiclass:: kraken.lib.train.TrainStopper
-    :members:
-
-.. autoapiclass:: kraken.lib.train.EarlyStopping
-    :members:
-
-.. autoapiclass:: kraken.lib.train.EpochStopping
-    :members:
-
-.. autoapiclass:: kraken.lib.train.NoStopping
-    :members:
-
-Loss and Evaluation Functions
------------------------------
-
-.. autoapifunction:: kraken.lib.train.recognition_loss_fn
-
-.. autoapifunction:: kraken.lib.train.baseline_label_loss_fn
-
-.. autoapifunction:: kraken.lib.train.recognition_evaluator_fn
-
-.. autoapifunction:: kraken.lib.train.baseline_label_evaluator_fn
-
-Trainer
--------
-
-.. autoapiclass:: kraken.lib.train.KrakenTrainer
-    :members:
-
-
-kraken.lib.dataset module
-=========================
-
-Datasets
---------
-
-.. autoapiclass:: kraken.lib.dataset.BaselineSet
-    :members:
-
-.. autoapiclass:: kraken.lib.dataset.PolygonGTDataset
-    :members:
-
-.. autoapiclass:: kraken.lib.dataset.GroundTruthDataset
-    :members:
-
-Helpers
--------
-
-.. autoapifunction:: kraken.lib.dataset.compute_error
-
-.. autoapifunction:: kraken.lib.dataset.preparse_xml_data
-
-.. autoapifunction:: kraken.lib.dataset.generate_input_transforms
-
-kraken.lib.segmentation module
-------------------------------
-
-.. autoapifunction:: kraken.lib.segmentation.reading_order
-
-.. autoapifunction:: kraken.lib.segmentation.polygonal_reading_order
-
-.. autoapifunction:: kraken.lib.segmentation.denoising_hysteresis_thresh
-
-.. autoapifunction:: kraken.lib.segmentation.vectorize_lines
-
-.. autoapifunction:: kraken.lib.segmentation.calculate_polygonal_environment
-
-.. autoapifunction:: kraken.lib.segmentation.scale_polygonal_lines
-
-.. autoapifunction:: kraken.lib.segmentation.scale_regions
-
-.. autoapifunction:: kraken.lib.segmentation.compute_polygon_section
-
-.. autoapifunction:: kraken.lib.segmentation.extract_polygons
-
+.. autoapiclass:: kraken.containers.ProcessingStep
+        :members:
 
 kraken.lib.ctc_decoder
-======================
+----------------------
 
 .. autoapifunction:: kraken.lib.ctc_decoder.beam_decoder
 
@@ -192,7 +120,7 @@ kraken.lib.ctc_decoder
 .. autoapifunction:: kraken.lib.ctc_decoder.blank_threshold_decoder
 
 kraken.lib.exceptions
-=====================
+---------------------
 
 .. autoapiclass:: kraken.lib.exceptions.KrakenCodecException
     :members:
@@ -218,6 +146,111 @@ kraken.lib.exceptions
 .. autoapiclass:: kraken.lib.exceptions.KrakenCairoSurfaceException
     :members:
 
+kraken.lib.models module
+------------------------
+
+.. autoapiclass:: kraken.lib.models.TorchSeqRecognizer
+    :members:
+
+.. autoapifunction:: kraken.lib.models.load_any
+
+kraken.lib.segmentation module
+------------------------------
+
+.. autoapifunction:: kraken.lib.segmentation.reading_order
+
+.. autoapifunction:: kraken.lib.segmentation.neural_reading_order
+
+.. autoapifunction:: kraken.lib.segmentation.polygonal_reading_order
+
+.. autoapifunction:: kraken.lib.segmentation.vectorize_lines
+
+.. autoapifunction:: kraken.lib.segmentation.calculate_polygonal_environment
+
+.. autoapifunction:: kraken.lib.segmentation.scale_polygonal_lines
+
+.. autoapifunction:: kraken.lib.segmentation.scale_regions
+
+.. autoapifunction:: kraken.lib.segmentation.compute_polygon_section
+
+.. autoapifunction:: kraken.lib.segmentation.extract_polygons
+
+kraken.lib.vgsl module
+----------------------
+
+.. autoapiclass:: kraken.lib.vgsl.TorchVGSLModel
+    :members:
+
+kraken.lib.xml module
+---------------------
+
+.. autoapiclass:: kraken.lib.xml.XMLPage
+
+Training
+========
+
+kraken.lib.train module
+-----------------------
+
+Loss and Evaluation Functions
+-----------------------------
+
+.. autoapifunction:: kraken.lib.train.recognition_loss_fn
+
+.. autoapifunction:: kraken.lib.train.baseline_label_loss_fn
+
+.. autoapifunction:: kraken.lib.train.recognition_evaluator_fn
+
+.. autoapifunction:: kraken.lib.train.baseline_label_evaluator_fn
+
+Trainer
+-------
+
+.. autoapiclass:: kraken.lib.train.KrakenTrainer
+    :members:
+
+
+kraken.lib.dataset module
+-------------------------
+
+Recognition datasets
+^^^^^^^^^^^^^^^^^^^^
+
+.. autoapiclass:: kraken.lib.dataset.ArrowIPCRecognitionDataset
+    :members:
+
+.. autoapiclass:: kraken.lib.dataset.BaselineSet
+    :members:
+
+.. autoapiclass:: kraken.lib.dataset.GroundTruthDataset
+    :members:
+
+Segmentation datasets
+^^^^^^^^^^^^^^^^^^^^^
+
+.. autoapiclass:: kraken.lib.dataset.PolygonGTDataset
+    :members:
+
+Reading order datasets
+^^^^^^^^^^^^^^^^^^^^^^
+
+.. autoapiclass:: kraken.lib.dataset.PairWiseROSet
+    :members:
+
+.. autoapiclass:: kraken.lib.dataset.PageWiseROSet
+    :members:
+
+Helpers
+^^^^^^^
+
+.. autoapiclass:: kraken.lib.dataset.ImageInputTransforms
+   :members:
+
+.. autoapifunction:: kraken.lib.dataset.collate_sequences
+
+.. autoapifunction:: kraken.lib.dataset.global_align
+
+.. autoapifunction:: kraken.lib.dataset.compute_confusions
 
 Legacy modules
 ==============

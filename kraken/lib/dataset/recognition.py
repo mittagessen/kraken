@@ -30,6 +30,7 @@ from collections import Counter
 from torch.utils.data import Dataset
 from typing import Dict, List, Tuple, Callable, Optional, Any, Union, Literal
 
+from kraken.containers import BaselineLine, BBoxLine, Segmentation
 from kraken.lib.util import is_bitonal
 from kraken.lib.codec import PytorchCodec
 from kraken.lib.segmentation import extract_polygons
@@ -320,54 +321,67 @@ class PolygonGTDataset(Dataset):
 
         self.im_mode = '1'
 
-    def add(self, *args, **kwargs):
+    def add(self,
+            line: Optional[BaselineLine] = None,
+            page: Optional[Segmentation] = None):
+        """
+        Adds an indiviual line or all lines on a page to the dataset.
+
+        Args:
+            line: BaselineLine container object of a line.
+            page: Segmentation container object for a page.
+        """
+        if line:
+            self.add_line(line)
+        if page:
+            self.add_page(page)
+        if not (line and page):
+            raise ValueError('Neither line nor page data provided in dataset builder')
+
+    def add_page(self, page: Segmentation):
+        """
+        Adds all lines on a page to the dataset.
+
+        Invalid lines will be skipped and a warning will be printed.
+
+        Args:
+            page: Segmentation container object for a page.
+        """
+        if page.type != 'baselines':
+            raise ValueError(f'Invalid segmentation of type {page.type} (expected "baselines")')
+        for line in page.lines:
+            try:
+                self.add_line(dataclasses.replace(line, imagename=page.imagename))
+            except ValueError as e:
+                logger.warning(e)
+
+    def add_line(self, line: BaselineLine):
         """
         Adds a line to the dataset.
 
         Args:
-            im (path): Path to the whole page image
-            text (str): Transcription of the line.
-            baseline (list): A list of coordinates [[x0, y0], ..., [xn, yn]].
-            boundary (list): A polygon mask for the line.
-        """
-        if 'preparse' not in kwargs or not kwargs['preparse']:
-            kwargs = self.parse(*args, **kwargs)
-        self._images.append((kwargs['image'], kwargs['baseline'], kwargs['boundary']))
-        self._gt.append(kwargs['text'])
-        self.alphabet.update(kwargs['text'])
+            line: BaselineLine container object for a line.
 
-    def parse(self,
-              image: Union[PathLike, str, Image.Image],
-              text: str,
-              baseline: List[Tuple[int, int]],
-              boundary: List[Tuple[int, int]],
-              *args,
-              **kwargs):
+        Raises:
+            ValueError if the transcription of the line is empty after
+            transformation or either baseline or bounding polygon are missing.
         """
-        Parses a sample for the dataset and returns it.
+        if line.type != 'baselines':
+            raise ValueError(f'Invalid line of type {line.type} (expected "baselines")')
 
-        This function is mainly uses for parallelized loading of training data.
-
-        Args:
-            im (path): Path to the whole page image
-            text (str): Transcription of the line.
-            baseline (list): A list of coordinates [[x0, y0], ..., [xn, yn]].
-            boundary (list): A polygon mask for the line.
-        """
-        orig_text = text
+        text = line.text
         for func in self.text_transforms:
             text = func(text)
         if not text and self.skip_empty_lines:
-            raise KrakenInputException(f'Text line "{orig_text}" is empty after transformations')
-        if not baseline:
-            raise KrakenInputException('No baseline given for line')
-        if not boundary:
-            raise KrakenInputException('No boundary given for line')
-        return {'text': text,
-                'image': image,
-                'baseline': baseline,
-                'boundary': boundary,
-                'preparse': True}
+            raise ValueError(f'Text line "{line.text}" is empty after transformations')
+        if not line.baseline:
+            raise ValueError('No baseline given for line')
+        if not line.boundary:
+            raise ValueError('No boundary given for line')
+
+        self._images.append((line.image, line.baseline, line.boundary))
+        self._gt.append(text)
+        self.alphabet.update(text)
 
     def encode(self, codec: Optional[PytorchCodec] = None) -> None:
         """
@@ -433,8 +447,7 @@ class GroundTruthDataset(Dataset):
 
     All data is cached in memory.
     """
-    def __init__(self, split: Callable[[Union[PathLike, str]], str] = F_t.default_split,
-                 suffix: str = '.gt.txt',
+    def __init__(self,
                  normalization: Optional[str] = None,
                  whitespace_normalization: bool = True,
                  skip_empty_lines: bool = True,
@@ -445,10 +458,6 @@ class GroundTruthDataset(Dataset):
         Reads a list of image-text pairs and creates a ground truth set.
 
         Args:
-            split: Function for generating the base name without
-                   extensions from paths
-            suffix: Suffix to attach to image base name for text
-                    retrieval
             mode: Image color space. Either RGB (color) or L
                   (grayscale/bw). Only L is compatible with vertical
                   scaling/dewarping.
@@ -467,8 +476,6 @@ class GroundTruthDataset(Dataset):
                            tensor suitable for forward passes.
             augmentation: Enables augmentation.
         """
-        self.suffix = suffix
-        self.split = partial(F_t.suffix_split, split=split, suffix=suffix)
         self._images = []  # type:  Union[List[Image], List[torch.Tensor]]
         self._gt = []  # type:  List[str]
         self.alphabet = Counter()  # type: Counter
@@ -494,35 +501,67 @@ class GroundTruthDataset(Dataset):
 
         self.im_mode = '1'
 
-    def add(self, *args, **kwargs) -> None:
+    def add(self,
+            line: Optional[BBoxLine] = None,
+            page: Optional[Segmentation] = None):
         """
-        Adds a line-image-text pair to the dataset.
+        Adds an indiviual line or all lines on a page to the dataset.
 
         Args:
-            image (str): Input image path
+            line: BBoxLine container object of a line.
+            page: Segmentation container object for a page.
         """
-        if 'preparse' not in kwargs or not kwargs['preparse']:
-            kwargs = self.parse(*args, **kwargs)
-        self._images.append(kwargs['image'])
-        self._gt.append(kwargs['text'])
-        self.alphabet.update(kwargs['text'])
+        if line:
+            self.add_line(line)
+        if page:
+            self.add_page(page)
+        if not (line and page):
+            raise ValueError('Neither line nor page data provided in dataset builder')
 
-    def parse(self, image: Union[PathLike, str, Image.Image], *args, **kwargs) -> Dict:
+    def add_page(self, page: Segmentation):
         """
-        Parses a sample for this dataset.
+        Adds all lines on a page to the dataset.
 
-        This is mostly used to parallelize populating the dataset.
+        Invalid lines will be skipped and a warning will be printed.
 
         Args:
-            image (str): Input image path
+            page: Segmentation container object for a page.
         """
-        with open(self.split(image), 'r', encoding='utf-8') as fp:
-            text = fp.read().strip('\n\r')
-            for func in self.text_transforms:
-                text = func(text)
-            if not text and self.skip_empty_lines:
-                raise KrakenInputException(f'Text line is empty ({fp.name})')
-        return {'image': image, 'text': text, 'preparse': True}
+        if page.type != 'bbox':
+            raise ValueError(f'Invalid segmentation of type {page.type} (expected "bbox")')
+        for line in page.lines:
+            try:
+                self.add_line(dataclasses.replace(line, imagename=page.imagename))
+            except ValueError as e:
+                logger.warning(e)
+
+    def add_line(self, line: BBoxLine):
+        """
+        Adds a line to the dataset.
+
+        Args:
+            line: BBoxLine container object for a line.
+
+        Raises:
+            ValueError if the transcription of the line is empty after
+            transformation or either baseline or bounding polygon are missing.
+        """
+        if line.type != 'bbox':
+            raise ValueError(f'Invalid line of type {line.type} (expected "bbox")')
+
+        text = line.text
+        for func in self.text_transforms:
+            text = func(text)
+        if not text and self.skip_empty_lines:
+            raise ValueError(f'Text line "{line.text}" is empty after transformations')
+        if not line.baseline:
+            raise ValueError('No baseline given for line')
+        if not line.boundary:
+            raise ValueError('No boundary given for line')
+
+        self._images.append(line.image)
+        self._gt.append(text)
+        self.alphabet.update(text)
 
     def encode(self, codec: Optional[PytorchCodec] = None) -> None:
         """

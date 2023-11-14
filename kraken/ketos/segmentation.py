@@ -24,7 +24,6 @@ import logging
 
 from PIL import Image
 
-from kraken.lib.progress import KrakenProgressBar
 from kraken.lib.exceptions import KrakenInputException
 from kraken.lib.default_specs import SEGMENTATION_HYPER_PARAMS, SEGMENTATION_SPEC
 
@@ -76,8 +75,8 @@ def _validate_merging(ctx, param, value):
               show_default=True,
               default=SEGMENTATION_HYPER_PARAMS['quit'],
               type=click.Choice(['early',
-                                 'dumb']),
-              help='Stop condition for training. Set to `early` for early stopping or `dumb` for fixed number of epochs')
+                                 'fixed']),
+              help='Stop condition for training. Set to `early` for early stopping or `fixed` for fixed number of epochs')
 @click.option('-N',
               '--epochs',
               show_default=True,
@@ -152,7 +151,8 @@ def _validate_merging(ctx, param, value):
 @click.option('-e', '--evaluation-files', show_default=True, default=None, multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
-@click.option('--workers', show_default=True, default=1, help='Number of OpenMP threads and workers when running on CPU.')
+@click.option('--workers', show_default=True, default=1, type=click.IntRange(1), help='Number of worker proesses.')
+@click.option('--threads', show_default=True, default=1, type=click.IntRange(1), help='Maximum size of OpenMP/BLAS thread pool.')
 @click.option('--load-hyper-parameters/--no-load-hyper-parameters', show_default=True, default=False,
               help='When loading an existing model, retrieve hyper-parameters from the model')
 @click.option('--force-binarization/--no-binarization', show_default=True,
@@ -219,7 +219,7 @@ def segtrain(ctx, output, spec, line_width, pad, load, freq, quit, epochs,
              min_epochs, lag, min_delta, device, precision, optimizer, lrate,
              momentum, weight_decay, warmup, schedule, gamma, step_size,
              sched_patience, cos_max, partition, training_files,
-             evaluation_files, workers, load_hyper_parameters,
+             evaluation_files, workers, threads, load_hyper_parameters,
              force_binarization, format_type, suppress_regions,
              suppress_baselines, valid_regions, valid_baselines, merge_regions,
              merge_baselines, bounding_regions,
@@ -229,7 +229,10 @@ def segtrain(ctx, output, spec, line_width, pad, load, freq, quit, epochs,
     """
     import shutil
 
+    from threadpoolctl import threadpool_limits
+
     from kraken.lib.train import SegmentationModel, KrakenTrainer
+    from kraken.lib.progress import KrakenProgressBar
 
     if resize != 'fail' and not load:
         raise click.BadOptionUsage('resize', 'resize option requires loading an existing model')
@@ -339,7 +342,7 @@ def segtrain(ctx, output, spec, line_width, pad, load, freq, quit, epochs,
     trainer = KrakenTrainer(accelerator=accelerator,
                             devices=device,
                             precision=precision,
-                            max_epochs=hyper_params['epochs'] if hyper_params['quit'] == 'dumb' else -1,
+                            max_epochs=hyper_params['epochs'] if hyper_params['quit'] == 'fixed' else -1,
                             min_epochs=hyper_params['min_epochs'],
                             enable_progress_bar=True if not ctx.meta['verbose'] else False,
                             deterministic=ctx.meta['deterministic'],
@@ -347,10 +350,15 @@ def segtrain(ctx, output, spec, line_width, pad, load, freq, quit, epochs,
                             log_dir=log_dir,
                             **val_check_interval)
 
-    trainer.fit(model)
+    with threadpool_limits(limits=threads):
+        trainer.fit(model)
 
     if model.best_epoch == -1:
         logger.warning('Model did not improve during training.')
+        ctx.exit(1)
+
+    if not model.epoch:
+        logger.warning('Training aborted before end of first epoch.')
         ctx.exit(1)
 
     if quit == 'early':
@@ -367,7 +375,10 @@ def segtrain(ctx, output, spec, line_width, pad, load, freq, quit, epochs,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with paths to evaluation data.')
 @click.option('-d', '--device', show_default=True, default='cpu', help='Select device to use (cpu, cuda:0, cuda:1, ...)')
-@click.option('--workers', show_default=True, default=1, help='Number of OpenMP threads when running on CPU.')
+@click.option('--workers', default=1, show_default=True, type=click.IntRange(1),
+              help='Number of worker processes for data loading.')
+@click.option('--threads', default=1, show_default=True, type=click.IntRange(1),
+              help='Size of thread pools for intra-op parallelization')
 @click.option('--force-binarization/--no-binarization', show_default=True,
               default=False, help='Forces input images to be binary, otherwise '
               'the appropriate color format will be auto-determined through the '
@@ -405,7 +416,7 @@ def segtrain(ctx, output, spec, line_width, pad, load, freq, quit, epochs,
 @click.option("--threshold", type=click.FloatRange(.01, .99), default=.3, show_default=True,
               help="Threshold for heatmap binarization. Training threshold is .3, prediction is .5")
 @click.argument('test_set', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
-def segtest(ctx, model, evaluation_files, device, workers, threshold,
+def segtest(ctx, model, evaluation_files, device, workers, threads, threshold,
             force_binarization, format_type, test_set, suppress_regions,
             suppress_baselines, valid_regions, valid_baselines, merge_regions,
             merge_baselines, bounding_regions):
@@ -415,6 +426,7 @@ def segtest(ctx, model, evaluation_files, device, workers, threshold,
     if not model:
         raise click.UsageError('No model to evaluate given.')
 
+    from threadpoolctl import threadpool_limits
     from torch.utils.data import DataLoader
     import torch
     import torch.nn.functional as F
@@ -504,46 +516,47 @@ def segtest(ctx, model, evaluation_files, device, workers, threshold,
     with KrakenProgressBar() as progress:
         batches = len(ds_loader)
         pred_task = progress.add_task('Evaluating', total=batches, visible=True if not ctx.meta['verbose'] else False)
-        for batch in ds_loader:
-            x, y = batch['image'], batch['target']
-            try:
-                pred, _ = nn.nn(x)
-                # scale target to output size
-                y = F.interpolate(y, size=(pred.size(2), pred.size(3))).squeeze(0).bool()
-                pred = pred.squeeze() > threshold
-                pred = pred.view(pred.size(0), -1)
-                y = y.view(y.size(0), -1)
-                pages.append({
-                    'intersections': (y & pred).sum(dim=1, dtype=torch.double),
-                    'unions': (y | pred).sum(dim=1, dtype=torch.double),
-                    'corrects': torch.eq(y, pred).sum(dim=1, dtype=torch.double),
-                    'cls_cnt': y.sum(dim=1, dtype=torch.double),
-                    'all_n': torch.tensor(y.size(1), dtype=torch.double, device=device)
-                })
-                if lines_idx:
-                    y_baselines = y[lines_idx].sum(dim=0, dtype=torch.bool)
-                    pred_baselines = pred[lines_idx].sum(dim=0, dtype=torch.bool)
-                    pages[-1]["baselines"] = {
-                        'intersections': (y_baselines & pred_baselines).sum(dim=0, dtype=torch.double),
-                        'unions': (y_baselines | pred_baselines).sum(dim=0, dtype=torch.double),
-                    }
-                if regions_idx:
-                    y_regions_idx = y[regions_idx].sum(dim=0, dtype=torch.bool)
-                    pred_regions_idx = pred[regions_idx].sum(dim=0, dtype=torch.bool)
-                    pages[-1]["regions"] = {
-                        'intersections': (y_regions_idx & pred_regions_idx).sum(dim=0, dtype=torch.double),
-                        'unions': (y_regions_idx | pred_regions_idx).sum(dim=0, dtype=torch.double),
-                    }
+        with threadpool_limits(limits=threads):
+            for batch in ds_loader:
+                x, y = batch['image'], batch['target']
+                try:
+                    pred, _ = nn.nn(x)
+                    # scale target to output size
+                    y = F.interpolate(y, size=(pred.size(2), pred.size(3))).squeeze(0).bool()
+                    pred = pred.squeeze() > threshold
+                    pred = pred.view(pred.size(0), -1)
+                    y = y.view(y.size(0), -1)
+                    pages.append({
+                        'intersections': (y & pred).sum(dim=1, dtype=torch.double),
+                        'unions': (y | pred).sum(dim=1, dtype=torch.double),
+                        'corrects': torch.eq(y, pred).sum(dim=1, dtype=torch.double),
+                        'cls_cnt': y.sum(dim=1, dtype=torch.double),
+                        'all_n': torch.tensor(y.size(1), dtype=torch.double, device=device)
+                    })
+                    if lines_idx:
+                        y_baselines = y[lines_idx].sum(dim=0, dtype=torch.bool)
+                        pred_baselines = pred[lines_idx].sum(dim=0, dtype=torch.bool)
+                        pages[-1]["baselines"] = {
+                            'intersections': (y_baselines & pred_baselines).sum(dim=0, dtype=torch.double),
+                            'unions': (y_baselines | pred_baselines).sum(dim=0, dtype=torch.double),
+                        }
+                    if regions_idx:
+                        y_regions_idx = y[regions_idx].sum(dim=0, dtype=torch.bool)
+                        pred_regions_idx = pred[regions_idx].sum(dim=0, dtype=torch.bool)
+                        pages[-1]["regions"] = {
+                            'intersections': (y_regions_idx & pred_regions_idx).sum(dim=0, dtype=torch.double),
+                            'unions': (y_regions_idx | pred_regions_idx).sum(dim=0, dtype=torch.double),
+                        }
 
-            except FileNotFoundError as e:
-                batches -= 1
-                progress.update(pred_task, total=batches)
-                logger.warning('{} {}. Skipping.'.format(e.strerror, e.filename))
-            except KrakenInputException as e:
-                batches -= 1
-                progress.update(pred_task, total=batches)
-                logger.warning(str(e))
-            progress.update(pred_task, advance=1)
+                except FileNotFoundError as e:
+                    batches -= 1
+                    progress.update(pred_task, total=batches)
+                    logger.warning('{} {}. Skipping.'.format(e.strerror, e.filename))
+                except KrakenInputException as e:
+                    batches -= 1
+                    progress.update(pred_task, total=batches)
+                    logger.warning(str(e))
+                progress.update(pred_task, advance=1)
 
     # Accuracy / pixel
     corrects = torch.stack([x['corrects'] for x in pages], -1).sum(dim=-1)

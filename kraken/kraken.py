@@ -21,18 +21,18 @@ Command line drivers for recognition functionality.
 import os
 import warnings
 import logging
+import dataclasses
 import pkg_resources
 
-from typing import Dict, Union, List, cast, Any, IO, Callable
-from pathlib import Path
-from rich.traceback import install
-from functools import partial
 from PIL import Image
+from pathlib import Path
+from functools import partial
+from rich.traceback import install
+from typing import Dict, Union, List, cast, Any, IO, Callable
 
 import click
 
 from kraken.lib import log
-from kraken.lib.progress import KrakenProgressBar, KrakenDownloadProgressBar
 
 warnings.simplefilter('ignore', UserWarning)
 
@@ -45,7 +45,6 @@ install(suppress=[click])
 APP_NAME = 'kraken'
 SEGMENTATION_DEFAULT_MODEL = pkg_resources.resource_filename(__name__, 'blla.mlmodel')
 DEFAULT_MODEL = ['en_best.mlmodel']
-LEGACY_MODEL_DIR = '/usr/local/share/ocropus'
 
 # raise default max image size to 20k * 20k pixels
 Image.MAX_IMAGE_PIXELS = 20000 ** 2
@@ -57,15 +56,9 @@ def message(msg: str, **styles) -> None:
 
 
 def get_input_parser(type_str: str) -> Callable[[str], Dict[str, Any]]:
-    if type_str == 'alto':
-        from kraken.lib.xml import parse_alto
-        return parse_alto
-    elif type_str == 'page':
-        from kraken.lib.xml import parse_page
-        return parse_page
-    elif type_str == 'xml':
-        from kraken.lib.xml import parse_xml
-        return parse_xml
+    if type_str in ['alto', 'page', 'xml']:
+        from kraken.lib.xml import XMLPage
+        return XMLPage
     elif type_str == 'image':
         return Image.open
 
@@ -78,7 +71,7 @@ def binarizer(threshold, zoom, escale, border, perc, range, low, high, input, ou
     ctx = click.get_current_context()
     if ctx.meta['first_process']:
         if ctx.meta['input_format_type'] != 'image':
-            input = get_input_parser(ctx.meta['input_format_type'])(input)['image']
+            input = get_input_parser(ctx.meta['input_format_type'])(input).imagename
         ctx.meta['first_process'] = False
     else:
         raise click.UsageError('Binarization has to be the initial process.')
@@ -124,14 +117,13 @@ def segmenter(legacy, model, text_direction, scale, maxcolseps, black_colseps,
               remove_hlines, pad, mask, device, input, output) -> None:
     import json
 
-    from kraken import pageseg
-    from kraken import blla
+    from kraken import blla, pageseg
 
     ctx = click.get_current_context()
 
     if ctx.meta['first_process']:
         if ctx.meta['input_format_type'] != 'image':
-            input = get_input_parser(ctx.meta['input_format_type'])(input)['image']
+            input = get_input_parser(ctx.meta['input_format_type'])(input).imagename
         ctx.meta['first_process'] = False
 
     if 'base_image' not in ctx.meta:
@@ -179,15 +171,20 @@ def segmenter(legacy, model, text_direction, scale, maxcolseps, black_colseps,
     else:
         with click.open_file(output, 'w') as fp:
             fp = cast(IO[Any], fp)
-            json.dump(res, fp)
+            json.dump(dataclasses.asdict(res), fp)
     message('\u2713', fg='green')
 
 
 def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore, input, output) -> None:
 
     import json
+    import uuid
+    import dataclasses
 
     from kraken import rpred
+    from kraken.containers import Segmentation, BBoxLine
+
+    from kraken.lib.progress import KrakenProgressBar
 
     ctx = click.get_current_context()
 
@@ -198,12 +195,11 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore, input,
     if ctx.meta['first_process']:
         if ctx.meta['input_format_type'] != 'image':
             doc = get_input_parser(ctx.meta['input_format_type'])(input)
-            ctx.meta['base_image'] = doc['image']
-            doc['text_direction'] = 'horizontal-lr'
-            if doc['base_dir'] and bidi_reordering is True:
-                message(f'Setting base text direction for BiDi reordering to {doc["base_dir"]} (from XML input file)')
-                bidi_reordering = doc['base_dir']
-            bounds = doc
+            ctx.meta['base_image'] = doc.imagename
+            if doc.base_dir and bidi_reordering is True:
+                message(f'Setting base text direction for BiDi reordering to {doc.base_dir} (from XML input file)')
+                bidi_reordering = doc.base_dir
+            bounds = doc.to_container()
     try:
         im = Image.open(ctx.meta['base_image'])
     except IOError as e:
@@ -213,14 +209,15 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore, input,
         with click.open_file(input, 'r') as fp:
             try:
                 fp = cast(IO[Any], fp)
-                bounds = json.load(fp)
+                bounds = Segmentation(**json.load(fp))
             except ValueError as e:
                 raise click.UsageError(f'{input} invalid segmentation: {str(e)}')
     elif not bounds:
         if no_segmentation:
-            bounds = {'script_detection': False,
-                      'text_direction': 'horizontal-lr',
-                      'boxes': [(0, 0) + im.size]}
+            bounds = Segmentation(type='bbox',
+                                  text_direction='horizontal-lr',
+                                  lines=[BBoxLine(id=uuid.uuid4(),
+                                                  bbox=((0, 0), (0, im.size[1]), im.size, (im.size[0], 0)))])
         else:
             raise click.UsageError('No line segmentation given. Add one with the input or run `segment` first.')
     elif no_segmentation:
@@ -228,7 +225,7 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore, input,
 
     tags = set()
     # script detection
-    if 'script_detection' in bounds and bounds['script_detection']:
+    if bounds.script_detection:
         it = rpred.mm_rpred(model, im, bounds, pad,
                             bidi_reordering=bidi_reordering,
                             tags_ignore=tags_ignore)
@@ -243,6 +240,7 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore, input,
         for pred in it:
             preds.append(pred)
             progress.update(pred_task, advance=1)
+    results = dataclasses.replace(it.bounds, lines=preds, imagename=ctx.meta['base_image'])
 
     ctx = click.get_current_context()
     with click.open_file(output, 'w', encoding='utf-8') as fp:
@@ -251,12 +249,10 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore, input,
         logger.info('Serializing as {} into {}'.format(ctx.meta['output_mode'], output))
         if ctx.meta['output_mode'] != 'native':
             from kraken import serialization
-            fp.write(serialization.serialize(records=preds,
-                                             image_name=ctx.meta['base_image'],
+            fp.write(serialization.serialize(results=results,
                                              image_size=Image.open(ctx.meta['base_image']).size,
                                              writing_mode=ctx.meta['text_direction'],
                                              scripts=tags,
-                                             regions=bounds['regions'] if 'regions' in bounds else None,
                                              template=ctx.meta['output_template'],
                                              template_source='custom' if ctx.meta['output_mode'] == 'template' else 'native',
                                              processing_steps=ctx.meta['steps']))
@@ -305,8 +301,10 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore, input,
               help='Raises the exception that caused processing to fail in the case of an error')
 @click.option('-2', '--autocast', default=False, show_default=True, flag_value=True,
               help='On compatible devices, uses autocast for `segment` which lower the memory usage.')
+@click.option('--threads', default=1, show_default=True, type=click.IntRange(1),
+              help='Size of thread pools for intra-op parallelization')
 def cli(input, batch_input, suffix, verbose, format_type, pdf_format,
-        serializer, template, device, raise_on_error, autocast):
+        serializer, template, device, raise_on_error, autocast, threads):
     """
     Base command for recognition functionality.
 
@@ -336,6 +334,7 @@ def cli(input, batch_input, suffix, verbose, format_type, pdf_format,
     ctx.meta['verbose'] = verbose
     ctx.meta['steps'] = []
     ctx.meta["autocast"] = autocast
+    ctx.meta['threads'] = threads
     log.set_logger(logger, level=30 - min(10 * verbose, 20))
 
 
@@ -348,6 +347,9 @@ def process_pipeline(subcommands, input, batch_input, suffix, verbose, format_ty
     import glob
     import uuid
     import tempfile
+
+    from threadpoolctl import threadpool_limits
+    from kraken.lib.progress import KrakenProgressBar
 
     ctx = click.get_current_context()
 
@@ -413,7 +415,8 @@ def process_pipeline(subcommands, input, batch_input, suffix, verbose, format_ty
             for idx, (task, input, output) in enumerate(zip(subcommands, fc, fc[1:])):
                 if len(fc) - 2 == idx:
                     ctx.meta['last_process'] = True
-                task(input=input, output=output)
+                with threadpool_limits(limits=ctx.meta['threads']):
+                    task(input=input, output=output)
         except Exception as e:
             logger.error(f'Failed processing {io_pair[0]}: {str(e)}')
             if ctx.meta['raise_failed']:
@@ -576,9 +579,7 @@ def _validate_mm(ctx, param, value):
               show_default=True,
               type=click.Choice(['horizontal-tb', 'vertical-lr', 'vertical-rl']),
               help='Sets principal text direction in serialization output')
-@click.option('--threads', default=1, show_default=True, type=click.IntRange(1),
-              help='Number of threads to use for OpenMP parallelization.')
-def ocr(ctx, model, pad, reorder, base_dir, no_segmentation, text_direction, threads):
+def ocr(ctx, model, pad, reorder, base_dir, no_segmentation, text_direction):
     """
     Recognizes text in line images.
     """
@@ -590,14 +591,12 @@ def ocr(ctx, model, pad, reorder, base_dir, no_segmentation, text_direction, thr
     if reorder and base_dir != 'auto':
         reorder = base_dir
 
-    # first try to find the OCR model by its given name, then
-    # in the kraken config folder, then in LEGACY_MODEL_DIR
+    # first we try to find the model in the absolue path, then ~/.kraken
     nm = {}  # type: Dict[str, models.TorchSeqRecognizer]
     ign_tags = model.pop('ignore')
     for k, v in model.items():
         search = [v,
-                  os.path.join(click.get_app_dir(APP_NAME), v),
-                  os.path.join(LEGACY_MODEL_DIR, v)]
+                  os.path.join(click.get_app_dir(APP_NAME), v)]
         location = None
         for loc in search:
             if os.path.isfile(loc):
@@ -622,8 +621,6 @@ def ocr(ctx, model, pad, reorder, base_dir, no_segmentation, text_direction, thr
         nn = defaultdict(lambda: nm['default'])  # type: Dict[str, models.TorchSeqRecognizer]
         nn.update(nm)
         nm = nn
-    # thread count is global so setting it once is sufficient
-    nm[k].nn.set_num_threads(threads)
 
     ctx.meta['steps'].append({'category': 'processing',
                               'description': 'Text line recognition',
@@ -676,6 +673,7 @@ def list_models(ctx):
     Lists models in the repository.
     """
     from kraken import repo
+    from kraken.lib.progress import KrakenProgressBar
 
     with KrakenProgressBar() as progress:
         download_task = progress.add_task('Retrieving model list', total=0, visible=True if not ctx.meta['verbose'] else False)
@@ -693,6 +691,7 @@ def get(ctx, model_id):
     Retrieves a model from the repository.
     """
     from kraken import repo
+    from kraken.lib.progress import KrakenDownloadProgressBar
 
     try:
         os.makedirs(click.get_app_dir(APP_NAME))

@@ -27,7 +27,6 @@ import unicodedata
 from typing import IO, Any, cast
 from bidi.algorithm import get_display
 
-from kraken.lib.progress import KrakenProgressBar
 from .util import message
 
 logging.captureWarnings(True)
@@ -68,6 +67,7 @@ def extract(ctx, binarize, normalization, normalize_whitespace, reorder,
     from lxml import html, etree
 
     from kraken import binarization
+    from kraken.lib.progress import KrakenProgressBar
 
     try:
         os.mkdir(output)
@@ -172,6 +172,7 @@ def transcription(ctx, text_direction, scale, bw, maxcolseps,
     from kraken import binarization
 
     from kraken.lib import models
+    from kraken.lib.progress import KrakenProgressBar
 
     ti = transcribe.TranscriptionInterface(font, font_style)
 

@@ -21,6 +21,7 @@ line recognizer uses the baseline paradigm.
 """
 
 import PIL
+import uuid
 import torch
 import logging
 import numpy as np
@@ -29,18 +30,21 @@ import shapely.geometry as geom
 import torch.nn.functional as F
 import torchvision.transforms as tf
 
-from typing import Optional, Dict, Callable, Union, List, Any, Tuple
+from typing import Optional, Dict, Callable, Union, List, Any, Tuple, Literal
 
 from scipy.ndimage import gaussian_filter
 from skimage.filters import sobel
 
 from kraken.lib import vgsl, dataset
+from kraken.containers import Region, Segmentation, BaselineLine
 from kraken.lib.util import is_bitonal, get_im_str
 from kraken.lib.exceptions import KrakenInputException, KrakenInvalidModelException
 from kraken.lib.segmentation import (polygonal_reading_order,
+                                     neural_reading_order,
                                      vectorize_lines, vectorize_regions,
                                      scale_polygonal_lines,
                                      calculate_polygonal_environment,
+                                     is_in_region,
                                      scale_regions)
 
 __all__ = ['segment']
@@ -73,8 +77,6 @@ def compute_segmentation_map(im: PIL.Image.Image,
     Raises:
         KrakenInputException: When given an invalid mask.
     """
-    im_str = get_im_str(im)
-    logger.info(f'Segmenting {im_str}')
 
     if model.input[1] == 1 and model.one_channel_mode == '1' and not is_bitonal(im):
         logger.warning('Running binary model on non-binary input image '
@@ -134,7 +136,7 @@ def compute_segmentation_map(im: PIL.Image.Image,
             'scal_im': scal_im}
 
 
-def vec_regions(heatmap: torch.Tensor, cls_map: Dict, scale: float, **kwargs) -> Dict[str, List[List[Tuple[int, int]]]]:
+def vec_regions(heatmap: torch.Tensor, cls_map: Dict, scale: float, **kwargs) -> Dict[str, List[Region]]:
     """
     Computes regions from a stack of heatmaps, a class mapping, and scaling
     factor.
@@ -154,8 +156,8 @@ def vec_regions(heatmap: torch.Tensor, cls_map: Dict, scale: float, **kwargs) ->
     for region_type, idx in cls_map['regions'].items():
         logger.debug(f'Vectorizing regions of type {region_type}')
         regions[region_type] = vectorize_regions(heatmap[idx])
-    for reg_id, regs in regions.items():
-        regions[reg_id] = scale_regions(regs, scale)
+    for reg_type, regs in regions.items():
+        regions[reg_type] = [Region(id=str(uuid.uuid4()), boundary=x, tags={'type': reg_type}) for x in scale_regions(regs, scale)]
     return regions
 
 
@@ -163,7 +165,6 @@ def vec_lines(heatmap: torch.Tensor,
               cls_map: Dict[str, Dict[str, int]],
               scale: float,
               text_direction: str = 'horizontal-lr',
-              reading_order_fn: Callable = polygonal_reading_order,
               regions: List[np.ndarray] = None,
               scal_im: np.ndarray = None,
               suppl_obj: List[np.ndarray] = None,
@@ -181,7 +182,6 @@ def vec_lines(heatmap: torch.Tensor,
         scale: Scaling factor between heatmap and unscaled input image.
         text_direction: Text directions used as hints in the reading order
                         algorithm.
-        reading_order_fn: Reading order calculation function.
         regions: Regions to be used as boundaries during polygonization and
                  atomic blocks during reading order determination for lines
                  contained within.
@@ -206,6 +206,7 @@ def vec_lines(heatmap: torch.Tensor,
              ...
             ]
     """
+
     st_sep = cls_map['aux']['_start_separator']
     end_sep = cls_map['aux']['_end_separator']
 
@@ -222,39 +223,34 @@ def vec_lines(heatmap: torch.Tensor,
     reg_pols = [geom.Polygon(x) for x in regions]
     for bl_idx in range(len(baselines)):
         bl = baselines[bl_idx]
-        mid_point = geom.LineString(bl[1]).interpolate(0.5, normalized=True)
-
+        bl_ls = geom.LineString(bl[1])
         suppl_obj = [x[1] for x in baselines[:bl_idx] + baselines[bl_idx+1:]]
         for reg_idx, reg_pol in enumerate(reg_pols):
-            if reg_pol.contains(mid_point):
+            if is_in_region(bl_ls, reg_pol):
                 suppl_obj.append(regions[reg_idx])
-
-        pol = calculate_polygonal_environment(
-            baselines=[bl[1]],
-            im_feats=im_feats,
-            suppl_obj=suppl_obj,
-            topline=topline,
-            raise_on_error=raise_on_error
-        )
+        pol = calculate_polygonal_environment(baselines=[bl[1]],
+                                              im_feats=im_feats,
+                                              suppl_obj=suppl_obj,
+                                              topline=topline,
+                                              raise_on_error=raise_on_error)
         if pol[0] is not None:
             lines.append((bl[0], bl[1], pol[0]))
 
     logger.debug('Scaling vectorized lines')
     sc = scale_polygonal_lines([x[1:] for x in lines], scale)
+
     lines = list(zip([x[0] for x in lines], [x[0] for x in sc], [x[1] for x in sc]))
-    logger.debug('Reordering baselines')
-    lines = reading_order_fn(lines=lines, regions=regions, text_direction=text_direction[-2:])
     return [{'tags': {'type': bl_type}, 'baseline': bl, 'boundary': pl} for bl_type, bl, pl in lines]
 
 
 def segment(im: PIL.Image.Image,
-            text_direction: str = 'horizontal-lr',
+            text_direction: Literal['horizontal-lr', 'horizontal-rl', 'vertical-lr', 'vertical-rl'] = 'horizontal-lr',
             mask: Optional[np.ndarray] = None,
             reading_order_fn: Callable = polygonal_reading_order,
             model: Union[List[vgsl.TorchVGSLModel], vgsl.TorchVGSLModel] = None,
             device: str = 'cpu',
             raise_on_error: bool = False,
-            autocast: bool = False) -> Dict[str, Any]:
+            autocast: bool = False) -> Segmentation:
     r"""
     Segments a page into text lines using the baseline segmenter.
 
@@ -280,31 +276,37 @@ def segment(im: PIL.Image.Image,
         autocast: Runs the model with automatic mixed precision
 
     Returns:
-        A dictionary containing the text direction and under the key 'lines' a
-        list of reading order sorted baselines (polylines) and their respective
-        polygonal boundaries. The last and first point of each boundary polygon
-        are connected.
+        A :class:`kraken.containers.Segmentation` class containing reading order
+        sorted baselines (polylines) and their respective polygonal boundaries
+        as :class:`kraken.containers.BaselineLine` records.
+        The format of the line and region records is shown below. The last and
+        first point of each boundary polygon are connected.
 
         .. code-block::
            :force:
 
-            {'text_direction': '$dir',
-             'type': 'baseline',
-             'lines': [
-                {'baseline': [[x0, y0], [x1, y1], ..., [x_n, y_n]], 'boundary': [[x0, y0, x1, y1], ... [x_m, y_m]]},
-                {'baseline': [[x0, ...]], 'boundary': [[x0, ...]]}
-              ]
-              'regions': [
-                {'region': [[x0, y0], [x1, y1], ..., [x_n, y_n]], 'type': 'image'},
-                {'region': [[x0, ...]], 'type': 'text'}
-              ]
-            }
+           'lines': [
+              {'baseline': [[x0, y0], [x1, y1], ..., [x_n, y_n]], 'boundary': [[x0, y0, x1, y1], ... [x_m, y_m]]},
+              {'baseline': [[x0, ...]], 'boundary': [[x0, ...]]}
+            ]
+            'regions': [
+              {'region': [[x0, y0], [x1, y1], ..., [x_n, y_n]], 'type': 'image'},
+              {'region': [[x0, ...]], 'type': 'text'}
+            ]
 
     Raises:
         KrakenInvalidModelException: if the given model is not a valid
                                      segmentation model.
         KrakenInputException: if the mask is not bitonal or does not match the
                               image size.
+
+    Notes:
+        Multi-model operation is most useful for combining one or more region
+        detection models and one text line model. Detected lines from all
+        models are simply combined without any merging or duplicate detection
+        so the chance of the same line appearing multiple times in the output
+        are high. In addition, neural reading order determination is disabled
+        when more than one model outputs lines.
     """
     if model is None:
         logger.info('No segmentation model given. Loading default model.')
@@ -322,6 +324,12 @@ def segment(im: PIL.Image.Image,
     im_str = get_im_str(im)
     logger.info(f'Segmenting {im_str}')
 
+    lines = []
+    order = None
+    regions = {}
+    multi_lines = False
+    # flag to indicate that multiple models produced line output -> disable
+    # neural reading order
     for net in model:
         if 'topline' in net.user_metadata:
             loc = {None: 'center',
@@ -329,32 +337,82 @@ def segment(im: PIL.Image.Image,
                    False: 'bottom'}[net.user_metadata['topline']]
             logger.debug(f'Baseline location: {loc}')
         rets = compute_segmentation_map(im, mask, net, device, autocast=autocast)
-        regions = vec_regions(**rets)
+        _regions = vec_regions(**rets)
+        for reg_key, reg_val in vec_regions(**rets).items():
+            if reg_key not in regions:
+                regions[reg_key] = []
+            regions[reg_key].extend(reg_val)
+
         # flatten regions for line ordering/fetch bounding regions
         line_regs = []
         suppl_obj = []
-        for cls, regs in regions.items():
+        for cls, regs in _regions.items():
             line_regs.extend(regs)
             if rets['bounding_regions'] is not None and cls in rets['bounding_regions']:
                 suppl_obj.extend(regs)
         # convert back to net scale
-        suppl_obj = scale_regions(suppl_obj, 1/rets['scale'])
-        line_regs = scale_regions(line_regs, 1/rets['scale'])
-        lines = vec_lines(**rets,
-                          regions=line_regs,
-                          reading_order_fn=reading_order_fn,
-                          text_direction=text_direction,
-                          suppl_obj=suppl_obj,
-                          topline=net.user_metadata['topline'] if 'topline' in net.user_metadata else False,
-                          raise_on_error=raise_on_error)
+        suppl_obj = scale_regions([x.boundary for x in suppl_obj], 1/rets['scale'])
+        line_regs = scale_regions([x.boundary for x in line_regs], 1/rets['scale'])
+
+        _lines = vec_lines(**rets,
+                           regions=line_regs,
+                           text_direction=text_direction,
+                           suppl_obj=suppl_obj,
+                           topline=net.user_metadata['topline'] if 'topline' in net.user_metadata else False,
+                           raise_on_error=raise_on_error)
+
+        if 'ro_model' in net.aux_layers:
+            logger.info(f'Using reading order model found in segmentation model {net}.')
+            _order = neural_reading_order(lines=_lines,
+                                          regions=_regions,
+                                          text_direction=text_direction[-2:],
+                                          model=net.aux_layers['ro_model'],
+                                          im_size=im.size,
+                                          class_mapping=net.user_metadata['ro_class_mapping'])
+        else:
+            _order = None
+
+        if _lines and lines or multi_lines:
+            multi_lines = True
+            order = None
+            logger.warning('Multiple models produced line output. This is '
+                           'likely unintended. Suppressing neural reading '
+                           'order.')
+        else:
+            order = _order
+
+        lines.extend(_lines)
 
     if len(rets['cls_map']['baselines']) > 1:
         script_detection = True
     else:
         script_detection = False
 
-    return {'text_direction': text_direction,
-            'type': 'baselines',
-            'lines': lines,
-            'regions': regions,
-            'script_detection': script_detection}
+    # create objects and assign IDs
+    blls = []
+    reg_idx = 0
+    _shp_regs = {}
+    for reg_type, rgs in regions.items():
+        for reg in rgs:
+            _shp_regs[reg.id] = geom.Polygon(reg.boundary)
+
+    # reorder lines
+    logger.debug(f'Reordering baselines with main RO function {reading_order_fn}.')
+    basic_lo = reading_order_fn(lines=lines, regions=_shp_regs.values(), text_direction=text_direction[-2:])
+    lines = [lines[idx] for idx in basic_lo]
+
+    for line in lines:
+        line_regs = []
+        for reg_id, reg in _shp_regs.items():
+            line_ls = geom.LineString(line['baseline'])
+            if is_in_region(line_ls, reg):
+                line_regs.append(reg_id)
+        blls.append(BaselineLine(id=str(uuid.uuid4()), baseline=line['baseline'], boundary=line['boundary'], tags=line['tags'], regions=line_regs))
+
+    return Segmentation(text_direction=text_direction,
+                        imagename=getattr(im, 'filename', None),
+                        type='baselines',
+                        lines=blls,
+                        regions=regions,
+                        script_detection=script_detection,
+                        line_orders=[order])

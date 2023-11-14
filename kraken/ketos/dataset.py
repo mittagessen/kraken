@@ -25,7 +25,7 @@ from .util import _validate_manifests
 
 @click.command('compile')
 @click.pass_context
-@click.option('-o', '--output', show_default=True, type=click.Path(), default='dataset.arrow', help='Output model file')
+@click.option('-o', '--output', show_default=True, type=click.Path(), default='dataset.arrow', help='Output dataset file')
 @click.option('--workers', show_default=True, default=1, help='Number of parallel workers for text line extraction.')
 @click.option('-f', '--format-type', type=click.Choice(['path', 'xml', 'alto', 'page']), default='xml', show_default=True,
               help='Sets the training data format. In ALTO and PageXML mode all '

@@ -1,5 +1,5 @@
 #
-# Copyright 2022 Benjamin Kiessling
+# Copyright 2023 Benjamin Kiessling
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,9 +13,7 @@
 # or implied. See the License for the specific language governing
 # permissions and limitations under the License.
 """
-Top-level module containing datasets for recognition and segmentation training.
+Tools for trainable reading order.
 """
-from .recognition import ArrowIPCRecognitionDataset, PolygonGTDataset, GroundTruthDataset # NOQA
-from .segmentation import BaselineSet # NOQA
-from .ro import PairWiseROSet, PageWiseROSet #NOQA
-from .utils import ImageInputTransforms, collate_sequences, global_align, compute_confusions # NOQA
+
+from .model import ROModel # NOQA

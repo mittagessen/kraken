@@ -33,7 +33,6 @@ from typing import Callable, Dict, Optional, Sequence, Union, Any, Literal
 from pytorch_lightning.callbacks import Callback, EarlyStopping, BaseFinetuning, LearningRateMonitor
 
 from kraken.lib import models, vgsl, default_specs, progress
-from kraken.lib.xml import preparse_xml_data
 from kraken.lib.util import make_printable
 from kraken.lib.codec import PytorchCodec
 from kraken.lib.dataset import (ArrowIPCRecognitionDataset, BaselineSet,
@@ -247,7 +246,8 @@ class RecognitionModel(pl.LightningModule):
 
         if hyper_params:
             hyper_params_.update(hyper_params)
-        self.save_hyperparameters(hyper_params_)
+        self.hyper_params = hyper_params_
+        self.save_hyperparameters()
 
         self.reorder = reorder
         self.append = append
@@ -272,10 +272,10 @@ class RecognitionModel(pl.LightningModule):
         valid_norm = True
         if format_type in ['xml', 'page', 'alto']:
             logger.info(f'Parsing {len(training_data)} XML files for training data')
-            training_data = preparse_xml_data(training_data, format_type, repolygonize)
+            training_data = [{'page': XMLPage(file, format_type).to_container()} for file in training_data]
             if evaluation_data:
                 logger.info(f'Parsing {len(evaluation_data)} XML files for validation data')
-                evaluation_data = preparse_xml_data(evaluation_data, format_type, repolygonize)
+                evaluation_data = [{'page': XMLPage(file, format_type).to_container()} for file in evaluation_data]
             if binary_dataset_split:
                 logger.warning('Internal binary dataset splits are enabled but using non-binary dataset files. Will be ignored.')
                 binary_dataset_split = False
@@ -306,9 +306,9 @@ class RecognitionModel(pl.LightningModule):
                 logger.info(f'Got {len(evaluation_data)} line strip images for validation data')
                 evaluation_data = [{'image': im} for im in evaluation_data]
             valid_norm = True
-        # format_type is None. Determine training type from length of training data entry
+        # format_type is None. Determine training type from container class types
         elif not format_type:
-            if len(training_data[0]) >= 4:
+            if training_data[0].type == 'baselines':
                 DatasetClass = PolygonGTDataset
                 valid_norm = False
             else:
@@ -320,6 +320,21 @@ class RecognitionModel(pl.LightningModule):
                 if binary_dataset_split:
                     logger.warning('Internal binary dataset splits are enabled but using non-binary dataset files. Will be ignored.')
                     binary_dataset_split = False
+            samples = []
+            for sample in training_data:
+                if isinstance(sample, Segmentation):
+                    samples.append({'page': sample})
+                else:
+                    samples.append({'line': sample})
+            training_data = samples
+            if evaluation_data:
+                samples = []
+                for sample in evaluation_data:
+                    if isinstance(sample, Segmentation):
+                        samples.append({'page': sample})
+                    else:
+                        samples.append({'line': sample})
+                evaluation_data = samples
         else:
             raise ValueError(f'format_type {format_type} not in [alto, page, xml, path, binary].')
 
@@ -417,28 +432,22 @@ class RecognitionModel(pl.LightningModule):
                        DatasetClass,
                        training_data,
                        **kwargs):
-        dataset = DatasetClass(normalization=self.hparams.normalization,
-                               whitespace_normalization=self.hparams.normalize_whitespace,
+        dataset = DatasetClass(normalization=self.hparams.hyper_params['normalization'],
+                               whitespace_normalization=self.hparams.hyper_params['normalize_whitespace'],
                                reorder=self.reorder,
                                im_transforms=self.transforms,
-                               augmentation=self.hparams.augment,
+                               augmentation=self.hparams.hyper_params['augment'],
                                **kwargs)
 
-        if (self.num_workers and self.num_workers > 1) and self.format_type != 'binary':
-            with Pool(processes=self.num_workers) as pool:
-                for im in pool.imap_unordered(partial(_star_fun, dataset.parse), training_data, 5):
-                    logger.debug(f'Adding sample {im} to training set')
-                    if im:
-                        dataset.add(**im)
-        else:
-            for im in training_data:
-                try:
-                    dataset.add(**im)
-                except KrakenInputException as e:
-                    logger.warning(str(e))
-            if self.format_type == 'binary' and self.hparams.normalization:
-                logger.debug('Rebuilding dataset using unicode normalization')
-                dataset.rebuild_alphabet()
+        for sample in training_data:
+            try:
+                dataset.add(**sample)
+            except KrakenInputException as e:
+                logger.warning(str(e))
+        if self.format_type == 'binary' and self.hparams.hyper_params['normalization']:
+            logger.debug('Rebuilding dataset using unicode normalization')
+            dataset.rebuild_alphabet()
+
         return dataset
 
     def forward(self, x, seq_lens=None):
@@ -593,7 +602,7 @@ class RecognitionModel(pl.LightningModule):
             if self.format_type != 'path' and self.nn.seg_type == 'bbox':
                 logger.warning('Neural network has been trained on bounding box image information but training set is polygonal.')
 
-            self.nn.hyper_params = self.hparams
+            self.nn.hyper_params = self.hparams.hyper_params
             self.nn.model_type = 'recognition'
 
             if not self.nn.seg_type:
@@ -607,7 +616,7 @@ class RecognitionModel(pl.LightningModule):
 
     def train_dataloader(self):
         return DataLoader(self.train_set,
-                          batch_size=self.hparams.batch_size,
+                          batch_size=self.hparams.hyper_params['batch_size'],
                           num_workers=self.num_workers,
                           pin_memory=True,
                           shuffle=True,
@@ -616,7 +625,7 @@ class RecognitionModel(pl.LightningModule):
     def val_dataloader(self):
         return DataLoader(self.val_set,
                           shuffle=False,
-                          batch_size=self.hparams.batch_size,
+                          batch_size=self.hparams.hyper_params['batch_size'],
                           num_workers=self.num_workers,
                           pin_memory=True,
                           collate_fn=collate_sequences,
@@ -624,11 +633,12 @@ class RecognitionModel(pl.LightningModule):
 
     def configure_callbacks(self):
         callbacks = []
-        if self.hparams.quit == 'early':
+        if self.hparams.hyper_params['quit'] == 'early':
             callbacks.append(EarlyStopping(monitor='val_accuracy',
                                            mode='max',
-                                           patience=self.hparams.lag,
+                                           patience=self.hparams.hyper_params['lag'],
                                            stopping_threshold=1.0))
+
         return callbacks
 
     # configuration of optimizers and learning rate schedulers
@@ -638,7 +648,7 @@ class RecognitionModel(pl.LightningModule):
     # batch-wise learning rate warmup. In lr_scheduler_step() calls to the
     # scheduler are then only performed at the end of the epoch.
     def configure_optimizers(self):
-        return _configure_optimizer_and_lr_scheduler(self.hparams,
+        return _configure_optimizer_and_lr_scheduler(self.hparams.hyper_params,
                                                      self.nn.nn.parameters(),
                                                      len_train_set=len(self.train_set),
                                                      loss_tracking_mode='max')
@@ -650,13 +660,13 @@ class RecognitionModel(pl.LightningModule):
 
         # linear warmup between 0 and the initial learning rate `lrate` in `warmup`
         # steps.
-        if self.hparams.warmup and self.trainer.global_step < self.hparams.warmup:
-            lr_scale = min(1.0, float(self.trainer.global_step + 1) / self.hparams.warmup)
+        if self.hparams.hyper_params['warmup'] and self.trainer.global_step < self.hparams.hyper_params['warmup']:
+            lr_scale = min(1.0, float(self.trainer.global_step + 1) / self.hparams.hyper_params['warmup'])
             for pg in optimizer.param_groups:
-                pg["lr"] = lr_scale * self.hparams.lrate
+                pg["lr"] = lr_scale * self.hparams.hyper_params['lrate']
 
-    def lr_scheduler_step(self, scheduler, metric):
-        if not self.hparams.warmup or self.trainer.global_step >= self.hparams.warmup:
+    def lr_scheduler_step(self, scheduler, optimizer_idx, metric):
+        if not self.hparams.hyper_params['warmup'] or self.trainer.global_step >= self.hparams.hyper_params['warmup']:
             # step OneCycleLR each batch if not in warmup phase
             if isinstance(scheduler, lr_scheduler.OneCycleLR):
                 scheduler.step()
@@ -762,7 +772,8 @@ class SegmentationModel(pl.LightningModule):
             hyper_params_.update(hyper_params)
 
         validate_hyper_parameters(hyper_params_)
-        self.save_hyperparameters(hyper_params_)
+        self.hyper_params = hyper_params_
+        self.save_hyperparameters()
 
         if not training_data:
             raise ValueError('No training data provided. Please add some.')
@@ -771,7 +782,7 @@ class SegmentationModel(pl.LightningModule):
                                           height,
                                           width,
                                           channels,
-                                          self.hparams.padding,
+                                          self.hparams.hyper_params.padding,
                                           valid_norm=False,
                                           force_binarization=force_binarization)
 
@@ -798,10 +809,10 @@ class SegmentationModel(pl.LightningModule):
             merge_baselines = None
 
         train_set = BaselineSet(training_data,
-                                line_width=self.hparams.line_width,
+                                line_width=self.hparams.hyper_params.line_width,
                                 im_transforms=transforms,
                                 mode=format_type,
-                                augmentation=self.hparams.augment,
+                                augmentation=self.hparams.hyper_params.augment,
                                 valid_baselines=valid_baselines,
                                 merge_baselines=merge_baselines,
                                 valid_regions=valid_regions,
@@ -813,7 +824,7 @@ class SegmentationModel(pl.LightningModule):
 
         if evaluation_data:
             val_set = BaselineSet(evaluation_data,
-                                  line_width=self.hparams.line_width,
+                                  line_width=self.hparams.hyper_params.line_width,
                                   im_transforms=transforms,
                                   mode=format_type,
                                   augmentation=False,
@@ -889,7 +900,7 @@ class SegmentationModel(pl.LightningModule):
         self.log('val_mean_acc', mean_accuracy, on_step=False, on_epoch=True, prog_bar=True, logger=True)
         self.log('val_mean_iu', mean_iu, on_step=False, on_epoch=True, prog_bar=True, logger=True)
         self.log('val_freq_iu', freq_iu, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-        self.log('val_metric', mean_iu, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+        self.log('val_metric', mean_iu, on_step=False, on_epoch=True, prog_bar=False, logger=True)
 
         self.val_px_accuracy.reset()
         self.val_mean_accuracy.reset()
@@ -1038,10 +1049,10 @@ class SegmentationModel(pl.LightningModule):
 
     def configure_callbacks(self):
         callbacks = []
-        if self.hparams.quit == 'early':
+        if self.hparams.hyper_params['quit'] == 'early':
             callbacks.append(EarlyStopping(monitor='val_mean_iu',
                                            mode='max',
-                                           patience=self.hparams.lag,
+                                           patience=self.hparams.hyper_params['lag'],
                                            stopping_threshold=1.0))
 
         return callbacks
@@ -1053,7 +1064,7 @@ class SegmentationModel(pl.LightningModule):
     # batch-wise learning rate warmup. In lr_scheduler_step() calls to the
     # scheduler are then only performed at the end of the epoch.
     def configure_optimizers(self):
-        return _configure_optimizer_and_lr_scheduler(self.hparams,
+        return _configure_optimizer_and_lr_scheduler(self.hparams.hyper_params,
                                                      self.nn.nn.parameters(),
                                                      len_train_set=len(self.train_set),
                                                      loss_tracking_mode='max')
@@ -1064,13 +1075,13 @@ class SegmentationModel(pl.LightningModule):
 
         # linear warmup between 0 and the initial learning rate `lrate` in `warmup`
         # steps.
-        if self.hparams.warmup and self.trainer.global_step < self.hparams.warmup:
-            lr_scale = min(1.0, float(self.trainer.global_step + 1) / self.hparams.warmup)
+        if self.hparams.hyper_params['warmup'] and self.trainer.global_step < self.hparams.hyper_params['warmup']:
+            lr_scale = min(1.0, float(self.trainer.global_step + 1) / self.hparams.hyper_params['warmup'])
             for pg in optimizer.param_groups:
-                pg["lr"] = lr_scale * self.hparams.lrate
+                pg["lr"] = lr_scale * self.hparams.hyper_params['lrate']
 
-    def lr_scheduler_step(self, scheduler, metric):
-        if not self.hparams.warmup or self.trainer.global_step >= self.hparams.warmup:
+    def lr_scheduler_step(self, scheduler, optimizer_idx, metric):
+        if not self.hparams.hyper_params['warmup'] or self.trainer.global_step >= self.hparams.hyper_params['warmup']:
             # step OneCycleLR each batch if not in warmup phase
             if isinstance(scheduler, lr_scheduler.OneCycleLR):
                 scheduler.step()
@@ -1080,51 +1091,63 @@ class SegmentationModel(pl.LightningModule):
 
 
 def _configure_optimizer_and_lr_scheduler(hparams, params, len_train_set=None, loss_tracking_mode='max'):
+    optimizer = hparams.get("optimizer")
+    lrate = hparams.get("lrate")
+    momentum = hparams.get("momentum")
+    weight_decay = hparams.get("weight_decay")
+    schedule = hparams.get("schedule")
+    gamma = hparams.get("gamma")
+    step_size = hparams.get("step_size")
+    rop_factor = hparams.get("rop_factor")
+    rop_patience = hparams.get("rop_patience")
+    epochs = hparams.get("epochs")
+    completed_epochs = hparams.get("completed_epochs")
+
     # XXX: Warmup is not configured here because it needs to be manually done in optimizer_step()
-    logger.debug(f'Constructing {hparams.optimizer} optimizer (lr: {hparams.lrate}, momentum: {hparams.momentum})')
-    if hparams.optimizer == 'Adam':
-        optim = torch.optim.Adam(params, lr=hparams.lrate, weight_decay=hparams.weight_decay)
+    logger.debug(f'Constructing {optimizer} optimizer (lr: {lrate}, momentum: {momentum})')
+    if optimizer == 'Adam':
+        optim = torch.optim.Adam(params, lr=lrate, weight_decay=weight_decay)
     else:
-        optim = getattr(torch.optim, hparams.optimizer)(params,
-                                                        lr=hparams.lrate,
-                                                        momentum=hparams.momentum,
-                                                        weight_decay=hparams.weight_decay)
+        optim = getattr(torch.optim, optimizer)(params,
+                                                lr=lrate,
+                                                momentum=momentum,
+                                                weight_decay=weight_decay)
     lr_sched = {}
-    if hparams.schedule == 'exponential':
-        lr_sched = {'scheduler': lr_scheduler.ExponentialLR(optim, hparams.gamma, last_epoch=hparams.completed_epochs-1),
+    if schedule == 'exponential':
+        lr_sched = {'scheduler': lr_scheduler.ExponentialLR(optim, gamma, last_epoch=completed_epochs-1),
                     'interval': 'step'}
-    elif hparams.schedule == 'cosine':
-        lr_sched = {'scheduler': lr_scheduler.CosineAnnealingLR(optim, hparams.gamma, last_epoch=hparams.completed_epochs-1),
+    elif schedule == 'cosine':
+        lr_sched = {'scheduler': lr_scheduler.CosineAnnealingLR(optim, gamma, last_epoch=completed_epochs-1),
                     'interval': 'step'}
-    elif hparams.schedule == 'step':
-        lr_sched = {'scheduler': lr_scheduler.StepLR(optim, hparams.step_size, hparams.gamma, last_epoch=hparams.completed_epochs-1),
+    elif schedule == 'step':
+        lr_sched = {'scheduler': lr_scheduler.StepLR(optim, step_size, gamma, last_epoch=completed_epochs-1),
                     'interval': 'step'}
-    elif hparams.schedule == 'reduceonplateau':
+    elif schedule == 'reduceonplateau':
         lr_sched = {'scheduler': lr_scheduler.ReduceLROnPlateau(optim,
                                                                 mode=loss_tracking_mode,
-                                                                factor=hparams.rop_factor,
-                                                                patience=hparams.rop_patience),
+                                                                factor=rop_factor,
+                                                                patience=rop_patience),
                     'interval': 'step'}
-    elif hparams.schedule == '1cycle':
-        if hparams.epochs <= 0:
+    elif schedule == '1cycle':
+        if epochs <= 0:
             raise ValueError('1cycle learning rate scheduler selected but '
                              'number of epochs is less than 0 '
-                             f'({hparams.epochs}).')
-        last_epoch = hparams.completed_epochs*len_train_set if hparams.completed_epochs else -1
+                             f'({epochs}).')
+        last_epoch = completed_epochs*len_train_set if completed_epochs else -1
         lr_sched = {'scheduler': lr_scheduler.OneCycleLR(optim,
-                                                         max_lr=hparams.lrate,
-                                                         epochs=hparams.epochs,
+                                                         max_lr=lrate,
+                                                         epochs=epochs,
                                                          steps_per_epoch=len_train_set,
                                                          last_epoch=last_epoch),
                     'interval': 'step'}
-    elif hparams.schedule != 'constant':
-        raise ValueError(f'Unsupported learning rate scheduler {hparams.schedule}.')
+    elif schedule != 'constant':
+        raise ValueError(f'Unsupported learning rate scheduler {schedule}.')
 
     ret = {'optimizer': optim}
     if lr_sched:
         ret['lr_scheduler'] = lr_sched
 
-    if hparams.schedule == 'reduceonplateau':
+    if schedule == 'reduceonplateau':
         lr_sched['monitor'] = 'val_metric'
         lr_sched['strict'] = False
         lr_sched['reduce_on_plateau'] = True

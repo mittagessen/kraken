@@ -23,7 +23,7 @@ from os import PathLike
 from pkg_resources import get_distribution
 from collections import Counter
 
-from kraken.rpred import BaselineOCRRecord, BBoxOCRRecord, ocr_record
+from kraken.containers import Segmentation, ProcessingStep
 from kraken.lib.util import make_printable
 from kraken.lib.segmentation import is_in_region
 
@@ -70,95 +70,92 @@ def max_bbox(boxes: Iterable[Sequence[int]]) -> Tuple[int, int, int, int]:
     return o
 
 
-def serialize(records: Sequence[ocr_record],
-              image_name: Union[PathLike, str] = None,
+def serialize(results: Segmentation,
               image_size: Tuple[int, int] = (0, 0),
               writing_mode: Literal['horizontal-tb', 'vertical-lr', 'vertical-rl'] = 'horizontal-tb',
               scripts: Optional[Iterable[str]] = None,
-              regions: Optional[Dict[str, List[List[Tuple[int, int]]]]] = None,
               template: [PathLike, str] = 'alto',
               template_source: Literal['native', 'custom'] = 'native',
-              processing_steps: Optional[List[Dict[str, Union[Dict, str, float, int, bool]]]] = None) -> str:
+              processing_steps: Optional[List[ProcessingStep]] = None) -> str:
     """
-    Serializes a list of ocr_records into an output document.
+    Serializes recognition and segmentation results into an output document.
 
-    Serializes a list of predictions and their corresponding positions by doing
-    some hOCR-specific preprocessing and then renders them through one of
-    several jinja2 templates.
+    Serializes a Segmentation container object containing either segmentation
+    or recognition results into an output document. The rendering is performed
+    with jinja2 templates that can either be shipped with kraken
+    (`template_source` == 'native') or custom (`template_source` == 'custom').
 
     Note: Empty records are ignored for serialization purposes.
 
     Args:
-        records: List of kraken.rpred.ocr_record
-        image_name: Name of the source image
+        segmentation: Segmentation container object
         image_size: Dimensions of the source image
         writing_mode: Sets the principal layout of lines and the
                       direction in which blocks progress. Valid values are
                       horizontal-tb, vertical-rl, and vertical-lr.
         scripts: List of scripts contained in the OCR records
-        regions: Dictionary mapping region types to a list of region polygons.
         template: Selector for the serialization format. May be 'hocr',
                   'alto', 'page' or any template found in the template
                   directory. If template_source is set to `custom` a path to a
                   template is expected.
         template_source: Switch to enable loading of custom templates from
                          outside the kraken package.
-        processing_steps: A list of dictionaries describing the processing kraken performed on the inputs::
-
-                          {'category': 'preprocessing',
-                           'description': 'natural language description of process',
-                           'settings': {'arg0': 'foo', 'argX': 'bar'}
-                          }
+        processing_steps: A list of ProcessingStep container classes describing
+                          the processing kraken performed on the inputs.
 
     Returns:
         The rendered template
     """
-    logger.info(f'Serialize {len(records)} records from {image_name} with template {template}.')
+    logger.info(f'Serialize {len(results.lines)} records from {results.imagename} with template {template}.')
     page = {'entities': [],
             'size': image_size,
-            'name': image_name,
+            'name': results.imagename,
             'writing_mode': writing_mode,
             'scripts': scripts,
             'date': datetime.datetime.now(datetime.timezone.utc).isoformat(),
-            'base_dir': [rec.base_dir for rec in records][0] if len(records) else None}  # type: dict
+            'base_dir': [rec.base_dir for rec in results.lines][0] if len(results.lines) else None,
+            'seg_type': results.type}  # type: dict
     metadata = {'processing_steps': processing_steps,
                 'version': get_distribution('kraken').version}
 
     seg_idx = 0
     char_idx = 0
-    region_map = {}
-    idx = 0
-    if regions is not None:
-        for id, regs in regions.items():
-            for reg in regs:
-                region_map[idx] = (id, geom.Polygon(reg), reg)
-                idx += 1
 
     # build region and line type dict
     types = []
-    for line in records:
-        if hasattr(line, 'tags') and line.tags is not None:
-            types.extend(line.tags.values())
-    page['types'] = list(set(types))
-    if regions is not None:
-        page['types'].extend(list(regions.keys()))
+    for line in results.lines:
+        if line.tags is not None:
+            types.extend((k, v) for k, v in line.tags.items())
+    page['line_types'] = list(set(types))
+    page['region_types'] =[list(results.regions.keys())]
 
-    is_in_reg = -1
-    for idx, record in enumerate(records):
-        if record.type == 'baselines':
-            l_obj = geom.LineString(record.baseline)
-        else:
-            l_obj = geom.LineString(record.line)
-        reg = list(filter(lambda x: is_in_region(l_obj, x[1][1]), region_map.items()))
-        if len(reg) == 0:
-            cur_ent = page['entities']
-        elif reg[0][0] != is_in_reg:
-            reg = reg[0]
-            is_in_reg = reg[0]
-            region = {'index': reg[0],
-                      'bbox': [int(x) for x in reg[1][1].bounds],
-                      'boundary': [list(x) for x in reg[1][2]],
-                      'region_type': reg[1][0],
+    # map reading orders indices to line IDs
+    ros = []
+    for ro in results.line_orders:
+        ros.append([results.lines[idx].id for idx in ro])
+    page['line_orders'] = ros
+
+    # build region ID to region dict
+    reg_dict = {}
+    for key, regs in results.regions.items():
+        for reg in regs:
+            reg_dict[reg.id] = reg
+
+    regs_with_lines = set()
+    prev_reg = None
+    for idx, record in enumerate(results.lines):
+        # line not in region
+        if len(record.regions) == 0:
+            cur_ent = page['entitites']
+        # line not in same region as previous line
+        elif prev_reg != record.regions[0]:
+            prev_reg = record.regions[0]
+            reg = reg_dict[record.regions[0]]
+            regs_with_lines.add(reg.id)
+            region = {'id': reg.id,
+                      'bbox': max_bbox([reg.boundary]),
+                      'boundary': [list(x) for x in reg.boundary],
+                      'tags': reg.tags,
                       'lines': [],
                       'type': 'region'
                       }
@@ -167,20 +164,19 @@ def serialize(records: Sequence[ocr_record],
 
         # set field to indicate the availability of baseline segmentation in
         # addition to bounding boxes
-        if record.type == 'baselines':
-            page['seg_type'] = 'baselines'
         line = {'index': idx,
-                'bbox': max_bbox([record.line]),
+                'bbox': max_bbox([record.boundary] if record.type == 'baselines' else record.bbox),
                 'cuts': record.cuts,
                 'confidences': record.confidences,
                 'recognition': [],
-                'boundary': [list(x) for x in record.line],
+                'boundary': [list(x) for x in record.boundary],
                 'type': 'line'
                 }
-        if hasattr(record, 'tags') and record.tags is not None:
+        if record.tags is not None:
             line['tags'] = record.tags
         if record.type == 'baselines':
             line['baseline'] = [list(x) for x in record.baseline]
+
         splits = regex.split(r'(\s+)', record.prediction)
         line_offset = 0
         logger.debug(f'Record contains {len(splits)} segments')
@@ -213,18 +209,19 @@ def serialize(records: Sequence[ocr_record],
             line_offset += len(segment)
         cur_ent.append(line)
 
-    # No records but there are regions -> serialize all regions
-    if not records and regions:
-        logger.debug(f'No lines given but {len(region_map)}. Serialize all regions.')
-        for reg in region_map.items():
-            region = {'index': reg[0],
-                      'bbox': [int(x) for x in reg[1][1].bounds],
-                      'boundary': [list(x) for x in reg[1][2]],
-                      'region_type': reg[1][0],
-                      'lines': [],
-                      'type': 'region'
-                      }
-            page['entities'].append(region)
+    # serialize all remaining (line-less) regions
+    for reg_id in regs_with_lines:
+        reg_dict.pop(reg_id)
+    logger.debug(f'No lines given but {len(results.regions)}. Serialize all regions.')
+    for reg in reg_dict.values():
+        region = {'id': reg.id,
+                  'bbox': max_bbox([reg.boundary]),
+                  'boundary': [list(x) for x in reg.boundary],
+                  'tags': reg.tags,
+                  'lines': [],
+                  'type': 'region'
+                  }
+        page['entities'].append(region)
 
     if template_source == 'native':
         logger.debug('Initializing native jinja environment.')
@@ -244,43 +241,6 @@ def serialize(records: Sequence[ocr_record],
     tmpl = env.get_template(template)
     logger.debug('Rendering data.')
     return tmpl.render(page=page, metadata=metadata)
-
-
-def serialize_segmentation(segresult: Dict[str, Any],
-                           image_name: Union[PathLike, str] = None,
-                           image_size: Tuple[int, int] = (0, 0),
-                           template: Union[PathLike, str] = 'alto',
-                           template_source: Literal['native', 'custom'] = 'native',
-                           processing_steps: Optional[List[Dict[str, Union[Dict, str, float, int, bool]]]] = None) -> str:
-    """
-    Serializes a segmentation result into an output document.
-
-    Args:
-        segresult: Result of blla.segment
-        image_name: Name of the source image
-        image_size: Dimensions of the source image
-        template: Selector for the serialization format. Any value accepted by
-                  `serialize` is valid.
-        template_source: Enables/disables loading of external templates.
-
-    Returns:
-            (str) rendered template.
-    """
-    if 'type' in segresult and segresult['type'] == 'baselines':
-        records = [BaselineOCRRecord('', (), (), bl) for bl in segresult['lines']]
-    else:
-        records = []
-        for line in segresult['boxes']:
-            xmin, xmax = min(line[::2]), max(line[::2])
-            ymin, ymax = min(line[1::2]), max(line[1::2])
-            records.append(BBoxOCRRecord('', (), (), ((xmin, ymin), (xmin, ymax), (xmax, ymax), (xmax, ymin))))
-    return serialize(records,
-                     image_name=image_name,
-                     image_size=image_size,
-                     regions=segresult['regions'] if 'regions' in segresult else None,
-                     template=template,
-                     template_source=template_source,
-                     processing_steps=processing_steps)
 
 
 def render_report(model: str,

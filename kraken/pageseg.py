@@ -19,6 +19,8 @@ kraken.pageseg
 
 Layout analysis methods.
 """
+import PIL
+import uuid
 import logging
 import numpy as np
 
@@ -26,11 +28,12 @@ from typing import Tuple, List, Callable, Optional, Dict, Any, Union
 from scipy.ndimage.filters import (gaussian_filter, uniform_filter,
                                    maximum_filter)
 
+from kraken.containers import Segmentation, BBoxLine
+
 from kraken.lib import morph, sl
 from kraken.lib.util import pil2array, is_bitonal, get_im_str
 from kraken.lib.exceptions import KrakenInputException
 from kraken.lib.segmentation import reading_order, topsort
-
 
 __all__ = ['segment']
 
@@ -301,7 +304,7 @@ def rotate_lines(lines: np.ndarray, angle: float, offset: int) -> np.ndarray:
     return np.column_stack((x.flatten(), y.flatten())).reshape(-1, 4)
 
 
-def segment(im,
+def segment(im: PIL.Image.Image,
             text_direction: str = 'horizontal-lr',
             scale: Optional[float] = None,
             maxcolseps: float = 2,
@@ -309,7 +312,7 @@ def segment(im,
             no_hlines: bool = True,
             pad: Union[int, Tuple[int, int]] = 0,
             mask: Optional[np.ndarray] = None,
-            reading_order_fn: Callable = reading_order) -> Dict[str, Any]:
+            reading_order_fn: Callable = reading_order) -> Segmentation:
     """
     Segments a page into text lines.
 
@@ -336,12 +339,9 @@ def segment(im,
                           direction in (`rl`, `lr`).
 
     Returns:
-        A dictionary containing the text direction and a list of reading order
-        sorted bounding boxes under the key 'boxes':
-
-        .. code-block::
-
-            {'text_direction': '$dir', 'boxes': [(x1, y1, x2, y2),...]}
+        A :class:`kraken.containers.Segmentation` class containing reading
+        order sorted bounding box-type lines as
+        :class:`kraken.containers.BBoxLine` records.
 
     Raises:
         KrakenInputException: if the input image is not binarized or the text
@@ -423,7 +423,12 @@ def segment(im,
     if isinstance(pad, int):
         pad = (pad, pad)
     lines = [(max(x[0]-pad[0], 0), x[1], min(x[2]+pad[1], im.size[0]), x[3]) for x in lines]
+    lines = [BBoxLine(id=str(uuid.uuid4()), bbox=line) for line in rotate_lines(lines, 360-angle, offset).tolist()]
 
-    return {'text_direction': text_direction,
-            'boxes': rotate_lines(lines, 360-angle, offset).tolist(),
-            'script_detection': False}
+    return Segmentation(text_direction=text_direction,
+                        imagename=getattr(im, 'filename', None),
+                        type='bbox',
+                        regions=None,
+                        line_orders=None,
+                        lines=lines,
+                        script_detection=False)

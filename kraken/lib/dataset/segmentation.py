@@ -33,7 +33,8 @@ from typing import Dict, List, Tuple, Sequence, Callable, Any, Union, Literal, O
 
 from skimage.draw import polygon
 
-from kraken.lib.xml import parse_alto, parse_page, parse_xml
+from kraken.containers import Segmentation
+from kraken.lib.xml import XMLPage
 
 from kraken.lib.exceptions import KrakenInputException
 
@@ -48,24 +49,20 @@ class BaselineSet(Dataset):
     """
     Dataset for training a baseline/region segmentation model.
     """
-    def __init__(self, imgs: Sequence[Union[PathLike, str]] = None,
-                 suffix: str = '.path',
+    def __init__(self,
                  line_width: int = 4,
                  padding: Tuple[int, int, int, int] = (0, 0, 0, 0),
                  im_transforms: Callable[[Any], torch.Tensor] = transforms.Compose([]),
-                 mode: Optional[Literal['path', 'alto', 'page', 'xml']] = 'path',
+                 mode: Optional[Literal['alto', 'page', 'xml']] = 'xml',
                  augmentation: bool = False,
                  valid_baselines: Sequence[str] = None,
                  merge_baselines: Dict[str, Sequence[str]] = None,
                  valid_regions: Sequence[str] = None,
                  merge_regions: Dict[str, Sequence[str]] = None):
         """
-        Reads a list of image-json pairs and creates a data set.
+        Creates a dataset for a text-line and region segmentation model.
 
         Args:
-            imgs:
-            suffix: Suffix to attach to image base name to load JSON files
-                    from.
             line_width: Height of the baseline in the scaled input.
             padding: Tuple of ints containing the left/right, top/bottom
                      padding of the input images.
@@ -90,7 +87,6 @@ class BaselineSet(Dataset):
         self.mode = mode
         self.im_mode = '1'
         self.pad = padding
-        self.aug = None
         self.targets = []
         # n-th entry contains semantic of n-th class
         self.class_mapping = {'aux': {'_start_separator': 0, '_end_separator': 1}, 'baselines': {}, 'regions': {}}
@@ -102,60 +98,8 @@ class BaselineSet(Dataset):
         self.mreg_dict = merge_regions if merge_regions is not None else {}
         self.valid_baselines = valid_baselines
         self.valid_regions = valid_regions
-        if mode in ['alto', 'page', 'xml']:
-            if mode == 'alto':
-                fn = parse_alto
-            elif mode == 'page':
-                fn = parse_page
-            elif mode == 'xml':
-                fn = parse_xml
-            im_paths = []
-            self.targets = []
-            for img in imgs:
-                try:
-                    data = fn(img)
-                    im_paths.append(data['image'])
-                    lines = defaultdict(list)
-                    for line in data['lines']:
-                        if valid_baselines is None or set(line['tags'].values()).intersection(valid_baselines):
-                            tags = set(line['tags'].values()).intersection(valid_baselines) if valid_baselines else line['tags'].values()
-                            for tag in tags:
-                                lines[self.mbl_dict.get(tag, tag)].append(line['baseline'])
-                                self.class_stats['baselines'][self.mbl_dict.get(tag, tag)] += 1
-                    regions = defaultdict(list)
-                    for k, v in data['regions'].items():
-                        if valid_regions is None or k in valid_regions:
-                            regions[self.mreg_dict.get(k, k)].extend(v)
-                            self.class_stats['regions'][self.mreg_dict.get(k, k)] += len(v)
-                    data['regions'] = regions
-                    self.targets.append({'baselines': lines, 'regions': data['regions']})
-                except KrakenInputException as e:
-                    logger.warning(e)
-                    continue
-            # get line types
-            imgs = im_paths
-            # calculate class mapping
-            line_types = set()
-            region_types = set()
-            for page in self.targets:
-                for line_type in page['baselines'].keys():
-                    line_types.add(line_type)
-                for reg_type in page['regions'].keys():
-                    region_types.add(reg_type)
-            idx = -1
-            for idx, line_type in enumerate(line_types):
-                self.class_mapping['baselines'][line_type] = idx + self.num_classes
-            self.num_classes += idx + 1
-            idx = -1
-            for idx, reg_type in enumerate(region_types):
-                self.class_mapping['regions'][reg_type] = idx + self.num_classes
-            self.num_classes += idx + 1
-        elif mode == 'path':
-            pass
-        elif mode is None:
-            imgs = []
-        else:
-            raise Exception('invalid dataset mode')
+
+        self.aug = None
         if augmentation:
             import cv2
             cv2.setNumThreads(0)
@@ -179,37 +123,26 @@ class BaselineSet(Dataset):
                                 ], p=0.2),
                                 HueSaturationValue(hue_shift_limit=20, sat_shift_limit=0.1, val_shift_limit=0.1, p=0.3),
                                ], p=0.5)
-        self.imgs = imgs
         self.line_width = line_width
         self.transforms = im_transforms
         self.seg_type = None
 
-    def add(self,
-            image: Union[PathLike, str, Image.Image],
-            baselines: List[List[List[Tuple[int, int]]]] = None,
-            regions: Dict[str, List[List[Tuple[int, int]]]] = None,
-            *args,
-            **kwargs):
+    def add(self, doc: Union[Segmentation, XMLPage]):
         """
         Adds a page to the dataset.
 
         Args:
-            im: Path to the whole page image
-            baseline: A list containing dicts with a list of coordinates
-                      and tags [{'baseline': [[x0, y0], ...,
-                      [xn, yn]], 'tags': ('script_type',)}, ...]
-            regions: A dict containing list of lists of coordinates
-                     {'region_type_0': [[x0, y0], ..., [xn, yn]]],
-                     'region_type_1': ...}.
+            doc: Either a Segmentation container class or an XMLPage.
         """
-        if self.mode:
-            raise Exception(f'The `add` method is incompatible with dataset mode {self.mode}')
+        if doc.type != 'baselines':
+            raise ValueError(f'{doc} is of type {doc.type}. Expected "baselines".')
+
         baselines_ = defaultdict(list)
-        for line in baselines:
-            if self.valid_baselines is None or set(line['tags'].values()).intersection(self.valid_baselines):
-                tags = set(line['tags'].values()).intersection(self.valid_baselines) if self.valid_baselines else line['tags'].values()
+        for line in doc.lines:
+            if self.valid_baselines is None or set(line.tags.values()).intersection(self.valid_baselines):
+                tags = set(line.tags.values()).intersection(self.valid_baselines) if self.valid_baselines else line.tags.values()
                 for tag in tags:
-                    baselines_[tag].append(line['baseline'])
+                    baselines_[tag].append(line.baseline)
                     self.class_stats['baselines'][tag] += 1
 
                     if tag not in self.class_mapping['baselines']:
@@ -217,7 +150,7 @@ class BaselineSet(Dataset):
                         self.class_mapping['baselines'][tag] = self.num_classes - 1
 
         regions_ = defaultdict(list)
-        for k, v in regions.items():
+        for k, v in doc.regions.items():
             reg_type = self.mreg_dict.get(k, k)
             if self.valid_regions is None or reg_type in self.valid_regions:
                 regions_[reg_type].extend(v)
@@ -231,11 +164,7 @@ class BaselineSet(Dataset):
 
     def __getitem__(self, idx):
         im = self.imgs[idx]
-        if self.mode != 'path':
-            target = self.targets[idx]
-        else:
-            with open('{}.path'.format(path.splitext(im)[0]), 'r') as fp:
-                target = json.load(fp)
+        target = self.targets[idx]
         if not isinstance(im, Image.Image):
             try:
                 logger.debug(f'Attempting to load {im}')

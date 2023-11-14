@@ -18,8 +18,6 @@ Utility functions for ground truth transcription.
 from kraken.lib.exceptions import KrakenInputException
 from kraken.lib.util import get_im_str
 
-from typing import List
-
 from jinja2 import Environment, PackageLoader
 from io import BytesIO
 

@@ -24,6 +24,7 @@ dependencies:
   - pyarrow
   - conda-forge::pytorch-lightning~=2.0.0
   - conda-forge::torchmetrics>=1.1.0
+  - conda-forge::threadpoolctl~=3.2
   - pip
   - albumentations
   - rich

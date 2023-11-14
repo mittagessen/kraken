@@ -56,8 +56,8 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
               show_default=True,
               default=RECOGNITION_PRETRAIN_HYPER_PARAMS['quit'],
               type=click.Choice(['early',
-                                 'dumb']),
-              help='Stop condition for training. Set to `early` for early stooping or `dumb` for fixed number of epochs')
+                                 'fixed']),
+              help='Stop condition for training. Set to `early` for early stooping or `fixed` for fixed number of epochs')
 @click.option('-N',
               '--epochs',
               show_default=True,
@@ -133,7 +133,8 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
 @click.option('-e', '--evaluation-files', show_default=True, default=None, multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
-@click.option('--workers', show_default=True, default=1, help='Number of OpenMP threads and workers when running on CPU.')
+@click.option('--workers', show_default=True, default=1, type=click.IntRange(1), help='Number of worker processes.')
+@click.option('--threads', show_default=True, default=1, type=click.IntRange(1), help='Maximum size of OpenMP/BLAS thread pool.')
 @click.option('--load-hyper-parameters/--no-load-hyper-parameters', show_default=True, default=False,
               help='When loading an existing model, retrieve hyperparameters from the model')
 @click.option('--repolygonize/--no-repolygonize', show_default=True,
@@ -182,8 +183,8 @@ def pretrain(ctx, batch_size, pad, output, spec, load, freq, quit, epochs,
              min_epochs, lag, min_delta, device, precision, optimizer, lrate, momentum,
              weight_decay, warmup, schedule, gamma, step_size, sched_patience,
              cos_max, partition, fixed_splits, training_files,
-             evaluation_files, workers, load_hyper_parameters, repolygonize,
-             force_binarization, format_type, augment, 
+             evaluation_files, workers, threads, load_hyper_parameters, repolygonize,
+             force_binarization, format_type, augment,
              mask_probability, mask_width, num_negatives, logit_temp,
              ground_truth):
     """
@@ -199,6 +200,7 @@ def pretrain(ctx, batch_size, pad, output, spec, load, freq, quit, epochs,
             raise click.BadOptionUsage('augment', 'augmentation needs the `albumentations` package installed.')
 
     import shutil
+    from threadpoolctl import threadpool_limits
     from kraken.lib.train import KrakenTrainer
     from kraken.lib.pretrain import PretrainDataModule, RecognitionPretrainModel
 
@@ -275,15 +277,21 @@ def pretrain(ctx, batch_size, pad, output, spec, load, freq, quit, epochs,
     trainer = KrakenTrainer(accelerator=accelerator,
                             devices=device,
                             precision=precision,
-                            max_epochs=hyper_params['epochs'] if hyper_params['quit'] == 'dumb' else -1,
+                            max_epochs=hyper_params['epochs'] if hyper_params['quit'] == 'fixed' else -1,
                             min_epochs=hyper_params['min_epochs'],
                             enable_progress_bar=True if not ctx.meta['verbose'] else False,
                             deterministic=ctx.meta['deterministic'],
                             **val_check_interval)
-    trainer.fit(model, datamodule=data_module)
+
+    with threadpool_limits(limits=threads):
+        trainer.fit(model, datamodule=data_module)
 
     if model.best_epoch == -1:
         logger.warning('Model did not improve during training.')
+        ctx.exit(1)
+
+    if not model.epoch:
+        logger.warning('Training aborted before end of first epoch.')
         ctx.exit(1)
 
     if quit == 'early':

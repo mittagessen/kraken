@@ -46,7 +46,7 @@ from pytorch_lightning.callbacks import EarlyStopping
 from pytorch_lightning.utilities.memory import is_oom_error, garbage_collection_cuda
 
 from kraken.lib import vgsl, default_specs, layers
-from kraken.lib.xml import preparse_xml_data
+from kraken.lib.xml import XMLPage
 from kraken.lib.codec import PytorchCodec
 from kraken.lib.dataset import (ArrowIPCRecognitionDataset,
                                 GroundTruthDataset, PolygonGTDataset,
@@ -109,10 +109,10 @@ class PretrainDataModule(pl.LightningDataModule):
         valid_norm = True
         if format_type in ['xml', 'page', 'alto']:
             logger.info(f'Parsing {len(training_data)} XML files for training data')
-            training_data = preparse_xml_data(training_data, format_type, repolygonize)
+            training_data = [{'page': XMLPage(file, format_type).to_container()} for file in training_data]
             if evaluation_data:
                 logger.info(f'Parsing {len(evaluation_data)} XML files for validation data')
-                evaluation_data = preparse_xml_data(evaluation_data, format_type, repolygonize)
+                evaluation_data = [{'page': XMLPage(file, format_type).to_container()} for file in evaluation_data]
             if binary_dataset_split:
                 logger.warning('Internal binary dataset splits are enabled but using non-binary dataset files. Will be ignored.')
                 binary_dataset_split = False
@@ -145,7 +145,7 @@ class PretrainDataModule(pl.LightningDataModule):
             valid_norm = True
         # format_type is None. Determine training type from length of training data entry
         elif not format_type:
-            if len(training_data[0]) >= 4:
+            if training_data[0].type == 'baselines':
                 DatasetClass = PolygonGTDataset
                 valid_norm = False
             else:
@@ -157,6 +157,22 @@ class PretrainDataModule(pl.LightningDataModule):
                 if binary_dataset_split:
                     logger.warning('Internal binary dataset splits are enabled but using non-binary dataset files. Will be ignored.')
                     binary_dataset_split = False
+            samples = []
+            for sample in training_data:
+                if isinstance(sample, Segmentation):
+                    samples.append({'page': sample})
+                else:
+                    samples.append({'line': sample})
+            training_data = samples
+            if evaluation_data:
+                samples = []
+                for sample in evaluation_data:
+                    if isinstance(sample, Segmentation):
+                        samples.append({'page': sample})
+                    else:
+                        samples.append({'line': sample})
+                evaluation_data = samples
+
         else:
             raise ValueError(f'format_type {format_type} not in [alto, page, xml, path, binary].')
 
@@ -204,18 +220,12 @@ class PretrainDataModule(pl.LightningDataModule):
                                skip_empty_lines=False,
                                **kwargs)
 
-        if (self.hparams.num_workers and self.hparams.num_workers > 1) and self.hparams.format_type != 'binary':
-            with Pool(processes=self.hparams.num_workers) as pool:
-                for im in pool.imap_unordered(partial(_star_fun, dataset.parse), training_data, 5):
-                    logger.debug(f'Adding sample {im} to training set')
-                    if im:
-                        dataset.add(**im)
-        else:
-            for im in training_data:
-                try:
-                    dataset.add(**im)
-                except KrakenInputException as e:
-                    logger.warning(str(e))
+        for sample in training_data:
+            try:
+                dataset.add(**sample)
+            except KrakenInputException as e:
+                logger.warning(str(e))
+
         return dataset
 
     def train_dataloader(self):

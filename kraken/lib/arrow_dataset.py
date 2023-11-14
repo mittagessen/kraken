@@ -28,9 +28,10 @@ from functools import partial
 from collections import Counter
 from typing import Optional, List, Union, Callable, Tuple, Dict
 from multiprocessing import Pool
+from kraken.containers import Segmentation
 from kraken.lib import functional_im_transforms as F_t
 from kraken.lib.segmentation import extract_polygons
-from kraken.lib.xml import parse_xml, parse_alto, parse_page
+from kraken.lib.xml import XMLPage
 from kraken.lib.util import is_bitonal, make_printable
 from kraken.lib.exceptions import KrakenInputException
 from os import extsep, PathLike
@@ -43,27 +44,33 @@ logger = logging.getLogger(__name__)
 def _extract_line(xml_record, skip_empty_lines: bool = True):
     lines = []
     try:
-        im = Image.open(xml_record['image'])
+        im = Image.open(xml_record.imagename)
     except (FileNotFoundError, UnidentifiedImageError):
         return lines, None, None
     if is_bitonal(im):
         im = im.convert('1')
-    seg_key = 'lines' if 'lines' in xml_record else 'boxes'
-    recs = xml_record.pop(seg_key)
+    recs = xml_record.lines.values()
     for idx, rec in enumerate(recs):
+        seg = Segmentation(text_direction='horizontal-lr',
+                           imagename=xml_record.imagename,
+                           type=xml_record.type,
+                           lines=[rec],
+                           regions=None,
+                           script_detection=False,
+                           line_orders=None)
         try:
-            line_im, line = next(extract_polygons(im, {**xml_record, seg_key: [rec]}))
-        except KrakenInputException as e:
-            logger.warning(f'Invalid line {idx} in {im.filename}: {e}')
+            line_im, line = next(extract_polygons(im, seg))
+        except KrakenInputException:
+            logger.warning(f'Invalid line {idx} in {im.filename}')
             continue
         except Exception as e:
             logger.warning(f'Unexpected exception {e} from line {idx} in {im.filename}')
             continue
-        if not line['text'] and skip_empty_lines:
+        if not line.text and skip_empty_lines:
             continue
         fp = io.BytesIO()
         line_im.save(fp, format='png')
-        lines.append({'text': line['text'], 'im': fp.getvalue()})
+        lines.append({'text': line.text, 'im': fp.getvalue()})
     return lines, im.mode
 
 
@@ -90,6 +97,7 @@ def parse_path(path: Union[str, PathLike],
         gt = fp.read().strip('\n\r')
         if not gt and skip_empty_lines:
             raise KrakenInputException(f'No text for ground truth line {path}.')
+
     return {'image': path, 'lines': [{'text': gt}]}
 
 
@@ -135,12 +143,8 @@ def build_binary_dataset(files: Optional[List[Union[str, PathLike, Dict]]] = Non
     logger.info('Parsing XML files')
     extract_fn = partial(_extract_line, skip_empty_lines=skip_empty_lines)
     parse_fn = None
-    if format_type == 'xml':
-        parse_fn = parse_xml
-    elif format_type == 'alto':
-        parse_fn = parse_alto
-    elif format_type == 'page':
-        parse_fn = parse_page
+    if format_type in ['xml', 'alto', 'page']:
+        parse_fn = XMLPage
     elif format_type == 'path':
         if not ignore_splits:
             logger.warning('ignore_splits is False and format_type is path. Will not serialize splits.')
@@ -163,10 +167,13 @@ def build_binary_dataset(files: Optional[List[Union[str, PathLike, Dict]]] = Non
                 logger.warning(f'Invalid input file {doc}')
                 continue
             try:
-                name_ext = str(data['image']).split(extsep, 1)
-                if name_ext[1] == 'gt.txt':
-                    data['image'] = name_ext[0] + '.png'
-                with open(data['image'], 'rb') as fp:
+                if format_type in ['xml', 'alto', 'page']:
+                    imagename = data.imagename
+                else:
+                    name_ext = str(data['image']).split(extsep, 1)
+                    imagename = name_ext[0] + '.png'
+                    data['image'] = imagename
+                with open(imagename, 'rb') as fp:
                     Image.open(fp)
             except (FileNotFoundError, UnidentifiedImageError) as e:
                 logger.warning(f'Could not open file {e.filename} in {doc}')
@@ -181,9 +188,13 @@ def build_binary_dataset(files: Optional[List[Union[str, PathLike, Dict]]] = Non
     alphabet = Counter()
     num_lines = 0
     for doc in docs:
-        for line in doc['lines']:
+        if format_type in ['xml', 'alto', 'page']:
+            lines = doc.lines.values()
+        else:
+            lines = doc['lines']
+        for line in lines:
             num_lines += 1
-            alphabet.update(line['text'])
+            alphabet.update(line.text if format_type in ['xml', 'alto', 'page'] else line['text'])
 
     callback(0, num_lines)
 
