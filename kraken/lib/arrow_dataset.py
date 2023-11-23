@@ -170,9 +170,7 @@ def build_binary_dataset(files: Optional[List[Union[str, PathLike, Dict]]] = Non
                 if format_type in ['xml', 'alto', 'page']:
                     imagename = data.imagename
                 else:
-                    name_ext = str(data['image']).split(extsep, 1)
-                    imagename = name_ext[0] + '.png'
-                    data['image'] = imagename
+                    imagename = data['image']
                 with open(imagename, 'rb') as fp:
                     Image.open(fp)
             except (FileNotFoundError, UnidentifiedImageError) as e:

@@ -194,7 +194,7 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
           weight_decay, warmup, freeze_backbone, schedule, gamma, step_size,
           sched_patience, cos_max, partition, fixed_splits, normalization,
           normalize_whitespace, codec, resize, reorder, base_dir,
-          training_files, evaluation_files, workers, load_hyper_parameters,
+          training_files, evaluation_files, workers, threads, load_hyper_parameters,
           repolygonize, force_binarization, format_type, augment,
           pl_logger, log_dir, ground_truth):
     """
