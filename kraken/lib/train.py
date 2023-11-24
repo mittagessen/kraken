@@ -357,7 +357,7 @@ class RecognitionModel(pl.LightningModule):
                                                height,
                                                width,
                                                channels,
-                                               (self.hparams.pad, 0),
+                                               (self.hparams.hyper_params['pad'], 0),
                                                valid_norm,
                                                force_binarization)
 
@@ -782,7 +782,7 @@ class SegmentationModel(pl.LightningModule):
                                           height,
                                           width,
                                           channels,
-                                          self.hparams.hyper_params.padding,
+                                          self.hparams.hyper_params['padding'],
                                           valid_norm=False,
                                           force_binarization=force_binarization)
 
@@ -809,10 +809,10 @@ class SegmentationModel(pl.LightningModule):
             merge_baselines = None
 
         train_set = BaselineSet(training_data,
-                                line_width=self.hparams.hyper_params.line_width,
+                                line_width=self.hparams.hyper_params['line_width'],
                                 im_transforms=transforms,
                                 mode=format_type,
-                                augmentation=self.hparams.hyper_params.augment,
+                                augmentation=self.hparams.hyper_params['augment'],
                                 valid_baselines=valid_baselines,
                                 merge_baselines=merge_baselines,
                                 valid_regions=valid_regions,
@@ -824,7 +824,7 @@ class SegmentationModel(pl.LightningModule):
 
         if evaluation_data:
             val_set = BaselineSet(evaluation_data,
-                                  line_width=self.hparams.hyper_params.line_width,
+                                  line_width=self.hparams.hyper_params['line_width'],
                                   im_transforms=transforms,
                                   mode=format_type,
                                   augmentation=False,
