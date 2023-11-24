@@ -170,7 +170,7 @@ class Segmentation:
             self.lines = []
         if len(self.lines) and not isinstance(self.lines[0], BBoxLine) and not isinstance(self.lines[0], BaselineLine):
             line_cls = BBoxLine if self.type == 'bbox' else BaselineLine
-            sel.lines = [line_cls(**line) for line in self.lines]
+            self.lines = [line_cls(**line) for line in self.lines]
         if len(self.regions) and not isinstance(next(iter(self.regions.values()))[0], Region):
             regs = {}
             for k, v in self.regions.items():
