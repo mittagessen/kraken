@@ -357,7 +357,7 @@ def segtrain(ctx, output, spec, line_width, pad, load, freq, quit, epochs,
         logger.warning('Model did not improve during training.')
         ctx.exit(1)
 
-    if not model.epoch:
+    if not model.current_epoch:
         logger.warning('Training aborted before end of first epoch.')
         ctx.exit(1)
 
