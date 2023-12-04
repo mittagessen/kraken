@@ -482,7 +482,6 @@ def _calc_seam(baseline, polygon, angle, im_feats, bias=150):
     level.
     """
     MASK_VAL = 99999
-    r, c = draw.polygon(polygon[:, 1], polygon[:, 0])
     c_min, c_max = int(polygon[:, 0].min()), int(polygon[:, 0].max())
     r_min, r_max = int(polygon[:, 1].min()), int(polygon[:, 1].max())
     patch = im_feats[r_min:r_max+2, c_min:c_max+2].copy()
@@ -496,8 +495,7 @@ def _calc_seam(baseline, polygon, angle, im_feats, bias=150):
         mask[line_locs] = 0
     dist_bias = distance_transform_cdt(mask)
     # absolute mask
-    mask = np.ones_like(patch, dtype=bool)
-    mask[r-r_min, c-c_min] = False
+    mask = np.array(make_polygonal_mask(polygon-(r_min, c_min)), patch.shape[1::-1]) > 128
     # dilate mask to compensate for aliasing during rotation
     mask = binary_erosion(mask, border_value=True, iterations=2)
     # combine weights with features
@@ -1117,13 +1115,28 @@ def _bevelled_warping_envelope(baseline: np.ndarray, output_bl_start: Tuple[floa
     ]
     return source_envelope, target_envelope
 
+def make_polygonal_mask(polygon: np.ndarray, shape: Tuple[int, int]) -> Image.Image:
+    """
+    Creates a mask from a polygon.
+
+    Args:
+        polygon: A polygon as a list of points.
+        shape: The shape of the mask to create.
+
+    Returns:
+        A PIL.Image.Image instance containing the mask.
+    """
+    mask = Image.new('L', shape, 0)
+    ImageDraw.Draw(mask).polygon([tuple(p) for p in polygon.astype(int).tolist()], fill=255, width=2)
+    return mask
+
+
 def apply_polygonal_mask(img: Image.Image, polygon: np.ndarray, cval=0) -> Image.Image:
     """
     Extract the polygonal mask of an image.
     """
-    mask = Image.new('L', (img.width, img.height), 0)
+    mask = make_polygonal_mask(polygon, img.size)
     out = Image.new(img.mode, (img.width, img.height), cval)
-    ImageDraw.Draw(mask).polygon([tuple(p) for p in polygon.astype(int).tolist()], fill=255, width=2)
     out.paste(img, mask=mask)
     return out
 
