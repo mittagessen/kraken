@@ -105,7 +105,7 @@ class PairWiseROSet(Dataset):
                     else:
                         raise ValueError(f'Invalid RO type {level}')
                     # traverse RO and substitute features.
-                    w, h = Image.open(doc.imagename).size
+                    w, h = doc.image_size
                     sorted_lines = []
                     for line in order:
                         line_coords = np.array(line.baseline) / (w, h)
@@ -211,7 +211,7 @@ class PageWiseROSet(Dataset):
                     else:
                         raise ValueError(f'Invalid RO type {level}')
                     # traverse RO and substitute features.
-                    w, h = Image.open(doc.imagename).size
+                    w, h = doc.image_size
                     sorted_lines = []
                     for line in order:
                         line_coords = np.array(line.baseline) / (w, h)
