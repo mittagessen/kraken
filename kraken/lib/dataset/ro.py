@@ -83,17 +83,6 @@ class PairWiseROSet(Dataset):
             for file in files:
                 try:
                     doc = XMLPage(file, filetype=mode)
-                    for tag in doc.tags:
-                        if tag not in self.class_mapping:
-                            self.class_mapping[tag] = self.num_classes
-                            self.num_classes += 1
-                except KrakenInputException as e:
-                    files.pop(file)
-                    logger.warning(e)
-                    continue
-            for file in files:
-                try:
-                    doc = XMLPage(file, filetype=mode)
                     if level == 'baselines':
                         if not ro_id:
                             ro_id = 'line_implicit'
@@ -104,6 +93,11 @@ class PairWiseROSet(Dataset):
                         order = doc.get_sorted_regions(ro_id)
                     else:
                         raise ValueError(f'Invalid RO type {level}')
+                    for el in order:
+                        for tag in el.tags.values():
+                            if tag not in self.class_mapping:
+                                self.class_mapping[tag] = self.num_classes
+                                self.num_classes += 1
                     # traverse RO and substitute features.
                     w, h = doc.image_size
                     sorted_lines = []
@@ -189,17 +183,6 @@ class PageWiseROSet(Dataset):
             for file in files:
                 try:
                     doc = XMLPage(file, filetype=mode)
-                    for tag in doc.tags:
-                        if tag not in self.class_mapping:
-                            self.class_mapping[tag] = self.num_classes
-                            self.num_classes += 1
-                except KrakenInputException as e:
-                    files.pop(file)
-                    logger.warning(e)
-                    continue
-            for file in files:
-                try:
-                    doc = XMLPage(file, filetype=mode)
                     if level == 'baselines':
                         if not ro_id:
                             ro_id = 'line_implicit'
@@ -210,6 +193,11 @@ class PageWiseROSet(Dataset):
                         order = doc.get_sorted_regions(ro_id)
                     else:
                         raise ValueError(f'Invalid RO type {level}')
+                    for el in order:
+                        for tag in el.tags.values():
+                            if tag not in self.class_mapping:
+                                self.class_mapping[tag] = self.num_classes
+                                self.num_classes += 1
                     # traverse RO and substitute features.
                     w, h = doc.image_size
                     sorted_lines = []
