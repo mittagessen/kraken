@@ -1093,7 +1093,7 @@ def _bevelled_warping_envelope(baseline: np.ndarray, output_bl_start: Tuple[floa
             # bezier interp
             t = i / bevel_nsteps
             tpt = pt + (1-t)**2 * bevel_prev + t**2 * bevel_next
-            tx = cum_lens[k+1] - (1-t)**2 * l_prev + t**2 * l_next
+            tx = output_bl_start[0] + cum_lens[k+1] - (1-t)**2 * l_prev + t**2 * l_next
             tnormal = (1-t) * bl_seg_normals[k] + t * bl_seg_normals[k+1]
             tnormal /= np.linalg.norm(tnormal)
             source_points = [_as_int_tuple(tpt + envelope_dy[0]*tnormal), _as_int_tuple(tpt + envelope_dy[1]*tnormal)]
