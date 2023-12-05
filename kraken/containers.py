@@ -411,10 +411,11 @@ class BaselineOCRRecord(ocr_record, BaselineLine):
                             boundary=self.boundary,
                             text=self.text,
                             base_dir=self._line_base_dir,
-                            image=self.image,
+                            imagename=self.imagename,
                             tags=self.tags,
                             split=self.split,
                             regions=self.regions)
+
         rec = BaselineOCRRecord(prediction=prediction,
                                 cuts=cuts,
                                 confidences=confidences,
@@ -581,7 +582,7 @@ class BBoxOCRRecord(ocr_record, BBoxLine):
                         bbox=self.bbox,
                         text=self.text,
                         base_dir=self._line_base_dir,
-                        image=self.image,
+                        imagename=self.imagename,
                         tags=self.tags,
                         split=self.split,
                         regions=self.regions)
