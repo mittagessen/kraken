@@ -65,6 +65,7 @@ class XMLPage(object):
     type: Literal['baselines', 'bbox'] = 'baselines'
     base_dir: Optional[Literal['L', 'R']] = None
     imagename: PathLike = None
+    image_size: Tuple[int, int] = None
     _orders: Dict[str, Dict[str, Any]] = None
     has_tags: bool = False
     _tag_set: Optional[Dict] = None
@@ -113,7 +114,10 @@ class XMLPage(object):
             image = doc.find('.//{*}fileName')
             if image is None or not image.text:
                 raise ValueError('No valid image filename found in ALTO file {self.filename}')
+
             self.imagename = base_directory.joinpath(image.text)
+            page = doc.find('.//{*}Page')
+            self.image_size = int(page.get('WIDTH')), int(page.get('HEIGHT'))
 
             # find all image regions in order
             regions = []
@@ -292,6 +296,8 @@ class XMLPage(object):
             except KeyError:
                 logger.warning(f'Invalid value {image.get("readingDirection")} encountered in page-level reading direction.')
             self.imagename = base_directory.joinpath(image.get('imageFilename'))
+            self.image_size = int(image.get('imageWidth')), int(image.get('imageHeight'))
+
             # find all image regions
             regions = [reg for reg in image.iterfind('./{*}*')]
             # parse region type and coords

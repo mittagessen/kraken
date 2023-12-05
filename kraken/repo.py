@@ -131,10 +131,14 @@ def get_model(model_id: str, path: str, callback: Callable[[int, int], Any] = la
         logger.error(f'Found {resp["hits"]["total"]} models when querying for id \'{model_id}\'')
         raise KrakenRepoException(f'Found {resp["hits"]["total"]} models when querying for id \'{model_id}\'')
 
-    metadata = resp['hits']['hits'][0]
-    model_url = [x['links']['self'] for x in metadata['files'] if x['type'] == 'mlmodel'][0]
+    record = resp['hits']['hits'][0]
+    metadata_url = [x['links']['self'] for x in record['files'] if x['key'] == 'metadata.json'][0]
+    r = requests.get(metadata_url)
+    r.raise_for_status()
+    resp = r.json()
     # callable model identifier
-    nat_id = os.path.basename(urllib.parse.urlparse(model_url).path)
+    nat_id = resp['name']
+    model_url = [x['links']['self'] for x in record['files'] if x['key'] == nat_id][0]
     spath = os.path.join(path, nat_id)
     logger.debug(f'downloading model file {model_url} to {spath}')
     with closing(requests.get(model_url, stream=True)) as r:
@@ -177,9 +181,9 @@ def get_description(model_id: str, callback: Callable[..., Any] = lambda: None) 
         raise KrakenRepoException(msg)
     meta_json = None
     for file in record['files']:
-        if file['key'] == 'metadata.json':
+        if file['filename'] == 'metadata.json':
             callback()
-            r = requests.get(file['links']['self'])
+            r = requests.get(file['links']['download'])
             r.raise_for_status()
             callback()
             try:
@@ -225,13 +229,14 @@ def get_listing(callback: Callable[[int, int], Any] = lambda total, advance: Non
     total = resp['hits']['total']
     callback(total, 0)
     records.extend(resp['hits']['hits'])
-    while 'next' in resp['links']:
-        logger.debug('Fetching next page')
-        r = requests.get(resp['links']['next'])
-        r.raise_for_status()
-        resp = r.json()
-        logger.debug('Found {} new records'.format(len(resp['hits']['hits'])))
-        records.extend(resp['hits']['hits'])
+    if 'links' in resp and 'next' in resp['links']:
+        while 'next' in resp['links']:
+            logger.debug('Fetching next page')
+            r = requests.get(resp['links']['next'])
+            r.raise_for_status()
+            resp = r.json()
+            logger.debug('Found {} new records'.format(len(resp['hits']['hits'])))
+            records.extend(resp['hits']['hits'])
     logger.debug('Retrieving model metadata')
     models = {}
     # fetch metadata.jsn for each model
