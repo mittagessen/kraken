@@ -142,7 +142,7 @@ option          type
 \--high         INTEGER RANGE
 ============    ====
 
-To binarize a image:
+To binarize an image:
 
 .. code-block:: console
 
@@ -303,7 +303,7 @@ to the right (inverse for right-to-left scripts like Arabic which start on the
 top right-most columns, continuing leftward, and returning to the right-most
 column just below when none remain).
 
-In multi-script documents the order of is determined by the primary writing
+In multi-script documents the order is determined by the primary writing
 system employed in the document, e.g. for a modern book containing both Latin
 and Arabic script text it would be set to `lr` when Latin is primary, e.g. when
 the binding is on the left side of the book seen from the title cover, and
