@@ -232,7 +232,6 @@ def segtrain(ctx, output, spec, line_width, pad, load, freq, quit, epochs,
     from threadpoolctl import threadpool_limits
 
     from kraken.lib.train import SegmentationModel, KrakenTrainer
-    from kraken.lib.progress import KrakenProgressBar
 
     if resize != 'fail' and not load:
         raise click.BadOptionUsage('resize', 'resize option requires loading an existing model')
@@ -431,6 +430,7 @@ def segtest(ctx, model, evaluation_files, device, workers, threads, threshold,
     import torch
     import torch.nn.functional as F
 
+    from kraken.lib.progress import KrakenProgressBar
     from kraken.lib.train import BaselineSet, ImageInputTransforms
     from kraken.lib.vgsl import TorchVGSLModel
 
