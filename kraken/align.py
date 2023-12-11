@@ -24,21 +24,16 @@ accuractely determine grapheme locations in input data.
 import torch
 import logging
 import dataclasses
-import numpy as np
 
 from PIL import Image
 from bidi.algorithm import get_display
 
 from dataclasses import dataclass
-from typing import List, Dict, Any, Optional, Literal
+from typing import Optional, Literal
 
 from kraken import rpred
 from kraken.containers import Segmentation, BaselineOCRRecord
-from kraken.lib.codec import PytorchCodec
-from kraken.lib.xml import XMLPage
 from kraken.lib.models import TorchSeqRecognizer
-from kraken.lib.exceptions import KrakenInputException, KrakenEncodeException
-from kraken.lib.segmentation import compute_polygon_section
 
 logger = logging.getLogger('kraken')
 
@@ -95,6 +90,8 @@ Copied from the forced alignment with Wav2Vec2 tutorial of pytorch available
 at:
 https://github.com/pytorch/audio/blob/main/examples/tutorials/forced_alignment_tutorial.py
 """
+
+
 @dataclass
 class Point:
     token_index: int

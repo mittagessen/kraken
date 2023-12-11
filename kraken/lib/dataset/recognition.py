@@ -19,6 +19,7 @@ import io
 import json
 import torch
 import traceback
+import dataclasses
 import numpy as np
 import pyarrow as pa
 
@@ -28,7 +29,7 @@ from functools import partial
 from torchvision import transforms
 from collections import Counter
 from torch.utils.data import Dataset
-from typing import Dict, List, Tuple, Callable, Optional, Any, Union, Literal
+from typing import List, Tuple, Callable, Optional, Any, Union, Literal
 
 from kraken.containers import BaselineLine, BBoxLine, Segmentation
 from kraken.lib.util import is_bitonal
@@ -75,6 +76,7 @@ class DefaultAugmenter():
 
     def __call__(self, image):
         return self._transforms(image=image)
+
 
 class ArrowIPCRecognitionDataset(Dataset):
     """
@@ -181,7 +183,7 @@ class ArrowIPCRecognitionDataset(Dataset):
             mask = np.ones(len(ds_table), dtype=bool)
             for index in range(len(ds_table)):
                 try:
-                    text = self._apply_text_transform(ds_table.column('lines')[index].as_py(),)
+                    self._apply_text_transform(ds_table.column('lines')[index].as_py(),)
                 except KrakenInputException:
                     mask[index] = False
                     continue
@@ -335,7 +337,7 @@ class PolygonGTDataset(Dataset):
             self.add_line(line)
         if page:
             self.add_page(page)
-        if not (line and page):
+        if not (line or page):
             raise ValueError('Neither line nor page data provided in dataset builder')
 
     def add_page(self, page: Segmentation):
@@ -379,7 +381,7 @@ class PolygonGTDataset(Dataset):
         if not line.boundary:
             raise ValueError('No boundary given for line')
 
-        self._images.append((line.image, line.baseline, line.boundary))
+        self._images.append((line.imagename, line.baseline, line.boundary))
         self._gt.append(text)
         self.alphabet.update(text)
 
@@ -412,8 +414,17 @@ class PolygonGTDataset(Dataset):
             im = item[0][0]
             if not isinstance(im, Image.Image):
                 im = Image.open(im)
-            im, _ = next(extract_polygons(im, {'type': 'baselines',
-                                               'lines': [{'baseline': item[0][1], 'boundary': item[0][2]}]}))
+            im, _ = next(extract_polygons(im,
+                                          Segmentation(type='baselines',
+                                                       imagename=item[0][0],
+                                                       text_direction='horizontal-lr',
+                                                       lines=[BaselineLine('id_0',
+                                                                           baseline=item[0][1],
+                                                                           boundary=item[0][2])],
+                                                       script_detection=True,
+                                                       regions={},
+                                                       line_orders=[])
+                                          ))
             im = self.transforms(im)
             if im.shape[0] == 3:
                 im_mode = 'RGB'

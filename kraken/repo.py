@@ -17,7 +17,6 @@ Accessors to the model repository on zenodo.
 """
 import os
 import json
-import urllib
 import logging
 import requests
 

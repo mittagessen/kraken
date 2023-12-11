@@ -128,12 +128,12 @@ class PytorchCodec(object):
                     idx += len(code)
                     encodable_suffix = True
                     break
-            
+
             if not encodable_suffix and s[idx] in self.c2l:
                 labels.extend(self.c2l[s[idx]])
                 idx += 1
                 encodable_suffix = True
-            
+
             if not encodable_suffix:
                 if self.strict:
                     raise KrakenEncodeException(f'Non-encodable sequence {s[idx:idx+5]}... encountered.')

@@ -396,7 +396,7 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
     from torch.utils.data import DataLoader
 
     from kraken.serialization import render_report
-    from kraken.lib import models
+    from kraken.lib import models, util
     from kraken.lib.xml import XMLPage
     from kraken.lib.dataset import (global_align, compute_confusions,
                                     PolygonGTDataset, GroundTruthDataset,
@@ -418,7 +418,6 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
         pin_ds_mem = True
 
     test_set = list(test_set)
-
 
     if evaluation_files:
         test_set.extend(evaluation_files)
@@ -445,7 +444,7 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
             force_binarization = False
         if repolygonize:
             logger.warning('Repolygonization enabled in `path` mode. Will be ignored.')
-        test_set = [{'image': img} for img in test_set]
+        test_set = [{'line': util.parse_gt_path(img)} for img in test_set]
         valid_norm = True
 
     if len(test_set) == 0:
@@ -480,7 +479,7 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
             ds_loader = DataLoader(ds,
                                    batch_size=batch_size,
                                    num_workers=workers,
-                                   pin_memory=True,
+                                   pin_memory=pin_ds_mem,
                                    collate_fn=collate_sequences)
 
             with KrakenProgressBar() as progress:

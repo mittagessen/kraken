@@ -26,7 +26,6 @@ from torchvision import transforms
 from collections import Counter
 from typing import Dict, List, Tuple, Sequence, Any, Union
 
-from kraken.lib.models import TorchSeqRecognizer
 from kraken.lib.exceptions import KrakenInputException
 from kraken.lib.lineest import CenterNormalizer
 

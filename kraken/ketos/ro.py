@@ -23,9 +23,7 @@ import pathlib
 import logging
 
 from PIL import Image
-from typing import Dict
 
-from kraken.lib.exceptions import KrakenInputException
 from kraken.lib.default_specs import READING_ORDER_HYPER_PARAMS
 
 from kraken.ketos.util import _validate_manifests, _expand_gt, message, to_ptl_device
@@ -35,6 +33,7 @@ logger = logging.getLogger('kraken')
 
 # raise default max image size to 20k * 20k pixels
 Image.MAX_IMAGE_PIXELS = 20000 ** 2
+
 
 @click.command('rotrain')
 @click.pass_context
@@ -156,14 +155,13 @@ def rotrain(ctx, batch_size, output, load, freq, quit, epochs, min_epochs, lag,
 
     from kraken.lib.ro import ROModel
     from kraken.lib.train import KrakenTrainer
-    from kraken.lib.progress import KrakenProgressBar
 
     if not (0 <= freq <= 1) and freq % 1.0 != 0:
         raise click.BadOptionUsage('freq', 'freq needs to be either in the interval [0,1.0] or a positive integer.')
 
     if pl_logger == 'tensorboard':
         try:
-            import tensorboard
+            import tensorboard  # NOQA
         except ImportError:
             raise click.BadOptionUsage('logger', 'tensorboard logger needs the `tensorboard` package installed.')
 
@@ -191,7 +189,9 @@ def rotrain(ctx, batch_size, output, load, freq, quit, epochs, min_epochs, lag,
                          'step_size': step_size,
                          'rop_patience': sched_patience,
                          'cos_t_max': cos_max,
-                         'pl_logger': pl_logger,})
+                         'pl_logger': pl_logger,
+                         }
+                        )
 
     # disable automatic partition when given evaluation set explicitly
     if evaluation_files:
@@ -281,7 +281,6 @@ def roadd(ctx, output, ro_model, seg_model):
     """
     from kraken.lib import vgsl
     from kraken.lib.ro import ROModel
-    from kraken.lib.train import KrakenTrainer
 
     message(f'Adding {ro_model} reading order model to {seg_model}.')
     ro_net = ROModel.load_from_checkpoint(ro_model)

@@ -24,16 +24,15 @@ import torch.nn.functional as F
 import pytorch_lightning as pl
 
 from os import PathLike
-from functools import partial
-from torch.multiprocessing import Pool
 from torchmetrics.classification import MultilabelAccuracy, MultilabelJaccardIndex
 from torchmetrics.text import CharErrorRate, WordErrorRate
 from torch.optim import lr_scheduler
 from typing import Callable, Dict, Optional, Sequence, Union, Any, Literal
 from pytorch_lightning.callbacks import Callback, EarlyStopping, BaseFinetuning, LearningRateMonitor
 
+from kraken.containers import Segmentation, XMLPage
 from kraken.lib import models, vgsl, default_specs, progress
-from kraken.lib.util import make_printable
+from kraken.lib.util import make_printable, parse_gt_path
 from kraken.lib.codec import PytorchCodec
 from kraken.lib.dataset import (ArrowIPCRecognitionDataset, BaselineSet,
                                 GroundTruthDataset, PolygonGTDataset,
@@ -56,6 +55,7 @@ def _star_fun(fun, kwargs):
         logger.warning(str(e))
     return None
 
+
 def _validation_worker_init_fn(worker_id):
     """ Fix random seeds so that augmentation always produces the same
         results when validating. Temporarily increase the logging level
@@ -66,6 +66,7 @@ def _validation_worker_init_fn(worker_id):
     logging.getLogger("lightning_fabric.utilities.seed").setLevel(logging.WARN)
     seed_everything(42)
     logging.getLogger("lightning_fabric.utilities.seed").setLevel(level)
+
 
 class KrakenTrainer(pl.Trainer):
     def __init__(self,
@@ -301,10 +302,10 @@ class RecognitionModel(pl.LightningModule):
                 logger.warning('Internal binary dataset splits are enabled but using non-binary dataset files. Will be ignored.')
                 binary_dataset_split = False
             logger.info(f'Got {len(training_data)} line strip images for training data')
-            training_data = [{'image': im} for im in training_data]
+            training_data = [{'line': parse_gt_path(im)} for im in training_data]
             if evaluation_data:
                 logger.info(f'Got {len(evaluation_data)} line strip images for validation data')
-                evaluation_data = [{'image': im} for im in evaluation_data]
+                evaluation_data = [{'line': parse_gt_path(im)} for im in evaluation_data]
             valid_norm = True
         # format_type is None. Determine training type from container class types
         elif not format_type:
@@ -518,7 +519,7 @@ class RecognitionModel(pl.LightningModule):
             # Log a few sample images before the datasets are encoded.
             # This is only possible for Arrow datasets, because the
             # other dataset types can only be accessed after encoding
-            if self.logger and isinstance(self.train_set.dataset, ArrowIPCRecognitionDataset) :
+            if self.logger and isinstance(self.train_set.dataset, ArrowIPCRecognitionDataset):
                 for i in range(min(len(self.train_set), 16)):
                     idx = np.random.randint(len(self.train_set))
                     sample = self.train_set[idx]
@@ -652,7 +653,6 @@ class RecognitionModel(pl.LightningModule):
                                                      self.nn.nn.parameters(),
                                                      len_train_set=len(self.train_set),
                                                      loss_tracking_mode='max')
-
 
     def optimizer_step(self, epoch, batch_idx, optimizer, optimizer_closure):
         # update params

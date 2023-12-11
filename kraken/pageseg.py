@@ -24,7 +24,7 @@ import uuid
 import logging
 import numpy as np
 
-from typing import Tuple, List, Callable, Optional, Dict, Any, Union
+from typing import Tuple, List, Callable, Optional, Union
 from scipy.ndimage.filters import (gaussian_filter, uniform_filter,
                                    maximum_filter)
 

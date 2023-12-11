@@ -15,28 +15,25 @@
 """
 Utility functions for data loading and training of VGSL networks.
 """
-import json
 import torch
 import traceback
 import numpy as np
 import torch.nn.functional as F
 import shapely.geometry as geom
 
-from os import path, PathLike
 from PIL import Image
 from shapely.ops import split
 from itertools import groupby
 from torchvision import transforms
 from collections import defaultdict
 from torch.utils.data import Dataset
-from typing import Dict, List, Tuple, Sequence, Callable, Any, Union, Literal, Optional
+from typing import Dict, Tuple, Sequence, Callable, Any, Union, Literal, Optional
 
 from skimage.draw import polygon
 
 from kraken.containers import Segmentation
 from kraken.lib.xml import XMLPage
 
-from kraken.lib.exceptions import KrakenInputException
 
 __all__ = ['BaselineSet']
 
@@ -160,7 +157,7 @@ class BaselineSet(Dataset):
                     self.class_mapping['regions'][reg_type] = self.num_classes - 1
 
         self.targets.append({'baselines': baselines_, 'regions': regions_})
-        self.imgs.append(image)
+        self.imgs.append(doc.imagename)
 
     def __getitem__(self, idx):
         im = self.imgs[idx]

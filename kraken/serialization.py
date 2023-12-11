@@ -17,7 +17,6 @@ from jinja2 import Environment, PackageLoader, FunctionLoader
 import regex
 import logging
 import datetime
-import shapely.geometry as geom
 
 from os import PathLike
 from pkg_resources import get_distribution
@@ -25,13 +24,12 @@ from collections import Counter
 
 from kraken.containers import Segmentation, ProcessingStep
 from kraken.lib.util import make_printable
-from kraken.lib.segmentation import is_in_region
 
-from typing import Union, List, Tuple, Iterable, Optional, Sequence, Dict, Any, Literal
+from typing import List, Tuple, Iterable, Optional, Sequence, Literal
 
 logger = logging.getLogger(__name__)
 
-__all__ = ['serialize', 'serialize_segmentation', 'render_report']
+__all__ = ['serialize', 'render_report']
 
 
 def _rescale(val: Sequence[float], low: float, high: float) -> List[float]:
@@ -127,14 +125,13 @@ def serialize(results: Segmentation,
         if line.tags is not None:
             types.extend((k, v) for k, v in line.tags.items())
     page['line_types'] = list(set(types))
-    page['region_types'] =[list(results.regions.keys())]
+    page['region_types'] = [list(results.regions.keys())]
 
     # map reading orders indices to line IDs
     ros = []
     for ro in results.line_orders:
         ros.append([results.lines[idx].id for idx in ro])
     page['line_orders'] = ros
-
     # build region ID to region dict
     reg_dict = {}
     for key, regs in results.regions.items():

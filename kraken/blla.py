@@ -30,7 +30,7 @@ import shapely.geometry as geom
 import torch.nn.functional as F
 import torchvision.transforms as tf
 
-from typing import Optional, Dict, Callable, Union, List, Any, Tuple, Literal
+from typing import Optional, Dict, Callable, Union, List, Any, Literal
 
 from scipy.ndimage import gaussian_filter
 from skimage.filters import sobel
@@ -415,4 +415,4 @@ def segment(im: PIL.Image.Image,
                         lines=blls,
                         regions=regions,
                         script_detection=script_detection,
-                        line_orders=[order])
+                        line_orders=[order] if order else [])

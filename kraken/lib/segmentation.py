@@ -40,7 +40,7 @@ from skimage.measure import approximate_polygon, subdivide_polygon, regionprops,
 from skimage.morphology import skeletonize
 from skimage.transform import PiecewiseAffineTransform, SimilarityTransform, AffineTransform, warp
 
-from typing import List, Tuple, Union, Dict, Any, Sequence, Optional, Literal
+from typing import List, Tuple, Union, Dict, Sequence, Optional, Literal
 
 from kraken.lib import default_specs
 from kraken.lib.exceptions import KrakenInputException

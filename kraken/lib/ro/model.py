@@ -17,8 +17,6 @@ Pytorch-lightning modules for reading order training.
 
 Adapted from:
 """
-import re
-import math
 import torch
 import logging
 import numpy as np
@@ -33,22 +31,23 @@ from typing import Dict, Optional, Sequence, Union, Any, Literal, List
 
 from pytorch_lightning.callbacks import EarlyStopping, LearningRateMonitor
 
-from kraken.lib import vgsl, default_specs, layers
+from kraken.lib import default_specs
 from kraken.lib.dataset import PairWiseROSet, PageWiseROSet
 from kraken.lib.train import _configure_optimizer_and_lr_scheduler
 from kraken.lib.segmentation import _greedy_order_decoder
 from kraken.lib.ro.layers import MLP
 
-from torch.utils.data import DataLoader, random_split, Subset
+from torch.utils.data import DataLoader, Subset
 
 
 logger = logging.getLogger(__name__)
+
 
 @dataclass
 class DummyVGSLModel:
     hyper_params: Dict[str, int] = field(default_factory=dict)
     user_metadata: Dict[str, List] = field(default_factory=dict)
-    one_channel_mode: Literal['1', 'L']  = '1'
+    one_channel_mode: Literal['1', 'L'] = '1'
     ptl_module: Module = None
     model_type: str = 'unknown'
 
@@ -128,7 +127,7 @@ class ROModel(pl.LightningModule):
         self.best_epoch = -1
         self.best_metric = torch.inf
 
-        logger.info(f'Creating new RO model')
+        logger.info('Creating new RO model')
         self.ro_net = MLP(train_set.get_feature_dim(), train_set.get_feature_dim() * 2)
 
         if 'file_system' in torch.multiprocessing.get_all_sharing_strategies():
@@ -245,4 +244,3 @@ class ROModel(pl.LightningModule):
                     scheduler.step()
                 else:
                     scheduler.step(metric)
-

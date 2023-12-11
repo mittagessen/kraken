@@ -161,7 +161,7 @@ class Segmentation:
     script_detection: bool
     lines: List[Union[BaselineLine, BBoxLine]]
     regions: Dict[str, List[Region]]
-    line_orders: Optional[List[List[int]]] = None
+    line_orders: List[List[int]]
 
     def __post_init__(self):
         if not self.regions:

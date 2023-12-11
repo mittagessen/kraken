@@ -15,22 +15,13 @@
 """
 Utility functions for data loading and training of VGSL networks.
 """
-import json
 import torch
-import traceback
 import numpy as np
-import torch.nn.functional as F
-import shapely.geometry as geom
 
 from math import factorial
-from os import path, PathLike
-from PIL import Image
-from shapely.ops import split
-from itertools import groupby
-from torchvision import transforms
-from collections import defaultdict
+from os import PathLike
 from torch.utils.data import Dataset
-from typing import Dict, List, Tuple, Sequence, Callable, Any, Union, Literal, Optional
+from typing import Dict, Sequence, Union, Literal, Optional
 
 from kraken.lib.xml import XMLPage
 
@@ -112,8 +103,9 @@ class PairWiseROSet(Dataset):
                                                             torch.tensor(line_center, dtype=torch.float),  # line center
                                                             torch.tensor(line_coords[0, :], dtype=torch.float),  # start_point coord
                                                             torch.tensor(line_coords[-1, :], dtype=torch.float),  # end point coord)
-                                                          ))
-                                    }
+                                                            )
+                                                           )
+                                     }
                         sorted_lines.append(line_data)
                     if len(sorted_lines) > 1:
                         self.data.append(sorted_lines)
@@ -212,8 +204,9 @@ class PageWiseROSet(Dataset):
                                                             torch.tensor(line_center, dtype=torch.float),  # line center
                                                             torch.tensor(line_coords[0, :], dtype=torch.float),  # start_point coord
                                                             torch.tensor(line_coords[-1, :], dtype=torch.float),  # end point coord)
-                                                          ))
-                                    }
+                                                            )
+                                                           )
+                                     }
                         sorted_lines.append(line_data)
                     if len(sorted_lines) > 1:
                         self.data.append(sorted_lines)

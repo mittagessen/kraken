@@ -38,15 +38,14 @@ import pytorch_lightning as pl
 
 from os import PathLike
 from itertools import chain
-from functools import partial
 from torch.optim import lr_scheduler
-from torch.multiprocessing import Pool
 from typing import Dict, Optional, Sequence, Union, Any
 from pytorch_lightning.callbacks import EarlyStopping
 from pytorch_lightning.utilities.memory import is_oom_error, garbage_collection_cuda
 
 from kraken.lib import vgsl, default_specs, layers
 from kraken.lib.xml import XMLPage
+from kraken.lib.util import parse_gt_path
 from kraken.lib.codec import PytorchCodec
 from kraken.lib.dataset import (ArrowIPCRecognitionDataset,
                                 GroundTruthDataset, PolygonGTDataset,
@@ -138,10 +137,10 @@ class PretrainDataModule(pl.LightningDataModule):
                 logger.warning('Internal binary dataset splits are enabled but using non-binary dataset files. Will be ignored.')
                 binary_dataset_split = False
             logger.info(f'Got {len(training_data)} line strip images for training data')
-            training_data = [{'image': im} for im in training_data]
+            training_data = [{'line': parse_gt_path(im)} for im in training_data]
             if evaluation_data:
                 logger.info(f'Got {len(evaluation_data)} line strip images for validation data')
-                evaluation_data = [{'image': im} for im in evaluation_data]
+                evaluation_data = [{'line': parse_gt_path(im)} for im in evaluation_data]
             valid_norm = True
         # format_type is None. Determine training type from length of training data entry
         elif not format_type:
@@ -375,7 +374,6 @@ class RecognitionPretrainModel(pl.LightningModule):
             with torch.no_grad():
                 if logits.numel() == 0:
                     corr = 0
-                    count = 0
                 else:
                     _max = logits.argmax(-1) == 0
                     _min = logits.argmin(-1) == 0

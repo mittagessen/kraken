@@ -20,7 +20,6 @@ Generators for recognition on lines images.
 """
 import logging
 import dataclasses
-import numpy as np
 
 from PIL import Image
 from functools import partial
@@ -34,7 +33,6 @@ from kraken.lib.segmentation import extract_polygons
 from kraken.lib.exceptions import KrakenInputException
 from kraken.lib.dataset import ImageInputTransforms
 
-import copy
 
 __all__ = ['mm_rpred', 'rpred']
 
@@ -151,7 +149,6 @@ class mm_rpred(object):
         flat_box = [point for box in line.bbox for point in box]
         xmin, xmax = min(flat_box[::2]), max(flat_box[::2])
         ymin, ymax = min(flat_box[1::2]), max(flat_box[1::2])
-        line_bbox = ((xmin, ymin), (xmin, ymax), (xmax, ymax), (xmax, ymin))
         prediction = ''
         cuts = []
         confidences = []
