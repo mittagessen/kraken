@@ -12,7 +12,7 @@ from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
 
 logger = logging.getLogger('coremltools')
 logger.setLevel(logging.ERROR)
-from coremltools.proto import NeuralNetwork_pb2
+from coremltools.proto import NeuralNetwork_pb2  # NOQA
 logger.setLevel(logging.WARNING)
 
 # all tensors are ordered NCHW, the "feature" dimension is C, so the output of
@@ -745,6 +745,7 @@ class LinSoftmax(Module):
         self.lin.weight = torch.nn.Parameter(weight)
         self.lin.bias = torch.nn.Parameter(bias)
 
+
 class ActConv2D(Module):
     """
     A wrapper for convolution + activation with automatic padding ensuring no
@@ -760,7 +761,7 @@ class ActConv2D(Module):
         self.dilation = dilation
         self.padding = tuple((dilation[i] * (kernel_size[i] - 1)) // 2 for i in range(2))
         self.transposed = transposed
-        
+
         if nl == 's':
             self.nl = torch.sigmoid
             self.nl_name = 'SIGMOID'
@@ -779,7 +780,7 @@ class ActConv2D(Module):
         else:
             self.nl_name = 'LINEAR'
             self.nl = lambda x: x
-        
+
         if self.transposed:
             self.co = torch.nn.ConvTranspose2d(in_channels, out_channels, kernel_size,
                                   stride=stride, padding=self.padding, dilation=self.dilation)
@@ -799,8 +800,8 @@ class ActConv2D(Module):
         if seq_len is not None:
             if self.transposed:
                 seq_len = torch.floor(
-                    ((seq_len - 1) * self.stride[1]\
-                        - 2 * self.padding[1]\
+                    ((seq_len - 1) * self.stride[1]
+                        - 2 * self.padding[1]
                         + self.dilation[1] * (self.kernel_size[1] - 1)
                         + 1))
             else:

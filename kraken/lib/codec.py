@@ -169,9 +169,9 @@ class PytorchCodec(object):
             if int(labels[idx]) in self.l2c_single:
                 code = self.l2c_single[int(labels[idx])]
                 decoded.extend([(c, s, e, u) for c, s, e, u in zip(code,
-                                                                    len(code) * [start[idx]],
-                                                                    len(code) * [end[idx]],
-                                                                    len(code) * [con[idx]])])
+                                                                   len(code) * [start[idx]],
+                                                                   len(code) * [end[idx]],
+                                                                   len(code) * [con[idx]])])
                 idx += 1
                 decodable_suffix = True
             else:

@@ -390,7 +390,6 @@ def segment(im: PIL.Image.Image,
 
     # create objects and assign IDs
     blls = []
-    reg_idx = 0
     _shp_regs = {}
     for reg_type, rgs in regions.items():
         for reg in rgs:

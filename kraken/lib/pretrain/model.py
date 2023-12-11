@@ -43,6 +43,8 @@ from typing import Dict, Optional, Sequence, Union, Any
 from pytorch_lightning.callbacks import EarlyStopping
 from pytorch_lightning.utilities.memory import is_oom_error, garbage_collection_cuda
 
+from kraken.containers import Segmentation
+
 from kraken.lib import vgsl, default_specs, layers
 from kraken.lib.xml import XMLPage
 from kraken.lib.util import parse_gt_path
@@ -371,14 +373,6 @@ class RecognitionPretrainModel(pl.LightningModule):
         o = self._step(batch, batch_idx)
         if o is not None:
             logits, targets, loss = o
-            with torch.no_grad():
-                if logits.numel() == 0:
-                    corr = 0
-                else:
-                    _max = logits.argmax(-1) == 0
-                    _min = logits.argmin(-1) == 0
-                    both = _max & _min
-                    corr = _max.long().sum().item() - both.long().sum().item()
             self.val_ce.append(loss.cpu())
             self.log('CE', loss, on_step=True, on_epoch=True)
 

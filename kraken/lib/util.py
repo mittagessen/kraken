@@ -10,12 +10,13 @@ import numpy as np
 from PIL import Image
 from os import PathLike
 
-from typing import Union, Callable
+from typing import Union, Callable, Optional, Literal
 
-from kraken.containers import BBoxLine
 from kraken.lib import functional_im_transforms as F_t
+from kraken.containers import BBoxLine
+from kraken.exceptions import KrakenInputException
 
-__all__ = ['pil2array', 'array2pil', 'is_bitonal', 'make_printable', 'get_im_str', 'parse_path']
+__all__ = ['pil2array', 'array2pil', 'is_bitonal', 'make_printable', 'get_im_str', 'parse_gt_path']
 
 
 def pil2array(im: Image.Image, alpha: int = 0) -> np.ndarray:
@@ -122,7 +123,7 @@ def parse_gt_path(path: Union[str, PathLike],
     try:
         with Image.open(path) as im:
             w, h = im.size
-    except Exception e:
+    except Exception as e:
         raise KrakenInputException(e)
 
     gt = ''
@@ -137,7 +138,7 @@ def parse_gt_path(path: Union[str, PathLike],
         raise KrakenInputException(f'No text for ground truth line {path}.')
 
     return BBoxLine(id=uuid.uuid4(),
-                    bbox=((0,0), (w,0), (w,h), (0,h)),
+                    bbox=((0, 0), (w, 0), (w, h), (0, h)),
                     text=gt,
                     base_dir=base_dir,
                     imagename=path,

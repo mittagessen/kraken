@@ -34,7 +34,7 @@ from kraken.lib.segmentation import extract_polygons
 from kraken.lib.xml import XMLPage
 from kraken.lib.util import is_bitonal, make_printable
 from kraken.lib.exceptions import KrakenInputException
-from os import extsep, PathLike
+from os import PathLike
 
 import logging
 

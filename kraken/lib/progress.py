@@ -15,21 +15,20 @@
 """
 Handlers for rich-based progress bars.
 """
-from typing import Any, Dict, Optional, Union
-from numbers import Number
+from typing import Union
 from dataclasses import dataclass
 
-import pytorch_lightning as pl
 from pytorch_lightning.callbacks.progress.rich_progress import CustomProgress, RichProgressBar, MetricsTextColumn
 
 from rich import get_console, reconfigure
-from rich.console import Console, RenderableType
-from rich.progress import BarColumn, Progress, ProgressColumn, Task, TextColumn, TimeRemainingColumn, TimeElapsedColumn, DownloadColumn
+from rich.console import RenderableType
+from rich.progress import BarColumn, Progress, ProgressColumn, TextColumn, TimeRemainingColumn, TimeElapsedColumn, DownloadColumn
 from rich.text import Text
 from rich.style import Style
 from rich.default_styles import DEFAULT_STYLES
 
 __all__ = ['KrakenProgressBar', 'KrakenDownloadProgressBar', 'KrakenTrainProgressBar']
+
 
 class BatchesProcessedColumn(ProgressColumn):
     def __init__(self):
@@ -129,6 +128,7 @@ class KrakenTrainProgressBar(RichProgressBar):
     def _get_train_description(self, current_epoch: int) -> str:
         return f"stage {current_epoch}/" \
                f"{self.trainer.max_epochs if self.trainer.model.hparams.hyper_params['quit'] == 'fixed' else '∞'}"
+
 
 @dataclass
 class RichProgressBarTheme:

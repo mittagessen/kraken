@@ -23,13 +23,10 @@ from pathlib import Path
 
 from itertools import groupby
 from lxml import etree
-from PIL import Image
 from typing import Union, Dict, Any, Sequence, Tuple, Literal, Optional, List
 
 from collections import defaultdict
 from kraken.containers import Segmentation, BaselineLine, Region
-from kraken.lib.segmentation import calculate_polygonal_environment
-from kraken.lib.exceptions import KrakenInputException
 
 logger = logging.getLogger(__name__)
 
@@ -247,7 +244,7 @@ class XMLPage(object):
                     _ro = []
                     if el.tag.endswith('UnorderedGroup'):
                         _ro = [_parse_group(x) for x in el.iterchildren()]
-                        is_total = False
+                        is_total = False  # NOQA
                     elif el.tag.endswith('OrderedGroup'):
                         _ro.extend(_parse_group(x) for x in el.iterchildren())
                     else:
@@ -306,7 +303,6 @@ class XMLPage(object):
 
             self._tag_set = set(('default',))
             tmp_transkribus_line_order = defaultdict(list)
-            valid_tr_lo = True
 
             for region in regions:
                 if not any([True if region.tag.endswith(k) else False for k in page_regions.keys()]):
@@ -329,7 +325,7 @@ class XMLPage(object):
                     if not rtype and 'structure' in cs and 'type' in cs['structure']:
                         rtype = cs['structure']['type']
                     # transkribus-style reading order
-                    if 'readingOrder' in cs and 'index'in cs['readingOrder']:
+                    if 'readingOrder' in cs and 'index' in cs['readingOrder']:
                         tr_region_order.append((region.get('id'), int(cs['readingOrder']['index'])))
                 # fall back to default region type if nothing is given
                 if not rtype:
@@ -388,7 +384,6 @@ class XMLPage(object):
                             reg_cus = self._parse_page_custom(line.getparent().get('custom'))
                             if 'readingOrder' not in reg_cus or 'index' not in reg_cus['readingOrder']:
                                 logger.warning('Incomplete `custom` attribute reading order found.')
-                                valid_tr_lo = False
                             else:
                                 tmp_transkribus_line_order[int(reg_cus['readingOrder']['index'])].append((int(cs['readingOrder']['index']), line.get('id')))
 
@@ -433,7 +428,7 @@ class XMLPage(object):
                     _ro = []
                     if el.tag.endswith('UnorderedGroup'):
                         _ro = [_parse_group(x) for x in el.iterchildren()]
-                        is_total = False
+                        is_total = False  # NOQA
                     elif el.tag.endswith('OrderedGroup'):
                         _ro.extend(_parse_group(x) for x in el.iterchildren())
                     else:

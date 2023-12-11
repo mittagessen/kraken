@@ -1,5 +1,24 @@
+#
+# Copyright 2023 Benjamin Kiessling
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
+# or implied. See the License for the specific language governing
+# permissions and limitations under the License.
+"""
+kraken.containers
+~~~~~~~~~~~~~~~~~
 
-import PIL.Image
+Container classes replacing the old dictionaries returned by kraken's
+functional blocks.
+"""
 import numpy as np
 import bidi.algorithm as bd
 
@@ -187,9 +206,9 @@ class ocr_record(ABC):
     def __init__(self,
                  prediction: str,
                  cuts: List[Union[Tuple[int, int], Tuple[Tuple[int, int],
-                                                             Tuple[int, int],
-                                                             Tuple[int, int],
-                                                             Tuple[int, int]]]],
+                                                         Tuple[int, int],
+                                                         Tuple[int, int],
+                                                         Tuple[int, int]]]],
                  confidences: List[float],
                  display_order: bool = True) -> None:
         self._prediction = prediction
@@ -463,9 +482,9 @@ class BBoxOCRRecord(ocr_record, BBoxLine):
     def __init__(self,
                  prediction: str,
                  cuts: List[Tuple[Tuple[int, int],
-                                      Tuple[int, int],
-                                      Tuple[int, int],
-                                      Tuple[int, int]]],
+                                  Tuple[int, int],
+                                  Tuple[int, int],
+                                  Tuple[int, int]]],
                  confidences: List[float],
                  line: Union[BBoxLine, Dict[str, Any]],
                  base_dir: Optional[Literal['L', 'R']] = None,
@@ -593,5 +612,3 @@ class BBoxOCRRecord(ocr_record, BBoxLine):
                             base_dir=base_dir,
                             display_order=not self._display_order)
         return rec
-
-

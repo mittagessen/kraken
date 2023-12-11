@@ -5,7 +5,6 @@ import re
 import json
 import torch
 import logging
-import warnings
 
 from torch import nn
 from os import PathLike
@@ -496,7 +495,7 @@ class TorchVGSLModel(object):
                       input: Tuple[int, int, int, int],
                       blocks: List[str],
                       idx: int,
-                  target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
+                      target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
         pattern = re.compile(r'(?P<type>Do)(?P<name>{\w+})?(?P<p>(\d+(\.\d*)?|\.\d+))?(,(?P<dim>\d+))?')
         m = pattern.match(blocks[idx])
         if not m:
@@ -735,7 +734,7 @@ class TorchVGSLModel(object):
             elif c != ")":
                 break
         return rst
-    
+
     def _parenthesis_count(self, block: str) -> int:
         rst = 0
         for c in block:
@@ -777,7 +776,7 @@ class TorchVGSLModel(object):
         named_spec[0]._block = '[' + named_spec[0]._block
         named_spec[-1]._block = named_spec[-1]._block + ']'
         return oshape, named_spec, nn
-    
+
     def build_parallel(self,
                        input: Tuple[int, int, int, int],
                        blocks: List[str],
