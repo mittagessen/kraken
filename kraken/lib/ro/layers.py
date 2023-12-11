@@ -6,6 +6,8 @@ from torch import nn
 
 from typing import Tuple
 
+from kraken.lib.vgsl import VGSLBlock
+
 # all tensors are ordered NCHW, the "feature" dimension is C, so the output of
 # an LSTM will be put into C same as the filters of a CNN.
 
@@ -36,7 +38,7 @@ class MLP(nn.Module):
         """
         return input
 
-    def get_spec(self, name) -> "VGSLBlock":
+    def get_spec(self, name) -> VGSLBlock:
         """
         Generates a VGSL spec block from the layer instance.
         """

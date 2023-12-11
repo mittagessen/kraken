@@ -26,8 +26,8 @@ from collections import defaultdict
 
 from PIL import Image
 
-from scipy.ndimage import maximum_filter, binary_erosion
-from scipy.ndimage import distance_transform_cdt
+from scipy.signal import convolve2d
+from scipy.ndimage import maximum_filter, binary_erosion, gaussian_filter, distance_transform_cdt
 from scipy.spatial.distance import pdist, squareform
 
 from shapely.ops import nearest_points, unary_union
@@ -42,11 +42,11 @@ from skimage.transform import PiecewiseAffineTransform, SimilarityTransform, Aff
 
 from typing import List, Tuple, Union, Dict, Sequence, Optional, Literal
 
-from kraken.lib import default_specs
-from kraken.lib.exceptions import KrakenInputException
+from kraken.containers import Segmentation
 
-from scipy.signal import convolve2d
-from scipy.ndimage import gaussian_filter
+from kraken.lib import default_specs
+from kraken.lib.vgsl import TorchVGSLModel
+from kraken.lib.exceptions import KrakenInputException
 
 
 logger = logging.getLogger('kraken')
@@ -818,7 +818,7 @@ def neural_reading_order(lines: Sequence[Dict],
                          text_direction: str = 'lr',
                          regions: Optional[Sequence[geom.Polygon]] = None,
                          im_size: Tuple[int, int] = None,
-                         model: 'TorchVGSLModel' = None,
+                         model: TorchVGSLModel = None,
                          class_mapping: Dict[str, int] = None) -> Sequence[int]:
     """
     Given a list of baselines and regions, calculates the correct reading order
@@ -1032,7 +1032,7 @@ def compute_polygon_section(baseline: Sequence[Tuple[int, int]],
     return tuple(o)
 
 
-def extract_polygons(im: Image.Image, bounds: 'kraken.containers.Segmentation') -> Image.Image:
+def extract_polygons(im: Image.Image, bounds: Segmentation) -> Image.Image:
     """
     Yields the subimages of image im defined in the list of bounding polygons
     with baselines preserving order.
