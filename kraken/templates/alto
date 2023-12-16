@@ -78,9 +78,9 @@
         <OtherTag DESCRIPTION="region type" ID="TYPE_{{ loop.index }}" TYPE={{ type }} LABEL="{{ label }}"/>
     {% endfor %}
     </Tags>
-    {% if len(page.line_orders) > 0 %}
+    {% if page.line_orders | length > 0 %}
     <ReadingOrder>
-        {% if len(page.line_orders) == 1 %}
+        {% if page.line_orders | length == 1 %}
         <OrderedGroup ID="ro_0">
            {% for id in page.line_orders[0] %}
            <ElementRef ID="o_{{ loop.index }}" REF="{{ id }}"/>
