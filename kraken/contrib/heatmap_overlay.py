@@ -4,6 +4,7 @@ Produces semi-transparent neural segmenter output overlays
 """
 import click
 
+
 @click.command()
 @click.option('-i', '--model', default=None, show_default=True, type=click.Path(exists=True),
               help='Baseline detection model to use.')

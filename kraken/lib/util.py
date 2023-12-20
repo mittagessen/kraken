@@ -8,13 +8,15 @@ import unicodedata
 import numpy as np
 
 from PIL import Image
-from os import PathLike
 
-from typing import Union, Callable, Optional, Literal
+from typing import Union, Callable, Optional, Literal, TYPE_CHECKING
 
 from kraken.lib import functional_im_transforms as F_t
 from kraken.containers import BBoxLine
-from kraken.exceptions import KrakenInputException
+from kraken.lib.exceptions import KrakenInputException
+
+if TYPE_CHECKING:
+    from os import PathLike
 
 __all__ = ['pil2array', 'array2pil', 'is_bitonal', 'make_printable', 'get_im_str', 'parse_gt_path']
 
@@ -101,9 +103,9 @@ def make_printable(char: str) -> str:
         return unicodedata.name(char)
 
 
-def parse_gt_path(path: Union[str, PathLike],
+def parse_gt_path(path: Union[str, 'PathLike'],
                   suffix: str = '.gt.txt',
-                  split: Callable[[Union[PathLike, str]], str] = F_t.default_split,
+                  split: Callable[[Union['PathLike', str]], str] = F_t.default_split,
                   skip_empty_lines: bool = True,
                   base_dir: Optional[Literal['L', 'R']] = None,
                   text_direction: Literal['horizontal-lr', 'horizontal-rl', 'vertical-lr', 'vertical-rl'] = 'horizontal-lr') -> BBoxLine:

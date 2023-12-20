@@ -21,18 +21,19 @@ Generators for recognition on lines images.
 import logging
 import dataclasses
 
-from PIL import Image
 from functools import partial
 from collections import defaultdict
-from typing import List, Tuple, Optional, Generator, Union, Dict, Sequence
+from typing import List, Tuple, Optional, Generator, Union, Dict, Sequence, TYPE_CHECKING
 
 from kraken.containers import BaselineOCRRecord, BBoxOCRRecord, ocr_record, Segmentation
 from kraken.lib.util import get_im_str, is_bitonal
-from kraken.lib.models import TorchSeqRecognizer
 from kraken.lib.segmentation import extract_polygons
 from kraken.lib.exceptions import KrakenInputException
 from kraken.lib.dataset import ImageInputTransforms
 
+if TYPE_CHECKING:
+    from PIL import Image
+    from kraken.lib.models import TorchSeqRecognizer
 
 __all__ = ['mm_rpred', 'rpred']
 

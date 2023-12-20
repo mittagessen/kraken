@@ -23,19 +23,24 @@ import warnings
 import logging
 import numpy as np
 
-from PIL import Image
 from kraken.lib.util import pil2array, array2pil, is_bitonal, get_im_str
 from scipy.ndimage import affine_transform, percentile_filter, gaussian_filter, binary_dilation
 from scipy.ndimage import zoom as _zoom
 
+from typing import TYPE_CHECKING
+
 from kraken.lib.exceptions import KrakenInputException
+
+if TYPE_CHECKING:
+    from PIL import Image
+
 
 __all__ = ['nlbin']
 
 logger = logging.getLogger(__name__)
 
 
-def nlbin(im: Image.Image,
+def nlbin(im: 'Image.Image',
           threshold: float = 0.5,
           zoom: float = 0.5,
           escale: float = 1.0,
@@ -43,7 +48,7 @@ def nlbin(im: Image.Image,
           perc: int = 80,
           range: int = 20,
           low: int = 5,
-          high: int = 90) -> Image.Image:
+          high: int = 90) -> 'Image.Image':
     """
     Performs binarization using non-linear processing.
 

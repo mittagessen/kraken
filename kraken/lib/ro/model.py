@@ -23,11 +23,9 @@ import numpy as np
 import torch.nn.functional as F
 import pytorch_lightning as pl
 
-from os import PathLike
 from torch.optim import lr_scheduler
 from dataclasses import dataclass, field
-from torch.nn import Module
-from typing import Dict, Optional, Sequence, Union, Any, Literal, List
+from typing import Dict, Optional, Sequence, Union, Any, Literal, List, TYPE_CHECKING
 
 from pytorch_lightning.callbacks import EarlyStopping, LearningRateMonitor
 
@@ -39,6 +37,9 @@ from kraken.lib.ro.layers import MLP
 
 from torch.utils.data import DataLoader, Subset
 
+if TYPE_CHECKING:
+    from os import PathLike
+    from torch.nn import Module
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +49,7 @@ class DummyVGSLModel:
     hyper_params: Dict[str, int] = field(default_factory=dict)
     user_metadata: Dict[str, List] = field(default_factory=dict)
     one_channel_mode: Literal['1', 'L'] = '1'
-    ptl_module: Module = None
+    ptl_module: 'Module' = None
     model_type: str = 'unknown'
 
     def __post_init__(self):
@@ -67,8 +68,8 @@ class ROModel(pl.LightningModule):
     def __init__(self,
                  hyper_params: Dict[str, Any] = None,
                  output: str = 'model',
-                 training_data: Union[Sequence[Union[PathLike, str]], Sequence[Dict[str, Any]]] = None,
-                 evaluation_data: Optional[Union[Sequence[Union[PathLike, str]], Sequence[Dict[str, Any]]]] = None,
+                 training_data: Union[Sequence[Union['PathLike', str]], Sequence[Dict[str, Any]]] = None,
+                 evaluation_data: Optional[Union[Sequence[Union['PathLike', str]], Sequence[Dict[str, Any]]]] = None,
                  partition: Optional[float] = 0.9,
                  num_workers: int = 1,
                  format_type: Literal['alto', 'page', 'xml'] = 'xml',

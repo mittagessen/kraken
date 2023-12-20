@@ -26,7 +26,7 @@ import tempfile
 from PIL import Image, UnidentifiedImageError
 from functools import partial
 from collections import Counter
-from typing import Optional, List, Union, Callable, Tuple, Dict
+from typing import Optional, List, Union, Callable, Tuple, Dict, TYPE_CHECKING
 from multiprocessing import Pool
 from kraken.containers import Segmentation
 from kraken.lib import functional_im_transforms as F_t
@@ -34,7 +34,9 @@ from kraken.lib.segmentation import extract_polygons
 from kraken.lib.xml import XMLPage
 from kraken.lib.util import is_bitonal, make_printable
 from kraken.lib.exceptions import KrakenInputException
-from os import PathLike
+
+if TYPE_CHECKING:
+    from os import PathLike
 
 import logging
 
@@ -89,7 +91,7 @@ def _extract_path_line(xml_record, skip_empty_lines: bool = True):
     return [line], im.mode
 
 
-def parse_path(path: Union[str, PathLike],
+def parse_path(path: Union[str, 'PathLike'],
                suffix: str = '.gt.txt',
                split=F_t.default_split,
                skip_empty_lines: bool = True):
@@ -101,8 +103,8 @@ def parse_path(path: Union[str, PathLike],
     return {'image': path, 'lines': [{'text': gt}]}
 
 
-def build_binary_dataset(files: Optional[List[Union[str, PathLike, Dict]]] = None,
-                         output_file: Union[str, PathLike] = None,
+def build_binary_dataset(files: Optional[List[Union[str, 'PathLike', Dict]]] = None,
+                         output_file: Union[str, 'PathLike'] = None,
                          format_type: str = 'xml',
                          num_workers: int = 0,
                          ignore_splits: bool = False,

@@ -19,13 +19,15 @@ import torch
 import numpy as np
 
 from math import factorial
-from os import PathLike
 from torch.utils.data import Dataset
-from typing import Dict, Sequence, Union, Literal, Optional
+from typing import Dict, Sequence, Union, Literal, Optional, TYPE_CHECKING
 
 from kraken.lib.xml import XMLPage
 
 from kraken.lib.exceptions import KrakenInputException
+
+if TYPE_CHECKING:
+    from os import PathLike
 
 __all__ = ['PairWiseROSet', 'PageWiseROSet']
 
@@ -40,7 +42,7 @@ class PairWiseROSet(Dataset):
 
     Returns random pairs of lines from the same page.
     """
-    def __init__(self, files: Sequence[Union[PathLike, str]] = None,
+    def __init__(self, files: Sequence[Union['PathLike', str]] = None,
                  mode: Optional[Literal['alto', 'page', 'xml']] = 'xml',
                  level: Literal['regions', 'baselines'] = 'baselines',
                  ro_id: Optional[str] = None,
@@ -142,7 +144,7 @@ class PageWiseROSet(Dataset):
 
     Returns all lines from the same page.
     """
-    def __init__(self, files: Sequence[Union[PathLike, str]] = None,
+    def __init__(self, files: Sequence[Union['PathLike', str]] = None,
                  mode: Optional[Literal['alto', 'page', 'xml']] = 'xml',
                  level: Literal['regions', 'baselines'] = 'baselines',
                  ro_id: Optional[str] = None,

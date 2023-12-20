@@ -11,7 +11,6 @@ from ray.tune.integration.pytorch_lightning import TuneReportCallback
 
 from kraken.lib.default_spec import RECOGNITION_PRETRAIN_HYPER_PARAMS, RECOGNITION_SPEC
 from kraken.lib.pretrain.model import PretrainDataModule, RecognitionPretrainModel
-from ray.tune.schedulers import ASHAScheduler
 
 import pytorch_lightning as pl
 

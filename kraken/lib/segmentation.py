@@ -15,7 +15,6 @@
 """
 Processing for baseline segmenter output
 """
-import PIL
 import torch
 import logging
 import numpy as np
@@ -40,14 +39,14 @@ from skimage.measure import approximate_polygon, subdivide_polygon, regionprops,
 from skimage.morphology import skeletonize
 from skimage.transform import PiecewiseAffineTransform, SimilarityTransform, AffineTransform, warp
 
-from typing import List, Tuple, Union, Dict, Sequence, Optional, Literal
-
-from kraken.containers import Segmentation
+from typing import List, Tuple, Union, Dict, Sequence, Optional, Literal, TYPE_CHECKING
 
 from kraken.lib import default_specs
-from kraken.lib.vgsl import TorchVGSLModel
 from kraken.lib.exceptions import KrakenInputException
 
+if TYPE_CHECKING:
+    from kraken.lib.vgsl import TorchVGSLModel
+    from kraken.containers import Segmentation
 
 logger = logging.getLogger('kraken')
 
@@ -631,7 +630,7 @@ def _calc_roi(line, bounds, baselines, suppl_obj, p_dir):
     return env_up, env_bottom
 
 
-def calculate_polygonal_environment(im: PIL.Image.Image = None,
+def calculate_polygonal_environment(im: Image.Image = None,
                                     baselines: Sequence[Sequence[Tuple[int, int]]] = None,
                                     suppl_obj: Sequence[Sequence[Tuple[int, int]]] = None,
                                     im_feats: np.ndarray = None,
@@ -643,27 +642,23 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
     environment around each baseline.
 
     Args:
-        im (PIL.Image): grayscale input image (mode 'L')
-        baselines (sequence): List of lists containing a single baseline per
-                              entry.
-        suppl_obj (sequence): List of lists containing additional polylines
-                              that should be considered hard boundaries for
-                              polygonizaton purposes. Can be used to prevent
-                              polygonization into non-text areas such as
-                              illustrations or to compute the polygonization of
-                              a subset of the lines in an image.
-        im_feats (numpy.array): An optional precomputed seamcarve energy map.
-                                Overrides data in `im`. The default map is
-                                `gaussian_filter(sobel(im), 2)`.
-        scale (tuple): A 2-tuple (h, w) containing optional scale factors of
-                       the input. Values of 0 are used for aspect-preserving
-                       scaling. `None` skips input scaling.
-        topline (bool): Switch to change default baseline location for offset
-                        calculation purposes. If set to False, baselines are
-                        assumed to be on the bottom of the text line and will
-                        be offset upwards, if set to True, baselines are on the
-                        top and will be offset downwards. If set to None, no
-                        offset will be applied.
+        im: grayscale input image (mode 'L')
+        baselines: List of lists containing a single baseline per entry.
+        suppl_obj: List of lists containing additional polylines that should be
+                   considered hard boundaries for polygonizaton purposes. Can
+                   be used to prevent polygonization into non-text areas such
+                   as illustrations or to compute the polygonization of a
+                   subset of the lines in an image.
+        im_feats: An optional precomputed seamcarve energy map. Overrides data
+                  in `im`. The default map is `gaussian_filter(sobel(im), 2)`.
+        scale: A 2-tuple (h, w) containing optional scale factors of the input.
+               Values of 0 are used for aspect-preserving scaling. `None` skips
+               input scaling.
+        topline: Switch to change default baseline location for offset
+                 calculation purposes. If set to False, baselines are assumed
+                 to be on the bottom of the text line and will be offset
+                 upwards, if set to True, baselines are on the top and will be
+                 offset downwards. If set to None, no offset will be applied.
         raise_on_error: Raises error instead of logging them when they are
                         not-blocking
     Returns:
@@ -745,11 +740,10 @@ def polygonal_reading_order(lines: Sequence[Dict],
     and applies it to the input.
 
     Args:
-        lines (Sequence): List of tuples containing the baseline and its
-                          polygonization.
-        regions (Sequence): List of region polygons.
-        text_direction (str): Set principal text direction for column ordering.
-                              Can be 'lr' or 'rl'
+        lines: List of tuples containing the baseline and its polygonization.
+        regions: List of region polygons.
+        text_direction: Set principal text direction for column ordering. Can
+                        be 'lr' or 'rl'
 
     Returns:
         The indices of the ordered input.
@@ -798,14 +792,14 @@ def polygonal_reading_order(lines: Sequence[Dict],
     return ordered_idxs
 
 
-def is_in_region(line, region) -> bool:
+def is_in_region(line: geom.LineString, region: geom.Polygon) -> bool:
     """
     Tests if a line is inside a region, i.e. if the mid point of the baseline
     is inside the region.
 
     Args:
-        line (geom.LineString): line to test
-        region (geom.Polygon): region to test against
+        line: line to test
+        region: region to test against
 
     Returns:
         False if line is not inside region, True otherwise.
@@ -818,7 +812,7 @@ def neural_reading_order(lines: Sequence[Dict],
                          text_direction: str = 'lr',
                          regions: Optional[Sequence[geom.Polygon]] = None,
                          im_size: Tuple[int, int] = None,
-                         model: TorchVGSLModel = None,
+                         model: 'TorchVGSLModel' = None,
                          class_mapping: Dict[str, int] = None) -> Sequence[int]:
     """
     Given a list of baselines and regions, calculates the correct reading order
@@ -911,9 +905,8 @@ def scale_regions(regions: Sequence[Tuple[List[int], List[int]]],
     Scales baselines/polygon coordinates by a certain factor.
 
     Args:
-        lines (Sequence): List of tuples containing the baseline and it's
-                          polygonization.
-        scale (float or tuple of floats): Scaling factor
+        lines: List of tuples containing the baseline and its polygonization.
+        scale: Scaling factor
     """
     if isinstance(scale, float):
         scale = (scale, scale)
@@ -928,9 +921,8 @@ def scale_polygonal_lines(lines: Sequence[Tuple[List, List]], scale: Union[float
     Scales baselines/polygon coordinates by a certain factor.
 
     Args:
-        lines (Sequence): List of tuples containing the baseline and it's
-                          polygonization.
-        scale (float or tuple of floats): Scaling factor
+        lines: List of tuples containing the baseline and its polygonization.
+        scale: Scaling factor
     """
     if isinstance(scale, float):
         scale = (scale, scale)
@@ -974,11 +966,11 @@ def compute_polygon_section(baseline: Sequence[Tuple[int, int]],
     baseline will be extrapolated to the polygon edge.
 
     Args:
-        baseline (list): A polyline ((x1, y1), ..., (xn, yn))
-        boundary (list): A bounding polygon around the baseline (same format as
-                         baseline).
-        dist1 (int): Absolute distance along the baseline of the first point.
-        dist2 (int): Absolute distance along the baseline of the second point.
+        baseline: A polyline ((x1, y1), ..., (xn, yn))
+        boundary: A bounding polygon around the baseline (same format as
+                  baseline). Last and first point are automatically connected.
+        dist1: Absolute distance along the baseline of the first point.
+        dist2: Absolute distance along the baseline of the second point.
 
     Returns:
         A sequence of polygon points.
@@ -1032,7 +1024,7 @@ def compute_polygon_section(baseline: Sequence[Tuple[int, int]],
     return tuple(o)
 
 
-def extract_polygons(im: Image.Image, bounds: Segmentation) -> Image.Image:
+def extract_polygons(im: Image.Image, bounds: 'Segmentation') -> Image.Image:
     """
     Yields the subimages of image im defined in the list of bounding polygons
     with baselines preserving order.

@@ -1,6 +1,7 @@
 #! /usr/bin/env python
 import click
 
+
 @click.command()
 @click.option('-f', '--format-type', type=click.Choice(['xml', 'alto', 'page', 'binary']), default='xml',
               help='Sets the input document format. In ALTO and PageXML mode all '

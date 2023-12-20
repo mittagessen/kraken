@@ -11,6 +11,7 @@ import dataclasses
 from itertools import cycle
 from collections import defaultdict
 
+
 cmap = cycle([(230, 25, 75, 127),
               (60, 180, 75, 127)])
 

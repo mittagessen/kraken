@@ -23,11 +23,10 @@ import numpy as np
 import torch.nn.functional as F
 import pytorch_lightning as pl
 
-from os import PathLike
 from torchmetrics.classification import MultilabelAccuracy, MultilabelJaccardIndex
 from torchmetrics.text import CharErrorRate, WordErrorRate
 from torch.optim import lr_scheduler
-from typing import Callable, Dict, Optional, Sequence, Union, Any, Literal
+from typing import Callable, Dict, Optional, Sequence, Union, Any, Literal, TYPE_CHECKING
 from pytorch_lightning.callbacks import Callback, EarlyStopping, BaseFinetuning, LearningRateMonitor
 
 from kraken.containers import Segmentation, XMLPage
@@ -42,6 +41,8 @@ from kraken.lib.exceptions import KrakenInputException, KrakenEncodeException
 
 from torch.utils.data import DataLoader, random_split, Subset
 
+if TYPE_CHECKING:
+    from os import PathLike
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +77,7 @@ class KrakenTrainer(pl.Trainer):
                  max_epochs: int = 100,
                  freeze_backbone=-1,
                  pl_logger: Union[pl.loggers.logger.Logger, str, None] = None,
-                 log_dir: Optional[PathLike] = None,
+                 log_dir: Optional['PathLike'] = None,
                  *args,
                  **kwargs):
         kwargs['enable_checkpointing'] = False
@@ -200,10 +201,10 @@ class RecognitionModel(pl.LightningModule):
                  output: str = 'model',
                  spec: str = default_specs.RECOGNITION_SPEC,
                  append: Optional[int] = None,
-                 model: Optional[Union[PathLike, str]] = None,
+                 model: Optional[Union['PathLike', str]] = None,
                  reorder: Union[bool, str] = True,
-                 training_data: Union[Sequence[Union[PathLike, str]], Sequence[Dict[str, Any]]] = None,
-                 evaluation_data: Optional[Union[Sequence[Union[PathLike, str]], Sequence[Dict[str, Any]]]] = None,
+                 training_data: Union[Sequence[Union['PathLike', str]], Sequence[Dict[str, Any]]] = None,
+                 evaluation_data: Optional[Union[Sequence[Union['PathLike', str]], Sequence[Dict[str, Any]]]] = None,
                  partition: Optional[float] = 0.9,
                  binary_dataset_split: bool = False,
                  num_workers: int = 1,
@@ -494,8 +495,13 @@ class RecognitionModel(pl.LightningModule):
             for i in range(self.hparams.batch_size):
                 count = self.hparams.batch_size * batch_idx + i
                 if count < 16:
-                    self.logger.experiment.add_image(f'Validation #{count}, target: {decoded_targets[i]}', batch['image'][i], self.global_step, dataformats="CHW")
-                    self.logger.experiment.add_text(f'Validation #{count}, target: {decoded_targets[i]}', pred[i], self.global_step)
+                    self.logger.experiment.add_image(f'Validation #{count}, target: {decoded_targets[i]}',
+                                                     batch['image'][i],
+                                                     self.global_step,
+                                                     dataformats="CHW")
+                    self.logger.experiment.add_text(f'Validation #{count}, target: {decoded_targets[i]}',
+                                                    pred[i],
+                                                    self.global_step)
 
     def on_validation_epoch_end(self):
         accuracy = 1.0 - self.val_cer.compute()
@@ -686,9 +692,9 @@ class SegmentationModel(pl.LightningModule):
                  message: Callable[[str], None] = lambda *args, **kwargs: None,
                  output: str = 'model',
                  spec: str = default_specs.SEGMENTATION_SPEC,
-                 model: Optional[Union[PathLike, str]] = None,
-                 training_data: Union[Sequence[Union[PathLike, str]], Sequence[Dict[str, Any]]] = None,
-                 evaluation_data: Optional[Union[Sequence[Union[PathLike, str]], Sequence[Dict[str, Any]]]] = None,
+                 model: Optional[Union['PathLike', str]] = None,
+                 training_data: Union[Sequence[Union['PathLike', str]], Sequence[Dict[str, Any]]] = None,
+                 evaluation_data: Optional[Union[Sequence[Union['PathLike', str]], Sequence[Dict[str, Any]]]] = None,
                  partition: Optional[float] = 0.9,
                  num_workers: int = 1,
                  force_binarization: bool = False,

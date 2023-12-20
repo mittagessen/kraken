@@ -18,17 +18,19 @@ ALTO/Page data loaders for segmentation training
 import re
 import logging
 
-from os import PathLike
 from pathlib import Path
 
 from itertools import groupby
 from lxml import etree
-from typing import Union, Dict, Any, Sequence, Tuple, Literal, Optional, List
+from typing import Union, Dict, Any, Sequence, Tuple, Literal, Optional, List, TYPE_CHECKING
 
 from collections import defaultdict
 from kraken.containers import Segmentation, BaselineLine, Region
 
 logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from os import PathLike
 
 __all__ = ['XMLPage']
 
@@ -61,7 +63,7 @@ class XMLPage(object):
 
     type: Literal['baselines', 'bbox'] = 'baselines'
     base_dir: Optional[Literal['L', 'R']] = None
-    imagename: PathLike = None
+    imagename: 'PathLike' = None
     image_size: Tuple[int, int] = None
     _orders: Dict[str, Dict[str, Any]] = None
     has_tags: bool = False
@@ -70,7 +72,7 @@ class XMLPage(object):
     _split_set: Optional[List] = None
 
     def __init__(self,
-                 filename: Union[str, PathLike],
+                 filename: Union[str, 'PathLike'],
                  filetype: Literal['xml', 'alto', 'page'] = 'xml'):
         super().__init__()
         self.filename = Path(filename)

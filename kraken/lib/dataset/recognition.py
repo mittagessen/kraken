@@ -24,12 +24,11 @@ import numpy as np
 import pyarrow as pa
 
 from PIL import Image
-from os import PathLike
 from functools import partial
 from torchvision import transforms
 from collections import Counter
 from torch.utils.data import Dataset
-from typing import List, Tuple, Callable, Optional, Any, Union, Literal
+from typing import List, Tuple, Callable, Optional, Any, Union, Literal, TYPE_CHECKING
 
 from kraken.containers import BaselineLine, BBoxLine, Segmentation
 from kraken.lib.util import is_bitonal
@@ -38,6 +37,9 @@ from kraken.lib.segmentation import extract_polygons
 from kraken.lib.exceptions import KrakenInputException, KrakenEncodeException
 
 from kraken.lib import functional_im_transforms as F_t
+
+if TYPE_CHECKING:
+    from os import PathLike
 
 __all__ = ['DefaultAugmenter',
            'ArrowIPCRecognitionDataset',
@@ -137,7 +139,7 @@ class ArrowIPCRecognitionDataset(Dataset):
 
         self.im_mode = self.transforms.mode
 
-    def add(self, file: Union[str, PathLike]) -> None:
+    def add(self, file: Union[str, 'PathLike']) -> None:
         """
         Adds an Arrow IPC file to the dataset.
 

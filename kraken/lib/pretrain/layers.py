@@ -3,11 +3,13 @@ Layers for VGSL models
 """
 import torch
 
-from typing import Tuple, Optional
+from typing import Tuple, Optional, TYPE_CHECKING
 from torch.nn import Module, Embedding, Linear
 
-from kraken.lib.vgsl import VGSLBlock
 from kraken.lib.pretrain.util import compute_mask_indices, sample_negatives
+
+if TYPE_CHECKING:
+    from kraken.lib.vgsl import VGSLBlock
 
 # all tensors are ordered NCHW, the "feature" dimension is C, so the output of
 # an LSTM will be put into C same as the filters of a CNN.

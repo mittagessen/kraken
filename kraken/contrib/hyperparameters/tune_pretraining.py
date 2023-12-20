@@ -51,6 +51,7 @@ def train_tune(config, training_data=None, epochs=100, spec=RECOGNITION_SPEC):
                          enable_progress_bar=False)
     trainer.fit(model, datamodule=data_module)
 
+
 @click.command()
 @click.option('-v', '--verbose', default=0, count=True)
 @click.option('-s', '--seed', default=42, type=click.INT,
@@ -82,6 +83,7 @@ def cli(verbose, seed, output, num_samples, epochs, spec, training_files, files)
                                 spec=spec), local_dir=output, num_samples=num_samples, resources_per_trial=resources_per_trial, config=config)
 
     click.echo("Best hyperparameters found were: ", analysis.get_best_config(metric='accuracy', mode='max'))
+
 
 if __name__ == '__main__':
     cli()

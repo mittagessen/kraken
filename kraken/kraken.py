@@ -86,7 +86,7 @@ def binarizer(threshold, zoom, escale, border, perc, range, low, high, input, ou
                                  low, high)
         if ctx.meta['last_process'] and ctx.meta['output_mode'] != 'native':
             with click.open_file(output, 'w', encoding='utf-8') as fp:
-                fp = cast(IO[Any], fp)
+                fp = cast('IO[Any]', fp)
                 logger.info('Serializing as {} into {}'.format(ctx.meta['output_mode'], output))
                 res.save(f'{output}.png')
                 from kraken import serialization
@@ -159,7 +159,7 @@ def segmenter(legacy, model, text_direction, scale, maxcolseps, black_colseps,
         ctx.exit(1)
     if ctx.meta['last_process'] and ctx.meta['output_mode'] != 'native':
         with click.open_file(output, 'w', encoding='utf-8') as fp:
-            fp = cast(IO[Any], fp)
+            fp = cast('IO[Any]', fp)
             logger.info('Serializing as {} into {}'.format(ctx.meta['output_mode'], output))
             from kraken import serialization
             fp.write(serialization.serialize_segmentation(res,
@@ -170,7 +170,7 @@ def segmenter(legacy, model, text_direction, scale, maxcolseps, black_colseps,
                                                           processing_steps=ctx.meta['steps']))
     else:
         with click.open_file(output, 'w') as fp:
-            fp = cast(IO[Any], fp)
+            fp = cast('IO[Any]', fp)
             json.dump(dataclasses.asdict(res), fp)
     message('\u2713', fg='green')
 
@@ -208,7 +208,7 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore, input,
     if not bounds and ctx.meta['base_image'] != input:
         with click.open_file(input, 'r') as fp:
             try:
-                fp = cast(IO[Any], fp)
+                fp = cast('IO[Any]', fp)
                 bounds = Segmentation(**json.load(fp))
             except ValueError as e:
                 raise click.UsageError(f'{input} invalid segmentation: {str(e)}')
@@ -244,7 +244,7 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore, input,
 
     ctx = click.get_current_context()
     with click.open_file(output, 'w', encoding='utf-8') as fp:
-        fp = cast(IO[Any], fp)
+        fp = cast('IO[Any]', fp)
         message(f'Writing recognition results for {ctx.meta["orig_file"]}\t', nl=False)
         logger.info('Serializing as {} into {}'.format(ctx.meta['output_mode'], output))
         if ctx.meta['output_mode'] != 'native':

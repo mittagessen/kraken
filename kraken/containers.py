@@ -22,12 +22,15 @@ functional blocks.
 import numpy as np
 import bidi.algorithm as bd
 
-from os import PathLike
-from typing import Literal, List, Dict, Union, Optional, Tuple, Any
+from typing import Literal, List, Dict, Union, Optional, Tuple, Any, TYPE_CHECKING
 from dataclasses import dataclass, asdict
 from abc import ABC, abstractmethod
 
 from kraken.lib.segmentation import compute_polygon_section
+
+if TYPE_CHECKING:
+    from os import PathLike
+
 
 __all__ = ['BaselineLine',
            'BBoxLine',
@@ -85,7 +88,7 @@ class BaselineLine:
     text: Optional[str] = None
     base_dir: Optional[Literal['L', 'R']] = None
     type: str = 'baselines'
-    imagename: Optional[Union[str, PathLike]] = None
+    imagename: Optional[Union[str, 'PathLike']] = None
     tags: Optional[Dict[str, str]] = None
     split: Optional[Literal['train', 'validation', 'test']] = None
     regions: Optional[List[str]] = None
@@ -124,7 +127,7 @@ class BBoxLine:
     text: Optional[str] = None
     base_dir: Optional[Literal['L', 'R']] = None
     type: str = 'bbox'
-    imagename: Optional[Union[str, PathLike]] = None
+    imagename: Optional[Union[str, 'PathLike']] = None
     tags: Optional[Dict[str, str]] = None
     split: Optional[Literal['train', 'validation', 'test']] = None
     regions: Optional[List[str]] = None
@@ -145,7 +148,7 @@ class Region:
     """
     id: str
     boundary: List[Tuple[int, int]]
-    imagename: Optional[Union[str, PathLike]] = None
+    imagename: Optional[Union[str, 'PathLike']] = None
     tags: Optional[Dict[str, str]] = None
 
 
@@ -175,7 +178,7 @@ class Segmentation:
                      Each reading order is a list of line indices.
     """
     type: Literal['baselines', 'bbox']
-    imagename: Union[str, PathLike]
+    imagename: Union[str, 'PathLike']
     text_direction: Literal['horizontal-lr', 'horizontal-rl', 'vertical-lr', 'vertical-rl']
     script_detection: bool
     lines: List[Union[BaselineLine, BBoxLine]]

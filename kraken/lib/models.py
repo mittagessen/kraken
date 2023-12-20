@@ -5,7 +5,6 @@ kraken.lib.models
 Wrapper around TorchVGSLModel including a variety of forward pass helpers for
 sequence classification.
 """
-from os import PathLike
 from os.path import expandvars, expanduser, abspath
 
 import torch
@@ -13,10 +12,14 @@ import numpy as np
 import kraken.lib.lineest
 import kraken.lib.ctc_decoder
 
-from typing import List, Tuple, Optional, Union
+from typing import List, Tuple, Optional, Union, TYPE_CHECKING
 
 from kraken.lib.vgsl import TorchVGSLModel
 from kraken.lib.exceptions import KrakenInvalidModelException, KrakenInputException
+
+if TYPE_CHECKING:
+    from os import PathLike
+
 
 __all__ = ['TorchSeqRecognizer', 'load_any']
 
@@ -171,7 +174,7 @@ class TorchSeqRecognizer(object):
         return oseqs
 
 
-def load_any(fname: Union[PathLike, str],
+def load_any(fname: Union['PathLike', str],
              train: bool = False,
              device: str = 'cpu') -> TorchSeqRecognizer:
     """

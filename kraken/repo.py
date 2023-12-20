@@ -20,12 +20,15 @@ import json
 import logging
 import requests
 
-from os import PathLike
 from pathlib import Path
 from contextlib import closing
-from typing import Callable, Any
+from typing import Callable, Any, TYPE_CHECKING
 
 from kraken.lib.exceptions import KrakenRepoException
+
+if TYPE_CHECKING:
+    from os import PathLike
+
 
 __all__ = ['get_model', 'get_description', 'get_listing', 'publish_model']
 
@@ -35,7 +38,7 @@ MODEL_REPO = 'https://zenodo.org/api/'
 SUPPORTED_MODELS = set(['kraken_pytorch'])
 
 
-def publish_model(model_file: [str, PathLike] = None,
+def publish_model(model_file: [str, 'PathLike'] = None,
                   metadata: dict = None,
                   access_token: str = None,
                   callback: Callable[[int, int], Any] = lambda: None,

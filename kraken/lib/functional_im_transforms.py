@@ -21,15 +21,17 @@ import regex
 import unicodedata
 import bidi.algorithm as bd
 
-from os import PathLike
 from pathlib import Path
-from PIL import Image
 from PIL.Image import Resampling
 
-from typing import Tuple, Optional, Callable, Any, Union
+from typing import Tuple, Optional, Callable, Any, Union, TYPE_CHECKING
 
 from kraken.binarization import nlbin
 from kraken.lib.lineest import dewarp, CenterNormalizer
+
+if TYPE_CHECKING:
+    from os import PathLike
+    from PIL import Image
 
 
 def pil_to_mode(im: Image.Image, mode: str) -> Image.Image:

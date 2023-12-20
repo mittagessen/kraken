@@ -27,12 +27,13 @@ from itertools import groupby
 from torchvision import transforms
 from collections import defaultdict
 from torch.utils.data import Dataset
-from typing import Dict, Tuple, Sequence, Callable, Any, Union, Literal, Optional
+from typing import Dict, Tuple, Sequence, Callable, Any, Union, Literal, Optional, TYPE_CHECKING
 
 from skimage.draw import polygon
 
-from kraken.containers import Segmentation
-from kraken.lib.xml import XMLPage
+if TYPE_CHECKING:
+    from kraken.containers import Segmentation
+    from kraken.lib.xml import XMLPage
 
 
 __all__ = ['BaselineSet']
@@ -124,7 +125,7 @@ class BaselineSet(Dataset):
         self.transforms = im_transforms
         self.seg_type = None
 
-    def add(self, doc: Union[Segmentation, XMLPage]):
+    def add(self, doc: Union['Segmentation', 'XMLPage']):
         """
         Adds a page to the dataset.
 

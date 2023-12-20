@@ -15,17 +15,19 @@
 """
 Handlers for rich-based progress bars.
 """
-from typing import Union
+from typing import Union, TYPE_CHECKING
 from dataclasses import dataclass
 
 from pytorch_lightning.callbacks.progress.rich_progress import CustomProgress, RichProgressBar, MetricsTextColumn
 
 from rich import get_console, reconfigure
-from rich.console import RenderableType
 from rich.progress import BarColumn, Progress, ProgressColumn, TextColumn, TimeRemainingColumn, TimeElapsedColumn, DownloadColumn
 from rich.text import Text
-from rich.style import Style
 from rich.default_styles import DEFAULT_STYLES
+
+if TYPE_CHECKING:
+    from rich.style import Style
+    from rich.console import RenderableType
 
 __all__ = ['KrakenProgressBar', 'KrakenDownloadProgressBar', 'KrakenTrainProgressBar']
 
@@ -34,7 +36,7 @@ class BatchesProcessedColumn(ProgressColumn):
     def __init__(self):
         super().__init__()
 
-    def render(self, task) -> RenderableType:
+    def render(self, task) -> 'RenderableType':
         total = task.total if task.total != float("inf") else "--"
         return Text(f"{int(task.completed)}/{total}", style='magenta')
 
@@ -147,11 +149,11 @@ class RichProgressBarTheme:
     https://rich.readthedocs.io/en/stable/style.html
     """
 
-    description: Union[str, Style] = DEFAULT_STYLES['progress.description']
-    progress_bar: Union[str, Style] = DEFAULT_STYLES['bar.complete']
-    progress_bar_finished: Union[str, Style] = DEFAULT_STYLES['bar.finished']
-    progress_bar_pulse: Union[str, Style] = DEFAULT_STYLES['bar.pulse']
-    batch_progress: Union[str, Style] = DEFAULT_STYLES['progress.description']
-    time: Union[str, Style] = DEFAULT_STYLES['progress.elapsed']
-    processing_speed: Union[str, Style] = DEFAULT_STYLES['progress.data.speed']
-    metrics: Union[str, Style] = DEFAULT_STYLES['progress.description']
+    description: Union[str, 'Style'] = DEFAULT_STYLES['progress.description']
+    progress_bar: Union[str, 'Style'] = DEFAULT_STYLES['bar.complete']
+    progress_bar_finished: Union[str, 'Style'] = DEFAULT_STYLES['bar.finished']
+    progress_bar_pulse: Union[str, 'Style'] = DEFAULT_STYLES['bar.pulse']
+    batch_progress: Union[str, 'Style'] = DEFAULT_STYLES['progress.description']
+    time: Union[str, 'Style'] = DEFAULT_STYLES['progress.elapsed']
+    processing_speed: Union[str, 'Style'] = DEFAULT_STYLES['progress.data.speed']
+    metrics: Union[str, 'Style'] = DEFAULT_STYLES['progress.description']

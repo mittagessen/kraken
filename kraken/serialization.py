@@ -18,14 +18,16 @@ import regex
 import logging
 import datetime
 
-from os import PathLike
 from pkg_resources import get_distribution
-from collections import Counter
 
-from kraken.containers import Segmentation, ProcessingStep
 from kraken.lib.util import make_printable
 
-from typing import List, Tuple, Iterable, Optional, Sequence, Literal
+from typing import List, Tuple, Iterable, Optional, Sequence, Literal, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from os import PathLike
+    from collections import Counter
+    from kraken.containers import Segmentation, ProcessingStep
 
 logger = logging.getLogger(__name__)
 
@@ -68,13 +70,13 @@ def max_bbox(boxes: Iterable[Sequence[int]]) -> Tuple[int, int, int, int]:
     return o
 
 
-def serialize(results: Segmentation,
+def serialize(results: 'Segmentation',
               image_size: Tuple[int, int] = (0, 0),
               writing_mode: Literal['horizontal-tb', 'vertical-lr', 'vertical-rl'] = 'horizontal-tb',
               scripts: Optional[Iterable[str]] = None,
-              template: [PathLike, str] = 'alto',
+              template: ['PathLike', str] = 'alto',
               template_source: Literal['native', 'custom'] = 'native',
-              processing_steps: Optional[List[ProcessingStep]] = None) -> str:
+              processing_steps: Optional[List['ProcessingStep']] = None) -> str:
     """
     Serializes recognition and segmentation results into an output document.
 
@@ -243,11 +245,11 @@ def serialize(results: Segmentation,
 def render_report(model: str,
                   chars: int,
                   errors: int,
-                  char_confusions: Counter,
-                  scripts: Counter,
-                  insertions: Counter,
+                  char_confusions: 'Counter',
+                  scripts: 'Counter',
+                  insertions: 'Counter',
                   deletions: int,
-                  substitutions: Counter) -> str:
+                  substitutions: 'Counter') -> str:
     """
     Renders an accuracy report.
 

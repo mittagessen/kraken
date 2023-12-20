@@ -202,7 +202,7 @@ def transcription(ctx, text_direction, scale, bw, maxcolseps,
             else:
                 with click.open_file(lines, 'r') as fp:
                     try:
-                        fp = cast(IO[Any], fp)
+                        fp = cast('IO[Any]', fp)
                         res = json.load(fp)
                     except ValueError as e:
                         raise click.UsageError('{} invalid segmentation: {}'.format(lines, str(e)))

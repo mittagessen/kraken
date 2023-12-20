@@ -36,10 +36,9 @@ import numpy as np
 import torch.nn.functional as F
 import pytorch_lightning as pl
 
-from os import PathLike
 from itertools import chain
 from torch.optim import lr_scheduler
-from typing import Dict, Optional, Sequence, Union, Any
+from typing import Dict, Optional, Sequence, Union, Any, TYPE_CHECKING
 from pytorch_lightning.callbacks import EarlyStopping
 from pytorch_lightning.utilities.memory import is_oom_error, garbage_collection_cuda
 
@@ -58,6 +57,8 @@ from kraken.lib.pretrain.layers import Wav2Vec2Mask
 
 from torch.utils.data import DataLoader, random_split, Subset
 
+if TYPE_CHECKING:
+    from os import PathLike
 
 logger = logging.getLogger(__name__)
 
@@ -74,8 +75,8 @@ def _star_fun(fun, kwargs):
 
 class PretrainDataModule(pl.LightningDataModule):
     def __init__(self,
-                 training_data: Union[Sequence[Union[PathLike, str]], Sequence[Dict[str, Any]]] = None,
-                 evaluation_data: Optional[Union[Sequence[Union[PathLike, str]], Sequence[Dict[str, Any]]]] = None,
+                 training_data: Union[Sequence[Union['PathLike', str]], Sequence[Dict[str, Any]]] = None,
+                 evaluation_data: Optional[Union[Sequence[Union['PathLike', str]], Sequence[Dict[str, Any]]]] = None,
                  partition: Optional[float] = 0.9,
                  binary_dataset_split: bool = False,
                  batch_size: int = 4,
@@ -253,7 +254,7 @@ class RecognitionPretrainModel(pl.LightningModule):
                  hyper_params: Dict[str, Any] = None,
                  output: str = 'model',
                  spec: str = default_specs.RECOGNITION_SPEC,
-                 model: Optional[Union[PathLike, str]] = None,
+                 model: Optional[Union['PathLike', str]] = None,
                  load_hyper_parameters: bool = False,
                  len_train_set: int = -1):
         """

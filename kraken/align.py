@@ -29,16 +29,18 @@ from PIL import Image
 from bidi.algorithm import get_display
 
 from dataclasses import dataclass
-from typing import Optional, Literal
+from typing import Optional, Literal, TYPE_CHECKING
 
 from kraken import rpred
 from kraken.containers import Segmentation, BaselineOCRRecord
-from kraken.lib.models import TorchSeqRecognizer
+
+if TYPE_CHECKING:
+    from kraken.lib.models import TorchSeqRecognizer
 
 logger = logging.getLogger('kraken')
 
 
-def forced_align(doc: Segmentation, model: TorchSeqRecognizer, base_dir: Optional[Literal['L', 'R']] = None) -> Segmentation:
+def forced_align(doc: Segmentation, model: 'TorchSeqRecognizer', base_dir: Optional[Literal['L', 'R']] = None) -> Segmentation:
     """
     Performs a forced character alignment of text with recognition model
     output activations.
