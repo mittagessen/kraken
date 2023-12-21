@@ -1,7 +1,6 @@
 import warnings
 import numpy as np
 
-from kraken.lib.util import pil2array, array2pil
 from scipy.ndimage import affine_transform, gaussian_filter, uniform_filter
 
 from typing import TYPE_CHECKING
@@ -77,8 +76,10 @@ def dewarp(normalizer: CenterNormalizer, im: 'Image.Image') -> 'Image.Image':
         im: Image to dewarp
 
     Returns:
-        PIL.Image containing the dewarped image.
+        PIL.Image.Image containing the dewarped image.
     """
+    from kraken.lib.util import pil2array, array2pil
+
     line = pil2array(im)
     temp = np.amax(line)-line
     temp = temp*1.0/np.amax(temp)
