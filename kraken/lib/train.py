@@ -29,7 +29,7 @@ from torch.optim import lr_scheduler
 from typing import Callable, Dict, Optional, Sequence, Union, Any, Literal, TYPE_CHECKING
 from pytorch_lightning.callbacks import Callback, EarlyStopping, BaseFinetuning, LearningRateMonitor
 
-from kraken.containers import Segmentation, XMLPage
+from kraken.containers import Segmentation
 from kraken.lib import models, vgsl, default_specs, progress
 from kraken.lib.util import make_printable, parse_gt_path
 from kraken.lib.codec import PytorchCodec
@@ -38,6 +38,7 @@ from kraken.lib.dataset import (ArrowIPCRecognitionDataset, BaselineSet,
                                 ImageInputTransforms, collate_sequences)
 from kraken.lib.models import validate_hyper_parameters
 from kraken.lib.exceptions import KrakenInputException, KrakenEncodeException
+from kraken.lib.xml import XMLPage
 
 from torch.utils.data import DataLoader, random_split, Subset
 
