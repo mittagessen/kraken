@@ -1,10 +1,6 @@
 # -*- coding: utf-8 -*-
 
 import unittest
-import json
-
-import kraken
-import dataclasses
 
 from pathlib import Path
 

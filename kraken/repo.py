@@ -183,19 +183,19 @@ def get_description(model_id: str, callback: Callable[..., Any] = lambda: None) 
         raise KrakenRepoException(msg)
     meta_json = None
     for file in record['files']:
-        if file['filename'] == 'metadata.json':
-            callback()
-            r = requests.get(file['links']['download'])
-            r.raise_for_status()
-            callback()
-            try:
-                meta_json = r.json()
-            except Exception:
-                msg = f'Metadata for \'{record["metadata"]["title"]}\' ({record["metadata"]["doi"]}) not in JSON format'
-                logger.error(msg)
-                raise KrakenRepoException(msg)
+        for file in record['files']:
+            if file['key'] == 'metadata.json':
+                callback()
+                r = requests.get(file['links']['self'])
+                r.raise_for_status()
+                try:
+                    meta_json = r.json()
+                except Exception:
+                    msg = f'Metadata for \'{record["metadata"]["title"]}\' ({record["metadata"]["doi"]}) not in JSON format'
+                    logger.error(msg)
+                    raise KrakenRepoException(msg)
     if not meta_json:
-        msg = 'Mo metadata.jsn found for \'{}\' ({})'.format(record['metadata']['title'], record['metadata']['doi'])
+        msg = 'Mo metadata.json found for \'{}\' ({})'.format(record['metadata']['title'], record['metadata']['doi'])
         logger.error(msg)
         raise KrakenRepoException(msg)
     # merge metadata.json into DataCite

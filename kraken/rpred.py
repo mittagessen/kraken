@@ -25,7 +25,7 @@ from functools import partial
 from collections import defaultdict
 from typing import List, Tuple, Optional, Generator, Union, Dict, Sequence, TYPE_CHECKING
 
-from kraken.containers import BaselineOCRRecord, BBoxOCRRecord, ocr_record, Segmentation
+from kraken.containers import BaselineOCRRecord, BBoxOCRRecord, ocr_record
 from kraken.lib.util import get_im_str, is_bitonal
 from kraken.lib.segmentation import extract_polygons
 from kraken.lib.exceptions import KrakenInputException
@@ -33,6 +33,7 @@ from kraken.lib.dataset import ImageInputTransforms
 
 if TYPE_CHECKING:
     from PIL import Image
+    from kraken.containers import Segmentation
     from kraken.lib.models import TorchSeqRecognizer
 
 __all__ = ['mm_rpred', 'rpred']
@@ -45,9 +46,9 @@ class mm_rpred(object):
     Multi-model version of kraken.rpred.rpred
     """
     def __init__(self,
-                 nets: Dict[Tuple[str, str], TorchSeqRecognizer],
-                 im: Image.Image,
-                 bounds: Segmentation,
+                 nets: Dict[Tuple[str, str], 'TorchSeqRecognizer'],
+                 im: 'Image.Image',
+                 bounds: 'Segmentation',
                  pad: int = 16,
                  bidi_reordering: Union[bool, str] = True,
                  tags_ignore: Optional[List[Tuple[str, str]]] = None) -> Generator[ocr_record, None, None]:
@@ -291,9 +292,9 @@ class mm_rpred(object):
         return int(round(min(max(((val*self.net_scale)-self.pad)*self.in_scale, min_val), max_val-1)))
 
 
-def rpred(network: TorchSeqRecognizer,
-          im: Image.Image,
-          bounds: Segmentation,
+def rpred(network: 'TorchSeqRecognizer',
+          im: 'Image.Image',
+          bounds: 'Segmentation',
           pad: int = 16,
           bidi_reordering: Union[bool, str] = True) -> Generator[ocr_record, None, None]:
     """
@@ -319,8 +320,8 @@ def rpred(network: TorchSeqRecognizer,
 
 
 def _resolve_tags_to_model(tags: Sequence[Dict[str, str]],
-                           model_map: Dict[Tuple[str, str], TorchSeqRecognizer],
-                           default: Optional[TorchSeqRecognizer] = None) -> TorchSeqRecognizer:
+                           model_map: Dict[Tuple[str, str], 'TorchSeqRecognizer'],
+                           default: Optional['TorchSeqRecognizer'] = None) -> 'TorchSeqRecognizer':
     """
     Resolves a sequence of tags
     """
