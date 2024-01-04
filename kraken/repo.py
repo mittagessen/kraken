@@ -248,6 +248,7 @@ def get_listing(callback: Callable[[int, int], Any] = lambda total, advance: Non
         model_type = SUPPORTED_MODELS.intersection(record['metadata']['keywords'])
         if not model_type:
             continue
+        metadata = None
         for file in record['files']:
             if file['key'] == 'metadata.json':
                 callback(total, 1)
@@ -259,6 +260,9 @@ def get_listing(callback: Callable[[int, int], Any] = lambda total, advance: Non
                     msg = f'Metadata for \'{record["metadata"]["title"]}\' ({record["metadata"]["doi"]}) not in JSON format'
                     logger.error(msg)
                     raise KrakenRepoException(msg)
+        if not metadata:
+            logger.warning(f"No metadata found for record '{record['doi']}'.")
+            continue
         # merge metadata.jsn into DataCite
         key = record['metadata']['doi']
         models[key] = record['metadata']

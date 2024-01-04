@@ -528,7 +528,7 @@ class GroundTruthDataset(Dataset):
             self.add_line(line)
         if page:
             self.add_page(page)
-        if not (line and page):
+        if not (line or page):
             raise ValueError('Neither line nor page data provided in dataset builder')
 
     def add_page(self, page: Segmentation):
@@ -567,12 +567,10 @@ class GroundTruthDataset(Dataset):
             text = func(text)
         if not text and self.skip_empty_lines:
             raise ValueError(f'Text line "{line.text}" is empty after transformations')
-        if not line.baseline:
-            raise ValueError('No baseline given for line')
-        if not line.boundary:
-            raise ValueError('No boundary given for line')
+        if not line.bbox:
+            raise ValueError('No bounding box given for line')
 
-        self._images.append(line.image)
+        self._images.append((line.imagename, line.bbox))
         self._gt.append(text)
         self.alphabet.update(text)
 
@@ -602,9 +600,12 @@ class GroundTruthDataset(Dataset):
         item = self.training_set[index]
         try:
             logger.debug(f'Attempting to load {item[0]}')
-            im = item[0]
-            if not isinstance(im, Image.Image):
-                im = Image.open(im)
+            im, bbox = item[0]
+            flat_box = [x for point in bbox for x in point]
+            xmin, xmax = min(flat_box[::2]), max(flat_box[::2])
+            ymin, ymax = min(flat_box[1::2]), max(flat_box[1::2])
+            im = Image.open(im)
+            im = im.crop((xmin, ymin, xmax, ymax))
             im = self.transforms(im)
             if im.shape[0] == 3:
                 im_mode = 'RGB'
@@ -621,6 +622,7 @@ class GroundTruthDataset(Dataset):
                 im = torch.tensor(o['image'].transpose(2, 0, 1))
             return {'image': im, 'target': item[1]}
         except Exception:
+            raise
             self.failed_samples.add(index)
             idx = np.random.randint(0, len(self.training_set))
             logger.debug(traceback.format_exc())
