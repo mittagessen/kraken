@@ -598,4 +598,4 @@ class XMLPage(object):
                             script_detection=True,
                             lines=self.get_sorted_lines(),
                             regions=self._regions,
-                            line_orders=None)
+                            line_orders=[])

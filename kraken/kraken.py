@@ -22,7 +22,7 @@ import os
 import warnings
 import logging
 import dataclasses
-import pkg_resources
+import importlib.resources
 
 from PIL import Image
 from pathlib import Path
@@ -43,7 +43,7 @@ logger = logging.getLogger('kraken')
 install(suppress=[click])
 
 APP_NAME = 'kraken'
-SEGMENTATION_DEFAULT_MODEL = pkg_resources.resource_filename(__name__, 'blla.mlmodel')
+SEGMENTATION_DEFAULT_MODEL = importlib.resources.files(APP_NAME).joinpath('blla.mlmodel')
 DEFAULT_MODEL = ['en_best.mlmodel']
 
 # raise default max image size to 20k * 20k pixels

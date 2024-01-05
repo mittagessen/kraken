@@ -18,7 +18,7 @@ import regex
 import logging
 import datetime
 
-from pkg_resources import get_distribution
+import importlib.metadata
 
 from kraken.lib.util import make_printable
 
@@ -116,7 +116,7 @@ def serialize(results: 'Segmentation',
             'base_dir': [rec.base_dir for rec in results.lines][0] if len(results.lines) else None,
             'seg_type': results.type}  # type: dict
     metadata = {'processing_steps': processing_steps,
-                'version': get_distribution('kraken').version}
+                'version': importlib.metadata.version('kraken')}
 
     seg_idx = 0
     char_idx = 0
@@ -127,7 +127,7 @@ def serialize(results: 'Segmentation',
         if line.tags is not None:
             types.extend((k, v) for k, v in line.tags.items())
     page['line_types'] = list(set(types))
-    page['region_types'] = [list(results.regions.keys())]
+    page['region_types'] = list(results.regions.keys())
 
     # map reading orders indices to line IDs
     ros = []
@@ -144,8 +144,8 @@ def serialize(results: 'Segmentation',
     prev_reg = None
     for idx, record in enumerate(results.lines):
         # line not in region
-        if len(record.regions) == 0:
-            cur_ent = page['entitites']
+        if not record.regions or len(record.regions) == 0:
+            cur_ent = page['entities']
         # line not in same region as previous line
         elif prev_reg != record.regions[0]:
             prev_reg = record.regions[0]
@@ -164,11 +164,11 @@ def serialize(results: 'Segmentation',
         # set field to indicate the availability of baseline segmentation in
         # addition to bounding boxes
         line = {'index': idx,
-                'bbox': max_bbox([record.boundary] if record.type == 'baselines' else record.bbox),
+                'bbox': max_bbox([record.boundary] if record.type == 'baselines' else [record.bbox]),
                 'cuts': record.cuts,
                 'confidences': record.confidences,
                 'recognition': [],
-                'boundary': [list(x) for x in record.boundary],
+                'boundary': [list(x) for x in record.boundary] if record.type == 'baselines' else record.bbox,
                 'type': 'line'
                 }
         if record.tags is not None:
@@ -199,7 +199,6 @@ def serialize(results: 'Segmentation',
                                               segment,
                                               range(char_idx, char_idx + len(segment)))],
                           'index': seg_idx}
-            # compute convex hull of all characters in segment
             if record.type == 'baselines':
                 seg_struct['boundary'] = record[line_offset:line_offset + len(segment)][1]
             line['recognition'].append(seg_struct)

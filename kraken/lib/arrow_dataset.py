@@ -59,7 +59,7 @@ def _extract_line(xml_record, skip_empty_lines: bool = True):
                            lines=[rec],
                            regions=None,
                            script_detection=False,
-                           line_orders=None)
+                           line_orders=[])
         try:
             line_im, line = next(extract_polygons(im, seg))
         except KrakenInputException:

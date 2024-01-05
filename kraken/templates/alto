@@ -3,7 +3,7 @@
               'postprocessing': 'postOperation'}
 %}
 {%+ macro render_line(page, line) +%}
-                    <TextLine ID="line_{{ line.index }}" HPOS="{{ line.bbox[0] }}" VPOS="{{ line.bbox[1] }}" WIDTH="{{ line.bbox[2] - line.bbox[0] }}" HEIGHT="{{ line.bbox[3] - line.bbox[1] }}" {% if line.baseline %}BASELINE="{{ line.baseline|sum(start=[])|join(' ') }}"{% endif %} {% if line.tags %}TAGREFS="{% for type in page.types %}{% if type in line.tags.values() %}TYPE_{{ loop.index }}{% endif %}{% endfor %}"{% endif %}>
+                    <TextLine ID="line_{{ line.index }}" HPOS="{{ line.bbox[0] }}" VPOS="{{ line.bbox[1] }}" WIDTH="{{ line.bbox[2] - line.bbox[0] }}" HEIGHT="{{ line.bbox[3] - line.bbox[1] }}" {% if line.baseline %}BASELINE="{{ line.baseline|sum(start=[])|join(' ') }}"{% endif %} {% if line.tags %}TAGREFS="{% for type in page.line_types %}{% if type[0] in line.tags and line.tags["type[0]"] == type[1] %}TYPE_{{ loop.index }}{% endif %}{% endfor %}"{% endif %}>
                         {% if line.boundary %}
                         <Shape>
                             <Polygon POINTS="{{ line.boundary|sum(start=[])|join(' ') }}"/>
@@ -52,7 +52,7 @@
         <Processing ID="OCR_{{ step.id }}">
             <processingCategory>{{ proc_type_table[step.category] }}</processingCategory>
             <processingStepDescription>{{ step.description }}</processingStepDescription>
-            <processingStepSettings>{% for k, v in step.settings.items() %}{{k}}: {{v}}; {% endfor %}</processingStepSettings>
+            <processingStepSettings>{% for k, v in step.settings.items() %}{{k}}: {{v}}{% if not loop.last %}; {% endif %}{% endfor %}</processingStepSettings>
             <processingSoftware>
                 <softwareName>kraken</softwareName>
                 <softwareVersion>{{ metadata.version }}</softwareVersion>
@@ -72,13 +72,13 @@
     </Description>
     <Tags>
     {% for type, label in page.line_types %}
-        <OtherTag DESCRIPTION="line type" ID="TYPE_{{ loop.index }}" TYPE={{ type }} LABEL="{{ label }}"/>
+        <OtherTag DESCRIPTION="line type" ID="TYPE_{{ loop.index }}" TYPE="{{ type }}" LABEL="{{ label }}"/>
     {% endfor %}
     {% for label in page.region_types %}
-        <OtherTag DESCRIPTION="region type" ID="TYPE_{{ loop.index }}" TYPE={{ type }} LABEL="{{ label }}"/>
+        <OtherTag DESCRIPTION="region type" ID="TYPE_{{ loop.index }}" TYPE="region" LABEL="{{ label }}"/>
     {% endfor %}
     </Tags>
-    {% if len(page.line_orders) > 0 %}
+    {% if page.line_orders|length() > 0 %}
     <ReadingOrder>
         {% if len(page.line_orders) == 1 %}
         <OrderedGroup ID="ro_0">
@@ -107,7 +107,7 @@
                 {% if loop.previtem and loop.previtem.type == 'line' %}
                 </TextBlock>
                 {% endif %}
-                <TextBlock ID="block_{{ entity.index }}" HPOS="{{ entity.bbox[0] }}" VPOS="{{ entity.bbox[1] }}" WIDTH="{{ entity.bbox[2] - entity.bbox[0] }}" HEIGHT="{{ entity.bbox[3] - entity.bbox[1] }}" {% for type in page.types %}{% if type == entity.region_type %}TAGREFS="TYPE_{{ loop.index }}"{% endif %}{% endfor %}>
+                <TextBlock ID="block_{{ entity.index }}" HPOS="{{ entity.bbox[0] }}" VPOS="{{ entity.bbox[1] }}" WIDTH="{{ entity.bbox[2] - entity.bbox[0] }}" HEIGHT="{{ entity.bbox[3] - entity.bbox[1] }}" {% for type in page.region_types %}{% if type == entity.region_type %}TAGREFS="TYPE_{{ loop.index }}"{% endif %}{% endfor %}>
                     <Shape>
                         <Polygon POINTS="{{ entity.boundary|sum(start=[])|join(' ') }}"/>
                     </Shape>

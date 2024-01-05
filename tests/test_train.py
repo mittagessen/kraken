@@ -21,7 +21,7 @@ class TestKrakenTrainer(unittest.TestCase):
     """
     def setUp(self):
         self.xml = resources / '170025120000003,0074.xml'
-        self.bls = xml.parse_page(self.xml)
+        self.bls = xml.XMLPage(self.xml)
         self.box_lines = [resources / '000236.png']
         self.model = resources / 'model_small.mlmodel'
 

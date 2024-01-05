@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import json
+import uuid
 import unittest
 import tempfile
 import numpy as np
@@ -97,9 +98,10 @@ class TestSerializations(unittest.TestCase):
         self.bl_segmentation_regs = containers.Segmentation(type='baselines',
                                                             imagename='foo.png',
                                                             text_direction='horizontal-lr',
-                                                            lines=self.box_records,
+                                                            lines=self.bl_records,
                                                             script_detection=True,
                                                             regions=self.bl_regions)
+
         self.bl_seg_nolines_regs = containers.Segmentation(type='baselines',
                                                            imagename='foo.png',
                                                            text_direction='horizontal-lr',
@@ -107,16 +109,21 @@ class TestSerializations(unittest.TestCase):
                                                            lines=[],
                                                            regions=self.bl_regions)
 
-        self.metadata_steps = [{'category': 'preprocessing', 'description': 'PDF image extraction', 'settings': {}},
-                               {'category': 'processing',
-                                'description': 'Baseline and region segmentation',
-                                'settings': {'model': 'foo.mlmodel', 'text_direction': 'horizontal-lr'}},
-                               {'category': 'processing',
-                                'description': 'Text line recognition',
-                                'settings': {'text_direction': 'horizontal-lr',
-                                             'models': 'bar.mlmodel',
-                                             'pad': 16,
-                                             'bidi_reordering': True}}]
+        self.metadata_steps = [containers.ProcessingStep(id=str(uuid.uuid4()),
+                                                         category='preprocessing',
+                                                         description='PDF image extraction',
+                                                         settings={}),
+                               containers.ProcessingStep(id=str(uuid.uuid4()),
+                                                         category='processing',
+                                                         description='Baseline and region segmentation',
+                                                         settings={'model': 'foo.mlmodel', 'text_direction': 'horizontal-lr'}),
+                               containers.ProcessingStep(id=str(uuid.uuid4()),
+                                                         category='processing',
+                                                         description='Text line recognition',
+                                                         settings={'text_direction': 'horizontal-lr',
+                                                                   'models': 'bar.mlmodel',
+                                                                   'pad': 16,
+                                                                   'bidi_reordering': True})]
 
 
     def test_box_vertical_hocr_serialization(self):
@@ -261,49 +268,14 @@ class TestSerializations(unittest.TestCase):
         fp.write(serialization.serialize(self.bl_seg_nolines_regs, template='pagexml'))
         validate_page(self, fp)
 
-    def test_serialize_segmentation_alto(self):
-        """
-        Validates output of `serialize_segmentation` against ALTO schema
-        """
-        fp = StringIO()
-
-        fp.write(serialization.serialize_segmentation({'boxes': []}, image_name='foo.png', template='alto'))
-        validate_alto(self, fp)
-
-    def test_serialize_segmentation_pagexml(self):
-        """
-        Validates output of `serialize_segmentation` against ALTO schema
-        """
-        fp = StringIO()
-
-        fp.write(serialization.serialize_segmentation({'boxes': []}, image_name='foo.png', template='pagexml'))
-        validate_page(self, fp)
-
-    def test_serialize_segmentation_alto_steps(self):
-        """
-        Validates output of `serialize_segmentation` with processing steps against ALTO schema
-        """
-        fp = StringIO()
-
-        fp.write(serialization.serialize_segmentation({'boxes': []}, image_name='foo.png', template='alto', processing_steps=self.metadata_steps))
-        validate_alto(self, fp)
-
-    def test_serialize_segmentation_pagexml(self):
-        """
-        Validates output of `serialize_segmentation` with processing steps against PageXML schema
-        """
-        fp = StringIO()
-
-        fp.write(serialization.serialize_segmentation({'boxes': []}, image_name='foo.png', template='pagexml', processing_steps=self.metadata_steps))
-        validate_page(self, fp)
-
     def test_bl_region_alto_serialization_validation_steps(self):
         """
         Validates output with processing steps against ALTO schema
         """
         fp = StringIO()
 
-        fp.write(serialization.serialize(self.bl_records, image_name='foo.png', template='alto', regions=self.bl_regions, processing_steps=self.metadata_steps))
+        fp.write(serialization.serialize(self.bl_segmentation, template='alto', processing_steps=self.metadata_steps))
+
         validate_alto(self, fp)
         roundtrip(self, self.bl_records, fp)
 
@@ -313,7 +285,8 @@ class TestSerializations(unittest.TestCase):
         """
         fp = StringIO()
 
-        fp.write(serialization.serialize(self.bl_records, image_name='foo.png', template='abbyyxml', regions=self.bl_regions, processing_steps=self.metadata_steps))
+        fp.write(serialization.serialize(self.bl_segmentation, template='abbyyxml', processing_steps=self.metadata_steps))
+
         doc = etree.fromstring(fp.getvalue().encode('utf-8'))
         with open(resources / 'FineReader10-schema-v1.xml') as schema_fp:
             abbyy_schema = etree.XMLSchema(etree.parse(schema_fp))
@@ -324,8 +297,7 @@ class TestSerializations(unittest.TestCase):
         Validates output with processing steps against PageXML schema
         """
         fp = StringIO()
-
-        fp.write(serialization.serialize(self.bl_records, image_name='foo.png', template='pagexml', regions=self.bl_regions, processing_steps=self.metadata_steps))
+        fp.write(serialization.serialize(self.bl_segmentation, template='pagexml', processing_steps=self.metadata_steps))
         validate_page(self, fp)
         roundtrip(self, self.bl_records, fp)
 
