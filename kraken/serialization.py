@@ -164,11 +164,14 @@ def serialize(results: 'Segmentation',
         # set field to indicate the availability of baseline segmentation in
         # addition to bounding boxes
         line = {'index': idx,
-                'bbox': max_bbox([record.boundary] if record.type == 'baselines' else [record.bbox]),
+                'bbox': max_bbox([record.boundary]) if record.type == 'baselines' else record.bbox,
                 'cuts': record.cuts,
                 'confidences': record.confidences,
                 'recognition': [],
-                'boundary': [list(x) for x in record.boundary] if record.type == 'baselines' else record.bbox,
+                'boundary': [list(x) for x in record.boundary] if record.type == 'baselines' else [[record.bbox[0], record.bbox[1]],
+                                                                                                   [record.bbox[2], record.bbox[1]],
+                                                                                                   [record.bbox[2], record.bbox[3]],
+                                                                                                   [record.bbox[0], record.bbox[3]]],
                 'type': 'line'
                 }
         if record.tags is not None:

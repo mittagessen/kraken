@@ -1139,7 +1139,8 @@ def extract_polygons(im: Image.Image, bounds: 'Segmentation') -> Image.Image:
             angle = 90
         else:
             angle = 0
-        for box in bounds.lines:
+        for line in bounds.lines:
+            box = line.bbox
             if isinstance(box, tuple):
                 box = list(box)
             if (box < [0, 0, 0, 0] or box[::2] >= [im.size[0], im.size[0]] or

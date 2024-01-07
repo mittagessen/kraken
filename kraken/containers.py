@@ -104,7 +104,7 @@ class BBoxLine:
 
     Attributes:
         id: Unique identifier
-        bbox: Tuple in form `((x0, y0), (x1, y0), (x1, y1), (x0, y1))` defining
+        bbox: Tuple in form `(xmin, ymin, xmax, ymax)` defining
               the bounding box.
         text: Transcription of this line.
         base_dir: An optional string defining the base direction (also called
@@ -120,10 +120,7 @@ class BBoxLine:
                         reading direction (of the document).
     """
     id: str
-    bbox: Tuple[Tuple[int, int],
-                Tuple[int, int],
-                Tuple[int, int],
-                Tuple[int, int]]
+    bbox: Tuple[int, int, int, int]
     text: Optional[str] = None
     base_dir: Optional[Literal['L', 'R']] = None
     type: str = 'bbox'
