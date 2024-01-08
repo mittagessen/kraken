@@ -19,6 +19,7 @@ kraken.kraken
 Command line drivers for recognition functionality.
 """
 import os
+import shlex
 import warnings
 import logging
 import dataclasses
@@ -26,6 +27,7 @@ import importlib.resources
 
 from PIL import Image
 from pathlib import Path
+
 from functools import partial
 from rich.traceback import install
 from typing import Dict, Union, List, cast, Any, IO, Callable
@@ -540,16 +542,24 @@ def _validate_mm(ctx, param, value):
     Maps model mappings to a dictionary.
     """
     model_dict = {'ignore': []}  # type: Dict[str, Union[str, List[str]]]
-    if len(value) == 1 and len(value[0].split(':')) == 1:
-        model_dict['default'] = value[0]
-        return model_dict
+    if len(value) == 1:
+        lexer = shlex.shlex(value[0], posix=True)
+        lexer.wordchars += '\/.+-()=^&;,.'
+        if len(list(lexer)) == 1:
+            model_dict['default'] = value[0]
+            return model_dict
     try:
         for m in value:
-            k, v = m.split(':')
+            lexer = shlex.shlex(m, posix=True)
+            lexer.wordchars += '\/.+-()=^&;,.'
+            tokens = list(lexer)
+            if len(tokens) != 3:
+                raise ValueError
+            k, _, v = tokens
             if v == 'ignore':
-                model_dict['ignore'].append(k)  # type: ignore
+                model_dict['ignore'].append(('type', k))  # type: ignore
             else:
-                model_dict[k] = os.path.expanduser(v)
+                model_dict[('type', k)] = Path(v)
     except Exception:
         raise click.BadParameter('Mappings must be in format tag:model')
     return model_dict
@@ -560,10 +570,11 @@ def _validate_mm(ctx, param, value):
 @click.option('-m', '--model', default=DEFAULT_MODEL, multiple=True,
               show_default=True, callback=_validate_mm,
               help='Path to an recognition model or mapping of the form '
-              '$tag1:$model1. Add multiple mappings to run multi-model '
-              'recognition based on detected tags. Use the default keyword '
+              '$tag1=$model1. Add multiple mappings to run multi-model '
+              'recognition based on detected tags. Use the `default` keyword '
               'for adding a catch-all model. Recognition on tags can be '
-              'ignored with the model value ignore.')
+              'ignored with the model value `ignore`. Refer to the '
+              'documentation for more information about tag handling.')
 @click.option('-p', '--pad', show_default=True, type=click.INT, default=16, help='Left and right '
               'padding around lines')
 @click.option('-n', '--reorder/--no-reorder', show_default=True, default=True,

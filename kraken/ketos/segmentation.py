@@ -18,6 +18,7 @@ kraken.ketos.segmentation
 
 Command line driver for segmentation training and evaluation.
 """
+import shlex
 import click
 import pathlib
 import logging
@@ -47,7 +48,12 @@ def _validate_merging(ctx, param, value):
     merge_dict = {}  # type: Dict[str, str]
     try:
         for m in value:
-            k, v = m.split(':')
+            lexer = shlex.shlex(m, posix=True)
+            lexer.wordchars += '\/.+-()=^&;,.'
+            tokens = list(lexer)
+            if len(tokens) != 3:
+                raise ValueError
+            k, _, v = tokens
             merge_dict[v] = k  # type: ignore
     except Exception:
         raise click.BadParameter('Mappings must be in format target:src')
