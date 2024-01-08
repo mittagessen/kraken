@@ -9,7 +9,7 @@ from pytest import raises
 from pathlib import Path
 from collections import defaultdict
 
-from kraken.containers import Segmentation, BBoxOCRRecord, BaselineOCRRecord, BaselineLine, BBoxLine 
+from kraken.containers import Segmentation, BBoxOCRRecord, BaselineOCRRecord, BaselineLine, BBoxLine
 from kraken.lib.models import load_any
 from kraken.rpred import rpred, mm_rpred
 from kraken.lib.exceptions import KrakenInputException
@@ -118,7 +118,7 @@ class TestBaselineRecords(unittest.TestCase):
     def setUp(self):
         with open(resources / 'bl_records.json', 'r') as fp:
             self.bl_records = json.load(fp)
-            self.ltr_record = self.bl_records[0]
+            self.ltr_record = self.bl_records['lines'][15]
 
     def test_baseline_record_cuts(self):
         """
@@ -148,9 +148,9 @@ class TestBaselineRecords(unittest.TestCase):
         """
         record = BaselineOCRRecord(**self.ltr_record, display_order=False)
         re_record = record.display_order()
-        self.assertEqual(re_record.prediction, 'في معجزاته عليه السلام')
-        self.assertEqual(re_record[:][1], ((1437, 119), (2173, 119), (2173, 256), (1437, 256)))
-        self.assertAlmostEqual(re_record[2:8][2], 0.9554762, places=4)
+        self.assertEqual(re_record.prediction, '.هنيدو')
+        self.assertEqual(re_record[:][1], ([1370, 1382], [1370, 1424], [1448, 1426], [1451, 1388]))
+        self.assertAlmostEqual(re_record[2:4][2], 0.9998551, places=4)
 
     def test_baseline_record_logical(self):
         """
@@ -158,29 +158,29 @@ class TestBaselineRecords(unittest.TestCase):
         """
         record = BaselineOCRRecord(**self.ltr_record, display_order=True)
         re_record = record.logical_order()
-        self.assertEqual(re_record.prediction, 'في معجزاته عليه السلام')
-        self.assertEqual(re_record[:][1], ((1437, 119), (2173, 119), (2173, 256), (1437, 256)))
-        self.assertAlmostEqual(re_record[2:8][2], 0.9554762, places=4)
+        self.assertEqual(re_record.prediction, '.هنيدو')
+        self.assertEqual(re_record[:][1], ([1370, 1382], [1370, 1424], [1448, 1426], [1451, 1388]))
+        self.assertAlmostEqual(re_record[2:3][2], 0.99996733, places=4)
 
     def test_baseline_record_slicing(self):
         """
         Tests simple slicing/aggregation of elements in record.
         """
         record = BaselineOCRRecord(**self.ltr_record, display_order=True)
-        pred, cut, conf = record[1:8]
-        self.assertEqual(pred, 'السلا ه')
-        self.assertEqual(cut, ((1484, 119), (1674, 119), (1674, 256), (1484, 256)))
-        self.assertAlmostEqual(conf, 0.9259478, places=4)
+        pred, cut, conf = record[2:5]
+        self.assertEqual(pred, 'ينه')
+        self.assertEqual(cut, ([1385, 1375], [1385, 1427], [1411, 1433], [1411, 1378]))
+        self.assertAlmostEqual(conf, 0.99957436, places=4)
 
-    def test_baseline_record_slicing(self):
+    def test_baseline_complex_record_slicing(self):
         """
         Tests complex slicing/aggregation of elements in record.
         """
         record = BaselineOCRRecord(**self.ltr_record, display_order=True)
         pred, cut, conf = record[1:5:2]
-        self.assertEqual(pred, 'اس')
-        self.assertEqual(cut, ((1484, 119), (1568, 119), (1568, 256), (1484, 256)))
-        self.assertAlmostEqual(conf, 0.74411, places=4)
+        self.assertEqual(pred, 'دن')
+        self.assertEqual(cut, ([1396, 1375], [1396, 1430], [1426, 1437], [1429, 1381]))
+        self.assertAlmostEqual(conf, 0.999982893, places=4)
 
 
 class TestRecognition(unittest.TestCase):
@@ -284,7 +284,7 @@ class TestRecognition(unittest.TestCase):
         """
         pred = rpred(self.model, self.overfit_line, self.simple_bl_seg, True)
         record = next(pred)
-        self.assertEqual(record.prediction, 'ܡ ܘܡ ܗ ܡܕܐ ܐ ܐܐ ܡ ܗܗܐܐܐܕ')
+        self.assertEqual(record.prediction, '.ܗ ܣܗܐ  ܕ ܣ   ܗ ܕܗܗ ܟܕܗܣ    ܠ  ܐ .ܣܕܐܣ. ܗ ')
 
     def test_mm_rpred_bbox_missing_tags(self):
         """
