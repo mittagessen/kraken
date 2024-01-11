@@ -122,7 +122,7 @@ class BaselineSet(Dataset):
         self.transforms = im_transforms
         self.seg_type = None
 
-    def add(self, doc: Union['Segmentation']):
+    def add(self, doc: 'Segmentation'):
         """
         Adds a page to the dataset.
 
@@ -154,7 +154,6 @@ class BaselineSet(Dataset):
                 if reg_type not in self.class_mapping['regions']:
                     self.num_classes += 1
                     self.class_mapping['regions'][reg_type] = self.num_classes - 1
-
         self.targets.append({'baselines': baselines_, 'regions': regions_})
         self.imgs.append(doc.imagename)
 

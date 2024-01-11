@@ -742,7 +742,6 @@ class SegmentationModel(pl.LightningModule):
             warnings.warn("'both' value for resize has been deprecated. Use 'new' instead.", DeprecationWarning)
         self.resize = resize
 
-        self.format_type = format_type
         self.output = output
         self.bounding_regions = bounding_regions
         self.topline = topline
@@ -782,6 +781,17 @@ class SegmentationModel(pl.LightningModule):
         self.hyper_params = hyper_params_
         self.save_hyperparameters()
 
+        if format_type in ['xml', 'page', 'alto']:
+            logger.info(f'Parsing {len(training_data)} XML files for training data')
+            training_data = [XMLPage(file, format_type).to_container() for file in training_data]
+            if evaluation_data:
+                logger.info(f'Parsing {len(evaluation_data)} XML files for validation data')
+                evaluation_data = [XMLPage(file, format_type).to_container() for file in evaluation_data]
+        elif not format_type:
+            pass
+        else:
+            raise ValueError(f'format_type {format_type} not in [alto, page, xml, None].')
+
         if not training_data:
             raise ValueError('No training data provided. Please add some.')
 
@@ -815,34 +825,29 @@ class SegmentationModel(pl.LightningModule):
             valid_baselines = []
             merge_baselines = None
 
-        train_set = BaselineSet(training_data,
-                                line_width=self.hparams.hyper_params['line_width'],
+        train_set = BaselineSet(line_width=self.hparams.hyper_params['line_width'],
                                 im_transforms=transforms,
-                                mode=format_type,
                                 augmentation=self.hparams.hyper_params['augment'],
                                 valid_baselines=valid_baselines,
                                 merge_baselines=merge_baselines,
                                 valid_regions=valid_regions,
                                 merge_regions=merge_regions)
 
-        if format_type is None:
-            for page in training_data:
-                train_set.add(**page)
+        for page in training_data:
+            train_set.add(page)
 
         if evaluation_data:
             val_set = BaselineSet(evaluation_data,
                                   line_width=self.hparams.hyper_params['line_width'],
                                   im_transforms=transforms,
-                                  mode=format_type,
                                   augmentation=False,
                                   valid_baselines=valid_baselines,
                                   merge_baselines=merge_baselines,
                                   valid_regions=valid_regions,
                                   merge_regions=merge_regions)
 
-            if format_type is None:
-                for page in evaluation_data:
-                    val_set.add(**page)
+            for page in evaluation_data:
+                val_set.add(page)
 
             train_set = Subset(train_set, range(len(train_set)))
             val_set = Subset(val_set, range(len(val_set)))
