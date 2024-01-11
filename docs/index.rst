@@ -19,7 +19,7 @@ Features
 
 kraken's main features are:
 
-  - Fully trainable layout analysis and character recognition
+  - Fully trainable :ref:`layout analysis <segtrain>`, :ref:`reading order <rotrain>`, and :ref:`character recognition <predtrain>`
   - `Right-to-Left <https://en.wikipedia.org/wiki/Right-to-left>`_, `BiDi
     <https://en.wikipedia.org/wiki/Bi-directional_text>`_, and Top-to-Bottom
     script support

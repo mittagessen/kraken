@@ -7,9 +7,16 @@ This page describes the training utilities available through the ``ketos``
 command line utility in depth. For a gentle introduction on model training
 please refer to the :ref:`tutorial <training>`. 
 
-Both segmentation and recognition are trainable in kraken. The segmentation
-model finds baselines and regions on a page image. Recognition models convert
-text image lines found by the segmenter into digital text.
+There are currently three trainable components in the kraken processing pipeline:
+* Segmentation: finding lines and regions in images
+* Reading Order: ordering lines found in the previous segmentation step. Reading order models are closely linked to segmentation models and both are usually trained on the same dataset.
+* Recognition: recognition models transform images of lines into text. 
+
+Depending on the use case it is not necessary to manually train new models for
+each material. The default segmentation model works well on quite a variety of
+handwritten and printed documents, a reading order model might not perform
+better than the default heuristic for simple text flows, and there are
+recognition models for some types of material available in the repository.
 
 Best practices
 --------------
@@ -34,7 +41,7 @@ Segmentation model training
 
 * The segmenter is fairly robust when it comes to hyperparameter choice.
 * Start by finetuning from the default model for a fixed number of epochs (50 for reasonably sized datasets) with a cosine schedule.
-* Segmentation models' performance are difficult to evaluate. Pixel accuracy doesn't mean much because there are many more pixels that aren't part of a line or region than just background. Frequency-weighted IoU is good for overall performance, while mean IoU overrepresents rare classes. The best way to evaluate segmentation models is to look at the output on unlabelled data.
+* Segmentation models' performance is difficult to evaluate. Pixel accuracy doesn't mean much because there are many more pixels that aren't part of a line or region than just background. Frequency-weighted IoU is good for overall performance, while mean IoU overrepresents rare classes. The best way to evaluate segmentation models is to look at the output on unlabelled data.
 * If you don't have rare classes you can use a fairly small validation set to make sure everything is converging and just visually validate on unlabelled data.
 
 Training data formats
@@ -44,13 +51,15 @@ The training tools accept a variety of training data formats, usually some kind
 of custom low level format, the XML-based formats that are commony used for
 archival of annotation and transcription data, and in the case of recognizer
 training a precompiled binary format. It is recommended to use the XML formats
-for segmentation training and the binary format for recognition training.
+for segmentation and reading order training and the binary format for
+recognition training.
 
 ALTO
 ~~~~
 
-Kraken parses and produces files according to ALTO 4.2. An example showing the
-attributes necessary for segmentation and recognition training follows:
+Kraken parses and produces files according to ALTO 4.3. An example showing the
+attributes necessary for segmentation, recognition, and reading order training
+follows:
 
 .. literalinclude:: alto.xml
    :language: xml
@@ -67,7 +76,8 @@ PAGE XML
 
 PAGE XML is parsed and produced according to the 2019-07-15 version of the
 schema, although the parser is not strict and works with non-conformant output
-of a variety of tools.
+from a variety of tools. As with ALTO, PAGE XML files can be used to train
+segmentation, reading order, and recognition models.
 
 .. literalinclude:: pagexml.xml
    :language: xml
@@ -79,11 +89,12 @@ Binary Datasets
 .. _binary_datasets:
 
 In addition to training recognition models directly from XML and image files, a
-binary dataset format offering a couple of advantages is supported. Binary
-datasets drastically improve loading performance allowing the saturation of
-most GPUs with minimal computational overhead while also allowing training with
-datasets that are larger than the systems main memory. A minor drawback is a
-~30% increase in dataset size in comparison to the raw images + XML approach.
+binary dataset format offering a couple of advantages is supported for
+recognition training. Binary datasets drastically improve loading performance
+allowing the saturation of most GPUs with minimal computational overhead while
+also allowing training with datasets that are larger than the systems main
+memory. A minor drawback is a ~30% increase in dataset size in comparison to
+the raw images + XML approach.
 
 To realize this speedup the dataset has to be compiled first:
 
@@ -123,6 +134,8 @@ otherwise) while the remaining 10% of the test set is selected by `ketos test`.
 
 Recognition training
 --------------------
+
+.. _predtrain:
 
 The training utility allows training of :ref:`VGSL <vgsl>` specified models
 both from scratch and from existing models. Here are its most important command line options:
@@ -193,23 +206,24 @@ Training will continue until the error does not improve anymore and the best
 model (among intermediate results) will be saved in the current directory; this
 approach is called early stopping.
 
-In some cases, such as color inputs, changing the network architecture might be
-useful:
+In some cases changing the network architecture might be useful. One such
+example would be material that is not well recognized in the grayscale domain,
+as the default architecture definition converts images into grayscale. The
+input definition can be changed quite easily to train on color data (RGB) instead:
 
 .. code-block:: console
 
-        $ ketos train -f page -s '[1,0,0,3 Cr3,3,16 Mp3,3 Lfys64 Lbx128 Lbx256 Do]' syr/*.xml
+        $ ketos train -f page -s '[1,120,0,3 Cr3,13,32 Do0.1,2 Mp2,2 Cr3,13,32 Do0.1,2 Mp2,2 Cr3,9,64 Do0.1,2 Mp2,2 Cr3,9,64 Do0.1,2 S1(1x0)1,3 Lbx200 Do0.1,2 Lbx200 Do0.1,2 Lbx200 Do]]' syr/*.xml
 
 Complete documentation for the network description language can be found on the
 :ref:`VGSL <vgsl>` page.
 
 Sometimes the early stopping default parameters might produce suboptimal
-results such as stopping training too soon. Adjusting the minimum delta an/or
-lag can be useful:
+results such as stopping training too soon. Adjusting the lag can be useful:
 
 .. code-block:: console
 
-        $ ketos train --lag 10 --min-delta 0.001 syr/*.png
+        $ ketos train --lag 10 syr/*.png
 
 To switch optimizers from Adam to SGD or RMSprop just set the option:
 
@@ -516,16 +530,6 @@ recognition. The basic invocation is:
 .. code-block:: console
 
         $ ketos segtrain -f xml training_data/*.xml
-        Training line types:
-          default 2	53980
-          foo     8     134
-        Training region types:
-          graphic	3	135
-          text	4	1128
-          separator	5	5431
-          paragraph	6	10218
-          table	7	16
-        val check  [------------------------------------]  0/0
 
 This takes all text lines and regions encoded in the XML files and trains a
 model to recognize them.
@@ -610,6 +614,8 @@ Finally, we can merge baselines and regions into each other:
         ...
 
 These options are combinable to massage the dataset into any typology you want.
+Tags containing the separator character `:` can be specified by escaping them
+with backslash.
 
 Then there are some options that set metadata fields controlling the
 postprocessing. When computing the bounding polygons the recognized baselines
@@ -633,7 +639,89 @@ be improved:
         $ ketos segtrain --bounding-regions paragraph -f xml training_data/*.xml
         ...
 
-Recognition Testing
+Reading order training
+----------------------
+
+.. _rotrain:
+
+Reading order models work slightly differently from segmentation and reading
+order models. They are closely linked to the typology used in the dataset they
+were trained on as they use type information on lines and regions to make
+ordering decisions. As the same typology was probably used to train a specific
+segmentation model, reading order models are trained separately but bundled
+with their segmentation model in a subsequent step. The general sequence is
+therefore:
+
+.. code-block:: console
+       
+        $ ketos segtrain -o fr_manu_seg.mlmodel -f xml french/*.xml
+        ...
+        $ ketos rotrain -o fr_manu_ro.mlmodel -f xml french/*.xml
+        ...
+        $ ketos roadd -o fr_manu_seg_with_ro.mlmodel -i fr_manu_seg_best.mlmodel  -r fr_manu_ro_best.mlmodel
+
+Only the `fr_manu_seg_with_ro.mlmodel` file will contain the trained reading
+order model.  Segmentation models can exist with or without reading order
+models. If one is added, the neural reading order will be computed *in
+addition* to the one produced by the default heuristic during segmentation and
+serialized in the final XML output (in ALTO/PAGE XML).
+
+.. note::
+
+        Reading order models work purely on the typology and geometric features
+        of the lines and regions. They construct an approximate ordering matrix
+        by feeding feature vectors of two lines (or regions) into the network
+        to decide which of those two lines precedes the other. 
+        
+        These feature vectors are quite simple; just the lines' types, and
+        their start, center, and end points. Therefore they can *not* reliably
+        learn any ordering relying on graphical features of the input page such
+        as: line color, typeface, or writing system.
+
+Reading order models are extremely simple and do not require a lot of memory or
+computational power to train. In fact, the default parameters are extremely
+conservative and it is recommended to increase the batch size for improved
+training speed. Large batch size above 128k are easily possible with
+sufficiently large training datasets:
+
+.. code-block:: console
+
+        $ ketos rotrain -o fr_manu_ro.mlmodel -B 128000 -f french/*.xml
+        Training RO on following baselines types:
+          DefaultLine	1
+          DropCapitalLine	2
+          HeadingLine	3
+          InterlinearLine	4
+        GPU available: False, used: False
+        TPU available: False, using: 0 TPU cores
+        IPU available: False, using: 0 IPUs
+        HPU available: False, using: 0 HPUs
+        ┏━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┓
+        ┃   ┃ Name        ┃ Type              ┃ Params ┃
+        ┡━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━╇━━━━━━━━┩
+        │ 0 │ criterion   │ BCEWithLogitsLoss │      0 │
+        │ 1 │ ro_net      │ MLP               │  1.1 K │
+        │ 2 │ ro_net.fc1  │ Linear            │  1.0 K │
+        │ 3 │ ro_net.relu │ ReLU              │      0 │
+        │ 4 │ ro_net.fc2  │ Linear            │     45 │
+        └───┴─────────────┴───────────────────┴────────┘
+        Trainable params: 1.1 K                                                                                                                                        
+        Non-trainable params: 0                                                                                                                                        
+        Total params: 1.1 K                                                                                                                                            
+        Total estimated model params size (MB): 0                                                                                                                      
+        stage 0/∞ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 0/35 0:00:00 • -:--:-- 0.00it/s val_spearman: 0.912 val_loss: 0.701 early_stopping: 0/300 inf
+
+During validation a metric called Spearman's footrule is computed. To calculate
+Spearman's footrule, the ranks of the lines of text in the ground truth reading
+order and the predicted reading order are compared. The footrule is then
+calculated as the sum of the absolute differences between the ranks of pairs of
+lines. The score increases by 1 for each line between the correct and predicted
+positions of a line.
+
+A lower footrule score indicates a better alignment between the two orders. A
+score of 0 implies perfect alignment of line ranks.
+
+Recognition testing
 -------------------
 
 Picking a particular model from a pool or getting a more detailed look on the
