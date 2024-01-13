@@ -18,7 +18,7 @@ Utility functions for data loading and training of VGSL networks.
 import json
 import torch
 import numbers
-import pkg_resources
+import importlib.resources
 import torch.nn.functional as F
 
 from functools import partial
@@ -320,7 +320,8 @@ def compute_confusions(algn1: Sequence[str], algn2: Sequence[str]):
         script substitutions.
     """
     counts: Dict[Tuple[str, str], int] = Counter()
-    with pkg_resources.resource_stream(__name__, 'scripts.json') as fp:
+    ref = importlib.resources.files(__name__).joinpath('scripts.json')
+    with ref.open('rb') as fp:
         script_map = json.load(fp)
 
     def _get_script(c):

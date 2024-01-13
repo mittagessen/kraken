@@ -25,7 +25,7 @@ from functools import partial
 from collections import defaultdict
 from typing import List, Tuple, Optional, Generator, Union, Dict, Sequence, TYPE_CHECKING
 
-from kraken.containers import BaselineOCRRecord, BBoxOCRRecord, ocr_record, Segmentation
+from kraken.containers import BaselineOCRRecord, BBoxOCRRecord, ocr_record
 from kraken.lib.util import get_im_str, is_bitonal
 from kraken.lib.segmentation import extract_polygons
 from kraken.lib.exceptions import KrakenInputException
@@ -33,6 +33,7 @@ from kraken.lib.dataset import ImageInputTransforms
 
 if TYPE_CHECKING:
     from PIL import Image
+    from kraken.containers import Segmentation
     from kraken.lib.models import TorchSeqRecognizer
 
 __all__ = ['mm_rpred', 'rpred']
@@ -45,9 +46,9 @@ class mm_rpred(object):
     Multi-model version of kraken.rpred.rpred
     """
     def __init__(self,
-                 nets: Dict[Tuple[str, str], TorchSeqRecognizer],
-                 im: Image.Image,
-                 bounds: Segmentation,
+                 nets: Dict[Tuple[str, str], 'TorchSeqRecognizer'],
+                 im: 'Image.Image',
+                 bounds: 'Segmentation',
                  pad: int = 16,
                  bidi_reordering: Union[bool, str] = True,
                  tags_ignore: Optional[List[Tuple[str, str]]] = None) -> Generator[ocr_record, None, None]:
@@ -90,13 +91,18 @@ class mm_rpred(object):
         if not tags_ignore:
             tags_ignore = []
 
+        if bounds.script_detection:
+            self.have_tags = True
+        else:
+            self.have_tags = False
+
         if bounds.type not in seg_types or len(seg_types) > 1:
             logger.warning(f'Recognizers with segmentation types {seg_types} will be '
                            f'applied to segmentation of type {bounds.type}. '
                            f'This will likely result in severely degraded performace')
         one_channel_modes = set(recognizer.nn.one_channel_mode for recognizer in nets.values())
         if '1' in one_channel_modes and len(one_channel_modes) > 1:
-            raise KrakenInputException('Mixing binary and non-binary recognition models is not supported.')
+            raise ValueError('Mixing binary and non-binary recognition models is not supported.')
         elif '1' in one_channel_modes and not is_bitonal(im):
             logger.warning('Running binary models on non-binary input image '
                            f'(mode {im.mode}). This will result in severely degraded '
@@ -112,32 +118,39 @@ class mm_rpred(object):
             valid_norm = True
             self.next_iter = self._recognize_box_line
 
-        tags = set()
-        for x in bounds.lines:
-            tags.update(x.tags.items())
+        if self.have_tags:
+            tags = set()
+            for x in bounds.lines:
+                tags.update(x.tags.items())
 
-        im_str = get_im_str(im)
-        logger.info(f'Running {len(nets)} multi-script recognizers on {im_str} with {self.len} lines')
+            im_str = get_im_str(im)
+            logger.info(f'Running {len(nets)} multi-script recognizers on {im_str} with {self.len} lines')
 
-        filtered_tags = []
-        miss = []
-        for tag in tags:
-            if not isinstance(nets, defaultdict) and (not nets.get(tag) and tag not in tags_ignore):
-                miss.append(tag)
-            elif tag not in tags_ignore:
-                filtered_tags.append(tag)
-        tags = filtered_tags
+            filtered_tags = []
+            miss = []
+            for tag in tags:
+                if not isinstance(nets, defaultdict) and (not nets.get(tag) and tag not in tags_ignore):
+                    miss.append(tag)
+                elif tag not in tags_ignore:
+                    filtered_tags.append(tag)
+            tags = filtered_tags
 
-        if miss:
-            raise KrakenInputException(f'Missing models for tags {set(miss)}')
+            if miss:
+                raise KrakenInputException(f'Missing models for tags {set(miss)}')
 
-        # build dictionary for line preprocessing
-        self.ts = {}
-        for tag in tags:
-            logger.debug(f'Loading line transforms for {tag}')
-            network = nets[tag]
+            # build dictionary for line preprocessing
+            self.ts = {}
+            for tag in tags:
+                logger.debug(f'Loading line transforms for {tag}')
+                network = nets[tag]
+                batch, channels, height, width = network.nn.input
+                self.ts[tag] = ImageInputTransforms(batch, height, width, channels, (pad, 0), valid_norm)
+        elif isinstance(nets, defaultdict) and nets.default_factory:
+            network = nets.default_factory()
             batch, channels, height, width = network.nn.input
-            self.ts[tag] = ImageInputTransforms(batch, height, width, channels, (pad, 0), valid_norm)
+            self.ts = {('type', 'default'): ImageInputTransforms(batch, height, width, channels, (pad, 0), valid_norm)}
+        else:
+            raise ValueError('No tags in input data and no default model in mapping given.')
 
         self.im = im
         self.nets = nets
@@ -147,23 +160,22 @@ class mm_rpred(object):
         self.tags_ignore = tags_ignore
 
     def _recognize_box_line(self, line):
-        flat_box = [point for box in line.bbox for point in box]
-        xmin, xmax = min(flat_box[::2]), max(flat_box[::2])
-        ymin, ymax = min(flat_box[1::2]), max(flat_box[1::2])
+        xmin, ymin, xmax, ymax = line.bbox
         prediction = ''
         cuts = []
         confidences = []
         line.text_direction = self.bounds.text_direction
 
-        if self.tags_ignore is not None:
-            for tag in line.tags.values():
+        if self.have_tags and self.tags_ignore:
+            for tag in line.tags.items():
                 if tag in self.tags_ignore:
                     logger.info(f'Ignoring line segment with tags {line.tags} based on {tag}.')
-                    return BaselineOCRRecord('', [], [], line)
+                    return BBoxOCRRecord('', (), (), line)
 
         tag, net = self._resolve_tags_to_model(line.tags, self.nets)
 
-        box, coords = next(extract_polygons(self.im, line))
+        seg = dataclasses.replace(self.bounds, lines=[line])
+        box, coords = next(extract_polygons(self.im, seg))
         self.box = box
 
         # check if boxes are non-zero in any dimension
@@ -182,8 +194,6 @@ class mm_rpred(object):
         if ts_box.max() == ts_box.min():
             logger.warning('Empty run. Emitting empty record.')
             return BBoxOCRRecord('', (), (), line)
-
-        _, net = self._resolve_tags_to_model({'type': tag}, self.nets)
 
         logger.debug(f'Forward pass with model {tag}.')
         preds = net.predict(ts_box.unsqueeze(0))[0]
@@ -223,8 +233,8 @@ class mm_rpred(object):
             return rec.display_order(None)
 
     def _recognize_baseline_line(self, line):
-        if self.tags_ignore is not None:
-            for tag in line.tags.values():
+        if self.have_tags and self.tags_ignore is not None:
+            for tag in line.tags.items():
                 if tag in self.tags_ignore:
                     logger.info(f'Ignoring line segment with tags {line.tags} based on {tag}.')
                     return BaselineOCRRecord('', [], [], line)
@@ -291,9 +301,9 @@ class mm_rpred(object):
         return int(round(min(max(((val*self.net_scale)-self.pad)*self.in_scale, min_val), max_val-1)))
 
 
-def rpred(network: TorchSeqRecognizer,
-          im: Image.Image,
-          bounds: Segmentation,
+def rpred(network: 'TorchSeqRecognizer',
+          im: 'Image.Image',
+          bounds: 'Segmentation',
           pad: int = 16,
           bidi_reordering: Union[bool, str] = True) -> Generator[ocr_record, None, None]:
     """
@@ -318,15 +328,18 @@ def rpred(network: TorchSeqRecognizer,
     return mm_rpred(defaultdict(lambda: network), im, bounds, pad, bidi_reordering)
 
 
-def _resolve_tags_to_model(tags: Sequence[Dict[str, str]],
-                           model_map: Dict[Tuple[str, str], TorchSeqRecognizer],
-                           default: Optional[TorchSeqRecognizer] = None) -> TorchSeqRecognizer:
+def _resolve_tags_to_model(tags: Optional[Sequence[Dict[str, str]]],
+                           model_map: Dict[Tuple[str, str], 'TorchSeqRecognizer'],
+                           default: Optional['TorchSeqRecognizer'] = None) -> 'TorchSeqRecognizer':
     """
     Resolves a sequence of tags
     """
-    for tag in tags.items():
-        if tag in model_map:
-            return tag, model_map[tag]
-    if default:
+    if not tags and default:
+        return ('type', 'default'), default
+    elif tags:
+        for tag in tags.items():
+            if tag in model_map:
+                return tag, model_map[tag]
+    elif tags and default:
         return next(tags.values()), default
     raise KrakenInputException(f'No model for tags {tags}')

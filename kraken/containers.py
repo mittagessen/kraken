@@ -104,7 +104,7 @@ class BBoxLine:
 
     Attributes:
         id: Unique identifier
-        bbox: Tuple in form `((x0, y0), (x1, y0), (x1, y1), (x0, y1))` defining
+        bbox: Tuple in form `(xmin, ymin, xmax, ymax)` defining
               the bounding box.
         text: Transcription of this line.
         base_dir: An optional string defining the base direction (also called
@@ -120,10 +120,7 @@ class BBoxLine:
                         reading direction (of the document).
     """
     id: str
-    bbox: Tuple[Tuple[int, int],
-                Tuple[int, int],
-                Tuple[int, int],
-                Tuple[int, int]]
+    bbox: Tuple[int, int, int, int]
     text: Optional[str] = None
     base_dir: Optional[Literal['L', 'R']] = None
     type: str = 'bbox'
@@ -181,15 +178,17 @@ class Segmentation:
     imagename: Union[str, 'PathLike']
     text_direction: Literal['horizontal-lr', 'horizontal-rl', 'vertical-lr', 'vertical-rl']
     script_detection: bool
-    lines: List[Union[BaselineLine, BBoxLine]]
-    regions: Dict[str, List[Region]]
-    line_orders: List[List[int]]
+    lines: Optional[List[Union[BaselineLine, BBoxLine]]] = None
+    regions: Optional[Dict[str, List[Region]]] = None
+    line_orders: Optional[List[List[int]]] = None
 
     def __post_init__(self):
         if not self.regions:
             self.regions = {}
         if not self.lines:
             self.lines = []
+        if not self.line_orders:
+            self.line_orders = []
         if len(self.lines) and not isinstance(self.lines[0], BBoxLine) and not isinstance(self.lines[0], BaselineLine):
             line_cls = BBoxLine if self.type == 'bbox' else BaselineLine
             self.lines = [line_cls(**line) for line in self.lines]
@@ -502,7 +501,7 @@ class BBoxOCRRecord(ocr_record, BBoxLine):
         ocr_record.__init__(self, prediction, cuts, confidences, display_order)
 
     def __repr__(self) -> str:
-        return f'pred: {self.prediction} line: {self.line} confidences: {self.confidences}'
+        return f'pred: {self.prediction} bbox: {self.bbox} confidences: {self.confidences}'
 
     def __next__(self) -> Tuple[str, int, float]:
         if self.idx + 1 < len(self):

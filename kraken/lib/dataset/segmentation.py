@@ -31,6 +31,8 @@ from typing import Dict, Tuple, Sequence, Callable, Any, Union, Literal, Optiona
 
 from skimage.draw import polygon
 
+from kraken.lib.segmentation import scale_regions
+
 if TYPE_CHECKING:
     from kraken.containers import Segmentation
     from kraken.lib.xml import XMLPage
@@ -51,7 +53,6 @@ class BaselineSet(Dataset):
                  line_width: int = 4,
                  padding: Tuple[int, int, int, int] = (0, 0, 0, 0),
                  im_transforms: Callable[[Any], torch.Tensor] = transforms.Compose([]),
-                 mode: Optional[Literal['alto', 'page', 'xml']] = 'xml',
                  augmentation: bool = False,
                  valid_baselines: Sequence[str] = None,
                  merge_baselines: Dict[str, Sequence[str]] = None,
@@ -65,10 +66,6 @@ class BaselineSet(Dataset):
             padding: Tuple of ints containing the left/right, top/bottom
                      padding of the input images.
             target_size: Target size of the image as a (height, width) tuple.
-            mode: Either path, alto, page, xml, or None. In alto, page, and xml
-                  mode the baseline paths and image data is retrieved from an
-                  ALTO/PageXML file. In `None` mode data is iteratively added
-                  through the `add` method.
             augmentation: Enable/disable augmentation.
             valid_baselines: Sequence of valid baseline identifiers. If `None`
                              all are valid.
@@ -82,7 +79,7 @@ class BaselineSet(Dataset):
                            been discarded.
         """
         super().__init__()
-        self.mode = mode
+        self.imgs = []
         self.im_mode = '1'
         self.pad = padding
         self.targets = []
@@ -125,12 +122,12 @@ class BaselineSet(Dataset):
         self.transforms = im_transforms
         self.seg_type = None
 
-    def add(self, doc: Union['Segmentation', 'XMLPage']):
+    def add(self, doc: 'Segmentation'):
         """
         Adds a page to the dataset.
 
         Args:
-            doc: Either a Segmentation container class or an XMLPage.
+            doc: A Segmentation container class.
         """
         if doc.type != 'baselines':
             raise ValueError(f'{doc} is of type {doc.type}. Expected "baselines".')
@@ -139,6 +136,7 @@ class BaselineSet(Dataset):
         for line in doc.lines:
             if self.valid_baselines is None or set(line.tags.values()).intersection(self.valid_baselines):
                 tags = set(line.tags.values()).intersection(self.valid_baselines) if self.valid_baselines else line.tags.values()
+                tags = set([self.mbl_dict.get(v, v) for v in tags])
                 for tag in tags:
                     baselines_[tag].append(line.baseline)
                     self.class_stats['baselines'][tag] += 1
@@ -149,14 +147,13 @@ class BaselineSet(Dataset):
 
         regions_ = defaultdict(list)
         for k, v in doc.regions.items():
-            reg_type = self.mreg_dict.get(k, k)
-            if self.valid_regions is None or reg_type in self.valid_regions:
+            if self.valid_regions is None or k in self.valid_regions:
+                reg_type = self.mreg_dict.get(k, k)
                 regions_[reg_type].extend(v)
                 self.class_stats['baselines'][reg_type] += len(v)
                 if reg_type not in self.class_mapping['regions']:
                     self.num_classes += 1
                     self.class_mapping['regions'][reg_type] = self.num_classes - 1
-
         self.targets.append({'baselines': baselines_, 'regions': regions_})
         self.imgs.append(doc.imagename)
 
@@ -170,6 +167,7 @@ class BaselineSet(Dataset):
                 im, target = self.transform(im, target)
                 return {'image': im, 'target': target}
             except Exception:
+                raise
                 self.failed_samples.add(idx)
                 idx = np.random.randint(0, len(self.imgs))
                 logger.debug(traceback.format_exc())
@@ -235,7 +233,7 @@ class BaselineSet(Dataset):
                 # skip regions of classes not present in the training set
                 continue
             for region in regions:
-                region = np.array(region)*scale
+                region = np.array(scale_regions([region.boundary], scale)[0])
                 rr, cc = polygon(region[:, 1], region[:, 0], shape=image.shape[1:])
                 t[cls_idx, rr, cc] = 1
         target = F.pad(t, self.pad)

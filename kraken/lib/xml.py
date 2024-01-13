@@ -144,8 +144,10 @@ class XMLPage(object):
             # parse region type and coords
             region_data = defaultdict(list)
             for region in regions:
+                region_id = region.get('ID')
                 # try to find shape object
                 coords = region.find('./{*}Shape/{*}Polygon')
+                boundary = None
                 if coords is not None:
                     boundary = self._parse_alto_pointstype(coords.get('POINTS'))
                 elif (region.get('HPOS') is not None and region.get('VPOS') is not None and
@@ -169,8 +171,7 @@ class XMLPage(object):
                             break
                 if rtype is None:
                     rtype = alto_regions[region.tag.split('}')[-1]]
-                region_id = region.get('ID')
-                region_data[rtype].append(Region(id=region_id, boundary=coords, tags={'type': rtype}))
+                region_data[rtype].append(Region(id=region_id, boundary=boundary, tags={'type': rtype}))
                 # register implicit reading order
                 self._orders['region_implicit']['order'].append(region_id)
 
@@ -598,4 +599,4 @@ class XMLPage(object):
                             script_detection=True,
                             lines=self.get_sorted_lines(),
                             regions=self._regions,
-                            line_orders=None)
+                            line_orders=[])

@@ -43,7 +43,7 @@ def publish(ctx, metadata, access_token, private, model):
     Publishes a model on the zenodo model repository.
     """
     import json
-    import pkg_resources
+    import importlib.resources
 
     from jsonschema import validate
     from jsonschema.exceptions import ValidationError
@@ -52,7 +52,8 @@ def publish(ctx, metadata, access_token, private, model):
     from kraken.lib import models
     from kraken.lib.progress import KrakenDownloadProgressBar
 
-    with pkg_resources.resource_stream('kraken', 'metadata.schema.json') as fp:
+    ref = importlib.resources.files('kraken').joinpath('metadata.schema.json')
+    with open(ref, 'rb') as fp:
         schema = json.load(fp)
 
     nn = models.load_any(model)

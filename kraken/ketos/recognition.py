@@ -472,7 +472,7 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
             for line in test_set:
                 try:
                     ds.add(**line)
-                except KrakenInputException as e:
+                except ValueError as e:
                     logger.info(e)
             # don't encode validation set as the alphabets may not match causing encoding failures
             ds.no_encode()
