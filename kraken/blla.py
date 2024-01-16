@@ -25,7 +25,7 @@ import uuid
 import torch
 import logging
 import numpy as np
-import importlib.resources
+import importlib_resources
 import shapely.geometry as geom
 import torch.nn.functional as F
 import torchvision.transforms as tf
@@ -310,7 +310,7 @@ def segment(im: PIL.Image.Image,
     """
     if model is None:
         logger.info('No segmentation model given. Loading default model.')
-        model = vgsl.TorchVGSLModel.load_model(importlib.resources.files(__name__).joinpath('blla.mlmodel'))
+        model = vgsl.TorchVGSLModel.load_model(importlib_resources.files(__name__).joinpath('blla.mlmodel'))
 
     if isinstance(model, vgsl.TorchVGSLModel):
         model = [model]
