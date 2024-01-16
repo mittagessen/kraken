@@ -48,7 +48,7 @@ class ProcessingStep:
 
     Attributes:
         id: Unique identifier
-        category: Category of processing step that has been performat.
+        category: Category of processing step that has been performed.
         description: Natural-language description of the process.
         settings: Dict describing the parameters of the processing step.
     """

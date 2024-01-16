@@ -286,7 +286,7 @@ def segment(im: PIL.Image.Image,
            :force:
 
            'lines': [
-              {'baseline': [[x0, y0], [x1, y1], ..., [x_n, y_n]], 'boundary': [[x0, y0, x1, y1], ... [x_m, y_m]]},
+              {'baseline': [[x0, y0], [x1, y1], ..., [x_n, y_n]], 'boundary': [[x0, y0], [x1, y1], ... [x_m, y_m]]},
               {'baseline': [[x0, ...]], 'boundary': [[x0, ...]]}
             ]
             'regions': [
