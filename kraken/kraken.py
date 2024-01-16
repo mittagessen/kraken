@@ -602,7 +602,7 @@ def ocr(ctx, model, pad, reorder, base_dir, no_segmentation, text_direction):
     if reorder and base_dir != 'auto':
         reorder = base_dir
 
-    # first we try to find the model in the absolue path, then ~/.kraken
+    # first we try to find the model in the absolute path, then ~/.kraken
     nm = {}  # type: Dict[str, models.TorchSeqRecognizer]
     ign_tags = model.pop('ignore')
     for k, v in model.items():

@@ -329,7 +329,7 @@ class PolygonGTDataset(Dataset):
             line: Optional[BaselineLine] = None,
             page: Optional[Segmentation] = None):
         """
-        Adds an indiviual line or all lines on a page to the dataset.
+        Adds an individual line or all lines on a page to the dataset.
 
         Args:
             line: BaselineLine container object of a line.
@@ -518,7 +518,7 @@ class GroundTruthDataset(Dataset):
             line: Optional[BBoxLine] = None,
             page: Optional[Segmentation] = None):
         """
-        Adds an indiviual line or all lines on a page to the dataset.
+        Adds an individual line or all lines on a page to the dataset.
 
         Args:
             line: BBoxLine container object of a line.

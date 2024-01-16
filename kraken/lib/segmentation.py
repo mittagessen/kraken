@@ -1031,7 +1031,7 @@ def extract_polygons(im: Image.Image, bounds: 'Segmentation') -> Image.Image:
 
     Args:
         im: Input image
-        bounds: A Segmentation class containing a boundig box or baseline
+        bounds: A Segmentation class containing a bounding box or baseline
                 segmentation.
 
     Yields:
