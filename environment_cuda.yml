@@ -18,7 +18,7 @@ dependencies:
   - cudatoolkit>=9.2
   - jsonschema
   - scikit-learn~=1.2.1
-  - scikit-image~=0.22.0
+  - scikit-image~=0.21.0
   - shapely~=1.8.5
   - pyvips
   - imagemagick>=7.1.0
