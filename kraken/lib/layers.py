@@ -30,7 +30,7 @@ class MultiParamSequential(Sequential):
         modules = self._modules.values()
         i = 0
         for module in modules:
-            if type(inputs) == tuple:
+            if isinstance(inputs, tuple):
                 inputs = module(*inputs, output_shape=output_shape if i == len(modules) - 1 else None)
             else:
                 inputs = module(inputs, output_shape=output_shape if i == len(modules) - 1 else None)

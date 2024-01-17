@@ -30,7 +30,7 @@ from pathlib import Path
 
 from functools import partial
 from rich.traceback import install
-from typing import Dict, Union, List, cast, Any, IO, Callable
+from typing import Dict, cast, Any, IO, Callable
 
 import click
 
@@ -544,14 +544,14 @@ def _validate_mm(ctx, param, value):
     model_dict = {'ignore': []}  # type: Dict[str, Union[str, List[str]]]
     if len(value) == 1:
         lexer = shlex.shlex(value[0], posix=True)
-        lexer.wordchars += '\/.+-()=^&;,.'
+        lexer.wordchars += r'\/.+-()=^&;,.'
         if len(list(lexer)) == 1:
             model_dict['default'] = value[0]
             return model_dict
     try:
         for m in value:
             lexer = shlex.shlex(m, posix=True)
-            lexer.wordchars += '\/.+-()=^&;,.'
+            lexer.wordchars += r'\/.+-()=^&;,.'
             tokens = list(lexer)
             if len(tokens) != 3:
                 raise ValueError
