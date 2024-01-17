@@ -248,7 +248,6 @@ class mm_rpred(object):
             return BaselineOCRRecord('', [], [], line)
 
         self.box = box
-
         tag, net = self._resolve_tags_to_model(line.tags, self.nets)
         # check if boxes are non-zero in any dimension
         if 0 in box.size:
@@ -340,6 +339,6 @@ def _resolve_tags_to_model(tags: Optional[Sequence[Dict[str, str]]],
         for tag in tags.items():
             if tag in model_map:
                 return tag, model_map[tag]
-    elif tags and default:
-        return next(tags.values()), default
+    if tags and default:
+        return next(iter(tags.items())), default
     raise KrakenInputException(f'No model for tags {tags}')
