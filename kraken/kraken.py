@@ -30,7 +30,7 @@ from pathlib import Path
 
 from functools import partial
 from rich.traceback import install
-from typing import Dict, cast, Any, IO, Callable
+from typing import Dict, cast, Any, IO, Callable, Union, List
 
 import click
 
@@ -541,7 +541,7 @@ def _validate_mm(ctx, param, value):
     """
     Maps model mappings to a dictionary.
     """
-    model_dict = {'ignore': []}  # type: Dict[str, Union[str, List[str]]]
+    model_dict: Dict[str, Union[str, List[str]]] = {'ignore': []}
     if len(value) == 1:
         lexer = shlex.shlex(value[0], posix=True)
         lexer.wordchars += r'\/.+-()=^&;,.'
@@ -603,7 +603,7 @@ def ocr(ctx, model, pad, reorder, base_dir, no_segmentation, text_direction):
         reorder = base_dir
 
     # first we try to find the model in the absolute path, then ~/.kraken
-    nm = {}  # type: Dict[str, models.TorchSeqRecognizer]
+    nm: Dict[str, models.TorchSeqRecognizer] = {}
     ign_tags = model.pop('ignore')
     for k, v in model.items():
         search = [v,
@@ -629,7 +629,7 @@ def ocr(ctx, model, pad, reorder, base_dir, no_segmentation, text_direction):
     if 'default' in nm:
         from collections import defaultdict
 
-        nn = defaultdict(lambda: nm['default'])  # type: Dict[str, models.TorchSeqRecognizer]
+        nn: Dict[str, models.TorchSeqRecognizer] = defaultdict(lambda: nm['default'])
         nn.update(nm)
         nm = nn
 

@@ -7,8 +7,6 @@ import tempfile
 from pytest import raises
 from pathlib import Path
 
-import kraken.lib.lstm
-
 from kraken.lib import models
 from kraken.lib.exceptions import KrakenInvalidModelException
 

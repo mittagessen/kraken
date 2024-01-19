@@ -27,7 +27,7 @@ from itertools import groupby
 from torchvision import transforms
 from collections import defaultdict
 from torch.utils.data import Dataset
-from typing import Dict, Tuple, Sequence, Callable, Any, Union, Literal, Optional, TYPE_CHECKING
+from typing import Dict, Tuple, Sequence, Callable, Any, TYPE_CHECKING
 
 from skimage.draw import polygon
 
@@ -35,7 +35,6 @@ from kraken.lib.segmentation import scale_regions
 
 if TYPE_CHECKING:
     from kraken.containers import Segmentation
-    from kraken.lib.xml import XMLPage
 
 
 __all__ = ['BaselineSet']

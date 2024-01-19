@@ -64,7 +64,7 @@ class PytorchCodec(object):
                 raise KrakenCodecException(f'Duplicate entry in codec definition string: {cc}')
             self.c2l = {k: [v] for v, k in enumerate(sorted(charset), start=1)}
         self.c_sorted = sorted(self.c2l.keys(), key=len, reverse=True)
-        self.l2c = {tuple(v): k for k, v in self.c2l.items()}  # type: Dict[Tuple[int], str]
+        self.l2c: Dict[Tuple[int], str] = {tuple(v): k for k, v in self.c2l.items()}
         self.l2c_single = {k[0]: v for k, v in self.l2c.items() if len(k) == 1}
         self.strict = strict
         if not self.is_valid:
@@ -116,7 +116,7 @@ class PytorchCodec(object):
             KrakenEncodeException: if the a subsequence is not encodable and the
                                    codec is set to strict mode.
         """
-        labels = []  # type: List[int]
+        labels: List[int] = []
         idx = 0
         while idx < len(s):
             encodable_suffix = False

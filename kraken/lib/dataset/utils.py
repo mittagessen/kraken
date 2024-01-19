@@ -66,7 +66,7 @@ class ImageInputTransforms(transforms.Compose):
         """
         super().__init__(None)
 
-        self._scale = (height, width)  # type: Tuple[int, int]
+        self._scale: Tuple[int, int] = (height, width)
         self._valid_norm = valid_norm
         self._force_binarization = force_binarization
         self._batch = batch

@@ -112,8 +112,8 @@ class ArrowIPCRecognitionDataset(Dataset):
                           `test` only rows with the appropriate flag set in the
                           file will be considered.
         """
-        self.alphabet = Counter()  # type: Counter
-        self.text_transforms = []  # type: List[Callable[[str], str]]
+        self.alphabet: Counter = Counter()
+        self.text_transforms: List[Callable[[str], str]] = []
         self.failed_samples = set()
         self.transforms = im_transforms
         self.aug = None
@@ -300,10 +300,10 @@ class PolygonGTDataset(Dataset):
                            suitable for forward passes.
             augmentation: Enables augmentation.
         """
-        self._images = []  # type:  Union[List[Image], List[torch.Tensor]]
-        self._gt = []  # type:  List[str]
-        self.alphabet = Counter()  # type: Counter
-        self.text_transforms = []  # type: List[Callable[[str], str]]
+        self._images: Union[List[Image.Image], List[torch.Tensor]] = []
+        self._gt: List[str] = []
+        self.alphabet: Counter = Counter()
+        self.text_transforms: List[Callable[[str], str]] = []
         self.transforms = im_transforms
         self.aug = None
         self.skip_empty_lines = skip_empty_lines
@@ -397,7 +397,7 @@ class PolygonGTDataset(Dataset):
             self.codec = codec
         else:
             self.codec = PytorchCodec(''.join(self.alphabet.keys()))
-        self.training_set = []  # type: List[Tuple[Union[Image, torch.Tensor], torch.Tensor]]
+        self.training_set: List[Tuple[Union[Image.Image, torch.Tensor], torch.Tensor]] = []
         for im, gt in zip(self._images, self._gt):
             self.training_set.append((im, self.codec.encode(gt)))
 
@@ -405,7 +405,7 @@ class PolygonGTDataset(Dataset):
         """
         Creates an unencoded dataset.
         """
-        self.training_set = []  # type: List[Tuple[Union[Image, torch.Tensor], str]]
+        self.training_set: List[Tuple[Union[Image.Image, torch.Tensor], str]] = []
         for im, gt in zip(self._images, self._gt):
             self.training_set.append((im, gt))
 
@@ -584,7 +584,7 @@ class GroundTruthDataset(Dataset):
             self.codec = codec
         else:
             self.codec = PytorchCodec(''.join(self.alphabet.keys()))
-        self.training_set = []  # type: List[Tuple[Union[Image, torch.Tensor], torch.Tensor]]
+        self.training_set: List[Tuple[Union[Image.Image, torch.Tensor], torch.Tensor]] = []
         for im, gt in zip(self._images, self._gt):
             self.training_set.append((im, self.codec.encode(gt)))
 
@@ -592,7 +592,7 @@ class GroundTruthDataset(Dataset):
         """
         Creates an unencoded dataset.
         """
-        self.training_set = []  # type: List[Tuple[Union[Image, torch.Tensor], str]]
+        self.training_set: List[Tuple[Union[Image.Image, torch.Tensor], str]] = []
         for im, gt in zip(self._images, self._gt):
             self.training_set.append((im, gt))
 

@@ -15,15 +15,16 @@
 """
 Utility functions for ground truth transcription.
 """
-from kraken.lib.exceptions import KrakenInputException
-from kraken.lib.util import get_im_str
-
-from jinja2 import Environment, PackageLoader
 from io import BytesIO
+from typing import List, Dict, Any
+from jinja2 import Environment, PackageLoader
 
 import uuid
 import base64
 import logging
+
+from kraken.lib.exceptions import KrakenInputException
+from kraken.lib.util import get_im_str
 
 logger = logging.getLogger()
 
@@ -36,7 +37,7 @@ class TranscriptionInterface(object):
         env = Environment(loader=PackageLoader('kraken', 'templates'), autoescape=True)
         logger.debug('Loading transcription template.')
         self.tmpl = env.get_template('layout.html')
-        self.pages = []  # type: List[dict]
+        self.pages: List[Dict[Any, Any]] = []
         self.font = {'font': font, 'style': font_style}
         self.text_direction = 'horizontal-tb'
         self.page_idx = 1

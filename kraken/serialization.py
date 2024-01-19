@@ -22,7 +22,7 @@ import importlib.metadata
 
 from kraken.lib.util import make_printable
 
-from typing import List, Tuple, Iterable, Optional, Sequence, Literal, TYPE_CHECKING
+from typing import List, Tuple, Iterable, Optional, Sequence, Literal, TYPE_CHECKING, Dict, Any
 
 if TYPE_CHECKING:
     from os import PathLike
@@ -107,14 +107,14 @@ def serialize(results: 'Segmentation',
         The rendered template
     """
     logger.info(f'Serialize {len(results.lines)} records from {results.imagename} with template {template}.')
-    page = {'entities': [],
-            'size': image_size,
-            'name': results.imagename,
-            'writing_mode': writing_mode,
-            'scripts': scripts,
-            'date': datetime.datetime.now(datetime.timezone.utc).isoformat(),
-            'base_dir': [rec.base_dir for rec in results.lines][0] if len(results.lines) else None,
-            'seg_type': results.type}  # type: dict
+    page: Dict[str, Any] = {'entities': [],
+                            'size': image_size,
+                            'name': results.imagename,
+                            'writing_mode': writing_mode,
+                            'scripts': scripts,
+                            'date': datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                            'base_dir': [rec.base_dir for rec in results.lines][0] if len(results.lines) else None,
+                            'seg_type': results.type}
     metadata = {'processing_steps': processing_steps,
                 'version': importlib.metadata.version('kraken')}
 

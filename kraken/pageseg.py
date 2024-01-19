@@ -46,9 +46,9 @@ class record(object):
     """
     def __init__(self, **kw):
         self.__dict__.update(kw)
-        self.label = 0  # type: int
-        self.bounds = []  # type: List
-        self.mask = None  # type: np.ndarray
+        self.label: int = 0
+        self.bounds: List = []
+        self.mask: np.ndarray = None
 
 
 def find(condition):

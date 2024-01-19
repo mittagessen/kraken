@@ -45,7 +45,7 @@ def _validate_merging(ctx, param, value):
     """
     if not value:
         return None
-    merge_dict = {}  # type: Dict[str, str]
+    merge_dict: Dict[str, str] = {}
     try:
         for m in value:
             lexer = shlex.shlex(m, posix=True)

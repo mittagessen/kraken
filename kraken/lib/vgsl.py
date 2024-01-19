@@ -127,21 +127,21 @@ class TorchVGSLModel(object):
                     dimension.
         """
         self.spec = spec
-        self.named_spec = []  # type:  List[str]
+        self.named_spec: List[str] = []
         self.ops = [self.build_addition, self.build_identity, self.build_rnn,
                     self.build_dropout, self.build_maxpool, self.build_conv,
                     self.build_output, self.build_reshape, self.build_wav2vec2,
                     self.build_groupnorm, self.build_series,
                     self.build_parallel, self.build_ro]
-        self.codec = None  # type: Optional[PytorchCodec]
-        self.criterion = None  # type: Any
+        self.codec: Optional[PytorchCodec] = None
+        self.criterion: Any = None
         self.nn = layers.MultiParamSequential()
-        self.user_metadata = {'accuracy': [],
-                              'metrics': [],
-                              'seg_type': None,
-                              'one_channel_mode': None,
-                              'model_type': None,
-                              'hyper_params': {}}  # type: dict[str, Any]
+        self.user_metadata: Dict[str, Any] = {'accuracy': [],
+                                              'metrics': [],
+                                              'seg_type': None,
+                                              'one_channel_mode': None,
+                                              'model_type': None,
+                                              'hyper_params': {}}
         self._aux_layers = nn.ModuleDict()
 
         self.idx = -1
@@ -304,12 +304,12 @@ class TorchVGSLModel(object):
         if 'codec' in mlmodel.user_defined_metadata:
             nn.add_codec(PytorchCodec(json.loads(mlmodel.user_defined_metadata['codec'])))
 
-        nn.user_metadata = {'accuracy': [],
-                            'metrics': [],
-                            'seg_type': 'bbox',
-                            'one_channel_mode': '1',
-                            'model_type': None,
-                            'hyper_params': {}}  # type: dict[str, str]
+        nn.user_metadata: Dict[str, Any] = {'accuracy': [],
+                                            'metrics': [],
+                                            'seg_type': 'bbox',
+                                            'one_channel_mode': '1',
+                                            'model_type': None,
+                                            'hyper_params': {}}
 
         if 'kraken_meta' in mlmodel.user_defined_metadata:
             nn.user_metadata.update(json.loads(mlmodel.user_defined_metadata['kraken_meta']))

@@ -46,7 +46,7 @@ class MultiParamParallel(Module):
         outputs = []
         seq_lens = None
         for module in self._modules.values():
-            if type(inputs) == tuple:
+            if isinstance(inputs, tuple):
                 output, seq_lens = module(*inputs, output_shape=output_shape)
                 outputs.append(output)
             else:
@@ -135,7 +135,7 @@ class PeepholeBidiLSTM(Module):
 
         self.input_size = input_size
         self.hidden_size = hidden_size
-        self._all_weights = []  # type: List[List[str]]
+        self._all_weights: List[List[str]] = []
         gate_size = 4 * hidden_size
         for direction in range(2):
             w_ih = torch.nn.Parameter(torch.Tensor(gate_size, input_size))
