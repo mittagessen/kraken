@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
-import pytest
 import unittest
 from typing import Sequence, Tuple
 
-import shapely.geometry as geom
 import numpy as np
+import pytest
+import shapely.geometry as geom
 
 from kraken.lib.segmentation import is_in_region, reading_order, topsort
 

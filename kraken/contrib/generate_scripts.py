@@ -2,8 +2,9 @@
 """
 Script fetching the latest unicode Scripts.txt and dumping it as json.
 """
-from urllib import request
 import json
+from urllib import request
+
 import regex
 
 uri = 'http://www.unicode.org/Public/UNIDATA/Scripts.txt'

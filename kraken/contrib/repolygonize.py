@@ -28,12 +28,13 @@ def cli(format_type, topline, files):
         click.echo(ctx.get_help())
         ctx.exit()
 
-    from lxml import etree
+    from itertools import groupby
     from os.path import splitext
 
-    from itertools import groupby
-    from kraken.lib import xml
+    from lxml import etree
     from PIL import Image
+
+    from kraken.lib import xml
     from kraken.lib.segmentation import calculate_polygonal_environment
 
     def _repl_alto(fname, polygons):

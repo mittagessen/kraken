@@ -18,16 +18,17 @@ kraken.ketos.train
 
 Command line driver for recognition training and evaluation.
 """
-import click
 import logging
 import pathlib
-
 from typing import List
+
+import click
 from threadpoolctl import threadpool_limits
 
-from kraken.lib.exceptions import KrakenInputException
 from kraken.lib.default_specs import RECOGNITION_HYPER_PARAMS, RECOGNITION_SPEC
-from .util import _validate_manifests, _expand_gt, message, to_ptl_device
+from kraken.lib.exceptions import KrakenInputException
+
+from .util import _expand_gt, _validate_manifests, message, to_ptl_device
 
 logging.captureWarnings(True)
 logger = logging.getLogger('kraken')
@@ -211,13 +212,13 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
 
     if augment:
         try:
-            import albumentations # NOQA
+            import albumentations  # NOQA
         except ImportError:
             raise click.BadOptionUsage('augment', 'augmentation needs the `albumentations` package installed.')
 
     if pl_logger == 'tensorboard':
         try:
-            import tensorboard # NOQA
+            import tensorboard  # NOQA
         except ImportError:
             raise click.BadOptionUsage('logger', 'tensorboard logger needs the `tensorboard` package installed.')
 
@@ -226,7 +227,8 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
 
     import json
     import shutil
-    from kraken.lib.train import RecognitionModel, KrakenTrainer
+
+    from kraken.lib.train import KrakenTrainer, RecognitionModel
 
     hyper_params = RECOGNITION_HYPER_PARAMS.copy()
     hyper_params.update({'freq': freq,
@@ -395,15 +397,14 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
     import numpy as np
     from torch.utils.data import DataLoader
 
-    from kraken.serialization import render_report
     from kraken.lib import models, util
-    from kraken.lib.xml import XMLPage
-    from kraken.lib.dataset import (global_align, compute_confusions,
-                                    PolygonGTDataset, GroundTruthDataset,
-                                    ImageInputTransforms,
-                                    ArrowIPCRecognitionDataset,
-                                    collate_sequences)
+    from kraken.lib.dataset import (ArrowIPCRecognitionDataset,
+                                    GroundTruthDataset, ImageInputTransforms,
+                                    PolygonGTDataset, collate_sequences,
+                                    compute_confusions, global_align)
     from kraken.lib.progress import KrakenProgressBar
+    from kraken.lib.xml import XMLPage
+    from kraken.serialization import render_report
 
     logger.info('Building test set from {} line images'.format(len(test_set) + len(evaluation_files)))
 

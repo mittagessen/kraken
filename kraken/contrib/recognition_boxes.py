@@ -6,14 +6,14 @@ segmenter model.
 
 import os
 import sys
+from itertools import cycle
 
 from PIL import Image, ImageDraw
 
-from kraken.pageseg import segment
 from kraken.binarization import nlbin
-from kraken.rpred import rpred
-from itertools import cycle
 from kraken.lib import models
+from kraken.pageseg import segment
+from kraken.rpred import rpred
 
 cmap = cycle([(230, 25, 75, 127),
               (60, 180, 75, 127),

@@ -21,18 +21,17 @@ align
 A character alignment module using a network output lattice and ground truth to
 accuractely determine grapheme locations in input data.
 """
-import torch
-import logging
 import dataclasses
-
-from PIL import Image
-from bidi.algorithm import get_display
-
+import logging
 from dataclasses import dataclass
-from typing import Optional, Literal, TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal, Optional
+
+import torch
+from bidi.algorithm import get_display
+from PIL import Image
 
 from kraken import rpred
-from kraken.containers import Segmentation, BaselineOCRRecord
+from kraken.containers import BaselineOCRRecord, Segmentation
 
 if TYPE_CHECKING:
     from kraken.lib.models import TorchSeqRecognizer

@@ -15,19 +15,20 @@
 """
 Handlers for rich-based progress bars.
 """
-from typing import Union, TYPE_CHECKING
 from dataclasses import dataclass
+from typing import TYPE_CHECKING, Union
 
-from pytorch_lightning.callbacks.progress.rich_progress import CustomProgress, RichProgressBar, MetricsTextColumn
-
+from pytorch_lightning.callbacks.progress.rich_progress import (
+    CustomProgress, MetricsTextColumn, RichProgressBar)
 from rich import get_console, reconfigure
-from rich.progress import BarColumn, Progress, ProgressColumn, TextColumn, TimeRemainingColumn, TimeElapsedColumn, DownloadColumn
-from rich.text import Text
 from rich.default_styles import DEFAULT_STYLES
+from rich.progress import (BarColumn, DownloadColumn, Progress, ProgressColumn,
+                           TextColumn, TimeElapsedColumn, TimeRemainingColumn)
+from rich.text import Text
 
 if TYPE_CHECKING:
-    from rich.style import Style
     from rich.console import RenderableType
+    from rich.style import Style
 
 __all__ = ['KrakenProgressBar', 'KrakenDownloadProgressBar', 'KrakenTrainProgressBar']
 

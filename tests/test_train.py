@@ -1,16 +1,15 @@
 # -*- coding: utf-8 -*-
 
-import unittest
 import json
-
-import kraken
-
-from pytest import raises
+import unittest
 from pathlib import Path
 
+from pytest import raises
+
+import kraken
 from kraken.lib import xml
-from kraken.lib.train import KrakenTrainer, RecognitionModel, SegmentationModel
 from kraken.lib.exceptions import KrakenInputException
+from kraken.lib.train import KrakenTrainer, RecognitionModel, SegmentationModel
 
 thisfile = Path(__file__).resolve().parent
 resources = thisfile / 'resources'

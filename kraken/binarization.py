@@ -19,17 +19,17 @@ kraken.binarization
 
 An adaptive binarization algorithm.
 """
-import warnings
 import logging
-import numpy as np
-
-from kraken.lib.util import pil2array, array2pil, is_bitonal, get_im_str
-from scipy.ndimage import affine_transform, percentile_filter, gaussian_filter, binary_dilation
-from scipy.ndimage import zoom as _zoom
-
+import warnings
 from typing import TYPE_CHECKING
 
+import numpy as np
+from scipy.ndimage import (affine_transform, binary_dilation, gaussian_filter,
+                           percentile_filter)
+from scipy.ndimage import zoom as _zoom
+
 from kraken.lib.exceptions import KrakenInputException
+from kraken.lib.util import array2pil, get_im_str, is_bitonal, pil2array
 
 if TYPE_CHECKING:
     from PIL import Image

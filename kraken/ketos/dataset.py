@@ -61,8 +61,9 @@ def compile(ctx, output, workers, format_type, files, random_split, force_type,
     """
     Precompiles a binary dataset from a collection of XML files.
     """
-    from .util import message
     from kraken.lib.progress import KrakenProgressBar
+
+    from .util import message
 
     ground_truth = list(ground_truth)
 

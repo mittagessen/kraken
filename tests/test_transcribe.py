@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
-import os
 import json
+import os
 import unittest
-
-from PIL import Image
 from io import BytesIO
-from lxml import etree
 from pathlib import Path
+
+from lxml import etree
+from PIL import Image
 
 from kraken.transcribe import TranscriptionInterface
 

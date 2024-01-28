@@ -15,14 +15,14 @@
 """
 Accessors to the model repository on zenodo.
 """
-import os
 import json
 import logging
-import requests
-
-from pathlib import Path
+import os
 from contextlib import closing
-from typing import Callable, Any, TYPE_CHECKING
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Callable
+
+import requests
 
 from kraken.lib.exceptions import KrakenRepoException
 

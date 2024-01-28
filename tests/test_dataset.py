@@ -1,15 +1,14 @@
 # -*- coding: utf-8 -*-
 import unittest
-
 from pathlib import Path
-from pytest import raises
 
 from PIL import Image
-from kraken.lib.dataset import ImageInputTransforms, BaselineSet
+from pytest import raises
 
 from kraken.lib import xml
-from kraken.lib.util import is_bitonal
+from kraken.lib.dataset import BaselineSet, ImageInputTransforms
 from kraken.lib.exceptions import KrakenInputException
+from kraken.lib.util import is_bitonal
 
 thisfile = Path(__file__).resolve().parent
 resources = thisfile / 'resources'

@@ -16,20 +16,21 @@
 Named functions for all the transforms that were lambdas in the past to
 facilitate pickling.
 """
-import torch
-import regex
 import unicodedata
-import bidi.algorithm as bd
-
 from pathlib import Path
+from typing import (TYPE_CHECKING, Any, Callable, Literal, Optional, Tuple,
+                    Union)
+
+import bidi.algorithm as bd
+import regex
+import torch
 from PIL.Image import Resampling
 
-from typing import Literal, Tuple, Optional, Callable, Any, Union, TYPE_CHECKING
-
-from kraken.lib.lineest import dewarp, CenterNormalizer
+from kraken.lib.lineest import CenterNormalizer, dewarp
 
 if TYPE_CHECKING:
     from os import PathLike
+
     from PIL import Image
 
 

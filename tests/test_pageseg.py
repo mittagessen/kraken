@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 import unittest
+from pathlib import Path
 
 from PIL import Image
 from pytest import raises
-from pathlib import Path
 
-from kraken.pageseg import segment
 from kraken.lib.exceptions import KrakenInputException
+from kraken.pageseg import segment
 
 thisfile = Path(__file__).resolve().parent
 resources = thisfile / 'resources'

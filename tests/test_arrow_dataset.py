@@ -1,13 +1,12 @@
 # -*- coding: utf-8 -*-
 
-import unittest
 import json
-
-import kraken
-
-from pytest import raises
+import unittest
 from pathlib import Path
 
+from pytest import raises
+
+import kraken
 from kraken.lib import xml
 from kraken.lib.arrow_dataset import build_binary_dataset
 

@@ -15,13 +15,13 @@
 """
 Utility functions for ground truth transcription.
 """
-from io import BytesIO
-from typing import List, Dict, Any
-from jinja2 import Environment, PackageLoader
-
-import uuid
 import base64
 import logging
+import uuid
+from io import BytesIO
+from typing import Any, Dict, List
+
+from jinja2 import Environment, PackageLoader
 
 from kraken.lib.exceptions import KrakenInputException
 from kraken.lib.util import get_im_str

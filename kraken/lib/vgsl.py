@@ -1,24 +1,22 @@
 """
 VGSL plumbing
 """
-import re
 import json
-import torch
 import logging
-
-from torch import nn
+import re
 from os import PathLike
-from typing import Sequence, List, Tuple, Union, Optional, Iterable, Callable, Dict, Any
+from typing import (Any, Callable, Dict, Iterable, List, Optional, Sequence,
+                    Tuple, Union)
+
+import torch
+from coremltools.models import MLModel, datatypes
+from coremltools.models.neural_network import NeuralNetworkBuilder
+from google.protobuf.message import DecodeError
+from torch import nn
 
 from kraken.lib import layers
 from kraken.lib.codec import PytorchCodec
 from kraken.lib.exceptions import KrakenInvalidModelException
-
-from coremltools.models import MLModel
-from coremltools.models import datatypes
-from coremltools.models.neural_network import NeuralNetworkBuilder
-
-from google.protobuf.message import DecodeError
 
 # all tensors are ordered NCHW, the "feature" dimension is C, so the output of
 # an LSTM will be put into C same as the filters of a CNN.

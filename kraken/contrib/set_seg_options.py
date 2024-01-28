@@ -2,8 +2,9 @@
 """
 A script setting the metadata of segmentation models.
 """
-import click
 import shutil
+
+import click
 
 
 @click.command()

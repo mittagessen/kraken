@@ -19,21 +19,22 @@ __all__ = ['build_binary_dataset']
 
 import io
 import json
+import tempfile
+from collections import Counter
+from functools import partial
+from multiprocessing import Pool
+from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Tuple, Union
+
 import numpy as np
 import pyarrow as pa
-import tempfile
-
 from PIL import Image, UnidentifiedImageError
-from functools import partial
-from collections import Counter
-from typing import Optional, List, Union, Callable, Tuple, Dict, TYPE_CHECKING
-from multiprocessing import Pool
+
 from kraken.containers import Segmentation
 from kraken.lib import functional_im_transforms as F_t
-from kraken.lib.segmentation import extract_polygons
-from kraken.lib.xml import XMLPage
-from kraken.lib.util import is_bitonal, make_printable
 from kraken.lib.exceptions import KrakenInputException
+from kraken.lib.segmentation import extract_polygons
+from kraken.lib.util import is_bitonal, make_printable
+from kraken.lib.xml import XMLPage
 
 if TYPE_CHECKING:
     from os import PathLike

@@ -15,32 +15,34 @@
 """
 Training loop interception helpers
 """
-import re
-import torch
 import logging
+import re
 import warnings
-import numpy as np
-import torch.nn.functional as F
-import pytorch_lightning as pl
+from typing import (TYPE_CHECKING, Any, Callable, Dict, Literal, Optional,
+                    Sequence, Union)
 
-from torchmetrics.classification import MultilabelAccuracy, MultilabelJaccardIndex
-from torchmetrics.text import CharErrorRate, WordErrorRate
+import numpy as np
+import pytorch_lightning as pl
+import torch
+import torch.nn.functional as F
+from pytorch_lightning.callbacks import (BaseFinetuning, Callback,
+                                         EarlyStopping, LearningRateMonitor)
 from torch.optim import lr_scheduler
-from typing import Callable, Dict, Optional, Sequence, Union, Any, Literal, TYPE_CHECKING
-from pytorch_lightning.callbacks import Callback, EarlyStopping, BaseFinetuning, LearningRateMonitor
+from torch.utils.data import DataLoader, Subset, random_split
+from torchmetrics.classification import (MultilabelAccuracy,
+                                         MultilabelJaccardIndex)
+from torchmetrics.text import CharErrorRate, WordErrorRate
 
 from kraken.containers import Segmentation
-from kraken.lib import models, vgsl, default_specs, progress
-from kraken.lib.xml import XMLPage
-from kraken.lib.util import make_printable, parse_gt_path
+from kraken.lib import default_specs, models, progress, vgsl
 from kraken.lib.codec import PytorchCodec
 from kraken.lib.dataset import (ArrowIPCRecognitionDataset, BaselineSet,
-                                GroundTruthDataset, PolygonGTDataset,
-                                ImageInputTransforms, collate_sequences)
+                                GroundTruthDataset, ImageInputTransforms,
+                                PolygonGTDataset, collate_sequences)
+from kraken.lib.exceptions import KrakenEncodeException, KrakenInputException
 from kraken.lib.models import validate_hyper_parameters
-from kraken.lib.exceptions import KrakenInputException, KrakenEncodeException
-
-from torch.utils.data import DataLoader, random_split, Subset
+from kraken.lib.util import make_printable, parse_gt_path
+from kraken.lib.xml import XMLPage
 
 if TYPE_CHECKING:
     from os import PathLike

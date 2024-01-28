@@ -2,19 +2,19 @@
 """
 A script for a grid search over pretraining hyperparameters.
 """
-import click
 from functools import partial
 
-from ray import tune
-
-from ray.tune.integration.pytorch_lightning import TuneReportCallback
-
-from kraken.lib.default_specs import RECOGNITION_PRETRAIN_HYPER_PARAMS, RECOGNITION_SPEC
-from kraken.lib.pretrain.model import PretrainDataModule, RecognitionPretrainModel
-from kraken.ketos.util import _validate_manifests
-
+import click
 import pytorch_lightning as pl
 from pytorch_lightning import seed_everything
+from ray import tune
+from ray.tune.integration.pytorch_lightning import TuneReportCallback
+
+from kraken.ketos.util import _validate_manifests
+from kraken.lib.default_specs import (RECOGNITION_PRETRAIN_HYPER_PARAMS,
+                                      RECOGNITION_SPEC)
+from kraken.lib.pretrain.model import (PretrainDataModule,
+                                       RecognitionPretrainModel)
 
 config = {'lrate': tune.loguniform(1e-8, 1e-2),
           'num_negatives': tune.qrandint(1, 4, 1),

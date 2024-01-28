@@ -1,10 +1,10 @@
 """
 Layers for VGSL models
 """
-import torch
+from typing import TYPE_CHECKING, Optional, Tuple
 
-from typing import Tuple, Optional, TYPE_CHECKING
-from torch.nn import Module, Embedding, Linear
+import torch
+from torch.nn import Embedding, Linear, Module
 
 from kraken.lib.pretrain.util import compute_mask_indices, sample_negatives
 

@@ -19,9 +19,9 @@ kraken.ketos
 Command line drivers for training functionality.
 """
 
-import click
 import logging
 
+import click
 from PIL import Image
 from rich.traceback import install
 
@@ -30,11 +30,11 @@ from kraken.lib import log
 from .dataset import compile
 from .linegen import line_generator
 from .pretrain import pretrain
-from .recognition import train, test
+from .recognition import test, train
 from .repo import publish
-from .segmentation import segtrain, segtest
+from .ro import roadd, rotrain
+from .segmentation import segtest, segtrain
 from .transcription import extract, transcription
-from .ro import rotrain, roadd
 
 APP_NAME = 'kraken'
 

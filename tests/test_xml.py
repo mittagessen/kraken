@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 import json
-import unittest
 import tempfile
-import numpy as np
-
+import unittest
 from pathlib import Path
+
+import numpy as np
 from pytest import raises
 
 from kraken.lib import xml

@@ -31,20 +31,19 @@ and Machine Intelligence 22.11 (2000): 1209-1223.
 
 """
 
-from scipy.ndimage.filters import gaussian_filter
-from scipy.ndimage.measurements import find_objects
-from scipy.ndimage.morphology import distance_transform_cdt, binary_closing
-
-from scipy.ndimage.interpolation import affine_transform, geometric_transform
-from PIL import Image, ImageOps
-
-import logging
 import ctypes
 import ctypes.util
+import logging
+
 import numpy as np
+from PIL import Image, ImageOps
+from scipy.ndimage.filters import gaussian_filter
+from scipy.ndimage.interpolation import affine_transform, geometric_transform
+from scipy.ndimage.measurements import find_objects
+from scipy.ndimage.morphology import binary_closing, distance_transform_cdt
 
 from kraken.lib.exceptions import KrakenCairoSurfaceException
-from kraken.lib.util import pil2array, array2pil
+from kraken.lib.util import array2pil, pil2array
 
 logger = logging.getLogger(__name__)
 

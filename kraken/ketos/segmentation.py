@@ -18,19 +18,19 @@ kraken.ketos.segmentation
 
 Command line driver for segmentation training and evaluation.
 """
-import shlex
-import click
-import pathlib
 import logging
-
-from PIL import Image
-
+import pathlib
+import shlex
 from typing import Dict
 
-from kraken.lib.exceptions import KrakenInputException
-from kraken.lib.default_specs import SEGMENTATION_HYPER_PARAMS, SEGMENTATION_SPEC
+import click
+from PIL import Image
 
-from kraken.ketos.util import _validate_manifests, _expand_gt, message, to_ptl_device
+from kraken.ketos.util import (_expand_gt, _validate_manifests, message,
+                               to_ptl_device)
+from kraken.lib.default_specs import (SEGMENTATION_HYPER_PARAMS,
+                                      SEGMENTATION_SPEC)
+from kraken.lib.exceptions import KrakenInputException
 
 logging.captureWarnings(True)
 logger = logging.getLogger('kraken')
@@ -239,7 +239,7 @@ def segtrain(ctx, output, spec, line_width, pad, load, freq, quit, epochs,
 
     from threadpoolctl import threadpool_limits
 
-    from kraken.lib.train import SegmentationModel, KrakenTrainer
+    from kraken.lib.train import KrakenTrainer, SegmentationModel
 
     if resize != 'fail' and not load:
         raise click.BadOptionUsage('resize', 'resize option requires loading an existing model')
@@ -249,13 +249,13 @@ def segtrain(ctx, output, spec, line_width, pad, load, freq, quit, epochs,
 
     if augment:
         try:
-            import albumentations # NOQA
+            import albumentations  # NOQA
         except ImportError:
             raise click.BadOptionUsage('augment', 'augmentation needs the `albumentations` package installed.')
 
     if pl_logger == 'tensorboard':
         try:
-            import tensorboard # NOQA
+            import tensorboard  # NOQA
         except ImportError:
             raise click.BadOptionUsage('logger', 'tensorboard logger needs the `tensorboard` package installed.')
 
@@ -433,10 +433,10 @@ def segtest(ctx, model, evaluation_files, device, workers, threads, threshold,
     if not model:
         raise click.UsageError('No model to evaluate given.')
 
-    from threadpoolctl import threadpool_limits
-    from torch.utils.data import DataLoader
     import torch
     import torch.nn.functional as F
+    from threadpoolctl import threadpool_limits
+    from torch.utils.data import DataLoader
 
     from kraken.lib.progress import KrakenProgressBar
     from kraken.lib.train import BaselineSet, ImageInputTransforms

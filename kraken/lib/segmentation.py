@@ -15,38 +15,37 @@
 """
 Processing for baseline segmenter output
 """
-import torch
 import logging
+from collections import defaultdict
+from typing import (TYPE_CHECKING, Dict, List, Literal, Optional, Sequence,
+                    Tuple, Union)
+
 import numpy as np
 import shapely.geometry as geom
+import torch
 import torch.nn.functional as F
-
-from collections import defaultdict
-
 from PIL import Image
-
+from scipy.ndimage import (binary_erosion, distance_transform_cdt,
+                           gaussian_filter, maximum_filter)
 from scipy.signal import convolve2d
-from scipy.ndimage import maximum_filter, binary_erosion, gaussian_filter, distance_transform_cdt
 from scipy.spatial.distance import pdist, squareform
-
 from shapely.ops import nearest_points, unary_union
 from shapely.validation import explain_validity
-
 from skimage import draw, filters
-from skimage.graph import MCP_Connect
 from skimage.filters import sobel
-from skimage.measure import approximate_polygon, subdivide_polygon, regionprops, label
+from skimage.graph import MCP_Connect
+from skimage.measure import (approximate_polygon, label, regionprops,
+                             subdivide_polygon)
 from skimage.morphology import skeletonize
-from skimage.transform import PiecewiseAffineTransform, SimilarityTransform, AffineTransform, warp
-
-from typing import List, Tuple, Union, Dict, Sequence, Optional, Literal, TYPE_CHECKING
+from skimage.transform import (AffineTransform, PiecewiseAffineTransform,
+                               SimilarityTransform, warp)
 
 from kraken.lib import default_specs
 from kraken.lib.exceptions import KrakenInputException
 
 if TYPE_CHECKING:
-    from kraken.lib.vgsl import TorchVGSLModel
     from kraken.containers import Segmentation
+    from kraken.lib.vgsl import TorchVGSLModel
 
 logger = logging.getLogger('kraken')
 
