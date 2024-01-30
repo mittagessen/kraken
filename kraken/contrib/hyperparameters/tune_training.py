@@ -31,15 +31,15 @@ def train_tune(config, training_data=None, epochs=100):
                                      output='model',
                                      spec=RECOGNITION_SPEC)
 
-    data_module = PretrainDataModule(batch_size=hyper_params.pop('batch_size'),
-                                     pad=hyper_params.pop('pad'),
-                                     augment=hyper_params.pop('augment'),
-                                     training_data=training_data,
-                                     num_workers=resources_per_trial['cpu'],
-                                     height=model.height,
-                                     width=model.width,
-                                     channels=model.channels,
-                                     format_type='binary')
+    _ = PretrainDataModule(batch_size=hyper_params.pop('batch_size'),
+                           pad=hyper_params.pop('pad'),
+                           augment=hyper_params.pop('augment'),
+                           training_data=training_data,
+                           num_workers=resources_per_trial['cpu'],
+                           height=model.height,
+                           width=model.width,
+                           channels=model.channels,
+                           format_type='binary')
 
     callback = TuneReportCallback({'loss': 'CE'}, on='validation_end')
     trainer = pl.Trainer(max_epochs=epochs,
@@ -49,6 +49,10 @@ def train_tune(config, training_data=None, epochs=100):
     trainer.fit(model)
 
 
-analysis = tune.run(partial(train_tune, training_data=sys.argv[2:]), local_dir=sys.argv[1], num_samples=100, resources_per_trial=resources_per_trial, config=config)
+analysis = tune.run(partial(train_tune, training_data=sys.argv[2:]),
+                    local_dir=sys.argv[1],
+                    num_samples=100,
+                    resources_per_trial=resources_per_trial,
+                    config=config)
 
 print("Best hyperparameters found were: ", analysis.get_best_config(metric='accuracy', mode='max'))

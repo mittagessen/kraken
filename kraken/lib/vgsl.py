@@ -469,7 +469,8 @@ class TorchVGSLModel(object):
                   input: Tuple[int, int, int, int],
                   blocks: List[str],
                   idx: int,
-                  target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
+                  target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> Union[Tuple[None, None, None],
+                                                                                            Tuple[Tuple[int, int, int, int], str, Callable]]:
         """
         Builds an LSTM/GRU layer returning number of outputs and layer.
         """
@@ -497,7 +498,8 @@ class TorchVGSLModel(object):
                       input: Tuple[int, int, int, int],
                       blocks: List[str],
                       idx: int,
-                      target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
+                      target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> Union[Tuple[None, None, None],
+                                                                                                Tuple[Tuple[int, int, int, int], str, Callable]]:
         pattern = re.compile(r'(?P<type>Do)(?P<name>{\w+})?(?P<p>(\d+(\.\d*)?|\.\d+))?(,(?P<dim>\d+))?')
         m = pattern.match(blocks[idx])
         if not m:
@@ -513,7 +515,8 @@ class TorchVGSLModel(object):
                        input: Tuple[int, int, int, int],
                        blocks: List[str],
                        idx: int,
-                       target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
+                       target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> Union[Tuple[None, None, None],
+                                                                                                 Tuple[Tuple[int, int, int, int], str, Callable]]:
         pattern = re.compile(r'(?P<type>A)(?P<name>{\w+})?(?P<dim>\d+),(?P<chunk_size>\d+)')
         m = pattern.match(blocks[idx])
         if not m:
@@ -533,7 +536,8 @@ class TorchVGSLModel(object):
                        input: Tuple[int, int, int, int],
                        blocks: List[str],
                        idx: int,
-                       target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
+                       target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> Union[Tuple[None, None, None],
+                                                                                                 Tuple[Tuple[int, int, int, int], str, Callable]]:
         pattern = re.compile(r'(?P<type>I)(?P<name>{\w+})?')
         m = pattern.match(blocks[idx])
         if not m:
@@ -547,7 +551,8 @@ class TorchVGSLModel(object):
                         input: Tuple[int, int, int, int],
                         blocks: List[str],
                         idx: int,
-                        target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
+                        target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> Union[Tuple[None, None, None],
+                                                                                                  Tuple[Tuple[int, int, int, int], str, Callable]]:
         pattern = re.compile(r'(?P<type>Gn)(?P<name>{\w+})?(?P<groups>\d+)')
         m = pattern.match(blocks[idx])
         if not m:
@@ -562,7 +567,8 @@ class TorchVGSLModel(object):
                        input: Tuple[int, int, int, int],
                        blocks: List[str],
                        idx: int,
-                       target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
+                       target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> Union[Tuple[None, None, None],
+                                                                                                 Tuple[Tuple[int, int, int, int], str, Callable]]:
         """
         Builds a Wav2Vec2 masking layer.
         """
@@ -604,7 +610,8 @@ class TorchVGSLModel(object):
                    input: Tuple[int, int, int, int],
                    blocks: List[str],
                    idx: int,
-                   target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
+                   target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> Union[Tuple[None, None, None],
+                                                                                             Tuple[Tuple[int, int, int, int], str, Callable]]:
         """
         Builds a 2D convolution layer.
         """
@@ -629,7 +636,8 @@ class TorchVGSLModel(object):
                       input: Tuple[int, int, int, int],
                       blocks: List[str],
                       idx: int,
-                      target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
+                      target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> Union[Tuple[None, None, None],
+                                                                                                Tuple[Tuple[int, int, int, int], str, Callable]]:
         """
         Builds a maxpool layer.
         """
@@ -649,7 +657,8 @@ class TorchVGSLModel(object):
                       input: Tuple[int, int, int, int],
                       blocks: List[str],
                       idx: int,
-                      target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
+                      target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> Union[Tuple[None, None, None],
+                                                                                                Tuple[Tuple[int, int, int, int], str, Callable]]:
         """
         Builds a reshape layer
         """
@@ -688,7 +697,8 @@ class TorchVGSLModel(object):
                      input: Tuple[int, int, int, int],
                      blocks: List[str],
                      idx: int,
-                     target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
+                     target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> Union[Tuple[None, None, None],
+                                                                                               Tuple[Tuple[int, int, int, int], str, Callable]]:
         """
         Builds an output layer.
         """
@@ -755,7 +765,8 @@ class TorchVGSLModel(object):
                      input: Tuple[int, int, int, int],
                      blocks: List[str],
                      idx: int,
-                     target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
+                     target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> Union[Tuple[None, None, None],
+                                                                                               Tuple[Tuple[int, int, int, int], str, Callable]]:
         """
         Builds a serial block of layers.
         """
@@ -784,7 +795,8 @@ class TorchVGSLModel(object):
                        input: Tuple[int, int, int, int],
                        blocks: List[str],
                        idx: int,
-                       target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
+                       target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> Union[Tuple[None, None, None],
+                                                                                                 Tuple[Tuple[int, int, int, int], str, Callable]]:
         """
         Builds a block of parallel layers.
         """

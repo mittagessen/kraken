@@ -26,24 +26,21 @@ parser = argparse.ArgumentParser(description='''Convert kraken hocr output so
 parser.add_argument('--inputDir', help='Path to directory where source files are found', required=True)
 parser.add_argument('--outputDir', help='Path to directory where output is stored', required=True)
 parser.add_argument('--imageDir', help='Path to directory where images corresponding to the html files are stored.', required=False)
-parser.add_argument(
-    '-c',
-    '--confidenceSummary',
-    default=False,
-    action="store_true",
-    help="store summaries of word confidence in xhtml data- attributes and cut all material after the first ; from the word span title attribute, making their mouseover popups less obtrusive.")
-parser.add_argument(
-    '-f',
-    '--fixBigWordSpans',
-    default=False,
-    action="store_true",
-    help="fix word_span elements whose bbox area is greater than a sixth of the whole page area by assigning them the bbox of the previous word.")
-parser.add_argument(
-    '-s',
-    '--shareSpaceSpans',
-    default=False,
-    action="store_true",
-    help="normalize hocr output from kraken, which assigns a word to every space and gives it a bbox. This removes those space words and assigns their area to the words on either side, with some space in between, generating output more like Ocropus and tesseract.")
+parser.add_argument('-c', '--confidenceSummary', default=False, action="store_true",
+                    help="store summaries of word confidence in xhtml data- "
+                         "attributes and cut all material after the first ; from the "
+                         "word span title attribute, making their mouseover popups "
+                         "less obtrusive.")
+parser.add_argument('-f', '--fixBigWordSpans', default=False, action="store_true",
+                    help="fix word_span elements whose bbox area is greater "
+                         "than a sixth of the whole page area by assigning them the "
+                         "bbox of the previous word.")
+parser.add_argument('-s', '--shareSpaceSpans', default=False, action="store_true",
+                    help="normalize hocr output from kraken, which assigns a "
+                         "word to every space and gives it a bbox. This removes those "
+                         "space words and assigns their area to the words on either "
+                         "side, with some space in between, generating output more "
+                         "like Ocropus and tesseract.")
 parser.add_argument("-v", "--verbose", help="increase output verbosity", default=False, action="store_true")
 args = parser.parse_args()
 
@@ -76,7 +73,7 @@ def get_bbox_area(span):
         if (args.verbose):
             print("this element's area is " + str(area))
         return area
-    except Exception as e:
+    except Exception:
         # print("Exception getting area on span  {}".format(etree.tostring(span)))
         raise
 
@@ -84,7 +81,7 @@ def get_bbox_area(span):
 def set_bbox_value(span, position, val):
     try:
         parts = span.get('title').split(';')
-    except Exception as e:
+    except Exception:
         print("Exception getting title element on span id {}.".format(span.get('id')))
         raise BboxError
     bbox_parts = parts[0].split(' ')
@@ -114,7 +111,7 @@ def share_space_spans(treeIn):
             print(e)
             raise
         # check that we have both
-        if ((not previous_span is None) and (not next_span is None)):
+        if previous_span and next_span:
             # this means that there is both a previous and a next
             if (args.verbose):
                 print("***")
@@ -155,7 +152,7 @@ def confidence_summary(treeIn):
             word_span.set('data-min-confidence', str(minimum))
             word_span.set('data-average-confidence', str(average))
             word_span.set('title', bbox_only)
-        except Exception as e:
+        except Exception:
             # there's not much to do if this goes wrong
             pass
 

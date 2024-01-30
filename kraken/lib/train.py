@@ -946,8 +946,8 @@ class SegmentationModel(pl.LightningModule):
                     elif self.resize == 'union':
                         new_bls = self.train_set.dataset.class_mapping['baselines'].keys() - self.nn.user_metadata['class_mapping']['baselines'].keys()
                         new_regions = self.train_set.dataset.class_mapping['regions'].keys() - self.nn.user_metadata['class_mapping']['regions'].keys()
-                        cls_idx = max(max(self.nn.user_metadata['class_mapping']['baselines'].values()) if self.nn.user_metadata['class_mapping']['baselines'] else -1,
-                                      max(self.nn.user_metadata['class_mapping']['regions'].values()) if self.nn.user_metadata['class_mapping']['regions'] else -1)
+                        cls_idx = max(max(self.nn.user_metadata['class_mapping']['baselines'].values()) if self.nn.user_metadata['class_mapping']['baselines'] else -1, # noqa
+                                      max(self.nn.user_metadata['class_mapping']['regions'].values()) if self.nn.user_metadata['class_mapping']['regions'] else -1) # noqa
                         logger.info(f'Adding {len(new_bls) + len(new_regions)} missing types to network output layer.')
                         self.nn.resize_output(cls_idx + len(new_bls) + len(new_regions) + 1)
                         for c in new_bls:
@@ -965,8 +965,8 @@ class SegmentationModel(pl.LightningModule):
 
                         logger.info(f'Adding {len(new_bls) + len(new_regions)} missing '
                                     f'types and removing {len(del_bls) + len(del_regions)} to network output layer ')
-                        cls_idx = max(max(self.nn.user_metadata['class_mapping']['baselines'].values()) if self.nn.user_metadata['class_mapping']['baselines'] else -1,
-                                      max(self.nn.user_metadata['class_mapping']['regions'].values()) if self.nn.user_metadata['class_mapping']['regions'] else -1)
+                        cls_idx = max(max(self.nn.user_metadata['class_mapping']['baselines'].values()) if self.nn.user_metadata['class_mapping']['baselines'] else -1, # noqa
+                                      max(self.nn.user_metadata['class_mapping']['regions'].values()) if self.nn.user_metadata['class_mapping']['regions'] else -1) # noqa
 
                         del_indices = [self.nn.user_metadata['class_mapping']['baselines'][x] for x in del_bls]
                         del_indices.extend(self.nn.user_metadata['class_mapping']['regions'][x] for x in del_regions)
@@ -974,8 +974,8 @@ class SegmentationModel(pl.LightningModule):
                                               len(del_bls) - len(del_regions) + 1, del_indices)
 
                         # delete old baseline/region types
-                        cls_idx = min(min(self.nn.user_metadata['class_mapping']['baselines'].values()) if self.nn.user_metadata['class_mapping']['baselines'] else np.inf,
-                                      min(self.nn.user_metadata['class_mapping']['regions'].values()) if self.nn.user_metadata['class_mapping']['regions'] else np.inf)
+                        cls_idx = min(min(self.nn.user_metadata['class_mapping']['baselines'].values()) if self.nn.user_metadata['class_mapping']['baselines'] else np.inf, # noqa
+                                      min(self.nn.user_metadata['class_mapping']['regions'].values()) if self.nn.user_metadata['class_mapping']['regions'] else np.inf) # noqa
 
                         bls = {}
                         for k, v in sorted(self.nn.user_metadata['class_mapping']['baselines'].items(), key=lambda item: item[1]):

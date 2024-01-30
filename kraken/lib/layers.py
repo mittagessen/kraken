@@ -865,7 +865,8 @@ class ActConv2D(Module):
                                  self.out_channels,
                                  int(max(np.floor((input[2]+2*self.padding[0]-self.dilation[0]*(self.kernel_size[0]-1)-1) /
                                      self.stride[0]+1), 1) if input[2] != 0 else 0),
-                                 int(max(np.floor((input[3]+2*self.padding[1]-self.dilation[1]*(self.kernel_size[1]-1)-1)/self.stride[1]+1), 1) if input[3] != 0 else 0))
+                                 int(max(np.floor((input[3]+2*self.padding[1]-self.dilation[1]*(self.kernel_size[1]-1)-1) /
+                                     self.stride[1]+1), 1) if input[3] != 0 else 0))
         return self.output_shape
 
     def deserialize(self, name: str, spec) -> None:
