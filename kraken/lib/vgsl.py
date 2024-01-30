@@ -77,6 +77,7 @@ class TorchVGSLModel(object):
                                 models trained on binarized images, 'L' for
                                 grayscale, and None otherwise.
     """
+
     def __init__(self, spec: str) -> None:
         """
         Constructs a torch module from a (subset of) VSGL spec.
@@ -159,7 +160,10 @@ class TorchVGSLModel(object):
         self.named_spec.extend(str(x) for x in named_spec)
         self.init_weights()
 
-    def _parse(self, input: Tuple[int, int, int, int], blocks: Sequence[str], parallel=False, target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> None:
+    def _parse(self,
+               input: Tuple[int, int, int, int],
+               blocks: Sequence[str], parallel=False,
+               target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> None:
         """
         Parses VGSL spec and appends layers to nn
         """
@@ -211,10 +215,10 @@ class TorchVGSLModel(object):
             spec (str): VGSL spec without input block to append to model.
         """
         self.nn = self.nn[:idx]
-        self.idx = idx-1
+        self.idx = idx - 1
         spec = spec[1:-1]
         blocks = spec.split(' ')
-        self.named_spec = self.named_spec[:idx+1]
+        self.named_spec = self.named_spec[:idx + 1]
         named_spec, nn, self.output = self._parse(self.nn[-1].output_shape, blocks)
         self.named_spec.extend(str(x) for x in named_spec)
         for module in nn.named_children():
@@ -432,7 +436,7 @@ class TorchVGSLModel(object):
                         torch.nn.init.orthogonal_(p.data)
                     # initialize biases to 1 (jozefowicz 2015)
                     else:
-                        torch.nn.init.constant_(p.data[len(p)//4:len(p)//2], 1.0)
+                        torch.nn.init.constant_(p.data[len(p) // 4:len(p) // 2], 1.0)
             elif isinstance(m, torch.nn.GRU):
                 for p in m.parameters():
                     torch.nn.init.orthogonal_(p.data)
@@ -770,7 +774,8 @@ class TorchVGSLModel(object):
                 break
         if block_depth:
             raise ValueError('Unbalanced parentheses in VGSL spec')
-        named_spec, nn, oshape = self._parse(input, [blocks[idx][1:]] + blocks[idx+1:idx+bl_idx] + [blocks[idx+bl_idx][:-1]], target_output_shape=target_output_shape)
+        named_spec, nn, oshape = self._parse(input, [blocks[idx][1:]] + blocks[idx + 1:idx + bl_idx] +
+                                             [blocks[idx + bl_idx][:-1]], target_output_shape=target_output_shape)
         named_spec[0]._block = '[' + named_spec[0]._block
         named_spec[-1]._block = named_spec[-1]._block + ']'
         return oshape, named_spec, nn
@@ -797,7 +802,8 @@ class TorchVGSLModel(object):
                 break
         if block_depth:
             raise ValueError('Unbalanced parentheses in VGSL spec')
-        named_spec, nn, oshape = self._parse(input, [blocks[idx][1:]] + blocks[idx+1:idx+bl_idx] + [blocks[idx+bl_idx][:-1]], parallel=True, target_output_shape=target_output_shape)
+        named_spec, nn, oshape = self._parse(input, [blocks[idx][1:]] + blocks[idx + 1:idx + bl_idx] +
+                                             [blocks[idx + bl_idx][:-1]], parallel=True, target_output_shape=target_output_shape)
         named_spec[0]._block = '(' + named_spec[0]._block
         named_spec[-1]._block = named_spec[-1]._block + ')'
         return oshape, named_spec, nn

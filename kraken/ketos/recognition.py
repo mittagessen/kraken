@@ -434,8 +434,7 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
             logger.warning("--fixed-splits can only be use with data using binary format")
         else:
             dataset_kwargs["split_filter"] = "test"
-      
-           
+
     if format_type in ['xml', 'page', 'alto']:
         if repolygonize:
             message('Repolygonizing data')

@@ -1071,7 +1071,7 @@ def extract_polygons(im: Image.Image, bounds: 'Segmentation') -> Image.Image:
                 r, c = draw.polygon(offset_polygon[:, 1], offset_polygon[:, 0])
                 mask = np.zeros(patch.shape[:2], dtype=bool)
                 mask[r, c] = True
-                patch[mask != True] = 0
+                patch[np.invert(mask)] = 0
                 extrema = offset_polygon[(0, -1), :]
                 # scale line image to max 600 pixel width
                 tform, rotated_patch = _rotate(patch, angle, center=extrema[0], scale=1.0, cval=0)
@@ -1124,7 +1124,7 @@ def extract_polygons(im: Image.Image, bounds: 'Segmentation') -> Image.Image:
                 mask = np.zeros(patch.shape[:2], dtype=bool)
                 r, c = draw.polygon(offset_polygon[:, 1], offset_polygon[:, 0])
                 mask[r, c] = True
-                patch[mask != True] = 0
+                patch[np.invert(mask)] = 0
                 # estimate piecewise transform
                 src_points = np.concatenate((offset_baseline, offset_polygon))
                 dst_points = np.concatenate((offset_bl_dst_pts, offset_pol_dst_pts))

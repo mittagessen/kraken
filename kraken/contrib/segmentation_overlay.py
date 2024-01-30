@@ -28,6 +28,7 @@ def slugify(value):
     value = re.sub(r'[-\s]+', '-', value)
     return value
 
+
 @click.command()
 @click.option('-i', '--model', default=None, show_default=True, type=click.Path(exists=True),
               help='Baseline detection model to use. Overrides format type and expects image files as input.')
