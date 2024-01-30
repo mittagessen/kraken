@@ -382,10 +382,12 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
               'sharing a prefix up to the last extension with JSON `.path` files '
               'containing the baseline information. In `binary` mode files are '
               'collections of pre-extracted text line images.')
+@click.option('--fixed-splits/--ignore-fixed-split', show_default=True, default=False,
+              help='Whether to honor fixed splits in binary datasets.')
 @click.argument('test_set', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
          threads, reorder, base_dir, normalization, normalize_whitespace,
-         repolygonize, force_binarization, format_type, test_set):
+         repolygonize, force_binarization, format_type, fixed_splits, test_set):
     """
     Evaluate on a test set.
     """
@@ -425,6 +427,14 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
     if len(test_set) == 0:
         raise click.UsageError('No evaluation data was provided to the test command. Use `-e` or the `test_set` argument.')
 
+    dataset_kwargs = {}
+    if fixed_splits:
+        if format_type != "binary":
+            logger.warning("--fixed-splits can only be use with data using binary format")
+        else:
+            dataset_kwargs["split_filter"] = "test"
+      
+           
     if format_type in ['xml', 'page', 'alto']:
         if repolygonize:
             message('Repolygonizing data')
@@ -468,7 +478,8 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
             ds = DatasetClass(normalization=normalization,
                               whitespace_normalization=normalize_whitespace,
                               reorder=reorder,
-                              im_transforms=ts)
+                              im_transforms=ts,
+                              **dataset_kwargs)
             for line in test_set:
                 try:
                     ds.add(**line)
