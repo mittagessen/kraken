@@ -1,11 +1,11 @@
-from kraken.lib.train import RecognitionModel
-from kraken.lib.exceptions import KrakenInputException
-from kraken.lib.default_specs import RECOGNITION_HYPER_PARAMS
 #from kraken.ketos.util import _expand_gt
 from pathlib import Path
-from unittest import TestCase
 from unicodedata import normalize
+from unittest import TestCase
 
+from kraken.lib.default_specs import RECOGNITION_HYPER_PARAMS
+from kraken.lib.exceptions import KrakenInputException
+from kraken.lib.train import RecognitionModel
 
 _here = Path(__file__).parent
 base_model = _here.joinpath(Path("./resources/merge_tests/merge_codec_nfd.mlmodel"))

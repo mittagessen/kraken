@@ -1,18 +1,19 @@
 # -*- coding: utf-8 -*-
-import os
 import json
-import pytest
+import os
 import unittest
+from collections import defaultdict
+from pathlib import Path
 
+import pytest
 from PIL import Image
 from pytest import raises
-from pathlib import Path
-from collections import defaultdict
 
-from kraken.containers import Segmentation, BBoxOCRRecord, BaselineOCRRecord, BaselineLine, BBoxLine
-from kraken.lib.models import load_any
-from kraken.rpred import rpred, mm_rpred
+from kraken.containers import (BaselineLine, BaselineOCRRecord, BBoxLine,
+                               BBoxOCRRecord, Segmentation)
 from kraken.lib.exceptions import KrakenInputException
+from kraken.lib.models import load_any
+from kraken.rpred import mm_rpred, rpred
 
 thisfile = Path(__file__).resolve().parent
 resources = thisfile / 'resources'

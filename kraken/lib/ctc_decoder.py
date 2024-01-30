@@ -24,13 +24,12 @@ Extracted label sequences are converted into the code point domain using kraken.
 """
 
 import collections
-import numpy as np
-
-from typing import List, Tuple
-from scipy.special import logsumexp
-from scipy.ndimage import measurements
-
 from itertools import groupby
+from typing import List, Tuple
+
+import numpy as np
+from scipy.ndimage import measurements
+from scipy.special import logsumexp
 
 __all__ = ['beam_decoder', 'greedy_decoder', 'blank_threshold_decoder']
 

@@ -18,12 +18,12 @@ kraken.ketos.util
 
 Command line driver helpers
 """
-import os
 import glob
-import click
 import logging
-
+import os
 from typing import List, Optional, Tuple
+
+import click
 
 logging.captureWarnings(True)
 logger = logging.getLogger('kraken')

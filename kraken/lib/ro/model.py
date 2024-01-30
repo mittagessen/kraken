@@ -17,28 +17,28 @@ Pytorch-lightning modules for reading order training.
 
 Adapted from:
 """
-import torch
 import logging
-import numpy as np
-import torch.nn.functional as F
-import pytorch_lightning as pl
-
-from torch.optim import lr_scheduler
 from dataclasses import dataclass, field
-from typing import Dict, Optional, Sequence, Union, Any, Literal, List, TYPE_CHECKING
+from typing import (TYPE_CHECKING, Any, Dict, List, Literal, Optional,
+                    Sequence, Union)
 
+import numpy as np
+import pytorch_lightning as pl
+import torch
+import torch.nn.functional as F
 from pytorch_lightning.callbacks import EarlyStopping, LearningRateMonitor
+from torch.optim import lr_scheduler
+from torch.utils.data import DataLoader, Subset
 
 from kraken.lib import default_specs
-from kraken.lib.dataset import PairWiseROSet, PageWiseROSet
-from kraken.lib.train import _configure_optimizer_and_lr_scheduler
-from kraken.lib.segmentation import _greedy_order_decoder
+from kraken.lib.dataset import PageWiseROSet, PairWiseROSet
 from kraken.lib.ro.layers import MLP
-
-from torch.utils.data import DataLoader, Subset
+from kraken.lib.segmentation import _greedy_order_decoder
+from kraken.lib.train import _configure_optimizer_and_lr_scheduler
 
 if TYPE_CHECKING:
     from os import PathLike
+
     from torch.nn import Module
 
 logger = logging.getLogger(__name__)

@@ -18,21 +18,19 @@ kraken.kraken
 
 Command line drivers for recognition functionality.
 """
+import dataclasses
+import logging
 import os
 import shlex
 import warnings
-import logging
-import dataclasses
-import importlib_resources
-
-from PIL import Image
-from pathlib import Path
-
 from functools import partial
-from rich.traceback import install
-from typing import Dict, cast, Any, IO, Callable, Union, List
+from pathlib import Path
+from typing import IO, Any, Callable, Dict, List, Union, cast
 
 import click
+import importlib_resources
+from PIL import Image
+from rich.traceback import install
 
 from kraken.lib import log
 
@@ -179,13 +177,12 @@ def segmenter(legacy, model, text_direction, scale, maxcolseps, black_colseps,
 
 def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore, input, output) -> None:
 
+    import dataclasses
     import json
     import uuid
-    import dataclasses
 
     from kraken import rpred
-    from kraken.containers import Segmentation, BBoxLine
-
+    from kraken.containers import BBoxLine, Segmentation
     from kraken.lib.progress import KrakenProgressBar
 
     ctx = click.get_current_context()
@@ -347,10 +344,11 @@ def process_pipeline(subcommands, input, batch_input, suffix, verbose, format_ty
     placing their respective outputs in temporary files.
     """
     import glob
-    import uuid
     import tempfile
+    import uuid
 
     from threadpoolctl import threadpool_limits
+
     from kraken.lib.progress import KrakenProgressBar
 
     ctx = click.get_current_context()
@@ -658,7 +656,7 @@ def show(ctx, model_id):
     Retrieves model metadata from the repository.
     """
     from kraken import repo
-    from kraken.lib.util import make_printable, is_printable
+    from kraken.lib.util import is_printable, make_printable
 
     desc = repo.get_description(model_id)
 

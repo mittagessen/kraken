@@ -69,22 +69,21 @@ def line_generator(ctx, font, maxlines, encoding, normalization, renormalize,
     """
     Generates artificial text line training data.
     """
-    import os
     import errno
     import logging
-    import numpy as np
+    import os
     import unicodedata
-
     from typing import Set
+
+    import numpy as np
     from bidi.algorithm import get_display
 
-    from kraken.lib.progress import KrakenProgressBar
+    from kraken import linegen
     from kraken.lib.exceptions import KrakenCairoSurfaceException
+    from kraken.lib.progress import KrakenProgressBar
+    from kraken.lib.util import make_printable
 
     from .util import message
-
-    from kraken import linegen
-    from kraken.lib.util import make_printable
 
     logging.captureWarnings(True)
     logger = logging.getLogger('kraken')

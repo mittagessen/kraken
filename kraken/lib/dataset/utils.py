@@ -16,20 +16,19 @@
 Utility functions for data loading and training of VGSL networks.
 """
 import json
-import torch
 import numbers
-import importlib_resources
-import torch.nn.functional as F
-
-from functools import partial
-from torchvision import transforms
 from collections import Counter
-from typing import Dict, List, Tuple, Sequence, Any, Union
+from functools import partial
+from typing import Any, Dict, List, Sequence, Tuple, Union
 
-from kraken.lib.exceptions import KrakenInputException
-from kraken.lib.lineest import CenterNormalizer
+import importlib_resources
+import torch
+import torch.nn.functional as F
+from torchvision import transforms
 
 from kraken.lib import functional_im_transforms as F_t
+from kraken.lib.exceptions import KrakenInputException
+from kraken.lib.lineest import CenterNormalizer
 
 __all__ = ['ImageInputTransforms',
            'collate_sequences']

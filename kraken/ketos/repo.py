@@ -18,9 +18,10 @@ kraken.ketos.repo
 
 Command line driver for publishing models to the model repository.
 """
-import os
-import click
 import logging
+import os
+
+import click
 
 from .util import message
 
@@ -43,8 +44,8 @@ def publish(ctx, metadata, access_token, private, model):
     Publishes a model on the zenodo model repository.
     """
     import json
-    import importlib_resources
 
+    import importlib_resources
     from jsonschema import validate
     from jsonschema.exceptions import ValidationError
 

@@ -5,15 +5,14 @@ A script for a grid search over pretraining hyperparameters.
 import sys
 from functools import partial
 
+import pytorch_lightning as pl
 from ray import tune
-
 from ray.tune.integration.pytorch_lightning import TuneReportCallback
 
-from kraken.lib.default_spec import RECOGNITION_PRETRAIN_HYPER_PARAMS, RECOGNITION_SPEC
-from kraken.lib.pretrain.model import PretrainDataModule, RecognitionPretrainModel
-
-import pytorch_lightning as pl
-
+from kraken.lib.default_spec import (RECOGNITION_PRETRAIN_HYPER_PARAMS,
+                                     RECOGNITION_SPEC)
+from kraken.lib.pretrain.model import (PretrainDataModule,
+                                       RecognitionPretrainModel)
 
 config = {'lrate': tune.loguniform(1e-8, 1e-2),
           'num_negatives': tune.qrandint(2, 100, 8),

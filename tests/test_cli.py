@@ -1,16 +1,16 @@
 # -*- coding: utf-8 -*-
 import os
-import click
-import unittest
 import tempfile
-import numpy as np
-
-from PIL import Image
+import unittest
 from pathlib import Path
-from click.testing import CliRunner
-from kraken.kraken import cli
 
+import click
+import numpy as np
+from click.testing import CliRunner
+from PIL import Image
 from pytest import raises
+
+from kraken.kraken import cli
 
 thisfile = Path(__file__).resolve().parent
 resources = thisfile / 'resources'

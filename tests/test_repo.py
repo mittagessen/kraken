@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 import shutil
-import unittest
 import tempfile
-
+import unittest
 from pathlib import Path
 
 from kraken import repo

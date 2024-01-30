@@ -1,10 +1,10 @@
 """
 Layers for VGSL models
 """
+from typing import TYPE_CHECKING, Tuple
+
 import torch
 from torch import nn
-
-from typing import Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from kraken.lib.vgsl import VGSLBlock

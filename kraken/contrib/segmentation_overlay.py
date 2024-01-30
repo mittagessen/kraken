@@ -3,14 +3,14 @@
 Draws a transparent overlay of baseline segmenter output over a list of image
 files.
 """
-import re
-import os
-import click
-import unicodedata
 import dataclasses
-from itertools import cycle
+import os
+import re
+import unicodedata
 from collections import defaultdict
+from itertools import cycle
 
+import click
 
 cmap = cycle([(230, 25, 75, 127),
               (60, 180, 75, 127)])
@@ -58,8 +58,8 @@ def cli(model, text_direction, repolygonize, files):
 
     from PIL import Image, ImageDraw
 
-    from kraken.lib import vgsl, xml, segmentation
     from kraken import blla
+    from kraken.lib import segmentation, vgsl, xml
 
     if model is None:
         for doc in files:

@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
 import json
-import uuid
-import unittest
 import tempfile
-import numpy as np
-
-from lxml import etree
+import unittest
+import uuid
+from collections import Counter
 from io import StringIO
 from pathlib import Path
+
+import numpy as np
 from hocr_spec import HocrValidator
-from collections import Counter
+from lxml import etree
 
 from kraken import containers, serialization
 from kraken.lib import xml

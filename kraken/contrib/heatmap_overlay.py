@@ -14,12 +14,14 @@ def cli(model, files):
     Applies a BLLA baseline segmentation model and outputs the raw heatmaps of
     the first baseline class.
     """
-    import torch
-    from PIL import Image
-    from kraken.lib import vgsl, dataset
-    import torch.nn.functional as F
     from os.path import splitext
+
+    import torch
+    import torch.nn.functional as F
     import torchvision.transforms as tf
+    from PIL import Image
+
+    from kraken.lib import dataset, vgsl
 
     model = vgsl.TorchVGSLModel.load_model(model)
     model.eval()

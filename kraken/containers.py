@@ -19,12 +19,13 @@ kraken.containers
 Container classes replacing the old dictionaries returned by kraken's
 functional blocks.
 """
-import numpy as np
-import bidi.algorithm as bd
-
-from typing import Literal, List, Dict, Union, Optional, Tuple, Any, TYPE_CHECKING
-from dataclasses import dataclass, asdict
 from abc import ABC, abstractmethod
+from dataclasses import asdict, dataclass
+from typing import (TYPE_CHECKING, Any, Dict, List, Literal, Optional, Tuple,
+                    Union)
+
+import bidi.algorithm as bd
+import numpy as np
 
 from kraken.lib.segmentation import compute_polygon_section
 

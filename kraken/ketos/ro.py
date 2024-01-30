@@ -18,15 +18,15 @@ kraken.ketos.ro
 
 Command line driver for reading order training, evaluation, and handling.
 """
-import click
-import pathlib
 import logging
+import pathlib
 
+import click
 from PIL import Image
 
+from kraken.ketos.util import (_expand_gt, _validate_manifests, message,
+                               to_ptl_device)
 from kraken.lib.default_specs import READING_ORDER_HYPER_PARAMS
-
-from kraken.ketos.util import _validate_manifests, _expand_gt, message, to_ptl_device
 
 logging.captureWarnings(True)
 logger = logging.getLogger('kraken')

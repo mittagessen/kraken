@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 import os
 import pickle
-import unittest
 import tempfile
+import unittest
+from pathlib import Path
 
 from pytest import raises
-from pathlib import Path
 
 from kraken.lib import models
 from kraken.lib.exceptions import KrakenInvalidModelException

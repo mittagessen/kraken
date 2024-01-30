@@ -5,17 +5,17 @@ kraken.lib.models
 Wrapper around TorchVGSLModel including a variety of forward pass helpers for
 sequence classification.
 """
-from os.path import expandvars, expanduser, abspath
+from os.path import abspath, expanduser, expandvars
+from typing import TYPE_CHECKING, List, Optional, Tuple, Union
 
-import torch
 import numpy as np
-import kraken.lib.lineest
+import torch
+
 import kraken.lib.ctc_decoder
-
-from typing import List, Tuple, Optional, Union, TYPE_CHECKING
-
+import kraken.lib.lineest
+from kraken.lib.exceptions import (KrakenInputException,
+                                   KrakenInvalidModelException)
 from kraken.lib.vgsl import TorchVGSLModel
-from kraken.lib.exceptions import KrakenInvalidModelException, KrakenInputException
 
 if TYPE_CHECKING:
     from os import PathLike

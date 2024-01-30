@@ -2,17 +2,16 @@
 Ocropus's magic PIL-numpy array conversion routines. They express slightly
 different behavior from PIL.Image.toarray().
 """
-import uuid
-import torch
 import unicodedata
-import numpy as np
+import uuid
+from typing import TYPE_CHECKING, Callable, Literal, Optional, Union
 
+import numpy as np
+import torch
 from PIL import Image
 
-from typing import Union, Callable, Optional, Literal, TYPE_CHECKING
-
-from kraken.lib import functional_im_transforms as F_t
 from kraken.containers import BBoxLine
+from kraken.lib import functional_im_transforms as F_t
 from kraken.lib.exceptions import KrakenInputException
 
 if TYPE_CHECKING:

@@ -1,9 +1,8 @@
 import warnings
-import numpy as np
-
-from scipy.ndimage import affine_transform, gaussian_filter, uniform_filter
-
 from typing import TYPE_CHECKING
+
+import numpy as np
+from scipy.ndimage import affine_transform, gaussian_filter, uniform_filter
 
 if TYPE_CHECKING:
     from PIL import Image
@@ -78,7 +77,7 @@ def dewarp(normalizer: CenterNormalizer, im: 'Image.Image') -> 'Image.Image':
     Returns:
         PIL.Image.Image containing the dewarped image.
     """
-    from kraken.lib.util import pil2array, array2pil
+    from kraken.lib.util import array2pil, pil2array
 
     line = pil2array(im)
     temp = np.amax(line)-line

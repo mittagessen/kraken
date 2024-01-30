@@ -15,17 +15,17 @@
 """
 ALTO/Page data loaders for segmentation training
 """
-import re
 import logging
-
-from pathlib import Path
-
-from itertools import groupby
-from lxml import etree
-from typing import Union, Dict, Any, Sequence, Tuple, Literal, Optional, List, TYPE_CHECKING
-
+import re
 from collections import defaultdict
-from kraken.containers import Segmentation, BaselineLine, Region
+from itertools import groupby
+from pathlib import Path
+from typing import (TYPE_CHECKING, Any, Dict, List, Literal, Optional,
+                    Sequence, Tuple, Union)
+
+from lxml import etree
+
+from kraken.containers import BaselineLine, Region, Segmentation
 
 logger = logging.getLogger(__name__)
 

@@ -2,10 +2,9 @@
 Various add-ons to the SciPy morphology package
 """
 import numpy as np
-from scipy.ndimage import label as _label
-from scipy.ndimage import distance_transform_edt
+from scipy.ndimage import distance_transform_edt, filters
 from scipy.ndimage import find_objects as _find_objects
-from scipy.ndimage import filters
+from scipy.ndimage import label as _label
 
 
 def label(image: np.ndarray, **kw) -> np.ndarray:

@@ -18,12 +18,13 @@ Pytorch compatible codec with many-to-many mapping between labels and
 graphemes.
 """
 import logging
-import numpy as np
-
 from collections import Counter
-from typing import List, Tuple, Set, Union, Dict, Sequence
+from typing import Dict, List, Sequence, Set, Tuple, Union
+
+import numpy as np
 from torch import IntTensor
-from kraken.lib.exceptions import KrakenEncodeException, KrakenCodecException
+
+from kraken.lib.exceptions import KrakenCodecException, KrakenEncodeException
 
 __all__ = ['PytorchCodec']
 

@@ -15,16 +15,15 @@
 """
 Utility functions for data loading and training of VGSL networks.
 """
-import torch
-import numpy as np
-
 from math import factorial
-from torch.utils.data import Dataset
-from typing import Dict, Sequence, Union, Literal, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict, Literal, Optional, Sequence, Union
 
-from kraken.lib.xml import XMLPage
+import numpy as np
+import torch
+from torch.utils.data import Dataset
 
 from kraken.lib.exceptions import KrakenInputException
+from kraken.lib.xml import XMLPage
 
 if TYPE_CHECKING:
     from os import PathLike

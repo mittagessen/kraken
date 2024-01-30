@@ -15,21 +15,20 @@
 """
 Utility functions for data loading and training of VGSL networks.
 """
-import torch
 import traceback
-import numpy as np
-import torch.nn.functional as F
-import shapely.geometry as geom
+from collections import defaultdict
+from itertools import groupby
+from typing import TYPE_CHECKING, Any, Callable, Dict, Sequence, Tuple
 
+import numpy as np
+import shapely.geometry as geom
+import torch
+import torch.nn.functional as F
 from PIL import Image
 from shapely.ops import split
-from itertools import groupby
-from torchvision import transforms
-from collections import defaultdict
-from torch.utils.data import Dataset
-from typing import Dict, Tuple, Sequence, Callable, Any, TYPE_CHECKING
-
 from skimage.draw import polygon
+from torch.utils.data import Dataset
+from torchvision import transforms
 
 from kraken.lib.segmentation import scale_regions
 
@@ -97,11 +96,10 @@ class BaselineSet(Dataset):
         if augmentation:
             import cv2
             cv2.setNumThreads(0)
-            from albumentations import (
-                Compose, ToFloat, OneOf, MotionBlur, MedianBlur, Blur,
-                ShiftScaleRotate, OpticalDistortion, ElasticTransform,
-                HueSaturationValue,
-                )
+            from albumentations import (Blur, Compose, ElasticTransform,
+                                        HueSaturationValue, MedianBlur,
+                                        MotionBlur, OneOf, OpticalDistortion,
+                                        ShiftScaleRotate, ToFloat)
 
             self.aug = Compose([
                                 ToFloat(),

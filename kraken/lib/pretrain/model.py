@@ -28,34 +28,33 @@ Vogler, Nikolai, et al. "Lacuna Reconstruction: Self-supervised Pre-training
 for Low-Resource Historical Document Transcription." arXiv preprint
 arXiv:2112.08692 (2021).
 """
-import re
-import math
-import torch
 import logging
-import numpy as np
-import torch.nn.functional as F
-import pytorch_lightning as pl
-
+import math
+import re
 from itertools import chain
-from torch.optim import lr_scheduler
-from typing import Dict, Optional, Sequence, Union, Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence, Union
+
+import numpy as np
+import pytorch_lightning as pl
+import torch
+import torch.nn.functional as F
 from pytorch_lightning.callbacks import EarlyStopping
-from pytorch_lightning.utilities.memory import is_oom_error, garbage_collection_cuda
+from pytorch_lightning.utilities.memory import (garbage_collection_cuda,
+                                                is_oom_error)
+from torch.optim import lr_scheduler
+from torch.utils.data import DataLoader, Subset, random_split
 
 from kraken.containers import Segmentation
-
-from kraken.lib import vgsl, default_specs, layers
-from kraken.lib.xml import XMLPage
-from kraken.lib.util import parse_gt_path
+from kraken.lib import default_specs, layers, vgsl
 from kraken.lib.codec import PytorchCodec
-from kraken.lib.dataset import (ArrowIPCRecognitionDataset,
-                                GroundTruthDataset, PolygonGTDataset,
-                                ImageInputTransforms, collate_sequences)
+from kraken.lib.dataset import (ArrowIPCRecognitionDataset, GroundTruthDataset,
+                                ImageInputTransforms, PolygonGTDataset,
+                                collate_sequences)
 from kraken.lib.exceptions import KrakenInputException
-from kraken.lib.train import _configure_optimizer_and_lr_scheduler
 from kraken.lib.pretrain.layers import Wav2Vec2Mask
-
-from torch.utils.data import DataLoader, random_split, Subset
+from kraken.lib.train import _configure_optimizer_and_lr_scheduler
+from kraken.lib.util import parse_gt_path
+from kraken.lib.xml import XMLPage
 
 if TYPE_CHECKING:
     from os import PathLike

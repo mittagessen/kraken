@@ -15,28 +15,28 @@
 """
 Utility functions for data loading and training of VGSL networks.
 """
+import dataclasses
 import io
 import json
-import torch
 import traceback
-import dataclasses
+from collections import Counter
+from functools import partial
+from typing import (TYPE_CHECKING, Any, Callable, List, Literal, Optional,
+                    Tuple, Union)
+
 import numpy as np
 import pyarrow as pa
-
+import torch
 from PIL import Image
-from functools import partial
-from torchvision import transforms
-from collections import Counter
 from torch.utils.data import Dataset
-from typing import List, Tuple, Callable, Optional, Any, Union, Literal, TYPE_CHECKING
+from torchvision import transforms
 
 from kraken.containers import BaselineLine, BBoxLine, Segmentation
-from kraken.lib.util import is_bitonal
-from kraken.lib.codec import PytorchCodec
-from kraken.lib.segmentation import extract_polygons
-from kraken.lib.exceptions import KrakenInputException, KrakenEncodeException
-
 from kraken.lib import functional_im_transforms as F_t
+from kraken.lib.codec import PytorchCodec
+from kraken.lib.exceptions import KrakenEncodeException, KrakenInputException
+from kraken.lib.segmentation import extract_polygons
+from kraken.lib.util import is_bitonal
 
 if TYPE_CHECKING:
     from os import PathLike
@@ -55,11 +55,10 @@ class DefaultAugmenter():
     def __init__(self):
         import cv2
         cv2.setNumThreads(0)
-        from albumentations import (
-            Compose, ToFloat, OneOf, MotionBlur, MedianBlur, Blur,
-            ShiftScaleRotate, OpticalDistortion, ElasticTransform,
-            PixelDropout
-            )
+        from albumentations import (Blur, Compose, ElasticTransform,
+                                    MedianBlur, MotionBlur, OneOf,
+                                    OpticalDistortion, PixelDropout,
+                                    ShiftScaleRotate, ToFloat)
 
         self._transforms = Compose([
                                     ToFloat(),

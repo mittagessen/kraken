@@ -20,32 +20,30 @@ Trainable layout analysis tools for kraken for line and region detection. The
 line recognizer uses the baseline paradigm.
 """
 
-import PIL
-import uuid
-import torch
 import logging
-import numpy as np
+import uuid
+from typing import Any, Callable, Dict, List, Literal, Optional, Union
+
 import importlib_resources
+import numpy as np
+import PIL
 import shapely.geometry as geom
+import torch
 import torch.nn.functional as F
 import torchvision.transforms as tf
-
-from typing import Optional, Dict, Callable, Union, List, Any, Literal
-
 from scipy.ndimage import gaussian_filter
 from skimage.filters import sobel
 
-from kraken.lib import vgsl, dataset
-from kraken.containers import Region, Segmentation, BaselineLine
-from kraken.lib.util import is_bitonal, get_im_str
-from kraken.lib.exceptions import KrakenInputException, KrakenInvalidModelException
-from kraken.lib.segmentation import (polygonal_reading_order,
-                                     neural_reading_order,
-                                     vectorize_lines, vectorize_regions,
-                                     scale_polygonal_lines,
-                                     calculate_polygonal_environment,
-                                     is_in_region,
-                                     scale_regions)
+from kraken.containers import BaselineLine, Region, Segmentation
+from kraken.lib import dataset, vgsl
+from kraken.lib.exceptions import (KrakenInputException,
+                                   KrakenInvalidModelException)
+from kraken.lib.segmentation import (calculate_polygonal_environment,
+                                     is_in_region, neural_reading_order,
+                                     polygonal_reading_order,
+                                     scale_polygonal_lines, scale_regions,
+                                     vectorize_lines, vectorize_regions)
+from kraken.lib.util import get_im_str, is_bitonal
 
 __all__ = ['segment']
 

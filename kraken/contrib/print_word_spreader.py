@@ -1,10 +1,15 @@
 #!/usr/bin/env python
 #2020, Bruce Robertson
 #Master file at https://github.com/brobertson/Lace2-tools/blob/master/normalize_hocr.py
-import html, os, sys, argparse
+import argparse
+import html
+import os
+import sys
 from statistics import mean
+
 from lxml import etree
 from PIL import Image
+
 
 #a custom exception to indicate when a page or other element doesn't
 #have a bounding box where we would expect it.

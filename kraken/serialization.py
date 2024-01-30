@@ -12,22 +12,22 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
 # or implied. See the License for the specific language governing
 # permissions and limitations under the License.
-from jinja2 import Environment, PackageLoader, FunctionLoader
+import datetime
+import importlib.metadata
+import logging
+from typing import (TYPE_CHECKING, Any, Dict, Iterable, List, Literal,
+                    Optional, Sequence, Tuple)
 
 import regex
-import logging
-import datetime
-
-import importlib.metadata
+from jinja2 import Environment, FunctionLoader, PackageLoader
 
 from kraken.lib.util import make_printable
 
-from typing import List, Tuple, Iterable, Optional, Sequence, Literal, TYPE_CHECKING, Dict, Any
-
 if TYPE_CHECKING:
-    from os import PathLike
     from collections import Counter
-    from kraken.containers import Segmentation, ProcessingStep
+    from os import PathLike
+
+    from kraken.containers import ProcessingStep, Segmentation
 
 logger = logging.getLogger(__name__)
 
