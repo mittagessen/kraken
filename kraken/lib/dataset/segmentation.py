@@ -151,6 +151,7 @@ class BaselineSet(Dataset):
                 if reg_type not in self.class_mapping['regions']:
                     self.num_classes += 1
                     self.class_mapping['regions'][reg_type] = self.num_classes - 1
+                self.class_stats['regions'][reg_type] += 1
         self.targets.append({'baselines': baselines_, 'regions': regions_})
         self.imgs.append(doc.imagename)
 
