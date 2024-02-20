@@ -388,7 +388,7 @@ def _rotate(image: _T_pil_or_np, angle: float, center: Any, scale: float, cval=0
         rows, cols = image.height, image.width
     else:
         rows, cols = image.shape[:2]
-        assert len(image.shape) == 3
+        assert len(image.shape) == 3 or len(image.shape) == 2, 'Image must be 2D or 3D'
 
     tform = AffineTransform(rotation=angle, scale=(1/scale, 1))
     corners = np.array([
@@ -422,7 +422,7 @@ def _rotate(image: _T_pil_or_np, angle: float, center: Any, scale: float, cval=0
     offset = pdata[:2, 2].copy()
     # scipy expects a 3x3 *linear* matrix (to include channel axis), we don't want the channel axis to be modified
     pdata[:2, 2] = 0
-    return tform, affine_transform(image, pdata, offset=(*offset, 0), output_shape=(*output_shape, image.shape[2]), cval=cval, order=order)
+    return tform, affine_transform(image, pdata, offset=(*offset, 0), output_shape=(*output_shape, *image.shape[2:]), cval=cval, order=order)
 
 def line_regions(line, regions):
     """
@@ -1153,7 +1153,6 @@ def extract_polygons(
             im = im.convert('L')
         else:
             order = 1
-        im = np.array(im)
 
         for line in bounds.lines:
             if line.boundary is None:
@@ -1163,12 +1162,15 @@ def extract_polygons(
             c_min, c_max = int(pl[:, 0].min()), int(pl[:, 0].max())
             r_min, r_max = int(pl[:, 1].min()), int(pl[:, 1].max())
 
-            if (pl < 0).any() or (pl.max(axis=0)[::-1] >= im.shape[:2]).any():
+            imshape = np.array([im.height, im.width])
+
+            if (pl < 0).any() or (pl.max(axis=0)[::-1] >= imshape).any():
                 raise KrakenInputException('Line polygon outside of image bounds')
-            if (baseline < 0).any() or (baseline.max(axis=0)[::-1] >= im.shape[:2]).any():
+            if (baseline < 0).any() or (baseline.max(axis=0)[::-1] >= imshape).any():
                 raise KrakenInputException('Baseline outside of image bounds')
 
             if legacy:
+                im = np.array(im)
                 # Old, slow, and deprecated path
                 # fast path for straight baselines requiring only rotation
                 if len(baseline) == 2:
