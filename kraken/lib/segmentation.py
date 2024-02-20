@@ -18,7 +18,7 @@ Processing for baseline segmenter output
 import logging
 from collections import defaultdict
 from typing import (TYPE_CHECKING, Dict, List, Literal, Optional, Sequence,
-                    Tuple, Union, TypeVar, Any, Iterator)
+                    Tuple, Union, TypeVar, Any, Generator)
 
 import numpy as np
 import shapely.geometry as geom
@@ -1127,11 +1127,11 @@ def apply_polygonal_mask(img: Image.Image, polygon: np.ndarray, cval: int=0) -> 
 
 def extract_polygons(
     im: Image.Image, bounds: "Segmentation", legacy: bool=False
-) -> Iterator[
+) -> Generator[
     Tuple[
         Image.Image,
         Union["BBoxLine", "BaselineLine"],
-    ]
+    ], None, None
 ]:
     """
     Yields the subimages of image im defined in the list of bounding polygons

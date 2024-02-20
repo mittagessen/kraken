@@ -21,6 +21,8 @@ Command line driver for recognition training and evaluation.
 import logging
 import pathlib
 from typing import List
+from functools import partial
+import warnings
 
 import click
 from threadpoolctl import threadpool_limits
@@ -190,6 +192,7 @@ logger = logging.getLogger('kraken')
 @click.option('--log-dir', show_default=True, type=click.Path(exists=True, dir_okay=True, writable=True),
               help='Path to directory where the logger will store the logs. If not set, a directory will be created in the current working directory.')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
+@click.option('--legacy-polygons', show_default=True, default=False, is_flag=True, help='Use the legacy polygon extractor.')
 def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
           min_epochs, lag, min_delta, device, precision, optimizer, lrate, momentum,
           weight_decay, warmup, freeze_backbone, schedule, gamma, step_size,
@@ -197,7 +200,7 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
           normalize_whitespace, codec, resize, reorder, base_dir,
           training_files, evaluation_files, workers, threads, load_hyper_parameters,
           repolygonize, force_binarization, format_type, augment,
-          pl_logger, log_dir, ground_truth):
+          pl_logger, log_dir, ground_truth, legacy_polygons):
     """
     Trains a model from image-text pairs.
     """
@@ -300,7 +303,10 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
                              force_binarization=force_binarization,
                              format_type=format_type,
                              codec=codec,
-                             resize=resize)
+                             resize=resize,
+                             legacy_polygons=legacy_polygons)
+    
+    model.nn.use_legacy_polygons = legacy_polygons
 
     trainer = KrakenTrainer(accelerator=accelerator,
                             devices=device,
@@ -387,9 +393,10 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
 @click.option('--fixed-splits/--ignore-fixed-split', show_default=True, default=False,
               help='Whether to honor fixed splits in binary datasets.')
 @click.argument('test_set', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
+@click.option('--no-legacy-polygons', show_default=True, default=False, is_flag=True, help='Force disable the legacy polygon extractor.')
 def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
          threads, reorder, base_dir, normalization, normalize_whitespace,
-         repolygonize, force_binarization, format_type, fixed_splits, test_set):
+         repolygonize, force_binarization, format_type, fixed_splits, test_set, no_legacy_polygons):
     """
     Evaluate on a test set.
     """
@@ -410,11 +417,28 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
 
     logger.info('Building test set from {} line images'.format(len(test_set) + len(evaluation_files)))
 
+    legacy_polygons = None
+    incoherent_legacy_polygons = False
+
     nn = {}
     for p in model:
         message('Loading model {}\t'.format(p), nl=False)
         nn[p] = models.load_any(p, device)
         message('\u2713', fg='green')
+        model_legacy_polygons = nn[p].nn.use_legacy_polygons
+        if legacy_polygons is None:
+            legacy_polygons = model_legacy_polygons
+        elif legacy_polygons != model_legacy_polygons:
+            incoherent_legacy_polygons = True
+
+    if incoherent_legacy_polygons and not no_legacy_polygons:
+        logger.warning('Models use different polygon extractors. Legacy polygon extractor will be used ; use --no-legacy-polygons to force disable it.')
+        legacy_polygons = True
+    elif no_legacy_polygons:
+        legacy_polygons = False
+
+    if legacy_polygons:
+        warnings.warn('Using legacy polygon extractor, as the model was not trained with the new method. Please retrain your model to get performance improvements.')
 
     pin_ds_mem = False
     if device != 'cpu':
@@ -440,7 +464,7 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
             message('Repolygonizing data')
         test_set = [{'page': XMLPage(file, filetype=format_type).to_container()} for file in test_set]
         valid_norm = False
-        DatasetClass = PolygonGTDataset
+        DatasetClass = partial(PolygonGTDataset, legacy_polygons=legacy_polygons)
     elif format_type == 'binary':
         DatasetClass = ArrowIPCRecognitionDataset
         if repolygonize:

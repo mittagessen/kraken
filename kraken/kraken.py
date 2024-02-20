@@ -302,8 +302,10 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore, input,
               help='On compatible devices, uses autocast for `segment` which lower the memory usage.')
 @click.option('--threads', default=1, show_default=True, type=click.IntRange(1),
               help='Size of thread pools for intra-op parallelization')
+@click.option('--no-legacy-polygons', 'no_legacy_polygons', is_flag=True, default=False,
+              help="Force disable legacy polygon extraction")
 def cli(input, batch_input, suffix, verbose, format_type, pdf_format,
-        serializer, template, device, raise_on_error, autocast, threads):
+        serializer, template, device, raise_on_error, autocast, threads, no_legacy_polygons):
     """
     Base command for recognition functionality.
 
@@ -334,6 +336,13 @@ def cli(input, batch_input, suffix, verbose, format_type, pdf_format,
     ctx.meta['steps'] = []
     ctx.meta["autocast"] = autocast
     ctx.meta['threads'] = threads
+
+    ctx.meta['no_legacy_polygons'] = no_legacy_polygons
+    if no_legacy_polygons:
+        # force disable legacy polygons globally
+        from kraken import rpred
+        rpred.mm_rpred.DISABLE_LEGACY_POLYGONS = True
+
     log.set_logger(logger, level=30 - min(10 * verbose, 20))
 
 

@@ -24,6 +24,7 @@ from collections import defaultdict
 from functools import partial
 from typing import (TYPE_CHECKING, Dict, Generator, List, Optional, Sequence,
                     Tuple, Union)
+import warnings
 
 from kraken.containers import BaselineOCRRecord, BBoxOCRRecord, ocr_record
 from kraken.lib.dataset import ImageInputTransforms
@@ -46,6 +47,8 @@ class mm_rpred(object):
     """
     Multi-model version of kraken.rpred.rpred
     """
+    DISABLE_LEGACY_POLYGONS = False # flag to force disable legacy polygon extraction mode
+
     def __init__(self,
                  nets: Dict[Tuple[str, str], 'TorchSeqRecognizer'],
                  im: 'Image.Image',
@@ -175,8 +178,10 @@ class mm_rpred(object):
 
         tag, net = self._resolve_tags_to_model(line.tags, self.nets)
 
+        use_legacy_polygons = self.__choose_legacy_polygon_extractor(net)
+
         seg = dataclasses.replace(self.bounds, lines=[line])
-        box, coords = next(extract_polygons(self.im, seg))
+        box, coords = next(extract_polygons(self.im, seg, legacy=use_legacy_polygons))
         self.box = box
 
         # check if boxes are non-zero in any dimension
@@ -242,14 +247,17 @@ class mm_rpred(object):
 
         seg = dataclasses.replace(self.bounds, lines=[line])
 
+        tag, net = self._resolve_tags_to_model(line.tags, self.nets)
+
+        use_legacy_polygons = self.__choose_legacy_polygon_extractor(net)
+
         try:
-            box, coords = next(extract_polygons(self.im, seg))
+            box, coords = next(extract_polygons(self.im, seg, legacy=use_legacy_polygons))
         except KrakenInputException as e:
             logger.warning(f'Extracting line failed: {e}')
             return BaselineOCRRecord('', [], [], line)
 
         self.box = box
-        tag, net = self._resolve_tags_to_model(line.tags, self.nets)
         # check if boxes are non-zero in any dimension
         if 0 in box.size:
             logger.warning(f'{line} with zero dimension. Emitting empty record.')
@@ -299,6 +307,18 @@ class mm_rpred(object):
 
     def _scale_val(self, val, min_val, max_val):
         return int(round(min(max(((val*self.net_scale)-self.pad)*self.in_scale, min_val), max_val-1)))
+    
+    def __choose_legacy_polygon_extractor(self, net) -> bool:
+        # grouping the checks here to display warnings only once
+        if net.nn.use_legacy_polygons:
+            if self.DISABLE_LEGACY_POLYGONS:
+                warnings.warn('Enforcing use of the new polygon extractor for models trained with old version. Accuracy may be affected.')
+                return False
+            else:
+                warnings.warn('Using legacy polygon extractor, as the model was not trained with the new method. Please retrain your model to get speed improvement.')
+                return True
+        return False
+
 
 
 def rpred(network: 'TorchSeqRecognizer',

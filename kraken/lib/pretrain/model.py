@@ -32,6 +32,7 @@ import logging
 import math
 import re
 from itertools import chain
+from functools import partial
 from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence, Union
 
 import numpy as np
@@ -87,7 +88,8 @@ class PretrainDataModule(pl.LightningDataModule):
                  force_binarization: bool = False,
                  format_type: str = 'path',
                  pad: int = 16,
-                 augment: bool = default_specs.RECOGNITION_PRETRAIN_HYPER_PARAMS['augment']):
+                 augment: bool = default_specs.RECOGNITION_PRETRAIN_HYPER_PARAMS['augment'],
+                 legacy_polygons: bool = False):
         """
         A LightningDataModule encapsulating text-less training data for
         unsupervised recognition model pretraining.
@@ -117,7 +119,7 @@ class PretrainDataModule(pl.LightningDataModule):
             if binary_dataset_split:
                 logger.warning('Internal binary dataset splits are enabled but using non-binary dataset files. Will be ignored.')
                 binary_dataset_split = False
-            DatasetClass = PolygonGTDataset
+            DatasetClass = partial(PolygonGTDataset, legacy_polygons=legacy_polygons)
             valid_norm = False
         elif format_type == 'binary':
             DatasetClass = ArrowIPCRecognitionDataset
@@ -147,7 +149,7 @@ class PretrainDataModule(pl.LightningDataModule):
         # format_type is None. Determine training type from length of training data entry
         elif not format_type:
             if training_data[0].type == 'baselines':
-                DatasetClass = PolygonGTDataset
+                DatasetClass = partial(PolygonGTDataset, legacy_polygons=legacy_polygons)
                 valid_norm = False
             else:
                 if force_binarization:

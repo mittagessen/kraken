@@ -284,7 +284,8 @@ class PolygonGTDataset(Dataset):
                  skip_empty_lines: bool = True,
                  reorder: Union[bool, Literal['L', 'R']] = True,
                  im_transforms: Callable[[Any], torch.Tensor] = transforms.Compose([]),
-                 augmentation: bool = False) -> None:
+                 augmentation: bool = False,
+                 legacy_polygons: bool=False) -> None:
         """
         Creates a dataset for a polygonal (baseline) transcription model.
 
@@ -307,6 +308,7 @@ class PolygonGTDataset(Dataset):
         self.aug = None
         self.skip_empty_lines = skip_empty_lines
         self.failed_samples = set()
+        self.legacy_polygons = legacy_polygons
 
         self.seg_type = 'baselines'
         # built text transformations
@@ -424,8 +426,8 @@ class PolygonGTDataset(Dataset):
                                                                            boundary=item[0][2])],
                                                        script_detection=True,
                                                        regions={},
-                                                       line_orders=[])
-                                          ))
+                                                       line_orders=[]),
+                                          legacy=self.legacy_polygons))
             im = self.transforms(im)
             if im.shape[0] == 3:
                 im_mode = 'RGB'

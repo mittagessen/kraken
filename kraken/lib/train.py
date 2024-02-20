@@ -20,6 +20,7 @@ import re
 import warnings
 from typing import (TYPE_CHECKING, Any, Callable, Dict, Literal, Optional,
                     Sequence, Union)
+from functools import partial
 
 import numpy as np
 import pytorch_lightning as pl
@@ -216,7 +217,8 @@ class RecognitionModel(pl.LightningModule):
                  force_binarization: bool = False,
                  format_type: Literal['path', 'alto', 'page', 'xml', 'binary'] = 'path',
                  codec: Optional[Dict] = None,
-                 resize: Literal['fail', 'both', 'new', 'add', 'union'] = 'fail'):
+                 resize: Literal['fail', 'both', 'new', 'add', 'union'] = 'fail',
+                 legacy_polygons: bool = False):
         """
         A LightningModule encapsulating the training setup for a text
         recognition model.
@@ -284,7 +286,7 @@ class RecognitionModel(pl.LightningModule):
             if binary_dataset_split:
                 logger.warning('Internal binary dataset splits are enabled but using non-binary dataset files. Will be ignored.')
                 binary_dataset_split = False
-            DatasetClass = PolygonGTDataset
+            DatasetClass = partial(PolygonGTDataset, legacy_polygons=legacy_polygons)
             valid_norm = False
         elif format_type == 'binary':
             DatasetClass = ArrowIPCRecognitionDataset
@@ -314,7 +316,7 @@ class RecognitionModel(pl.LightningModule):
         # format_type is None. Determine training type from container class types
         elif not format_type:
             if training_data[0].type == 'baselines':
-                DatasetClass = PolygonGTDataset
+                DatasetClass = partial(PolygonGTDataset, legacy_polygons=legacy_polygons)
                 valid_norm = False
             else:
                 if force_binarization:
