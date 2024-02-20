@@ -15,7 +15,9 @@
 """
 Top-level module containing datasets for recognition and segmentation training.
 """
-from .recognition import ArrowIPCRecognitionDataset, PolygonGTDataset, GroundTruthDataset # NOQA
-from .segmentation import BaselineSet # NOQA
-from .ro import PairWiseROSet, PageWiseROSet #NOQA
-from .utils import ImageInputTransforms, collate_sequences, global_align, compute_confusions # NOQA
+from .recognition import (ArrowIPCRecognitionDataset,  # NOQA
+                          GroundTruthDataset, PolygonGTDataset)
+from .ro import PageWiseROSet, PairWiseROSet  # NOQA
+from .segmentation import BaselineSet  # NOQA
+from .utils import (ImageInputTransforms, collate_sequences,  # NOQA
+                    compute_confusions, global_align)

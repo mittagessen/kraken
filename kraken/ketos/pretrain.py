@@ -18,15 +18,15 @@ kraken.ketos.pretrain
 
 Command line driver for unsupervised recognition pretraining
 """
-import click
 import logging
 
+import click
 from PIL import Image
 
 from kraken.lib.default_specs import (RECOGNITION_PRETRAIN_HYPER_PARAMS,
                                       RECOGNITION_SPEC)
 
-from .util import _validate_manifests, _expand_gt, message, to_ptl_device
+from .util import _expand_gt, _validate_manifests, message, to_ptl_device
 
 logging.captureWarnings(True)
 logger = logging.getLogger('kraken')
@@ -195,14 +195,17 @@ def pretrain(ctx, batch_size, pad, output, spec, load, freq, quit, epochs,
 
     if augment:
         try:
-            import albumentations # NOQA
+            import albumentations  # NOQA
         except ImportError:
             raise click.BadOptionUsage('augment', 'augmentation needs the `albumentations` package installed.')
 
     import shutil
+
     from threadpoolctl import threadpool_limits
+
+    from kraken.lib.pretrain import (PretrainDataModule,
+                                     RecognitionPretrainModel)
     from kraken.lib.train import KrakenTrainer
-    from kraken.lib.pretrain import PretrainDataModule, RecognitionPretrainModel
 
     hyper_params = RECOGNITION_PRETRAIN_HYPER_PARAMS.copy()
     hyper_params.update({'freq': freq,

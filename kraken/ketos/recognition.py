@@ -18,16 +18,17 @@ kraken.ketos.train
 
 Command line driver for recognition training and evaluation.
 """
-import click
 import logging
 import pathlib
-
 from typing import List
+
+import click
 from threadpoolctl import threadpool_limits
 
-from kraken.lib.exceptions import KrakenInputException
 from kraken.lib.default_specs import RECOGNITION_HYPER_PARAMS, RECOGNITION_SPEC
-from .util import _validate_manifests, _expand_gt, message, to_ptl_device
+from kraken.lib.exceptions import KrakenInputException
+
+from .util import _expand_gt, _validate_manifests, message, to_ptl_device
 
 logging.captureWarnings(True)
 logger = logging.getLogger('kraken')
@@ -211,13 +212,13 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
 
     if augment:
         try:
-            import albumentations # NOQA
+            import albumentations  # NOQA
         except ImportError:
             raise click.BadOptionUsage('augment', 'augmentation needs the `albumentations` package installed.')
 
     if pl_logger == 'tensorboard':
         try:
-            import tensorboard # NOQA
+            import tensorboard  # NOQA
         except ImportError:
             raise click.BadOptionUsage('logger', 'tensorboard logger needs the `tensorboard` package installed.')
 
@@ -226,7 +227,8 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
 
     import json
     import shutil
-    from kraken.lib.train import RecognitionModel, KrakenTrainer
+
+    from kraken.lib.train import KrakenTrainer, RecognitionModel
 
     hyper_params = RECOGNITION_HYPER_PARAMS.copy()
     hyper_params.update({'freq': freq,
@@ -382,10 +384,12 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
               'sharing a prefix up to the last extension with JSON `.path` files '
               'containing the baseline information. In `binary` mode files are '
               'collections of pre-extracted text line images.')
+@click.option('--fixed-splits/--ignore-fixed-split', show_default=True, default=False,
+              help='Whether to honor fixed splits in binary datasets.')
 @click.argument('test_set', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
          threads, reorder, base_dir, normalization, normalize_whitespace,
-         repolygonize, force_binarization, format_type, test_set):
+         repolygonize, force_binarization, format_type, fixed_splits, test_set):
     """
     Evaluate on a test set.
     """
@@ -395,15 +399,14 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
     import numpy as np
     from torch.utils.data import DataLoader
 
-    from kraken.serialization import render_report
-    from kraken.lib import models
-    from kraken.lib.xml import XMLPage
-    from kraken.lib.dataset import (global_align, compute_confusions,
-                                    PolygonGTDataset, GroundTruthDataset,
-                                    ImageInputTransforms,
-                                    ArrowIPCRecognitionDataset,
-                                    collate_sequences)
+    from kraken.lib import models, util
+    from kraken.lib.dataset import (ArrowIPCRecognitionDataset,
+                                    GroundTruthDataset, ImageInputTransforms,
+                                    PolygonGTDataset, collate_sequences,
+                                    compute_confusions, global_align)
     from kraken.lib.progress import KrakenProgressBar
+    from kraken.lib.xml import XMLPage
+    from kraken.serialization import render_report
 
     logger.info('Building test set from {} line images'.format(len(test_set) + len(evaluation_files)))
 
@@ -419,12 +422,18 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
 
     test_set = list(test_set)
 
-
     if evaluation_files:
         test_set.extend(evaluation_files)
 
     if len(test_set) == 0:
         raise click.UsageError('No evaluation data was provided to the test command. Use `-e` or the `test_set` argument.')
+
+    dataset_kwargs = {}
+    if fixed_splits:
+        if format_type != "binary":
+            logger.warning("--fixed-splits can only be use with data using binary format")
+        else:
+            dataset_kwargs["split_filter"] = "test"
 
     if format_type in ['xml', 'page', 'alto']:
         if repolygonize:
@@ -445,7 +454,7 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
             force_binarization = False
         if repolygonize:
             logger.warning('Repolygonization enabled in `path` mode. Will be ignored.')
-        test_set = [{'image': img} for img in test_set]
+        test_set = [{'line': util.parse_gt_path(img)} for img in test_set]
         valid_norm = True
 
     if len(test_set) == 0:
@@ -469,18 +478,19 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
             ds = DatasetClass(normalization=normalization,
                               whitespace_normalization=normalize_whitespace,
                               reorder=reorder,
-                              im_transforms=ts)
+                              im_transforms=ts,
+                              **dataset_kwargs)
             for line in test_set:
                 try:
                     ds.add(**line)
-                except KrakenInputException as e:
+                except ValueError as e:
                     logger.info(e)
             # don't encode validation set as the alphabets may not match causing encoding failures
             ds.no_encode()
             ds_loader = DataLoader(ds,
                                    batch_size=batch_size,
                                    num_workers=workers,
-                                   pin_memory=True,
+                                   pin_memory=pin_ds_mem,
                                    collate_fn=collate_sequences)
 
             with KrakenProgressBar() as progress:

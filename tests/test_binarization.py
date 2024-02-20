@@ -1,12 +1,11 @@
 # -*- coding: utf-8 -*-
 import unittest
-
-from pytest import raises
+from pathlib import Path
 
 from PIL import Image
-from pathlib import Path
-from kraken.binarization import nlbin
+from pytest import raises
 
+from kraken.binarization import nlbin
 from kraken.lib.exceptions import KrakenInputException
 
 thisfile = Path(__file__).resolve().parent

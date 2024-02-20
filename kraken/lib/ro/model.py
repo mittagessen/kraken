@@ -17,39 +17,39 @@ Pytorch-lightning modules for reading order training.
 
 Adapted from:
 """
-import re
-import math
-import torch
 import logging
-import numpy as np
-import torch.nn.functional as F
-import pytorch_lightning as pl
-
-from os import PathLike
-from torch.optim import lr_scheduler
 from dataclasses import dataclass, field
-from torch.nn import Module
-from typing import Dict, Optional, Sequence, Union, Any, Literal, List
+from typing import (TYPE_CHECKING, Any, Dict, List, Literal, Optional,
+                    Sequence, Union)
 
+import numpy as np
+import pytorch_lightning as pl
+import torch
+import torch.nn.functional as F
 from pytorch_lightning.callbacks import EarlyStopping, LearningRateMonitor
+from torch.optim import lr_scheduler
+from torch.utils.data import DataLoader, Subset
 
-from kraken.lib import vgsl, default_specs, layers
-from kraken.lib.dataset import PairWiseROSet, PageWiseROSet
-from kraken.lib.train import _configure_optimizer_and_lr_scheduler
-from kraken.lib.segmentation import _greedy_order_decoder
+from kraken.lib import default_specs
+from kraken.lib.dataset import PageWiseROSet, PairWiseROSet
 from kraken.lib.ro.layers import MLP
+from kraken.lib.segmentation import _greedy_order_decoder
+from kraken.lib.train import _configure_optimizer_and_lr_scheduler
 
-from torch.utils.data import DataLoader, random_split, Subset
+if TYPE_CHECKING:
+    from os import PathLike
 
+    from torch.nn import Module
 
 logger = logging.getLogger(__name__)
+
 
 @dataclass
 class DummyVGSLModel:
     hyper_params: Dict[str, int] = field(default_factory=dict)
     user_metadata: Dict[str, List] = field(default_factory=dict)
-    one_channel_mode: Literal['1', 'L']  = '1'
-    ptl_module: Module = None
+    one_channel_mode: Literal['1', 'L'] = '1'
+    ptl_module: 'Module' = None
     model_type: str = 'unknown'
 
     def __post_init__(self):
@@ -68,8 +68,8 @@ class ROModel(pl.LightningModule):
     def __init__(self,
                  hyper_params: Dict[str, Any] = None,
                  output: str = 'model',
-                 training_data: Union[Sequence[Union[PathLike, str]], Sequence[Dict[str, Any]]] = None,
-                 evaluation_data: Optional[Union[Sequence[Union[PathLike, str]], Sequence[Dict[str, Any]]]] = None,
+                 training_data: Union[Sequence[Union['PathLike', str]], Sequence[Dict[str, Any]]] = None,
+                 evaluation_data: Optional[Union[Sequence[Union['PathLike', str]], Sequence[Dict[str, Any]]]] = None,
                  partition: Optional[float] = 0.9,
                  num_workers: int = 1,
                  format_type: Literal['alto', 'page', 'xml'] = 'xml',
@@ -128,7 +128,7 @@ class ROModel(pl.LightningModule):
         self.best_epoch = -1
         self.best_metric = torch.inf
 
-        logger.info(f'Creating new RO model')
+        logger.info('Creating new RO model')
         self.ro_net = MLP(train_set.get_feature_dim(), train_set.get_feature_dim() * 2)
 
         if 'file_system' in torch.multiprocessing.get_all_sharing_strategies():
@@ -245,4 +245,3 @@ class ROModel(pl.LightningModule):
                     scheduler.step()
                 else:
                     scheduler.step(metric)
-

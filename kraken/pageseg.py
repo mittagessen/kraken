@@ -19,21 +19,20 @@ kraken.pageseg
 
 Layout analysis methods.
 """
-import PIL
-import uuid
 import logging
+import uuid
+from typing import Callable, List, Optional, Tuple, Union
+
 import numpy as np
+import PIL
+from scipy.ndimage.filters import (gaussian_filter, maximum_filter,
+                                   uniform_filter)
 
-from typing import Tuple, List, Callable, Optional, Dict, Any, Union
-from scipy.ndimage.filters import (gaussian_filter, uniform_filter,
-                                   maximum_filter)
-
-from kraken.containers import Segmentation, BBoxLine
-
+from kraken.containers import BBoxLine, Segmentation
 from kraken.lib import morph, sl
-from kraken.lib.util import pil2array, is_bitonal, get_im_str
 from kraken.lib.exceptions import KrakenInputException
 from kraken.lib.segmentation import reading_order, topsort
+from kraken.lib.util import get_im_str, is_bitonal, pil2array
 
 __all__ = ['segment']
 
@@ -46,9 +45,9 @@ class record(object):
     """
     def __init__(self, **kw):
         self.__dict__.update(kw)
-        self.label = 0  # type: int
-        self.bounds = []  # type: List
-        self.mask = None  # type: np.ndarray
+        self.label: int = 0
+        self.bounds: List = []
+        self.mask: np.ndarray = None
 
 
 def find(condition):

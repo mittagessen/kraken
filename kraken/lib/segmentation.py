@@ -15,39 +15,37 @@
 """
 Processing for baseline segmenter output
 """
-import PIL
-import torch
 import logging
+from collections import defaultdict
+from typing import (TYPE_CHECKING, Dict, List, Literal, Optional, Sequence,
+                    Tuple, Union, TypeVar, Any, Iterator)
+
 import numpy as np
 import shapely.geometry as geom
+import torch
 import torch.nn.functional as F
-
-from collections import defaultdict
-
 from PIL import Image, ImageDraw
-
-from scipy.ndimage import maximum_filter, binary_erosion, affine_transform
-from scipy.ndimage import distance_transform_cdt
+from scipy.ndimage import (binary_erosion, distance_transform_cdt,
+                           gaussian_filter, maximum_filter, affine_transform)
+from scipy.signal import convolve2d
 from scipy.spatial.distance import pdist, squareform
-
 from shapely.ops import nearest_points, unary_union
 from shapely.validation import explain_validity
-
 from skimage import draw, filters
-from skimage.graph import MCP_Connect
 from skimage.filters import sobel
-from skimage.measure import approximate_polygon, subdivide_polygon, regionprops, label
+from skimage.graph import MCP_Connect
+from skimage.measure import (approximate_polygon, label, regionprops,
+                             subdivide_polygon)
 from skimage.morphology import skeletonize
-from skimage.transform import PiecewiseAffineTransform, SimilarityTransform, AffineTransform, warp
-
-from typing import List, Tuple, Union, Dict, Any, Sequence, Optional, Literal, TypeVar, Iterator
+from skimage.transform import (AffineTransform, PiecewiseAffineTransform,
+                               warp)
 
 from kraken.lib import default_specs
 from kraken.lib.exceptions import KrakenInputException
 
-from scipy.signal import convolve2d
-from scipy.ndimage import gaussian_filter
-
+if TYPE_CHECKING:
+    from kraken.containers import Segmentation, BBoxLine, BaselineLine
+    from kraken.lib.vgsl import TorchVGSLModel
 
 logger = logging.getLogger('kraken')
 
@@ -375,7 +373,6 @@ _T_pil_or_np = TypeVar('_T_pil_or_np', Image.Image, np.ndarray)
 def _rotate(image: _T_pil_or_np, angle: float, center: Any, scale: float, cval=0, order:int=0) -> Tuple[AffineTransform, _T_pil_or_np]:
     """
     Rotate an image at an angle with optional scaling
-
     Args:
         image (PIL.Image.Image or (H, W, C) np.ndarray): Input image
         angle (float): Angle in radians
@@ -383,10 +380,8 @@ def _rotate(image: _T_pil_or_np, angle: float, center: Any, scale: float, cval=0
         scale (float): x-Axis scaling factor
         cval (int): Padding value
         order (int): Interpolation order
-
     Returns:
         A tuple containing the transformation matrix and the rotated image.
-
     Note: this function is much faster applied on PIL images than on numpy ndarrays.
     """
     if isinstance(image, Image.Image):
@@ -428,7 +423,6 @@ def _rotate(image: _T_pil_or_np, angle: float, center: Any, scale: float, cval=0
     # scipy expects a 3x3 *linear* matrix (to include channel axis), we don't want the channel axis to be modified
     pdata[:2, 2] = 0
     return tform, affine_transform(image, pdata, offset=(*offset, 0), output_shape=(*output_shape, image.shape[2]), cval=cval, order=order)
-
 
 def line_regions(line, regions):
     """
@@ -653,7 +647,7 @@ def _calc_roi(line, bounds, baselines, suppl_obj, p_dir):
     return env_up, env_bottom
 
 
-def calculate_polygonal_environment(im: PIL.Image.Image = None,
+def calculate_polygonal_environment(im: Image.Image = None,
                                     baselines: Sequence[Sequence[Tuple[int, int]]] = None,
                                     suppl_obj: Sequence[Sequence[Tuple[int, int]]] = None,
                                     im_feats: np.ndarray = None,
@@ -665,27 +659,23 @@ def calculate_polygonal_environment(im: PIL.Image.Image = None,
     environment around each baseline.
 
     Args:
-        im (PIL.Image): grayscale input image (mode 'L')
-        baselines (sequence): List of lists containing a single baseline per
-                              entry.
-        suppl_obj (sequence): List of lists containing additional polylines
-                              that should be considered hard boundaries for
-                              polygonizaton purposes. Can be used to prevent
-                              polygonization into non-text areas such as
-                              illustrations or to compute the polygonization of
-                              a subset of the lines in an image.
-        im_feats (numpy.array): An optional precomputed seamcarve energy map.
-                                Overrides data in `im`. The default map is
-                                `gaussian_filter(sobel(im), 2)`.
-        scale (tuple): A 2-tuple (h, w) containing optional scale factors of
-                       the input. Values of 0 are used for aspect-preserving
-                       scaling. `None` skips input scaling.
-        topline (bool): Switch to change default baseline location for offset
-                        calculation purposes. If set to False, baselines are
-                        assumed to be on the bottom of the text line and will
-                        be offset upwards, if set to True, baselines are on the
-                        top and will be offset downwards. If set to None, no
-                        offset will be applied.
+        im: grayscale input image (mode 'L')
+        baselines: List of lists containing a single baseline per entry.
+        suppl_obj: List of lists containing additional polylines that should be
+                   considered hard boundaries for polygonizaton purposes. Can
+                   be used to prevent polygonization into non-text areas such
+                   as illustrations or to compute the polygonization of a
+                   subset of the lines in an image.
+        im_feats: An optional precomputed seamcarve energy map. Overrides data
+                  in `im`. The default map is `gaussian_filter(sobel(im), 2)`.
+        scale: A 2-tuple (h, w) containing optional scale factors of the input.
+               Values of 0 are used for aspect-preserving scaling. `None` skips
+               input scaling.
+        topline: Switch to change default baseline location for offset
+                 calculation purposes. If set to False, baselines are assumed
+                 to be on the bottom of the text line and will be offset
+                 upwards, if set to True, baselines are on the top and will be
+                 offset downwards. If set to None, no offset will be applied.
         raise_on_error: Raises error instead of logging them when they are
                         not-blocking
     Returns:
@@ -767,11 +757,10 @@ def polygonal_reading_order(lines: Sequence[Dict],
     and applies it to the input.
 
     Args:
-        lines (Sequence): List of tuples containing the baseline and its
-                          polygonization.
-        regions (Sequence): List of region polygons.
-        text_direction (str): Set principal text direction for column ordering.
-                              Can be 'lr' or 'rl'
+        lines: List of tuples containing the baseline and its polygonization.
+        regions: List of region polygons.
+        text_direction: Set principal text direction for column ordering. Can
+                        be 'lr' or 'rl'
 
     Returns:
         The indices of the ordered input.
@@ -820,14 +809,14 @@ def polygonal_reading_order(lines: Sequence[Dict],
     return ordered_idxs
 
 
-def is_in_region(line, region) -> bool:
+def is_in_region(line: geom.LineString, region: geom.Polygon) -> bool:
     """
     Tests if a line is inside a region, i.e. if the mid point of the baseline
     is inside the region.
 
     Args:
-        line (geom.LineString): line to test
-        region (geom.Polygon): region to test against
+        line: line to test
+        region: region to test against
 
     Returns:
         False if line is not inside region, True otherwise.
@@ -933,9 +922,8 @@ def scale_regions(regions: Sequence[Tuple[List[int], List[int]]],
     Scales baselines/polygon coordinates by a certain factor.
 
     Args:
-        lines (Sequence): List of tuples containing the baseline and it's
-                          polygonization.
-        scale (float or tuple of floats): Scaling factor
+        lines: List of tuples containing the baseline and its polygonization.
+        scale: Scaling factor
     """
     if isinstance(scale, float):
         scale = (scale, scale)
@@ -950,9 +938,8 @@ def scale_polygonal_lines(lines: Sequence[Tuple[List, List]], scale: Union[float
     Scales baselines/polygon coordinates by a certain factor.
 
     Args:
-        lines (Sequence): List of tuples containing the baseline and it's
-                          polygonization.
-        scale (float or tuple of floats): Scaling factor
+        lines: List of tuples containing the baseline and its polygonization.
+        scale: Scaling factor
     """
     if isinstance(scale, float):
         scale = (scale, scale)
@@ -996,11 +983,11 @@ def compute_polygon_section(baseline: Sequence[Tuple[int, int]],
     baseline will be extrapolated to the polygon edge.
 
     Args:
-        baseline (list): A polyline ((x1, y1), ..., (xn, yn))
-        boundary (list): A bounding polygon around the baseline (same format as
-                         baseline).
-        dist1 (int): Absolute distance along the baseline of the first point.
-        dist2 (int): Absolute distance along the baseline of the second point.
+        baseline: A polyline ((x1, y1), ..., (xn, yn))
+        boundary: A bounding polygon around the baseline (same format as
+                  baseline). Last and first point are automatically connected.
+        dist1: Absolute distance along the baseline of the first point.
+        dist2: Absolute distance along the baseline of the second point.
 
     Returns:
         A sequence of polygon points.
@@ -1052,7 +1039,6 @@ def compute_polygon_section(baseline: Sequence[Tuple[int, int]],
     o = np.int_(points[0]).reshape(-1, 2).tolist()
     o.extend(np.int_(np.roll(points[1], 2)).reshape(-1, 2).tolist())
     return tuple(o)
-
 
 def _bevelled_warping_envelope(baseline: np.ndarray, output_bl_start: Tuple[float, float], output_shape: Tuple[int, int]) -> Tuple[List[Tuple[int, int]], List[Tuple[int, int]]]:
     """
@@ -1130,8 +1116,7 @@ def make_polygonal_mask(polygon: np.ndarray, shape: Tuple[int, int]) -> Image.Im
     ImageDraw.Draw(mask).polygon([tuple(p) for p in polygon.astype(int).tolist()], fill=255, width=2)
     return mask
 
-
-def apply_polygonal_mask(img: Image.Image, polygon: np.ndarray, cval=0) -> Image.Image:
+def apply_polygonal_mask(img: Image.Image, polygon: np.ndarray, cval: int=0) -> Image.Image:
     """
     Extract the polygonal mask of an image.
     """
@@ -1140,18 +1125,26 @@ def apply_polygonal_mask(img: Image.Image, polygon: np.ndarray, cval=0) -> Image
     out.paste(img, mask=mask)
     return out
 
-def extract_polygons(im: Image.Image, bounds: 'kraken.containers.Segmentation') -> Iterator[Tuple[Image.Image, Union['kraken.containers.BoundingBox', 'kraken.containers.Baseline']]]:
+def extract_polygons(
+    im: Image.Image, bounds: "Segmentation", legacy: bool=False
+) -> Iterator[
+    Tuple[
+        Image.Image,
+        Union["BBoxLine", "BaselineLine"],
+    ]
+]:
     """
     Yields the subimages of image im defined in the list of bounding polygons
     with baselines preserving order.
 
     Args:
         im: Input image
-        bounds: A Segmentation class containing a boundig box or baseline
+        bounds: A Segmentation class containing a bounding box or baseline
                 segmentation.
+        legacy: Use the old, slow, and deprecated path
 
     Yields:
-        The extracted subimage
+        The extracted subimage, and the corresponding bounding box or baseline
     """
     if bounds.type == 'baselines':
         # select proper interpolation scheme depending on shape
@@ -1175,90 +1168,170 @@ def extract_polygons(im: Image.Image, bounds: 'kraken.containers.Segmentation') 
             if (baseline < 0).any() or (baseline.max(axis=0)[::-1] >= im.shape[:2]).any():
                 raise KrakenInputException('Baseline outside of image bounds')
 
-            # fast path for straight baselines requiring only rotation
-            if len(baseline) == 2:
-                baseline = baseline.astype(float)
-                # calculate direction vector
-                lengths = np.linalg.norm(np.diff(baseline.T), axis=0)
-                p_dir = np.mean(np.diff(baseline.T) * lengths/lengths.sum(), axis=1)
-                p_dir = (p_dir.T / np.sqrt(np.sum(p_dir**2, axis=-1)))
-                angle = np.arctan2(p_dir[1], p_dir[0])
-                # crop out bounding box
-                patch = im.crop((c_min, r_min, c_max+1, r_max+1))
-                offset_polygon = pl - (c_min, r_min)
-                patch = apply_polygonal_mask(patch, offset_polygon, cval=0)
-                extrema = offset_polygon[(0, -1), :]
-                tform, i = _rotate(patch, angle, center=extrema[0], scale=1.0, cval=0, order=order)
-            # normal slow path with piecewise affine transformation
-            else:
-                if len(pl) > 50:
-                    pl = approximate_polygon(pl, 2)
-                full_polygon = subdivide_polygon(pl, preserve_ends=True)
+            if legacy:
+                # Old, slow, and deprecated path
+                # fast path for straight baselines requiring only rotation
+                if len(baseline) == 2:
+                    baseline = baseline.astype(float)
+                    # calculate direction vector
+                    lengths = np.linalg.norm(np.diff(baseline.T), axis=0)
+                    p_dir = np.mean(np.diff(baseline.T) * lengths/lengths.sum(), axis=1)
+                    p_dir = (p_dir.T / np.sqrt(np.sum(p_dir**2, axis=-1)))
+                    angle = np.arctan2(p_dir[1], p_dir[0])
+                    patch = im[r_min:r_max+1, c_min:c_max+1].copy()
+                    offset_polygon = pl - (c_min, r_min)
+                    r, c = draw.polygon(offset_polygon[:, 1], offset_polygon[:, 0])
+                    mask = np.zeros(patch.shape[:2], dtype=bool)
+                    mask[r, c] = True
+                    patch[np.invert(mask)] = 0
+                    extrema = offset_polygon[(0, -1), :]
+                    # scale line image to max 600 pixel width
+                    tform, rotated_patch = _rotate(patch, angle, center=extrema[0], scale=1.0, cval=0)
+                    i = Image.fromarray(rotated_patch.astype('uint8'))
+                # normal slow path with piecewise affine transformation
+                else:
+                    if len(pl) > 50:
+                        pl = approximate_polygon(pl, 2)
+                    full_polygon = subdivide_polygon(pl, preserve_ends=True)
+                    pl = geom.MultiPoint(full_polygon)
 
-                # baseline segment vectors
-                diff_bl = np.diff(baseline, axis=0)
-                diff_bl_norms = np.linalg.norm(diff_bl, axis=1)
-                diff_bl_normed = diff_bl / diff_bl_norms[:, None]
+                    bl = zip(baseline[:-1:], baseline[1::])
+                    bl = [geom.LineString(x) for x in bl]
+                    cum_lens = np.cumsum([0] + [line.length for line in bl])
+                    # distance of intercept from start point and number of line segment
+                    control_pts = []
+                    for point in pl.geoms:
+                        npoint = np.array(point.coords)[0]
+                        line_idx, dist, intercept = min(((idx, line.project(point),
+                                                        np.array(line.interpolate(line.project(point)).coords)) for idx, line in enumerate(bl)),
+                                                        key=lambda x: np.linalg.norm(npoint-x[2]))
+                        # absolute distance from start of line
+                        line_dist = cum_lens[line_idx] + dist
+                        intercept = np.array(intercept)
+                        # side of line the point is at
+                        side = np.linalg.det(np.array([[baseline[line_idx+1][0]-baseline[line_idx][0],
+                                                        npoint[0]-baseline[line_idx][0]],
+                                                    [baseline[line_idx+1][1]-baseline[line_idx][1],
+                                                        npoint[1]-baseline[line_idx][1]]]))
+                        side = np.sign(side)
+                        # signed perpendicular distance from the rectified distance
+                        per_dist = side * np.linalg.norm(npoint-intercept)
+                        control_pts.append((line_dist, per_dist))
+                    # calculate baseline destination points
+                    bl_dst_pts = baseline[0] + np.dstack((cum_lens, np.zeros_like(cum_lens)))[0]
+                    # calculate bounding polygon destination points
+                    pol_dst_pts = np.array([baseline[0] + (line_dist, per_dist) for line_dist, per_dist in control_pts])
+                    # extract bounding box patch
+                    c_dst_min, c_dst_max = int(pol_dst_pts[:, 0].min()), int(pol_dst_pts[:, 0].max())
+                    r_dst_min, r_dst_max = int(pol_dst_pts[:, 1].min()), int(pol_dst_pts[:, 1].max())
+                    output_shape = np.around((r_dst_max - r_dst_min + 1, c_dst_max - c_dst_min + 1))
+                    patch = im[r_min:r_max+1, c_min:c_max+1].copy()
+                    # offset src points by patch shape
+                    offset_polygon = full_polygon - (c_min, r_min)
+                    offset_baseline = baseline - (c_min, r_min)
+                    # offset dst point by dst polygon shape
+                    offset_bl_dst_pts = bl_dst_pts - (c_dst_min, r_dst_min)
+                    offset_pol_dst_pts = pol_dst_pts - (c_dst_min, r_dst_min)
+                    # mask out points outside bounding polygon
+                    mask = np.zeros(patch.shape[:2], dtype=bool)
+                    r, c = draw.polygon(offset_polygon[:, 1], offset_polygon[:, 0])
+                    mask[r, c] = True
+                    patch[np.invert(mask)] = 0
+                    # estimate piecewise transform
+                    src_points = np.concatenate((offset_baseline, offset_polygon))
+                    dst_points = np.concatenate((offset_bl_dst_pts, offset_pol_dst_pts))
+                    tform = PiecewiseAffineTransform()
+                    tform.estimate(src_points, dst_points)
+                    o = warp(patch, tform.inverse, output_shape=output_shape, preserve_range=True, order=order)
+                    i = Image.fromarray(o.astype('uint8'))
 
-                l_poly = len(full_polygon)
-                cum_lens = np.cumsum([0] + np.linalg.norm(diff_bl, axis=1).tolist())
+            else: # if not legacy
+                # new, fast, and efficient path
+                # fast path for straight baselines requiring only rotation
+                if len(baseline) == 2:
+                    baseline = baseline.astype(float)
+                    # calculate direction vector
+                    lengths = np.linalg.norm(np.diff(baseline.T), axis=0)
+                    p_dir = np.mean(np.diff(baseline.T) * lengths/lengths.sum(), axis=1)
+                    p_dir = (p_dir.T / np.sqrt(np.sum(p_dir**2, axis=-1)))
+                    angle = np.arctan2(p_dir[1], p_dir[0])
+                    # crop out bounding box
+                    patch = im.crop((c_min, r_min, c_max+1, r_max+1))
+                    offset_polygon = pl - (c_min, r_min)
+                    patch = apply_polygonal_mask(patch, offset_polygon, cval=0)
+                    extrema = offset_polygon[(0, -1), :]
+                    tform, i = _rotate(patch, angle, center=extrema[0], scale=1.0, cval=0, order=order)
+                # normal slow path with piecewise affine transformation
+                else:
+                    if len(pl) > 50:
+                        pl = approximate_polygon(pl, 2)
+                    full_polygon = subdivide_polygon(pl, preserve_ends=True)
 
-                # calculate baseline destination points :
-                bl_dst_pts = baseline[0] + np.dstack((cum_lens, np.zeros_like(cum_lens)))[0]
+                    # baseline segment vectors
+                    diff_bl = np.diff(baseline, axis=0)
+                    diff_bl_norms = np.linalg.norm(diff_bl, axis=1)
+                    diff_bl_normed = diff_bl / diff_bl_norms[:, None]
 
-                # calculate bounding polygon destination points :
-                # difference between baselines and polygon
-                # diff[k, p] = baseline[k] - polygon[p]
-                poly_bl_diff = full_polygon[None, :] - baseline[:-1, None]
-                # local x coordinates of polygon points on baseline segments
-                # x[k, p] = (baseline[k] - polygon[p]) . (baseline[k+1] - baseline[k]) / |baseline[k+1] - baseline[k]|
-                poly_bl_x = np.einsum('kpm,km->kp', poly_bl_diff, diff_bl_normed)
-                # distance to baseline segments
-                poly_bl_segdist = np.maximum(-poly_bl_x, poly_bl_x - diff_bl_norms[:, None])
-                # closest baseline segment index
-                poly_closest_bl = np.argmin((poly_bl_segdist), axis=0)
-                poly_bl_x = poly_bl_x[poly_closest_bl, np.arange(l_poly)]
-                poly_bl_diff = poly_bl_diff[poly_closest_bl, np.arange(l_poly)]
-                # signed distance between polygon points and baseline segments (to get y coordinates)
-                poly_bl_y = np.cross(diff_bl_normed[poly_closest_bl], poly_bl_diff)
-                # final destination points
-                pol_dst_pts = np.array(
-                    [cum_lens[poly_closest_bl] + poly_bl_x, poly_bl_y]
-                ).T + baseline[:1]
+                    l_poly = len(full_polygon)
+                    cum_lens = np.cumsum([0] + np.linalg.norm(diff_bl, axis=1).tolist())
 
-                # extract bounding box patch
-                c_dst_min, c_dst_max = int(pol_dst_pts[:, 0].min()), int(pol_dst_pts[:, 0].max())
-                r_dst_min, r_dst_max = int(pol_dst_pts[:, 1].min()), int(pol_dst_pts[:, 1].max())
-                output_shape = np.around((r_dst_max - r_dst_min + 1, c_dst_max - c_dst_min + 1))
-                patch = im.crop((c_min, r_min, c_max+1, r_max+1))
-                # offset src points by patch shape
-                offset_polygon = full_polygon - (c_min, r_min)
-                offset_baseline = baseline - (c_min, r_min)
-                # offset dst point by dst polygon shape
-                offset_bl_dst_pts = bl_dst_pts - (c_dst_min, r_dst_min)
-                # mask out points outside bounding polygon
-                patch = apply_polygonal_mask(patch, offset_polygon, cval=0)
+                    # calculate baseline destination points :
+                    bl_dst_pts = baseline[0] + np.dstack((cum_lens, np.zeros_like(cum_lens)))[0]
 
-                # estimate piecewise transform by beveling angles
-                source_envelope, target_envelope = _bevelled_warping_envelope(offset_baseline, offset_bl_dst_pts[0], output_shape)
-                # mesh for PIL, as (box, quad) tuples : box is (NW, SE) and quad is (NW, SW, SE, NE)
-                deform_mesh = [
-                    (
-                        (*target_envelope[i], *target_envelope[i+3]),
-                        (*source_envelope[i], *source_envelope[i+1], *source_envelope[i+3], *source_envelope[i+2])
-                    )
-                    for i in range(0, len(source_envelope)-3, 2)
-                ]
-                # warp
-                resample = {0: Image.NEAREST, 1: Image.BILINEAR, 2: Image.BICUBIC, 3: Image.BICUBIC}.get(order, Image.NEAREST)
-                i = patch.transform((output_shape[1], output_shape[0]), Image.MESH, data=deform_mesh, resample=resample)
+                    # calculate bounding polygon destination points :
+                    # diff[k, p] = baseline[k] - polygon[p]
+                    poly_bl_diff = full_polygon[None, :] - baseline[:-1, None]
+                    # local x coordinates of polygon points on baseline segments
+                    # x[k, p] = (baseline[k] - polygon[p]) . (baseline[k+1] - baseline[k]) / |baseline[k+1] - baseline[k]|
+                    poly_bl_x = np.einsum('kpm,km->kp', poly_bl_diff, diff_bl_normed)
+                    # distance to baseline segments
+                    poly_bl_segdist = np.maximum(-poly_bl_x, poly_bl_x - diff_bl_norms[:, None])
+                    # closest baseline segment index
+                    poly_closest_bl = np.argmin((poly_bl_segdist), axis=0)
+                    poly_bl_x = poly_bl_x[poly_closest_bl, np.arange(l_poly)]
+                    poly_bl_diff = poly_bl_diff[poly_closest_bl, np.arange(l_poly)]
+                    # signed distance between polygon points and baseline segments (to get y coordinates)
+                    poly_bl_y = np.cross(diff_bl_normed[poly_closest_bl], poly_bl_diff)
+                    # final destination points
+                    pol_dst_pts = np.array(
+                        [cum_lens[poly_closest_bl] + poly_bl_x, poly_bl_y]
+                    ).T + baseline[:1]
+
+                    # extract bounding box patch
+                    c_dst_min, c_dst_max = int(pol_dst_pts[:, 0].min()), int(pol_dst_pts[:, 0].max())
+                    r_dst_min, r_dst_max = int(pol_dst_pts[:, 1].min()), int(pol_dst_pts[:, 1].max())
+                    output_shape = np.around((r_dst_max - r_dst_min + 1, c_dst_max - c_dst_min + 1))
+                    patch = im.crop((c_min, r_min, c_max+1, r_max+1))
+                    # offset src points by patch shape
+                    offset_polygon = full_polygon - (c_min, r_min)
+                    offset_baseline = baseline - (c_min, r_min)
+                    # offset dst point by dst polygon shape
+                    offset_bl_dst_pts = bl_dst_pts - (c_dst_min, r_dst_min)
+                    # mask out points outside bounding polygon
+                    patch = apply_polygonal_mask(patch, offset_polygon, cval=0)
+
+                    # estimate piecewise transform by beveling angles
+                    source_envelope, target_envelope = _bevelled_warping_envelope(offset_baseline, offset_bl_dst_pts[0], output_shape)
+                    # mesh for PIL, as (box, quad) tuples : box is (NW, SE) and quad is (NW, SW, SE, NE)
+                    deform_mesh = [
+                        (
+                            (*target_envelope[i], *target_envelope[i+3]),
+                            (*source_envelope[i], *source_envelope[i+1], *source_envelope[i+3], *source_envelope[i+2])
+                        )
+                        for i in range(0, len(source_envelope)-3, 2)
+                    ]
+                    # warp
+                    resample = {0: Image.NEAREST, 1: Image.BILINEAR, 2: Image.BICUBIC, 3: Image.BICUBIC}.get(order, Image.NEAREST)
+                    i = patch.transform((output_shape[1], output_shape[0]), Image.MESH, data=deform_mesh, resample=resample)
+
             yield i.crop(i.getbbox()), line
     else:
         if bounds.text_direction.startswith('vertical'):
             angle = 90
         else:
             angle = 0
-        for box in bounds.lines:
+        for line in bounds.lines:
+            box = line.bbox
             if isinstance(box, tuple):
                 box = list(box)
             if (box < [0, 0, 0, 0] or box[::2] >= [im.size[0], im.size[0]] or

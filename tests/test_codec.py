@@ -2,11 +2,11 @@
 import unittest
 
 from pytest import raises
-
 from torch import IntTensor
 
 from kraken.lib import codec
-from kraken.lib.exceptions import KrakenEncodeException, KrakenCodecException
+from kraken.lib.exceptions import KrakenCodecException, KrakenEncodeException
+
 
 class TestCodec(unittest.TestCase):
 

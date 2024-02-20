@@ -28,35 +28,36 @@ Vogler, Nikolai, et al. "Lacuna Reconstruction: Self-supervised Pre-training
 for Low-Resource Historical Document Transcription." arXiv preprint
 arXiv:2112.08692 (2021).
 """
-import re
-import math
-import torch
 import logging
-import numpy as np
-import torch.nn.functional as F
-import pytorch_lightning as pl
-
-from os import PathLike
+import math
+import re
 from itertools import chain
-from functools import partial
-from torch.optim import lr_scheduler
-from torch.multiprocessing import Pool
-from typing import Dict, Optional, Sequence, Union, Any
+from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence, Union
+
+import numpy as np
+import pytorch_lightning as pl
+import torch
+import torch.nn.functional as F
 from pytorch_lightning.callbacks import EarlyStopping
-from pytorch_lightning.utilities.memory import is_oom_error, garbage_collection_cuda
+from pytorch_lightning.utilities.memory import (garbage_collection_cuda,
+                                                is_oom_error)
+from torch.optim import lr_scheduler
+from torch.utils.data import DataLoader, Subset, random_split
 
-from kraken.lib import vgsl, default_specs, layers
-from kraken.lib.xml import XMLPage
+from kraken.containers import Segmentation
+from kraken.lib import default_specs, layers, vgsl
 from kraken.lib.codec import PytorchCodec
-from kraken.lib.dataset import (ArrowIPCRecognitionDataset,
-                                GroundTruthDataset, PolygonGTDataset,
-                                ImageInputTransforms, collate_sequences)
+from kraken.lib.dataset import (ArrowIPCRecognitionDataset, GroundTruthDataset,
+                                ImageInputTransforms, PolygonGTDataset,
+                                collate_sequences)
 from kraken.lib.exceptions import KrakenInputException
-from kraken.lib.train import _configure_optimizer_and_lr_scheduler
 from kraken.lib.pretrain.layers import Wav2Vec2Mask
+from kraken.lib.train import _configure_optimizer_and_lr_scheduler
+from kraken.lib.util import parse_gt_path
+from kraken.lib.xml import XMLPage
 
-from torch.utils.data import DataLoader, random_split, Subset
-
+if TYPE_CHECKING:
+    from os import PathLike
 
 logger = logging.getLogger(__name__)
 
@@ -73,8 +74,8 @@ def _star_fun(fun, kwargs):
 
 class PretrainDataModule(pl.LightningDataModule):
     def __init__(self,
-                 training_data: Union[Sequence[Union[PathLike, str]], Sequence[Dict[str, Any]]] = None,
-                 evaluation_data: Optional[Union[Sequence[Union[PathLike, str]], Sequence[Dict[str, Any]]]] = None,
+                 training_data: Union[Sequence[Union['PathLike', str]], Sequence[Dict[str, Any]]] = None,
+                 evaluation_data: Optional[Union[Sequence[Union['PathLike', str]], Sequence[Dict[str, Any]]]] = None,
                  partition: Optional[float] = 0.9,
                  binary_dataset_split: bool = False,
                  batch_size: int = 4,
@@ -138,10 +139,10 @@ class PretrainDataModule(pl.LightningDataModule):
                 logger.warning('Internal binary dataset splits are enabled but using non-binary dataset files. Will be ignored.')
                 binary_dataset_split = False
             logger.info(f'Got {len(training_data)} line strip images for training data')
-            training_data = [{'image': im} for im in training_data]
+            training_data = [{'line': parse_gt_path(im)} for im in training_data]
             if evaluation_data:
                 logger.info(f'Got {len(evaluation_data)} line strip images for validation data')
-                evaluation_data = [{'image': im} for im in evaluation_data]
+                evaluation_data = [{'line': parse_gt_path(im)} for im in evaluation_data]
             valid_norm = True
         # format_type is None. Determine training type from length of training data entry
         elif not format_type:
@@ -252,7 +253,7 @@ class RecognitionPretrainModel(pl.LightningModule):
                  hyper_params: Dict[str, Any] = None,
                  output: str = 'model',
                  spec: str = default_specs.RECOGNITION_SPEC,
-                 model: Optional[Union[PathLike, str]] = None,
+                 model: Optional[Union['PathLike', str]] = None,
                  load_hyper_parameters: bool = False,
                  len_train_set: int = -1):
         """
@@ -372,15 +373,6 @@ class RecognitionPretrainModel(pl.LightningModule):
         o = self._step(batch, batch_idx)
         if o is not None:
             logits, targets, loss = o
-            with torch.no_grad():
-                if logits.numel() == 0:
-                    corr = 0
-                    count = 0
-                else:
-                    _max = logits.argmax(-1) == 0
-                    _min = logits.argmin(-1) == 0
-                    both = _max & _min
-                    corr = _max.long().sum().item() - both.long().sum().item()
             self.val_ce.append(loss.cpu())
             self.log('CE', loss, on_step=True, on_epoch=True)
 

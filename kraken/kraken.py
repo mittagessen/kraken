@@ -18,19 +18,19 @@ kraken.kraken
 
 Command line drivers for recognition functionality.
 """
-import os
-import warnings
-import logging
 import dataclasses
-import pkg_resources
-
-from PIL import Image
-from pathlib import Path
+import logging
+import os
+import shlex
+import warnings
 from functools import partial
-from rich.traceback import install
-from typing import Dict, Union, List, cast, Any, IO, Callable
+from pathlib import Path
+from typing import IO, Any, Callable, Dict, List, Union, cast
 
 import click
+import importlib_resources
+from PIL import Image
+from rich.traceback import install
 
 from kraken.lib import log
 
@@ -43,7 +43,7 @@ logger = logging.getLogger('kraken')
 install(suppress=[click])
 
 APP_NAME = 'kraken'
-SEGMENTATION_DEFAULT_MODEL = pkg_resources.resource_filename(__name__, 'blla.mlmodel')
+SEGMENTATION_DEFAULT_MODEL = importlib_resources.files(APP_NAME).joinpath('blla.mlmodel')
 DEFAULT_MODEL = ['en_best.mlmodel']
 
 # raise default max image size to 20k * 20k pixels
@@ -86,7 +86,7 @@ def binarizer(threshold, zoom, escale, border, perc, range, low, high, input, ou
                                  low, high)
         if ctx.meta['last_process'] and ctx.meta['output_mode'] != 'native':
             with click.open_file(output, 'w', encoding='utf-8') as fp:
-                fp = cast(IO[Any], fp)
+                fp = cast('IO[Any]', fp)
                 logger.info('Serializing as {} into {}'.format(ctx.meta['output_mode'], output))
                 res.save(f'{output}.png')
                 from kraken import serialization
@@ -159,7 +159,7 @@ def segmenter(legacy, model, text_direction, scale, maxcolseps, black_colseps,
         ctx.exit(1)
     if ctx.meta['last_process'] and ctx.meta['output_mode'] != 'native':
         with click.open_file(output, 'w', encoding='utf-8') as fp:
-            fp = cast(IO[Any], fp)
+            fp = cast('IO[Any]', fp)
             logger.info('Serializing as {} into {}'.format(ctx.meta['output_mode'], output))
             from kraken import serialization
             fp.write(serialization.serialize_segmentation(res,
@@ -170,20 +170,19 @@ def segmenter(legacy, model, text_direction, scale, maxcolseps, black_colseps,
                                                           processing_steps=ctx.meta['steps']))
     else:
         with click.open_file(output, 'w') as fp:
-            fp = cast(IO[Any], fp)
+            fp = cast('IO[Any]', fp)
             json.dump(dataclasses.asdict(res), fp)
     message('\u2713', fg='green')
 
 
 def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore, input, output) -> None:
 
+    import dataclasses
     import json
     import uuid
-    import dataclasses
 
     from kraken import rpred
-    from kraken.containers import Segmentation, BBoxLine
-
+    from kraken.containers import BBoxLine, Segmentation
     from kraken.lib.progress import KrakenProgressBar
 
     ctx = click.get_current_context()
@@ -208,7 +207,7 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore, input,
     if not bounds and ctx.meta['base_image'] != input:
         with click.open_file(input, 'r') as fp:
             try:
-                fp = cast(IO[Any], fp)
+                fp = cast('IO[Any]', fp)
                 bounds = Segmentation(**json.load(fp))
             except ValueError as e:
                 raise click.UsageError(f'{input} invalid segmentation: {str(e)}')
@@ -244,7 +243,7 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore, input,
 
     ctx = click.get_current_context()
     with click.open_file(output, 'w', encoding='utf-8') as fp:
-        fp = cast(IO[Any], fp)
+        fp = cast('IO[Any]', fp)
         message(f'Writing recognition results for {ctx.meta["orig_file"]}\t', nl=False)
         logger.info('Serializing as {} into {}'.format(ctx.meta['output_mode'], output))
         if ctx.meta['output_mode'] != 'native':
@@ -345,10 +344,11 @@ def process_pipeline(subcommands, input, batch_input, suffix, verbose, format_ty
     placing their respective outputs in temporary files.
     """
     import glob
-    import uuid
     import tempfile
+    import uuid
 
     from threadpoolctl import threadpool_limits
+
     from kraken.lib.progress import KrakenProgressBar
 
     ctx = click.get_current_context()
@@ -539,17 +539,25 @@ def _validate_mm(ctx, param, value):
     """
     Maps model mappings to a dictionary.
     """
-    model_dict = {'ignore': []}  # type: Dict[str, Union[str, List[str]]]
-    if len(value) == 1 and len(value[0].split(':')) == 1:
-        model_dict['default'] = value[0]
-        return model_dict
+    model_dict: Dict[str, Union[str, List[str]]] = {'ignore': []}
+    if len(value) == 1:
+        lexer = shlex.shlex(value[0], posix=True)
+        lexer.wordchars += r'\/.+-()=^&;,.'
+        if len(list(lexer)) == 1:
+            model_dict['default'] = value[0]
+            return model_dict
     try:
         for m in value:
-            k, v = m.split(':')
+            lexer = shlex.shlex(m, posix=True)
+            lexer.wordchars += r'\/.+-()=^&;,.'
+            tokens = list(lexer)
+            if len(tokens) != 3:
+                raise ValueError
+            k, _, v = tokens
             if v == 'ignore':
-                model_dict['ignore'].append(k)  # type: ignore
+                model_dict['ignore'].append(('type', k))  # type: ignore
             else:
-                model_dict[k] = os.path.expanduser(v)
+                model_dict[('type', k)] = Path(v)
     except Exception:
         raise click.BadParameter('Mappings must be in format tag:model')
     return model_dict
@@ -560,10 +568,11 @@ def _validate_mm(ctx, param, value):
 @click.option('-m', '--model', default=DEFAULT_MODEL, multiple=True,
               show_default=True, callback=_validate_mm,
               help='Path to an recognition model or mapping of the form '
-              '$tag1:$model1. Add multiple mappings to run multi-model '
-              'recognition based on detected tags. Use the default keyword '
+              '$tag1=$model1. Add multiple mappings to run multi-model '
+              'recognition based on detected tags. Use the `default` keyword '
               'for adding a catch-all model. Recognition on tags can be '
-              'ignored with the model value ignore.')
+              'ignored with the model value `ignore`. Refer to the '
+              'documentation for more information about tag handling.')
 @click.option('-p', '--pad', show_default=True, type=click.INT, default=16, help='Left and right '
               'padding around lines')
 @click.option('-n', '--reorder/--no-reorder', show_default=True, default=True,
@@ -591,8 +600,8 @@ def ocr(ctx, model, pad, reorder, base_dir, no_segmentation, text_direction):
     if reorder and base_dir != 'auto':
         reorder = base_dir
 
-    # first we try to find the model in the absolue path, then ~/.kraken
-    nm = {}  # type: Dict[str, models.TorchSeqRecognizer]
+    # first we try to find the model in the absolute path, then ~/.kraken
+    nm: Dict[str, models.TorchSeqRecognizer] = {}
     ign_tags = model.pop('ignore')
     for k, v in model.items():
         search = [v,
@@ -618,7 +627,7 @@ def ocr(ctx, model, pad, reorder, base_dir, no_segmentation, text_direction):
     if 'default' in nm:
         from collections import defaultdict
 
-        nn = defaultdict(lambda: nm['default'])  # type: Dict[str, models.TorchSeqRecognizer]
+        nn: Dict[str, models.TorchSeqRecognizer] = defaultdict(lambda: nm['default'])
         nn.update(nm)
         nm = nn
 
@@ -647,7 +656,7 @@ def show(ctx, model_id):
     Retrieves model metadata from the repository.
     """
     from kraken import repo
-    from kraken.lib.util import make_printable, is_printable
+    from kraken.lib.util import is_printable, make_printable
 
     desc = repo.get_description(model_id)
 

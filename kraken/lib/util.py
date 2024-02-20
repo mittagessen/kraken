@@ -2,15 +2,22 @@
 Ocropus's magic PIL-numpy array conversion routines. They express slightly
 different behavior from PIL.Image.toarray().
 """
-import torch
 import unicodedata
-import numpy as np
+import uuid
+from typing import TYPE_CHECKING, Callable, Literal, Optional, Union
 
+import numpy as np
+import torch
 from PIL import Image
 
-from typing import Union
+from kraken.containers import BBoxLine
+from kraken.lib import functional_im_transforms as F_t
+from kraken.lib.exceptions import KrakenInputException
 
-__all__ = ['pil2array', 'array2pil', 'is_bitonal', 'make_printable', 'get_im_str']
+if TYPE_CHECKING:
+    from os import PathLike
+
+__all__ = ['pil2array', 'array2pil', 'is_bitonal', 'make_printable', 'get_im_str', 'parse_gt_path']
 
 
 def pil2array(im: Image.Image, alpha: int = 0) -> np.ndarray:
@@ -93,3 +100,47 @@ def make_printable(char: str) -> str:
         return '0x{:x}'.format(ord(char))
     else:
         return unicodedata.name(char)
+
+
+def parse_gt_path(path: Union[str, 'PathLike'],
+                  suffix: str = '.gt.txt',
+                  split: Callable[[Union['PathLike', str]], str] = F_t.default_split,
+                  skip_empty_lines: bool = True,
+                  base_dir: Optional[Literal['L', 'R']] = None,
+                  text_direction: Literal['horizontal-lr', 'horizontal-rl', 'vertical-lr', 'vertical-rl'] = 'horizontal-lr') -> BBoxLine:
+    """
+    Returns a BBoxLine from a image/text file pair.
+
+    Args:
+        path: Path to image file
+        suffix: Suffix of the corresponding ground truth text file to image
+                file in `path`.
+        split: Suffix stripping function.
+        skip_empty_lines: Whether to raise an exception if ground truth is
+                          empty or text file is missing.
+        base_dir: Unicode BiDi algorithm base direction
+        text_direction: Orientation of the line box.
+    """
+    try:
+        with Image.open(path) as im:
+            w, h = im.size
+    except Exception as e:
+        raise KrakenInputException(e)
+
+    gt = ''
+    try:
+        with open(F_t.suffix_split(path, split=split, suffix=suffix), 'r', encoding='utf-8') as fp:
+            gt = fp.read().strip('\n\r')
+    except FileNotFoundError:
+        if not skip_empty_lines:
+            raise KrakenInputException(f'No text file found for ground truth line {path}.')
+
+    if not gt and skip_empty_lines:
+        raise KrakenInputException(f'No text for ground truth line {path}.')
+
+    return BBoxLine(id=uuid.uuid4(),
+                    bbox=((0, 0), (w, 0), (w, h), (0, h)),
+                    text=gt,
+                    base_dir=base_dir,
+                    imagename=path,
+                    text_direction=text_direction)

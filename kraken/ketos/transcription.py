@@ -18,13 +18,13 @@ kraken.ketos.transcription
 
 Legacy command line drivers for recognition training data annotation.
 """
-import os
-import uuid
-import click
 import logging
+import os
 import unicodedata
-
+import uuid
 from typing import IO, Any, cast
+
+import click
 from bidi.algorithm import get_display
 
 from .util import message
@@ -59,12 +59,12 @@ def extract(ctx, binarize, normalization, normalize_whitespace, reorder,
     Extracts image-text pairs from a transcription environment created using
     ``ketos transcribe``.
     """
-    import regex
     import base64
-
     from io import BytesIO
+
+    import regex
+    from lxml import etree, html
     from PIL import Image
-    from lxml import html, etree
 
     from kraken import binarization
     from kraken.lib.progress import KrakenProgressBar
@@ -166,11 +166,7 @@ def transcription(ctx, text_direction, scale, bw, maxcolseps,
 
     from PIL import Image
 
-    from kraken import rpred
-    from kraken import pageseg
-    from kraken import transcribe
-    from kraken import binarization
-
+    from kraken import binarization, pageseg, rpred, transcribe
     from kraken.lib import models
     from kraken.lib.progress import KrakenProgressBar
 
@@ -202,7 +198,7 @@ def transcription(ctx, text_direction, scale, bw, maxcolseps,
             else:
                 with click.open_file(lines, 'r') as fp:
                     try:
-                        fp = cast(IO[Any], fp)
+                        fp = cast('IO[Any]', fp)
                         res = json.load(fp)
                     except ValueError as e:
                         raise click.UsageError('{} invalid segmentation: {}'.format(lines, str(e)))

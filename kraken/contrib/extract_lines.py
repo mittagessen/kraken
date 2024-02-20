@@ -1,6 +1,7 @@
 #! /usr/bin/env python
 import click
 
+
 @click.command()
 @click.option('-f', '--format-type', type=click.Choice(['xml', 'alto', 'page', 'binary']), default='xml',
               help='Sets the input document format. In ALTO and PageXML mode all '
@@ -19,13 +20,15 @@ def cli(format_type, model, files):
         click.echo(ctx.get_help())
         ctx.exit()
 
-    from PIL import Image
-    from os.path import splitext
-    from kraken import blla
-    from kraken.lib import segmentation, vgsl, xml
     import io
     import json
+    from os.path import splitext
+
     import pyarrow as pa
+    from PIL import Image
+
+    from kraken import blla
+    from kraken.lib import segmentation, vgsl, xml
 
     if model is None:
         for doc in files:

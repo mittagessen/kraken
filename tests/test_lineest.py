@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 import unittest
+from pathlib import Path
 
 from PIL import Image
-from pathlib import Path
 from pytest import raises
 
 from kraken.lib import lineest

@@ -1,9 +1,11 @@
 import warnings
-from PIL import Image
-import numpy as np
+from typing import TYPE_CHECKING
 
-from kraken.lib.util import pil2array, array2pil
+import numpy as np
 from scipy.ndimage import affine_transform, gaussian_filter, uniform_filter
+
+if TYPE_CHECKING:
+    from PIL import Image
 
 __all__ = ['CenterNormalizer', 'dewarp']
 
@@ -63,19 +65,20 @@ class CenterNormalizer(object):
         return scaled
 
 
-def dewarp(normalizer: CenterNormalizer, im: Image.Image) -> Image.Image:
+def dewarp(normalizer: CenterNormalizer, im: 'Image.Image') -> 'Image.Image':
     """
     Dewarps an image of a line using a kraken.lib.lineest.CenterNormalizer
     instance.
 
     Args:
-        normalizer (kraken.lib.lineest.CenterNormalizer): A line normalizer
-                                                          instance
-        im (PIL.Image.Image): Image to dewarp
+        normalizer: A line normalizer instance
+        im: Image to dewarp
 
     Returns:
-        PIL.Image containing the dewarped image.
+        PIL.Image.Image containing the dewarped image.
     """
+    from kraken.lib.util import array2pil, pil2array
+
     line = pil2array(im)
     temp = np.amax(line)-line
     temp = temp*1.0/np.amax(temp)

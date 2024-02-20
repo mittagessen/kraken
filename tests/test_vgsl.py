@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
+import os
+import tempfile
 import unittest
+
+import torch
 from pytest import raises
 
-import os
-import torch
-import tempfile
-from kraken.lib import vgsl, layers
+from kraken.lib import layers, vgsl
 
 
 class TestVGSL(unittest.TestCase):

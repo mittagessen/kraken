@@ -1,17 +1,19 @@
 # -*- coding: utf-8 -*-
-import os
 import json
-import pytest
+import os
 import unittest
+from collections import defaultdict
+from pathlib import Path
 
+import pytest
 from PIL import Image
 from pytest import raises
-from pathlib import Path
-from collections import defaultdict
 
-from kraken.lib.models import load_any
-from kraken.rpred import rpred, mm_rpred, BaselineOCRRecord, BBoxOCRRecord
+from kraken.containers import (BaselineLine, BaselineOCRRecord, BBoxLine,
+                               BBoxOCRRecord, Segmentation)
 from kraken.lib.exceptions import KrakenInputException
+from kraken.lib.models import load_any
+from kraken.rpred import mm_rpred, rpred
 
 thisfile = Path(__file__).resolve().parent
 resources = thisfile / 'resources'
@@ -109,57 +111,78 @@ class TestBBoxRecords(unittest.TestCase):
         self.assertEqual(cut, ((1484, 119), (1568, 119), (1568, 256), (1484, 256)))
         self.assertAlmostEqual(conf, 0.74411, places=4)
 
+
 class TestBaselineRecords(unittest.TestCase):
     """
     Tests the baseline OCR record.
     """
     def setUp(self):
-        self.bidi_record = ()
-        self.ltr_record = ()
+        with open(resources / 'bl_records.json', 'r') as fp:
+            self.bl_records = json.load(fp)
+            self.ltr_record = self.bl_records['lines'][15]
 
     def test_baseline_record_cuts(self):
         """
         Make sure that the cuts of a record are converted to absolute coordinates.
         """
-        pass
+        record = BaselineOCRRecord(**self.ltr_record)
 
     def test_baseline_record_redisplay(self):
         """
         Test that a display order record remains in display order when
         requesting a DO record.
         """
-        pass
+        record = BaselineOCRRecord(**self.ltr_record, display_order=True)
+        self.assertEqual(record, record.display_order())
 
     def test_baseline_record_relogical(self):
         """
         Test that a logical order record remains in logical order when
         requesting a LO record.
         """
-        pass
+        record = BaselineOCRRecord(**self.ltr_record, display_order=False)
+        self.assertEqual(record, record.logical_order())
 
     def test_baseline_record_display(self):
         """
         test display order conversion of record.
         """
-        pass
+        record = BaselineOCRRecord(**self.ltr_record, display_order=False)
+        re_record = record.display_order()
+        self.assertEqual(re_record.prediction, '.هنيدو')
+        self.assertEqual(re_record[:][1], ([1370, 1382], [1370, 1424], [1448, 1426], [1451, 1388]))
+        self.assertAlmostEqual(re_record[2:4][2], 0.9998551, places=4)
 
     def test_baseline_record_logical(self):
         """
         Test logical order conversion of record.
         """
-        pass
+        record = BaselineOCRRecord(**self.ltr_record, display_order=True)
+        re_record = record.logical_order()
+        self.assertEqual(re_record.prediction, '.هنيدو')
+        self.assertEqual(re_record[:][1], ([1370, 1382], [1370, 1424], [1448, 1426], [1451, 1388]))
+        self.assertAlmostEqual(re_record[2:3][2], 0.99996733, places=4)
 
     def test_baseline_record_slicing(self):
         """
         Tests simple slicing/aggregation of elements in record.
         """
-        pass
+        record = BaselineOCRRecord(**self.ltr_record, display_order=True)
+        pred, cut, conf = record[2:5]
+        self.assertEqual(pred, 'ينه')
+        self.assertEqual(cut, ([1385, 1375], [1385, 1427], [1411, 1433], [1411, 1378]))
+        self.assertAlmostEqual(conf, 0.99957436, places=4)
 
-    def test_baseline_record_slicing(self):
+    def test_baseline_complex_record_slicing(self):
         """
         Tests complex slicing/aggregation of elements in record.
         """
-        pass
+        record = BaselineOCRRecord(**self.ltr_record, display_order=True)
+        pred, cut, conf = record[1:5:2]
+        self.assertEqual(pred, 'دن')
+        self.assertEqual(cut, ([1396, 1375], [1396, 1430], [1426, 1437], [1429, 1381]))
+        self.assertAlmostEqual(conf, 0.999982893, places=4)
+
 
 class TestRecognition(unittest.TestCase):
 
@@ -170,16 +193,73 @@ class TestRecognition(unittest.TestCase):
         self.im = Image.open(resources / 'bw.png')
         self.overfit_line = Image.open(resources / '000236.png')
         self.model = load_any(resources / 'overfit.mlmodel')
+        self.invalid_box_seg = Segmentation(type='bbox',
+                                            imagename = resources / 'bw.png',
+                                            lines=[BBoxLine(id='foo',
+                                                            bbox=[-1, -1, 10000, 10000])],
+                                            text_direction='horizontal-lr',
+                                            script_detection=False
+                                           )
+        self.invalid_bl_seg = Segmentation(type='baselines',
+                                           imagename = resources / 'bw.png',
+                                           lines=[BaselineLine(id='bar',
+                                                               tags={'type': 'default'},
+                                                               baseline=[[0,0], [10000, 0]],
+                                                               boundary=[[-1, -1], [-1, 10000], [10000, 10000], [10000, -1]])],
+                                           text_direction='horizontal-lr',
+                                           script_detection=False
+                                          )
 
-    def tearDown(self):
-        self.im.close()
+        self.simple_box_seg = Segmentation(type='bbox',
+                                           imagename = resources / 'bw.png',
+                                           lines=[BBoxLine(id='foo',
+                                                           bbox=[0, 0, 2544, 156])],
+                                           text_direction='horizontal-lr',
+                                           script_detection=False
+                                          )
+        self.simple_bl_seg = Segmentation(type='baselines',
+                                          imagename = resources / 'bw.png',
+                                          lines=[BaselineLine(id='foo',
+                                                              baseline=[[0, 10], [2543, 10]],
+                                                              boundary=[[0, 0], [2543, 0], [2543, 155], [0, 155]])],
+                                           text_direction='horizontal-lr',
+                                           script_detection=False
+                                         )
+
+        self.tagged_box_seg = Segmentation(type='bbox',
+                                           imagename = resources / 'bw.png',
+                                           lines=[BBoxLine(id='foo',
+                                                           bbox=[0, 0, 2544, 156],
+                                                           tags={'type': 'foobar'}),
+                                                  BBoxLine(id='bar',
+                                                           bbox=[0, 0, 2544, 156],
+                                                           tags={'type': 'default'})
+                                                 ],
+                                           text_direction='horizontal-lr',
+                                           script_detection=True
+                                          )
+        self.tagged_bl_seg = Segmentation(type='baselines',
+                                          imagename = resources / 'bw.png',
+                                          lines=[BaselineLine(id='foo',
+                                                              baseline=[[0, 10], [2543, 10]],
+                                                              boundary=[[0, 0], [2543, 0], [2543, 155], [0, 155]],
+                                                              tags={'type': 'foobar'}),
+                                                 BaselineLine(id='bar',
+                                                              baseline=[[0, 10], [2543, 10]],
+                                                              boundary=[[0, 0], [2543, 0], [2543, 155], [0, 155]],
+                                                              tags={'type': 'default'}),
+                                                ],
+                                           text_direction='horizontal-lr',
+                                           script_detection=True
+                                          )
+
 
     def test_rpred_bbox_outbounds(self):
         """
         Tests correct handling of invalid bbox line coordinates.
         """
         with raises(KrakenInputException):
-            pred = rpred(self.model, self.im, {'boxes': [[-1, -1, 10000, 10000]], 'text_direction': 'horizontal'}, True)
+            pred = rpred(self.model, self.im, self.invalid_box_seg, True)
             next(pred)
 
     @pytest.mark.xfail
@@ -188,18 +268,14 @@ class TestRecognition(unittest.TestCase):
         Tests correct handling of invalid baseline coordinates.
         """
         with raises(KrakenInputException):
-            pred = rpred(self.model, self.im, {'lines': [{'tags': {'type': 'default'},
-                                                          'baseline': [[0,0], [10000, 0]],
-                                                          'boundary': [[-1, -1], [-1, 10000], [10000, 10000], [10000, -1]]}],
-                                               'text_direction': 'horizontal',
-                                               'type': 'baselines'}, True)
+            pred = rpred(self.model, self.im, self.invalid_bl_seg, True)
             next(pred)
 
     def test_simple_bbox_rpred(self):
         """
         Tests simple recognition without tags.
         """
-        pred = rpred(self.model, self.overfit_line, {'boxes': [[0, 0, 2544, 156]], 'text_direction': 'horizontal'}, True)
+        pred = rpred(self.model, self.overfit_line, self.simple_box_seg, True)
         record = next(pred)
         self.assertEqual(record.prediction, 'ܡ ܘܡ ܗ ܡܕܐ ܐ ܐܐ ܡ ܗܗܐܐܐܕ')
 
@@ -207,52 +283,39 @@ class TestRecognition(unittest.TestCase):
         """
         Tests simple recognition without tags.
         """
-        pred = rpred(self.model, self.overfit_line, {'boxes': [[0, 0, 2544, 156]], 'text_direction': 'horizontal'}, True)
+        pred = rpred(self.model, self.overfit_line, self.simple_bl_seg, True)
         record = next(pred)
-        self.assertEqual(record.prediction, 'ܡ ܘܡ ܗ ܡܕܐ ܐ ܐܐ ܡ ܗܗܐܐܐܕ')
+        self.assertEqual(record.prediction, '.ܗ ܣܗܐ  ܕ ܣ   ܗ ܕܗܗ ܟܕܗܣ    ܠ  ܐ .ܣܕܐܣ. ܗ ')
 
     def test_mm_rpred_bbox_missing_tags(self):
         """
         Test that mm_rpred fails when tags are missing
         """
-        with raises(KrakenInputException):
-            pred = mm_rpred({'default': self.model},
+        with raises(ValueError):
+            pred = mm_rpred({('type', 'default'): self.model},
                             self.overfit_line,
-                            {'boxes': [[('default', [0, 0, 2544, 156])],
-                                       [('foobar', [0, 0, 2544, 156])]],
-                             'text_direction': 'horizontal',
-                             'script_detection': True},
+                            self.simple_box_seg,
                             True)
 
     def test_mm_rpred_bl_missing_tags(self):
         """
         Test that mm_rpred fails when tags are missing
         """
-        with raises(KrakenInputException):
-            pred = mm_rpred({'default': self.model},
+        with raises(ValueError):
+            pred = mm_rpred({('type', 'default'): self.model},
                             self.overfit_line,
-                            {'lines': [{'tags': {'type': 'default'},
-                                        'baseline': [[0,0], [10000, 0]],
-                                        'boundary': [[-1, -1], [-1, 10000], [10000, 10000], [10000, -1]]},
-                                        {'tags': {'type': 'foobar'},
-                                        'baseline': [[0,0], [10000, 0]],
-                                        'boundary': [[-1, -1], [-1, 10000], [10000, 10000], [10000, -1]]}],
-                             'text_direction': 'horizontal',
-                             'type': 'baselines'},
+                            self.simple_bl_seg,
                             True)
 
     def test_mm_rpred_bbox_ignore_tags(self):
         """
         Tests mm_rpred recognition with ignore tags.
         """
-        pred = mm_rpred({'default': self.model},
+        pred = mm_rpred({('type', 'default'): self.model},
                         self.overfit_line,
-                        {'boxes': [[('foobar', [0, 0, 2544, 156])],
-                                   [('default', [0, 0, 2544, 156])]],
-                         'text_direction': 'horizontal',
-                         'script_detection': True},
+                        self.tagged_box_seg,
                         True,
-                        tags_ignore=['foobar'])
+                        tags_ignore=[('type', 'foobar')])
         record = next(pred)
         self.assertEqual(record.prediction, '')
         record = next(pred)
@@ -264,10 +327,7 @@ class TestRecognition(unittest.TestCase):
         """
         pred = mm_rpred(defaultdict(lambda: self.model),
                         self.overfit_line,
-                        {'boxes': [[('foobar', [0, 0, 2544, 156])],
-                                   [('default', [0, 0, 2544, 156])]],
-                         'text_direction': 'horizontal',
-                         'script_detection': True},
+                        self.tagged_box_seg,
                         True)
         record = next(pred)
         self.assertEqual(record.prediction, 'ܡ ܘܡ ܗ ܡܕܐ ܐ ܐܐ ܡ ܗܗܐܐܐܕ')
@@ -278,18 +338,11 @@ class TestRecognition(unittest.TestCase):
         """
         Tests baseline recognition with ignore tags.
         """
-        pred = mm_rpred({'default': self.model},
+        pred = mm_rpred({('type', 'default'): self.model},
                         self.overfit_line,
-                        {'lines': [{'tags': {'type': 'foobar'},
-                                    'baseline': [[0, 10], [2543, 10]],
-                                    'boundary': [[0, 0], [2543, 0], [2543, 155], [0, 155]]},
-                                   {'tags': {'type': 'default'},
-                                    'baseline': [[0, 10], [2543, 10]],
-                                    'boundary': [[0, 0], [2543, 0], [2543, 155], [0, 155]]}],
-                         'script_detection': True,
-                         'type': 'baselines'},
+                        self.tagged_bl_seg,
                         True,
-                        tags_ignore=['foobar'])
+                        tags_ignore=[('type', 'foobar')])
         record = next(pred)
         self.assertEqual(record.prediction, '')
         record = next(pred)
@@ -301,14 +354,7 @@ class TestRecognition(unittest.TestCase):
         """
         pred = mm_rpred(defaultdict(lambda: self.model),
                         self.overfit_line,
-                        {'lines': [{'tags': {'type': 'foobar'},
-                                    'baseline': [[0, 10], [2543, 10]],
-                                    'boundary': [[0, 0], [2543, 0], [2543, 155], [0, 155]]},
-                                   {'tags': {'type': 'default'},
-                                    'baseline': [[0, 10], [2543, 10]],
-                                    'boundary': [[0, 0], [2543, 0], [2543, 155], [0, 155]]}],
-                         'script_detection': True,
-                         'type': 'baselines'},
+                        self.tagged_bl_seg,
                         True)
         record = next(pred)
         self.assertEqual(record.prediction, '.ܗ ܣܗܐ  ܕ ܣ   ܗ ܕܗܗ ܟܕܗܣ    ܠ  ܐ .ܣܕܐܣ. ܗ ')
@@ -321,11 +367,7 @@ class TestRecognition(unittest.TestCase):
         """
         pred = mm_rpred(defaultdict(lambda: self.model),
                         self.overfit_line,
-                        {'lines': [{'tags': {'type': 'default'},
-                                    'baseline': [[0, 10], [2543, 10]],
-                                    'boundary': [[0, 0], [2543, 0], [2543, 155], [0, 155]]}],
-                         'script_detection': True,
-                         'type': 'baselines'},
+                        self.simple_bl_seg,
                         bidi_reordering=False)
         record = next(pred)
         self.assertEqual(record.prediction, 'ܕܗ .ܣܐܗܗ.ܐ ܗܣ ܕ   ܗܣ ܗ.ܗܝܣܗ ܣ ܗܢ ܪܗܗܕ ܐ   ܗܠ')
@@ -336,10 +378,7 @@ class TestRecognition(unittest.TestCase):
         """
         pred = mm_rpred(defaultdict(lambda: self.model),
                         self.overfit_line,
-                        {'boxes': [[('foobar', [0, 0, 2544, 156])],
-                                   [('default', [0, 0, 2544, 156])]],
-                         'text_direction': 'horizontal',
-                         'script_detection': True},
+                        self.simple_box_seg,
                         bidi_reordering=False)
         record = next(pred)
         self.assertEqual(record.prediction,  'ܕܗܣܐܕ ܪܝ .ܡܡ ܐܠܠ ܗܠ ܐܘܗ ܟܘܗܢ ܡܡ ܐܠ')

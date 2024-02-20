@@ -4,6 +4,7 @@ Produces semi-transparent neural segmenter output overlays
 """
 import click
 
+
 @click.command()
 @click.option('-i', '--model', default=None, show_default=True, type=click.Path(exists=True),
               help='Baseline detection model to use.')
@@ -13,12 +14,14 @@ def cli(model, files):
     Applies a BLLA baseline segmentation model and outputs the raw heatmaps of
     the first baseline class.
     """
-    import torch
-    from PIL import Image
-    from kraken.lib import vgsl, dataset
-    import torch.nn.functional as F
     from os.path import splitext
+
+    import torch
+    import torch.nn.functional as F
     import torchvision.transforms as tf
+    from PIL import Image
+
+    from kraken.lib import dataset, vgsl
 
     model = vgsl.TorchVGSLModel.load_model(model)
     model.eval()

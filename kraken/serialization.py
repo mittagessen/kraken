@@ -12,26 +12,26 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
 # or implied. See the License for the specific language governing
 # permissions and limitations under the License.
-from jinja2 import Environment, PackageLoader, FunctionLoader
+import datetime
+import importlib.metadata
+import logging
+from typing import (TYPE_CHECKING, Any, Dict, Iterable, List, Literal,
+                    Optional, Sequence, Tuple)
 
 import regex
-import logging
-import datetime
-import shapely.geometry as geom
+from jinja2 import Environment, FunctionLoader, PackageLoader
 
-from os import PathLike
-from pkg_resources import get_distribution
-from collections import Counter
-
-from kraken.containers import Segmentation, ProcessingStep
 from kraken.lib.util import make_printable
-from kraken.lib.segmentation import is_in_region
 
-from typing import Union, List, Tuple, Iterable, Optional, Sequence, Dict, Any, Literal
+if TYPE_CHECKING:
+    from collections import Counter
+    from os import PathLike
+
+    from kraken.containers import ProcessingStep, Segmentation
 
 logger = logging.getLogger(__name__)
 
-__all__ = ['serialize', 'serialize_segmentation', 'render_report']
+__all__ = ['serialize', 'render_report']
 
 
 def _rescale(val: Sequence[float], low: float, high: float) -> List[float]:
@@ -70,13 +70,13 @@ def max_bbox(boxes: Iterable[Sequence[int]]) -> Tuple[int, int, int, int]:
     return o
 
 
-def serialize(results: Segmentation,
+def serialize(results: 'Segmentation',
               image_size: Tuple[int, int] = (0, 0),
               writing_mode: Literal['horizontal-tb', 'vertical-lr', 'vertical-rl'] = 'horizontal-tb',
               scripts: Optional[Iterable[str]] = None,
-              template: [PathLike, str] = 'alto',
+              template: ['PathLike', str] = 'alto',
               template_source: Literal['native', 'custom'] = 'native',
-              processing_steps: Optional[List[ProcessingStep]] = None) -> str:
+              processing_steps: Optional[List['ProcessingStep']] = None) -> str:
     """
     Serializes recognition and segmentation results into an output document.
 
@@ -107,16 +107,16 @@ def serialize(results: Segmentation,
         The rendered template
     """
     logger.info(f'Serialize {len(results.lines)} records from {results.imagename} with template {template}.')
-    page = {'entities': [],
-            'size': image_size,
-            'name': results.imagename,
-            'writing_mode': writing_mode,
-            'scripts': scripts,
-            'date': datetime.datetime.now(datetime.timezone.utc).isoformat(),
-            'base_dir': [rec.base_dir for rec in results.lines][0] if len(results.lines) else None,
-            'seg_type': results.type}  # type: dict
+    page: Dict[str, Any] = {'entities': [],
+                            'size': image_size,
+                            'name': results.imagename,
+                            'writing_mode': writing_mode,
+                            'scripts': scripts,
+                            'date': datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                            'base_dir': [rec.base_dir for rec in results.lines][0] if len(results.lines) else None,
+                            'seg_type': results.type}
     metadata = {'processing_steps': processing_steps,
-                'version': get_distribution('kraken').version}
+                'version': importlib.metadata.version('kraken')}
 
     seg_idx = 0
     char_idx = 0
@@ -127,14 +127,13 @@ def serialize(results: Segmentation,
         if line.tags is not None:
             types.extend((k, v) for k, v in line.tags.items())
     page['line_types'] = list(set(types))
-    page['region_types'] =[list(results.regions.keys())]
+    page['region_types'] = list(results.regions.keys())
 
     # map reading orders indices to line IDs
     ros = []
     for ro in results.line_orders:
         ros.append([results.lines[idx].id for idx in ro])
     page['line_orders'] = ros
-
     # build region ID to region dict
     reg_dict = {}
     for key, regs in results.regions.items():
@@ -145,8 +144,8 @@ def serialize(results: Segmentation,
     prev_reg = None
     for idx, record in enumerate(results.lines):
         # line not in region
-        if len(record.regions) == 0:
-            cur_ent = page['entitites']
+        if not record.regions or len(record.regions) == 0:
+            cur_ent = page['entities']
         # line not in same region as previous line
         elif prev_reg != record.regions[0]:
             prev_reg = record.regions[0]
@@ -165,11 +164,14 @@ def serialize(results: Segmentation,
         # set field to indicate the availability of baseline segmentation in
         # addition to bounding boxes
         line = {'index': idx,
-                'bbox': max_bbox([record.boundary] if record.type == 'baselines' else record.bbox),
+                'bbox': max_bbox([record.boundary]) if record.type == 'baselines' else record.bbox,
                 'cuts': record.cuts,
                 'confidences': record.confidences,
                 'recognition': [],
-                'boundary': [list(x) for x in record.boundary],
+                'boundary': [list(x) for x in record.boundary] if record.type == 'baselines' else [[record.bbox[0], record.bbox[1]],
+                                                                                                   [record.bbox[2], record.bbox[1]],
+                                                                                                   [record.bbox[2], record.bbox[3]],
+                                                                                                   [record.bbox[0], record.bbox[3]]],
                 'type': 'line'
                 }
         if record.tags is not None:
@@ -200,7 +202,6 @@ def serialize(results: Segmentation,
                                               segment,
                                               range(char_idx, char_idx + len(segment)))],
                           'index': seg_idx}
-            # compute convex hull of all characters in segment
             if record.type == 'baselines':
                 seg_struct['boundary'] = record[line_offset:line_offset + len(segment)][1]
             line['recognition'].append(seg_struct)
@@ -246,11 +247,11 @@ def serialize(results: Segmentation,
 def render_report(model: str,
                   chars: int,
                   errors: int,
-                  char_confusions: Counter,
-                  scripts: Counter,
-                  insertions: Counter,
+                  char_confusions: 'Counter',
+                  scripts: 'Counter',
+                  insertions: 'Counter',
                   deletions: int,
-                  substitutions: Counter) -> str:
+                  substitutions: 'Counter') -> str:
     """
     Renders an accuracy report.
 

@@ -15,27 +15,29 @@
 """
 Handlers for rich-based progress bars.
 """
-from typing import Any, Dict, Optional, Union
-from numbers import Number
 from dataclasses import dataclass
+from typing import TYPE_CHECKING, Union
 
-import pytorch_lightning as pl
-from pytorch_lightning.callbacks.progress.rich_progress import CustomProgress, RichProgressBar, MetricsTextColumn
-
+from pytorch_lightning.callbacks.progress.rich_progress import (
+    CustomProgress, MetricsTextColumn, RichProgressBar)
 from rich import get_console, reconfigure
-from rich.console import Console, RenderableType
-from rich.progress import BarColumn, Progress, ProgressColumn, Task, TextColumn, TimeRemainingColumn, TimeElapsedColumn, DownloadColumn
-from rich.text import Text
-from rich.style import Style
 from rich.default_styles import DEFAULT_STYLES
+from rich.progress import (BarColumn, DownloadColumn, Progress, ProgressColumn,
+                           TextColumn, TimeElapsedColumn, TimeRemainingColumn)
+from rich.text import Text
+
+if TYPE_CHECKING:
+    from rich.console import RenderableType
+    from rich.style import Style
 
 __all__ = ['KrakenProgressBar', 'KrakenDownloadProgressBar', 'KrakenTrainProgressBar']
+
 
 class BatchesProcessedColumn(ProgressColumn):
     def __init__(self):
         super().__init__()
 
-    def render(self, task) -> RenderableType:
+    def render(self, task) -> 'RenderableType':
         total = task.total if task.total != float("inf") else "--"
         return Text(f"{int(task.completed)}/{total}", style='magenta')
 
@@ -130,6 +132,7 @@ class KrakenTrainProgressBar(RichProgressBar):
         return f"stage {current_epoch}/" \
                f"{self.trainer.max_epochs if self.trainer.model.hparams.hyper_params['quit'] == 'fixed' else '∞'}"
 
+
 @dataclass
 class RichProgressBarTheme:
     """Styles to associate to different base components.
@@ -147,11 +150,11 @@ class RichProgressBarTheme:
     https://rich.readthedocs.io/en/stable/style.html
     """
 
-    description: Union[str, Style] = DEFAULT_STYLES['progress.description']
-    progress_bar: Union[str, Style] = DEFAULT_STYLES['bar.complete']
-    progress_bar_finished: Union[str, Style] = DEFAULT_STYLES['bar.finished']
-    progress_bar_pulse: Union[str, Style] = DEFAULT_STYLES['bar.pulse']
-    batch_progress: Union[str, Style] = DEFAULT_STYLES['progress.description']
-    time: Union[str, Style] = DEFAULT_STYLES['progress.elapsed']
-    processing_speed: Union[str, Style] = DEFAULT_STYLES['progress.data.speed']
-    metrics: Union[str, Style] = DEFAULT_STYLES['progress.description']
+    description: Union[str, 'Style'] = DEFAULT_STYLES['progress.description']
+    progress_bar: Union[str, 'Style'] = DEFAULT_STYLES['bar.complete']
+    progress_bar_finished: Union[str, 'Style'] = DEFAULT_STYLES['bar.finished']
+    progress_bar_pulse: Union[str, 'Style'] = DEFAULT_STYLES['bar.pulse']
+    batch_progress: Union[str, 'Style'] = DEFAULT_STYLES['progress.description']
+    time: Union[str, 'Style'] = DEFAULT_STYLES['progress.elapsed']
+    processing_speed: Union[str, 'Style'] = DEFAULT_STYLES['progress.data.speed']
+    metrics: Union[str, 'Style'] = DEFAULT_STYLES['progress.description']

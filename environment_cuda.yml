@@ -1,4 +1,4 @@
-name: kraken
+name: kraken_2
 channels:
   - defaults
   - conda-forge
@@ -11,10 +11,10 @@ dependencies:
   - click>=8.1
   - numpy~=1.23
   - pillow>=9.2.0
-  - scipy~=1.11.0
+  - scipy~=1.10.0
   - jinja2~=3.0
-  - conda-forge::torchvision
-  - conda-forge::pytorch>=1.11,<1.14
+  - conda-forge::torchvision>=0.5.0
+  - conda-forge::pytorch~=2.0.0
   - cudatoolkit>=9.2
   - jsonschema
   - scikit-learn~=1.2.1
@@ -23,6 +23,7 @@ dependencies:
   - pyvips
   - imagemagick>=7.1.0
   - pyarrow
+  - importlib-resources>=1.3.0
   - conda-forge::pytorch-lightning~=2.0.0
   - conda-forge::torchmetrics>=1.1.0
   - conda-forge::threadpoolctl~=3.2

@@ -20,32 +20,30 @@ Trainable layout analysis tools for kraken for line and region detection. The
 line recognizer uses the baseline paradigm.
 """
 
-import PIL
-import uuid
-import torch
 import logging
+import uuid
+from typing import Any, Callable, Dict, List, Literal, Optional, Union
+
+import importlib_resources
 import numpy as np
-import pkg_resources
+import PIL
 import shapely.geometry as geom
+import torch
 import torch.nn.functional as F
 import torchvision.transforms as tf
-
-from typing import Optional, Dict, Callable, Union, List, Any, Tuple, Literal
-
 from scipy.ndimage import gaussian_filter
 from skimage.filters import sobel
 
-from kraken.lib import vgsl, dataset
-from kraken.containers import Region, Segmentation, BaselineLine
-from kraken.lib.util import is_bitonal, get_im_str
-from kraken.lib.exceptions import KrakenInputException, KrakenInvalidModelException
-from kraken.lib.segmentation import (polygonal_reading_order,
-                                     neural_reading_order,
-                                     vectorize_lines, vectorize_regions,
-                                     scale_polygonal_lines,
-                                     calculate_polygonal_environment,
-                                     is_in_region,
-                                     scale_regions)
+from kraken.containers import BaselineLine, Region, Segmentation
+from kraken.lib import dataset, vgsl
+from kraken.lib.exceptions import (KrakenInputException,
+                                   KrakenInvalidModelException)
+from kraken.lib.segmentation import (calculate_polygonal_environment,
+                                     is_in_region, neural_reading_order,
+                                     polygonal_reading_order,
+                                     scale_polygonal_lines, scale_regions,
+                                     vectorize_lines, vectorize_regions)
+from kraken.lib.util import get_im_str, is_bitonal
 
 __all__ = ['segment']
 
@@ -286,7 +284,7 @@ def segment(im: PIL.Image.Image,
            :force:
 
            'lines': [
-              {'baseline': [[x0, y0], [x1, y1], ..., [x_n, y_n]], 'boundary': [[x0, y0, x1, y1], ... [x_m, y_m]]},
+              {'baseline': [[x0, y0], [x1, y1], ..., [x_n, y_n]], 'boundary': [[x0, y0], [x1, y1], ... [x_m, y_m]]},
               {'baseline': [[x0, ...]], 'boundary': [[x0, ...]]}
             ]
             'regions': [
@@ -310,7 +308,7 @@ def segment(im: PIL.Image.Image,
     """
     if model is None:
         logger.info('No segmentation model given. Loading default model.')
-        model = vgsl.TorchVGSLModel.load_model(pkg_resources.resource_filename(__name__, 'blla.mlmodel'))
+        model = vgsl.TorchVGSLModel.load_model(importlib_resources.files(__name__).joinpath('blla.mlmodel'))
 
     if isinstance(model, vgsl.TorchVGSLModel):
         model = [model]
@@ -390,7 +388,6 @@ def segment(im: PIL.Image.Image,
 
     # create objects and assign IDs
     blls = []
-    reg_idx = 0
     _shp_regs = {}
     for reg_type, rgs in regions.items():
         for reg in rgs:
@@ -415,4 +412,4 @@ def segment(im: PIL.Image.Image,
                         lines=blls,
                         regions=regions,
                         script_detection=script_detection,
-                        line_orders=[order])
+                        line_orders=[order] if order else [])

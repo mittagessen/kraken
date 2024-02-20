@@ -3,13 +3,14 @@
 Draws a transparent overlay of the forced alignment output over the input
 image.
 """
-import re
 import os
-import click
+import re
 import unicodedata
-from lxml import etree
 from itertools import cycle
 from unicodedata import normalize
+
+import click
+from lxml import etree
 
 cmap = cycle([(230, 25, 75, 127),
               (60, 180, 75, 127),
@@ -100,9 +101,9 @@ def cli(format_type, model, normalization, output, files):
 
     from PIL import Image, ImageDraw
 
-    from kraken.lib.xml import XMLPage
-    from kraken.lib import models
     from kraken import align
+    from kraken.lib import models
+    from kraken.lib.xml import XMLPage
 
     if format_type == 'alto':
         repl_fn = _repl_alto

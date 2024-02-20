@@ -15,28 +15,31 @@
 """
 Utility functions for data loading and training of VGSL networks.
 """
+import dataclasses
 import io
 import json
-import torch
 import traceback
+from collections import Counter
+from functools import partial
+from typing import (TYPE_CHECKING, Any, Callable, List, Literal, Optional,
+                    Tuple, Union)
+
 import numpy as np
 import pyarrow as pa
-
+import torch
 from PIL import Image
-from os import PathLike
-from functools import partial
-from torchvision import transforms
-from collections import Counter
 from torch.utils.data import Dataset
-from typing import Dict, List, Tuple, Callable, Optional, Any, Union, Literal
+from torchvision import transforms
 
 from kraken.containers import BaselineLine, BBoxLine, Segmentation
-from kraken.lib.util import is_bitonal
-from kraken.lib.codec import PytorchCodec
-from kraken.lib.segmentation import extract_polygons
-from kraken.lib.exceptions import KrakenInputException, KrakenEncodeException
-
 from kraken.lib import functional_im_transforms as F_t
+from kraken.lib.codec import PytorchCodec
+from kraken.lib.exceptions import KrakenEncodeException, KrakenInputException
+from kraken.lib.segmentation import extract_polygons
+from kraken.lib.util import is_bitonal
+
+if TYPE_CHECKING:
+    from os import PathLike
 
 __all__ = ['DefaultAugmenter',
            'ArrowIPCRecognitionDataset',
@@ -52,11 +55,10 @@ class DefaultAugmenter():
     def __init__(self):
         import cv2
         cv2.setNumThreads(0)
-        from albumentations import (
-            Compose, ToFloat, OneOf, MotionBlur, MedianBlur, Blur,
-            ShiftScaleRotate, OpticalDistortion, ElasticTransform,
-            PixelDropout
-            )
+        from albumentations import (Blur, Compose, ElasticTransform,
+                                    MedianBlur, MotionBlur, OneOf,
+                                    OpticalDistortion, PixelDropout,
+                                    ShiftScaleRotate, ToFloat)
 
         self._transforms = Compose([
                                     ToFloat(),
@@ -75,6 +77,7 @@ class DefaultAugmenter():
 
     def __call__(self, image):
         return self._transforms(image=image)
+
 
 class ArrowIPCRecognitionDataset(Dataset):
     """
@@ -108,8 +111,8 @@ class ArrowIPCRecognitionDataset(Dataset):
                           `test` only rows with the appropriate flag set in the
                           file will be considered.
         """
-        self.alphabet = Counter()  # type: Counter
-        self.text_transforms = []  # type: List[Callable[[str], str]]
+        self.alphabet: Counter = Counter()
+        self.text_transforms: List[Callable[[str], str]] = []
         self.failed_samples = set()
         self.transforms = im_transforms
         self.aug = None
@@ -135,7 +138,7 @@ class ArrowIPCRecognitionDataset(Dataset):
 
         self.im_mode = self.transforms.mode
 
-    def add(self, file: Union[str, PathLike]) -> None:
+    def add(self, file: Union[str, 'PathLike']) -> None:
         """
         Adds an Arrow IPC file to the dataset.
 
@@ -181,7 +184,7 @@ class ArrowIPCRecognitionDataset(Dataset):
             mask = np.ones(len(ds_table), dtype=bool)
             for index in range(len(ds_table)):
                 try:
-                    text = self._apply_text_transform(ds_table.column('lines')[index].as_py(),)
+                    self._apply_text_transform(ds_table.column('lines')[index].as_py(),)
                 except KrakenInputException:
                     mask[index] = False
                     continue
@@ -296,10 +299,10 @@ class PolygonGTDataset(Dataset):
                            suitable for forward passes.
             augmentation: Enables augmentation.
         """
-        self._images = []  # type:  Union[List[Image], List[torch.Tensor]]
-        self._gt = []  # type:  List[str]
-        self.alphabet = Counter()  # type: Counter
-        self.text_transforms = []  # type: List[Callable[[str], str]]
+        self._images: Union[List[Image.Image], List[torch.Tensor]] = []
+        self._gt: List[str] = []
+        self.alphabet: Counter = Counter()
+        self.text_transforms: List[Callable[[str], str]] = []
         self.transforms = im_transforms
         self.aug = None
         self.skip_empty_lines = skip_empty_lines
@@ -325,7 +328,7 @@ class PolygonGTDataset(Dataset):
             line: Optional[BaselineLine] = None,
             page: Optional[Segmentation] = None):
         """
-        Adds an indiviual line or all lines on a page to the dataset.
+        Adds an individual line or all lines on a page to the dataset.
 
         Args:
             line: BaselineLine container object of a line.
@@ -335,7 +338,7 @@ class PolygonGTDataset(Dataset):
             self.add_line(line)
         if page:
             self.add_page(page)
-        if not (line and page):
+        if not (line or page):
             raise ValueError('Neither line nor page data provided in dataset builder')
 
     def add_page(self, page: Segmentation):
@@ -379,7 +382,7 @@ class PolygonGTDataset(Dataset):
         if not line.boundary:
             raise ValueError('No boundary given for line')
 
-        self._images.append((line.image, line.baseline, line.boundary))
+        self._images.append((line.imagename, line.baseline, line.boundary))
         self._gt.append(text)
         self.alphabet.update(text)
 
@@ -393,7 +396,7 @@ class PolygonGTDataset(Dataset):
             self.codec = codec
         else:
             self.codec = PytorchCodec(''.join(self.alphabet.keys()))
-        self.training_set = []  # type: List[Tuple[Union[Image, torch.Tensor], torch.Tensor]]
+        self.training_set: List[Tuple[Union[Image.Image, torch.Tensor], torch.Tensor]] = []
         for im, gt in zip(self._images, self._gt):
             self.training_set.append((im, self.codec.encode(gt)))
 
@@ -401,7 +404,7 @@ class PolygonGTDataset(Dataset):
         """
         Creates an unencoded dataset.
         """
-        self.training_set = []  # type: List[Tuple[Union[Image, torch.Tensor], str]]
+        self.training_set: List[Tuple[Union[Image.Image, torch.Tensor], str]] = []
         for im, gt in zip(self._images, self._gt):
             self.training_set.append((im, gt))
 
@@ -412,8 +415,17 @@ class PolygonGTDataset(Dataset):
             im = item[0][0]
             if not isinstance(im, Image.Image):
                 im = Image.open(im)
-            im, _ = next(extract_polygons(im, {'type': 'baselines',
-                                               'lines': [{'baseline': item[0][1], 'boundary': item[0][2]}]}))
+            im, _ = next(extract_polygons(im,
+                                          Segmentation(type='baselines',
+                                                       imagename=item[0][0],
+                                                       text_direction='horizontal-lr',
+                                                       lines=[BaselineLine('id_0',
+                                                                           baseline=item[0][1],
+                                                                           boundary=item[0][2])],
+                                                       script_detection=True,
+                                                       regions={},
+                                                       line_orders=[])
+                                          ))
             im = self.transforms(im)
             if im.shape[0] == 3:
                 im_mode = 'RGB'
@@ -505,7 +517,7 @@ class GroundTruthDataset(Dataset):
             line: Optional[BBoxLine] = None,
             page: Optional[Segmentation] = None):
         """
-        Adds an indiviual line or all lines on a page to the dataset.
+        Adds an individual line or all lines on a page to the dataset.
 
         Args:
             line: BBoxLine container object of a line.
@@ -515,7 +527,7 @@ class GroundTruthDataset(Dataset):
             self.add_line(line)
         if page:
             self.add_page(page)
-        if not (line and page):
+        if not (line or page):
             raise ValueError('Neither line nor page data provided in dataset builder')
 
     def add_page(self, page: Segmentation):
@@ -554,12 +566,10 @@ class GroundTruthDataset(Dataset):
             text = func(text)
         if not text and self.skip_empty_lines:
             raise ValueError(f'Text line "{line.text}" is empty after transformations')
-        if not line.baseline:
-            raise ValueError('No baseline given for line')
-        if not line.boundary:
-            raise ValueError('No boundary given for line')
+        if not line.bbox:
+            raise ValueError('No bounding box given for line')
 
-        self._images.append(line.image)
+        self._images.append((line.imagename, line.bbox))
         self._gt.append(text)
         self.alphabet.update(text)
 
@@ -573,7 +583,7 @@ class GroundTruthDataset(Dataset):
             self.codec = codec
         else:
             self.codec = PytorchCodec(''.join(self.alphabet.keys()))
-        self.training_set = []  # type: List[Tuple[Union[Image, torch.Tensor], torch.Tensor]]
+        self.training_set: List[Tuple[Union[Image.Image, torch.Tensor], torch.Tensor]] = []
         for im, gt in zip(self._images, self._gt):
             self.training_set.append((im, self.codec.encode(gt)))
 
@@ -581,7 +591,7 @@ class GroundTruthDataset(Dataset):
         """
         Creates an unencoded dataset.
         """
-        self.training_set = []  # type: List[Tuple[Union[Image, torch.Tensor], str]]
+        self.training_set: List[Tuple[Union[Image.Image, torch.Tensor], str]] = []
         for im, gt in zip(self._images, self._gt):
             self.training_set.append((im, gt))
 
@@ -589,9 +599,12 @@ class GroundTruthDataset(Dataset):
         item = self.training_set[index]
         try:
             logger.debug(f'Attempting to load {item[0]}')
-            im = item[0]
-            if not isinstance(im, Image.Image):
-                im = Image.open(im)
+            im, bbox = item[0]
+            flat_box = [x for point in bbox for x in point]
+            xmin, xmax = min(flat_box[::2]), max(flat_box[::2])
+            ymin, ymax = min(flat_box[1::2]), max(flat_box[1::2])
+            im = Image.open(im)
+            im = im.crop((xmin, ymin, xmax, ymax))
             im = self.transforms(im)
             if im.shape[0] == 3:
                 im_mode = 'RGB'
@@ -608,6 +621,7 @@ class GroundTruthDataset(Dataset):
                 im = torch.tensor(o['image'].transpose(2, 0, 1))
             return {'image': im, 'target': item[1]}
         except Exception:
+            raise
             self.failed_samples.add(index)
             idx = np.random.randint(0, len(self.training_set))
             logger.debug(traceback.format_exc())

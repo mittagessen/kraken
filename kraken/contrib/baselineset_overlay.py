@@ -9,10 +9,12 @@ import click
 @click.argument('files', nargs=-1)
 def cli(files):
 
-    import torch
-    from PIL import Image
     from os.path import splitext
+
+    import torch
     import torchvision.transforms as tf
+    from PIL import Image
+
     from kraken.lib import dataset
 
     batch, channels, height, width = 1, 3, 1200, 0

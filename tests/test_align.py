@@ -1,15 +1,10 @@
 # -*- coding: utf-8 -*-
 
 import unittest
-import json
-
-import kraken
-import dataclasses
-
 from pathlib import Path
 
-from kraken.lib import xml
 from kraken.align import forced_align
+from kraken.lib import xml
 
 thisfile = Path(__file__).resolve().parent
 resources = thisfile / 'resources'

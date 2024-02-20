@@ -1,25 +1,22 @@
 """
 VGSL plumbing
 """
-import re
 import json
-import torch
 import logging
-import warnings
-
-from torch import nn
+import re
 from os import PathLike
-from typing import Sequence, List, Tuple, Union, Optional, Iterable, Callable, Dict, Any
+from typing import (Any, Callable, Dict, Iterable, List, Optional, Sequence,
+                    Tuple, Union)
+
+import torch
+from coremltools.models import MLModel, datatypes
+from coremltools.models.neural_network import NeuralNetworkBuilder
+from google.protobuf.message import DecodeError
+from torch import nn
 
 from kraken.lib import layers
 from kraken.lib.codec import PytorchCodec
 from kraken.lib.exceptions import KrakenInvalidModelException
-
-from coremltools.models import MLModel
-from coremltools.models import datatypes
-from coremltools.models.neural_network import NeuralNetworkBuilder
-
-from google.protobuf.message import DecodeError
 
 # all tensors are ordered NCHW, the "feature" dimension is C, so the output of
 # an LSTM will be put into C same as the filters of a CNN.
@@ -80,6 +77,7 @@ class TorchVGSLModel(object):
                                 models trained on binarized images, 'L' for
                                 grayscale, and None otherwise.
     """
+
     def __init__(self, spec: str) -> None:
         """
         Constructs a torch module from a (subset of) VSGL spec.
@@ -128,21 +126,21 @@ class TorchVGSLModel(object):
                     dimension.
         """
         self.spec = spec
-        self.named_spec = []  # type:  List[str]
+        self.named_spec: List[str] = []
         self.ops = [self.build_addition, self.build_identity, self.build_rnn,
                     self.build_dropout, self.build_maxpool, self.build_conv,
                     self.build_output, self.build_reshape, self.build_wav2vec2,
                     self.build_groupnorm, self.build_series,
                     self.build_parallel, self.build_ro]
-        self.codec = None  # type: Optional[PytorchCodec]
-        self.criterion = None  # type: Any
+        self.codec: Optional[PytorchCodec] = None
+        self.criterion: Any = None
         self.nn = layers.MultiParamSequential()
-        self.user_metadata = {'accuracy': [],
-                              'metrics': [],
-                              'seg_type': None,
-                              'one_channel_mode': None,
-                              'model_type': None,
-                              'hyper_params': {}}  # type: dict[str, Any]
+        self.user_metadata: Dict[str, Any] = {'accuracy': [],
+                                              'metrics': [],
+                                              'seg_type': None,
+                                              'one_channel_mode': None,
+                                              'model_type': None,
+                                              'hyper_params': {}}
         self._aux_layers = nn.ModuleDict()
 
         self.idx = -1
@@ -162,7 +160,10 @@ class TorchVGSLModel(object):
         self.named_spec.extend(str(x) for x in named_spec)
         self.init_weights()
 
-    def _parse(self, input: Tuple[int, int, int, int], blocks: Sequence[str], parallel=False, target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> None:
+    def _parse(self,
+               input: Tuple[int, int, int, int],
+               blocks: Sequence[str], parallel=False,
+               target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> None:
         """
         Parses VGSL spec and appends layers to nn
         """
@@ -214,10 +215,10 @@ class TorchVGSLModel(object):
             spec (str): VGSL spec without input block to append to model.
         """
         self.nn = self.nn[:idx]
-        self.idx = idx-1
+        self.idx = idx - 1
         spec = spec[1:-1]
         blocks = spec.split(' ')
-        self.named_spec = self.named_spec[:idx+1]
+        self.named_spec = self.named_spec[:idx + 1]
         named_spec, nn, self.output = self._parse(self.nn[-1].output_shape, blocks)
         self.named_spec.extend(str(x) for x in named_spec)
         for module in nn.named_children():
@@ -305,12 +306,12 @@ class TorchVGSLModel(object):
         if 'codec' in mlmodel.user_defined_metadata:
             nn.add_codec(PytorchCodec(json.loads(mlmodel.user_defined_metadata['codec'])))
 
-        nn.user_metadata = {'accuracy': [],
-                            'metrics': [],
-                            'seg_type': 'bbox',
-                            'one_channel_mode': '1',
-                            'model_type': None,
-                            'hyper_params': {}}  # type: dict[str, str]
+        nn.user_metadata: Dict[str, Any] = {'accuracy': [],
+                                            'metrics': [],
+                                            'seg_type': 'bbox',
+                                            'one_channel_mode': '1',
+                                            'model_type': None,
+                                            'hyper_params': {}}
 
         if 'kraken_meta' in mlmodel.user_defined_metadata:
             nn.user_metadata.update(json.loads(mlmodel.user_defined_metadata['kraken_meta']))
@@ -435,7 +436,7 @@ class TorchVGSLModel(object):
                         torch.nn.init.orthogonal_(p.data)
                     # initialize biases to 1 (jozefowicz 2015)
                     else:
-                        torch.nn.init.constant_(p.data[len(p)//4:len(p)//2], 1.0)
+                        torch.nn.init.constant_(p.data[len(p) // 4:len(p) // 2], 1.0)
             elif isinstance(m, torch.nn.GRU):
                 for p in m.parameters():
                     torch.nn.init.orthogonal_(p.data)
@@ -468,7 +469,8 @@ class TorchVGSLModel(object):
                   input: Tuple[int, int, int, int],
                   blocks: List[str],
                   idx: int,
-                  target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
+                  target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> Union[Tuple[None, None, None],
+                                                                                            Tuple[Tuple[int, int, int, int], str, Callable]]:
         """
         Builds an LSTM/GRU layer returning number of outputs and layer.
         """
@@ -496,7 +498,8 @@ class TorchVGSLModel(object):
                       input: Tuple[int, int, int, int],
                       blocks: List[str],
                       idx: int,
-                  target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
+                      target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> Union[Tuple[None, None, None],
+                                                                                                Tuple[Tuple[int, int, int, int], str, Callable]]:
         pattern = re.compile(r'(?P<type>Do)(?P<name>{\w+})?(?P<p>(\d+(\.\d*)?|\.\d+))?(,(?P<dim>\d+))?')
         m = pattern.match(blocks[idx])
         if not m:
@@ -512,7 +515,8 @@ class TorchVGSLModel(object):
                        input: Tuple[int, int, int, int],
                        blocks: List[str],
                        idx: int,
-                       target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
+                       target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> Union[Tuple[None, None, None],
+                                                                                                 Tuple[Tuple[int, int, int, int], str, Callable]]:
         pattern = re.compile(r'(?P<type>A)(?P<name>{\w+})?(?P<dim>\d+),(?P<chunk_size>\d+)')
         m = pattern.match(blocks[idx])
         if not m:
@@ -532,7 +536,8 @@ class TorchVGSLModel(object):
                        input: Tuple[int, int, int, int],
                        blocks: List[str],
                        idx: int,
-                       target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
+                       target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> Union[Tuple[None, None, None],
+                                                                                                 Tuple[Tuple[int, int, int, int], str, Callable]]:
         pattern = re.compile(r'(?P<type>I)(?P<name>{\w+})?')
         m = pattern.match(blocks[idx])
         if not m:
@@ -546,7 +551,8 @@ class TorchVGSLModel(object):
                         input: Tuple[int, int, int, int],
                         blocks: List[str],
                         idx: int,
-                        target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
+                        target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> Union[Tuple[None, None, None],
+                                                                                                  Tuple[Tuple[int, int, int, int], str, Callable]]:
         pattern = re.compile(r'(?P<type>Gn)(?P<name>{\w+})?(?P<groups>\d+)')
         m = pattern.match(blocks[idx])
         if not m:
@@ -561,7 +567,8 @@ class TorchVGSLModel(object):
                        input: Tuple[int, int, int, int],
                        blocks: List[str],
                        idx: int,
-                       target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
+                       target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> Union[Tuple[None, None, None],
+                                                                                                 Tuple[Tuple[int, int, int, int], str, Callable]]:
         """
         Builds a Wav2Vec2 masking layer.
         """
@@ -603,7 +610,8 @@ class TorchVGSLModel(object):
                    input: Tuple[int, int, int, int],
                    blocks: List[str],
                    idx: int,
-                   target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
+                   target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> Union[Tuple[None, None, None],
+                                                                                             Tuple[Tuple[int, int, int, int], str, Callable]]:
         """
         Builds a 2D convolution layer.
         """
@@ -628,7 +636,8 @@ class TorchVGSLModel(object):
                       input: Tuple[int, int, int, int],
                       blocks: List[str],
                       idx: int,
-                      target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
+                      target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> Union[Tuple[None, None, None],
+                                                                                                Tuple[Tuple[int, int, int, int], str, Callable]]:
         """
         Builds a maxpool layer.
         """
@@ -648,7 +657,8 @@ class TorchVGSLModel(object):
                       input: Tuple[int, int, int, int],
                       blocks: List[str],
                       idx: int,
-                      target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
+                      target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> Union[Tuple[None, None, None],
+                                                                                                Tuple[Tuple[int, int, int, int], str, Callable]]:
         """
         Builds a reshape layer
         """
@@ -687,7 +697,8 @@ class TorchVGSLModel(object):
                      input: Tuple[int, int, int, int],
                      blocks: List[str],
                      idx: int,
-                     target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
+                     target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> Union[Tuple[None, None, None],
+                                                                                               Tuple[Tuple[int, int, int, int], str, Callable]]:
         """
         Builds an output layer.
         """
@@ -735,7 +746,7 @@ class TorchVGSLModel(object):
             elif c != ")":
                 break
         return rst
-    
+
     def _parenthesis_count(self, block: str) -> int:
         rst = 0
         for c in block:
@@ -754,7 +765,8 @@ class TorchVGSLModel(object):
                      input: Tuple[int, int, int, int],
                      blocks: List[str],
                      idx: int,
-                     target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
+                     target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> Union[Tuple[None, None, None],
+                                                                                               Tuple[Tuple[int, int, int, int], str, Callable]]:
         """
         Builds a serial block of layers.
         """
@@ -773,16 +785,18 @@ class TorchVGSLModel(object):
                 break
         if block_depth:
             raise ValueError('Unbalanced parentheses in VGSL spec')
-        named_spec, nn, oshape = self._parse(input, [blocks[idx][1:]] + blocks[idx+1:idx+bl_idx] + [blocks[idx+bl_idx][:-1]], target_output_shape=target_output_shape)
+        named_spec, nn, oshape = self._parse(input, [blocks[idx][1:]] + blocks[idx + 1:idx + bl_idx] +
+                                             [blocks[idx + bl_idx][:-1]], target_output_shape=target_output_shape)
         named_spec[0]._block = '[' + named_spec[0]._block
         named_spec[-1]._block = named_spec[-1]._block + ']'
         return oshape, named_spec, nn
-    
+
     def build_parallel(self,
                        input: Tuple[int, int, int, int],
                        blocks: List[str],
                        idx: int,
-                       target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
+                       target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> Union[Tuple[None, None, None],
+                                                                                                 Tuple[Tuple[int, int, int, int], str, Callable]]:
         """
         Builds a block of parallel layers.
         """
@@ -800,7 +814,8 @@ class TorchVGSLModel(object):
                 break
         if block_depth:
             raise ValueError('Unbalanced parentheses in VGSL spec')
-        named_spec, nn, oshape = self._parse(input, [blocks[idx][1:]] + blocks[idx+1:idx+bl_idx] + [blocks[idx+bl_idx][:-1]], parallel=True, target_output_shape=target_output_shape)
+        named_spec, nn, oshape = self._parse(input, [blocks[idx][1:]] + blocks[idx + 1:idx + bl_idx] +
+                                             [blocks[idx + bl_idx][:-1]], parallel=True, target_output_shape=target_output_shape)
         named_spec[0]._block = '(' + named_spec[0]._block
         named_spec[-1]._block = named_spec[-1]._block + ')'
         return oshape, named_spec, nn

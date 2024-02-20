@@ -142,7 +142,7 @@ option          type
 \--high         INTEGER RANGE
 ============    ====
 
-To binarize a image:
+To binarize an image:
 
 .. code-block:: console
 
@@ -303,7 +303,7 @@ to the right (inverse for right-to-left scripts like Arabic which start on the
 top right-most columns, continuing leftward, and returning to the right-most
 column just below when none remain).
 
-In multi-script documents the order of is determined by the primary writing
+In multi-script documents the order is determined by the primary writing
 system employed in the document, e.g. for a modern book containing both Latin
 and Arabic script text it would be set to `lr` when Latin is primary, e.g. when
 the binding is on the left side of the book seen from the title cover, and
@@ -451,15 +451,15 @@ segmentation and a mapping between scripts and models:
 
 .. code-block:: console
 
-        $ kraken -i ... ... ocr -m Grek:porson.clstm -m Latn:antiqua.clstm
+        $ kraken -i ... ... ocr -m Grek:porson.mlmodel -m Latn:antiqua.mlmodel
 
-All polytonic Greek text portions will be recognized using the `porson.clstm`
-model while Latin text will be fed into the `antiqua.clstm` model. It is
+All polytonic Greek text portions will be recognized using the `porson.mlmodel`
+model while Latin text will be fed into the `antiqua.mlmodel` model. It is
 possible to define a fallback model that other text will be fed to:
 
 .. code-block:: console
 
-        $ kraken -i ... ... ocr -m ... -m ... -m default:porson.clstm
+        $ kraken -i ... ... ocr -m ... -m ... -m default:porson.mlmodel
 
 It is also possible to disable recognition on a particular script by mapping to
 the special model keyword `ignore`. Ignored lines will still be serialized but

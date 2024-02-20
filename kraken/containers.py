@@ -1,14 +1,37 @@
+#
+# Copyright 2023 Benjamin Kiessling
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
+# or implied. See the License for the specific language governing
+# permissions and limitations under the License.
+"""
+kraken.containers
+~~~~~~~~~~~~~~~~~
 
-import PIL.Image
-import numpy as np
-import bidi.algorithm as bd
-
-from os import PathLike
-from typing import Literal, List, Dict, Union, Optional, Tuple, Any
-from dataclasses import dataclass, asdict
+Container classes replacing the old dictionaries returned by kraken's
+functional blocks.
+"""
 from abc import ABC, abstractmethod
+from dataclasses import asdict, dataclass
+from typing import (TYPE_CHECKING, Any, Dict, List, Literal, Optional, Tuple,
+                    Union)
+
+import bidi.algorithm as bd
+import numpy as np
 
 from kraken.lib.segmentation import compute_polygon_section
+
+if TYPE_CHECKING:
+    from os import PathLike
+
 
 __all__ = ['BaselineLine',
            'BBoxLine',
@@ -26,7 +49,7 @@ class ProcessingStep:
 
     Attributes:
         id: Unique identifier
-        category: Category of processing step that has been performat.
+        category: Category of processing step that has been performed.
         description: Natural-language description of the process.
         settings: Dict describing the parameters of the processing step.
     """
@@ -66,7 +89,7 @@ class BaselineLine:
     text: Optional[str] = None
     base_dir: Optional[Literal['L', 'R']] = None
     type: str = 'baselines'
-    imagename: Optional[Union[str, PathLike]] = None
+    imagename: Optional[Union[str, 'PathLike']] = None
     tags: Optional[Dict[str, str]] = None
     split: Optional[Literal['train', 'validation', 'test']] = None
     regions: Optional[List[str]] = None
@@ -82,7 +105,7 @@ class BBoxLine:
 
     Attributes:
         id: Unique identifier
-        bbox: Tuple in form `((x0, y0), (x1, y0), (x1, y1), (x0, y1))` defining
+        bbox: Tuple in form `(xmin, ymin, xmax, ymax)` defining
               the bounding box.
         text: Transcription of this line.
         base_dir: An optional string defining the base direction (also called
@@ -98,14 +121,11 @@ class BBoxLine:
                         reading direction (of the document).
     """
     id: str
-    bbox: Tuple[Tuple[int, int],
-                Tuple[int, int],
-                Tuple[int, int],
-                Tuple[int, int]]
+    bbox: Tuple[int, int, int, int]
     text: Optional[str] = None
     base_dir: Optional[Literal['L', 'R']] = None
     type: str = 'bbox'
-    imagename: Optional[Union[str, PathLike]] = None
+    imagename: Optional[Union[str, 'PathLike']] = None
     tags: Optional[Dict[str, str]] = None
     split: Optional[Literal['train', 'validation', 'test']] = None
     regions: Optional[List[str]] = None
@@ -126,7 +146,7 @@ class Region:
     """
     id: str
     boundary: List[Tuple[int, int]]
-    imagename: Optional[Union[str, PathLike]] = None
+    imagename: Optional[Union[str, 'PathLike']] = None
     tags: Optional[Dict[str, str]] = None
 
 
@@ -156,11 +176,11 @@ class Segmentation:
                      Each reading order is a list of line indices.
     """
     type: Literal['baselines', 'bbox']
-    imagename: Union[str, PathLike]
+    imagename: Union[str, 'PathLike']
     text_direction: Literal['horizontal-lr', 'horizontal-rl', 'vertical-lr', 'vertical-rl']
     script_detection: bool
-    lines: List[Union[BaselineLine, BBoxLine]]
-    regions: Dict[str, List[Region]]
+    lines: Optional[List[Union[BaselineLine, BBoxLine]]] = None
+    regions: Optional[Dict[str, List[Region]]] = None
     line_orders: Optional[List[List[int]]] = None
 
     def __post_init__(self):
@@ -168,6 +188,8 @@ class Segmentation:
             self.regions = {}
         if not self.lines:
             self.lines = []
+        if not self.line_orders:
+            self.line_orders = []
         if len(self.lines) and not isinstance(self.lines[0], BBoxLine) and not isinstance(self.lines[0], BaselineLine):
             line_cls = BBoxLine if self.type == 'bbox' else BaselineLine
             self.lines = [line_cls(**line) for line in self.lines]
@@ -187,9 +209,9 @@ class ocr_record(ABC):
     def __init__(self,
                  prediction: str,
                  cuts: List[Union[Tuple[int, int], Tuple[Tuple[int, int],
-                                                             Tuple[int, int],
-                                                             Tuple[int, int],
-                                                             Tuple[int, int]]]],
+                                                         Tuple[int, int],
+                                                         Tuple[int, int],
+                                                         Tuple[int, int]]]],
                  confidences: List[float],
                  display_order: bool = True) -> None:
         self._prediction = prediction
@@ -463,9 +485,9 @@ class BBoxOCRRecord(ocr_record, BBoxLine):
     def __init__(self,
                  prediction: str,
                  cuts: List[Tuple[Tuple[int, int],
-                                      Tuple[int, int],
-                                      Tuple[int, int],
-                                      Tuple[int, int]]],
+                                  Tuple[int, int],
+                                  Tuple[int, int],
+                                  Tuple[int, int]]],
                  confidences: List[float],
                  line: Union[BBoxLine, Dict[str, Any]],
                  base_dir: Optional[Literal['L', 'R']] = None,
@@ -480,7 +502,7 @@ class BBoxOCRRecord(ocr_record, BBoxLine):
         ocr_record.__init__(self, prediction, cuts, confidences, display_order)
 
     def __repr__(self) -> str:
-        return f'pred: {self.prediction} line: {self.line} confidences: {self.confidences}'
+        return f'pred: {self.prediction} bbox: {self.bbox} confidences: {self.confidences}'
 
     def __next__(self) -> Tuple[str, int, float]:
         if self.idx + 1 < len(self):
@@ -593,5 +615,3 @@ class BBoxOCRRecord(ocr_record, BBoxLine):
                             base_dir=base_dir,
                             display_order=not self._display_order)
         return rec
-
-

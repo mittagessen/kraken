@@ -16,4 +16,4 @@
 Tools for unsupervised pretraining of recognition models.
 """
 
-from .model import PretrainDataModule, RecognitionPretrainModel # NOQA
+from .model import PretrainDataModule, RecognitionPretrainModel  # NOQA

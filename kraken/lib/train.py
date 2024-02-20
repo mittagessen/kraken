@@ -15,34 +15,37 @@
 """
 Training loop interception helpers
 """
-import re
-import torch
 import logging
+import re
 import warnings
+from typing import (TYPE_CHECKING, Any, Callable, Dict, Literal, Optional,
+                    Sequence, Union)
+
 import numpy as np
-import torch.nn.functional as F
 import pytorch_lightning as pl
-
-from os import PathLike
-from functools import partial
-from torch.multiprocessing import Pool
-from torchmetrics.classification import MultilabelAccuracy, MultilabelJaccardIndex
-from torchmetrics.text import CharErrorRate, WordErrorRate
+import torch
+import torch.nn.functional as F
+from pytorch_lightning.callbacks import (BaseFinetuning, Callback,
+                                         EarlyStopping, LearningRateMonitor)
 from torch.optim import lr_scheduler
-from typing import Callable, Dict, Optional, Sequence, Union, Any, Literal
-from pytorch_lightning.callbacks import Callback, EarlyStopping, BaseFinetuning, LearningRateMonitor
+from torch.utils.data import DataLoader, Subset, random_split
+from torchmetrics.classification import (MultilabelAccuracy,
+                                         MultilabelJaccardIndex)
+from torchmetrics.text import CharErrorRate, WordErrorRate
 
-from kraken.lib import models, vgsl, default_specs, progress
-from kraken.lib.util import make_printable
+from kraken.containers import Segmentation
+from kraken.lib import default_specs, models, progress, vgsl
 from kraken.lib.codec import PytorchCodec
 from kraken.lib.dataset import (ArrowIPCRecognitionDataset, BaselineSet,
-                                GroundTruthDataset, PolygonGTDataset,
-                                ImageInputTransforms, collate_sequences)
+                                GroundTruthDataset, ImageInputTransforms,
+                                PolygonGTDataset, collate_sequences)
+from kraken.lib.exceptions import KrakenEncodeException, KrakenInputException
 from kraken.lib.models import validate_hyper_parameters
-from kraken.lib.exceptions import KrakenInputException, KrakenEncodeException
+from kraken.lib.util import make_printable, parse_gt_path
+from kraken.lib.xml import XMLPage
 
-from torch.utils.data import DataLoader, random_split, Subset
-
+if TYPE_CHECKING:
+    from os import PathLike
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +59,7 @@ def _star_fun(fun, kwargs):
         logger.warning(str(e))
     return None
 
+
 def _validation_worker_init_fn(worker_id):
     """ Fix random seeds so that augmentation always produces the same
         results when validating. Temporarily increase the logging level
@@ -67,6 +71,7 @@ def _validation_worker_init_fn(worker_id):
     seed_everything(42)
     logging.getLogger("lightning_fabric.utilities.seed").setLevel(level)
 
+
 class KrakenTrainer(pl.Trainer):
     def __init__(self,
                  enable_progress_bar: bool = True,
@@ -75,7 +80,7 @@ class KrakenTrainer(pl.Trainer):
                  max_epochs: int = 100,
                  freeze_backbone=-1,
                  pl_logger: Union[pl.loggers.logger.Logger, str, None] = None,
-                 log_dir: Optional[PathLike] = None,
+                 log_dir: Optional['PathLike'] = None,
                  *args,
                  **kwargs):
         kwargs['enable_checkpointing'] = False
@@ -199,10 +204,10 @@ class RecognitionModel(pl.LightningModule):
                  output: str = 'model',
                  spec: str = default_specs.RECOGNITION_SPEC,
                  append: Optional[int] = None,
-                 model: Optional[Union[PathLike, str]] = None,
+                 model: Optional[Union['PathLike', str]] = None,
                  reorder: Union[bool, str] = True,
-                 training_data: Union[Sequence[Union[PathLike, str]], Sequence[Dict[str, Any]]] = None,
-                 evaluation_data: Optional[Union[Sequence[Union[PathLike, str]], Sequence[Dict[str, Any]]]] = None,
+                 training_data: Union[Sequence[Union['PathLike', str]], Sequence[Dict[str, Any]]] = None,
+                 evaluation_data: Optional[Union[Sequence[Union['PathLike', str]], Sequence[Dict[str, Any]]]] = None,
                  partition: Optional[float] = 0.9,
                  binary_dataset_split: bool = False,
                  num_workers: int = 1,
@@ -301,10 +306,10 @@ class RecognitionModel(pl.LightningModule):
                 logger.warning('Internal binary dataset splits are enabled but using non-binary dataset files. Will be ignored.')
                 binary_dataset_split = False
             logger.info(f'Got {len(training_data)} line strip images for training data')
-            training_data = [{'image': im} for im in training_data]
+            training_data = [{'line': parse_gt_path(im)} for im in training_data]
             if evaluation_data:
                 logger.info(f'Got {len(evaluation_data)} line strip images for validation data')
-                evaluation_data = [{'image': im} for im in evaluation_data]
+                evaluation_data = [{'line': parse_gt_path(im)} for im in evaluation_data]
             valid_norm = True
         # format_type is None. Determine training type from container class types
         elif not format_type:
@@ -493,8 +498,13 @@ class RecognitionModel(pl.LightningModule):
             for i in range(self.hparams.batch_size):
                 count = self.hparams.batch_size * batch_idx + i
                 if count < 16:
-                    self.logger.experiment.add_image(f'Validation #{count}, target: {decoded_targets[i]}', batch['image'][i], self.global_step, dataformats="CHW")
-                    self.logger.experiment.add_text(f'Validation #{count}, target: {decoded_targets[i]}', pred[i], self.global_step)
+                    self.logger.experiment.add_image(f'Validation #{count}, target: {decoded_targets[i]}',
+                                                     batch['image'][i],
+                                                     self.global_step,
+                                                     dataformats="CHW")
+                    self.logger.experiment.add_text(f'Validation #{count}, target: {decoded_targets[i]}',
+                                                    pred[i],
+                                                    self.global_step)
 
     def on_validation_epoch_end(self):
         accuracy = 1.0 - self.val_cer.compute()
@@ -518,7 +528,7 @@ class RecognitionModel(pl.LightningModule):
             # Log a few sample images before the datasets are encoded.
             # This is only possible for Arrow datasets, because the
             # other dataset types can only be accessed after encoding
-            if self.logger and isinstance(self.train_set.dataset, ArrowIPCRecognitionDataset) :
+            if self.logger and isinstance(self.train_set.dataset, ArrowIPCRecognitionDataset):
                 for i in range(min(len(self.train_set), 16)):
                     idx = np.random.randint(len(self.train_set))
                     sample = self.train_set[idx]
@@ -653,7 +663,6 @@ class RecognitionModel(pl.LightningModule):
                                                      len_train_set=len(self.train_set),
                                                      loss_tracking_mode='max')
 
-
     def optimizer_step(self, epoch, batch_idx, optimizer, optimizer_closure):
         # update params
         optimizer.step(closure=optimizer_closure)
@@ -686,9 +695,9 @@ class SegmentationModel(pl.LightningModule):
                  message: Callable[[str], None] = lambda *args, **kwargs: None,
                  output: str = 'model',
                  spec: str = default_specs.SEGMENTATION_SPEC,
-                 model: Optional[Union[PathLike, str]] = None,
-                 training_data: Union[Sequence[Union[PathLike, str]], Sequence[Dict[str, Any]]] = None,
-                 evaluation_data: Optional[Union[Sequence[Union[PathLike, str]], Sequence[Dict[str, Any]]]] = None,
+                 model: Optional[Union['PathLike', str]] = None,
+                 training_data: Union[Sequence[Union['PathLike', str]], Sequence[Dict[str, Any]]] = None,
+                 evaluation_data: Optional[Union[Sequence[Union['PathLike', str]], Sequence[Dict[str, Any]]]] = None,
                  partition: Optional[float] = 0.9,
                  num_workers: int = 1,
                  force_binarization: bool = False,
@@ -735,7 +744,6 @@ class SegmentationModel(pl.LightningModule):
             warnings.warn("'both' value for resize has been deprecated. Use 'new' instead.", DeprecationWarning)
         self.resize = resize
 
-        self.format_type = format_type
         self.output = output
         self.bounding_regions = bounding_regions
         self.topline = topline
@@ -775,6 +783,17 @@ class SegmentationModel(pl.LightningModule):
         self.hyper_params = hyper_params_
         self.save_hyperparameters()
 
+        if format_type in ['xml', 'page', 'alto']:
+            logger.info(f'Parsing {len(training_data)} XML files for training data')
+            training_data = [XMLPage(file, format_type).to_container() for file in training_data]
+            if evaluation_data:
+                logger.info(f'Parsing {len(evaluation_data)} XML files for validation data')
+                evaluation_data = [XMLPage(file, format_type).to_container() for file in evaluation_data]
+        elif not format_type:
+            pass
+        else:
+            raise ValueError(f'format_type {format_type} not in [alto, page, xml, None].')
+
         if not training_data:
             raise ValueError('No training data provided. Please add some.')
 
@@ -808,34 +827,29 @@ class SegmentationModel(pl.LightningModule):
             valid_baselines = []
             merge_baselines = None
 
-        train_set = BaselineSet(training_data,
-                                line_width=self.hparams.hyper_params['line_width'],
+        train_set = BaselineSet(line_width=self.hparams.hyper_params['line_width'],
                                 im_transforms=transforms,
-                                mode=format_type,
                                 augmentation=self.hparams.hyper_params['augment'],
                                 valid_baselines=valid_baselines,
                                 merge_baselines=merge_baselines,
                                 valid_regions=valid_regions,
                                 merge_regions=merge_regions)
 
-        if format_type is None:
-            for page in training_data:
-                train_set.add(**page)
+        for page in training_data:
+            train_set.add(page)
 
         if evaluation_data:
             val_set = BaselineSet(evaluation_data,
                                   line_width=self.hparams.hyper_params['line_width'],
                                   im_transforms=transforms,
-                                  mode=format_type,
                                   augmentation=False,
                                   valid_baselines=valid_baselines,
                                   merge_baselines=merge_baselines,
                                   valid_regions=valid_regions,
                                   merge_regions=merge_regions)
 
-            if format_type is None:
-                for page in evaluation_data:
-                    val_set.add(**page)
+            for page in evaluation_data:
+                val_set.add(page)
 
             train_set = Subset(train_set, range(len(train_set)))
             val_set = Subset(val_set, range(len(val_set)))
@@ -932,8 +946,8 @@ class SegmentationModel(pl.LightningModule):
                     elif self.resize == 'union':
                         new_bls = self.train_set.dataset.class_mapping['baselines'].keys() - self.nn.user_metadata['class_mapping']['baselines'].keys()
                         new_regions = self.train_set.dataset.class_mapping['regions'].keys() - self.nn.user_metadata['class_mapping']['regions'].keys()
-                        cls_idx = max(max(self.nn.user_metadata['class_mapping']['baselines'].values()) if self.nn.user_metadata['class_mapping']['baselines'] else -1,
-                                      max(self.nn.user_metadata['class_mapping']['regions'].values()) if self.nn.user_metadata['class_mapping']['regions'] else -1)
+                        cls_idx = max(max(self.nn.user_metadata['class_mapping']['baselines'].values()) if self.nn.user_metadata['class_mapping']['baselines'] else -1, # noqa
+                                      max(self.nn.user_metadata['class_mapping']['regions'].values()) if self.nn.user_metadata['class_mapping']['regions'] else -1) # noqa
                         logger.info(f'Adding {len(new_bls) + len(new_regions)} missing types to network output layer.')
                         self.nn.resize_output(cls_idx + len(new_bls) + len(new_regions) + 1)
                         for c in new_bls:
@@ -951,8 +965,8 @@ class SegmentationModel(pl.LightningModule):
 
                         logger.info(f'Adding {len(new_bls) + len(new_regions)} missing '
                                     f'types and removing {len(del_bls) + len(del_regions)} to network output layer ')
-                        cls_idx = max(max(self.nn.user_metadata['class_mapping']['baselines'].values()) if self.nn.user_metadata['class_mapping']['baselines'] else -1,
-                                      max(self.nn.user_metadata['class_mapping']['regions'].values()) if self.nn.user_metadata['class_mapping']['regions'] else -1)
+                        cls_idx = max(max(self.nn.user_metadata['class_mapping']['baselines'].values()) if self.nn.user_metadata['class_mapping']['baselines'] else -1, # noqa
+                                      max(self.nn.user_metadata['class_mapping']['regions'].values()) if self.nn.user_metadata['class_mapping']['regions'] else -1) # noqa
 
                         del_indices = [self.nn.user_metadata['class_mapping']['baselines'][x] for x in del_bls]
                         del_indices.extend(self.nn.user_metadata['class_mapping']['regions'][x] for x in del_regions)
@@ -960,8 +974,8 @@ class SegmentationModel(pl.LightningModule):
                                               len(del_bls) - len(del_regions) + 1, del_indices)
 
                         # delete old baseline/region types
-                        cls_idx = min(min(self.nn.user_metadata['class_mapping']['baselines'].values()) if self.nn.user_metadata['class_mapping']['baselines'] else np.inf,
-                                      min(self.nn.user_metadata['class_mapping']['regions'].values()) if self.nn.user_metadata['class_mapping']['regions'] else np.inf)
+                        cls_idx = min(min(self.nn.user_metadata['class_mapping']['baselines'].values()) if self.nn.user_metadata['class_mapping']['baselines'] else np.inf, # noqa
+                                      min(self.nn.user_metadata['class_mapping']['regions'].values()) if self.nn.user_metadata['class_mapping']['regions'] else np.inf) # noqa
 
                         bls = {}
                         for k, v in sorted(self.nn.user_metadata['class_mapping']['baselines'].items(), key=lambda item: item[1]):

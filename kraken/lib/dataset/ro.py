@@ -15,26 +15,18 @@
 """
 Utility functions for data loading and training of VGSL networks.
 """
-import json
-import torch
-import traceback
-import numpy as np
-import torch.nn.functional as F
-import shapely.geometry as geom
-
 from math import factorial
-from os import path, PathLike
-from PIL import Image
-from shapely.ops import split
-from itertools import groupby
-from torchvision import transforms
-from collections import defaultdict
-from torch.utils.data import Dataset
-from typing import Dict, List, Tuple, Sequence, Callable, Any, Union, Literal, Optional
+from typing import TYPE_CHECKING, Dict, Literal, Optional, Sequence, Union
 
-from kraken.lib.xml import XMLPage
+import numpy as np
+import torch
+from torch.utils.data import Dataset
 
 from kraken.lib.exceptions import KrakenInputException
+from kraken.lib.xml import XMLPage
+
+if TYPE_CHECKING:
+    from os import PathLike
 
 __all__ = ['PairWiseROSet', 'PageWiseROSet']
 
@@ -49,7 +41,7 @@ class PairWiseROSet(Dataset):
 
     Returns random pairs of lines from the same page.
     """
-    def __init__(self, files: Sequence[Union[PathLike, str]] = None,
+    def __init__(self, files: Sequence[Union['PathLike', str]] = None,
                  mode: Optional[Literal['alto', 'page', 'xml']] = 'xml',
                  level: Literal['regions', 'baselines'] = 'baselines',
                  ro_id: Optional[str] = None,
@@ -112,8 +104,9 @@ class PairWiseROSet(Dataset):
                                                             torch.tensor(line_center, dtype=torch.float),  # line center
                                                             torch.tensor(line_coords[0, :], dtype=torch.float),  # start_point coord
                                                             torch.tensor(line_coords[-1, :], dtype=torch.float),  # end point coord)
-                                                          ))
-                                    }
+                                                            )
+                                                           )
+                                     }
                         sorted_lines.append(line_data)
                     if len(sorted_lines) > 1:
                         self.data.append(sorted_lines)
@@ -150,7 +143,7 @@ class PageWiseROSet(Dataset):
 
     Returns all lines from the same page.
     """
-    def __init__(self, files: Sequence[Union[PathLike, str]] = None,
+    def __init__(self, files: Sequence[Union['PathLike', str]] = None,
                  mode: Optional[Literal['alto', 'page', 'xml']] = 'xml',
                  level: Literal['regions', 'baselines'] = 'baselines',
                  ro_id: Optional[str] = None,
@@ -212,8 +205,9 @@ class PageWiseROSet(Dataset):
                                                             torch.tensor(line_center, dtype=torch.float),  # line center
                                                             torch.tensor(line_coords[0, :], dtype=torch.float),  # start_point coord
                                                             torch.tensor(line_coords[-1, :], dtype=torch.float),  # end point coord)
-                                                          ))
-                                    }
+                                                            )
+                                                           )
+                                     }
                         sorted_lines.append(line_data)
                     if len(sorted_lines) > 1:
                         self.data.append(sorted_lines)

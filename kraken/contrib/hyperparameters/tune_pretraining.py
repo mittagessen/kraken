@@ -2,19 +2,19 @@
 """
 A script for a grid search over pretraining hyperparameters.
 """
-import click
 from functools import partial
 
-from ray import tune
-
-from ray.tune.integration.pytorch_lightning import TuneReportCallback
-
-from kraken.lib.default_specs import RECOGNITION_PRETRAIN_HYPER_PARAMS, RECOGNITION_SPEC
-from kraken.lib.pretrain.model import PretrainDataModule, RecognitionPretrainModel
-from kraken.ketos.util import _validate_manifests
-
+import click
 import pytorch_lightning as pl
 from pytorch_lightning import seed_everything
+from ray import tune
+from ray.tune.integration.pytorch_lightning import TuneReportCallback
+
+from kraken.ketos.util import _validate_manifests
+from kraken.lib.default_specs import (RECOGNITION_PRETRAIN_HYPER_PARAMS,
+                                      RECOGNITION_SPEC)
+from kraken.lib.pretrain.model import (PretrainDataModule,
+                                       RecognitionPretrainModel)
 
 config = {'lrate': tune.loguniform(1e-8, 1e-2),
           'num_negatives': tune.qrandint(1, 4, 1),
@@ -51,6 +51,7 @@ def train_tune(config, training_data=None, epochs=100, spec=RECOGNITION_SPEC):
                          enable_progress_bar=False)
     trainer.fit(model, datamodule=data_module)
 
+
 @click.command()
 @click.option('-v', '--verbose', default=0, count=True)
 @click.option('-s', '--seed', default=42, type=click.INT,
@@ -82,6 +83,7 @@ def cli(verbose, seed, output, num_samples, epochs, spec, training_files, files)
                                 spec=spec), local_dir=output, num_samples=num_samples, resources_per_trial=resources_per_trial, config=config)
 
     click.echo("Best hyperparameters found were: ", analysis.get_best_config(metric='accuracy', mode='max'))
+
 
 if __name__ == '__main__':
     cli()

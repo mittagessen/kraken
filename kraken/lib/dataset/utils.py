@@ -16,21 +16,19 @@
 Utility functions for data loading and training of VGSL networks.
 """
 import json
-import torch
 import numbers
-import pkg_resources
-import torch.nn.functional as F
-
-from functools import partial
-from torchvision import transforms
 from collections import Counter
-from typing import Dict, List, Tuple, Sequence, Any, Union
+from functools import partial
+from typing import Any, Dict, List, Sequence, Tuple, Union
 
-from kraken.lib.models import TorchSeqRecognizer
-from kraken.lib.exceptions import KrakenInputException
-from kraken.lib.lineest import CenterNormalizer
+import importlib_resources
+import torch
+import torch.nn.functional as F
+from torchvision import transforms
 
 from kraken.lib import functional_im_transforms as F_t
+from kraken.lib.exceptions import KrakenInputException
+from kraken.lib.lineest import CenterNormalizer
 
 __all__ = ['ImageInputTransforms',
            'collate_sequences']
@@ -67,7 +65,7 @@ class ImageInputTransforms(transforms.Compose):
         """
         super().__init__(None)
 
-        self._scale = (height, width)  # type: Tuple[int, int]
+        self._scale: Tuple[int, int] = (height, width)
         self._valid_norm = valid_norm
         self._force_binarization = force_binarization
         self._batch = batch
@@ -321,7 +319,8 @@ def compute_confusions(algn1: Sequence[str], algn2: Sequence[str]):
         script substitutions.
     """
     counts: Dict[Tuple[str, str], int] = Counter()
-    with pkg_resources.resource_stream(__name__, 'scripts.json') as fp:
+    ref = importlib_resources.files(__name__).joinpath('scripts.json')
+    with ref.open('rb') as fp:
         script_map = json.load(fp)
 
     def _get_script(c):

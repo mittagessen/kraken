@@ -1,18 +1,19 @@
 """
 Layers for VGSL models
 """
-import torch
 import logging
-import numpy as np
+from typing import Iterable, List, Optional, Tuple
 
-from typing import List, Tuple, Optional, Iterable
+import numpy as np
+import torch
 from torch.nn import Module, Sequential
 from torch.nn import functional as F
-from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
 logger = logging.getLogger('coremltools')
 logger.setLevel(logging.ERROR)
-from coremltools.proto import NeuralNetwork_pb2
+from coremltools.proto import NeuralNetwork_pb2  # NOQA
+
 logger.setLevel(logging.WARNING)
 
 # all tensors are ordered NCHW, the "feature" dimension is C, so the output of
@@ -30,7 +31,7 @@ class MultiParamSequential(Sequential):
         modules = self._modules.values()
         i = 0
         for module in modules:
-            if type(inputs) == tuple:
+            if isinstance(inputs, tuple):
                 inputs = module(*inputs, output_shape=output_shape if i == len(modules) - 1 else None)
             else:
                 inputs = module(inputs, output_shape=output_shape if i == len(modules) - 1 else None)
@@ -46,7 +47,7 @@ class MultiParamParallel(Module):
         outputs = []
         seq_lens = None
         for module in self._modules.values():
-            if type(inputs) == tuple:
+            if isinstance(inputs, tuple):
                 output, seq_lens = module(*inputs, output_shape=output_shape)
                 outputs.append(output)
             else:
@@ -135,7 +136,7 @@ class PeepholeBidiLSTM(Module):
 
         self.input_size = input_size
         self.hidden_size = hidden_size
-        self._all_weights = []  # type: List[List[str]]
+        self._all_weights: List[List[str]] = []
         gate_size = 4 * hidden_size
         for direction in range(2):
             w_ih = torch.nn.Parameter(torch.Tensor(gate_size, input_size))
@@ -187,7 +188,10 @@ class Addition(Module):
         self.chunk_size = chunk_size
         super().__init__()
 
-    def forward(self, inputs: torch.Tensor, seq_len: Optional[torch.Tensor] = None, output_shape: Optional[List[int]] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+    def forward(self,
+                inputs: torch.Tensor,
+                seq_len: Optional[torch.Tensor] = None,
+                output_shape: Optional[List[int]] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         out = inputs.unfold(self.dim, self.chunk_size, self.chunk_size)
         out = out.sum(self.dim, keepdim=True)
         out = out.transpose(-1, self.dim).squeeze(-1)
@@ -237,7 +241,10 @@ class Identity(Module):
         """
         super().__init__()
 
-    def forward(self, inputs: torch.Tensor, seq_len: Optional[torch.Tensor] = None, output_shape: Optional[Tuple[int, int]] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+    def forward(self,
+                inputs: torch.Tensor,
+                seq_len: Optional[torch.Tensor] = None,
+                output_shape: Optional[Tuple[int, int]] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         return inputs, seq_len
 
     def get_shape(self, input: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
@@ -289,7 +296,10 @@ class Reshape(Module):
         self.high = high
         self.low = low
 
-    def forward(self, input: torch.Tensor, seq_len: Optional[torch.Tensor] = None, output_shape: Optional[Tuple[int, int]] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+    def forward(self,
+                input: torch.Tensor,
+                seq_len: Optional[torch.Tensor] = None,
+                output_shape: Optional[Tuple[int, int]] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         initial_len = input.shape[3]
         # split dimension src_dim into part_a x part_b
         input = input.reshape(input.shape[:self.src_dim] + (self.part_a, self.part_b) + input.shape[self.src_dim + 1:])
@@ -354,7 +364,10 @@ class MaxPool(Module):
         self.stride = stride
         self.layer = torch.nn.MaxPool2d(kernel_size, stride)
 
-    def forward(self, inputs: torch.Tensor, seq_len: Optional[torch.Tensor] = None, output_shape: Optional[Tuple[int, int]] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+    def forward(self,
+                inputs: torch.Tensor,
+                seq_len: Optional[torch.Tensor] = None,
+                output_shape: Optional[Tuple[int, int]] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         o = self.layer(inputs)
         if seq_len is not None:
             seq_len = torch.floor((seq_len-(self.kernel_size[1]-1)-1).float()/self.stride[1]+1).int()
@@ -403,7 +416,10 @@ class Dropout(Module):
         elif dim == 2:
             self.layer = torch.nn.Dropout2d(p)
 
-    def forward(self, inputs: torch.Tensor, seq_len: Optional[torch.Tensor] = None, output_shape: Optional[Tuple[int, int]] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+    def forward(self,
+                inputs: torch.Tensor,
+                seq_len: Optional[torch.Tensor] = None,
+                output_shape: Optional[Tuple[int, int]] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         return self.layer(inputs), seq_len
 
     def get_shape(self, input: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
@@ -479,7 +495,10 @@ class TransposedSummarizingRNN(Module):
                                        batch_first=True,
                                        bias=False if legacy else True)
 
-    def forward(self, inputs: torch.Tensor, seq_len: Optional[torch.Tensor] = None, output_shape: Optional[Tuple[int, int]] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+    def forward(self,
+                inputs: torch.Tensor,
+                seq_len: Optional[torch.Tensor] = None,
+                output_shape: Optional[Tuple[int, int]] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         # NCHW -> HNWC
         inputs = inputs.permute(2, 0, 3, 1)
         if self.transpose:
@@ -671,7 +690,10 @@ class LinSoftmax(Module):
 
         self.lin = torch.nn.Linear(self.input_size, output_size)
 
-    def forward(self, inputs: torch.Tensor, seq_len: Optional[torch.Tensor] = None, output_shape: Optional[Tuple[int, int]] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+    def forward(self,
+                inputs: torch.Tensor,
+                seq_len: Optional[torch.Tensor] = None,
+                output_shape: Optional[Tuple[int, int]] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         # move features (C) to last dimension for linear activation
         # NCHW -> NWHC
         inputs = inputs.transpose(1, 3)
@@ -745,13 +767,21 @@ class LinSoftmax(Module):
         self.lin.weight = torch.nn.Parameter(weight)
         self.lin.bias = torch.nn.Parameter(bias)
 
+
 class ActConv2D(Module):
     """
     A wrapper for convolution + activation with automatic padding ensuring no
     dropped columns.
     """
 
-    def __init__(self, in_channels: int, out_channels: int, kernel_size: Tuple[int, int], stride: Tuple[int, int], nl: str = 'l', dilation: Tuple[int, int] = (1, 1), transposed: bool = False) -> None:
+    def __init__(self,
+                 in_channels: int,
+                 out_channels: int,
+                 kernel_size: Tuple[int, int],
+                 stride: Tuple[int, int],
+                 nl: str = 'l',
+                 dilation: Tuple[int, int] = (1, 1),
+                 transposed: bool = False) -> None:
         super().__init__()
         self.in_channels = in_channels
         self.kernel_size = kernel_size
@@ -760,7 +790,7 @@ class ActConv2D(Module):
         self.dilation = dilation
         self.padding = tuple((dilation[i] * (kernel_size[i] - 1)) // 2 for i in range(2))
         self.transposed = transposed
-        
+
         if nl == 's':
             self.nl = torch.sigmoid
             self.nl_name = 'SIGMOID'
@@ -779,15 +809,26 @@ class ActConv2D(Module):
         else:
             self.nl_name = 'LINEAR'
             self.nl = lambda x: x
-        
-        if self.transposed:
-            self.co = torch.nn.ConvTranspose2d(in_channels, out_channels, kernel_size,
-                                  stride=stride, padding=self.padding, dilation=self.dilation)
-        else:
-            self.co = torch.nn.Conv2d(in_channels, out_channels, kernel_size,
-                                      stride=stride, padding=self.padding, dilation=self.dilation)
 
-    def forward(self, inputs: torch.Tensor, seq_len: Optional[torch.Tensor] = None, output_shape: Optional[Tuple[int, int]] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+        if self.transposed:
+            self.co = torch.nn.ConvTranspose2d(in_channels,
+                                               out_channels,
+                                               kernel_size,
+                                               stride=stride,
+                                               padding=self.padding,
+                                               dilation=self.dilation)
+        else:
+            self.co = torch.nn.Conv2d(in_channels,
+                                      out_channels,
+                                      kernel_size,
+                                      stride=stride,
+                                      padding=self.padding,
+                                      dilation=self.dilation)
+
+    def forward(self,
+                inputs: torch.Tensor,
+                seq_len: Optional[torch.Tensor] = None,
+                output_shape: Optional[Tuple[int, int]] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         if self.transposed:
             o = self.co(inputs, output_size=output_shape)
         else:
@@ -799,8 +840,8 @@ class ActConv2D(Module):
         if seq_len is not None:
             if self.transposed:
                 seq_len = torch.floor(
-                    ((seq_len - 1) * self.stride[1]\
-                        - 2 * self.padding[1]\
+                    ((seq_len - 1) * self.stride[1]
+                        - 2 * self.padding[1]
                         + self.dilation[1] * (self.kernel_size[1] - 1)
                         + 1))
             else:
@@ -821,10 +862,11 @@ class ActConv2D(Module):
                                  min(min_x + self.stride[1] - 1, max(target_x, min_x)))
         else:
             self.output_shape = (input[0],
-                             self.out_channels,
-                             int(max(np.floor((input[2]+2*self.padding[0]-self.dilation[0]*(self.kernel_size[0]-1)-1) /
-                                 self.stride[0]+1), 1) if input[2] != 0 else 0),
-                             int(max(np.floor((input[3]+2*self.padding[1]-self.dilation[1]*(self.kernel_size[1]-1)-1)/self.stride[1]+1), 1) if input[3] != 0 else 0))
+                                 self.out_channels,
+                                 int(max(np.floor((input[2]+2*self.padding[0]-self.dilation[0]*(self.kernel_size[0]-1)-1) /
+                                     self.stride[0]+1), 1) if input[2] != 0 else 0),
+                                 int(max(np.floor((input[3]+2*self.padding[1]-self.dilation[1]*(self.kernel_size[1]-1)-1) /
+                                     self.stride[1]+1), 1) if input[3] != 0 else 0))
         return self.output_shape
 
     def deserialize(self, name: str, spec) -> None:
@@ -896,7 +938,7 @@ class ActConv2D(Module):
         bias = torch.cat([bias, torch.zeros(output_size - bias.size(0))])
         if self.transposed:
             self.co = torch.nn.ConvTranspose2d(self.in_channels, self.out_channels, self.kernel_size,
-                                      stride=self.stride, padding=self.padding)
+                                               stride=self.stride, padding=self.padding)
         else:
             self.co = torch.nn.Conv2d(self.in_channels, self.out_channels, self.kernel_size,
                                       stride=self.stride, padding=self.padding)
@@ -916,7 +958,10 @@ class GroupNorm(Module):
 
         self.layer = torch.nn.GroupNorm(num_groups, in_channels)
 
-    def forward(self, inputs: torch.Tensor, seq_len: Optional[torch.Tensor], output_shape: Optional[Tuple[int, int]] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+    def forward(self,
+                inputs: torch.Tensor,
+                seq_len: Optional[torch.Tensor],
+                output_shape: Optional[Tuple[int, int]] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         t = inputs.dtype
         # XXX: verify that pytorch AMP casts the inputs to float32 correctly at
         # some point.

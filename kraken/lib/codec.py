@@ -18,12 +18,13 @@ Pytorch compatible codec with many-to-many mapping between labels and
 graphemes.
 """
 import logging
-import numpy as np
-
 from collections import Counter
-from typing import List, Tuple, Set, Union, Dict, Sequence
+from typing import Dict, List, Sequence, Set, Tuple, Union
+
+import numpy as np
 from torch import IntTensor
-from kraken.lib.exceptions import KrakenEncodeException, KrakenCodecException
+
+from kraken.lib.exceptions import KrakenCodecException, KrakenEncodeException
 
 __all__ = ['PytorchCodec']
 
@@ -64,7 +65,7 @@ class PytorchCodec(object):
                 raise KrakenCodecException(f'Duplicate entry in codec definition string: {cc}')
             self.c2l = {k: [v] for v, k in enumerate(sorted(charset), start=1)}
         self.c_sorted = sorted(self.c2l.keys(), key=len, reverse=True)
-        self.l2c = {tuple(v): k for k, v in self.c2l.items()}  # type: Dict[Tuple[int], str]
+        self.l2c: Dict[Tuple[int], str] = {tuple(v): k for k, v in self.c2l.items()}
         self.l2c_single = {k[0]: v for k, v in self.l2c.items() if len(k) == 1}
         self.strict = strict
         if not self.is_valid:
@@ -116,7 +117,7 @@ class PytorchCodec(object):
             KrakenEncodeException: if the a subsequence is not encodable and the
                                    codec is set to strict mode.
         """
-        labels = []  # type: List[int]
+        labels: List[int] = []
         idx = 0
         while idx < len(s):
             encodable_suffix = False
@@ -128,12 +129,12 @@ class PytorchCodec(object):
                     idx += len(code)
                     encodable_suffix = True
                     break
-            
+
             if not encodable_suffix and s[idx] in self.c2l:
                 labels.extend(self.c2l[s[idx]])
                 idx += 1
                 encodable_suffix = True
-            
+
             if not encodable_suffix:
                 if self.strict:
                     raise KrakenEncodeException(f'Non-encodable sequence {s[idx:idx+5]}... encountered.')
@@ -169,9 +170,9 @@ class PytorchCodec(object):
             if int(labels[idx]) in self.l2c_single:
                 code = self.l2c_single[int(labels[idx])]
                 decoded.extend([(c, s, e, u) for c, s, e, u in zip(code,
-                                                                    len(code) * [start[idx]],
-                                                                    len(code) * [end[idx]],
-                                                                    len(code) * [con[idx]])])
+                                                                   len(code) * [start[idx]],
+                                                                   len(code) * [end[idx]],
+                                                                   len(code) * [con[idx]])])
                 idx += 1
                 decodable_suffix = True
             else:

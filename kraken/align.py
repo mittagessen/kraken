@@ -21,29 +21,25 @@ align
 A character alignment module using a network output lattice and ground truth to
 accuractely determine grapheme locations in input data.
 """
-import torch
-import logging
 import dataclasses
-import numpy as np
-
-from PIL import Image
-from bidi.algorithm import get_display
-
+import logging
 from dataclasses import dataclass
-from typing import List, Dict, Any, Optional, Literal
+from typing import TYPE_CHECKING, Literal, Optional
+
+import torch
+from bidi.algorithm import get_display
+from PIL import Image
 
 from kraken import rpred
-from kraken.containers import Segmentation, BaselineOCRRecord
-from kraken.lib.codec import PytorchCodec
-from kraken.lib.xml import XMLPage
-from kraken.lib.models import TorchSeqRecognizer
-from kraken.lib.exceptions import KrakenInputException, KrakenEncodeException
-from kraken.lib.segmentation import compute_polygon_section
+from kraken.containers import BaselineOCRRecord, Segmentation
+
+if TYPE_CHECKING:
+    from kraken.lib.models import TorchSeqRecognizer
 
 logger = logging.getLogger('kraken')
 
 
-def forced_align(doc: Segmentation, model: TorchSeqRecognizer, base_dir: Optional[Literal['L', 'R']] = None) -> Segmentation:
+def forced_align(doc: Segmentation, model: 'TorchSeqRecognizer', base_dir: Optional[Literal['L', 'R']] = None) -> Segmentation:
     """
     Performs a forced character alignment of text with recognition model
     output activations.
@@ -95,6 +91,8 @@ Copied from the forced alignment with Wav2Vec2 tutorial of pytorch available
 at:
 https://github.com/pytorch/audio/blob/main/examples/tutorials/forced_alignment_tutorial.py
 """
+
+
 @dataclass
 class Point:
     token_index: int
