@@ -113,7 +113,8 @@ def build_binary_dataset(files: Optional[List[Union[str, 'PathLike', Dict]]] = N
                          force_type: Optional[str] = None,
                          recordbatch_size: int = 100,
                          skip_empty_lines: bool = True,
-                         callback: Callable[[int, int], None] = lambda chunk, lines: None) -> None:
+                         callback: Callable[[int, int], None] = lambda chunk, lines: None,
+                         temp_dir: Optional[str] = None) -> None:
     """
     Parses XML files and dumps the baseline-style line images and text into a
     binary dataset.
@@ -141,6 +142,7 @@ def build_binary_dataset(files: Optional[List[Union[str, 'PathLike', Dict]]] = N
         skip_empty_lines: Do not compile empty text lines into the dataset.
         callback: Function called every time a new recordbatch is flushed into
                   the Arrow IPC file.
+        temp_dir: A target for the temporary directory used at extraction time
     """
 
     logger.info('Parsing XML files')
@@ -249,7 +251,7 @@ def build_binary_dataset(files: Optional[List[Union[str, 'PathLike', Dict]]] = N
 
     line_cache = []
     logger.info('Writing lines to temporary file.')
-    with tempfile.TemporaryDirectory() as tmp_output_dir:
+    with tempfile.TemporaryDirectory(dir=temp_dir) as tmp_output_dir:
         tmp_file = tmp_output_dir + '/dataset.arrow'
         with pa.OSFile(tmp_file, 'wb') as sink:
             with pa.ipc.new_file(sink, schema) as writer:
