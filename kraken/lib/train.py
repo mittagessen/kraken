@@ -839,8 +839,7 @@ class SegmentationModel(pl.LightningModule):
             train_set.add(page)
 
         if evaluation_data:
-            val_set = BaselineSet(evaluation_data,
-                                  line_width=self.hparams.hyper_params['line_width'],
+            val_set = BaselineSet(line_width=self.hparams.hyper_params['line_width'],
                                   im_transforms=transforms,
                                   augmentation=False,
                                   valid_baselines=valid_baselines,
