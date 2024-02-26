@@ -38,6 +38,8 @@ class TestNewPolygons(unittest.TestCase):
         self.im = Image.open(resources / "bw.png")
         self.old_model_path = resources / "overfit.mlmodel"
         self.old_model = load_any(self.old_model_path)
+        self.new_model_path = resources / "overfit_newpoly.mlmodel"
+        self.new_model = load_any(self.new_model_path)
         self.segmented_img = resources / "170025120000003,0074-lite.xml"
         self.runner = CliRunner()
         self.color_img = resources / "input.tif"
@@ -55,8 +57,10 @@ class TestNewPolygons(unittest.TestCase):
             script_detection=False,
         )
 
+    ## RECIPES
+
     @patch("kraken.rpred.extract_polygons", new_callable=mock_extract_polygons)
-    def _test_rpred(self, extractor_mock: Mock, *, model, no_legacy_polygons: bool, expect_legacy: bool):
+    def _test_rpred(self, extractor_mock: Mock, *, model, no_legacy_polygons: bool=False, expect_legacy: bool):
         """
         Base recipe for testing rpred with a given model and polygon extraction method
         """
@@ -67,24 +71,8 @@ class TestNewPolygons(unittest.TestCase):
         for cl in extractor_mock.mock_calls:
             self.assertEqual(cl[2]["legacy"], expect_legacy)
 
-    @unittest.skip
-    def test_rpred_from_old_model(self):
-        """
-        Test rpred with old model, check that it uses legacy polygon extraction method
-        """
-        self._test_rpred(model=self.old_model, no_legacy_polygons=False, expect_legacy=True)
-
-    @unittest.skip
-    def test_rpred_from_old_model_force_new(self):
-        """
-        Test rpred with old model, but disabling legacy polygons
-        """
-        self._test_rpred(model=self.old_model, no_legacy_polygons=True, expect_legacy=False)
-
-
-
     @patch("kraken.rpred.extract_polygons", new_callable=mock_extract_polygons)
-    def _test_krakencli(self, extractor_mock: Mock, *, args, no_legacy_polygons: bool, expect_legacy: bool,):
+    def _test_krakencli(self, extractor_mock: Mock, *, args, no_legacy_polygons: bool=False, expect_legacy: bool,):
         """
         Base recipe for testing kraken_cli with a given polygon extraction method
         """
@@ -92,7 +80,6 @@ class TestNewPolygons(unittest.TestCase):
             args = ["--no-legacy-polygons"] + args
 
         result = self.runner.invoke(kraken_cli, args)
-        print(result.output, result.exception)
 
         self.assertEqual(result.exit_code, 0)
         extractor_mock.assert_called()
@@ -100,7 +87,41 @@ class TestNewPolygons(unittest.TestCase):
             # assert always called with legacy=True
             self.assertEqual(cl[2]["legacy"], expect_legacy)
 
-    @unittest.skip
+    @patch("kraken.lib.dataset.recognition.extract_polygons", new_callable=mock_extract_polygons)
+    def _test_ketoscli(self, extractor_mock: Mock, *, args, expect_legacy: bool, check_exit_code=0):
+        """
+        Base recipe for testing ketos_cli with a given polygon extraction method
+        """
+        result = self.runner.invoke(ketos_cli, args)
+
+        if check_exit_code is not None:
+            self.assertEqual(result.exit_code, check_exit_code, "Command failed")
+        extractor_mock.assert_called()
+        for cl in extractor_mock.mock_calls:
+            # assert always called with legacy=True
+            self.assertEqual(cl[2]["legacy"], expect_legacy)
+
+    ## TESTS
+
+    def test_rpred_from_old_model(self):
+        """
+        Test rpred with old model, check that it uses legacy polygon extraction method
+        """
+        self._test_rpred(model=self.old_model, no_legacy_polygons=False, expect_legacy=True)
+
+    def test_rpred_from_old_model_force_new(self):
+        """
+        Test rpred with old model, but disabling legacy polygons
+        """
+        self._test_rpred(model=self.old_model, no_legacy_polygons=True, expect_legacy=False)
+
+    def test_rpred_from_new_model(self):
+        """
+        Test rpred with new model, check that it uses new polygon extraction method
+        """
+        self._test_rpred(model=self.new_model, no_legacy_polygons=False, expect_legacy=False)
+
+
     def test_krakencli_ocr_old_model(self):
         """
         Test kraken_cli with old model, check that it uses legacy polygon extraction method
@@ -112,7 +133,6 @@ class TestNewPolygons(unittest.TestCase):
                 expect_legacy=True,
             )
 
-    @unittest.skip
     def test_krakencli_ocr_old_model_force_new(self):
         """
         Test kraken_cli with old model, check that it uses legacy polygon extraction method
@@ -124,48 +144,50 @@ class TestNewPolygons(unittest.TestCase):
                 expect_legacy=False,
             )
 
-
-
-    @patch("kraken.lib.dataset.recognition.extract_polygons", new_callable=mock_extract_polygons)
-    def _test_ketoscli(self, extractor_mock: Mock, *, args, expect_legacy: bool, check_exit_code=0):
+    def test_krakencli_ocr_new_model(self):
         """
-        Base recipe for testing ketos_cli with a given polygon extraction method
+        Test kraken_cli with new model, check that it uses new polygon extraction method
         """
-        result = self.runner.invoke(ketos_cli, args)
-        print('ketos', *args)
-        print(result.output, result.exception)
+        with tempfile.NamedTemporaryFile() as fp:
+            self._test_krakencli(
+                args=['-f', 'xml', '-i', self.segmented_img, fp.name, 'ocr', '-m', str(self.new_model_path)],
+                no_legacy_polygons=False,
+                expect_legacy=False,
+            )
 
-        if check_exit_code is not None:
-            self.assertEqual(result.exit_code, check_exit_code, "Command failed")
-        extractor_mock.assert_called()
-        for cl in extractor_mock.mock_calls:
-            # assert always called with legacy=True
-            self.assertEqual(cl[2]["legacy"], expect_legacy)
 
-    @unittest.skip
+
     def test_ketoscli_test_old_model(self):
         """
-        Test ketos_cli with old model, check that it uses legacy polygon extraction method
+        Test `ketos test` with old model, check that it uses legacy polygon extraction method
         """
         self._test_ketoscli(
             args=['test', '-m', str(self.old_model_path), '-f', 'xml', '--workers', '0', str(self.segmented_img)],
             expect_legacy=True,
         )
 
-    @unittest.skip
     def test_ketoscli_test_old_model_force_new(self):
         """
-        Test ketos_cli with old model, check that it does not use legacy polygon extraction method
+        Test `ketos test` with old model, check that it does not use legacy polygon extraction method
         """
         self._test_ketoscli(
             args=['test', '--no-legacy-polygons', '-m', str(self.old_model_path), '-f', 'xml', '--workers', '0', str(self.segmented_img)],
             expect_legacy=False,
         )
 
-    #@unittest.skip
+    def test_ketoscli_test_new_model(self):
+        """
+        Test `ketos test` with new model, check that it uses new polygon extraction method
+        """
+        self._test_ketoscli(
+            args=['test', '-m', str(self.new_model_path), '-f', 'xml', '--workers', '0', str(self.segmented_img)],
+            expect_legacy=False,
+        )
+
+
     def test_ketoscli_train_new_model(self):
         """
-        Test ketos_cli with new model, check that it uses new polygon extraction method
+        Test `ketos train` with new model, check that it uses new polygon extraction method
         """
         with tempfile.NamedTemporaryFile() as mfp:
             self._test_ketoscli(
@@ -181,7 +203,7 @@ class TestNewPolygons(unittest.TestCase):
 
     def test_ketoscli_train_old_model(self):
         """
-        Test ketos_cli with old model, check that it uses new polygon extraction method
+        Test `ketos train` finetuning old model, check that it uses new polygon extraction method
         """
         with tempfile.NamedTemporaryFile() as mfp:
             self._test_ketoscli(
@@ -195,4 +217,22 @@ class TestNewPolygons(unittest.TestCase):
                     args=['-f', 'xml', '-i', self.segmented_img, fp.name, 'ocr', '-m', mfp.name + "_0.mlmodel"],
                     no_legacy_polygons=True,
                     expect_legacy=False,
+                )
+
+    def test_ketoscli_train_old_model_force_old(self):
+        """
+        Test `ketos train` finetuning old model, check that it uses legacy polygon extraction method if forced
+        """
+        with tempfile.NamedTemporaryFile() as mfp:
+            self._test_ketoscli(
+                args=['train', '--legacy-polygons', '-f', 'xml', '-N', '1', '-q', 'fixed', '-i', str(self.old_model_path), '--resize', 'add', '-o', mfp.name, '--workers', '0', str(self.segmented_img)],
+                expect_legacy=True,
+                check_exit_code=None, # Model may not improve during training
+            )
+            # Check that the model still expects legacy polygons
+            with tempfile.NamedTemporaryFile() as fp:
+                self._test_krakencli(
+                    args=['-f', 'xml', '-i', self.segmented_img, fp.name, 'ocr', '-m', mfp.name + "_0.mlmodel"],
+                    no_legacy_polygons=False,
+                    expect_legacy=True,
                 )
