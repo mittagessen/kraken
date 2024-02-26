@@ -4,6 +4,7 @@ import unittest
 import tempfile
 from unittest.mock import Mock, patch
 from pathlib import Path
+from traceback import print_exception
 
 from PIL import Image
 
@@ -36,11 +37,11 @@ class TestNewPolygons(unittest.TestCase):
 
     def setUp(self):
         self.im = Image.open(resources / "bw.png")
-        self.old_model_path = resources / "overfit.mlmodel"
+        self.old_model_path = str(resources / "overfit.mlmodel")
         self.old_model = load_any(self.old_model_path)
-        self.new_model_path = resources / "overfit_newpoly.mlmodel"
+        self.new_model_path = str(resources / "overfit_newpoly.mlmodel")
         self.new_model = load_any(self.new_model_path)
-        self.segmented_img = resources / "170025120000003,0074-lite.xml"
+        self.segmented_img = str(resources / "170025120000003,0074-lite.xml")
         self.runner = CliRunner()
         self.color_img = resources / "input.tif"
         self.simple_bl_seg = Segmentation(
@@ -60,11 +61,11 @@ class TestNewPolygons(unittest.TestCase):
     ## RECIPES
 
     @patch("kraken.rpred.extract_polygons", new_callable=mock_extract_polygons)
-    def _test_rpred(self, extractor_mock: Mock, *, model, no_legacy_polygons: bool=False, expect_legacy: bool):
+    def _test_rpred(self, extractor_mock: Mock, *, model, force_no_legacy: bool=False, expect_legacy: bool):
         """
         Base recipe for testing rpred with a given model and polygon extraction method
         """
-        pred = rpred(model, self.im, self.simple_bl_seg, True, no_legacy_polygons=no_legacy_polygons)
+        pred = rpred(model, self.im, self.simple_bl_seg, True, no_legacy_polygons=force_no_legacy)
         _ = next(pred)
 
         extractor_mock.assert_called()
@@ -72,11 +73,11 @@ class TestNewPolygons(unittest.TestCase):
             self.assertEqual(cl[2]["legacy"], expect_legacy)
 
     @patch("kraken.rpred.extract_polygons", new_callable=mock_extract_polygons)
-    def _test_krakencli(self, extractor_mock: Mock, *, args, no_legacy_polygons: bool=False, expect_legacy: bool,):
+    def _test_krakencli(self, extractor_mock: Mock, *, args, force_no_legacy: bool=False, expect_legacy: bool,):
         """
         Base recipe for testing kraken_cli with a given polygon extraction method
         """
-        if no_legacy_polygons:
+        if force_no_legacy:
             args = ["--no-legacy-polygons"] + args
 
         result = self.runner.invoke(kraken_cli, args)
@@ -84,7 +85,6 @@ class TestNewPolygons(unittest.TestCase):
         self.assertEqual(result.exit_code, 0)
         extractor_mock.assert_called()
         for cl in extractor_mock.mock_calls:
-            # assert always called with legacy=True
             self.assertEqual(cl[2]["legacy"], expect_legacy)
 
     @patch("kraken.lib.dataset.recognition.extract_polygons", new_callable=mock_extract_polygons)
@@ -94,11 +94,14 @@ class TestNewPolygons(unittest.TestCase):
         """
         result = self.runner.invoke(ketos_cli, args)
 
+        print("ketos", *args)
+        if result.exception:
+            print_exception(result.exception)
+
         if check_exit_code is not None:
             self.assertEqual(result.exit_code, check_exit_code, "Command failed")
         extractor_mock.assert_called()
         for cl in extractor_mock.mock_calls:
-            # assert always called with legacy=True
             self.assertEqual(cl[2]["legacy"], expect_legacy)
 
     ## TESTS
@@ -107,19 +110,19 @@ class TestNewPolygons(unittest.TestCase):
         """
         Test rpred with old model, check that it uses legacy polygon extraction method
         """
-        self._test_rpred(model=self.old_model, no_legacy_polygons=False, expect_legacy=True)
+        self._test_rpred(model=self.old_model, force_no_legacy=False, expect_legacy=True)
 
     def test_rpred_from_old_model_force_new(self):
         """
         Test rpred with old model, but disabling legacy polygons
         """
-        self._test_rpred(model=self.old_model, no_legacy_polygons=True, expect_legacy=False)
+        self._test_rpred(model=self.old_model, force_no_legacy=True, expect_legacy=False)
 
     def test_rpred_from_new_model(self):
         """
         Test rpred with new model, check that it uses new polygon extraction method
         """
-        self._test_rpred(model=self.new_model, no_legacy_polygons=False, expect_legacy=False)
+        self._test_rpred(model=self.new_model, force_no_legacy=False, expect_legacy=False)
 
 
     def test_krakencli_ocr_old_model(self):
@@ -128,8 +131,8 @@ class TestNewPolygons(unittest.TestCase):
         """
         with tempfile.NamedTemporaryFile() as fp:
             self._test_krakencli(
-                args=['-f', 'xml', '-i', self.segmented_img, fp.name, 'ocr', '-m', str(self.old_model_path)],
-                no_legacy_polygons=False,
+                args=['-f', 'xml', '-i', self.segmented_img, fp.name, 'ocr', '-m', self.old_model_path],
+                force_no_legacy=False,
                 expect_legacy=True,
             )
 
@@ -139,8 +142,8 @@ class TestNewPolygons(unittest.TestCase):
         """
         with tempfile.NamedTemporaryFile() as fp:
             self._test_krakencli(
-                args=['-f', 'xml', '-i', self.segmented_img, fp.name, 'ocr', '-m', str(self.old_model_path)],
-                no_legacy_polygons=True,
+                args=['-f', 'xml', '-i', self.segmented_img, fp.name, 'ocr', '-m', self.old_model_path],
+                force_no_legacy=True,
                 expect_legacy=False,
             )
 
@@ -150,8 +153,8 @@ class TestNewPolygons(unittest.TestCase):
         """
         with tempfile.NamedTemporaryFile() as fp:
             self._test_krakencli(
-                args=['-f', 'xml', '-i', self.segmented_img, fp.name, 'ocr', '-m', str(self.new_model_path)],
-                no_legacy_polygons=False,
+                args=['-f', 'xml', '-i', self.segmented_img, fp.name, 'ocr', '-m', self.new_model_path],
+                force_no_legacy=False,
                 expect_legacy=False,
             )
 
@@ -162,7 +165,7 @@ class TestNewPolygons(unittest.TestCase):
         Test `ketos test` with old model, check that it uses legacy polygon extraction method
         """
         self._test_ketoscli(
-            args=['test', '-m', str(self.old_model_path), '-f', 'xml', '--workers', '0', str(self.segmented_img)],
+            args=['test', '-m', self.old_model_path, '-f', 'xml', '--workers', '0', self.segmented_img],
             expect_legacy=True,
         )
 
@@ -171,7 +174,7 @@ class TestNewPolygons(unittest.TestCase):
         Test `ketos test` with old model, check that it does not use legacy polygon extraction method
         """
         self._test_ketoscli(
-            args=['test', '--no-legacy-polygons', '-m', str(self.old_model_path), '-f', 'xml', '--workers', '0', str(self.segmented_img)],
+            args=['test', '--no-legacy-polygons', '-m', self.old_model_path, '-f', 'xml', '--workers', '0', self.segmented_img],
             expect_legacy=False,
         )
 
@@ -180,7 +183,7 @@ class TestNewPolygons(unittest.TestCase):
         Test `ketos test` with new model, check that it uses new polygon extraction method
         """
         self._test_ketoscli(
-            args=['test', '-m', str(self.new_model_path), '-f', 'xml', '--workers', '0', str(self.segmented_img)],
+            args=['test', '-m', self.new_model_path, '-f', 'xml', '--workers', '0', self.segmented_img],
             expect_legacy=False,
         )
 
@@ -189,50 +192,130 @@ class TestNewPolygons(unittest.TestCase):
         """
         Test `ketos train` with new model, check that it uses new polygon extraction method
         """
-        with tempfile.NamedTemporaryFile() as mfp:
+        with tempfile.TemporaryDirectory() as tempdir:
+            mfp = str(Path(tempdir) / "model")
+            fp = str(Path(tempdir) / "test.xml")
+
             self._test_ketoscli(
-                args=['train', '-f', 'xml', '-N', '1', '-q', 'fixed', '-o', mfp.name, '--workers', '0', str(self.segmented_img)],
+                args=['train', '-f', 'xml', '-N', '1', '-q', 'fixed', '-o', mfp, '--workers', '0', self.segmented_img],
                 expect_legacy=False,
             )
-            with tempfile.NamedTemporaryFile() as fp:
-                self._test_krakencli(
-                    args=['-f', 'xml', '-i', self.segmented_img, fp.name, 'ocr', '-m', mfp.name + "_0.mlmodel"],
-                    no_legacy_polygons=True,
-                    expect_legacy=False,
-                )
+
+            self._test_krakencli(
+                args=['-f', 'xml', '-i', self.segmented_img, fp, 'ocr', '-m', mfp + "_0.mlmodel"],
+                expect_legacy=False,
+            )
+
+    def test_ketoscli_train_new_model_force_legacy(self):
+        """
+        Test `ketos train` training new model, check that it uses legacy polygon extraction method if forced
+        """
+        with tempfile.TemporaryDirectory() as tempdir:
+            mfp = str(Path(tempdir) / "model")
+            fp = str(Path(tempdir) / "test.xml")
+
+            self._test_ketoscli(
+                args=['train', '--legacy-polygons', '-f', 'xml', '-N', '1', '-q', 'fixed', '-o', mfp, '--workers', '0', self.segmented_img],
+                expect_legacy=True,
+            )
+
+            self._test_krakencli(
+                args=['-f', 'xml', '-i', self.segmented_img, fp, 'ocr', '-m', mfp + "_0.mlmodel"],
+                expect_legacy=True,
+            )
 
     def test_ketoscli_train_old_model(self):
         """
         Test `ketos train` finetuning old model, check that it uses new polygon extraction method
         """
-        with tempfile.NamedTemporaryFile() as mfp:
+        with tempfile.TemporaryDirectory() as tempdir:
+            mfp = str(Path(tempdir) / "model")
+            fp = str(Path(tempdir) / "test.xml")
+
             self._test_ketoscli(
-                args=['train', '-f', 'xml', '-N', '1', '-q', 'fixed', '-i', str(self.old_model_path), '--resize', 'add', '-o', mfp.name, '--workers', '0', str(self.segmented_img)],
+                args=['train', '-f', 'xml', '-N', '1', '-q', 'fixed', '-i', self.old_model_path, '--resize', 'add', '-o', mfp, '--workers', '0', self.segmented_img],
                 expect_legacy=False,
                 check_exit_code=None, # Model may not improve during training
             )
-            # Check that the model now expects new polygons
-            with tempfile.NamedTemporaryFile() as fp:
-                self._test_krakencli(
-                    args=['-f', 'xml', '-i', self.segmented_img, fp.name, 'ocr', '-m', mfp.name + "_0.mlmodel"],
-                    no_legacy_polygons=True,
-                    expect_legacy=False,
-                )
+            self._test_krakencli(
+                args=['-f', 'xml', '-i', self.segmented_img, fp, 'ocr', '-m', mfp + "_0.mlmodel"],
+                expect_legacy=False,
+            )
 
-    def test_ketoscli_train_old_model_force_old(self):
+    def test_ketoscli_train_old_model_force_legacy(self):
         """
         Test `ketos train` finetuning old model, check that it uses legacy polygon extraction method if forced
         """
-        with tempfile.NamedTemporaryFile() as mfp:
+        with tempfile.TemporaryDirectory() as tempdir:
+            mfp = str(Path(tempdir) / "model")
+            fp = str(Path(tempdir) / "test.xml")
+
             self._test_ketoscli(
-                args=['train', '--legacy-polygons', '-f', 'xml', '-N', '1', '-q', 'fixed', '-i', str(self.old_model_path), '--resize', 'add', '-o', mfp.name, '--workers', '0', str(self.segmented_img)],
+                args=['train', '--legacy-polygons', '-f', 'xml', '-N', '1', '-q', 'fixed', '-i', self.old_model_path, '--resize', 'add', '-o', mfp, '--workers', '0', self.segmented_img],
                 expect_legacy=True,
                 check_exit_code=None, # Model may not improve during training
             )
-            # Check that the model still expects legacy polygons
-            with tempfile.NamedTemporaryFile() as fp:
-                self._test_krakencli(
-                    args=['-f', 'xml', '-i', self.segmented_img, fp.name, 'ocr', '-m', mfp.name + "_0.mlmodel"],
-                    no_legacy_polygons=False,
-                    expect_legacy=True,
-                )
+            self._test_krakencli(
+                args=['-f', 'xml', '-i', self.segmented_img, fp, 'ocr', '-m', mfp + "_0.mlmodel"],
+                expect_legacy=True,
+            )
+
+
+    @unittest.expectedFailure
+    def test_ketoscli_pretrain_new_model(self):
+        """
+        Test `ketos pretrain` with new model, check that it uses new polygon extraction method
+        """
+        with tempfile.TemporaryDirectory() as tempdir:
+            mfp = str(Path(tempdir) / "model")
+            fp = str(Path(tempdir) / "test.xml")
+
+            self._test_ketoscli(
+                args=['pretrain', '-f', 'xml', '-N', '1', '-q', 'fixed', '-o', mfp, '--workers', '0', self.segmented_img],
+                expect_legacy=False,
+            )
+            self._test_krakencli(
+                args=['-f', 'xml', '-i', self.segmented_img, fp, 'ocr', '-m', mfp + "_0.mlmodel"],
+                expect_legacy=False,
+            )
+
+    @unittest.expectedFailure
+    def test_ketoscli_pretrain_new_model_force_legacy(self):
+        """
+        Test `ketos pretrain` with new model, check that it uses legacy polygon extraction method if forced
+        """
+        with tempfile.TemporaryDirectory() as tempdir:
+            mfp = str(Path(tempdir) / "model")
+            fp = str(Path(tempdir) / "test.xml")
+
+            self._test_ketoscli(
+                args=['pretrain', '--legacy-polygons', '-f', 'xml', '-N', '1', '-q', 'fixed', '-o', mfp, '--workers', '0', self.segmented_img],
+                expect_legacy=True,
+                check_exit_code=None, # Model may not improve during training
+            )
+
+            self._test_krakencli(
+                args=['-f', 'xml', '-i', self.segmented_img, fp, 'ocr', '-m', str(mfp) + "_0.mlmodel"],
+                expect_legacy=True,
+            )
+
+    @unittest.expectedFailure
+    def test_ketoscli_pretrain_old_model(self):
+        """
+        Test `ketos pretrain` with old model, check that it uses new polygon extraction method
+        """
+        with tempfile.TemporaryDirectory() as tempdir:
+            mfp = str(Path(tempdir) / "model")
+            fp = str(Path(tempdir) / "test.xml")
+
+            self._test_ketoscli(
+                args=['pretrain', '-f', 'xml', '-N', '1', '-q', 'fixed', '-i', self.old_model_path, '--resize', 'add', '-o', mfp, '--workers', '0', self.segmented_img],
+                expect_legacy=False,
+                check_exit_code=None, # Model may not improve during training
+            )
+
+            self._test_krakencli(
+                args=['-f', 'xml', '-i', self.segmented_img, fp, 'ocr', '-m', mfp + "_0.mlmodel"],
+                expect_legacy=False,
+            )
+

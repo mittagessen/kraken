@@ -257,7 +257,8 @@ class RecognitionPretrainModel(pl.LightningModule):
                  spec: str = default_specs.RECOGNITION_SPEC,
                  model: Optional[Union['PathLike', str]] = None,
                  load_hyper_parameters: bool = False,
-                 len_train_set: int = -1):
+                 len_train_set: int = -1,
+                 legacy_polygons: bool = False):
         """
         A LightningModule encapsulating the unsupervised pretraining setup for
         a text recognition model.
@@ -275,9 +276,14 @@ class RecognitionPretrainModel(pl.LightningModule):
         """
         super().__init__()
         hyper_params_ = default_specs.RECOGNITION_PRETRAIN_HYPER_PARAMS
+        self.legacy_polygons = legacy_polygons
+
         if model:
             logger.info(f'Loading existing model from {model} ')
             self.nn = vgsl.TorchVGSLModel.load_model(model)
+
+            # apply legacy polygon parameter
+            self.nn.use_legacy_polygons = legacy_polygons
 
             if self.nn.model_type not in [None, 'recognition']:
                 raise ValueError(f'Model {model} is of type {self.nn.model_type} while `recognition` is expected.')
@@ -432,6 +438,7 @@ class RecognitionPretrainModel(pl.LightningModule):
             else:
                 logger.info(f'Creating new model {self.spec}')
                 self.nn = vgsl.TorchVGSLModel(self.spec)
+                self.nn.use_legacy_polygons = self.legacy_polygons
                 # initialize weights
                 self.nn.init_weights()
 

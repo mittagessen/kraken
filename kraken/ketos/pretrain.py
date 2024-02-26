@@ -259,9 +259,8 @@ def pretrain(ctx, batch_size, pad, output, spec, load, freq, quit, epochs,
                                      output=output,
                                      spec=spec,
                                      model=load,
-                                     load_hyper_parameters=load_hyper_parameters)
-
-    model.nn.use_legacy_polygons = legacy_polygons
+                                     load_hyper_parameters=load_hyper_parameters,
+                                     legacy_polygons=legacy_polygons)
 
     data_module = PretrainDataModule(batch_size=hyper_params.pop('batch_size'),
                                      pad=hyper_params.pop('pad'),

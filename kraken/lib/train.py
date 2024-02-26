@@ -235,10 +235,14 @@ class RecognitionModel(pl.LightningModule):
             **kwargs: Setup parameters, i.e. CLI parameters of the train() command.
         """
         super().__init__()
+        self.legacy_polygons = legacy_polygons
         hyper_params_ = default_specs.RECOGNITION_HYPER_PARAMS.copy()
         if model:
             logger.info(f'Loading existing model from {model} ')
             self.nn = vgsl.TorchVGSLModel.load_model(model)
+
+            # apply legacy polygon mode
+            self.nn.use_legacy_polygons = legacy_polygons
 
             if self.nn.model_type not in [None, 'recognition']:
                 raise ValueError(f'Model {model} is of type {self.nn.model_type} while `recognition` is expected.')
@@ -594,6 +598,7 @@ class RecognitionModel(pl.LightningModule):
                 logger.info(f'Creating new model {self.spec} with {self.train_set.dataset.codec.max_label+1} outputs')
                 self.spec = '[{} O1c{}]'.format(self.spec[1:-1], self.train_set.dataset.codec.max_label + 1)
                 self.nn = vgsl.TorchVGSLModel(self.spec)
+                self.nn.use_legacy_polygons = self.legacy_polygons
                 # initialize weights
                 self.nn.init_weights()
                 self.nn.add_codec(self.train_set.dataset.codec)
