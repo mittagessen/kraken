@@ -227,10 +227,12 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore, input,
     if bounds.script_detection:
         it = rpred.mm_rpred(model, im, bounds, pad,
                             bidi_reordering=bidi_reordering,
-                            tags_ignore=tags_ignore)
+                            tags_ignore=tags_ignore,
+                            no_legacy_polygons=ctx.meta['no_legacy_polygons'])
     else:
         it = rpred.rpred(model['default'], im, bounds, pad,
-                         bidi_reordering=bidi_reordering)
+                         bidi_reordering=bidi_reordering,
+                         no_legacy_polygons=ctx.meta['no_legacy_polygons'])
 
     preds = []
 
@@ -336,12 +338,7 @@ def cli(input, batch_input, suffix, verbose, format_type, pdf_format,
     ctx.meta['steps'] = []
     ctx.meta["autocast"] = autocast
     ctx.meta['threads'] = threads
-
     ctx.meta['no_legacy_polygons'] = no_legacy_polygons
-    if no_legacy_polygons:
-        # force disable legacy polygons globally
-        from kraken import rpred
-        rpred.mm_rpred.DISABLE_LEGACY_POLYGONS = True
 
     log.set_logger(logger, level=30 - min(10 * verbose, 20))
 

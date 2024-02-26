@@ -159,7 +159,7 @@ logger = logging.getLogger('kraken')
 @click.option('-e', '--evaluation-files', show_default=True, default=None, multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
-@click.option('--workers', show_default=True, default=1, type=click.IntRange(1), help='Number of worker processes.')
+@click.option('--workers', show_default=True, default=1, type=click.IntRange(0), help='Number of worker processes.')
 @click.option('--threads', show_default=True, default=1, type=click.IntRange(1), help='Maximum size of OpenMP/BLAS thread pool.')
 @click.option('--load-hyper-parameters/--no-load-hyper-parameters', show_default=True, default=False,
               help='When loading an existing model, retrieve hyperparameters from the model')
@@ -306,7 +306,8 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
                              resize=resize,
                              legacy_polygons=legacy_polygons)
     
-    model.nn.use_legacy_polygons = legacy_polygons
+    if model.nn:
+        model.nn.use_legacy_polygons = legacy_polygons
 
     trainer = KrakenTrainer(accelerator=accelerator,
                             devices=device,
@@ -355,7 +356,7 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
 @click.option('--pad', show_default=True, type=click.INT, default=16, help='Left and right '
               'padding around lines')
 @click.option('--workers', show_default=True, default=1,
-              type=click.IntRange(1),
+              type=click.IntRange(0),
               help='Number of worker processes when running on CPU.')
 @click.option('--threads', show_default=True, default=1,
               type=click.IntRange(1),

@@ -47,15 +47,14 @@ class mm_rpred(object):
     """
     Multi-model version of kraken.rpred.rpred
     """
-    DISABLE_LEGACY_POLYGONS = False # flag to force disable legacy polygon extraction mode
-
     def __init__(self,
                  nets: Dict[Tuple[str, str], 'TorchSeqRecognizer'],
                  im: 'Image.Image',
                  bounds: 'Segmentation',
                  pad: int = 16,
                  bidi_reordering: Union[bool, str] = True,
-                 tags_ignore: Optional[List[Tuple[str, str]]] = None) -> Generator[ocr_record, None, None]:
+                 tags_ignore: Optional[List[Tuple[str, str]]] = None,
+                 no_legacy_polygons: bool = False) -> Generator[ocr_record, None, None]:
         """
         Multi-model version of kraken.rpred.rpred.
 
@@ -162,6 +161,7 @@ class mm_rpred(object):
         self.pad = pad
         self.bounds = bounds
         self.tags_ignore = tags_ignore
+        self.no_legacy_polygons = no_legacy_polygons
 
     def _recognize_box_line(self, line):
         xmin, ymin, xmax, ymax = line.bbox
@@ -178,7 +178,7 @@ class mm_rpred(object):
 
         tag, net = self._resolve_tags_to_model(line.tags, self.nets)
 
-        use_legacy_polygons = self.__choose_legacy_polygon_extractor(net)
+        use_legacy_polygons = self._choose_legacy_polygon_extractor(net)
 
         seg = dataclasses.replace(self.bounds, lines=[line])
         box, coords = next(extract_polygons(self.im, seg, legacy=use_legacy_polygons))
@@ -249,7 +249,7 @@ class mm_rpred(object):
 
         tag, net = self._resolve_tags_to_model(line.tags, self.nets)
 
-        use_legacy_polygons = self.__choose_legacy_polygon_extractor(net)
+        use_legacy_polygons = self._choose_legacy_polygon_extractor(net)
 
         try:
             box, coords = next(extract_polygons(self.im, seg, legacy=use_legacy_polygons))
@@ -308,10 +308,10 @@ class mm_rpred(object):
     def _scale_val(self, val, min_val, max_val):
         return int(round(min(max(((val*self.net_scale)-self.pad)*self.in_scale, min_val), max_val-1)))
     
-    def __choose_legacy_polygon_extractor(self, net) -> bool:
+    def _choose_legacy_polygon_extractor(self, net) -> bool:
         # grouping the checks here to display warnings only once
         if net.nn.use_legacy_polygons:
-            if self.DISABLE_LEGACY_POLYGONS:
+            if self.no_legacy_polygons:
                 warnings.warn('Enforcing use of the new polygon extractor for models trained with old version. Accuracy may be affected.')
                 return False
             else:
@@ -325,7 +325,8 @@ def rpred(network: 'TorchSeqRecognizer',
           im: 'Image.Image',
           bounds: 'Segmentation',
           pad: int = 16,
-          bidi_reordering: Union[bool, str] = True) -> Generator[ocr_record, None, None]:
+          bidi_reordering: Union[bool, str] = True,
+          no_legacy_polygons: bool = False) -> Generator[ocr_record, None, None]:
     """
     Uses a TorchSeqRecognizer and a segmentation to recognize text
 
@@ -345,7 +346,7 @@ def rpred(network: 'TorchSeqRecognizer',
         An ocr_record containing the recognized text, absolute character
         positions, and confidence values for each character.
     """
-    return mm_rpred(defaultdict(lambda: network), im, bounds, pad, bidi_reordering)
+    return mm_rpred(defaultdict(lambda: network), im, bounds, pad, bidi_reordering, no_legacy_polygons=no_legacy_polygons)
 
 
 def _resolve_tags_to_model(tags: Optional[Sequence[Dict[str, str]]],

@@ -159,7 +159,7 @@ def _validate_merging(ctx, param, value):
 @click.option('-e', '--evaluation-files', show_default=True, default=None, multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
-@click.option('--workers', show_default=True, default=1, type=click.IntRange(1), help='Number of worker proesses.')
+@click.option('--workers', show_default=True, default=1, type=click.IntRange(0), help='Number of worker proesses.')
 @click.option('--threads', show_default=True, default=1, type=click.IntRange(1), help='Maximum size of OpenMP/BLAS thread pool.')
 @click.option('--load-hyper-parameters/--no-load-hyper-parameters', show_default=True, default=False,
               help='When loading an existing model, retrieve hyper-parameters from the model')
@@ -382,7 +382,7 @@ def segtrain(ctx, output, spec, line_width, pad, load, freq, quit, epochs,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with paths to evaluation data.')
 @click.option('-d', '--device', show_default=True, default='cpu', help='Select device to use (cpu, cuda:0, cuda:1, ...)')
-@click.option('--workers', default=1, show_default=True, type=click.IntRange(1),
+@click.option('--workers', default=1, show_default=True, type=click.IntRange(0),
               help='Number of worker processes for data loading.')
 @click.option('--threads', default=1, show_default=True, type=click.IntRange(1),
               help='Size of thread pools for intra-op parallelization')
