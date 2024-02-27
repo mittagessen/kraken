@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -*-
 
+from contextlib import contextmanager
 import unittest
 import tempfile
 from unittest.mock import Mock, patch
 from pathlib import Path
 from traceback import print_exception
+import warnings
+from typing import Optional, List
 
 from PIL import Image
 
@@ -44,6 +47,7 @@ class TestNewPolygons(unittest.TestCase):
         self.segmented_img = str(resources / "170025120000003,0074-lite.xml")
         self.runner = CliRunner()
         self.color_img = resources / "input.tif"
+        self.arrow_data = str(resources / "merge_tests/base.arrow")
         self.simple_bl_seg = Segmentation(
             type="baselines",
             imagename=resources / "bw.png",
@@ -81,28 +85,36 @@ class TestNewPolygons(unittest.TestCase):
             args = ["--no-legacy-polygons"] + args
 
         result = self.runner.invoke(kraken_cli, args)
+        print("kraken", *args)
+
+        if result.exception:
+            print_exception(result.exception)
 
         self.assertEqual(result.exit_code, 0)
         extractor_mock.assert_called()
         for cl in extractor_mock.mock_calls:
             self.assertEqual(cl[2]["legacy"], expect_legacy)
 
-    @patch("kraken.lib.dataset.recognition.extract_polygons", new_callable=mock_extract_polygons)
-    def _test_ketoscli(self, extractor_mock: Mock, *, args, expect_legacy: bool, check_exit_code=0):
+    def _test_ketoscli(self, *, args, expect_legacy: bool, check_exit_code: Optional[int|List[int]]=0, patching_dir="kraken.lib.dataset.recognition"):
         """
         Base recipe for testing ketos_cli with a given polygon extraction method
         """
-        result = self.runner.invoke(ketos_cli, args)
+        with patch(patching_dir + ".extract_polygons", new_callable=mock_extract_polygons) as extractor_mock:
+            result = self.runner.invoke(ketos_cli, args)
 
-        print("ketos", *args)
-        if result.exception:
-            print_exception(result.exception)
+            print("ketos", *args)
+            if result.exception:
+                print(result.output)
+                print_exception(result.exception)
 
-        if check_exit_code is not None:
-            self.assertEqual(result.exit_code, check_exit_code, "Command failed")
-        extractor_mock.assert_called()
-        for cl in extractor_mock.mock_calls:
-            self.assertEqual(cl[2]["legacy"], expect_legacy)
+            if check_exit_code is not None:
+                if isinstance(check_exit_code, int):
+                    check_exit_code = [check_exit_code]
+                self.assertIn(result.exit_code, check_exit_code, "Command failed")
+
+            extractor_mock.assert_called()
+            for cl in extractor_mock.mock_calls:
+                self.assertEqual(cl[2]["legacy"], expect_legacy)
 
     ## TESTS
 
@@ -199,6 +211,7 @@ class TestNewPolygons(unittest.TestCase):
             self._test_ketoscli(
                 args=['train', '-f', 'xml', '-N', '1', '-q', 'fixed', '-o', mfp, '--workers', '0', self.segmented_img],
                 expect_legacy=False,
+                check_exit_code=[0, 1], # Model may not improve during training
             )
 
             self._test_krakencli(
@@ -217,6 +230,7 @@ class TestNewPolygons(unittest.TestCase):
             self._test_ketoscli(
                 args=['train', '--legacy-polygons', '-f', 'xml', '-N', '1', '-q', 'fixed', '-o', mfp, '--workers', '0', self.segmented_img],
                 expect_legacy=True,
+                check_exit_code=[0, 1], # Model may not improve during training
             )
 
             self._test_krakencli(
@@ -235,7 +249,7 @@ class TestNewPolygons(unittest.TestCase):
             self._test_ketoscli(
                 args=['train', '-f', 'xml', '-N', '1', '-q', 'fixed', '-i', self.old_model_path, '--resize', 'add', '-o', mfp, '--workers', '0', self.segmented_img],
                 expect_legacy=False,
-                check_exit_code=None, # Model may not improve during training
+                check_exit_code=[0, 1], # Model may not improve during training
             )
             self._test_krakencli(
                 args=['-f', 'xml', '-i', self.segmented_img, fp, 'ocr', '-m', mfp + "_0.mlmodel"],
@@ -253,7 +267,7 @@ class TestNewPolygons(unittest.TestCase):
             self._test_ketoscli(
                 args=['train', '--legacy-polygons', '-f', 'xml', '-N', '1', '-q', 'fixed', '-i', self.old_model_path, '--resize', 'add', '-o', mfp, '--workers', '0', self.segmented_img],
                 expect_legacy=True,
-                check_exit_code=None, # Model may not improve during training
+                check_exit_code=[0, 1], # Model may not improve during training
             )
             self._test_krakencli(
                 args=['-f', 'xml', '-i', self.segmented_img, fp, 'ocr', '-m', mfp + "_0.mlmodel"],
@@ -273,6 +287,7 @@ class TestNewPolygons(unittest.TestCase):
             self._test_ketoscli(
                 args=['pretrain', '-f', 'xml', '-N', '1', '-q', 'fixed', '-o', mfp, '--workers', '0', self.segmented_img],
                 expect_legacy=False,
+                check_exit_code=[0, 1], # Model may not improve during training
             )
             self._test_krakencli(
                 args=['-f', 'xml', '-i', self.segmented_img, fp, 'ocr', '-m', mfp + "_0.mlmodel"],
@@ -291,7 +306,7 @@ class TestNewPolygons(unittest.TestCase):
             self._test_ketoscli(
                 args=['pretrain', '--legacy-polygons', '-f', 'xml', '-N', '1', '-q', 'fixed', '-o', mfp, '--workers', '0', self.segmented_img],
                 expect_legacy=True,
-                check_exit_code=None, # Model may not improve during training
+                check_exit_code=[0, 1], # Model may not improve during training
             )
 
             self._test_krakencli(
@@ -311,7 +326,7 @@ class TestNewPolygons(unittest.TestCase):
             self._test_ketoscli(
                 args=['pretrain', '-f', 'xml', '-N', '1', '-q', 'fixed', '-i', self.old_model_path, '--resize', 'add', '-o', mfp, '--workers', '0', self.segmented_img],
                 expect_legacy=False,
-                check_exit_code=None, # Model may not improve during training
+                check_exit_code=[0, 1], # Model may not improve during training
             )
 
             self._test_krakencli(
@@ -319,3 +334,62 @@ class TestNewPolygons(unittest.TestCase):
                 expect_legacy=False,
             )
 
+
+    def _assertWarnsWhenTrainingArrow(self, model: str, dset: str, force_legacy: bool, expect_warning: bool):
+        args = ['-f', 'binary', '-N', '1', '-q', 'fixed', '-o', model, dset]
+        if force_legacy:
+            args = ['--legacy-polygons'] + args
+        print("ketos", 'train', *args)
+        run = self.runner.invoke(ketos_cli, ['train'] + args)
+        if expect_warning:
+            self.assertIn("polygon extraction", run.output, "Expected warning about polygon extraction method")
+        else:
+            self.assertNotIn("polygon extraction", run.output, "Unexpected warning about polygon extraction method")
+
+    def test_ketos_old_arrow_train_new(self):
+        """
+        Test `ketos train`, on old arrow dataset, check that it raises a warning about polygon extraction method only if incoherent
+        """
+        with tempfile.TemporaryDirectory() as tempdir:
+            mfp = str(Path(tempdir) / "model")
+            mfp2 = str(Path(tempdir) / "model2")
+
+            self._assertWarnsWhenTrainingArrow(mfp, self.arrow_data, force_legacy=False, expect_warning=True)
+            self._assertWarnsWhenTrainingArrow(mfp2, self.arrow_data, force_legacy=True, expect_warning=False)
+
+    def test_ketos_new_arrow(self):
+        """
+        Test `ketos compile`, check that it uses new polygon extraction method
+        """
+        with tempfile.TemporaryDirectory() as tempdir:
+            dset = str(Path(tempdir) / "dataset.arrow")
+            mfp = str(Path(tempdir) / "model")
+            mfp2 = str(Path(tempdir) / "model2")
+
+            self._test_ketoscli(
+                args=['compile', '-f', 'xml', '-o', dset, self.segmented_img],
+                expect_legacy=False,
+                patching_dir="kraken.lib.arrow_dataset",
+            )
+
+            self._assertWarnsWhenTrainingArrow(mfp, dset, force_legacy=False, expect_warning=False)
+            self._assertWarnsWhenTrainingArrow(mfp2, dset, force_legacy=True, expect_warning=True)
+
+
+    def test_ketos_new_arrow_force_legacy(self):
+        """
+        Test `ketos compile`, check that it uses old polygon extraction method
+        """
+        with tempfile.TemporaryDirectory() as tempdir:
+            dset = str(Path(tempdir) / "dataset.arrow")
+            mfp = str(Path(tempdir) / "model")
+            mfp2 = str(Path(tempdir) / "model2")
+
+            self._test_ketoscli(
+                args=['compile', '--legacy-polygons', '-f', 'xml', '-o', dset, self.segmented_img],
+                expect_legacy=True,
+                patching_dir="kraken.lib.arrow_dataset",
+            )
+
+            self._assertWarnsWhenTrainingArrow(mfp, dset, force_legacy=False, expect_warning=True)
+            self._assertWarnsWhenTrainingArrow(mfp2, dset, force_legacy=True, expect_warning=False)
