@@ -122,7 +122,7 @@ class PretrainDataModule(pl.LightningDataModule):
             DatasetClass = partial(PolygonGTDataset, legacy_polygons=legacy_polygons)
             valid_norm = False
         elif format_type == 'binary':
-            DatasetClass = ArrowIPCRecognitionDataset
+            DatasetClass = partial(ArrowIPCRecognitionDataset, legacy_polygons=legacy_polygons)
             if repolygonize:
                 logger.warning('Repolygonization enabled in `binary` mode. Will be ignored.')
             valid_norm = False

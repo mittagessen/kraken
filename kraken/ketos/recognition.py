@@ -467,7 +467,7 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
         valid_norm = False
         DatasetClass = partial(PolygonGTDataset, legacy_polygons=legacy_polygons)
     elif format_type == 'binary':
-        DatasetClass = ArrowIPCRecognitionDataset
+        DatasetClass = partial(ArrowIPCRecognitionDataset, legacy_polygons=legacy_polygons)
         if repolygonize:
             logger.warning('Repolygonization enabled in `binary` mode. Will be ignored.')
         test_set = [{'file': file} for file in test_set]
