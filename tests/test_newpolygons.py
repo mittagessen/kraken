@@ -26,6 +26,7 @@ from kraken.lib.models import load_any
 from kraken.rpred import mm_rpred, rpred
 from kraken.kraken import cli as kraken_cli
 from kraken.ketos import cli as ketos_cli
+import re
 
 thisfile = Path(__file__).resolve().parent
 resources = thisfile / "resources"
@@ -335,16 +336,24 @@ class TestNewPolygons(unittest.TestCase):
             )
 
 
-    def _assertWarnsWhenTrainingArrow(self, model: str, dset: str, force_legacy: bool, expect_warning: bool):
-        args = ['-f', 'binary', '-N', '1', '-q', 'fixed', '-o', model, dset]
+    def _assertWarnsWhenTrainingArrow(
+            self, model: str, *dset: str, from_model: str|None=None, force_legacy: bool=False, 
+            expect_warning_msgs: list[str]=[], expect_not_warning_msgs: list[str]=[]):
+
+        args = ['-f', 'binary', '-N', '1', '-q', 'fixed', '-o', model, *dset]
         if force_legacy:
             args = ['--legacy-polygons'] + args
+        if from_model:
+            args = ['-i', from_model, '--resize', 'add'] + args
+
         print("ketos", 'train', *args)
         run = self.runner.invoke(ketos_cli, ['train'] + args)
-        if expect_warning:
-            self.assertIn("polygon extraction", run.output, "Expected warning about polygon extraction method")
-        else:
-            self.assertNotIn("polygon extraction", run.output, "Unexpected warning about polygon extraction method")
+        output = re.sub(r'\w+\.py:\d+\n', '', run.output)
+        output = re.sub(r'\s+', ' ', output)
+        for warning_msg in expect_warning_msgs:
+            self.assertIn(warning_msg, output, f"Expected warning '{warning_msg}' not found in output")
+        for warning_msg in expect_not_warning_msgs:
+            self.assertNotIn(warning_msg, output, f"Unexpected warning '{warning_msg}' found in output")
 
     def test_ketos_old_arrow_train_new(self):
         """
@@ -354,8 +363,8 @@ class TestNewPolygons(unittest.TestCase):
             mfp = str(Path(tempdir) / "model")
             mfp2 = str(Path(tempdir) / "model2")
 
-            self._assertWarnsWhenTrainingArrow(mfp, self.arrow_data, force_legacy=False, expect_warning=True)
-            self._assertWarnsWhenTrainingArrow(mfp2, self.arrow_data, force_legacy=True, expect_warning=False)
+            self._assertWarnsWhenTrainingArrow(mfp, self.arrow_data, force_legacy=False, expect_warning_msgs=["WARNING Setting dataset legacy polygon status to True based on training set", "the new model will be flagged to use legacy"])
+            self._assertWarnsWhenTrainingArrow(mfp2, self.arrow_data, force_legacy=True, expect_not_warning_msgs=["WARNING Setting dataset legacy polygon status to True based on training set", "the new model will be flagged to use legacy"])
 
     def test_ketos_new_arrow(self):
         """
@@ -372,8 +381,8 @@ class TestNewPolygons(unittest.TestCase):
                 patching_dir="kraken.lib.arrow_dataset",
             )
 
-            self._assertWarnsWhenTrainingArrow(mfp, dset, force_legacy=False, expect_warning=False)
-            self._assertWarnsWhenTrainingArrow(mfp2, dset, force_legacy=True, expect_warning=True)
+            self._assertWarnsWhenTrainingArrow(mfp, dset, force_legacy=False, expect_not_warning_msgs=["WARNING Setting dataset legacy polygon status to False based on training set", "the new model will be flagged to use legacy"])
+            self._assertWarnsWhenTrainingArrow(mfp2, dset, force_legacy=True, expect_warning_msgs=["WARNING Setting dataset legacy polygon status to False based on training set", "the new model will be flagged to use new"])
 
 
     def test_ketos_new_arrow_force_legacy(self):
@@ -391,5 +400,50 @@ class TestNewPolygons(unittest.TestCase):
                 patching_dir="kraken.lib.arrow_dataset",
             )
 
-            self._assertWarnsWhenTrainingArrow(mfp, dset, force_legacy=False, expect_warning=True)
-            self._assertWarnsWhenTrainingArrow(mfp2, dset, force_legacy=True, expect_warning=False)
+            self._assertWarnsWhenTrainingArrow(mfp, dset, force_legacy=False, expect_warning_msgs=["WARNING Setting dataset legacy polygon status to True based on training set", "the new model will be flagged to use legacy"])
+            self._assertWarnsWhenTrainingArrow(mfp2, dset, force_legacy=True, expect_not_warning_msgs=["WARNING Setting dataset legacy polygon status to True based on training set", "the new model will be flagged to use legacy"])
+
+    def test_ketos_old_arrow_old_model(self):
+        """
+        Test `ketos train`, on old arrow dataset, check that it raises a warning about polygon extraction method only if incoherent
+        """
+        with tempfile.TemporaryDirectory() as tempdir:
+            mfp = str(Path(tempdir) / "model")
+            mfp2 = str(Path(tempdir) / "model2")
+
+            self._assertWarnsWhenTrainingArrow(mfp, self.arrow_data, from_model=self.old_model_path, force_legacy=False, expect_warning_msgs=["WARNING Setting dataset legacy polygon status to True based on training set"], expect_not_warning_msgs=["model will be flagged to use new"])
+            self._assertWarnsWhenTrainingArrow(mfp2, self.arrow_data, from_model=self.old_model_path, force_legacy=True, expect_not_warning_msgs=["WARNING Setting dataset legacy polygon status to True based on training set", "model will be flagged to use new"])
+
+    def test_ketos_new_arrow_old_model(self):
+        """
+        Test `ketos train`, on new arrow dataset, check that it raises a warning about polygon extraction method only if incoherent
+        """
+        with tempfile.TemporaryDirectory() as tempdir:
+            dset = str(Path(tempdir) / "dataset.arrow")
+            mfp = str(Path(tempdir) / "model")
+            mfp2 = str(Path(tempdir) / "model2")
+
+            self._test_ketoscli(
+                args=['compile', '-f', 'xml', '-o', dset, self.segmented_img],
+                expect_legacy=False,
+                patching_dir="kraken.lib.arrow_dataset",
+            )
+
+            self._assertWarnsWhenTrainingArrow(mfp, dset, from_model=self.old_model_path, force_legacy=False, expect_not_warning_msgs=["WARNING Setting dataset legacy polygon status to False based on training set"], expect_warning_msgs=["model will be flagged to use new"])
+            self._assertWarnsWhenTrainingArrow(mfp2, dset, from_model=self.old_model_path, force_legacy=True, expect_warning_msgs=["WARNING Setting dataset legacy polygon status to False based on training set"], expect_not_warning_msgs=["model will be flagged to use new"])
+
+    def test_ketos_mixed_arrow_train_new(self):
+        """
+        Test `ketos train`, on mixed arrow dataset, check that it raises a warning about polygon extraction method only if incoherent
+        """
+        with tempfile.TemporaryDirectory() as tempdir:
+            dset = str(Path(tempdir) / "dataset.arrow")
+            mfp = str(Path(tempdir) / "model")
+
+            self._test_ketoscli(
+                args=['compile', '-f', 'xml', '-o', dset, self.segmented_img, self.arrow_data],
+                expect_legacy=False,
+                patching_dir="kraken.lib.arrow_dataset",
+            )
+
+            self._assertWarnsWhenTrainingArrow(mfp, dset, self.arrow_data, force_legacy=True, expect_warning_msgs=["WARNING Mixed legacy polygon", "WARNING Setting dataset legacy polygon status to False based on training set"], expect_not_warning_msgs=["model will be flagged to use legacy"])

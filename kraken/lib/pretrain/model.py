@@ -108,6 +108,8 @@ class PretrainDataModule(pl.LightningDataModule):
         super().__init__()
         self.save_hyperparameters()
 
+        self.legacy_polygons = legacy_polygons
+
         DatasetClass = GroundTruthDataset
         valid_norm = True
         if format_type in ['xml', 'page', 'alto']:
@@ -122,7 +124,7 @@ class PretrainDataModule(pl.LightningDataModule):
             DatasetClass = partial(PolygonGTDataset, legacy_polygons=legacy_polygons)
             valid_norm = False
         elif format_type == 'binary':
-            DatasetClass = partial(ArrowIPCRecognitionDataset, legacy_polygons=legacy_polygons)
+            DatasetClass = ArrowIPCRecognitionDataset
             if repolygonize:
                 logger.warning('Repolygonization enabled in `binary` mode. Will be ignored.')
             valid_norm = False
@@ -206,6 +208,19 @@ class PretrainDataModule(pl.LightningDataModule):
                         f'{val_len} (of {len(train_set)}) samples to validation '
                         'set. (Will disable alphabet mismatch detection.)')
             self.train_set, self.val_set = random_split(train_set, (train_len, val_len))
+
+        if format_type == 'binary':
+            legacy_train_status = train_set.legacy_polygons_status
+            if val_set and val_set.legacy_polygons_status != legacy_train_status:
+                logger.warning(
+                    f'Train and validation set have different legacy polygon status: {legacy_train_status} and {val_set.legacy_polygons_status}.'
+                     'Train set status prevails.')
+            if legacy_train_status == "mixed":
+                logger.warning('Mixed legacy polygon status in training dataset. Consider recompilation.')
+                legacy_train_status = False
+            if legacy_polygons != legacy_train_status:
+                logger.warning(f'Setting dataset legacy polygon status to {legacy_train_status} based on training set.')
+                self.legacy_polygons = legacy_train_status
 
         if len(self.train_set) == 0 or len(self.val_set) == 0:
             raise ValueError('No valid training data was provided to the train '

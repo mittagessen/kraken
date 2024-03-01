@@ -91,8 +91,7 @@ class ArrowIPCRecognitionDataset(Dataset):
                  reorder: Union[bool, Literal['L', 'R']] = True,
                  im_transforms: Callable[[Any], torch.Tensor] = transforms.Compose([]),
                  augmentation: bool = False,
-                 split_filter: Optional[str] = None,
-                 legacy_polygons: Optional[bool] = None) -> None:
+                 split_filter: Optional[str] = None) -> None:
         """
         Creates a dataset for a polygonal (baseline) transcription model.
 
@@ -111,8 +110,6 @@ class ArrowIPCRecognitionDataset(Dataset):
                           are sampled, if set to `train`, `validation`, or
                           `test` only rows with the appropriate flag set in the
                           file will be considered.
-            legacy_polygons: Whether it should have been compiled with the
-                             legacy polygon extraction method (for sanity check).
         """
         self.alphabet: Counter = Counter()
         self.text_transforms: List[Callable[[str], str]] = []
@@ -124,7 +121,7 @@ class ArrowIPCRecognitionDataset(Dataset):
         self.arrow_table = None
         self.codec = None
         self.skip_empty_lines = skip_empty_lines
-        self.legacy_polygons = legacy_polygons
+        self.legacy_polygons_status = None
 
         self.seg_type = None
         # built text transformations
@@ -179,12 +176,10 @@ class ArrowIPCRecognitionDataset(Dataset):
             self.transforms.valid_norm = True
 
         legacy_polygons = metadata.get('legacy_polygons', True)
-        if self.legacy_polygons is not None and self.legacy_polygons != legacy_polygons:
-            logger.warning(
-                f'Dataset was compiled using {"legacy" if legacy_polygons else "new"} polygon extraction method, '
-                f'but its context of use requires the {"legacy" if self.legacy_polygons else "new"} method. \n'
-                f'Consider recompiling the dataset with the correct method, or using it with the flag --legacy-polygons.'
-            )
+        if self.legacy_polygons_status is None:
+            self.legacy_polygons_status = legacy_polygons
+        elif self.legacy_polygons_status != legacy_polygons:
+            self.legacy_polygons_status = "mixed"
 
         self.alphabet.update(metadata['alphabet'])
         num_lines = metadata['counts'][self._split_filter] if self._split_filter else metadata['counts']['all']

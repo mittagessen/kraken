@@ -241,9 +241,6 @@ class RecognitionModel(pl.LightningModule):
             logger.info(f'Loading existing model from {model} ')
             self.nn = vgsl.TorchVGSLModel.load_model(model)
 
-            # apply legacy polygon mode
-            self.nn.use_legacy_polygons = legacy_polygons
-
             if self.nn.model_type not in [None, 'recognition']:
                 raise ValueError(f'Model {model} is of type {self.nn.model_type} while `recognition` is expected.')
 
@@ -293,7 +290,7 @@ class RecognitionModel(pl.LightningModule):
             DatasetClass = partial(PolygonGTDataset, legacy_polygons=legacy_polygons)
             valid_norm = False
         elif format_type == 'binary':
-            DatasetClass = partial(ArrowIPCRecognitionDataset, legacy_polygons=legacy_polygons)
+            DatasetClass = ArrowIPCRecognitionDataset
             if repolygonize:
                 logger.warning('Repolygonization enabled in `binary` mode. Will be ignored.')
             valid_norm = False
@@ -381,6 +378,7 @@ class RecognitionModel(pl.LightningModule):
             logger.debug('Setting multiprocessing tensor sharing strategy to file_system')
             torch.multiprocessing.set_sharing_strategy('file_system')
 
+        val_set = None
         if evaluation_data:
             train_set = self._build_dataset(DatasetClass, training_data)
             self.train_set = Subset(train_set, range(len(train_set)))
@@ -404,6 +402,19 @@ class RecognitionModel(pl.LightningModule):
         if len(self.train_set) == 0 or len(self.val_set) == 0:
             raise ValueError('No valid training data was provided to the train '
                              'command. Please add valid XML, line, or binary data.')
+
+        if format_type == 'binary':
+            legacy_train_status = train_set.legacy_polygons_status
+            if val_set and val_set.legacy_polygons_status != legacy_train_status:
+                logger.warning(
+                    f'Train and validation set have different legacy polygon status: {legacy_train_status} and {val_set.legacy_polygons_status}.'
+                     'Train set status prevails.')
+            if legacy_train_status == "mixed":
+                logger.warning('Mixed legacy polygon status in training dataset. Consider recompilation.')
+                legacy_train_status = False
+            if legacy_polygons != legacy_train_status:
+                logger.warning(f'Setting dataset legacy polygon status to {legacy_train_status} based on training set.')
+                self.legacy_polygons = legacy_train_status
 
         logger.info(f'Training set {len(self.train_set)} lines, validation set '
                     f'{len(self.val_set)} lines, alphabet {len(train_set.alphabet)} '

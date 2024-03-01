@@ -306,8 +306,16 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
                              resize=resize,
                              legacy_polygons=legacy_polygons)
     
-    if model.nn:
-        model.nn.use_legacy_polygons = legacy_polygons
+    # Force upgrade to new polygon extractor if model was not trained with it
+    if model.nn and model.nn.use_legacy_polygons:
+        if not legacy_polygons and not model.legacy_polygons:
+            # upgrade to new polygon extractor
+            logger.warning('The model will be flagged to use new polygon extractor.')
+            model.nn.use_legacy_polygons = False
+    if not model.nn and legacy_polygons != model.legacy_polygons:
+        logger.warning(f'Dataset was compiled with legacy polygon extractor: {model.legacy_polygons}, '
+                       f'the new model will be flagged to use {"legacy" if model.legacy_polygons else "new"} method.')
+        legacy_polygons = model.legacy_polygons
 
     trainer = KrakenTrainer(accelerator=accelerator,
                             devices=device,
@@ -467,7 +475,7 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
         valid_norm = False
         DatasetClass = partial(PolygonGTDataset, legacy_polygons=legacy_polygons)
     elif format_type == 'binary':
-        DatasetClass = partial(ArrowIPCRecognitionDataset, legacy_polygons=legacy_polygons)
+        DatasetClass = ArrowIPCRecognitionDataset
         if repolygonize:
             logger.warning('Repolygonization enabled in `binary` mode. Will be ignored.')
         test_set = [{'file': file} for file in test_set]
@@ -510,6 +518,13 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
                     ds.add(**line)
                 except ValueError as e:
                     logger.info(e)
+
+            if hasattr(ds, 'legacy_polygon_status'):
+                if ds.legacy_polygons_status != legacy_polygons:
+                    warnings.warn(
+                        f'Binary dataset was compiled with legacy polygon extractor: {ds.legacy_polygon_status}, '
+                        f'while expecting data extracted with {"legacy" if legacy_polygons else "new"} method. Results may be inaccurate.')
+
             # don't encode validation set as the alphabets may not match causing encoding failures
             ds.no_encode()
             ds_loader = DataLoader(ds,
