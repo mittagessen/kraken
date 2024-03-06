@@ -21,6 +21,7 @@ Command line drivers for recognition functionality.
 import dataclasses
 import logging
 import os
+import uuid
 import shlex
 import warnings
 from functools import partial
@@ -179,7 +180,6 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore, input,
 
     import dataclasses
     import json
-    import uuid
 
     from kraken import rpred
     from kraken.containers import BBoxLine, Segmentation
@@ -345,7 +345,6 @@ def process_pipeline(subcommands, input, batch_input, suffix, verbose, format_ty
     """
     import glob
     import tempfile
-    import uuid
 
     from threadpoolctl import threadpool_limits
 
@@ -450,7 +449,8 @@ def binarize(ctx, threshold, zoom, escale, border, perc, range, low, high):
     """
     from kraken.containers import ProcessingStep
 
-    ctx.meta['steps'].append(ProcessingStep(category='preprocessing',
+    ctx.meta['steps'].append(ProcessingStep(id=uuid.uuid4(),
+                                            category='preprocessing',
                                             description='Image binarization',
                                             settings={'threshold': threshold,
                                                       'zoom': zoom,
@@ -501,7 +501,8 @@ def segment(ctx, model, boxes, text_direction, scale, maxcolseps,
     if boxes is False:
         if not model:
             model = SEGMENTATION_DEFAULT_MODEL
-        ctx.meta['steps'].append(ProcessingStep(category='processing',
+        ctx.meta['steps'].append(ProcessingStep(id=uuid.uuid4(),
+                                                category='processing',
                                                 description='Baseline and region segmentation',
                                                 settings={'model': os.path.basename(model),
                                                           'text_direction': text_direction}))
@@ -530,7 +531,8 @@ def segment(ctx, model, boxes, text_direction, scale, maxcolseps,
 
         message('\u2713', fg='green')
     else:
-        ctx.meta['steps'].append(ProcessingStep(category='processing',
+        ctx.meta['steps'].append(ProcessingStep(id=uuid.uuid4(),
+                                                category='processing',
                                                 description='bounding box segmentation',
                                                 settings={'text_direction': text_direction,
                                                           'scale': scale,
@@ -641,7 +643,8 @@ def ocr(ctx, model, pad, reorder, base_dir, no_segmentation, text_direction):
         nn.update(nm)
         nm = nn
 
-    ctx.meta['steps'].append(ProcessingStep(category='processing',
+    ctx.meta['steps'].append(ProcessingStep(id=uuid.uuid4(),
+                                            category='processing',
                                             description='Text line recognition',
                                             settings={'text_direction': text_direction,
                                                       'models': ' '.join(os.path.basename(v) for v in model.values()),
