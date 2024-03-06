@@ -349,6 +349,7 @@ def process_pipeline(subcommands, input, batch_input, suffix, verbose, format_ty
 
     from threadpoolctl import threadpool_limits
 
+    from kraken.containers import ProcessingStep
     from kraken.lib.progress import KrakenProgressBar
 
     ctx = click.get_current_context()
@@ -399,7 +400,10 @@ def process_pipeline(subcommands, input, batch_input, suffix, verbose, format_ty
                     progress.update(pdf_parse_task, total=num_pages)
                     logger.warning(f'{fpath} is not a PDF file. Skipping.')
         input = new_input
-        ctx.meta['steps'].insert(0, {'category': 'preprocessing', 'description': 'PDF image extraction', 'settings': {}})
+        ctx.meta['steps'].insert(0, ProcessingStep(id=uuid.uuid4(),
+                                                   category='preprocessing',
+                                                   description='PDF image extraction',
+                                                   settings={}))
 
     for io_pair in input:
         ctx.meta['first_process'] = True
@@ -444,16 +448,18 @@ def binarize(ctx, threshold, zoom, escale, border, perc, range, low, high):
     """
     Binarizes page images.
     """
-    ctx.meta['steps'].append({'category': 'preprocessing',
-                              'description': 'Image binarization',
-                              'settings': {'threshold': threshold,
-                                           'zoom': zoom,
-                                           'escale': escale,
-                                           'border': border,
-                                           'perc': perc,
-                                           'range': range,
-                                           'low': low,
-                                           'high': high}})
+    from kraken.containers import ProcessingStep
+
+    ctx.meta['steps'].append(ProcessingStep(category='preprocessing',
+                                            description='Image binarization',
+                                            settings={'threshold': threshold,
+                                                      'zoom': zoom,
+                                                      'escale': escale,
+                                                      'border': border,
+                                                      'perc': perc,
+                                                      'range': range,
+                                                      'low': low,
+                                                      'high': high}))
 
     return partial(binarizer, threshold, zoom, escale, border, perc, range,
                    low, high)
@@ -486,6 +492,8 @@ def segment(ctx, model, boxes, text_direction, scale, maxcolseps,
     """
     Segments page images into text lines.
     """
+    from kraken.containers import ProcessingStep
+
     if model and boxes:
         logger.warning(f'Baseline model ({model}) given but legacy segmenter selected. Forcing to -bl.')
         boxes = False
@@ -493,10 +501,10 @@ def segment(ctx, model, boxes, text_direction, scale, maxcolseps,
     if boxes is False:
         if not model:
             model = SEGMENTATION_DEFAULT_MODEL
-        ctx.meta['steps'].append({'category': 'processing',
-                                  'description': 'Baseline and region segmentation',
-                                  'settings': {'model': os.path.basename(model),
-                                               'text_direction': text_direction}})
+        ctx.meta['steps'].append(ProcessingStep(category='processing',
+                                                description='Baseline and region segmentation',
+                                                settings={'model': os.path.basename(model),
+                                                          'text_direction': text_direction}))
 
         # first try to find the segmentation model by its given name,
         # then look in the kraken config folder
@@ -522,14 +530,14 @@ def segment(ctx, model, boxes, text_direction, scale, maxcolseps,
 
         message('\u2713', fg='green')
     else:
-        ctx.meta['steps'].append({'category': 'processing',
-                                  'description': 'bounding box segmentation',
-                                  'settings': {'text_direction': text_direction,
-                                               'scale': scale,
-                                               'maxcolseps': maxcolseps,
-                                               'black_colseps': black_colseps,
-                                               'remove_hlines': remove_hlines,
-                                               'pad': pad}})
+        ctx.meta['steps'].append(ProcessingStep(category='processing',
+                                                description='bounding box segmentation',
+                                                settings={'text_direction': text_direction,
+                                                          'scale': scale,
+                                                          'maxcolseps': maxcolseps,
+                                                          'black_colseps': black_colseps,
+                                                          'remove_hlines': remove_hlines,
+                                                          'pad': pad}))
 
     return partial(segmenter, boxes, model, text_direction, scale, maxcolseps,
                    black_colseps, remove_hlines, pad, mask, ctx.meta['device'])
@@ -594,6 +602,8 @@ def ocr(ctx, model, pad, reorder, base_dir, no_segmentation, text_direction):
     """
     from kraken.lib import models
 
+    from kraken.containers import ProcessingStep
+
     if ctx.meta['input_format_type'] != 'image' and no_segmentation:
         raise click.BadParameter('no_segmentation mode is incompatible with page/alto inputs')
 
@@ -631,12 +641,12 @@ def ocr(ctx, model, pad, reorder, base_dir, no_segmentation, text_direction):
         nn.update(nm)
         nm = nn
 
-    ctx.meta['steps'].append({'category': 'processing',
-                              'description': 'Text line recognition',
-                              'settings': {'text_direction': text_direction,
-                                           'models': ' '.join(os.path.basename(v) for v in model.values()),
-                                           'pad': pad,
-                                           'bidi_reordering': reorder}})
+    ctx.meta['steps'].append(ProcessingStep(category='processing',
+                                            description='Text line recognition',
+                                            settings={'text_direction': text_direction,
+                                                      'models': ' '.join(os.path.basename(v) for v in model.values()),
+                                                      'pad': pad,
+                                                      'bidi_reordering': reorder}))
 
     # set output mode
     ctx.meta['text_direction'] = text_direction
