@@ -352,10 +352,13 @@ def vectorize_regions(im: np.ndarray, threshold: float = 0.5):
         [[x0, y0, ... xn, yn], [xm, ym, ..., xk, yk], ... ]
         A list of lists containing the region polygons.
     """
+    print(f'shape: {im.shape} {im.max()}')
     bin = im > threshold
     labelled = label(bin)
     boundaries = []
     for x in regionprops(labelled):
+        if x.area < 32:
+            continue
         boundary = boundary_tracing(x)
         if len(boundary) > 2:
             boundaries.append(geom.Polygon(boundary))
