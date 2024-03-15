@@ -25,8 +25,7 @@ from typing import Callable, List, Optional, Tuple, Union
 
 import numpy as np
 import PIL
-from scipy.ndimage.filters import (gaussian_filter, maximum_filter,
-                                   uniform_filter)
+from scipy.ndimage import gaussian_filter, maximum_filter, uniform_filter
 
 from kraken.containers import BBoxLine, Segmentation
 from kraken.lib import morph, sl
