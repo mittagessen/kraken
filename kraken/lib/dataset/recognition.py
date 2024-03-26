@@ -292,7 +292,7 @@ class PolygonGTDataset(Dataset):
                  reorder: Union[bool, Literal['L', 'R']] = True,
                  im_transforms: Callable[[Any], torch.Tensor] = transforms.Compose([]),
                  augmentation: bool = False,
-                 legacy_polygons: bool=False) -> None:
+                 legacy_polygons: bool = False) -> None:
         """
         Creates a dataset for a polygonal (baseline) transcription model.
 

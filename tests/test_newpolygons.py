@@ -5,7 +5,7 @@ import unittest
 import tempfile
 from unittest.mock import Mock, patch
 from pathlib import Path
-from traceback import print_exception
+from traceback import print_exc
 import warnings
 from typing import Optional, List, Union
 
@@ -89,7 +89,7 @@ class TestNewPolygons(unittest.TestCase):
         print("kraken", *args)
 
         if result.exception:
-            print_exception(result.exception)
+            print_exc()
 
         self.assertEqual(result.exit_code, 0)
         extractor_mock.assert_called()
@@ -106,7 +106,7 @@ class TestNewPolygons(unittest.TestCase):
             print("ketos", *args)
             if result.exception:
                 print(result.output)
-                print_exception(result.exception)
+                print_exc()
 
             if check_exit_code is not None:
                 if isinstance(check_exit_code, int):

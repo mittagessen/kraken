@@ -25,6 +25,7 @@ import shapely.geometry as geom
 import torch
 import torch.nn.functional as F
 from PIL import Image, ImageDraw
+from PIL.Image import Resampling, Transform
 from scipy.ndimage import (binary_erosion, distance_transform_cdt,
                            gaussian_filter, maximum_filter, affine_transform)
 from scipy.signal import convolve2d
@@ -419,8 +420,8 @@ def _rotate(image: _T_pil_or_np,
     if isinstance(image, Image.Image):
         # PIL is much faster than scipy
         pdata = tform.params.flatten().tolist()[:6]
-        resample = {0: Image.NEAREST, 1: Image.BILINEAR, 2: Image.BICUBIC, 3: Image.BICUBIC}.get(order, Image.NEAREST)
-        return tform, image.transform(output_shape[::-1], Image.AFFINE, data=pdata, resample=resample, fillcolor=cval)
+        resample = {0: Resampling.NEAREST, 1: Resampling.BILINEAR, 2: Resampling.BICUBIC, 3: Resampling.BICUBIC}.get(order, Resampling.NEAREST)
+        return tform, image.transform(output_shape[::-1], Transform.AFFINE, data=pdata, resample=resample, fillcolor=cval)
 
     # params for scipy
     # swap X and Y axis for scipy
@@ -1332,7 +1333,7 @@ def extract_polygons(im: Image.Image,
                         for i in range(0, len(source_envelope)-3, 2)
                     ]
                     # warp
-                    resample = {0: Image.NEAREST, 1: Image.BILINEAR, 2: Image.BICUBIC, 3: Image.BICUBIC}.get(order, Image.NEAREST)
+                    resample = {0: Resampling.NEAREST, 1: Resampling.BILINEAR, 2: Resampling.BICUBIC, 3: Resampling.BICUBIC}.get(order, Resampling.NEAREST)
                     i = patch.transform((output_shape[1], output_shape[0]), Image.MESH, data=deform_mesh, resample=resample)
 
             yield i.crop(i.getbbox()), line

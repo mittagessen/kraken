@@ -165,7 +165,6 @@ class BaselineSet(Dataset):
                 im, target = self.transform(im, target)
                 return {'image': im, 'target': target}
             except Exception:
-                raise
                 self.failed_samples.add(idx)
                 idx = np.random.randint(0, len(self.imgs))
                 logger.debug(traceback.format_exc())
