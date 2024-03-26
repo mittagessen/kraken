@@ -32,6 +32,7 @@ import logging
 import math
 import re
 from itertools import chain
+from functools import partial
 from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence, Union
 
 import numpy as np
@@ -87,7 +88,8 @@ class PretrainDataModule(pl.LightningDataModule):
                  force_binarization: bool = False,
                  format_type: str = 'path',
                  pad: int = 16,
-                 augment: bool = default_specs.RECOGNITION_PRETRAIN_HYPER_PARAMS['augment']):
+                 augment: bool = default_specs.RECOGNITION_PRETRAIN_HYPER_PARAMS['augment'],
+                 legacy_polygons: bool = False):
         """
         A LightningDataModule encapsulating text-less training data for
         unsupervised recognition model pretraining.
@@ -106,6 +108,8 @@ class PretrainDataModule(pl.LightningDataModule):
         super().__init__()
         self.save_hyperparameters()
 
+        self.legacy_polygons = legacy_polygons
+
         DatasetClass = GroundTruthDataset
         valid_norm = True
         if format_type in ['xml', 'page', 'alto']:
@@ -117,7 +121,7 @@ class PretrainDataModule(pl.LightningDataModule):
             if binary_dataset_split:
                 logger.warning('Internal binary dataset splits are enabled but using non-binary dataset files. Will be ignored.')
                 binary_dataset_split = False
-            DatasetClass = PolygonGTDataset
+            DatasetClass = partial(PolygonGTDataset, legacy_polygons=legacy_polygons)
             valid_norm = False
         elif format_type == 'binary':
             DatasetClass = ArrowIPCRecognitionDataset
@@ -147,7 +151,7 @@ class PretrainDataModule(pl.LightningDataModule):
         # format_type is None. Determine training type from length of training data entry
         elif not format_type:
             if training_data[0].type == 'baselines':
-                DatasetClass = PolygonGTDataset
+                DatasetClass = partial(PolygonGTDataset, legacy_polygons=legacy_polygons)
                 valid_norm = False
             else:
                 if force_binarization:
@@ -205,6 +209,19 @@ class PretrainDataModule(pl.LightningDataModule):
                         'set. (Will disable alphabet mismatch detection.)')
             self.train_set, self.val_set = random_split(train_set, (train_len, val_len))
 
+        if format_type == 'binary':
+            legacy_train_status = train_set.legacy_polygons_status
+            if val_set and val_set.legacy_polygons_status != legacy_train_status:
+                logger.warning(
+                    f'Train and validation set have different legacy polygon status: {legacy_train_status} and {val_set.legacy_polygons_status}.'
+                     'Train set status prevails.')
+            if legacy_train_status == "mixed":
+                logger.warning('Mixed legacy polygon status in training dataset. Consider recompilation.')
+                legacy_train_status = False
+            if legacy_polygons != legacy_train_status:
+                logger.warning(f'Setting dataset legacy polygon status to {legacy_train_status} based on training set.')
+                self.legacy_polygons = legacy_train_status
+
         if len(self.train_set) == 0 or len(self.val_set) == 0:
             raise ValueError('No valid training data was provided to the train '
                              'command. Please add valid XML, line, or binary data.')
@@ -255,7 +272,8 @@ class RecognitionPretrainModel(pl.LightningModule):
                  spec: str = default_specs.RECOGNITION_SPEC,
                  model: Optional[Union['PathLike', str]] = None,
                  load_hyper_parameters: bool = False,
-                 len_train_set: int = -1):
+                 len_train_set: int = -1,
+                 legacy_polygons: bool = False):
         """
         A LightningModule encapsulating the unsupervised pretraining setup for
         a text recognition model.
@@ -273,9 +291,14 @@ class RecognitionPretrainModel(pl.LightningModule):
         """
         super().__init__()
         hyper_params_ = default_specs.RECOGNITION_PRETRAIN_HYPER_PARAMS
+        self.legacy_polygons = legacy_polygons
+
         if model:
             logger.info(f'Loading existing model from {model} ')
             self.nn = vgsl.TorchVGSLModel.load_model(model)
+
+            # apply legacy polygon parameter
+            self.nn.use_legacy_polygons = legacy_polygons
 
             if self.nn.model_type not in [None, 'recognition']:
                 raise ValueError(f'Model {model} is of type {self.nn.model_type} while `recognition` is expected.')
@@ -430,6 +453,7 @@ class RecognitionPretrainModel(pl.LightningModule):
             else:
                 logger.info(f'Creating new model {self.spec}')
                 self.nn = vgsl.TorchVGSLModel(self.spec)
+                self.nn.use_legacy_polygons = self.legacy_polygons
                 # initialize weights
                 self.nn.init_weights()
 

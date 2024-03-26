@@ -20,6 +20,7 @@ import re
 import warnings
 from typing import (TYPE_CHECKING, Any, Callable, Dict, Literal, Optional,
                     Sequence, Union)
+from functools import partial
 
 import numpy as np
 import pytorch_lightning as pl
@@ -216,7 +217,8 @@ class RecognitionModel(pl.LightningModule):
                  force_binarization: bool = False,
                  format_type: Literal['path', 'alto', 'page', 'xml', 'binary'] = 'path',
                  codec: Optional[Dict] = None,
-                 resize: Literal['fail', 'both', 'new', 'add', 'union'] = 'fail'):
+                 resize: Literal['fail', 'both', 'new', 'add', 'union'] = 'fail',
+                 legacy_polygons: bool = False):
         """
         A LightningModule encapsulating the training setup for a text
         recognition model.
@@ -233,6 +235,7 @@ class RecognitionModel(pl.LightningModule):
             **kwargs: Setup parameters, i.e. CLI parameters of the train() command.
         """
         super().__init__()
+        self.legacy_polygons = legacy_polygons
         hyper_params_ = default_specs.RECOGNITION_HYPER_PARAMS.copy()
         if model:
             logger.info(f'Loading existing model from {model} ')
@@ -284,7 +287,7 @@ class RecognitionModel(pl.LightningModule):
             if binary_dataset_split:
                 logger.warning('Internal binary dataset splits are enabled but using non-binary dataset files. Will be ignored.')
                 binary_dataset_split = False
-            DatasetClass = PolygonGTDataset
+            DatasetClass = partial(PolygonGTDataset, legacy_polygons=legacy_polygons)
             valid_norm = False
         elif format_type == 'binary':
             DatasetClass = ArrowIPCRecognitionDataset
@@ -314,7 +317,7 @@ class RecognitionModel(pl.LightningModule):
         # format_type is None. Determine training type from container class types
         elif not format_type:
             if training_data[0].type == 'baselines':
-                DatasetClass = PolygonGTDataset
+                DatasetClass = partial(PolygonGTDataset, legacy_polygons=legacy_polygons)
                 valid_norm = False
             else:
                 if force_binarization:
@@ -375,6 +378,7 @@ class RecognitionModel(pl.LightningModule):
             logger.debug('Setting multiprocessing tensor sharing strategy to file_system')
             torch.multiprocessing.set_sharing_strategy('file_system')
 
+        val_set = None
         if evaluation_data:
             train_set = self._build_dataset(DatasetClass, training_data)
             self.train_set = Subset(train_set, range(len(train_set)))
@@ -398,6 +402,19 @@ class RecognitionModel(pl.LightningModule):
         if len(self.train_set) == 0 or len(self.val_set) == 0:
             raise ValueError('No valid training data was provided to the train '
                              'command. Please add valid XML, line, or binary data.')
+
+        if format_type == 'binary':
+            legacy_train_status = train_set.legacy_polygons_status
+            if val_set and val_set.legacy_polygons_status != legacy_train_status:
+                logger.warning(
+                    f'Train and validation set have different legacy polygon status: {legacy_train_status} and {val_set.legacy_polygons_status}.'
+                     'Train set status prevails.')
+            if legacy_train_status == "mixed":
+                logger.warning('Mixed legacy polygon status in training dataset. Consider recompilation.')
+                legacy_train_status = False
+            if legacy_polygons != legacy_train_status:
+                logger.warning(f'Setting dataset legacy polygon status to {legacy_train_status} based on training set.')
+                self.legacy_polygons = legacy_train_status
 
         logger.info(f'Training set {len(self.train_set)} lines, validation set '
                     f'{len(self.val_set)} lines, alphabet {len(train_set.alphabet)} '
@@ -592,6 +609,7 @@ class RecognitionModel(pl.LightningModule):
                 logger.info(f'Creating new model {self.spec} with {self.train_set.dataset.codec.max_label+1} outputs')
                 self.spec = '[{} O1c{}]'.format(self.spec[1:-1], self.train_set.dataset.codec.max_label + 1)
                 self.nn = vgsl.TorchVGSLModel(self.spec)
+                self.nn.use_legacy_polygons = self.legacy_polygons
                 # initialize weights
                 self.nn.init_weights()
                 self.nn.add_codec(self.train_set.dataset.codec)

@@ -133,7 +133,7 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
 @click.option('-e', '--evaluation-files', show_default=True, default=None, multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
-@click.option('--workers', show_default=True, default=1, type=click.IntRange(1), help='Number of worker processes.')
+@click.option('--workers', show_default=True, default=1, type=click.IntRange(0), help='Number of worker processes.')
 @click.option('--threads', show_default=True, default=1, type=click.IntRange(1), help='Maximum size of OpenMP/BLAS thread pool.')
 @click.option('--load-hyper-parameters/--no-load-hyper-parameters', show_default=True, default=False,
               help='When loading an existing model, retrieve hyperparameters from the model')
@@ -179,6 +179,7 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
               default=RECOGNITION_PRETRAIN_HYPER_PARAMS['logit_temp'],
               help='Multiplicative factor for the logits used in contrastive loss.')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
+@click.option('--legacy-polygons', show_default=True, default=False, is_flag=True, help='Use the legacy polygon extractor.')
 def pretrain(ctx, batch_size, pad, output, spec, load, freq, quit, epochs,
              min_epochs, lag, min_delta, device, precision, optimizer, lrate, momentum,
              weight_decay, warmup, schedule, gamma, step_size, sched_patience,
@@ -186,7 +187,7 @@ def pretrain(ctx, batch_size, pad, output, spec, load, freq, quit, epochs,
              evaluation_files, workers, threads, load_hyper_parameters, repolygonize,
              force_binarization, format_type, augment,
              mask_probability, mask_width, num_negatives, logit_temp,
-             ground_truth):
+             ground_truth, legacy_polygons):
     """
     Trains a model from image-text pairs.
     """
@@ -258,7 +259,8 @@ def pretrain(ctx, batch_size, pad, output, spec, load, freq, quit, epochs,
                                      output=output,
                                      spec=spec,
                                      model=load,
-                                     load_hyper_parameters=load_hyper_parameters)
+                                     load_hyper_parameters=load_hyper_parameters,
+                                     legacy_polygons=legacy_polygons)
 
     data_module = PretrainDataModule(batch_size=hyper_params.pop('batch_size'),
                                      pad=hyper_params.pop('pad'),
@@ -273,7 +275,8 @@ def pretrain(ctx, batch_size, pad, output, spec, load, freq, quit, epochs,
                                      channels=model.channels,
                                      repolygonize=repolygonize,
                                      force_binarization=force_binarization,
-                                     format_type=format_type)
+                                     format_type=format_type,
+                                     legacy_polygons=legacy_polygons,)
 
     model.len_train_set = len(data_module.train_dataloader())
 

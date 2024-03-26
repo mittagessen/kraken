@@ -44,7 +44,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def _extract_line(xml_record, skip_empty_lines: bool = True):
+def _extract_line(xml_record, skip_empty_lines: bool = True, legacy_polygons: bool = False):
     lines = []
     try:
         im = Image.open(xml_record.imagename)
@@ -62,7 +62,7 @@ def _extract_line(xml_record, skip_empty_lines: bool = True):
                            script_detection=False,
                            line_orders=[])
         try:
-            line_im, line = next(extract_polygons(im, seg))
+            line_im, line = next(extract_polygons(im, seg, legacy=legacy_polygons))
         except KrakenInputException:
             logger.warning(f'Invalid line {idx} in {im.filename}')
             continue
@@ -113,7 +113,8 @@ def build_binary_dataset(files: Optional[List[Union[str, 'PathLike', Dict]]] = N
                          force_type: Optional[str] = None,
                          recordbatch_size: int = 100,
                          skip_empty_lines: bool = True,
-                         callback: Callable[[int, int], None] = lambda chunk, lines: None) -> None:
+                         callback: Callable[[int, int], None] = lambda chunk, lines: None,
+                         legacy_polygons: bool = False) -> None:
     """
     Parses XML files and dumps the baseline-style line images and text into a
     binary dataset.
@@ -141,10 +142,11 @@ def build_binary_dataset(files: Optional[List[Union[str, 'PathLike', Dict]]] = N
         skip_empty_lines: Do not compile empty text lines into the dataset.
         callback: Function called every time a new recordbatch is flushed into
                   the Arrow IPC file.
+        legacy_polygons: Use legacy polygon extraction code.
     """
 
     logger.info('Parsing XML files')
-    extract_fn = partial(_extract_line, skip_empty_lines=skip_empty_lines)
+    extract_fn = partial(_extract_line, skip_empty_lines=skip_empty_lines, legacy_polygons=legacy_polygons)
     parse_fn = None
     if format_type in ['xml', 'alto', 'page']:
         parse_fn = XMLPage
@@ -216,6 +218,7 @@ def build_binary_dataset(files: Optional[List[Union[str, 'PathLike', Dict]]] = N
                           'image_type': 'raw',
                           'splits': ['train', 'eval', 'test'],
                           'im_mode': '1',
+                          'legacy_polygons': legacy_polygons,
                           'counts': Counter({'all': 0,
                                              'train': 0,
                                              'validation': 0,
@@ -309,6 +312,7 @@ def build_binary_dataset(files: Optional[List[Union[str, 'PathLike', Dict]]] = N
                     f"image_type: {metadata['lines']['image_type']}\n"
                     f"splits: {metadata['lines']['splits']}\n"
                     f"im_mode: {metadata['lines']['im_mode']}\n"
+                    f"legacy_polygons: {metadata['lines']['legacy_polygons']}\n"
                     f"lines: {metadata['lines']['counts']}\n")
 
         with pa.memory_map(tmp_file, 'rb') as source:

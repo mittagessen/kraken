@@ -55,9 +55,11 @@ from .util import _validate_manifests
               help='Minimum number of records per RecordBatch written to the '
                    'output file. Larger batches require more transient memory '
                    'but slightly improve reading performance.')
+@click.option('--legacy-polygons', show_default=True, default=False, is_flag=True,
+                help='Use the old polygon extractor.')
 @click.argument('ground_truth', nargs=-1, type=click.Path(exists=True, dir_okay=False))
 def compile(ctx, output, workers, format_type, files, random_split, force_type,
-            save_splits, skip_empty_lines, recordbatch_size, ground_truth):
+            save_splits, skip_empty_lines, recordbatch_size, ground_truth, legacy_polygons):
     """
     Precompiles a binary dataset from a collection of XML files.
     """
@@ -91,6 +93,7 @@ def compile(ctx, output, workers, format_type, files, random_split, force_type,
                                            force_type,
                                            recordbatch_size,
                                            skip_empty_lines,
-                                           lambda advance, total: progress.update(extract_task, total=total, advance=advance))
+                                           lambda advance, total: progress.update(extract_task, total=total, advance=advance),
+                                           legacy_polygons=legacy_polygons)
 
     message(f'Output file written to {output}')

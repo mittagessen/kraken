@@ -123,7 +123,7 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
 @click.option('-e', '--evaluation-files', show_default=True, default=None, multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
-@click.option('--workers', show_default=True, default=1, type=click.IntRange(1), help='Number of worker proesses.')
+@click.option('--workers', show_default=True, default=1, type=click.IntRange(0), help='Number of worker proesses.')
 @click.option('--threads', show_default=True, default=1, type=click.IntRange(1), help='Maximum size of OpenMP/BLAS thread pool.')
 @click.option('--load-hyper-parameters/--no-load-hyper-parameters', show_default=True, default=False,
               help='When loading an existing model, retrieve hyper-parameters from the model')

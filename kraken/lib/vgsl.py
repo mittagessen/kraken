@@ -140,7 +140,8 @@ class TorchVGSLModel(object):
                                               'seg_type': None,
                                               'one_channel_mode': None,
                                               'model_type': None,
-                                              'hyper_params': {}}
+                                              'hyper_params': {},
+                                              'legacy_polygons': False} # enable new polygons by default on new models
         self._aux_layers = nn.ModuleDict()
 
         self.idx = -1
@@ -311,7 +312,8 @@ class TorchVGSLModel(object):
                                             'seg_type': 'bbox',
                                             'one_channel_mode': '1',
                                             'model_type': None,
-                                            'hyper_params': {}}
+                                            'hyper_params': {},
+                                            'legacy_polygons': True} # disable new polygons by default on load
 
         if 'kraken_meta' in mlmodel.user_defined_metadata:
             nn.user_metadata.update(json.loads(mlmodel.user_defined_metadata['kraken_meta']))
@@ -362,6 +364,14 @@ class TorchVGSLModel(object):
     @aux_layers.setter
     def aux_layers(self, val: Dict[str, torch.nn.Module]):
         self._aux_layers.update(val)
+
+    @property
+    def use_legacy_polygons(self):
+        return self.user_metadata.get('legacy_polygons', True)
+    
+    @use_legacy_polygons.setter
+    def use_legacy_polygons(self, val: bool):
+        self.user_metadata['legacy_polygons'] = val
 
     def save_model(self, path: str):
         """
