@@ -32,14 +32,14 @@ class TestRepo(unittest.TestCase):
         """
         Tests fetching the description of a model.
         """
-        record = repo.get_description('10.5281/zenodo.6657809')
-        self.assertEqual(record['doi'], '10.5281/zenodo.6657809')
+        record = repo.get_description('10.5281/zenodo.8425684')
+        self.assertEqual(record['doi'], '10.5281/zenodo.8425684')
 
     def test_get_model(self):
         """
         Tests fetching a model.
         """
-        id = repo.get_model('10.5281/zenodo.6657809',
+        id = repo.get_model('10.5281/zenodo.8425684',
                             path=self.temp_model.name)
-        self.assertEqual(id, 'HTR-United-Manu_McFrench.mlmodel')
-        self.assertEqual((self.temp_path / id).stat().st_size, 16176844)
+        self.assertEqual(id, 'omnisyr_best.mlmodel')
+        self.assertEqual((self.temp_path / id).stat().st_size, 16245671)
