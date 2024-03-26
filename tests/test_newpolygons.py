@@ -7,7 +7,7 @@ from unittest.mock import Mock, patch
 from pathlib import Path
 from traceback import print_exception
 import warnings
-from typing import Optional, List
+from typing import Optional, List, Union
 
 from PIL import Image
 
@@ -96,7 +96,7 @@ class TestNewPolygons(unittest.TestCase):
         for cl in extractor_mock.mock_calls:
             self.assertEqual(cl[2]["legacy"], expect_legacy)
 
-    def _test_ketoscli(self, *, args, expect_legacy: bool, check_exit_code: Optional[int|List[int]]=0, patching_dir="kraken.lib.dataset.recognition"):
+    def _test_ketoscli(self, *, args, expect_legacy: bool, check_exit_code: Optional[Union[int, List[int]]] = 0, patching_dir="kraken.lib.dataset.recognition"):
         """
         Base recipe for testing ketos_cli with a given polygon extraction method
         """
@@ -336,9 +336,13 @@ class TestNewPolygons(unittest.TestCase):
             )
 
 
-    def _assertWarnsWhenTrainingArrow(
-            self, model: str, *dset: str, from_model: str|None=None, force_legacy: bool=False, 
-            expect_warning_msgs: list[str]=[], expect_not_warning_msgs: list[str]=[]):
+    def _assertWarnsWhenTrainingArrow(self,
+                                      model: str,
+                                      *dset: str,
+                                      from_model: Optional[str] = None,
+                                      force_legacy: bool = False,
+                                      expect_warning_msgs: List[str] = [],
+                                      expect_not_warning_msgs: List[str] = []):
 
         args = ['-f', 'binary', '-N', '1', '-q', 'fixed', '-o', model, *dset]
         if force_legacy:
