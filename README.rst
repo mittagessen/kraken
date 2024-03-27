@@ -9,7 +9,7 @@ material.
 
 kraken's main features are:
 
-  - Fully trainable layout analysis and character recognition
+  - Fully trainable layout analysis, reading order, and character recognition
   - `Right-to-Left <https://en.wikipedia.org/wiki/Right-to-left>`_, `BiDi
     <https://en.wikipedia.org/wiki/Bi-directional_text>`_, and Top-to-Bottom
     script support
@@ -44,14 +44,14 @@ install the `pdf` extras package for PyPi:
 
   $ pip install kraken[pdf]
 
-or install `pyvips` manually with conda:
+or install `pyvips` manually with pip:
 
 ::
 
-  $ conda install -c conda-forge pyvips
+  $ pip install pyvips
 
-Conda environment files are provided which for the seamless installation of the
-main branch as well:
+Conda environment files are provided for the seamless installation of the main
+branch as well:
 
 ::
 
@@ -70,12 +70,12 @@ or:
 for CUDA acceleration with the appropriate hardware.
 
 Finally you'll have to scrounge up a model to do the actual recognition of
-characters. To download the default model for printed English text and place it
+characters. To download the default model for printed French text and place it
 in the kraken directory for the current user:
 
 ::
 
-  $ kraken get 10.5281/zenodo.2577813 
+  $ kraken get 10.5281/zenodo.10592716 
 
 A list of libre models available in the central repository can be retrieved by
 running:
@@ -111,7 +111,7 @@ To segment and OCR an image using the default model(s):
 
 ::
 
-  $ kraken -i image.tif image.txt segment -bl ocr
+  $ kraken -i image.tif image.txt segment -bl ocr -m catmus-print-fondue-large.mlmodel
 
 All subcommands and options are documented. Use the ``help`` option to get more
 information.
