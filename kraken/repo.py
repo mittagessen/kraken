@@ -125,7 +125,7 @@ def get_model(model_id: str, path: str, callback: Callable[[int, int], Any] = la
         Will usually be the file name of the model.
     """
     logger.info(f'Saving model {model_id} to {path}')
-    r = requests.get(f'{MODEL_REPO}records', params={'q': f'doi:"{model_id}"'})
+    r = requests.get(f'{MODEL_REPO}records', params={'q': f'doi:"{model_id}"', 'allversions': '1'})
     r.raise_for_status()
     callback(0, 0)
     resp = r.json()
@@ -164,7 +164,7 @@ def get_description(model_id: str, callback: Callable[..., Any] = lambda: None) 
         Dict
     """
     logger.info(f'Retrieving metadata for {model_id}')
-    r = requests.get(f'{MODEL_REPO}records', params={'q': f'doi:"{model_id}"'})
+    r = requests.get(f'{MODEL_REPO}records', params={'q': f'doi:"{model_id}"', 'allversions': '1'})
     r.raise_for_status()
     callback()
     resp = r.json()
