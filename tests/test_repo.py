@@ -43,3 +43,20 @@ class TestRepo(unittest.TestCase):
                             path=self.temp_model.name)
         self.assertEqual(id, 'omnisyr_best.mlmodel')
         self.assertEqual((self.temp_path / id).stat().st_size, 16245671)
+
+    def test_prev_record_version_get_description(self):
+        """
+        Tests fetching the description of a model that has a superseding newer version.
+        """
+        record = repo.get_description('10.5281/zenodo.6657809')
+        self.assertEqual(record['doi'], '10.5281/zenodo.6657809')
+
+    def test_prev_record_version_get_model(self):
+        """
+        Tests fetching a model that has a superseding newer version.
+        """
+        id = repo.get_model('10.5281/zenodo.6657809',
+                            path=self.temp_model.name)
+        self.assertEqual(id, 'HTR-United-Manu_McFrench.mlmodel')
+        self.assertEqual((self.temp_path / id).stat().st_size, 16176844)
+
