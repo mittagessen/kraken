@@ -55,11 +55,11 @@ Examples
 
         [1,1,0,48 Lbx100 Do 01c59]
 
-        Creating new model [1,1,0,48 Lbx100 Do] with 59 outputs 
-        layer		type	params 
+        Creating new model [1,1,0,48 Lbx100 Do] with 59 outputs
+        layer		type	params
         0		rnn	direction b transposed False summarize False out 100 legacy None
-        1		dropout	probability 0.5 dims 1 
-        2		linear	augmented False out 59 
+        1		dropout	probability 0.5 dims 1
+        2		linear	augmented False out 59
 
 A simple recurrent recognition model with a single LSTM layer classifying lines
 normalized to 48 pixels in height.
@@ -68,18 +68,18 @@ normalized to 48 pixels in height.
 
         [1,48,0,1 Cr3,3,32 Do0.1,2 Mp2,2 Cr3,3,64 Do0.1,2 Mp2,2 S1(1x12)1,3 Lbx100 Do 01c59]
 
-        Creating new model [1,48,0,1 Cr3,3,32 Do0.1,2 Mp2,2 Cr3,3,64 Do0.1,2 Mp2,2 S1(1x12)1,3 Lbx100 Do] with 59 outputs 
-        layer		type	params 
-        0		conv	kernel 3 x 3 filters 32 activation r 
-        1		dropout	probability 0.1 dims 2 
-        2		maxpool	kernel 2 x 2 stride 2 x 2 
-        3		conv	kernel 3 x 3 filters 64 activation r 
-        4		dropout	probability 0.1 dims 2 
-        5		maxpool	kernel 2 x 2 stride 2 x 2 
-        6		reshape from 1 1 x 12 to 1/3 
-        7		rnn	direction b transposed False summarize False out 100 legacy None 
-        8		dropout	probability 0.5 dims 1 
-        9		linear	augmented False out 59 
+        Creating new model [1,48,0,1 Cr3,3,32 Do0.1,2 Mp2,2 Cr3,3,64 Do0.1,2 Mp2,2 S1(1x12)1,3 Lbx100 Do] with 59 outputs
+        layer		type	params
+        0		conv	kernel 3 x 3 filters 32 activation r
+        1		dropout	probability 0.1 dims 2
+        2		maxpool	kernel 2 x 2 stride 2 x 2
+        3		conv	kernel 3 x 3 filters 64 activation r
+        4		dropout	probability 0.1 dims 2
+        5		maxpool	kernel 2 x 2 stride 2 x 2
+        6		reshape from 1 1 x 12 to 1/3
+        7		rnn	direction b transposed False summarize False out 100 legacy None
+        8		dropout	probability 0.5 dims 1
+        9		linear	augmented False out 59
 
 A model with a small convolutional stack before a recurrent LSTM layer. The
 extended dropout layer syntax is used to reduce drop probability on the depth
@@ -129,7 +129,7 @@ other branch simply passes through the output of the first convolution layer.
 The input of the last convolutional layer is then the output of the two branches
 of the parallel block concatenated, i.e. the output of the first
 convolutional layer together with the output of the transposed convolutional layer,
-giving `32 + 32 = 64` feature dimensions. 
+giving `32 + 32 = 64` feature dimensions.
 
 Convolutional Layers
 --------------------

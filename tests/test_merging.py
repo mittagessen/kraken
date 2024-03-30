@@ -81,7 +81,7 @@ class TestMerging(TestCase):
             model.nn.codec.encode("x").shape, (1, ),
             "x is known to the loaded model and should be encoded through `new`"
         )
-        
+
     def test_merging_union_with_nfd(self):
         """ Asserts that union, which only takes into account new the original codec and the new data,
             works as intended

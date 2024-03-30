@@ -6,15 +6,15 @@
     <MeasurementUnit>pixel</MeasurementUnit>
     <sourceImageInformation>
       <fileName>0014.jpg</fileName>
-      
+
     </sourceImageInformation>
   </Description>
-  
+
   <Tags>
     <OtherTag ID="BT4" LABEL="Illustration" DESCRIPTION="block type Illustration"/><OtherTag ID="BT3" LABEL="Commentary" DESCRIPTION="block type Commentary"/><OtherTag ID="BT2" LABEL="Main" DESCRIPTION="block type Main"/><OtherTag ID="BT1" LABEL="Title" DESCRIPTION="block type Title"/>
-    
+
   </Tags>
-  
+
   <Layout>
     <Page WIDTH="228"
           HEIGHT="109"
@@ -24,15 +24,15 @@
                   VPOS="0"
                   WIDTH="228"
                   HEIGHT="109">
-        
 
-        
+
+
         <TextBlock ID="eSc_dummyblock_">
-          
-          
+
+
           <TextLine ID="eSc_line_0e5809e0"
-                    
-                    BASELINE="5 44 224 50" 
+
+                    BASELINE="5 44 224 50"
                     HPOS="4"
                     VPOS="41"
                     WIDTH="219"
@@ -45,11 +45,11 @@
                     HEIGHT="10"></String>
           </TextLine>
 
-          
-          
+
+
           <TextLine ID="eSc_line_d9c33ce2"
-                    
-                    BASELINE="20 73 197 72" 
+
+                    BASELINE="20 73 197 72"
                     HPOS="19"
                     VPOS="68"
                     WIDTH="177"
@@ -62,9 +62,9 @@
                     HEIGHT="6"></String>
           </TextLine>
 
-          
+
         </TextBlock>
-        
+
       </PrintSpace>
     </Page>
   </Layout>

@@ -142,7 +142,7 @@ that can be adjusted:
 Training a network will take some time on a modern computer, even with the
 default parameters. While the exact time required is unpredictable as training
 is a somewhat random process a rough guide is that accuracy seldom improves
-after 50 epochs reached between 8 and 24 hours of training. 
+after 50 epochs reached between 8 and 24 hours of training.
 
 When to stop training is a matter of experience; the default setting employs a
 fairly reliable approach known as `early stopping
@@ -150,10 +150,10 @@ fairly reliable approach known as `early stopping
 the error rate on the validation set doesn't improve anymore.  This will
 prevent `overfitting <https://en.wikipedia.org/wiki/Overfitting>`_, i.e.
 fitting the model to recognize only the training data properly instead of the
-general patterns contained therein. 
+general patterns contained therein.
 
 .. code-block:: console
-        
+
         $ ketos train output_dir/*.png
         Building training set  [####################################]  100%
         Building validation set  [####################################]  100%
@@ -164,7 +164,7 @@ general patterns contained therein.
         Accuracy report (1) 0.0245 3504 3418
         epoch 1/-1  [####################################]  788/788
         Accuracy report (2) 0.8445 3504 545
-        epoch 2/-1  [####################################]  788/788             
+        epoch 2/-1  [####################################]  788/788
         Accuracy report (3) 0.9541 3504 161
         epoch 3/-1  [------------------------------------]  13/788  0d 00:22:09
         ...
@@ -212,8 +212,8 @@ information by appending one or more ``-v`` to the command:
 .. code-block:: console
 
         $ ketos -vv train syr/*.png
-        [0.7272] Building ground truth set from 876 line images 
-        [0.7281] Taking 88 lines from training for evaluation 
+        [0.7272] Building ground truth set from 876 line images
+        [0.7281] Taking 88 lines from training for evaluation
         ...
         [0.8479] Training set 788 lines, validation set 88 lines, alphabet 48 symbols
         [0.8481] alphabet mismatch {'\xa0', '0', ':', '݀', '܇', '݂', '5'}
@@ -314,20 +314,20 @@ After all lines have been processed a evaluation report will be printed:
 .. code-block:: console
 
       === report  ===
-      
+
       35619	Characters
       336	Errors
       99.06%	Accuracy
-      
+
       157	Insertions
       81	Deletions
       98	Substitutions
-      
+
       Count	Missed	%Right
       27046	143	99.47%	Syriac
       7015	52	99.26%	Common
       1558	60	96.15%	Inherited
-      
+
       Errors	Correct-Generated
       25	{  } - { COMBINING DOT BELOW }
       25	{ COMBINING DOT BELOW } - {  }
@@ -433,16 +433,16 @@ Retrieving model metadata for a particular model:
 
 	$ kraken show arabic-alam-al-kutub
 	name: arabic-alam-al-kutub.mlmodel
-	
+
 	An experimental model for Classical Arabic texts.
-	
+
 	Network trained on 889 lines of [0] as a test case for a general Classical
 	Arabic model. Ground truth was prepared by Sarah Savant
 	<sarah.savant@aku.edu> and Maxim Romanov <maxim.romanov@uni-leipzig.de>.
-	
+
 	Vocalization was omitted in the ground truth. Training was stopped at ~35000
 	iterations with an accuracy of 97%.
-	
+
 	[0] Ibn al-Faqīh (d. 365 AH). Kitāb al-buldān. Edited by Yūsuf al-Hādī, 1st
 	edition. Bayrūt: ʿĀlam al-kutub, 1416 AH/1996 CE.
 	alphabet:  !()-.0123456789:[] «»،؟ءابةتثجحخدذرزسشصضطظعغفقكلمنهوىي ARABIC

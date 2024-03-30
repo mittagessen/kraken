@@ -307,7 +307,7 @@ class mm_rpred(object):
 
     def _scale_val(self, val, min_val, max_val):
         return int(round(min(max(((val*self.net_scale)-self.pad)*self.in_scale, min_val), max_val-1)))
-    
+
     def _choose_legacy_polygon_extractor(self, net) -> bool:
         # grouping the checks here to display warnings only once
         if net.nn.use_legacy_polygons:
