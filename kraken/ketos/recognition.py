@@ -127,6 +127,10 @@ logger = logging.getLogger('kraken')
               show_default=True,
               default=RECOGNITION_HYPER_PARAMS['cos_t_max'],
               help='Epoch of minimal learning rate for cosine LR scheduler.')
+@click.option('--cos-min-lr',
+              show_default=True,
+              default=RECOGNITION_HYPER_PARAMS['cos_min_lr'],
+              help='Minimal final learning rate for cosine LR scheduler.')
 @click.option('-p', '--partition', show_default=True, default=0.9,
               help='Ground truth data partition ratio between train/validation set')
 @click.option('--fixed-splits/--ignore-fixed-split', show_default=True, default=False,
@@ -194,13 +198,14 @@ logger = logging.getLogger('kraken')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 @click.option('--legacy-polygons', show_default=True, default=False, is_flag=True, help='Use the legacy polygon extractor.')
 def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
-          min_epochs, lag, min_delta, device, precision, optimizer, lrate, momentum,
-          weight_decay, warmup, freeze_backbone, schedule, gamma, step_size,
-          sched_patience, cos_max, partition, fixed_splits, normalization,
-          normalize_whitespace, codec, resize, reorder, base_dir,
-          training_files, evaluation_files, workers, threads, load_hyper_parameters,
-          repolygonize, force_binarization, format_type, augment,
-          pl_logger, log_dir, ground_truth, legacy_polygons):
+          min_epochs, lag, min_delta, device, precision, optimizer, lrate,
+          momentum, weight_decay, warmup, freeze_backbone, schedule, gamma,
+          step_size, sched_patience, cos_max, cos_min_lr, partition,
+          fixed_splits, normalization, normalize_whitespace, codec, resize,
+          reorder, base_dir, training_files, evaluation_files, workers,
+          threads, load_hyper_parameters, repolygonize, force_binarization,
+          format_type, augment, pl_logger, log_dir, ground_truth,
+          legacy_polygons):
     """
     Trains a model from image-text pairs.
     """
@@ -253,6 +258,7 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
                          'step_size': step_size,
                          'rop_patience': sched_patience,
                          'cos_t_max': cos_max,
+                         'cos_min_lr': cos_min_lr,
                          'normalization': normalization,
                          'normalize_whitespace': normalize_whitespace,
                          'augment': augment,

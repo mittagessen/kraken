@@ -151,6 +151,10 @@ def _validate_merging(ctx, param, value):
               show_default=True,
               default=SEGMENTATION_HYPER_PARAMS['cos_t_max'],
               help='Epoch of minimal learning rate for cosine LR scheduler.')
+@click.option('--cos-min-lr',
+              show_default=True,
+              default=RECOGNITION_HYPER_PARAMS['cos_min_lr'],
+              help='Minimal final learning rate for cosine LR scheduler.')
 @click.option('-p', '--partition', show_default=True, default=0.9,
               help='Ground truth data partition ratio between train/validation set')
 @click.option('-t', '--training-files', show_default=True, default=None, multiple=True,
@@ -226,12 +230,12 @@ def _validate_merging(ctx, param, value):
 def segtrain(ctx, output, spec, line_width, pad, load, freq, quit, epochs,
              min_epochs, lag, min_delta, device, precision, optimizer, lrate,
              momentum, weight_decay, warmup, schedule, gamma, step_size,
-             sched_patience, cos_max, partition, training_files,
+             sched_patience, cos_max, cos_min_lr, partition, training_files,
              evaluation_files, workers, threads, load_hyper_parameters,
              force_binarization, format_type, suppress_regions,
              suppress_baselines, valid_regions, valid_baselines, merge_regions,
-             merge_baselines, bounding_regions,
-             augment, resize, topline, pl_logger, log_dir, ground_truth):
+             merge_baselines, bounding_regions, augment, resize, topline,
+             pl_logger, log_dir, ground_truth):
     """
     Trains a baseline labeling model for layout analysis
     """
@@ -285,6 +289,7 @@ def segtrain(ctx, output, spec, line_width, pad, load, freq, quit, epochs,
                          'step_size': step_size,
                          'rop_patience': sched_patience,
                          'cos_t_max': cos_max,
+                         'cos_min_lr': cos_min_lr,
                          })
 
     # disable automatic partition when given evaluation set explicitly

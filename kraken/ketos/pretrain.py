@@ -123,6 +123,10 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
               show_default=True,
               default=RECOGNITION_PRETRAIN_HYPER_PARAMS['cos_t_max'],
               help='Epoch of minimal learning rate for cosine LR scheduler.')
+@click.option('--cos-min-lr',
+              show_default=True,
+              default=RECOGNITION_HYPER_PARAMS['cos_min_lr'],
+              help='Minimal final learning rate for cosine LR scheduler.')
 @click.option('-p', '--partition', show_default=True, default=0.9,
               help='Ground truth data partition ratio between train/validation set')
 @click.option('--fixed-splits/--ignore-fixed-splits', show_default=True, default=False,
@@ -183,7 +187,7 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
 def pretrain(ctx, batch_size, pad, output, spec, load, freq, quit, epochs,
              min_epochs, lag, min_delta, device, precision, optimizer, lrate, momentum,
              weight_decay, warmup, schedule, gamma, step_size, sched_patience,
-             cos_max, partition, fixed_splits, training_files,
+             cos_max, cos_min_lr, partition, fixed_splits, training_files,
              evaluation_files, workers, threads, load_hyper_parameters, repolygonize,
              force_binarization, format_type, augment,
              mask_probability, mask_width, num_negatives, logit_temp,
@@ -227,6 +231,7 @@ def pretrain(ctx, batch_size, pad, output, spec, load, freq, quit, epochs,
                          'step_size': step_size,
                          'rop_patience': sched_patience,
                          'cos_t_max': cos_max,
+                         'cos_min_lr': cos_min_lr,
                          'augment': augment,
                          'mask_prob': mask_probability,
                          'mask_width': mask_width,
