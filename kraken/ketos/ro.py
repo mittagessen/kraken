@@ -117,7 +117,7 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
               help='Epoch of minimal learning rate for cosine LR scheduler.')
 @click.option('--cos-min-lr',
               show_default=True,
-              default=RECOGNITION_HYPER_PARAMS['cos_min_lr'],
+              default=READING_ORDER_HYPER_PARAMS['cos_min_lr'],
               help='Minimal final learning rate for cosine LR scheduler.')
 @click.option('-p', '--partition', show_default=True, default=0.9,
               help='Ground truth data partition ratio between train/validation set')

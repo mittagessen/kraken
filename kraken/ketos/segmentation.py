@@ -153,7 +153,7 @@ def _validate_merging(ctx, param, value):
               help='Epoch of minimal learning rate for cosine LR scheduler.')
 @click.option('--cos-min-lr',
               show_default=True,
-              default=RECOGNITION_HYPER_PARAMS['cos_min_lr'],
+              default=SEGMENTATION_HYPER_PARAMS,['cos_min_lr'],
               help='Minimal final learning rate for cosine LR scheduler.')
 @click.option('-p', '--partition', show_default=True, default=0.9,
               help='Ground truth data partition ratio between train/validation set')
