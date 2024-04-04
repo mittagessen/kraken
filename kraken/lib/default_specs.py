@@ -132,6 +132,6 @@ SEGMENTATION_HYPER_PARAMS = {'line_width': 8,
                              'rop_patience': 5,
                              # cosine
                              'cos_t_max': 50,
-                             'cos_min_r': 2e-5,
+                             'cos_min_lr': 2e-5,
                              'warmup': 0,
                              }
