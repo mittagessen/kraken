@@ -36,7 +36,7 @@ from torchmetrics.text import CharErrorRate, WordErrorRate
 
 from kraken.containers import Segmentation
 from kraken.lib import default_specs, models, progress, vgsl
-from kraken.lib.codec import PytorchCodec
+from kraken.lib.codec import PytorchCodec, SentencePieceCodec
 from kraken.lib.dataset import (ArrowIPCRecognitionDataset, BaselineSet,
                                 GroundTruthDataset, ImageInputTransforms,
                                 PolygonGTDataset, collate_sequences)
@@ -615,14 +615,8 @@ class RecognitionModel(pl.LightningModule):
                 self.nn.init_weights()
                 self.nn.add_codec(self.train_set.dataset.codec)
 
-            val_diff = set(self.val_set.dataset.alphabet).difference(
-                set(self.train_set.dataset.codec.c2l.keys())
-            )
-            logger.info(f'Adding {len(val_diff)} dummy labels to validation set codec.')
-
-            val_codec = self.nn.codec.add_labels(val_diff)
-            self.val_set.dataset.encode(val_codec)
-            self.val_codec = val_codec
+            self.val_set.dataset.encode(self.train_set.dataset.codec)
+            self.val_codec = self.train_set.dataset.codec
 
             if self.nn.one_channel_mode and self.train_set.dataset.im_mode != self.nn.one_channel_mode:
                 logger.warning(f'Neural network has been trained on mode {self.nn.one_channel_mode} images, '

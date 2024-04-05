@@ -33,7 +33,7 @@ from torchvision import transforms
 
 from kraken.containers import BaselineLine, BBoxLine, Segmentation
 from kraken.lib import functional_im_transforms as F_t
-from kraken.lib.codec import PytorchCodec
+from kraken.lib.codec import PytorchCodec, SentencePieceCodec
 from kraken.lib.exceptions import KrakenEncodeException, KrakenInputException
 from kraken.lib.segmentation import extract_polygons
 from kraken.lib.util import is_bitonal
@@ -231,7 +231,7 @@ class ArrowIPCRecognitionDataset(Dataset):
                 raise KrakenInputException('empty text line')
         return text
 
-    def encode(self, codec: Optional[PytorchCodec] = None) -> None:
+    def encode(self, codec: Optional[SentencePieceCodec] = None) -> None:
         """
         Adds a codec to the dataset.
         """
@@ -249,7 +249,10 @@ class ArrowIPCRecognitionDataset(Dataset):
                 except KrakenInputException:
                     pass
         else:
-            self.codec = PytorchCodec(''.join(self.alphabet.keys()))
+            def _iter_arrow_text():
+                for index in range(self._num_lines):
+                    yield self._apply_text_transform(self.arrow_table.column('lines')[index].as_py())
+            self.codec = SentencePieceCodec(sentences=_iter_arrow_text())
 
     def no_encode(self) -> None:
         """
