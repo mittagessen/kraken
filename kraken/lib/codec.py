@@ -304,6 +304,8 @@ class SentencePieceCodec(object):
                                            character_coverage=1.0)
             self.spp = spm.SentencePieceProcessor(model_proto=_model.getvalue())
 
+        self.strict = strict
+
     def __len__(self) -> int:
         """
         Total number of input labels the codec can decode.
