@@ -414,7 +414,7 @@ class TorchVGSLModel(object):
             mlmodel.user_defined_metadata['vgsl'] = '[' + ' '.join(self.named_spec) + ']'
             if self.codec:
                 mlmodel.user_defined_metadata['codec'] = json.dumps({'type': 'SentencePiece',
-                                                                     'spp': base64.b64encode(self.codec.spp.serialized_model_proto())})
+                                                                     'spp': str(base64.b64encode(self.codec.spp.serialized_model_proto()))})
             if self.user_metadata:
                 mlmodel.user_defined_metadata['kraken_meta'] = json.dumps(self.user_metadata)
             if self.aux_layers:
