@@ -301,7 +301,8 @@ class SentencePieceCodec(object):
                                            normalization_rule_name='identity',
                                            remove_extra_whitespaces=False,
                                            split_by_whitespace=False,
-                                           character_coverage=1.0)
+                                           character_coverage=1.0,
+                                           vocab_size=8000)
             self.spp = spm.SentencePieceProcessor(model_proto=_model.getvalue())
 
         self.strict = strict

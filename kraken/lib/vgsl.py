@@ -307,7 +307,7 @@ class TorchVGSLModel(object):
         if 'codec' in mlmodel.user_defined_metadata:
             codec = json.loads(mlmodel.user_defined_metadata['codec'])
             if codec['type'] == 'SentencePiece':
-                nn.add_codec(SentencePieceCodec(codec['spp']))
+                nn.add_codec(SentencePieceCodec(mlmodel.user_defined_metadata['sp_codec']))
 
         nn.user_metadata: Dict[str, Any] = {'accuracy': [],
                                             'metrics': [],
@@ -411,7 +411,8 @@ class TorchVGSLModel(object):
             mlmodel.short_description = 'kraken model'
             mlmodel.user_defined_metadata['vgsl'] = '[' + ' '.join(self.named_spec) + ']'
             if self.codec:
-                mlmodel.user_defined_metadata['codec'] = json.dumps({'type': 'SentencePiece', 'spp': self.codec.spp.serialized_model_proto()})
+                mlmodel.user_defined_metadata['codec'] = json.dumps({'type': 'SentencePiece'})
+                mlmodel.user_defined_metadata['sp_codec'] = self.codec.spp.serialized_model_proto()
             if self.user_metadata:
                 mlmodel.user_defined_metadata['kraken_meta'] = json.dumps(self.user_metadata)
             if self.aux_layers:
