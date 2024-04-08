@@ -1210,10 +1210,7 @@ def extract_polygons(im: Image.Image,
                     angle = np.arctan2(p_dir[1], p_dir[0])
                     patch = im[r_min:r_max+1, c_min:c_max+1].copy()
                     offset_polygon = pl - (c_min, r_min)
-                    # r, c = draw.polygon(offset_polygon[:, 1], offset_polygon[:, 0])
-                    # mask = np.zeros(patch.shape[:2], dtype=bool)
-                    # mask[r, c] = True
-                    offset_polygon2 = offset_polygon.flatten().tolist()
+                    offset_polygon = offset_polygon.flatten().tolist()
                     img = Image.new('L', patch.shape[:2][::-1], 0)
                     ImageDraw.Draw(img).polygon(offset_polygon2, outline=1, fill=1)
                     mask = np.asarray(img, dtype=bool)
@@ -1267,12 +1264,9 @@ def extract_polygons(im: Image.Image,
                     offset_bl_dst_pts = bl_dst_pts - (c_dst_min, r_dst_min)
                     offset_pol_dst_pts = pol_dst_pts - (c_dst_min, r_dst_min)
                     # mask out points outside bounding polygon
-                    # mask = np.zeros(patch.shape[:2], dtype=bool)
-                    # r, c = draw.polygon(offset_polygon[:, 1], offset_polygon[:, 0])
-                    # mask[r, c] = True
-                    offset_polygon2 = offset_polygon.flatten().tolist()
+                    offset_polygon = offset_polygon.flatten().tolist()
                     img = Image.new('L', patch.shape[:2][::-1], 0)
-                    ImageDraw.Draw(img).polygon(offset_polygon2, outline=1, fill=1)
+                    ImageDraw.Draw(img).polygon(offset_polygon, outline=1, fill=1)
                     mask = np.asarray(img, dtype=bool)
                     patch[np.invert(mask)] = 0
                     # estimate piecewise transform
