@@ -56,7 +56,7 @@ def is_bitonal(im: Union[Image.Image, torch.Tensor]) -> bool:
     if isinstance(im, Image.Image):
         return im.getcolors(2) is not None and len(im.getcolors(2)) == 2
     elif isinstance(im, torch.Tensor):
-        return len(im.int().unique()) == 2
+        return len(im.unique()) == 2
 
 
 def get_im_str(im: Image.Image) -> str:
