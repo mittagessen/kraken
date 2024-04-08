@@ -516,7 +516,7 @@ def _calc_seam(baseline, polygon, angle, im_feats, bias=150):
         mask[line_locs] = 0
     dist_bias = distance_transform_cdt(mask)
     # absolute mask
-    mask = np.array(make_polygonal_mask(polygon-(r_min, c_min), patch.shape[::-1])) > 128
+    mask = np.array(make_polygonal_mask(polygon-(r_min, c_min)), patch.shape[1::-1]) > 128
     # dilate mask to compensate for aliasing during rotation
     mask = binary_erosion(mask, border_value=True, iterations=2)
     # combine weights with features
@@ -1210,9 +1210,12 @@ def extract_polygons(im: Image.Image,
                     angle = np.arctan2(p_dir[1], p_dir[0])
                     patch = im[r_min:r_max+1, c_min:c_max+1].copy()
                     offset_polygon = pl - (c_min, r_min)
-                    offset_polygon = offset_polygon.flatten().tolist()
+                    # r, c = draw.polygon(offset_polygon[:, 1], offset_polygon[:, 0])
+                    # mask = np.zeros(patch.shape[:2], dtype=bool)
+                    # mask[r, c] = True
+                    offset_polygon2 = offset_polygon.flatten().tolist()
                     img = Image.new('L', patch.shape[:2][::-1], 0)
-                    ImageDraw.Draw(img).polygon(offset_polygon, outline=1, fill=1)
+                    ImageDraw.Draw(img).polygon(offset_polygon2, outline=1, fill=1)
                     mask = np.asarray(img, dtype=bool)
                     patch[np.invert(mask)] = 0
                     extrema = offset_polygon[(0, -1), :]
@@ -1264,9 +1267,12 @@ def extract_polygons(im: Image.Image,
                     offset_bl_dst_pts = bl_dst_pts - (c_dst_min, r_dst_min)
                     offset_pol_dst_pts = pol_dst_pts - (c_dst_min, r_dst_min)
                     # mask out points outside bounding polygon
-                    offset_polygon = offset_polygon.flatten().tolist()
+                    # mask = np.zeros(patch.shape[:2], dtype=bool)
+                    # r, c = draw.polygon(offset_polygon[:, 1], offset_polygon[:, 0])
+                    # mask[r, c] = True
+                    offset_polygon2 = offset_polygon.flatten().tolist()
                     img = Image.new('L', patch.shape[:2][::-1], 0)
-                    ImageDraw.Draw(img).polygon(offset_polygon, outline=1, fill=1)
+                    ImageDraw.Draw(img).polygon(offset_polygon2, outline=1, fill=1)
                     mask = np.asarray(img, dtype=bool)
                     patch[np.invert(mask)] = 0
                     # estimate piecewise transform
