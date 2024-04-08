@@ -165,7 +165,7 @@ def serialize(results: 'Segmentation',
         # addition to bounding boxes
         line = {'id': record.id,
                 'bbox': max_bbox([record.boundary]) if record.type == 'baselines' else record.bbox,
-                'cuts': record.cuts,
+                'cuts': [list(x) for x in record.cuts],
                 'confidences': record.confidences,
                 'recognition': [],
                 'boundary': [list(x) for x in record.boundary] if record.type == 'baselines' else [[record.bbox[0], record.bbox[1]],
