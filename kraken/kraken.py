@@ -163,12 +163,11 @@ def segmenter(legacy, model, text_direction, scale, maxcolseps, black_colseps,
             fp = cast('IO[Any]', fp)
             logger.info('Serializing as {} into {}'.format(ctx.meta['output_mode'], output))
             from kraken import serialization
-            fp.write(serialization.serialize_segmentation(res,
-                                                          image_name=ctx.meta['base_image'],
-                                                          image_size=im.size,
-                                                          template=ctx.meta['output_template'],
-                                                          template_source='custom' if ctx.meta['output_mode'] == 'template' else 'native',
-                                                          processing_steps=ctx.meta['steps']))
+            fp.write(serialization.serialize(res,
+                                             image_size=im.size,
+                                             template=ctx.meta['output_template'],
+                                             template_source='custom' if ctx.meta['output_mode'] == 'template' else 'native',
+                                             processing_steps=ctx.meta['steps']))
     else:
         with click.open_file(output, 'w') as fp:
             fp = cast('IO[Any]', fp)
