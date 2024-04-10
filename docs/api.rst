@@ -59,17 +59,32 @@ scripts) and explicit masking of non-text image regions:
 
         >>> seg = pageseg.segment(bw_im)
         >>> seg
-        {'text_direction': 'horizontal-lr',
-         'boxes': [[0, 29, 232, 56],
-                   [28, 54, 121, 84],
-                   [9, 73, 92, 117],
-                   [103, 76, 145, 131],
-                   [7, 105, 119, 230],
-                   [10, 228, 126, 345],
-                   ...
-                  ],
-         'script_detection': False}
+        Segmentation(type='bbox',
+                     imagename='foo.png',
+                     text_direction='horizontal-lr',
+                     script_detection=False,
+                     lines=[BBoxLine(id='0ce11ad6-1f3b-4f7d-a8c8-0178e411df69',
+                                     bbox=[74, 61, 136, 101],
+                                     text=None,
+                                     base_dir=None,
+                                     type='bbox',
+                                     imagename=None,
+                                     tags=None,
+                                     split=None,
+                                     regions=None,
+                                     text_direction='horizontal-lr'),
+                            BBoxLine(id='c4a751dc-6731-4eea-a287-d4b57683f5b0', ...),
+                            ....],
+                     regions={},
+                     line_orders=[])
 
+All segmentation methods return a :class:`kraken.containers.Segmentation`
+object that contains all elements of the segmentation: its type, a list of
+lines (either :class:`kraken.containers.BBoxLine` or
+:class:`kraken.containers.BaselineLine`), a dictionary mapping region types to
+lists of regions (:class:`kraken.containers.Region`), and one or more line
+reading orders.
+                  
 Baseline segmentation
 ~~~~~~~~~~~~~~~~~~~~~
 
@@ -103,22 +118,35 @@ Afterwards they can be fed into the segmentation method
 
         >>> baseline_seg = blla.segment(im, model=model)
         >>> baseline_seg
-        {'text_direction': 'horizontal-lr',
-         'type': 'baselines',
-         'script_detection': False,
-         'lines': [{'script': 'default',
-                    'baseline': [[471, 1408], [524, 1412], [509, 1397], [1161, 1412], [1195, 1412]],
-                    'boundary': [[471, 1408], [491, 1408], [515, 1385], [562, 1388], [575, 1377], ... [473, 1410]]},
-                   ...],
-         'regions': {'$tip':[[[536, 1716], ... [522, 1708], [524, 1716], [536, 1716], ...]
-                     '$par': ...
-                     '$nop':  ...}}
-        >>> alto = serialization.serialize_segmentation(baseline_seg, image_name=im.filename, image_size=im.size, template='alto')
+        Segmentation(type='baselines',
+                     imagename='foo.png',
+                     text_direction='horizontal-lr',
+                     script_detection=False,
+                     lines=[BaselineLine(id='22fee3d1-377e-4130-b9e5-5983a0c50ce8',
+                                         baseline=[[71, 93], [145, 92]],
+                                         boundary=[[71, 93], ..., [71, 93]], 
+                                         text=None,
+                                         base_dir=None,
+                                         type='baselines',
+                                         imagename=None,
+                                         tags={'type': 'default'},
+                                         split=None,
+                                         regions=['f17d03e0-50bb-4a35-b247-cb910c0aaf2b']),
+                            BaselineLine(id='539eadce-f795-4bba-a785-c7767d10c407', ...), ...],
+                     regions={'text': [Region(id='f17d03e0-50bb-4a35-b247-cb910c0aaf2b',
+                                              boundary=[[277, 54], ..., [277, 54]],
+                                              imagename=None,
+                                              tags={'type': 'text'})]},
+                     line_orders=[])                     
+        >>> alto = serialization.serialize(baseline_seg,
+                                           image_size=im.size,
+                                           template='alto')
         >>> with open('segmentation_output.xml', 'w') as fp:
                 fp.write(alto)
 
-Optional parameters are largely the same as for the legacy segmenter, i.e. text
-direction and masking.
+A default segmentation model is supplied and will be used if none is specified
+explicitly as an argument.  Optional parameters are largely the same as for the
+legacy segmenter, i.e. text direction and masking.
 
 Images are automatically converted into the proper mode for recognition, except
 in the case of models trained on binary images as there is a plethora of
@@ -187,7 +215,7 @@ segmentation model loading.
         >>> model = models.load_any(rec_model_path)
 
 The sequence recognizer wrapper combines the neural network itself, a
-:ref:`codec <codecs>`, metadata such as the if the input is supposed to be
+:ref:`codec <codecs>`, metadata such as if the input is supposed to be
 grayscale or binarized, and an instance of a CTC decoder that performs the
 conversion of the raw output tensor of the network into a sequence of labels:
 
@@ -198,7 +226,7 @@ Afterwards, given an image, a segmentation and the model one can perform text
 recognition. The code is identical for both legacy and baseline segmentations.
 Like for segmentation input images are auto-converted to the correct color
 mode, except in the case of binary models for which a warning will be raised if
-there is a mismatch for binary input models.
+there is a mismatch.
 
 There are two methods for recognition, a basic single model call
 :func:`kraken.rpred.rpred` and a multi-model recognizer
@@ -210,12 +238,15 @@ a document.
 
         >>> from kraken import rpred
         # single model recognition
-        >>> pred_it = rpred(model, im, baseline_seg)
+        >>> pred_it = rpred(network=model,
+                            im=im,
+                            segmentation=baseline_seg)
         >>> for record in pred_it:
                 print(record)
 
-The output isn't just a sequence of characters but an
-:class:`kraken.rpred.ocr_record` record object containing the character
+The output isn't just a sequence of characters but, depending on the type of
+segmentation supplied, a :class:`kraken.containers.BaselineOCRRecord` or
+:class:`kraken.containers.BBoxOCRRecord` record object containing the character
 prediction, cuts (approximate locations), and confidences.
 
 .. code-block:: python
@@ -237,7 +268,7 @@ it is also possible to access the original line information:
 
         # for box lines
         >>> record.type
-        'box'
+        'bbox'
         >>> record.line
         >>> record.script
 
@@ -276,70 +307,179 @@ XML Parsing
 Sometimes it is desired to take the data in an existing XML serialization
 format like PageXML or ALTO and apply an OCR function on it. The
 :mod:`kraken.lib.xml` module includes parsers extracting information into data
-structures processable with minimal transformtion by the functional blocks:
+structures processable with minimal transformation by the functional blocks:
+
+Parsing is accessed is through the :class:`kraken.lib.xml.XMLPage` class.
 
 .. code-block:: python
 
         >>> from kraken.lib import xml
 
         >>> alto_doc = '/path/to/alto'
-        >>> xml.parse_alto(alto_doc)
-        {'image': '/path/to/image/file',
-         'type': 'baselines',
-         'lines': [{'baseline': [(24, 2017), (25, 2078)],
-                    'boundary': [(69, 2016), (70, 2077), (20, 2078), (19, 2017)],
-                    'text': '',
-                    'script': 'default'},
-                   {'baseline': [(79, 2016), (79, 2041)],
-                    'boundary': [(124, 2016), (124, 2041), (74, 2041), (74, 2016)],
-                    'text': '',
-                    'script': 'default'}, ...],
-         'regions': {'Image/Drawing/Figure': [[(-5, 3398), (207, 3398), (207, 2000), (-5, 2000)],
-                                              [(253, 3292), (668, 3292), (668, 3455), (253, 3455)],
-                                              [(216, -4), (1015, -4), (1015, 534), (216, 534)]],
-                     'Handwritten text': [[(2426, 3367), (2483, 3367), (2483, 3414), (2426, 3414)],
-                                          [(1824, 3437), (2072, 3437), (2072, 3514), (1824, 3514)]],
-                     ...}
+        >>> parsed_doc = xml.XMLPage(alto_doc)
+        >>> parsed_doc
+        XMLPage(filename='/path/to/alto', filetype=alto)
+        >>> parsed_doc.lines
+        {'line_1469098625593_463': BaselineLine(id='line_1469098625593_463',
+                                                baseline=[(2337, 226), (2421, 239)],
+                                                boundary=[(2344, 182), (2428, 195), (2420, 244), (2336, 231)],
+                                                text='$pag:39',
+                                                base_dir=None,
+                                                type='baselines',
+                                                imagename=None,
+                                                tags={'type': '$pag'},
+                                                split=None,
+                                                regions=['region_1469098609000_462']),
+ 
+         'line_1469098649515_464': BaselineLine(id='line_1469098649515_464',
+                                                baseline=[(789, 269), (2397, 304)],
+                                                boundary=[(790, 224), (2398, 259), (2397, 309), (789, 274)],
+                                                text='$-nor su hijo, De todos sus bienes, con los pactos',
+                                                base_dir=None,
+                                                type='baselines',
+                                                imagename=None,
+                                                tags={'type': '$pac'},
+                                                split=None,
+                                                regions=['region_1469098557906_461']),
+         ....}
+        >>> parsed_doc.regions
+        {'$pag': [Region(id='region_1469098609000_462',
+                         boundary=[(2324, 171), (2437, 171), (2436, 258), (2326, 237)],
+                         imagename=None,
+                         tags={'type': '$pag'})],
+         '$pac': [Region(id='region_1469098557906_461',
+                         boundary=[(738, 203), (2339, 245), (2398, 294), (2446, 345), (2574, 469), (2539, 1873), (2523, 2053), (2477, 2182), (738, 2243)],
+                         imagename=None,
+                         tags={'type': '$pac'})],
+         '$tip': [Region(id='TextRegion_1520586482298_194',
+                         boundary=[(687, 2428), (688, 2422), (107, 2420), (106, 2264), (789, 2256), (758, 2404)],
+                         imagename=None,
+                         tags={'type': '$tip'})],
+         '$par': [Region(id='TextRegion_1520586482298_193',
+                         boundary=[(675, 3772), (687, 2428), (758, 2404), (789, 2256), (2542, 2236), (2581, 3748)], 
+                         imagename=None,
+                         tags={'type': '$par'})]
         }
 
-        >>> page_doc = '/path/to/page'
-        >>> xml.parse_page(page_doc)
-        {'image': '/path/to/image/file',
-         'type': 'baselines',
-         'lines': [{'baseline': [(24, 2017), (25, 2078)],
-                    'boundary': [(69, 2016), (70, 2077), (20, 2078), (19, 2017)],
-                    'text': '',
-                    'script': 'default'},
-                   {'baseline': [(79, 2016), (79, 2041)],
-                    'boundary': [(124, 2016), (124, 2041), (74, 2041), (74, 2016)],
-                    'text': '',
-                    'script': 'default'}, ...],
-         'regions': {'Image/Drawing/Figure': [[(-5, 3398), (207, 3398), (207, 2000), (-5, 2000)],
-                                              [(253, 3292), (668, 3292), (668, 3455), (253, 3455)],
-                                              [(216, -4), (1015, -4), (1015, 534), (216, 534)]],
-                     'Handwritten text': [[(2426, 3367), (2483, 3367), (2483, 3414), (2426, 3414)],
-                                          [(1824, 3437), (2072, 3437), (2072, 3514), (1824, 3514)]],
-                     ...}
+The parser is aware of reading order(s), thus the basic properties accessing
+lines and regions are unordered dictionaries. Reading orders can be accessed
+separately through the `reading_orders` property:
+
+.. code-block:: python
+
+        >>> parsed_doc.region_orders
+        {'line_implicit': {'order': ['line_1469098625593_463',
+                                     'line_1469098649515_464',
+                                     ...
+                                    'line_1469099255968_508'],
+                           'is_total': True,
+                           'description': 'Implicit line order derived from element sequence'},
+        'region_implicit': {'order': ['region_1469098609000_462',
+                                      ...
+                                     'TextRegion_1520586482298_193'],
+                            'is_total': True,
+                            'description': 'Implicit region order derived from element sequence'},
+        'region_transkribus': {'order': ['region_1469098609000_462',
+                                         ...
+                                        'TextRegion_1520586482298_193'],
+                            'is_total': True,
+                            'description': 'Explicit region order from `custom` attribute'},
+        'line_transkribus': {'order': ['line_1469098625593_463',
+                                       ...
+                                       'line_1469099255968_508'],
+                             'is_total': True,
+                             'description': 'Explicit line order from `custom` attribute'},
+        'o_1530717944451': {'order': ['region_1469098609000_462',
+                                      ...
+                                      'TextRegion_1520586482298_193'],
+                           'is_total': True,
+                           'description': 'Regions reading order'}}
+
+Reading orders are created from different sources, depending on the content of
+the XML file. Every document will contain at least implicit orders for lines
+and regions (`line_implicit` and `region_implicit`) sourced from the sequence
+of line and region elements. There can also be explicit additional orders
+defined by the standard reading order elements, for example `o_1530717944451`
+in the above example. In Page XML files reading orders defined with the
+Transkribus style custom attribute are also recognized.
+
+To access the lines or regions of a document in a particular order:
+
+.. code-block:: python
+
+        >>> parsed_doc.get_sorted_lines(ro='line_implicit')
+        [BaselineLine(id='line_1469098625593_463',
+                      baseline=[(2337, 226), (2421, 239)],
+                      boundary=[(2344, 182), (2428, 195), (2420, 244), (2336, 231)],
+                      text='$pag:39',
+                      base_dir=None,
+                      type='baselines',
+                      imagename=None,
+                      tags={'type': '$pag'},
+                      split=None,
+                      regions=['region_1469098609000_462']),
+         BaselineLine(id='line_1469098649515_464',
+                      baseline=[(789, 269), (2397, 304)],
+                      boundary=[(790, 224), (2398, 259), (2397, 309), (789, 274)],
+                      text='$-nor su hijo, De todos sus bienes, con los pactos',
+                      base_dir=None,
+                      type='baselines',
+                      imagename=None,
+                      tags={'type': '$pac'},
+                      split=None,
+                      regions=['region_1469098557906_461'])
+        ...]
+
+The recognizer functions do not accept :class:`kraken.lib.xml.XMLPage` objects
+directly which means that for most practical purposes these need to be
+converted into :class:`container <kraken.containers.Segmentation>` objects:
+
+.. code-block:: python
+
+        >>> segmentation = parsed_doc.to_container()
+        >>> pred_it = rpred(network=model,
+                            im=im,
+                            segmentation=segmentation)
+        >>> for record in pred_it:
+                print(record)
 
 
 Serialization
 -------------
 
-The serialization module can be used to transform the :class:`ocr_records
-<kraken.rpred.ocr_record>` returned by the prediction iterator into a text
-based (most often XML) format for archival. The module renders `jinja2
-<https://jinja.palletsprojects.com>`_ templates in `kraken/templates` through
-the :func:`kraken.serialization.serialize` function.
+
+The serialization module can be used to transform results returned by the
+segmenter or recognizer into a text based (most often XML) format for archival.
+The module renders `jinja2 <https://jinja.palletsprojects.com>`_ templates,
+either ones :ref:`packaged <templates>` with kraken or supplied externally,
+through the :func:`kraken.serialization.serialize` function.
 
 .. code-block:: python
 
+        >>> import dataclasses
         >>> from kraken.lib import serialization
 
+        >>> alto_seg_only = serialization.serialize(baseline_seg, image_size=im.size, template='alto')
+
         >>> records = [record for record in pred_it]
-        >>> alto = serialization.serialize(records, image_name='path/to/image', image_size=im.size, template='alto')
+        >>> results = dataclasses.replace(pred_it.bounds, lines=records)
+        >>> alto = serialization.serialize(results, image_size=im.size, template='alto')
         >>> with open('output.xml', 'w') as fp:
                 fp.write(alto)
 
+The serialization function accepts arbitrary
+:class:`kraken.containers.Segmentation` objects, which may contain textual or
+only segmentation information. As the recognizer returns
+:class:`ocr_records <kraken.containers.ocr_record>` which cannot be serialized
+directly it is necessary to either construct a new
+:class:`kraken.containers.Segmentation` from scratch or insert them into the
+segmentation fed into the recognizer (:class:`ocr_records
+<kraken.containers.ocr_record>` subclass :class:`BaselineLine
+<kraken.containers.BaselineLine>`/:class:`BBoxLine
+<kraken.containers.BBoxLine>` The container classes are immutable data classes,
+therefore it is necessary for simple insertion of the records to use
+`dataclasses.replace` to create a new segmentation with a changed lines
+attribute.
 
 Training
 --------
