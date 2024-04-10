@@ -36,6 +36,7 @@ if TYPE_CHECKING:
 __all__ = ['BaselineLine',
            'BBoxLine',
            'Segmentation',
+           'Region',
            'ocr_record',
            'BaselineOCRRecord',
            'BBoxOCRRecord',
