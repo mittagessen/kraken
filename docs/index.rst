@@ -30,7 +30,7 @@ kraken's main features are:
   - :ref:`Public repository <repo>` of model files
   - :ref:`Variable recognition network architectures <vgsl>`
 
-Pull requests and code contributions are always welcome. 
+Pull requests and code contributions are always welcome.
 
 Installation
 ============
@@ -86,7 +86,7 @@ The git repository contains some environment files that aid in setting up the la
 
 .. code-block:: console
 
-  $ git clone https://github.com/mittagessen/kraken.git 
+  $ git clone https://github.com/mittagessen/kraken.git
   $ cd kraken
   $ conda env create -f environment.yml
 
@@ -94,7 +94,7 @@ or:
 
 .. code-block:: console
 
-  $ git clone https://github.com/mittagessen/kraken.git 
+  $ git clone https://github.com/mittagessen/kraken.git
   $ cd kraken
   $ conda env create -f environment_cuda.yml
 
@@ -109,7 +109,7 @@ in the kraken directory for the current user:
 
 ::
 
-  $ kraken get 10.5281/zenodo.10592716 
+  $ kraken get 10.5281/zenodo.10592716
 
 
 A list of libre models available in the central repository can be retrieved by
@@ -125,9 +125,9 @@ Model metadata can be extracted using:
 
   $ kraken show 10.5281/zenodo.10592716
   name: 10.5281/zenodo.10592716
-  
+
   CATMuS-Print (Large, 2024-01-30) - Diachronic model for French prints and other languages
-  
+
   <p><strong>CATMuS-Print (Large) - Diachronic model for French prints and other West European languages</strong></p>
   <p>CATMuS (Consistent Approach to Transcribing ManuScript) Print is a Kraken HTR model trained on data produced by several projects, dealing with different languages (French, Spanish, German, English, Corsican, Catalan, Latin, Italian&hellip;) and different centuries (from the first prints of the 16th c. to digital documents of the 21st century).</p>
   <p>Transcriptions follow graphematic principles and try to be as compatible as possible with guidelines previously published for French: no ligature (except those that still exist), no allographetic variants (except the long s), and preservation of the historical use of some letters (u/v, i/j). Abbreviations are not resolved. Inconsistencies might be present, because transcriptions have been done over several years and the norms have slightly evolved.</p>

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <!-- ALTO: Analyzed Layout and Text Object  -->
-<!-- This document is available under the Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0 - https://creativecommons.org/licenses/by-sa/4.0/ ). 
+<!-- This document is available under the Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0 - https://creativecommons.org/licenses/by-sa/4.0/ ).
 The ALTO Editorial Board has waived all rights to it worldwide under copyright law with confirmation of the original creating authors, including all related and neighboring rights, to the extent allowed by law.
 For the full text see https://creativecommons.org/licenses/by-sa/4.0/legalcode. -->
 
@@ -13,17 +13,17 @@ For the full text see https://creativecommons.org/licenses/by-sa/4.0/legalcode. 
 <!-- Change History -->
 <!-- June 22, 2004: Version finalized for docWORKS/METAe -->
 <!-- November 19, 2004: Modifications requested by Justin Littman -->
-<!-- Modifications of November 19, 2004: 
+<!-- Modifications of November 19, 2004:
 	1. add "Description" element
 	2. change "InnerMargin/OuterMargin" to "LeftMargin/RightMargin", add "POSITION" attribute to "PAGE" element
 	3. add "PROCESSING" attribute to "PAGE" element
 	4. internal changes to validate with Xerces parser
 	5. define fontstyles by enumerations
 	6. change "WC" (word confidence) attribute to xsd:float in range of "0" to "1".
-	7. Add "ALTERNATIVE" als childs to "STRING" element 
+	7. Add "ALTERNATIVE" als childs to "STRING" element
 	8. Add "language" attribute to "Textblock" and "STRING" element
 -->
-<!-- Modifications of December 02, 2004: 
+<!-- Modifications of December 02, 2004:
 	1. fixed problem with multiple use of blockgroup
 	2. add measurement enumeration 'inch1200'
 -->
@@ -49,10 +49,10 @@ For the full text see https://creativecommons.org/licenses/by-sa/4.0/legalcode. 
 	2. Use standard LC XLink Schema.
 	3. Push version to 2.0 to reflect change in maintenance agency.
 	4. Remove CCS copyright statement.
-	5. Rollback to model used in 1.4 schema except with the changes itemized in 1-4 of this change note.  An incorrect version of the 2.0 alpha schema was public until 2010-01-11.  The incorrect version was a derivative of the Library of Congress's custom ALTO XML Schema that introduced new elements and attributes. 
+	5. Rollback to model used in 1.4 schema except with the changes itemized in 1-4 of this change note.  An incorrect version of the 2.0 alpha schema was public until 2010-01-11.  The incorrect version was a derivative of the Library of Congress's custom ALTO XML Schema that introduced new elements and attributes.
 -->
 <!-- Modifications of January 11, 2010:
-	1. Rollback to model used in 1.4 schema except with the changes itemized in 1-4 of the previous change note of August 7, 2009.  An incorrect version of the 2.0 alpha schema was public until 2010-01-11.  The incorrect version was a derivative of the Library of Congress's custom ALTO XML Schema that introduced new elements and attributes that extended the 1.4 model prior to editorial board approval. 
+	1. Rollback to model used in 1.4 schema except with the changes itemized in 1-4 of the previous change note of August 7, 2009.  An incorrect version of the 2.0 alpha schema was public until 2010-01-11.  The incorrect version was a derivative of the Library of Congress's custom ALTO XML Schema that introduced new elements and attributes that extended the 1.4 model prior to editorial board approval.
 -->
 <!-- February 20, 2014, version 2.1:
 	1. Page and BlockType element HEIGHT, WIDTH, HPOS, VPOS attribute types changed to xsd:float from xsd:int.
@@ -66,7 +66,7 @@ For the full text see https://creativecommons.org/licenses/by-sa/4.0/legalcode. 
 	9. HEIGHT attribute added to HYP and SP elements.
 -->
 <!-- April, 2014, version 2.2 DRAFT:
-	1. Anonymous types changed to named types (to allow use of xsd:redefine mechanism)	
+	1. Anonymous types changed to named types (to allow use of xsd:redefine mechanism)
 -->
 <!-- July 2014, version 2.2 DRAFT
 	1. Version added to xsd:schema.
@@ -75,10 +75,10 @@ For the full text see https://creativecommons.org/licenses/by-sa/4.0/legalcode. 
 -->
 <!-- August 2014, version 3.0
 	1. Changed namespace and targetNamespace to http://www.loc.gov/standards/alto/ns-v3#
-	2. Changed schema version to 3.0 
+	2. Changed schema version to 3.0
 
-	ALTO schemas will be updated by whole numbers upon making changes that break backward compatibility (version 1 to version 2), 
-	and decimals for changes that will not (2.0 to 2.1). The namespace itself will also only change on major versions (ns-v2 to ns-v3). 
+	ALTO schemas will be updated by whole numbers upon making changes that break backward compatibility (version 1 to version 2),
+	and decimals for changes that will not (2.0 to 2.1). The namespace itself will also only change on major versions (ns-v2 to ns-v3).
 -->
 <!-- January 2016, version 3.1
 	1. Changed schema version to 3.1
@@ -98,22 +98,22 @@ For the full text see https://creativecommons.org/licenses/by-sa/4.0/legalcode. 
 -->
 <!-- May 2019, version 4.1
 	1. Fix for Processing including  processingStepType.
-	2. Add missing PROCESSINGREFS to PageType, PageSpaceType, BlockType, TextLine, StringType for referencing Processing history. 
+	2. Add missing PROCESSINGREFS to PageType, PageSpaceType, BlockType, TextLine, StringType for referencing Processing history.
 -->
 <!-- June/July 2020, version 4.2
 	1. Change BASELINE to accommodate a list of points in addition to a single point.
-	2. Make FONTSIZE optional. 
+	2. Make FONTSIZE optional.
 	3. Add "strikethrough" to list of allowed values for FONTSTYLE.
 -->
 <!-- May 2022, version 4.3
 	1. Add BASEDIRECTION attribute defining base direction and line orientation to TextLine and BlockType.
-	2. Add support for explicit reading order definitions with "ReadingOrder" element containing "UnorderedGroup"s, "OrderedGroup"s, and "ElementRef"s. 
+	2. Add support for explicit reading order definitions with "ReadingOrder" element containing "UnorderedGroup"s, "OrderedGroup"s, and "ElementRef"s.
 -->
 <xsd:schema xmlns="http://www.loc.gov/standards/alto/ns-v4#" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xlink="http://www.w3.org/1999/xlink" targetNamespace="http://www.loc.gov/standards/alto/ns-v4#" elementFormDefault="qualified" attributeFormDefault="unqualified" version="4.3">
 	<xsd:import namespace="http://www.w3.org/1999/xlink" schemaLocation="xlink.xsd"/>
 	<xsd:element name="alto" type="altoType">
 		<xsd:annotation>
-			<xsd:documentation>ALTO (analyzed layout and text object) stores layout information and 
+			<xsd:documentation>ALTO (analyzed layout and text object) stores layout information and
 			OCR recognized text of pages of any kind of printed documents like books, journals and newspapers.
 			ALTO is a standardized XML format to store layout and content information.
 			It is designed to be used as an extension schema to METS (Metadata Encoding and Transmission Standard),
@@ -602,7 +602,7 @@ For the full text see https://creativecommons.org/licenses/by-sa/4.0/legalcode. 
 				Any alternative for the word.
 				Alternative can outline a variant of writing by new typing / spelling rules, typically manually done or by dictionary replacements.
 				The above sample is an old composed character "Æ" of ancient time, which is replaced now by "Ä".
-				As variant are meant alternatives of the real printed content which are options outlined by the text recognition process. 
+				As variant are meant alternatives of the real printed content which are options outlined by the text recognition process.
 				Similar sample: "Straße" vs. "Strasse". Such alternatives are not coming from text recognition.
 			</xsd:documentation>
 		</xsd:annotation>
@@ -715,7 +715,7 @@ For the full text see https://creativecommons.org/licenses/by-sa/4.0/legalcode. 
 		<xsd:annotation>
 			<xsd:documentation>An ellipse shape. HPOS and VPOS describe the center of the ellipse.
 										            HLENGTH and VLENGTH are the width and height of the described ellipse.</xsd:documentation>
-			<xsd:documentation>The attribute ROTATION tells the rotation of the e.g. text or 
+			<xsd:documentation>The attribute ROTATION tells the rotation of the e.g. text or
 									 illustration within the block. The value is in degrees counterclockwise. </xsd:documentation>
 		</xsd:annotation>
 		<xsd:attribute name="HPOS" type="xsd:float" use="required"/>
@@ -773,23 +773,23 @@ For the full text see https://creativecommons.org/licenses/by-sa/4.0/legalcode. 
 			<xsd:enumeration value="fixed"/>
 		</xsd:restriction>
 	</xsd:simpleType>
-	
+
 	<xsd:simpleType name="MeasurementUnitType">
 		<xsd:annotation>
 			<xsd:documentation>
-				All measurement values inside the alto file are related to 
+				All measurement values inside the alto file are related to
 				this unit, except the font size.
 				Coordinates as being used in HPOS and VPOS are absolute coordinates referring to the upper-left corner of a page.
-				The upper left corner of the page is defined as coordinate (0/0). 
+				The upper left corner of the page is defined as coordinate (0/0).
 
 				values meaning:
 				mm10: 1/10th of millimeter
-				inch1200: 1/1200th of inch 
+				inch1200: 1/1200th of inch
 				pixel: 1 pixel
-										
-				The values for pixel will be related to the resolution of the image based 
+
+				The values for pixel will be related to the resolution of the image based
 				on which the layout is described. Incase the original image is not known
-				the scaling factor can be calculated based on total width and height of 
+				the scaling factor can be calculated based on total width and height of
 				the image and the according information of the PAGE element.
 		</xsd:documentation>
 		</xsd:annotation>
@@ -821,7 +821,7 @@ For the full text see https://creativecommons.org/licenses/by-sa/4.0/legalcode. 
 	<xsd:complexType name="fileIdentifierType">
 		<xsd:annotation>
 			<xsd:documentation>A unique identifier for the image file. This is drawn from MIX.</xsd:documentation>
-			<xsd:documentation> This identifier must be unique within the local system. 
+			<xsd:documentation> This identifier must be unique within the local system.
 			To facilitate file sharing or interoperability with other systems, fileIdentifierLocation may be added to designate the system or application where the identifier is unique.</xsd:documentation>
 		</xsd:annotation>
 		<xsd:simpleContent>
@@ -843,7 +843,7 @@ For the full text see https://creativecommons.org/licenses/by-sa/4.0/legalcode. 
 	<xsd:complexType name="documentIdentifierType">
 		<xsd:annotation>
 			<xsd:documentation>A unique identifier for the document.</xsd:documentation>
-			<xsd:documentation> This identifier must be unique within the local system. 
+			<xsd:documentation> This identifier must be unique within the local system.
 			To facilitate file sharing or interoperability with other systems, documentIdentifierLocation may be added to designate the system or application where the identifier is unique.</xsd:documentation>
 		</xsd:annotation>
 		<xsd:simpleContent>
@@ -1150,19 +1150,19 @@ For the full text see https://creativecommons.org/licenses/by-sa/4.0/legalcode. 
 				See http://www.fileformat.info/info/unicode/char/0101/index.htm
 				"U+0101" = (U+0061) + (U+0304)
 				"combining characters" ("base characters" in combination with non-spacing marks or characters which are combined to one) are represented as one "glyph", e.g. áàâ.
-				
+
 				Each glyph has its own coordinate information and must be separately addressable as a distinct object.
 				Correction and verification processes can be carried out for individual characters.
-				
+
 				Post-OCR analysis of the text as well as adaptive OCR algorithm must be able to record information on glyph level.
 				In order to reproduce the decision of the OCR software, optional characters must be recorded. These are called variants.
 				The OCR software evaluates each variant and picks the one with the highest confidence score as the glyph.
 				The confidence score expresses how confident the OCR software is that a single glyph had been recognized correctly.
-				
+
 				The glyph elements are in order of the word. Each glyph need to be recorded to built up the whole word sequence.
-				
+
 				The glyph’s CONTENT attribute is no replacement for the string’s CONTENT attribute.
-				Due to post-processing steps such as correction the values of both attributes may be inconsistent. 
+				Due to post-processing steps such as correction the values of both attributes may be inconsistent.
 			</xsd:documentation>
 		</xsd:annotation>
 		<xsd:sequence minOccurs="0">

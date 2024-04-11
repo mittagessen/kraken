@@ -524,7 +524,7 @@
 				<annotation>
 					<documentation>Semantic labels / tags</documentation>
 				</annotation>
-			</element>			
+			</element>
 		</sequence>
 		<attribute name="id" type="ID" use="required"/>
 		<attribute name="primaryLanguage" type="pc:LanguageSimpleType">
@@ -545,7 +545,7 @@
 		<attribute name="secondaryScript" type="pc:ScriptSimpleType">
 			<annotation>
 				<documentation>
-				The secondary script used in the text line 
+				The secondary script used in the text line
 				</documentation>
 			</annotation>
 		</attribute>
@@ -608,7 +608,7 @@
 				<annotation>
 					<documentation>Semantic labels / tags</documentation>
 				</annotation>
-			</element>			
+			</element>
 		</sequence>
 		<attribute name="id" type="ID" use="required"/>
 		<attribute name="language" type="pc:LanguageSimpleType">
@@ -629,7 +629,7 @@
 		<attribute name="secondaryScript" type="pc:ScriptSimpleType">
 			<annotation>
 				<documentation>
-				The secondary script used in the word 
+				The secondary script used in the word
 				</documentation>
 			</annotation>
 		</attribute>
@@ -2131,13 +2131,13 @@
 			One-to-one relation between to layout object. Use 'link'
 			for loose relations and 'join' for strong relations
 			(where something is fragmented for instance).
-			
+
 			Examples for 'link': caption - image floating -
 			paragraph paragraph - paragraph (when a paragraph is
 			split across columns and the last word of the first
 			paragraph DOES NOT continue in the second paragraph)
 			drop-cap - paragraph (when the drop-cap is a whole word)
-			
+
 			Examples for 'join': word - word (separated word at the
 			end of a line) drop-cap - paragraph (when the drop-cap
 			is not a whole word) paragraph - paragraph (when a
@@ -2307,7 +2307,7 @@
 				<annotation>
 					<documentation>Semantic labels / tags</documentation>
 				</annotation>
-			</element>    		
+			</element>
 			<element name="Roles" type="pc:RolesType"
 				 minOccurs="0" maxOccurs="1">
 				<annotation>
@@ -2619,7 +2619,7 @@
 				Is the cell a column or row header?
 				</documentation>
 			</annotation>
-		</attribute>    	
+		</attribute>
 	</complexType>
 	<complexType name="RolesType">
 		<sequence>

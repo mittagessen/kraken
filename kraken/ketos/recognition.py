@@ -311,7 +311,7 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
                              codec=codec,
                              resize=resize,
                              legacy_polygons=legacy_polygons)
-    
+
     # Force upgrade to new polygon extractor if model was not trained with it
     if model.nn and model.nn.use_legacy_polygons:
         if not legacy_polygons and not model.legacy_polygons:

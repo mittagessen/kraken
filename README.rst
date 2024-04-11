@@ -55,7 +55,7 @@ branch as well:
 
 ::
 
-  $ git clone https://github.com/mittagessen/kraken.git 
+  $ git clone https://github.com/mittagessen/kraken.git
   $ cd kraken
   $ conda env create -f environment.yml
 
@@ -63,7 +63,7 @@ or:
 
 ::
 
-  $ git clone https://github.com/mittagessen/kraken.git 
+  $ git clone https://github.com/mittagessen/kraken.git
   $ cd kraken
   $ conda env create -f environment_cuda.yml
 
@@ -75,7 +75,7 @@ in the kraken directory for the current user:
 
 ::
 
-  $ kraken get 10.5281/zenodo.10592716 
+  $ kraken get 10.5281/zenodo.10592716
 
 A list of libre models available in the central repository can be retrieved by
 running:
@@ -105,7 +105,7 @@ To segment an image (binarized or not) with the new baseline segmenter:
 ::
 
   $ kraken -i image.tif lines.json segment -bl
- 
+
 
 To segment and OCR an image using the default model(s):
 

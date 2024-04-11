@@ -1,10 +1,10 @@
-API Quickstart 
+API Quickstart
 ==============
 
 Kraken provides routines which are usable by third party tools to access all
 functionality of the OCR engine. Most functional blocks, binarization,
 segmentation, recognition, and serialization are encapsulated in one high
-level method each. 
+level method each.
 
 Simple use cases of the API which are mostly useful for debugging purposes are
 contained in the `contrib` directory. In general it is recommended to look at
@@ -493,7 +493,7 @@ handling and verbosity options for the CLI.
 
 .. code-block:: python
 
-        >>> from kraken.lib.train import RecognitionModel, KrakenTrainer 
+        >>> from kraken.lib.train import RecognitionModel, KrakenTrainer
         >>> ground_truth = glob.glob('training/*.xml')
         >>> training_files = ground_truth[:250] # training data is shuffled internally
         >>> evaluation_files = ground_truth[250:]
@@ -522,14 +522,14 @@ can be attached to the trainer object:
 .. code-block:: python
 
         >>> from pytorch_lightning.callbacks import Callback
-        >>> from kraken.lib.train import RecognitionModel, KrakenTrainer 
+        >>> from kraken.lib.train import RecognitionModel, KrakenTrainer
         >>> class MyPrintingCallback(Callback):
             def on_init_start(self, trainer):
                 print("Starting to init trainer!")
-        
+
             def on_init_end(self, trainer):
                 print("trainer is init now")
-        
+
             def on_train_end(self, trainer, pl_module):
                 print("do something when training ends")
         >>> ground_truth = glob.glob('training/*.xml')
