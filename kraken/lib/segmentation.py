@@ -41,6 +41,24 @@ from skimage.morphology import skeletonize
 from skimage.transform import (AffineTransform, PiecewiseAffineTransform,
                                warp)
 
+#faster implementation of PiecewiseAffineTransform - see https://github.com/scikit-image/scikit-image/issues/6864 and https://github.com/scikit-image/scikit-image/pull/6963
+class FastPiecewiseAffineTransform(PiecewiseAffineTransform):
+    def __call__(self, coords):
+        coords = np.asarray(coords)
+
+        simplex = self._tesselation.find_simplex(coords)
+
+        affines = np.array(
+            [self.affines[i].params for i in range(len(self._tesselation.simplices))]
+        )[simplex]
+
+        pts = np.c_[coords, np.ones((coords.shape[0], 1))]
+
+        result = np.einsum("ij,ikj->ik", pts, affines)
+        result[simplex == -1, :] = -1
+
+        return result
+
 from kraken.lib import default_specs
 from kraken.lib.exceptions import KrakenInputException
 
@@ -1180,7 +1198,7 @@ def extract_polygons(im: Image.Image,
                 raise KrakenInputException('Baseline outside of image bounds')
 
             if legacy:
-                im = np.array(im)
+                im = np.asarray(im)
                 # Old, slow, and deprecated path
                 # fast path for straight baselines requiring only rotation
                 if len(baseline) == 2:
@@ -1192,9 +1210,10 @@ def extract_polygons(im: Image.Image,
                     angle = np.arctan2(p_dir[1], p_dir[0])
                     patch = im[r_min:r_max+1, c_min:c_max+1].copy()
                     offset_polygon = pl - (c_min, r_min)
-                    r, c = draw.polygon(offset_polygon[:, 1], offset_polygon[:, 0])
-                    mask = np.zeros(patch.shape[:2], dtype=bool)
-                    mask[r, c] = True
+                    offset_polygon2 = offset_polygon.flatten().tolist()
+                    img = Image.new('L', patch.shape[:2][::-1], 0)
+                    ImageDraw.Draw(img).polygon(offset_polygon2, outline=1, fill=1)
+                    mask = np.asarray(img, dtype=bool)
                     patch[np.invert(mask)] = 0
                     extrema = offset_polygon[(0, -1), :]
                     # scale line image to max 600 pixel width
@@ -1245,14 +1264,15 @@ def extract_polygons(im: Image.Image,
                     offset_bl_dst_pts = bl_dst_pts - (c_dst_min, r_dst_min)
                     offset_pol_dst_pts = pol_dst_pts - (c_dst_min, r_dst_min)
                     # mask out points outside bounding polygon
-                    mask = np.zeros(patch.shape[:2], dtype=bool)
-                    r, c = draw.polygon(offset_polygon[:, 1], offset_polygon[:, 0])
-                    mask[r, c] = True
+                    offset_polygon2 = offset_polygon.flatten().tolist()
+                    img = Image.new('L', patch.shape[:2][::-1], 0)
+                    ImageDraw.Draw(img).polygon(offset_polygon2, outline=1, fill=1)
+                    mask = np.asarray(img, dtype=bool)
                     patch[np.invert(mask)] = 0
                     # estimate piecewise transform
                     src_points = np.concatenate((offset_baseline, offset_polygon))
                     dst_points = np.concatenate((offset_bl_dst_pts, offset_pol_dst_pts))
-                    tform = PiecewiseAffineTransform()
+                    tform = FastPiecewiseAffineTransform()
                     tform.estimate(src_points, dst_points)
                     o = warp(patch, tform.inverse, output_shape=output_shape, preserve_range=True, order=order)
                     i = Image.fromarray(o.astype('uint8'))
