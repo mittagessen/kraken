@@ -21,7 +21,7 @@ requirements:
      - scipy~=1.11.0
      - jinja2~=3.0
      - torchvision
-     - pytorch>=1.12.0
+     - pytorch~=2.1.0
      - cudatoolkit
      - jsonschema
      - scikit-image~=0.21.0
@@ -30,9 +30,9 @@ requirements:
      - pyvips
      - coremltools
      - pyarrow
-     - lightning~=2.0
+     - lightning~=2.2
      - torchmetrics>=1.1.0
-     - conda-forge::threadpoolctl~=3.2.0
+     - conda-forge::threadpoolctl~=3.4.0
      - albumentations
      - rich
 about:

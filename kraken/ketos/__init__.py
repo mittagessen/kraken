@@ -60,10 +60,10 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
 def cli(ctx, verbose, seed, deterministic):
     ctx.meta['deterministic'] = False if not deterministic else 'warn'
     if seed:
-        from pytorch_lightning import seed_everything
+        from lightning.pytorch import seed_everything
         seed_everything(seed, workers=True)
     elif deterministic:
-        from pytorch_lightning import seed_everything
+        from lightning.pytorch import seed_everything
         seed_everything(42, workers=True)
 
     ctx.meta['verbose'] = verbose

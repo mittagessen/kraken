@@ -381,7 +381,7 @@ class TestNewPolygons(unittest.TestCase):
             mfp2 = str(Path(tempdir) / "model2")
 
             self._test_ketoscli(
-                args=['compile', '-f', 'xml', '-o', dset, self.segmented_img],
+                args=['compile', '--workers', '0', '-f', 'xml', '-o', dset, self.segmented_img],
                 expect_legacy=False,
                 patching_dir="kraken.lib.arrow_dataset",
             )
@@ -400,7 +400,7 @@ class TestNewPolygons(unittest.TestCase):
             mfp2 = str(Path(tempdir) / "model2")
 
             self._test_ketoscli(
-                args=['compile', '--legacy-polygons', '-f', 'xml', '-o', dset, self.segmented_img],
+                args=['compile', '--workers', '0', '--legacy-polygons', '-f', 'xml', '-o', dset, self.segmented_img],
                 expect_legacy=True,
                 patching_dir="kraken.lib.arrow_dataset",
             )
@@ -429,7 +429,7 @@ class TestNewPolygons(unittest.TestCase):
             mfp2 = str(Path(tempdir) / "model2")
 
             self._test_ketoscli(
-                args=['compile', '-f', 'xml', '-o', dset, self.segmented_img],
+                args=['compile', '--workers', '0', '-f', 'xml', '-o', dset, self.segmented_img],
                 expect_legacy=False,
                 patching_dir="kraken.lib.arrow_dataset",
             )
@@ -446,7 +446,7 @@ class TestNewPolygons(unittest.TestCase):
             mfp = str(Path(tempdir) / "model")
 
             self._test_ketoscli(
-                args=['compile', '-f', 'xml', '-o', dset, self.segmented_img, self.arrow_data],
+                args=['compile', '--workers', '0', '-f', 'xml', '-o', dset, self.segmented_img, self.arrow_data],
                 expect_legacy=False,
                 patching_dir="kraken.lib.arrow_dataset",
             )

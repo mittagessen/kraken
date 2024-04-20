@@ -23,10 +23,10 @@ from typing import (TYPE_CHECKING, Any, Callable, Dict, Literal, Optional,
 from functools import partial
 
 import numpy as np
-import pytorch_lightning as pl
+import lightning as L
 import torch
 import torch.nn.functional as F
-from pytorch_lightning.callbacks import (BaseFinetuning, Callback,
+from lightning.pytorch.callbacks import (BaseFinetuning, Callback,
                                          EarlyStopping, LearningRateMonitor)
 from torch.optim import lr_scheduler
 from torch.utils.data import DataLoader, Subset, random_split
@@ -66,21 +66,21 @@ def _validation_worker_init_fn(worker_id):
         results when validating. Temporarily increase the logging level
         for lightning because otherwise it will display a message
         at info level about the seed being changed. """
-    from pytorch_lightning import seed_everything
+    from lightning.pytorch import seed_everything
     level = logging.getLogger("lightning_fabric.utilities.seed").level
     logging.getLogger("lightning_fabric.utilities.seed").setLevel(logging.WARN)
     seed_everything(42)
     logging.getLogger("lightning_fabric.utilities.seed").setLevel(level)
 
 
-class KrakenTrainer(pl.Trainer):
+class KrakenTrainer(L.Trainer):
     def __init__(self,
                  enable_progress_bar: bool = True,
                  enable_summary: bool = True,
                  min_epochs: int = 5,
                  max_epochs: int = 100,
                  freeze_backbone=-1,
-                 pl_logger: Union[pl.loggers.logger.Logger, str, None] = None,
+                 pl_logger: Union[L.pytorch.loggers.logger.Logger, str, None] = None,
                  log_dir: Optional['PathLike'] = None,
                  *args,
                  **kwargs):
@@ -93,14 +93,14 @@ class KrakenTrainer(pl.Trainer):
             kwargs['callbacks'] = [kwargs['callbacks']]
 
         if pl_logger:
-            if 'logger' in kwargs and isinstance(kwargs['logger'], pl.loggers.logger.Logger):
+            if 'logger' in kwargs and isinstance(kwargs['logger'], L.pytorch.loggers.logger.Logger):
                 logger.debug('Experiment logger has been provided outside KrakenTrainer as `logger`')
-            elif isinstance(pl_logger, pl.loggers.logger.Logger):
+            elif isinstance(pl_logger, L.pytorch.loggers.logger.Logger):
                 logger.debug('Experiment logger has been provided outside KrakenTrainer as `pl_logger`')
                 kwargs['logger'] = pl_logger
             elif pl_logger == 'tensorboard':
                 logger.debug('Creating default experiment logger')
-                kwargs['logger'] = pl.loggers.TensorBoardLogger(log_dir)
+                kwargs['logger'] = L.pytorch.loggers.TensorBoardLogger(log_dir)
             else:
                 logger.error('`pl_logger` was set, but %s is not an accepted value', pl_logger)
                 raise ValueError(f'{pl_logger} is not acceptable as logger')
@@ -113,7 +113,7 @@ class KrakenTrainer(pl.Trainer):
             kwargs['callbacks'].append(progress_bar_cb)
 
         if enable_summary:
-            from pytorch_lightning.callbacks import RichModelSummary
+            from lightning.pytorch.callbacks import RichModelSummary
             summary_cb = RichModelSummary(max_depth=2)
             kwargs['callbacks'].append(summary_cb)
             kwargs['enable_model_summary'] = False
@@ -146,10 +146,10 @@ class KrakenFreezeBackbone(BaseFinetuning):
     def finetune_function(self, pl_module, current_epoch, optimizer):
         pass
 
-    def on_train_start(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule") -> None:
+    def on_train_start(self, trainer: "L.Trainer", pl_module: "L.LightningModule") -> None:
         self.freeze(pl_module.net[:-1])
 
-    def on_train_batch_start(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule", batch, batch_idx) -> None:
+    def on_train_batch_start(self, trainer: "L.Trainer", pl_module: "L.LightningModule", batch, batch_idx) -> None:
         """
         Called for each training batch.
         """
@@ -162,7 +162,7 @@ class KrakenFreezeBackbone(BaseFinetuning):
                 current_param_groups = optimizer.param_groups
                 self._store(pl_module, opt_idx, num_param_groups, current_param_groups)
 
-    def on_train_epoch_start(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule") -> None:
+    def on_train_epoch_start(self, trainer: "L.Trainer", pl_module: "L.LightningModule") -> None:
         """Called when the epoch begins."""
         pass
 
@@ -171,7 +171,7 @@ class KrakenSetOneChannelMode(Callback):
     """
     Callback that sets the one_channel_mode of the model after the first epoch.
     """
-    def on_train_epoch_end(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule") -> None:
+    def on_train_epoch_end(self, trainer: "L.Trainer", pl_module: "L.LightningModule") -> None:
         # fill one_channel_mode after 1 iteration over training data set
         if not trainer.sanity_checking and trainer.current_epoch == 0 and trainer.model.nn.model_type == 'recognition':
             ds = getattr(pl_module, 'train_set', None)
@@ -187,7 +187,7 @@ class KrakenSaveModel(Callback):
     """
     Kraken's own serialization callback instead of pytorch's.
     """
-    def on_validation_end(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule") -> None:
+    def on_validation_end(self, trainer: "L.Trainer", pl_module: "L.LightningModule") -> None:
         if not trainer.sanity_checking:
             trainer.model.nn.hyper_params['completed_epochs'] += 1
             metric = float(trainer.logged_metrics['val_metric']) if 'val_metric' in trainer.logged_metrics else -1.0
@@ -199,7 +199,7 @@ class KrakenSaveModel(Callback):
             trainer.model.best_model = f'{trainer.model.output}_{trainer.model.best_epoch}.mlmodel'
 
 
-class RecognitionModel(pl.LightningModule):
+class RecognitionModel(L.LightningModule):
     def __init__(self,
                  hyper_params: Dict[str, Any] = None,
                  output: str = 'model',
@@ -706,7 +706,7 @@ class RecognitionModel(pl.LightningModule):
                     scheduler.step(metric)
 
 
-class SegmentationModel(pl.LightningModule):
+class SegmentationModel(L.LightningModule):
     def __init__(self,
                  hyper_params: Dict = None,
                  load_hyper_parameters: bool = False,

@@ -18,7 +18,7 @@ Handlers for rich-based progress bars.
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Union
 
-from pytorch_lightning.callbacks.progress.rich_progress import (
+from lightning.pytorch.callbacks.progress.rich_progress import (
     CustomProgress, MetricsTextColumn, RichProgressBar)
 from rich import get_console, reconfigure
 from rich.default_styles import DEFAULT_STYLES
