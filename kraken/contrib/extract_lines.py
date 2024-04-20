@@ -56,6 +56,7 @@ def cli(format_type, model, legacy_polygons, files):
                         im.save('{}.{}.jpg'.format(splitext(doc)[0], idx))
                         with open('{}.{}.gt.txt'.format(splitext(doc)[0], idx), 'w') as fp:
                             fp.write(sample['text'])
+            click.echo()
     else:
         net = vgsl.TorchVGSLModel.load_model(model)
         for doc in files:
@@ -65,6 +66,7 @@ def cli(format_type, model, legacy_polygons, files):
             for idx, (im, box) in enumerate(segmentation.extract_polygons(full_im, bounds, legacy=legacy_polygons)):
                 click.echo('.', nl=False)
                 im.save('{}.{}.jpg'.format(splitext(doc)[0], idx))
+            click.echo()
 
 
 if __name__ == '__main__':
