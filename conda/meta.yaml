@@ -21,7 +21,7 @@ requirements:
      - scipy~=1.11.0
      - jinja2~=3.0
      - torchvision
-     - pytorch~=2.2.0
+     - pytorch~=2.1.0
      - cudatoolkit
      - jsonschema
      - scikit-image~=0.21.0

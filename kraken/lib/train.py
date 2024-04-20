@@ -80,7 +80,7 @@ class KrakenTrainer(L.Trainer):
                  min_epochs: int = 5,
                  max_epochs: int = 100,
                  freeze_backbone=-1,
-                 pl_logger: Union[L.loggers.logger.Logger, str, None] = None,
+                 pl_logger: Union[L.pytorch.loggers.logger.Logger, str, None] = None,
                  log_dir: Optional['PathLike'] = None,
                  *args,
                  **kwargs):
@@ -93,14 +93,14 @@ class KrakenTrainer(L.Trainer):
             kwargs['callbacks'] = [kwargs['callbacks']]
 
         if pl_logger:
-            if 'logger' in kwargs and isinstance(kwargs['logger'], L.loggers.logger.Logger):
+            if 'logger' in kwargs and isinstance(kwargs['logger'], L.pytorch.loggers.logger.Logger):
                 logger.debug('Experiment logger has been provided outside KrakenTrainer as `logger`')
-            elif isinstance(pl_logger, L.loggers.logger.Logger):
+            elif isinstance(pl_logger, L.pytorch.loggers.logger.Logger):
                 logger.debug('Experiment logger has been provided outside KrakenTrainer as `pl_logger`')
                 kwargs['logger'] = pl_logger
             elif pl_logger == 'tensorboard':
                 logger.debug('Creating default experiment logger')
-                kwargs['logger'] = L.loggers.TensorBoardLogger(log_dir)
+                kwargs['logger'] = L.pytorch.loggers.TensorBoardLogger(log_dir)
             else:
                 logger.error('`pl_logger` was set, but %s is not an accepted value', pl_logger)
                 raise ValueError(f'{pl_logger} is not acceptable as logger')
