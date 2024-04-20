@@ -3,15 +3,16 @@
 # For the full list of built-in configuration values, see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 
-import importlib.metadata
-
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = 'kraken'
 copyright = '2015-2024, Benjamin Kiessling'
 author = 'Benjamin Kiessling'
-release = importlib.metadata.version('kraken')
+
+from subprocess import Popen, PIPE
+pipe = Popen('git describe --tags --always main', stdout=PIPE, shell=True)
+release = pipe.stdout.read().decode('utf-8')
 
 extensions = [
     'sphinx.ext.autodoc',
