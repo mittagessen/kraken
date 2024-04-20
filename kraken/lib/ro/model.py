@@ -23,10 +23,10 @@ from typing import (TYPE_CHECKING, Any, Dict, List, Literal, Optional,
                     Sequence, Union)
 
 import numpy as np
-import pytorch_lightning as pl
+import lightning as L
 import torch
 import torch.nn.functional as F
-from pytorch_lightning.callbacks import EarlyStopping, LearningRateMonitor
+from lightning.pytorch.callbacks import EarlyStopping, LearningRateMonitor
 from torch.optim import lr_scheduler
 from torch.utils.data import DataLoader, Subset
 
@@ -64,7 +64,7 @@ def spearman_footrule_distance(s, t):
     return (s - t).abs().sum() / (0.5 * (len(s) ** 2 - (len(s) % 2)))
 
 
-class ROModel(pl.LightningModule):
+class ROModel(L.LightningModule):
     def __init__(self,
                  hyper_params: Dict[str, Any] = None,
                  output: str = 'model',

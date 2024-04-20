@@ -36,11 +36,11 @@ from functools import partial
 from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence, Union
 
 import numpy as np
-import pytorch_lightning as pl
+import lightning as L
 import torch
 import torch.nn.functional as F
-from pytorch_lightning.callbacks import EarlyStopping
-from pytorch_lightning.utilities.memory import (garbage_collection_cuda,
+from lightning.pytorch.callbacks import EarlyStopping
+from lightning.pytorch.utilities.memory import (garbage_collection_cuda,
                                                 is_oom_error)
 from torch.optim import lr_scheduler
 from torch.utils.data import DataLoader, Subset, random_split
@@ -73,7 +73,7 @@ def _star_fun(fun, kwargs):
     return None
 
 
-class PretrainDataModule(pl.LightningDataModule):
+class PretrainDataModule(L.LightningDataModule):
     def __init__(self,
                  training_data: Union[Sequence[Union['PathLike', str]], Sequence[Dict[str, Any]]] = None,
                  evaluation_data: Optional[Union[Sequence[Union['PathLike', str]], Sequence[Dict[str, Any]]]] = None,
@@ -266,7 +266,7 @@ class PretrainDataModule(pl.LightningDataModule):
         self.val_set.dataset.no_encode()
 
 
-class RecognitionPretrainModel(pl.LightningModule):
+class RecognitionPretrainModel(L.LightningModule):
     def __init__(self,
                  hyper_params: Dict[str, Any] = None,
                  output: str = 'model',
