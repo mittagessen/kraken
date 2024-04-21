@@ -126,7 +126,7 @@ jobs:
           prerelease: false
           draft: true
           files: |
-            conda/*/*.tar.bz2
+            output/*/*.conda
             pypi/*
 
   publish-gh-pages:
