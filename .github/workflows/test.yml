@@ -13,9 +13,9 @@ jobs:
         python-version: [3.8, 3.9, '3.10', '3.11']
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies and kraken
@@ -39,11 +39,11 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         fetch-depth: 0
     - name: Set up Python 3.9
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: 3.9
     - name: Build a binary wheel and a source tarball
@@ -68,43 +68,43 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: conda-incubator/setup-miniconda@v2
+      - uses: conda-incubator/setup-miniconda@v3
         with:
           python-version: 3.9
           miniforge-variant: Mambaforge
       - name: install dependencies build
         shell: bash -l {0}
-        run: mamba install "conda-build>=3.20" colorama pip ruamel ruamel.yaml rich jsonschema conda-verify anaconda-client mamba
+        run: mamba install colorama pip ruamel ruamel.yaml rich jsonschema conda-verify anaconda-client
       # Runs the action with the following inputs or defaults if not specified.
-      - name: install boa
-        shell: bash -l {0}
-        run: pip install https://github.com/mamba-org/boa/archive/refs/tags/0.14.0.zip
-      - name: validate recipe
-        shell: bash -l {0}
-        id: conda_validation
-        run: |
-          PACKAGE_PATHS=$(conda mambabuild . --output --check -c conda-forge | tail -n 1)
-          echo "package_paths=$PACKAGE_PATHS" >> $GITHUB_OUTPUT
-      - name: run build
-        shell: bash -l {0}
-        run: conda mambabuild . -c conda-forge
-      - name: convert packages
-        shell: bash -l {0}
-        run: |
-          conda convert -p osx-arm64 -p osx-64 -o conda_convert ${{ steps.conda_validation.outputs.package_paths }}
-          mkdir conda_convert/linux-64
-          cp -f ${{ steps.conda_validation.outputs.package_paths }} conda_convert/linux-64
-      - name: upload to anaconda
-        shell: bash -l {0}
-        run: anaconda -t ${{ secrets.ANACONDA_TOKEN }} upload --no-progress --force conda_convert/*/*
+      - name: Build linux-64 conda package
+        uses: prefix-dev/rattler-build-action@v0.2.6
+        with:
+          recipe-path: "conda/recipe.yaml"
+          build-args: "--experimental --target-platform linux-64"
+      - name: Build osx-64 conda package
+        uses: prefix-dev/rattler-build-action@v0.2.6
+        with:
+          recipe-path: "conda/recipe.yaml"
+          build-args: "--experimental --target-platform osx-64"
+      - name: Build osx-arm64 conda package
+        uses: prefix-dev/rattler-build-action@v0.2.6
+        with:
+          recipe-path: "conda/recipe.yaml"
+          build-args: "--experimental --target-platform osx-arm64"
+      - name: Upload conda package
+      - run: |
+          for pkg in $(find output -type f \( -name "*.conda" -o -name "*.tar.bz2" \) ); do
+            echo "Uploading ${pkg}"
+            rattler-build upload anaconda -o mittagessen -a ${{ secrets.ANACONDA_TOKEN }} "${pkg}"
+          done
       - name: Upload conda artifacts to GH storage
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: conda_packages
-          path: conda_convert/*/*.tar.bz2
+          path: output/*/*.conda
 
   autodraft-gh-release:
     name: Create github release
@@ -112,11 +112,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: conda_packages
           path: conda
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: pypi_packages
           path: pypi
@@ -138,11 +138,11 @@ jobs:
       startsWith(github.ref, 'refs/tags/')
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: Set up Python 3.9
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: 3.9
       - name: Install sphinx-multiversion
