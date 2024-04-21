@@ -79,21 +79,21 @@ jobs:
         shell: bash -l {0}
         run: mamba install colorama pip ruamel ruamel.yaml rich jsonschema conda-verify anaconda-client
       # Runs the action with the following inputs or defaults if not specified.
-      - name: Build linux-64 conda package
-        uses: prefix-dev/rattler-build-action@v0.2.6
-        with:
-          recipe-path: "conda/recipe.yaml"
-          build-args: "--experimental --target-platform linux-64"
-      - name: Build osx-64 conda package
-        uses: prefix-dev/rattler-build-action@v0.2.6
-        with:
-          recipe-path: "conda/recipe.yaml"
-          build-args: "--experimental --target-platform osx-64"
-      - name: Build osx-arm64 conda package
-        uses: prefix-dev/rattler-build-action@v0.2.6
-        with:
-          recipe-path: "conda/recipe.yaml"
-          build-args: "--experimental --target-platform osx-arm64"
+      #      - name: Build linux-64 conda package
+      #        uses: prefix-dev/rattler-build-action@v0.2.6
+      #        with:
+      #          recipe-path: "conda/recipe.yaml"
+      #          build-args: "--experimental --target-platform linux-64"
+      #      - name: Build osx-64 conda package
+      #        uses: prefix-dev/rattler-build-action@v0.2.6
+      #        with:
+      #          recipe-path: "conda/recipe.yaml"
+      #          build-args: "--experimental --target-platform osx-64"
+      #      - name: Build osx-arm64 conda package
+      #        uses: prefix-dev/rattler-build-action@v0.2.6
+      #        with:
+      #          recipe-path: "conda/recipe.yaml"
+      #          build-args: "--experimental --target-platform osx-arm64"
       - name: Upload conda package
       - run: |
           for pkg in $(find output -type f \( -name "*.conda" -o -name "*.tar.bz2" \) ); do
