@@ -141,15 +141,6 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
 @click.option('--threads', show_default=True, default=1, type=click.IntRange(1), help='Maximum size of OpenMP/BLAS thread pool.')
 @click.option('--load-hyper-parameters/--no-load-hyper-parameters', show_default=True, default=False,
               help='When loading an existing model, retrieve hyperparameters from the model')
-@click.option('--repolygonize/--no-repolygonize', show_default=True,
-              default=False, help='Repolygonizes line data in ALTO/PageXML '
-              'files. This ensures that the trained model is compatible with the '
-              'segmenter in kraken even if the original image files either do '
-              'not contain anything but transcriptions and baseline information '
-              'or the polygon data was created using a different method. Will '
-              'be ignored in `path` mode. Note that this option will be slow '
-              'and will not scale input images to the same size as the segmenter '
-              'does.')
 @click.option('--force-binarization/--no-binarization', show_default=True,
               default=False, help='Forces input images to be binary, otherwise '
               'the appropriate color format will be auto-determined through the '
@@ -188,7 +179,7 @@ def pretrain(ctx, batch_size, pad, output, spec, load, freq, quit, epochs,
              min_epochs, lag, min_delta, device, precision, optimizer, lrate, momentum,
              weight_decay, warmup, schedule, gamma, step_size, sched_patience,
              cos_max, cos_min_lr, partition, fixed_splits, training_files,
-             evaluation_files, workers, threads, load_hyper_parameters, repolygonize,
+             evaluation_files, workers, threads, load_hyper_parameters,
              force_binarization, format_type, augment,
              mask_probability, mask_width, num_negatives, logit_temp,
              ground_truth, legacy_polygons):
@@ -278,7 +269,6 @@ def pretrain(ctx, batch_size, pad, output, spec, load, freq, quit, epochs,
                                      height=model.height,
                                      width=model.width,
                                      channels=model.channels,
-                                     repolygonize=repolygonize,
                                      force_binarization=force_binarization,
                                      format_type=format_type,
                                      legacy_polygons=legacy_polygons,)
