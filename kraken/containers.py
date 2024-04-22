@@ -194,11 +194,14 @@ class Segmentation:
         if len(self.lines) and not isinstance(self.lines[0], BBoxLine) and not isinstance(self.lines[0], BaselineLine):
             line_cls = BBoxLine if self.type == 'bbox' else BaselineLine
             self.lines = [line_cls(**line) for line in self.lines]
-        if len(self.regions) and not isinstance(next(iter(self.regions.values()))[0], Region):
-            regs = {}
-            for k, v in self.regions.items():
-                regs[k] = [Region(**reg) for reg in v]
-            self.regions = regs
+        if len(self.regions):
+            for regs in self.regions.values():
+                if regs and not isinstance(regs[0], Region):
+                    regs = {}
+                    for k, v in self.regions.items():
+                        regs[k] = [Region(**reg) for reg in v]
+                    self.regions = regs
+                    break
 
 
 class ocr_record(ABC):
