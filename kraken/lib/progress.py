@@ -110,7 +110,10 @@ class KrakenTrainProgressBar(RichProgressBar):
             reconfigure(**self._console_kwargs)
             self._console = get_console()
             self._console.clear_live()
-            self._metric_component = MetricsTextColumn(trainer, self.theme.metrics)
+            self._metric_component = MetricsTextColumn(trainer,
+                                                       self.theme.metrics,
+                                                       self.theme.metrics_text_delimiter,
+                                                       self.theme.metrics_format)
             columns = self.configure_columns(trainer)
             columns.append(self._metric_component)
 
@@ -158,3 +161,5 @@ class RichProgressBarTheme:
     time: Union[str, 'Style'] = DEFAULT_STYLES['progress.elapsed']
     processing_speed: Union[str, 'Style'] = DEFAULT_STYLES['progress.data.speed']
     metrics: Union[str, 'Style'] = DEFAULT_STYLES['progress.description']
+    metrics_text_delimiter: str = ' '
+    metrics_format: str = '.3f'
