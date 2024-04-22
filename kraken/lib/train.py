@@ -213,7 +213,6 @@ class RecognitionModel(L.LightningModule):
                  binary_dataset_split: bool = False,
                  num_workers: int = 1,
                  load_hyper_parameters: bool = False,
-                 repolygonize: bool = False,
                  force_binarization: bool = False,
                  format_type: Literal['path', 'alto', 'page', 'xml', 'binary'] = 'path',
                  codec: Optional[Dict] = None,
@@ -291,8 +290,6 @@ class RecognitionModel(L.LightningModule):
             valid_norm = False
         elif format_type == 'binary':
             DatasetClass = ArrowIPCRecognitionDataset
-            if repolygonize:
-                logger.warning('Repolygonization enabled in `binary` mode. Will be ignored.')
             valid_norm = False
             logger.info(f'Got {len(training_data)} binary dataset files for training data')
             training_data = [{'file': file} for file in training_data]
@@ -303,8 +300,6 @@ class RecognitionModel(L.LightningModule):
             if force_binarization:
                 logger.warning('Forced binarization enabled in `path` mode. Will be ignored.')
                 force_binarization = False
-            if repolygonize:
-                logger.warning('Repolygonization enabled in `path` mode. Will be ignored.')
             if binary_dataset_split:
                 logger.warning('Internal binary dataset splits are enabled but using non-binary dataset files. Will be ignored.')
                 binary_dataset_split = False
@@ -323,8 +318,6 @@ class RecognitionModel(L.LightningModule):
                 if force_binarization:
                     logger.warning('Forced binarization enabled with box lines. Will be ignored.')
                     force_binarization = False
-                if repolygonize:
-                    logger.warning('Repolygonization enabled with box lines. Will be ignored.')
                 if binary_dataset_split:
                     logger.warning('Internal binary dataset splits are enabled but using non-binary dataset files. Will be ignored.')
                     binary_dataset_split = False

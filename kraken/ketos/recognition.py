@@ -167,15 +167,6 @@ logger = logging.getLogger('kraken')
 @click.option('--threads', show_default=True, default=1, type=click.IntRange(1), help='Maximum size of OpenMP/BLAS thread pool.')
 @click.option('--load-hyper-parameters/--no-load-hyper-parameters', show_default=True, default=False,
               help='When loading an existing model, retrieve hyperparameters from the model')
-@click.option('--repolygonize/--no-repolygonize', show_default=True,
-              default=False, help='Repolygonizes line data in ALTO/PageXML '
-              'files. This ensures that the trained model is compatible with the '
-              'segmenter in kraken even if the original image files either do '
-              'not contain anything but transcriptions and baseline information '
-              'or the polygon data was created using a different method. Will '
-              'be ignored in `path` mode. Note that this option will be slow '
-              'and will not scale input images to the same size as the segmenter '
-              'does.')
 @click.option('--force-binarization/--no-binarization', show_default=True,
               default=False, help='Forces input images to be binary, otherwise '
               'the appropriate color format will be auto-determined through the '
@@ -203,7 +194,7 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
           step_size, sched_patience, cos_max, cos_min_lr, partition,
           fixed_splits, normalization, normalize_whitespace, codec, resize,
           reorder, base_dir, training_files, evaluation_files, workers,
-          threads, load_hyper_parameters, repolygonize, force_binarization,
+          threads, load_hyper_parameters, force_binarization,
           format_type, augment, pl_logger, log_dir, ground_truth,
           legacy_polygons):
     """
@@ -305,7 +296,6 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
                              binary_dataset_split=fixed_splits,
                              num_workers=workers,
                              load_hyper_parameters=load_hyper_parameters,
-                             repolygonize=repolygonize,
                              force_binarization=force_binarization,
                              format_type=format_type,
                              codec=codec,
@@ -385,15 +375,6 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
               default=None, help='Ground truth normalization')
 @click.option('-n', '--normalize-whitespace/--no-normalize-whitespace',
               show_default=True, default=True, help='Normalizes unicode whitespace')
-@click.option('--repolygonize/--no-repolygonize', show_default=True,
-              default=False, help='Repolygonizes line data in ALTO/PageXML '
-              'files. This ensures that the trained model is compatible with the '
-              'segmenter in kraken even if the original image files either do '
-              'not contain anything but transcriptions and baseline information '
-              'or the polygon data was created using a different method. Will '
-              'be ignored in `path` mode. Note, that this option will be slow '
-              'and will not scale input images to the same size as the segmenter '
-              'does.')
 @click.option('--force-binarization/--no-binarization', show_default=True,
               default=False, help='Forces input images to be binary, otherwise '
               'the appropriate color format will be auto-determined through the '
@@ -411,7 +392,7 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
 @click.option('--no-legacy-polygons', show_default=True, default=False, is_flag=True, help='Force disable the legacy polygon extractor.')
 def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
          threads, reorder, base_dir, normalization, normalize_whitespace,
-         repolygonize, force_binarization, format_type, fixed_splits, test_set, no_legacy_polygons):
+         force_binarization, format_type, fixed_splits, test_set, no_legacy_polygons):
     """
     Evaluate on a test set.
     """
@@ -420,6 +401,8 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
 
     import numpy as np
     from torch.utils.data import DataLoader
+
+    from torchmetrics.text import CharErrorRate, WordErrorRate
 
     from kraken.lib import models, util
     from kraken.lib.dataset import (ArrowIPCRecognitionDataset,
@@ -475,15 +458,11 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
             dataset_kwargs["split_filter"] = "test"
 
     if format_type in ['xml', 'page', 'alto']:
-        if repolygonize:
-            message('Repolygonizing data')
         test_set = [{'page': XMLPage(file, filetype=format_type).to_container()} for file in test_set]
         valid_norm = False
         DatasetClass = partial(PolygonGTDataset, legacy_polygons=legacy_polygons)
     elif format_type == 'binary':
         DatasetClass = ArrowIPCRecognitionDataset
-        if repolygonize:
-            logger.warning('Repolygonization enabled in `binary` mode. Will be ignored.')
         test_set = [{'file': file} for file in test_set]
         valid_norm = False
     else:
@@ -491,8 +470,6 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
         if force_binarization:
             logger.warning('Forced binarization enabled in `path` mode. Will be ignored.')
             force_binarization = False
-        if repolygonize:
-            logger.warning('Repolygonization enabled in `path` mode. Will be ignored.')
         test_set = [{'line': util.parse_gt_path(img)} for img in test_set]
         valid_norm = True
 
@@ -502,7 +479,8 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
     if reorder and base_dir != 'auto':
         reorder = base_dir
 
-    acc_list = []
+    cer_list = []
+    wer_list = []
 
     with threadpool_limits(limits=threads):
         for p, net in nn.items():
@@ -539,6 +517,9 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
                                    pin_memory=pin_ds_mem,
                                    collate_fn=collate_sequences)
 
+            test_cer = CharErrorRate()
+            test_wer = WordErrorRate()
+
             with KrakenProgressBar() as progress:
                 batches = len(ds_loader)
                 pred_task = progress.add_task('Evaluating', total=batches, visible=True if not ctx.meta['verbose'] else False)
@@ -555,6 +536,9 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
                             algn_gt.extend(algn1)
                             algn_pred.extend(algn2)
                             error += c
+                            test_cer.update(x, y)
+                            test_wer.update(x, y)
+
                     except FileNotFoundError as e:
                         batches -= 1
                         progress.update(pred_task, total=batches)
@@ -565,10 +549,23 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
                         logger.warning(str(e))
                     progress.update(pred_task, advance=1)
 
-            acc_list.append((chars - error) / chars)
+            cer_list.append(1.0 - test_cer.compute())
+            wer_list.append(1.0 - test_wer.compute())
             confusions, scripts, ins, dels, subs = compute_confusions(algn_gt, algn_pred)
-            rep = render_report(p, chars, error, confusions, scripts, ins, dels, subs)
+            rep = render_report(p,
+                                chars,
+                                error,
+                                cer_list[-1],
+                                wer_list[-1],
+                                confusions,
+                                scripts,
+                                ins,
+                                dels,
+                                subs)
             logger.info(rep)
             message(rep)
-    logger.info('Average accuracy: {:0.2f}%, (stddev: {:0.2f})'.format(np.mean(acc_list) * 100, np.std(acc_list) * 100))
-    message('Average accuracy: {:0.2f}%, (stddev: {:0.2f})'.format(np.mean(acc_list) * 100, np.std(acc_list) * 100))
+
+    logger.info('Average character accuracy: {:0.2f}%, (stddev: {:0.2f})'.format(np.mean(cer_list) * 100, np.std(cer_list) * 100))
+    message('Average character accuracy: {:0.2f}%, (stddev: {:0.2f})'.format(np.mean(cer_list) * 100, np.std(cer_list) * 100))
+    logger.info('Average word accuracy: {:0.2f}%, (stddev: {:0.2f})'.format(np.mean(wer_list) * 100, np.std(wer_list) * 100))
+    message('Average word accuracy: {:0.2f}%, (stddev: {:0.2f})'.format(np.mean(wer_list) * 100, np.std(wer_list) * 100))
