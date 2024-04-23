@@ -117,7 +117,7 @@ def cli(format_type, model, normalization, output, files):
         click.echo(f'Processing {doc} ', nl=False)
         data = XMLPage(doc)
         im = Image.open(data.imagename).convert('RGBA')
-        result = align.forced_align(data.to_container, net)
+        result = align.forced_align(data.to_container(), net)
         if normalization:
             for line in data._lines:
                 line["text"] = normalize(normalization, line["text"])
