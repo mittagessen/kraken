@@ -138,8 +138,8 @@ otherwise) while the remaining 10% of the test set is selected by `ketos test`.
     Fixed splits in datasets are ignored during training and testing per
     default as they require loading the entire dataset into main memory at
     once, drastically increasing memory consumption and causing initial delays.
-    Use the `--fixed-splits` option in `ketos train` and `ketos test` to
-    respect fixed splints.
+    Use the `\-\-fixed-splits` option in `ketos train` and `ketos test` to
+    respect fixed splits.
 
 Recognition training
 --------------------
