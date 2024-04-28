@@ -134,8 +134,7 @@ to the validation set, and 10% to the test set. The training and validation
 sets in the dataset file are used automatically by `ketos train` (unless told
 otherwise) while the remaining 10% of the test set is selected by `ketos test`.
 
-.. warning:
-
+.. warning::
     Fixed splits in datasets are ignored during training and testing per
     default as they require loading the entire dataset into main memory at
     once, drastically increasing memory consumption and causing initial delays.
