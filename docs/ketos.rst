@@ -26,6 +26,7 @@ Recognition model training
 
 * The default architecture works well for decently sized datasets.
 * Use precompiled binary datasets and put them in a place where they can be memory mapped during training (local storage, not NFS or similar).
+* Fixed splits in precompiled datasets increase memory use and slow down startup as the dataset needs to be loaded once into the dataset. It is recommended to create explicit splits by compiling source XML files into separate datasets.
 * Use the ``--logger`` flag to track your training metrics across experiments using Tensorboard.
 * If the network doesn't converge before the early stopping aborts training, increase ``--min-epochs`` or ``--lag``. Use the ``--logger`` option to inspect your training loss.
 * Use the flag ``--augment`` to activate data augmentation.
@@ -127,10 +128,19 @@ compile time:
 
    $ ketos compile --random-split 0.8 0.1 0.1 ...
 
+
 The above line splits assigns 80% of the source lines to the training set, 10%
 to the validation set, and 10% to the test set. The training and validation
 sets in the dataset file are used automatically by `ketos train` (unless told
 otherwise) while the remaining 10% of the test set is selected by `ketos test`.
+
+.. warning:
+
+    Fixed splits in datasets are ignored during training and testing per
+    default as they require loading the entire dataset into main memory at
+    once, drastically increasing memory consumption and causing initial delays.
+    Use the `--fixed-splits` option in `ketos train` and `ketos test` to
+    respect fixed splints.
 
 Recognition training
 --------------------
