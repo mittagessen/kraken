@@ -214,8 +214,10 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore, input,
         if no_segmentation:
             bounds = Segmentation(type='bbox',
                                   text_direction='horizontal-lr',
-                                  lines=[BBoxLine(id=uuid.uuid4(),
-                                                  bbox=((0, 0), (0, im.size[1]), im.size, (im.size[0], 0)))])
+                                  imagename=ctx.meta['base_image'],
+                                  script_detection=False,
+                                  lines=[BBoxLine(id=str(uuid.uuid4()),
+                                                  bbox=(0, 0, im.size[1], im.size[0]))])
         else:
             raise click.UsageError('No line segmentation given. Add one with the input or run `segment` first.')
     elif no_segmentation:
@@ -404,7 +406,7 @@ def process_pipeline(subcommands, input, batch_input, suffix, verbose, format_ty
                     progress.update(pdf_parse_task, total=num_pages)
                     logger.warning(f'{fpath} is not a PDF file. Skipping.')
         input = new_input
-        ctx.meta['steps'].insert(0, ProcessingStep(id=uuid.uuid4(),
+        ctx.meta['steps'].insert(0, ProcessingStep(id=str(uuid.uuid4()),
                                                    category='preprocessing',
                                                    description='PDF image extraction',
                                                    settings={}))
@@ -454,7 +456,7 @@ def binarize(ctx, threshold, zoom, escale, border, perc, range, low, high):
     """
     from kraken.containers import ProcessingStep
 
-    ctx.meta['steps'].append(ProcessingStep(id=uuid.uuid4(),
+    ctx.meta['steps'].append(ProcessingStep(id=str(uuid.uuid4()),
                                             category='preprocessing',
                                             description='Image binarization',
                                             settings={'threshold': threshold,
@@ -506,7 +508,7 @@ def segment(ctx, model, boxes, text_direction, scale, maxcolseps,
     if boxes is False:
         if not model:
             model = SEGMENTATION_DEFAULT_MODEL
-        ctx.meta['steps'].append(ProcessingStep(id=uuid.uuid4(),
+        ctx.meta['steps'].append(ProcessingStep(id=str(uuid.uuid4()),
                                                 category='processing',
                                                 description='Baseline and region segmentation',
                                                 settings={'model': os.path.basename(model),
@@ -536,7 +538,7 @@ def segment(ctx, model, boxes, text_direction, scale, maxcolseps,
 
         message('\u2713', fg='green')
     else:
-        ctx.meta['steps'].append(ProcessingStep(id=uuid.uuid4(),
+        ctx.meta['steps'].append(ProcessingStep(id=str(uuid.uuid4()),
                                                 category='processing',
                                                 description='bounding box segmentation',
                                                 settings={'text_direction': text_direction,
@@ -648,7 +650,7 @@ def ocr(ctx, model, pad, reorder, base_dir, no_segmentation, text_direction):
         nn.update(nm)
         nm = nn
 
-    ctx.meta['steps'].append(ProcessingStep(id=uuid.uuid4(),
+    ctx.meta['steps'].append(ProcessingStep(id=str(uuid.uuid4()),
                                             category='processing',
                                             description='Text line recognition',
                                             settings={'text_direction': text_direction,
