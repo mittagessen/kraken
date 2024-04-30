@@ -67,10 +67,7 @@ def _validation_worker_init_fn(worker_id):
         for lightning because otherwise it will display a message
         at info level about the seed being changed. """
     from lightning.pytorch import seed_everything
-    level = logging.getLogger("lightning_fabric.utilities.seed").level
-    logging.getLogger("lightning_fabric.utilities.seed").setLevel(logging.WARN)
     seed_everything(42)
-    logging.getLogger("lightning_fabric.utilities.seed").setLevel(level)
 
 
 class KrakenTrainer(L.Trainer):
