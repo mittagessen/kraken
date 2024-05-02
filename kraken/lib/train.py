@@ -502,9 +502,9 @@ class RecognitionModel(L.LightningModule):
         self.val_cer.update(pred, decoded_targets)
         self.val_wer.update(pred, decoded_targets)
 
-        if self.logger and self.trainer.state.stage != 'sanity_check' and self.hparams.batch_size * batch_idx < 16:
-            for i in range(self.hparams.batch_size):
-                count = self.hparams.batch_size * batch_idx + i
+        if self.logger and self.trainer.state.stage != 'sanity_check' and self.hparams.hyper_params["batch_size"] * batch_idx < 16:
+            for i in range(self.hparams.hyper_params["batch_size"]):
+                count = self.hparams.hyper_params["batch_size"] * batch_idx + i
                 if count < 16:
                     self.logger.experiment.add_image(f'Validation #{count}, target: {decoded_targets[i]}',
                                                      batch['image'][i],
