@@ -1016,7 +1016,7 @@ class SegmentationModel(L.LightningModule):
                 self.val_set.dataset.class_mapping = self.nn.user_metadata['class_mapping']
 
             # updates model's hyper params with user-defined ones
-            self.nn.hyper_params = self.hparams
+            self.nn.hyper_params = self.hparams.hyper_params
 
             # change topline/baseline switch
             loc = {None: 'centerline',
