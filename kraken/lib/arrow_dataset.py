@@ -104,7 +104,7 @@ def parse_path(path: Union[str, 'PathLike'],
     return {'image': path, 'lines': [{'text': gt}]}
 
 
-def build_binary_dataset(files: Optional[List[Union[str, 'PathLike', Dict]]] = None,
+def build_binary_dataset(files: Optional[List[Union[str, 'PathLike', 'Segmentation']]] = None,
                          output_file: Union[str, 'PathLike'] = None,
                          format_type: str = 'xml',
                          num_workers: int = 0,
@@ -120,7 +120,7 @@ def build_binary_dataset(files: Optional[List[Union[str, 'PathLike', Dict]]] = N
     binary dataset.
 
     Args:
-        files: List of XML input files.
+        files: List of XML input files or Segmentation container objects.
         output_file: Path to the output file.
         format_type: One of `xml`, `alto`, `page`, `path`, or None. In `None`
                      mode, the files argument is expected to be a list of
@@ -191,9 +191,9 @@ def build_binary_dataset(files: Optional[List[Union[str, 'PathLike', Dict]]] = N
     alphabet = Counter()
     num_lines = 0
     for doc in docs:
-        if format_type in ['xml', 'alto', 'page']:
+        if format_type in ['xml', 'alto', 'page', None]:
             lines = doc.lines.values()
-        else:
+        elif format_type == 'path':
             lines = doc['lines']
         for line in lines:
             num_lines += 1
