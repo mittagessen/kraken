@@ -52,8 +52,7 @@ def _extract_line(xml_record, skip_empty_lines: bool = True, legacy_polygons: bo
         return lines, None, None
     if is_bitonal(im):
         im = im.convert('1')
-    recs = xml_record.lines.values()
-    for idx, rec in enumerate(recs):
+    for idx, rec in enumerate(xml_record.lines):
         seg = Segmentation(text_direction='horizontal-lr',
                            imagename=xml_record.imagename,
                            type=xml_record.type,
@@ -167,6 +166,8 @@ def build_binary_dataset(files: Optional[List[Union[str, 'PathLike', 'Segmentati
         for doc in files:
             try:
                 data = parse_fn(doc)
+                if format_type in ['xml', 'alto', 'page']:
+                    data = data.to_container()
             except (FileNotFoundError, KrakenInputException, ValueError):
                 logger.warning(f'Invalid input file {doc}')
                 continue
@@ -191,12 +192,12 @@ def build_binary_dataset(files: Optional[List[Union[str, 'PathLike', 'Segmentati
     num_lines = 0
     for doc in docs:
         if format_type in ['xml', 'alto', 'page', None]:
-            lines = doc.lines.values()
+            lines = doc.lines
         elif format_type == 'path':
             lines = doc['lines']
         for line in lines:
             num_lines += 1
-            alphabet.update(line.text if format_type in ['xml', 'alto', 'page'] else line['text'])
+            alphabet.update(line.text if format_type in ['xml', 'alto', 'page', None] else line['text'])
 
     callback(0, num_lines)
 
