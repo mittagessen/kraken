@@ -23,7 +23,7 @@ import tempfile
 from collections import Counter
 from functools import partial
 from multiprocessing import Pool
-from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Literal, Callable, List, Optional, Tuple, Union
 
 import numpy as np
 import pyarrow as pa
@@ -106,7 +106,7 @@ def parse_path(path: Union[str, 'PathLike'],
 
 def build_binary_dataset(files: Optional[List[Union[str, 'PathLike', 'Segmentation']]] = None,
                          output_file: Union[str, 'PathLike'] = None,
-                         format_type: str = 'xml',
+                         format_type: Literal['xml', 'alto', 'page', None] = 'xml',
                          num_workers: int = 0,
                          ignore_splits: bool = False,
                          random_split: Optional[Tuple[float, float, float]] = None,
@@ -124,8 +124,7 @@ def build_binary_dataset(files: Optional[List[Union[str, 'PathLike', 'Segmentati
         output_file: Path to the output file.
         format_type: One of `xml`, `alto`, `page`, `path`, or None. In `None`
                      mode, the files argument is expected to be a list of
-                     dictionaries in the output format of the
-                     `kraken.lib.xml.parse_{alto,page,xml}` functions.
+                     `kraken.containers.Segmentation` objects.
         num_workers: Number of workers for parallelized extraction of line
                      images. Set to `0` to disable parallelism.
         ignore_splits: Switch to disable serialization of the explicit
