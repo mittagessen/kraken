@@ -164,19 +164,21 @@ class ROModel(L.LightningModule):
         self.val_spearman.append(spearman_dist.cpu())
 
     def on_validation_epoch_end(self):
-        val_metric = np.mean(self.val_spearman)
-        val_loss = np.mean(self.val_losses)
+        if not self.trainer.sanity_checking:
+            val_metric = np.mean(self.val_spearman)
+            val_loss = np.mean(self.val_losses)
+
+            if val_metric < self.best_metric:
+                logger.debug(f'Updating best metric from {self.best_metric} ({self.best_epoch}) to {val_metric} ({self.current_epoch})')
+                self.best_epoch = self.current_epoch
+                self.best_metric = val_metric
+            logger.info(f'validation run: val_spearman {val_metric} val_loss {val_loss}')
+            self.log('val_spearman', val_metric, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+            self.log('val_metric', val_metric, on_step=False, on_epoch=True, prog_bar=False, logger=True)
+            self.log('val_loss', val_loss, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+
         self.val_spearman.clear()
         self.val_losses.clear()
-
-        if val_metric < self.best_metric:
-            logger.debug(f'Updating best metric from {self.best_metric} ({self.best_epoch}) to {val_metric} ({self.current_epoch})')
-            self.best_epoch = self.current_epoch
-            self.best_metric = val_metric
-        logger.info(f'validation run: val_spearman {val_metric} val_loss {val_loss}')
-        self.log('val_spearman', val_metric, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-        self.log('val_metric', val_metric, on_step=False, on_epoch=True, prog_bar=False, logger=True)
-        self.log('val_loss', val_loss, on_step=False, on_epoch=True, prog_bar=True, logger=True)
 
     def training_step(self, batch, batch_idx):
         x, y = batch['sample'], batch['target']

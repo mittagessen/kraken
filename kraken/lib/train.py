@@ -515,17 +515,19 @@ class RecognitionModel(L.LightningModule):
                                                     self.global_step)
 
     def on_validation_epoch_end(self):
-        accuracy = 1.0 - self.val_cer.compute()
-        word_accuracy = 1.0 - self.val_wer.compute()
+        if not self.trainer.sanity_checking:
+            accuracy = 1.0 - self.val_cer.compute()
+            word_accuracy = 1.0 - self.val_wer.compute()
 
-        if accuracy > self.best_metric:
-            logger.debug(f'Updating best metric from {self.best_metric} ({self.best_epoch}) to {accuracy} ({self.current_epoch})')
-            self.best_epoch = self.current_epoch
-            self.best_metric = accuracy
-        logger.info(f'validation run: total chars {self.val_cer.total} errors {self.val_cer.errors} accuracy {accuracy}')
-        self.log('val_accuracy', accuracy, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-        self.log('val_word_accuracy', word_accuracy, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-        self.log('val_metric', accuracy, on_step=False, on_epoch=True, prog_bar=False, logger=True)
+            if accuracy > self.best_metric:
+                logger.debug(f'Updating best metric from {self.best_metric} ({self.best_epoch}) to {accuracy} ({self.current_epoch})')
+                self.best_epoch = self.current_epoch
+                self.best_metric = accuracy
+            logger.info(f'validation run: total chars {self.val_cer.total} errors {self.val_cer.errors} accuracy {accuracy}')
+            self.log('val_accuracy', accuracy, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+            self.log('val_word_accuracy', word_accuracy, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+            self.log('val_metric', accuracy, on_step=False, on_epoch=True, prog_bar=False, logger=True)
+        # reset metrics even if not sanity checking
         self.val_cer.reset()
         self.val_wer.reset()
 
@@ -905,25 +907,26 @@ class SegmentationModel(L.LightningModule):
         self.val_freq_iu.update(pred, y)
 
     def on_validation_epoch_end(self):
+        if not self.trainer.sanity_checking:
+            pixel_accuracy = self.val_px_accuracy.compute()
+            mean_accuracy = self.val_mean_accuracy.compute()
+            mean_iu = self.val_mean_iu.compute()
+            freq_iu = self.val_freq_iu.compute()
 
-        pixel_accuracy = self.val_px_accuracy.compute()
-        mean_accuracy = self.val_mean_accuracy.compute()
-        mean_iu = self.val_mean_iu.compute()
-        freq_iu = self.val_freq_iu.compute()
+            if mean_iu > self.best_metric:
+                logger.debug(f'Updating best metric from {self.best_metric} ({self.best_epoch}) to {mean_iu} ({self.current_epoch})')
+                self.best_epoch = self.current_epoch
+                self.best_metric = mean_iu
 
-        if mean_iu > self.best_metric:
-            logger.debug(f'Updating best metric from {self.best_metric} ({self.best_epoch}) to {mean_iu} ({self.current_epoch})')
-            self.best_epoch = self.current_epoch
-            self.best_metric = mean_iu
+            logger.info(f'validation run: accuracy {pixel_accuracy} mean_acc {mean_accuracy} mean_iu {mean_iu} freq_iu {freq_iu}')
 
-        logger.info(f'validation run: accuracy {pixel_accuracy} mean_acc {mean_accuracy} mean_iu {mean_iu} freq_iu {freq_iu}')
+            self.log('val_accuracy', pixel_accuracy, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+            self.log('val_mean_acc', mean_accuracy, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+            self.log('val_mean_iu', mean_iu, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+            self.log('val_freq_iu', freq_iu, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+            self.log('val_metric', mean_iu, on_step=False, on_epoch=True, prog_bar=False, logger=True)
 
-        self.log('val_accuracy', pixel_accuracy, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-        self.log('val_mean_acc', mean_accuracy, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-        self.log('val_mean_iu', mean_iu, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-        self.log('val_freq_iu', freq_iu, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-        self.log('val_metric', mean_iu, on_step=False, on_epoch=True, prog_bar=False, logger=True)
-
+        # reset metrics even if sanity checking
         self.val_px_accuracy.reset()
         self.val_mean_accuracy.reset()
         self.val_mean_iu.reset()
