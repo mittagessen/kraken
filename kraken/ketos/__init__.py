@@ -36,11 +36,10 @@ from .ro import roadd, rotrain
 from .segmentation import segtest, segtrain
 from .transcription import extract, transcription
 
-APP_NAME = 'kraken'
-
 logging.captureWarnings(True)
 logger = logging.getLogger('kraken')
-
+# disable annoying lightning worker seeding log messages
+logging.getLogger("lightning.fabric.utilities.seed").setLevel(logging.ERROR)
 # install rich traceback handler
 install(suppress=[click])
 
