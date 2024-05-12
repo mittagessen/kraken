@@ -63,10 +63,10 @@ def _extract_line(xml_record, skip_empty_lines: bool = True, legacy_polygons: bo
         try:
             line_im, line = next(extract_polygons(im, seg, legacy=legacy_polygons))
         except KrakenInputException:
-            logger.warning(f'Invalid line {idx} in {im.filename}')
+            logger.warning(f'Invalid line {idx} in {xml_record.imagename}')
             continue
         except Exception as e:
-            logger.warning(f'Unexpected exception {e} from line {idx} in {im.filename}')
+            logger.warning(f'Unexpected exception {e} from line {idx} in {xml_record.imagename}')
             continue
         if not line.text and skip_empty_lines:
             continue
