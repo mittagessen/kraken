@@ -65,7 +65,7 @@ def cli(model, text_direction, repolygonize, files):
     if model is None:
         for doc in files:
             click.echo(f'Processing {doc} ', nl=False)
-            data = xml.XMLPage(doc)
+            data = xml.XMLPage(doc).to_container()
             if repolygonize:
                 im = Image.open(data.imagename).convert('L')
                 lines = data.lines
