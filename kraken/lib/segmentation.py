@@ -38,26 +38,7 @@ from skimage.graph import MCP_Connect
 from skimage.measure import (approximate_polygon, label, regionprops,
                              subdivide_polygon)
 from skimage.morphology import skeletonize
-from skimage.transform import (AffineTransform, PiecewiseAffineTransform,
-                               warp)
-
-#faster implementation of PiecewiseAffineTransform - see https://github.com/scikit-image/scikit-image/issues/6864 and https://github.com/scikit-image/scikit-image/pull/6963
-class FastPiecewiseAffineTransform(PiecewiseAffineTransform):
-    def __call__(self, coords):
-        coords = np.asarray(coords)
-
-        simplex = self._tesselation.find_simplex(coords)
-
-        affines = np.array(
-            [self.affines[i].params for i in range(len(self._tesselation.simplices))]
-        )[simplex]
-
-        pts = np.c_[coords, np.ones((coords.shape[0], 1))]
-
-        result = np.einsum("ij,ikj->ik", pts, affines)
-        result[simplex == -1, :] = -1
-
-        return result
+from skimage.transform import (AffineTransform, PiecewiseAffineTransform, warp)
 
 from kraken.lib import default_specs
 from kraken.lib.exceptions import KrakenInputException
@@ -80,6 +61,27 @@ __all__ = ['reading_order',
            'scale_regions',
            'compute_polygon_section',
            'extract_polygons']
+
+
+# faster implementation of PiecewiseAffineTransform - see
+# https://github.com/scikit-image/scikit-image/issues/6864 and
+# https://github.com/scikit-image/scikit-image/pull/6963
+class FastPiecewiseAffineTransform(PiecewiseAffineTransform):
+    def __call__(self, coords):
+        coords = np.asarray(coords)
+
+        simplex = self._tesselation.find_simplex(coords)
+
+        affines = np.array(
+            [self.affines[i].params for i in range(len(self._tesselation.simplices))]
+        )[simplex]
+
+        pts = np.c_[coords, np.ones((coords.shape[0], 1))]
+
+        result = np.einsum("ij,ikj->ik", pts, affines)
+        result[simplex == -1, :] = -1
+
+        return result
 
 
 def reading_order(lines: Sequence[Tuple[slice, slice]], text_direction: Literal['lr', 'rl'] = 'lr') -> np.ndarray:
@@ -396,9 +398,11 @@ def _rotate(image: _T_pil_or_np,
             center: Any,
             scale: float,
             cval: int = 0,
-            order: int = 0) -> Tuple[AffineTransform, _T_pil_or_np]:
+            order: int = 0,
+            use_skimage_warp: bool = False) -> Tuple[AffineTransform, _T_pil_or_np]:
     """
     Rotate an image at an angle with optional scaling
+
     Args:
         image (PIL.Image.Image or (H, W, C) np.ndarray): Input image
         angle (float): Angle in radians
@@ -448,7 +452,10 @@ def _rotate(image: _T_pil_or_np,
     offset = pdata[:2, 2].copy()
     # scipy expects a 3x3 *linear* matrix (to include channel axis), we don't want the channel axis to be modified
     pdata[:2, 2] = 0
-    return tform, affine_transform(image, pdata, offset=(*offset, 0), output_shape=(*output_shape, *image.shape[2:]), cval=cval, order=order)
+    if use_skimage_warp:
+        return tform, warp(image, tform, output_shape=output_shape, order=order, cval=cval, clip=False, preserve_range=True)
+    else:
+        return tform, affine_transform(image, pdata, offset=(*offset, 0), output_shape=(*output_shape, *image.shape[2:]), cval=cval, order=order)
 
 
 def line_regions(line, regions):
@@ -525,7 +532,12 @@ def _calc_seam(baseline, polygon, angle, im_feats, bias=150):
     extrema = baseline[(0, -1), :] - (c_min, r_min)
     # scale line image to max 600 pixel width
     scale = min(1.0, 600/(c_max-c_min))
-    tform, rotated_patch = _rotate(patch, angle, center=extrema[0], scale=scale, cval=MASK_VAL)
+    tform, rotated_patch = _rotate(patch,
+                                   angle,
+                                   center=extrema[0],
+                                   scale=scale,
+                                   cval=MASK_VAL,
+                                   use_skimage_warp=True)
     # ensure to cut off padding after rotation
     x_offsets = np.sort(np.around(tform.inverse(extrema)[:, 0]).astype('int'))
     rotated_patch = rotated_patch[:, x_offsets[0]:x_offsets[1]+1]
