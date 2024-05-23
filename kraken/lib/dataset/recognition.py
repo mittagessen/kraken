@@ -656,5 +656,3 @@ class GroundTruthDataset(Dataset):
         return {b'1': '1',
                 b'L': 'L',
                 b'R': 'RGB'}[self._im_mode.value]
-
-
