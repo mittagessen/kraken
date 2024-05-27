@@ -30,6 +30,7 @@ dependencies:
   - pip
   - albumentations
   - rich
+  - setuptools>=36.6.0,<70.0.0
   - pip:
     - coremltools~=6.0
     - file:.

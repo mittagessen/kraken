@@ -16,7 +16,7 @@ build:
 requirements:
   build:
     - python>=3.8,<3.12
-    - setuptools
+    - setuptools>=36.6.0,<70.0.0
     - pbr
   host:
      - python>=3.8,<3.12
