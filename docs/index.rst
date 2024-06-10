@@ -30,7 +30,7 @@ kraken's main features are:
   - :ref:`Public repository <repo>` of model files
   - :ref:`Variable recognition network architectures <vgsl>`
 
-Pull requests and code contributions are always welcome. 
+Pull requests and code contributions are always welcome.
 
 Installation
 ============
@@ -86,7 +86,7 @@ The git repository contains some environment files that aid in setting up the la
 
 .. code-block:: console
 
-  $ git clone https://github.com/mittagessen/kraken.git 
+  $ git clone https://github.com/mittagessen/kraken.git
   $ cd kraken
   $ conda env create -f environment.yml
 
@@ -94,7 +94,7 @@ or:
 
 .. code-block:: console
 
-  $ git clone https://github.com/mittagessen/kraken.git 
+  $ git clone https://github.com/mittagessen/kraken.git
   $ cd kraken
   $ conda env create -f environment_cuda.yml
 
@@ -103,13 +103,14 @@ for CUDA acceleration with the appropriate hardware.
 Finding Recognition Models
 --------------------------
 
-Finally you'll have to scrounge up a recognition model to do the actual
-recognition of characters. To download the default English text recognition
-model and place it in the user's kraken directory:
+Finally you'll have to scrounge up a model to do the actual recognition of
+characters. To download the default model for printed French text and place it
+in the kraken directory for the current user:
 
-.. code-block:: console
+::
 
-  $ kraken get 10.5281/zenodo.2577813
+  $ kraken get 10.5281/zenodo.10592716
+
 
 A list of libre models available in the central repository can be retrieved by
 running:
@@ -122,18 +123,22 @@ Model metadata can be extracted using:
 
 .. code-block:: console
 
-  $ kraken show 10.5281/zenodo.2577813
-  name: 10.5281/zenodo.2577813
+  $ kraken show 10.5281/zenodo.10592716
+  name: 10.5281/zenodo.10592716
 
-  A generalized model for English printed text
-  
-  This model has been trained on a large corpus of modern printed English text\naugmented with ~10000 lines of historical p
+  CATMuS-Print (Large, 2024-01-30) - Diachronic model for French prints and other languages
+
+  <p><strong>CATMuS-Print (Large) - Diachronic model for French prints and other West European languages</strong></p>
+  <p>CATMuS (Consistent Approach to Transcribing ManuScript) Print is a Kraken HTR model trained on data produced by several projects, dealing with different languages (French, Spanish, German, English, Corsican, Catalan, Latin, Italian&hellip;) and different centuries (from the first prints of the 16th c. to digital documents of the 21st century).</p>
+  <p>Transcriptions follow graphematic principles and try to be as compatible as possible with guidelines previously published for French: no ligature (except those that still exist), no allographetic variants (except the long s), and preservation of the historical use of some letters (u/v, i/j). Abbreviations are not resolved. Inconsistencies might be present, because transcriptions have been done over several years and the norms have slightly evolved.</p>
+  <p>The model is trained with NFKD Unicode normalization: each diacritic (including superscripts) are transcribed as their own characters, separately from the "main" character.</p>
+  <p>This model is the result of the collaboration from researchers from the University of Geneva and Inria Paris and will be consolidated under the CATMuS Medieval Guidelines in an upcoming paper.</p>
   scripts: Latn
-  alphabet: !"#$%&'()+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]`abcdefghijklmnopqrstuvwxyz{} SPACE
-  accuracy: 99.95%
-  license: Apache-2.0
-  author(s): Kiessling, Benjamin
-  date: 2019-02-26
+  alphabet: !"#$%&'()*+,-./0123456789:;<=>?ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_abcdefghijklmnopqrstuvwxyz|}~¡£¥§«¬°¶·»¿ÆßæđłŒœƀǝɇΑΒΓΔΕΖΘΙΚΛΜΝΟΠΡΣΤΥΦΧΩαβγδεζηθικλμνξοπρςστυφχωϛחלרᑕᗅᗞᚠẞ–—‘’‚“”„‟†•⁄⁊⁋℟←▽◊★☙✠✺✻⟦⟧⬪ꝑꝓꝗꝙꝟꝯꝵ SPACE, COMBINING GRAVE ACCENT, COMBINING ACUTE ACCENT, COMBINING CIRCUMFLEX ACCENT, COMBINING TILDE, COMBINING MACRON, COMBINING DOT ABOVE, COMBINING DIAERESIS, COMBINING RING ABOVE, COMBINING COMMA ABOVE, COMBINING REVERSED COMMA ABOVE, COMBINING CEDILLA, COMBINING OGONEK, COMBINING GREEK PERISPOMENI, COMBINING GREEK YPOGEGRAMMENI, COMBINING LATIN SMALL LETTER I, COMBINING LATIN SMALL LETTER U, 0xe682, 0xe68b, 0xe8bf, 0xf1a7
+  accuracy: 98.56%
+  license: cc-by-4.0
+  author(s): Gabay, Simon; Clérice, Thibault
+  date: 2024-01-30
 
 Quickstart
 ==========
@@ -154,7 +159,7 @@ prerequisite step of page segmentation:
 
 .. code-block:: console
 
-  $ kraken -i image.tif image.txt segment -bl ocr
+  $ kraken -i image.tif image.txt segment -bl ocr -m catmus-print-fondue-large.mlmodel
   Loading RNN     ✓
   Processing      ⣻
 
@@ -164,18 +169,18 @@ To segment an image into reading-order sorted baselines and regions:
 
   $ kraken -i bw.tif lines.json segment -bl
 
-To OCR an image using the default model:
+To OCR an image using the previously downloaded model:
 
 .. code-block:: console
 
-  $ kraken -i bw.tif image.txt segment -bl ocr
+  $ kraken -i bw.tif image.txt segment -bl ocr -m catmus-print-fondue-large.mlmodel
 
 To OCR an image using the default model and serialize the output using the ALTO
 template:
 
 .. code-block:: console
 
-  $ kraken -a -i bw.tif image.txt segment -bl ocr
+  $ kraken -a -i bw.tif image.txt segment -bl ocr -m catmus-print-fondue-large.mlmodel
 
 All commands and their parameters are documented, just add the standard
 ``--help`` flag for further information.
@@ -188,8 +193,8 @@ There is a training tutorial at :doc:`training`.
 Related Software
 ================
 
-These days kraken is quite closely linked to the `escriptorium
-<https://escriptorium.fr>`_ project developed in the same eScripta research
+These days kraken is quite closely linked to the `eScriptorium
+<https://gitlab.com/scripta/escriptorium/>`_ project developed in the same eScripta research
 group. eScriptorium provides a user-friendly interface for annotating data,
 training models, and inference (but also much more). There is a `gitter channel
 <https://gitter.im/escripta/escriptorium>`_ that is mostly intended for

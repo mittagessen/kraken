@@ -1,0 +1,55 @@
+context:
+  git_url: .
+  git_tag: ${{ git.latest_tag(git_url) }}
+
+package:
+  name: kraken
+  version: ${{ git_tag }}
+
+source:
+  git: ${{ git_url }}
+  tag: ${{ git_tag }}
+
+build:
+  script: pip install --no-deps .
+
+requirements:
+  build:
+    - python>=3.8,<3.12
+    - setuptools>=36.6.0,<70.0.0
+    - pbr
+  host:
+     - python>=3.8,<3.12
+  run:
+     - python>=3.8,<3.12
+     - python-bidi
+     - lxml
+     - regex
+     - requests
+     - click>=8.1
+     - numpy~=1.23.0
+     - pillow>=9.2.0
+     - scipy~=1.11.0
+     - jinja2~=3.0
+     - torchvision
+     - pytorch~=2.1.0
+     - cudatoolkit
+     - jsonschema
+     - scikit-image~=0.21.0
+     - scikit-learn~=1.2.1
+     - shapely~=1.8.5
+     - pyvips
+     - coremltools
+     - pyarrow
+     - lightning~=2.2
+     - torchmetrics>=1.1.0
+     - conda-forge::threadpoolctl~=3.4.0
+     - albumentations
+     - rich
+
+about:
+  homepage: https://kraken.re
+  license:  Apache-2.0
+  summary: 'OCR/HTR engine for all the languages'
+  repository: https://github.com/mittagessen/kraken
+  documentation: https://kraken.re

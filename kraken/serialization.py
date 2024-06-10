@@ -163,10 +163,10 @@ def serialize(results: 'Segmentation',
 
         # set field to indicate the availability of baseline segmentation in
         # addition to bounding boxes
-        line = {'index': idx,
+        line = {'id': record.id,
                 'bbox': max_bbox([record.boundary]) if record.type == 'baselines' else record.bbox,
-                'cuts': record.cuts,
-                'confidences': record.confidences,
+                'cuts': [list(x) for x in getattr(record, 'cuts', [])],
+                'confidences': getattr(record, 'confidences', []),
                 'recognition': [],
                 'boundary': [list(x) for x in record.boundary] if record.type == 'baselines' else [[record.bbox[0], record.bbox[1]],
                                                                                                    [record.bbox[2], record.bbox[1]],
@@ -179,7 +179,7 @@ def serialize(results: 'Segmentation',
         if record.type == 'baselines':
             line['baseline'] = [list(x) for x in record.baseline]
 
-        splits = regex.split(r'(\s+)', record.prediction)
+        splits = regex.split(r'(\s+)', getattr(record, 'prediction', ''))
         line_offset = 0
         logger.debug(f'Record contains {len(splits)} segments')
         for segment in splits:
@@ -247,6 +247,8 @@ def serialize(results: 'Segmentation',
 def render_report(model: str,
                   chars: int,
                   errors: int,
+                  char_accuracy: float,
+                  word_accuracy: float,
                   char_confusions: 'Counter',
                   scripts: 'Counter',
                   insertions: 'Counter',
@@ -275,7 +277,8 @@ def render_report(model: str,
     report = {'model': model,
               'chars': chars,
               'errors': errors,
-              'accuracy': (chars-errors)/chars * 100,
+              'character_accuracy': char_accuracy * 100,
+              'word_accuracy': word_accuracy * 100,
               'insertions': sum(insertions.values()),
               'deletions': deletions,
               'substitutions': sum(substitutions.values()),

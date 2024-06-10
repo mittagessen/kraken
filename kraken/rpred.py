@@ -24,6 +24,7 @@ from collections import defaultdict
 from functools import partial
 from typing import (TYPE_CHECKING, Dict, Generator, List, Optional, Sequence,
                     Tuple, Union)
+import warnings
 
 from kraken.containers import BaselineOCRRecord, BBoxOCRRecord, ocr_record
 from kraken.lib.dataset import ImageInputTransforms
@@ -52,7 +53,8 @@ class mm_rpred(object):
                  bounds: 'Segmentation',
                  pad: int = 16,
                  bidi_reordering: Union[bool, str] = True,
-                 tags_ignore: Optional[List[Tuple[str, str]]] = None) -> Generator[ocr_record, None, None]:
+                 tags_ignore: Optional[List[Tuple[str, str]]] = None,
+                 no_legacy_polygons: bool = False) -> Generator[ocr_record, None, None]:
         """
         Multi-model version of kraken.rpred.rpred.
 
@@ -159,6 +161,7 @@ class mm_rpred(object):
         self.pad = pad
         self.bounds = bounds
         self.tags_ignore = tags_ignore
+        self.no_legacy_polygons = no_legacy_polygons
 
     def _recognize_box_line(self, line):
         xmin, ymin, xmax, ymax = line.bbox
@@ -175,8 +178,10 @@ class mm_rpred(object):
 
         tag, net = self._resolve_tags_to_model(line.tags, self.nets)
 
+        use_legacy_polygons = self._choose_legacy_polygon_extractor(net)
+
         seg = dataclasses.replace(self.bounds, lines=[line])
-        box, coords = next(extract_polygons(self.im, seg))
+        box, coords = next(extract_polygons(self.im, seg, legacy=use_legacy_polygons))
         self.box = box
 
         # check if boxes are non-zero in any dimension
@@ -242,14 +247,17 @@ class mm_rpred(object):
 
         seg = dataclasses.replace(self.bounds, lines=[line])
 
+        tag, net = self._resolve_tags_to_model(line.tags, self.nets)
+
+        use_legacy_polygons = self._choose_legacy_polygon_extractor(net)
+
         try:
-            box, coords = next(extract_polygons(self.im, seg))
+            box, coords = next(extract_polygons(self.im, seg, legacy=use_legacy_polygons))
         except KrakenInputException as e:
             logger.warning(f'Extracting line failed: {e}')
             return BaselineOCRRecord('', [], [], line)
 
         self.box = box
-        tag, net = self._resolve_tags_to_model(line.tags, self.nets)
         # check if boxes are non-zero in any dimension
         if 0 in box.size:
             logger.warning(f'{line} with zero dimension. Emitting empty record.')
@@ -277,8 +285,8 @@ class mm_rpred(object):
         pos = []
         conf = []
         for _, start, end, c in preds:
-            pos.append((self._scale_val(start, 0, self.box.size[0]),
-                        self._scale_val(end, 0, self.box.size[0])))
+            pos.append([self._scale_val(start, 0, self.box.size[0]),
+                        self._scale_val(end, 0, self.box.size[0])])
             conf.append(c)
         rec = BaselineOCRRecord(pred, pos, conf, line)
         if self.bidi_reordering:
@@ -300,12 +308,25 @@ class mm_rpred(object):
     def _scale_val(self, val, min_val, max_val):
         return int(round(min(max(((val*self.net_scale)-self.pad)*self.in_scale, min_val), max_val-1)))
 
+    def _choose_legacy_polygon_extractor(self, net) -> bool:
+        # grouping the checks here to display warnings only once
+        if net.nn.use_legacy_polygons:
+            if self.no_legacy_polygons:
+                warnings.warn('Enforcing use of the new polygon extractor for models trained with old version. Accuracy may be affected.')
+                return False
+            else:
+                warnings.warn('Using legacy polygon extractor, as the model was not trained with the new method. Please retrain your model to get speed improvement.')
+                return True
+        return False
+
+
 
 def rpred(network: 'TorchSeqRecognizer',
           im: 'Image.Image',
           bounds: 'Segmentation',
           pad: int = 16,
-          bidi_reordering: Union[bool, str] = True) -> Generator[ocr_record, None, None]:
+          bidi_reordering: Union[bool, str] = True,
+          no_legacy_polygons: bool = False) -> Generator[ocr_record, None, None]:
     """
     Uses a TorchSeqRecognizer and a segmentation to recognize text
 
@@ -325,7 +346,7 @@ def rpred(network: 'TorchSeqRecognizer',
         An ocr_record containing the recognized text, absolute character
         positions, and confidence values for each character.
     """
-    return mm_rpred(defaultdict(lambda: network), im, bounds, pad, bidi_reordering)
+    return mm_rpred(defaultdict(lambda: network), im, bounds, pad, bidi_reordering, no_legacy_polygons=no_legacy_polygons)
 
 
 def _resolve_tags_to_model(tags: Optional[Sequence[Dict[str, str]]],

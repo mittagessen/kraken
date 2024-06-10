@@ -1,4 +1,4 @@
-<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" 
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
 		targetNamespace="http://www.abbyy.com/FineReader_xml/FineReader10-schema-v1.xml"
 		xmlns:tns="http://www.abbyy.com/FineReader_xml/FineReader10-schema-v1.xml"
 		elementFormDefault="qualified">
@@ -96,14 +96,14 @@
    <xs:attribute name="languages" type="xs:string" use="optional"/>
   </xs:complexType>
  </xs:element>
- 
+
  <xs:complexType name ="ParagraphStyleType">
   <xs:sequence>
     <xs:element name="fontStyle" minOccurs="0" maxOccurs="unbounded" type="tns:FontStyleType" />
   </xs:sequence>
   <xs:attribute name="id" type="xs:string" use="required" />
   <xs:attribute name="name" type="xs:string" use="required" />
-  <xs:attribute name="mainFontStyleId" type="xs:string" use="required" /> 
+  <xs:attribute name="mainFontStyleId" type="xs:string" use="required" />
   <xs:attribute name="role" use="required">
    <xs:simpleType>
     <xs:restriction base="xs:string">
@@ -114,10 +114,10 @@
      <xs:enumeration value="pictureCaption"/>
      <xs:enumeration value="tableCaption"/>
      <xs:enumeration value="contents" />
-     <xs:enumeration value="footnote" /> 
-     <xs:enumeration value="endnote" /> 
-     <xs:enumeration value="rt" /> 
-     <xs:enumeration value="garb" /> 
+     <xs:enumeration value="footnote" />
+     <xs:enumeration value="endnote" />
+     <xs:enumeration value="rt" />
+     <xs:enumeration value="garb" />
      <xs:enumeration value="other" />
      <xs:enumeration value="barcode" />
      <xs:enumeration value="headingNumber" />
@@ -135,7 +135,7 @@
   <xs:attribute name="lineSpacingRatio" type="xs:integer" use="optional" default="1" />
   <xs:attribute name="fixedLineSpacing" type="xs:boolean" use="optional" default="true" />
  </xs:complexType>
- 
+
  <xs:complexType name="FontStyleType">
   <xs:attribute name="id" type="xs:string" use="required" />
   <xs:attribute name="baseFont" type="xs:boolean" use="optional" default="false" />
@@ -216,7 +216,7 @@
           </xs:documentation>
         </xs:annotation>
         <xs:complexType>
-          <xs:sequence> 
+          <xs:sequence>
             <xs:element name="text" minOccurs="0" maxOccurs="1" type="tns:PageElementType"/>
            </xs:sequence>
           <xs:attribute name="topPos" type="xs:integer" use="required" />
@@ -258,7 +258,7 @@
 
   <xs:complexType name="CaptionType">
     <xs:sequence>
-      <xs:element name="pageElement" minOccurs="0" maxOccurs="unbounded" type="tns:PageElementType" />     
+      <xs:element name="pageElement" minOccurs="0" maxOccurs="unbounded" type="tns:PageElementType" />
     </xs:sequence>
   </xs:complexType>
 
@@ -273,7 +273,7 @@
       </xs:element>
     </xs:sequence>
   </xs:complexType>
-  
+
  <xs:complexType name="TextStreamType">
   <xs:sequence>
    <xs:element name="mainText" minOccurs="0" maxOccurs="1">
@@ -284,7 +284,7 @@
     </xs:element>
    <xs:element name="elemId" minOccurs="0" maxOccurs="unbounded">
     <xs:annotation>
-     <xs:documentation xml:lang="en">Id of page element 
+     <xs:documentation xml:lang="en">Id of page element
      </xs:documentation>
     </xs:annotation>
     <xs:complexType>
@@ -295,10 +295,10 @@
   <xs:attribute name="role" use="optional" default="text">
    <xs:simpleType>
     <xs:restriction base="xs:string">
-     <xs:enumeration value="garb" /> 
-     <xs:enumeration value="text" /> 
-     <xs:enumeration value="footnote" /> 
-     <xs:enumeration value="incut" /> 
+     <xs:enumeration value="garb" />
+     <xs:enumeration value="text" />
+     <xs:enumeration value="footnote" />
+     <xs:enumeration value="incut" />
     </xs:restriction>
    </xs:simpleType>
   </xs:attribute>
@@ -463,7 +463,7 @@
   <xs:attribute name="hasOverflowedHead" type="xs:boolean" use="optional" default="false" />
   <xs:attribute name="hasOverflowedTail" type="xs:boolean" use="optional" default="false" />
  </xs:complexType>
- 
+
 <xs:simpleType name="ParagraphAlignment">
  <xs:restriction base="xs:string">
   <xs:enumeration value="Left"/>
@@ -550,7 +550,7 @@
 
  <xs:complexType name="CharRecognitionVariant" mixed="true">
   <xs:attribute name="charConfidence" type="xs:integer" use="optional"/>
-  <xs:attribute name="serifProbability" type="xs:integer" use="optional"/>  
+  <xs:attribute name="serifProbability" type="xs:integer" use="optional"/>
  </xs:complexType>
 
  <xs:complexType name="CharParamsType" mixed="true">
@@ -620,7 +620,7 @@
   <xs:complexType name="Point">
    <xs:attribute name="x" type="xs:integer" use="required" />
    <xs:attribute name="y" type="xs:integer" use="required" />
- </xs:complexType> 
+ </xs:complexType>
 
 
 </xs:schema>

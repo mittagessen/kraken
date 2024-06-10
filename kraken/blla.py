@@ -274,23 +274,10 @@ def segment(im: PIL.Image.Image,
         autocast: Runs the model with automatic mixed precision
 
     Returns:
-        A :class:`kraken.containers.Segmentation` class containing reading order
-        sorted baselines (polylines) and their respective polygonal boundaries
-        as :class:`kraken.containers.BaselineLine` records.
-        The format of the line and region records is shown below. The last and
-        first point of each boundary polygon are connected.
-
-        .. code-block::
-           :force:
-
-           'lines': [
-              {'baseline': [[x0, y0], [x1, y1], ..., [x_n, y_n]], 'boundary': [[x0, y0], [x1, y1], ... [x_m, y_m]]},
-              {'baseline': [[x0, ...]], 'boundary': [[x0, ...]]}
-            ]
-            'regions': [
-              {'region': [[x0, y0], [x1, y1], ..., [x_n, y_n]], 'type': 'image'},
-              {'region': [[x0, ...]], 'type': 'text'}
-            ]
+        A :class:`kraken.containers.Segmentation` class containing reading
+        order sorted baselines (polylines) and their respective polygonal
+        boundaries as :class:`kraken.containers.BaselineLine` records. The
+        last and first point of each boundary polygon are connected.
 
     Raises:
         KrakenInvalidModelException: if the given model is not a valid

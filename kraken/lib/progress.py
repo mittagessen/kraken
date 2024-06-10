@@ -18,7 +18,7 @@ Handlers for rich-based progress bars.
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Union
 
-from pytorch_lightning.callbacks.progress.rich_progress import (
+from lightning.pytorch.callbacks.progress.rich_progress import (
     CustomProgress, MetricsTextColumn, RichProgressBar)
 from rich import get_console, reconfigure
 from rich.default_styles import DEFAULT_STYLES
@@ -110,7 +110,10 @@ class KrakenTrainProgressBar(RichProgressBar):
             reconfigure(**self._console_kwargs)
             self._console = get_console()
             self._console.clear_live()
-            self._metric_component = MetricsTextColumn(trainer, self.theme.metrics)
+            self._metric_component = MetricsTextColumn(trainer,
+                                                       self.theme.metrics,
+                                                       self.theme.metrics_text_delimiter,
+                                                       self.theme.metrics_format)
             columns = self.configure_columns(trainer)
             columns.append(self._metric_component)
 
@@ -158,3 +161,5 @@ class RichProgressBarTheme:
     time: Union[str, 'Style'] = DEFAULT_STYLES['progress.elapsed']
     processing_speed: Union[str, 'Style'] = DEFAULT_STYLES['progress.data.speed']
     metrics: Union[str, 'Style'] = DEFAULT_STYLES['progress.description']
+    metrics_text_delimiter: str = ' '
+    metrics_format: str = '.3f'

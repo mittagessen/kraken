@@ -21,6 +21,8 @@ Command line driver for recognition training and evaluation.
 import logging
 import pathlib
 from typing import List
+from functools import partial
+import warnings
 
 import click
 from threadpoolctl import threadpool_limits
@@ -125,6 +127,10 @@ logger = logging.getLogger('kraken')
               show_default=True,
               default=RECOGNITION_HYPER_PARAMS['cos_t_max'],
               help='Epoch of minimal learning rate for cosine LR scheduler.')
+@click.option('--cos-min-lr',
+              show_default=True,
+              default=RECOGNITION_HYPER_PARAMS['cos_min_lr'],
+              help='Minimal final learning rate for cosine LR scheduler.')
 @click.option('-p', '--partition', show_default=True, default=0.9,
               help='Ground truth data partition ratio between train/validation set')
 @click.option('--fixed-splits/--ignore-fixed-split', show_default=True, default=False,
@@ -157,19 +163,10 @@ logger = logging.getLogger('kraken')
 @click.option('-e', '--evaluation-files', show_default=True, default=None, multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
-@click.option('--workers', show_default=True, default=1, type=click.IntRange(1), help='Number of worker processes.')
+@click.option('--workers', show_default=True, default=1, type=click.IntRange(0), help='Number of worker processes.')
 @click.option('--threads', show_default=True, default=1, type=click.IntRange(1), help='Maximum size of OpenMP/BLAS thread pool.')
 @click.option('--load-hyper-parameters/--no-load-hyper-parameters', show_default=True, default=False,
               help='When loading an existing model, retrieve hyperparameters from the model')
-@click.option('--repolygonize/--no-repolygonize', show_default=True,
-              default=False, help='Repolygonizes line data in ALTO/PageXML '
-              'files. This ensures that the trained model is compatible with the '
-              'segmenter in kraken even if the original image files either do '
-              'not contain anything but transcriptions and baseline information '
-              'or the polygon data was created using a different method. Will '
-              'be ignored in `path` mode. Note that this option will be slow '
-              'and will not scale input images to the same size as the segmenter '
-              'does.')
 @click.option('--force-binarization/--no-binarization', show_default=True,
               default=False, help='Forces input images to be binary, otherwise '
               'the appropriate color format will be auto-determined through the '
@@ -190,14 +187,16 @@ logger = logging.getLogger('kraken')
 @click.option('--log-dir', show_default=True, type=click.Path(exists=True, dir_okay=True, writable=True),
               help='Path to directory where the logger will store the logs. If not set, a directory will be created in the current working directory.')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
+@click.option('--legacy-polygons', show_default=True, default=False, is_flag=True, help='Use the legacy polygon extractor.')
 def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
-          min_epochs, lag, min_delta, device, precision, optimizer, lrate, momentum,
-          weight_decay, warmup, freeze_backbone, schedule, gamma, step_size,
-          sched_patience, cos_max, partition, fixed_splits, normalization,
-          normalize_whitespace, codec, resize, reorder, base_dir,
-          training_files, evaluation_files, workers, threads, load_hyper_parameters,
-          repolygonize, force_binarization, format_type, augment,
-          pl_logger, log_dir, ground_truth):
+          min_epochs, lag, min_delta, device, precision, optimizer, lrate,
+          momentum, weight_decay, warmup, freeze_backbone, schedule, gamma,
+          step_size, sched_patience, cos_max, cos_min_lr, partition,
+          fixed_splits, normalization, normalize_whitespace, codec, resize,
+          reorder, base_dir, training_files, evaluation_files, workers,
+          threads, load_hyper_parameters, force_binarization,
+          format_type, augment, pl_logger, log_dir, ground_truth,
+          legacy_polygons):
     """
     Trains a model from image-text pairs.
     """
@@ -250,6 +249,7 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
                          'step_size': step_size,
                          'rop_patience': sched_patience,
                          'cos_t_max': cos_max,
+                         'cos_min_lr': cos_min_lr,
                          'normalization': normalization,
                          'normalize_whitespace': normalize_whitespace,
                          'augment': augment,
@@ -296,11 +296,22 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
                              binary_dataset_split=fixed_splits,
                              num_workers=workers,
                              load_hyper_parameters=load_hyper_parameters,
-                             repolygonize=repolygonize,
                              force_binarization=force_binarization,
                              format_type=format_type,
                              codec=codec,
-                             resize=resize)
+                             resize=resize,
+                             legacy_polygons=legacy_polygons)
+
+    # Force upgrade to new polygon extractor if model was not trained with it
+    if model.nn and model.nn.use_legacy_polygons:
+        if not legacy_polygons and not model.legacy_polygons:
+            # upgrade to new polygon extractor
+            logger.warning('The model will be flagged to use new polygon extractor.')
+            model.nn.use_legacy_polygons = False
+    if not model.nn and legacy_polygons != model.legacy_polygons:
+        logger.warning(f'Dataset was compiled with legacy polygon extractor: {model.legacy_polygons}, '
+                       f'the new model will be flagged to use {"legacy" if model.legacy_polygons else "new"} method.')
+        legacy_polygons = model.legacy_polygons
 
     trainer = KrakenTrainer(accelerator=accelerator,
                             devices=device,
@@ -349,7 +360,7 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
 @click.option('--pad', show_default=True, type=click.INT, default=16, help='Left and right '
               'padding around lines')
 @click.option('--workers', show_default=True, default=1,
-              type=click.IntRange(1),
+              type=click.IntRange(0),
               help='Number of worker processes when running on CPU.')
 @click.option('--threads', show_default=True, default=1,
               type=click.IntRange(1),
@@ -364,15 +375,6 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
               default=None, help='Ground truth normalization')
 @click.option('-n', '--normalize-whitespace/--no-normalize-whitespace',
               show_default=True, default=True, help='Normalizes unicode whitespace')
-@click.option('--repolygonize/--no-repolygonize', show_default=True,
-              default=False, help='Repolygonizes line data in ALTO/PageXML '
-              'files. This ensures that the trained model is compatible with the '
-              'segmenter in kraken even if the original image files either do '
-              'not contain anything but transcriptions and baseline information '
-              'or the polygon data was created using a different method. Will '
-              'be ignored in `path` mode. Note, that this option will be slow '
-              'and will not scale input images to the same size as the segmenter '
-              'does.')
 @click.option('--force-binarization/--no-binarization', show_default=True,
               default=False, help='Forces input images to be binary, otherwise '
               'the appropriate color format will be auto-determined through the '
@@ -387,9 +389,10 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
 @click.option('--fixed-splits/--ignore-fixed-split', show_default=True, default=False,
               help='Whether to honor fixed splits in binary datasets.')
 @click.argument('test_set', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
+@click.option('--no-legacy-polygons', show_default=True, default=False, is_flag=True, help='Force disable the legacy polygon extractor.')
 def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
          threads, reorder, base_dir, normalization, normalize_whitespace,
-         repolygonize, force_binarization, format_type, fixed_splits, test_set):
+         force_binarization, format_type, fixed_splits, test_set, no_legacy_polygons):
     """
     Evaluate on a test set.
     """
@@ -398,6 +401,8 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
 
     import numpy as np
     from torch.utils.data import DataLoader
+
+    from torchmetrics.text import CharErrorRate, WordErrorRate
 
     from kraken.lib import models, util
     from kraken.lib.dataset import (ArrowIPCRecognitionDataset,
@@ -410,11 +415,28 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
 
     logger.info('Building test set from {} line images'.format(len(test_set) + len(evaluation_files)))
 
+    legacy_polygons = None
+    incoherent_legacy_polygons = False
+
     nn = {}
     for p in model:
         message('Loading model {}\t'.format(p), nl=False)
         nn[p] = models.load_any(p, device)
         message('\u2713', fg='green')
+        model_legacy_polygons = nn[p].nn.use_legacy_polygons
+        if legacy_polygons is None:
+            legacy_polygons = model_legacy_polygons
+        elif legacy_polygons != model_legacy_polygons:
+            incoherent_legacy_polygons = True
+
+    if incoherent_legacy_polygons and not no_legacy_polygons:
+        logger.warning('Models use different polygon extractors. Legacy polygon extractor will be used ; use --no-legacy-polygons to force disable it.')
+        legacy_polygons = True
+    elif no_legacy_polygons:
+        legacy_polygons = False
+
+    if legacy_polygons:
+        warnings.warn('Using legacy polygon extractor, as the model was not trained with the new method. Please retrain your model to get performance improvements.')
 
     pin_ds_mem = False
     if device != 'cpu':
@@ -436,15 +458,11 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
             dataset_kwargs["split_filter"] = "test"
 
     if format_type in ['xml', 'page', 'alto']:
-        if repolygonize:
-            message('Repolygonizing data')
         test_set = [{'page': XMLPage(file, filetype=format_type).to_container()} for file in test_set]
         valid_norm = False
-        DatasetClass = PolygonGTDataset
+        DatasetClass = partial(PolygonGTDataset, legacy_polygons=legacy_polygons)
     elif format_type == 'binary':
         DatasetClass = ArrowIPCRecognitionDataset
-        if repolygonize:
-            logger.warning('Repolygonization enabled in `binary` mode. Will be ignored.')
         test_set = [{'file': file} for file in test_set]
         valid_norm = False
     else:
@@ -452,8 +470,6 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
         if force_binarization:
             logger.warning('Forced binarization enabled in `path` mode. Will be ignored.')
             force_binarization = False
-        if repolygonize:
-            logger.warning('Repolygonization enabled in `path` mode. Will be ignored.')
         test_set = [{'line': util.parse_gt_path(img)} for img in test_set]
         valid_norm = True
 
@@ -463,7 +479,8 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
     if reorder and base_dir != 'auto':
         reorder = base_dir
 
-    acc_list = []
+    cer_list = []
+    wer_list = []
 
     with threadpool_limits(limits=threads):
         for p, net in nn.items():
@@ -485,6 +502,13 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
                     ds.add(**line)
                 except ValueError as e:
                     logger.info(e)
+
+            if hasattr(ds, 'legacy_polygon_status'):
+                if ds.legacy_polygons_status != legacy_polygons:
+                    warnings.warn(
+                        f'Binary dataset was compiled with legacy polygon extractor: {ds.legacy_polygon_status}, '
+                        f'while expecting data extracted with {"legacy" if legacy_polygons else "new"} method. Results may be inaccurate.')
+
             # don't encode validation set as the alphabets may not match causing encoding failures
             ds.no_encode()
             ds_loader = DataLoader(ds,
@@ -492,6 +516,9 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
                                    num_workers=workers,
                                    pin_memory=pin_ds_mem,
                                    collate_fn=collate_sequences)
+
+            test_cer = CharErrorRate()
+            test_wer = WordErrorRate()
 
             with KrakenProgressBar() as progress:
                 batches = len(ds_loader)
@@ -509,6 +536,9 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
                             algn_gt.extend(algn1)
                             algn_pred.extend(algn2)
                             error += c
+                            test_cer.update(x, y)
+                            test_wer.update(x, y)
+
                     except FileNotFoundError as e:
                         batches -= 1
                         progress.update(pred_task, total=batches)
@@ -519,10 +549,23 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
                         logger.warning(str(e))
                     progress.update(pred_task, advance=1)
 
-            acc_list.append((chars - error) / chars)
+            cer_list.append(1.0 - test_cer.compute())
+            wer_list.append(1.0 - test_wer.compute())
             confusions, scripts, ins, dels, subs = compute_confusions(algn_gt, algn_pred)
-            rep = render_report(p, chars, error, confusions, scripts, ins, dels, subs)
+            rep = render_report(p,
+                                chars,
+                                error,
+                                cer_list[-1],
+                                wer_list[-1],
+                                confusions,
+                                scripts,
+                                ins,
+                                dels,
+                                subs)
             logger.info(rep)
             message(rep)
-    logger.info('Average accuracy: {:0.2f}%, (stddev: {:0.2f})'.format(np.mean(acc_list) * 100, np.std(acc_list) * 100))
-    message('Average accuracy: {:0.2f}%, (stddev: {:0.2f})'.format(np.mean(acc_list) * 100, np.std(acc_list) * 100))
+
+    logger.info('Average character accuracy: {:0.2f}%, (stddev: {:0.2f})'.format(np.mean(cer_list) * 100, np.std(cer_list) * 100))
+    message('Average character accuracy: {:0.2f}%, (stddev: {:0.2f})'.format(np.mean(cer_list) * 100, np.std(cer_list) * 100))
+    logger.info('Average word accuracy: {:0.2f}%, (stddev: {:0.2f})'.format(np.mean(wer_list) * 100, np.std(wer_list) * 100))
+    message('Average word accuracy: {:0.2f}%, (stddev: {:0.2f})'.format(np.mean(wer_list) * 100, np.std(wer_list) * 100))

@@ -266,7 +266,7 @@ an additional option. Valid options consist of two parts, an initial principal
 line orientation (`horizontal` or `vertical`) followed by a block order (`lr`
 for left-to-right or `rl` for right-to-left).
 
-.. warning:
+.. warning::
 
         The principal text direction is independent of the direction of the
         *inline text direction* (which is left-to-right for writing systems like

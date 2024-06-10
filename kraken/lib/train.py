@@ -20,12 +20,13 @@ import re
 import warnings
 from typing import (TYPE_CHECKING, Any, Callable, Dict, Literal, Optional,
                     Sequence, Union)
+from functools import partial
 
 import numpy as np
-import pytorch_lightning as pl
+import lightning as L
 import torch
 import torch.nn.functional as F
-from pytorch_lightning.callbacks import (BaseFinetuning, Callback,
+from lightning.pytorch.callbacks import (BaseFinetuning, Callback,
                                          EarlyStopping, LearningRateMonitor)
 from torch.optim import lr_scheduler
 from torch.utils.data import DataLoader, Subset, random_split
@@ -65,21 +66,18 @@ def _validation_worker_init_fn(worker_id):
         results when validating. Temporarily increase the logging level
         for lightning because otherwise it will display a message
         at info level about the seed being changed. """
-    from pytorch_lightning import seed_everything
-    level = logging.getLogger("lightning_fabric.utilities.seed").level
-    logging.getLogger("lightning_fabric.utilities.seed").setLevel(logging.WARN)
+    from lightning.pytorch import seed_everything
     seed_everything(42)
-    logging.getLogger("lightning_fabric.utilities.seed").setLevel(level)
 
 
-class KrakenTrainer(pl.Trainer):
+class KrakenTrainer(L.Trainer):
     def __init__(self,
                  enable_progress_bar: bool = True,
                  enable_summary: bool = True,
                  min_epochs: int = 5,
                  max_epochs: int = 100,
                  freeze_backbone=-1,
-                 pl_logger: Union[pl.loggers.logger.Logger, str, None] = None,
+                 pl_logger: Union[L.pytorch.loggers.logger.Logger, str, None] = None,
                  log_dir: Optional['PathLike'] = None,
                  *args,
                  **kwargs):
@@ -92,14 +90,14 @@ class KrakenTrainer(pl.Trainer):
             kwargs['callbacks'] = [kwargs['callbacks']]
 
         if pl_logger:
-            if 'logger' in kwargs and isinstance(kwargs['logger'], pl.loggers.logger.Logger):
+            if 'logger' in kwargs and isinstance(kwargs['logger'], L.pytorch.loggers.logger.Logger):
                 logger.debug('Experiment logger has been provided outside KrakenTrainer as `logger`')
-            elif isinstance(pl_logger, pl.loggers.logger.Logger):
+            elif isinstance(pl_logger, L.pytorch.loggers.logger.Logger):
                 logger.debug('Experiment logger has been provided outside KrakenTrainer as `pl_logger`')
                 kwargs['logger'] = pl_logger
             elif pl_logger == 'tensorboard':
                 logger.debug('Creating default experiment logger')
-                kwargs['logger'] = pl.loggers.TensorBoardLogger(log_dir)
+                kwargs['logger'] = L.pytorch.loggers.TensorBoardLogger(log_dir)
             else:
                 logger.error('`pl_logger` was set, but %s is not an accepted value', pl_logger)
                 raise ValueError(f'{pl_logger} is not acceptable as logger')
@@ -112,7 +110,7 @@ class KrakenTrainer(pl.Trainer):
             kwargs['callbacks'].append(progress_bar_cb)
 
         if enable_summary:
-            from pytorch_lightning.callbacks import RichModelSummary
+            from lightning.pytorch.callbacks import RichModelSummary
             summary_cb = RichModelSummary(max_depth=2)
             kwargs['callbacks'].append(summary_cb)
             kwargs['enable_model_summary'] = False
@@ -145,10 +143,10 @@ class KrakenFreezeBackbone(BaseFinetuning):
     def finetune_function(self, pl_module, current_epoch, optimizer):
         pass
 
-    def on_train_start(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule") -> None:
+    def on_train_start(self, trainer: "L.Trainer", pl_module: "L.LightningModule") -> None:
         self.freeze(pl_module.net[:-1])
 
-    def on_train_batch_start(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule", batch, batch_idx) -> None:
+    def on_train_batch_start(self, trainer: "L.Trainer", pl_module: "L.LightningModule", batch, batch_idx) -> None:
         """
         Called for each training batch.
         """
@@ -161,7 +159,7 @@ class KrakenFreezeBackbone(BaseFinetuning):
                 current_param_groups = optimizer.param_groups
                 self._store(pl_module, opt_idx, num_param_groups, current_param_groups)
 
-    def on_train_epoch_start(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule") -> None:
+    def on_train_epoch_start(self, trainer: "L.Trainer", pl_module: "L.LightningModule") -> None:
         """Called when the epoch begins."""
         pass
 
@@ -170,7 +168,7 @@ class KrakenSetOneChannelMode(Callback):
     """
     Callback that sets the one_channel_mode of the model after the first epoch.
     """
-    def on_train_epoch_end(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule") -> None:
+    def on_train_epoch_end(self, trainer: "L.Trainer", pl_module: "L.LightningModule") -> None:
         # fill one_channel_mode after 1 iteration over training data set
         if not trainer.sanity_checking and trainer.current_epoch == 0 and trainer.model.nn.model_type == 'recognition':
             ds = getattr(pl_module, 'train_set', None)
@@ -186,7 +184,7 @@ class KrakenSaveModel(Callback):
     """
     Kraken's own serialization callback instead of pytorch's.
     """
-    def on_validation_end(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule") -> None:
+    def on_validation_end(self, trainer: "L.Trainer", pl_module: "L.LightningModule") -> None:
         if not trainer.sanity_checking:
             trainer.model.nn.hyper_params['completed_epochs'] += 1
             metric = float(trainer.logged_metrics['val_metric']) if 'val_metric' in trainer.logged_metrics else -1.0
@@ -198,7 +196,7 @@ class KrakenSaveModel(Callback):
             trainer.model.best_model = f'{trainer.model.output}_{trainer.model.best_epoch}.mlmodel'
 
 
-class RecognitionModel(pl.LightningModule):
+class RecognitionModel(L.LightningModule):
     def __init__(self,
                  hyper_params: Dict[str, Any] = None,
                  output: str = 'model',
@@ -212,11 +210,11 @@ class RecognitionModel(pl.LightningModule):
                  binary_dataset_split: bool = False,
                  num_workers: int = 1,
                  load_hyper_parameters: bool = False,
-                 repolygonize: bool = False,
                  force_binarization: bool = False,
                  format_type: Literal['path', 'alto', 'page', 'xml', 'binary'] = 'path',
                  codec: Optional[Dict] = None,
-                 resize: Literal['fail', 'both', 'new', 'add', 'union'] = 'fail'):
+                 resize: Literal['fail', 'both', 'new', 'add', 'union'] = 'fail',
+                 legacy_polygons: bool = False):
         """
         A LightningModule encapsulating the training setup for a text
         recognition model.
@@ -233,6 +231,7 @@ class RecognitionModel(pl.LightningModule):
             **kwargs: Setup parameters, i.e. CLI parameters of the train() command.
         """
         super().__init__()
+        self.legacy_polygons = legacy_polygons
         hyper_params_ = default_specs.RECOGNITION_HYPER_PARAMS.copy()
         if model:
             logger.info(f'Loading existing model from {model} ')
@@ -284,12 +283,10 @@ class RecognitionModel(pl.LightningModule):
             if binary_dataset_split:
                 logger.warning('Internal binary dataset splits are enabled but using non-binary dataset files. Will be ignored.')
                 binary_dataset_split = False
-            DatasetClass = PolygonGTDataset
+            DatasetClass = partial(PolygonGTDataset, legacy_polygons=legacy_polygons)
             valid_norm = False
         elif format_type == 'binary':
             DatasetClass = ArrowIPCRecognitionDataset
-            if repolygonize:
-                logger.warning('Repolygonization enabled in `binary` mode. Will be ignored.')
             valid_norm = False
             logger.info(f'Got {len(training_data)} binary dataset files for training data')
             training_data = [{'file': file} for file in training_data]
@@ -300,8 +297,6 @@ class RecognitionModel(pl.LightningModule):
             if force_binarization:
                 logger.warning('Forced binarization enabled in `path` mode. Will be ignored.')
                 force_binarization = False
-            if repolygonize:
-                logger.warning('Repolygonization enabled in `path` mode. Will be ignored.')
             if binary_dataset_split:
                 logger.warning('Internal binary dataset splits are enabled but using non-binary dataset files. Will be ignored.')
                 binary_dataset_split = False
@@ -314,14 +309,12 @@ class RecognitionModel(pl.LightningModule):
         # format_type is None. Determine training type from container class types
         elif not format_type:
             if training_data[0].type == 'baselines':
-                DatasetClass = PolygonGTDataset
+                DatasetClass = partial(PolygonGTDataset, legacy_polygons=legacy_polygons)
                 valid_norm = False
             else:
                 if force_binarization:
                     logger.warning('Forced binarization enabled with box lines. Will be ignored.')
                     force_binarization = False
-                if repolygonize:
-                    logger.warning('Repolygonization enabled with box lines. Will be ignored.')
                 if binary_dataset_split:
                     logger.warning('Internal binary dataset splits are enabled but using non-binary dataset files. Will be ignored.')
                     binary_dataset_split = False
@@ -375,6 +368,7 @@ class RecognitionModel(pl.LightningModule):
             logger.debug('Setting multiprocessing tensor sharing strategy to file_system')
             torch.multiprocessing.set_sharing_strategy('file_system')
 
+        val_set = None
         if evaluation_data:
             train_set = self._build_dataset(DatasetClass, training_data)
             self.train_set = Subset(train_set, range(len(train_set)))
@@ -398,6 +392,20 @@ class RecognitionModel(pl.LightningModule):
         if len(self.train_set) == 0 or len(self.val_set) == 0:
             raise ValueError('No valid training data was provided to the train '
                              'command. Please add valid XML, line, or binary data.')
+
+        if format_type == 'binary':
+            legacy_train_status = train_set.legacy_polygons_status
+            if val_set and val_set.legacy_polygons_status != legacy_train_status:
+                logger.warning('Train and validation set have different legacy '
+                               f'polygon status: {legacy_train_status} and '
+                               f'{val_set.legacy_polygons_status}. Train set '
+                               'status prevails.')
+            if legacy_train_status == "mixed":
+                logger.warning('Mixed legacy polygon status in training dataset. Consider recompilation.')
+                legacy_train_status = False
+            if legacy_polygons != legacy_train_status:
+                logger.warning(f'Setting dataset legacy polygon status to {legacy_train_status} based on training set.')
+                self.legacy_polygons = legacy_train_status
 
         logger.info(f'Training set {len(self.train_set)} lines, validation set '
                     f'{len(self.val_set)} lines, alphabet {len(train_set.alphabet)} '
@@ -494,9 +502,9 @@ class RecognitionModel(pl.LightningModule):
         self.val_cer.update(pred, decoded_targets)
         self.val_wer.update(pred, decoded_targets)
 
-        if self.logger and self.trainer.state.stage != 'sanity_check' and self.hparams.batch_size * batch_idx < 16:
-            for i in range(self.hparams.batch_size):
-                count = self.hparams.batch_size * batch_idx + i
+        if self.logger and self.trainer.state.stage != 'sanity_check' and self.hparams.hyper_params["batch_size"] * batch_idx < 16:
+            for i in range(self.hparams.hyper_params["batch_size"]):
+                count = self.hparams.hyper_params["batch_size"] * batch_idx + i
                 if count < 16:
                     self.logger.experiment.add_image(f'Validation #{count}, target: {decoded_targets[i]}',
                                                      batch['image'][i],
@@ -507,17 +515,19 @@ class RecognitionModel(pl.LightningModule):
                                                     self.global_step)
 
     def on_validation_epoch_end(self):
-        accuracy = 1.0 - self.val_cer.compute()
-        word_accuracy = 1.0 - self.val_wer.compute()
+        if not self.trainer.sanity_checking:
+            accuracy = 1.0 - self.val_cer.compute()
+            word_accuracy = 1.0 - self.val_wer.compute()
 
-        if accuracy > self.best_metric:
-            logger.debug(f'Updating best metric from {self.best_metric} ({self.best_epoch}) to {accuracy} ({self.current_epoch})')
-            self.best_epoch = self.current_epoch
-            self.best_metric = accuracy
-        logger.info(f'validation run: total chars {self.val_cer.total} errors {self.val_cer.errors} accuracy {accuracy}')
-        self.log('val_accuracy', accuracy, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-        self.log('val_word_accuracy', word_accuracy, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-        self.log('val_metric', accuracy, on_step=False, on_epoch=True, prog_bar=False, logger=True)
+            if accuracy > self.best_metric:
+                logger.debug(f'Updating best metric from {self.best_metric} ({self.best_epoch}) to {accuracy} ({self.current_epoch})')
+                self.best_epoch = self.current_epoch
+                self.best_metric = accuracy
+            logger.info(f'validation run: total chars {self.val_cer.total} errors {self.val_cer.errors} accuracy {accuracy}')
+            self.log('val_accuracy', accuracy, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+            self.log('val_word_accuracy', word_accuracy, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+            self.log('val_metric', accuracy, on_step=False, on_epoch=True, prog_bar=False, logger=True)
+        # reset metrics even if not sanity checking
         self.val_cer.reset()
         self.val_wer.reset()
 
@@ -592,6 +602,7 @@ class RecognitionModel(pl.LightningModule):
                 logger.info(f'Creating new model {self.spec} with {self.train_set.dataset.codec.max_label+1} outputs')
                 self.spec = '[{} O1c{}]'.format(self.spec[1:-1], self.train_set.dataset.codec.max_label + 1)
                 self.nn = vgsl.TorchVGSLModel(self.spec)
+                self.nn.use_legacy_polygons = self.legacy_polygons
                 # initialize weights
                 self.nn.init_weights()
                 self.nn.add_codec(self.train_set.dataset.codec)
@@ -687,7 +698,7 @@ class RecognitionModel(pl.LightningModule):
                     scheduler.step(metric)
 
 
-class SegmentationModel(pl.LightningModule):
+class SegmentationModel(L.LightningModule):
     def __init__(self,
                  hyper_params: Dict = None,
                  load_hyper_parameters: bool = False,
@@ -696,12 +707,12 @@ class SegmentationModel(pl.LightningModule):
                  output: str = 'model',
                  spec: str = default_specs.SEGMENTATION_SPEC,
                  model: Optional[Union['PathLike', str]] = None,
-                 training_data: Union[Sequence[Union['PathLike', str]], Sequence[Dict[str, Any]]] = None,
-                 evaluation_data: Optional[Union[Sequence[Union['PathLike', str]], Sequence[Dict[str, Any]]]] = None,
+                 training_data: Union[Sequence[Union['PathLike', str]], Sequence[Segmentation]] = None,
+                 evaluation_data: Optional[Union[Sequence[Union['PathLike', str]], Sequence[Segmentation]]] = None,
                  partition: Optional[float] = 0.9,
                  num_workers: int = 1,
                  force_binarization: bool = False,
-                 format_type: Literal['path', 'alto', 'page', 'xml'] = 'path',
+                 format_type: Literal['path', 'alto', 'page', 'xml', None] = 'path',
                  suppress_regions: bool = False,
                  suppress_baselines: bool = False,
                  valid_regions: Optional[Sequence[str]] = None,
@@ -839,8 +850,7 @@ class SegmentationModel(pl.LightningModule):
             train_set.add(page)
 
         if evaluation_data:
-            val_set = BaselineSet(evaluation_data,
-                                  line_width=self.hparams.hyper_params['line_width'],
+            val_set = BaselineSet(line_width=self.hparams.hyper_params['line_width'],
                                   im_transforms=transforms,
                                   augmentation=False,
                                   valid_baselines=valid_baselines,
@@ -897,25 +907,26 @@ class SegmentationModel(pl.LightningModule):
         self.val_freq_iu.update(pred, y)
 
     def on_validation_epoch_end(self):
+        if not self.trainer.sanity_checking:
+            pixel_accuracy = self.val_px_accuracy.compute()
+            mean_accuracy = self.val_mean_accuracy.compute()
+            mean_iu = self.val_mean_iu.compute()
+            freq_iu = self.val_freq_iu.compute()
 
-        pixel_accuracy = self.val_px_accuracy.compute()
-        mean_accuracy = self.val_mean_accuracy.compute()
-        mean_iu = self.val_mean_iu.compute()
-        freq_iu = self.val_freq_iu.compute()
+            if mean_iu > self.best_metric:
+                logger.debug(f'Updating best metric from {self.best_metric} ({self.best_epoch}) to {mean_iu} ({self.current_epoch})')
+                self.best_epoch = self.current_epoch
+                self.best_metric = mean_iu
 
-        if mean_iu > self.best_metric:
-            logger.debug(f'Updating best metric from {self.best_metric} ({self.best_epoch}) to {mean_iu} ({self.current_epoch})')
-            self.best_epoch = self.current_epoch
-            self.best_metric = mean_iu
+            logger.info(f'validation run: accuracy {pixel_accuracy} mean_acc {mean_accuracy} mean_iu {mean_iu} freq_iu {freq_iu}')
 
-        logger.info(f'validation run: accuracy {pixel_accuracy} mean_acc {mean_accuracy} mean_iu {mean_iu} freq_iu {freq_iu}')
+            self.log('val_accuracy', pixel_accuracy, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+            self.log('val_mean_acc', mean_accuracy, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+            self.log('val_mean_iu', mean_iu, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+            self.log('val_freq_iu', freq_iu, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+            self.log('val_metric', mean_iu, on_step=False, on_epoch=True, prog_bar=False, logger=True)
 
-        self.log('val_accuracy', pixel_accuracy, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-        self.log('val_mean_acc', mean_accuracy, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-        self.log('val_mean_iu', mean_iu, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-        self.log('val_freq_iu', freq_iu, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-        self.log('val_metric', mean_iu, on_step=False, on_epoch=True, prog_bar=False, logger=True)
-
+        # reset metrics even if sanity checking
         self.val_px_accuracy.reset()
         self.val_mean_accuracy.reset()
         self.val_mean_iu.reset()
@@ -1008,7 +1019,7 @@ class SegmentationModel(pl.LightningModule):
                 self.val_set.dataset.class_mapping = self.nn.user_metadata['class_mapping']
 
             # updates model's hyper params with user-defined ones
-            self.nn.hyper_params = self.hparams
+            self.nn.hyper_params = self.hparams.hyper_params
 
             # change topline/baseline switch
             loc = {None: 'centerline',
@@ -1111,6 +1122,8 @@ def _configure_optimizer_and_lr_scheduler(hparams, params, len_train_set=None, l
     weight_decay = hparams.get("weight_decay")
     schedule = hparams.get("schedule")
     gamma = hparams.get("gamma")
+    cos_t_max = hparams.get("cos_t_max")
+    cos_min_lr = hparams.get("cos_min_lr")
     step_size = hparams.get("step_size")
     rop_factor = hparams.get("rop_factor")
     rop_patience = hparams.get("rop_patience")
@@ -1131,7 +1144,10 @@ def _configure_optimizer_and_lr_scheduler(hparams, params, len_train_set=None, l
         lr_sched = {'scheduler': lr_scheduler.ExponentialLR(optim, gamma, last_epoch=completed_epochs-1),
                     'interval': 'step'}
     elif schedule == 'cosine':
-        lr_sched = {'scheduler': lr_scheduler.CosineAnnealingLR(optim, gamma, last_epoch=completed_epochs-1),
+        lr_sched = {'scheduler': lr_scheduler.CosineAnnealingLR(optim,
+                                                                cos_t_max,
+                                                                cos_min_lr,
+                                                                last_epoch=completed_epochs-1),
                     'interval': 'step'}
     elif schedule == 'step':
         lr_sched = {'scheduler': lr_scheduler.StepLR(optim, step_size, gamma, last_epoch=completed_epochs-1),

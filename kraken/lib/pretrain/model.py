@@ -32,14 +32,15 @@ import logging
 import math
 import re
 from itertools import chain
+from functools import partial
 from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence, Union
 
 import numpy as np
-import pytorch_lightning as pl
+import lightning as L
 import torch
 import torch.nn.functional as F
-from pytorch_lightning.callbacks import EarlyStopping
-from pytorch_lightning.utilities.memory import (garbage_collection_cuda,
+from lightning.pytorch.callbacks import EarlyStopping
+from lightning.pytorch.utilities.memory import (garbage_collection_cuda,
                                                 is_oom_error)
 from torch.optim import lr_scheduler
 from torch.utils.data import DataLoader, Subset, random_split
@@ -72,7 +73,7 @@ def _star_fun(fun, kwargs):
     return None
 
 
-class PretrainDataModule(pl.LightningDataModule):
+class PretrainDataModule(L.LightningDataModule):
     def __init__(self,
                  training_data: Union[Sequence[Union['PathLike', str]], Sequence[Dict[str, Any]]] = None,
                  evaluation_data: Optional[Union[Sequence[Union['PathLike', str]], Sequence[Dict[str, Any]]]] = None,
@@ -83,11 +84,11 @@ class PretrainDataModule(pl.LightningDataModule):
                  width: int = 0,
                  channels: int = 1,
                  num_workers: int = 1,
-                 repolygonize: bool = False,
                  force_binarization: bool = False,
                  format_type: str = 'path',
                  pad: int = 16,
-                 augment: bool = default_specs.RECOGNITION_PRETRAIN_HYPER_PARAMS['augment']):
+                 augment: bool = default_specs.RECOGNITION_PRETRAIN_HYPER_PARAMS['augment'],
+                 legacy_polygons: bool = False):
         """
         A LightningDataModule encapsulating text-less training data for
         unsupervised recognition model pretraining.
@@ -106,6 +107,8 @@ class PretrainDataModule(pl.LightningDataModule):
         super().__init__()
         self.save_hyperparameters()
 
+        self.legacy_polygons = legacy_polygons
+
         DatasetClass = GroundTruthDataset
         valid_norm = True
         if format_type in ['xml', 'page', 'alto']:
@@ -117,12 +120,10 @@ class PretrainDataModule(pl.LightningDataModule):
             if binary_dataset_split:
                 logger.warning('Internal binary dataset splits are enabled but using non-binary dataset files. Will be ignored.')
                 binary_dataset_split = False
-            DatasetClass = PolygonGTDataset
+            DatasetClass = partial(PolygonGTDataset, legacy_polygons=legacy_polygons)
             valid_norm = False
         elif format_type == 'binary':
             DatasetClass = ArrowIPCRecognitionDataset
-            if repolygonize:
-                logger.warning('Repolygonization enabled in `binary` mode. Will be ignored.')
             valid_norm = False
             logger.info(f'Got {len(training_data)} binary dataset files for training data')
             training_data = [{'file': file} for file in training_data]
@@ -133,8 +134,6 @@ class PretrainDataModule(pl.LightningDataModule):
             if force_binarization:
                 logger.warning('Forced binarization enabled in `path` mode. Will be ignored.')
                 force_binarization = False
-            if repolygonize:
-                logger.warning('Repolygonization enabled in `path` mode. Will be ignored.')
             if binary_dataset_split:
                 logger.warning('Internal binary dataset splits are enabled but using non-binary dataset files. Will be ignored.')
                 binary_dataset_split = False
@@ -147,14 +146,12 @@ class PretrainDataModule(pl.LightningDataModule):
         # format_type is None. Determine training type from length of training data entry
         elif not format_type:
             if training_data[0].type == 'baselines':
-                DatasetClass = PolygonGTDataset
+                DatasetClass = partial(PolygonGTDataset, legacy_polygons=legacy_polygons)
                 valid_norm = False
             else:
                 if force_binarization:
                     logger.warning('Forced binarization enabled with box lines. Will be ignored.')
                     force_binarization = False
-                if repolygonize:
-                    logger.warning('Repolygonization enabled with box lines. Will be ignored.')
                 if binary_dataset_split:
                     logger.warning('Internal binary dataset splits are enabled but using non-binary dataset files. Will be ignored.')
                     binary_dataset_split = False
@@ -205,6 +202,20 @@ class PretrainDataModule(pl.LightningDataModule):
                         'set. (Will disable alphabet mismatch detection.)')
             self.train_set, self.val_set = random_split(train_set, (train_len, val_len))
 
+        if format_type == 'binary':
+            legacy_train_status = train_set.legacy_polygons_status
+            if val_set and val_set.legacy_polygons_status != legacy_train_status:
+                logger.warning('Train and validation set have different legacy '
+                               f'polygon status: {legacy_train_status} and '
+                               f'{val_set.legacy_polygons_status}. Train set '
+                               'status prevails.')
+            if legacy_train_status == "mixed":
+                logger.warning('Mixed legacy polygon status in training dataset. Consider recompilation.')
+                legacy_train_status = False
+            if legacy_polygons != legacy_train_status:
+                logger.warning(f'Setting dataset legacy polygon status to {legacy_train_status} based on training set.')
+                self.legacy_polygons = legacy_train_status
+
         if len(self.train_set) == 0 or len(self.val_set) == 0:
             raise ValueError('No valid training data was provided to the train '
                              'command. Please add valid XML, line, or binary data.')
@@ -248,14 +259,15 @@ class PretrainDataModule(pl.LightningDataModule):
         self.val_set.dataset.no_encode()
 
 
-class RecognitionPretrainModel(pl.LightningModule):
+class RecognitionPretrainModel(L.LightningModule):
     def __init__(self,
                  hyper_params: Dict[str, Any] = None,
                  output: str = 'model',
                  spec: str = default_specs.RECOGNITION_SPEC,
                  model: Optional[Union['PathLike', str]] = None,
                  load_hyper_parameters: bool = False,
-                 len_train_set: int = -1):
+                 len_train_set: int = -1,
+                 legacy_polygons: bool = False):
         """
         A LightningModule encapsulating the unsupervised pretraining setup for
         a text recognition model.
@@ -273,9 +285,14 @@ class RecognitionPretrainModel(pl.LightningModule):
         """
         super().__init__()
         hyper_params_ = default_specs.RECOGNITION_PRETRAIN_HYPER_PARAMS
+        self.legacy_polygons = legacy_polygons
+
         if model:
             logger.info(f'Loading existing model from {model} ')
             self.nn = vgsl.TorchVGSLModel.load_model(model)
+
+            # apply legacy polygon parameter
+            self.nn.use_legacy_polygons = legacy_polygons
 
             if self.nn.model_type not in [None, 'recognition']:
                 raise ValueError(f'Model {model} is of type {self.nn.model_type} while `recognition` is expected.')
@@ -377,15 +394,16 @@ class RecognitionPretrainModel(pl.LightningModule):
             self.log('CE', loss, on_step=True, on_epoch=True)
 
     def on_validation_epoch_end(self):
-        ce = np.mean(self.val_ce)
-        self.val_ce.clear()
+        if not self.trainer.sanity_checking:
+            ce = np.mean(self.val_ce)
 
-        if ce < self.best_metric:
-            logger.debug(f'Updating best metric from {self.best_metric} ({self.best_epoch}) to {ce} ({self.current_epoch})')
-            self.best_epoch = self.current_epoch
-            self.best_metric = ce
-        logger.info(f'validation run: cross_enctropy: {ce}')
-        self.log('val_ce', ce, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+            if ce < self.best_metric:
+                logger.debug(f'Updating best metric from {self.best_metric} ({self.best_epoch}) to {ce} ({self.current_epoch})')
+                self.best_epoch = self.current_epoch
+                self.best_metric = ce
+            logger.info(f'validation run: cross_enctropy: {ce}')
+            self.log('val_ce', ce, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+        self.val_ce.clear()
 
     def training_step(self, batch, batch_idx):
         o = self._step(batch, batch_idx)
@@ -430,6 +448,7 @@ class RecognitionPretrainModel(pl.LightningModule):
             else:
                 logger.info(f'Creating new model {self.spec}')
                 self.nn = vgsl.TorchVGSLModel(self.spec)
+                self.nn.use_legacy_polygons = self.legacy_polygons
                 # initialize weights
                 self.nn.init_weights()
 

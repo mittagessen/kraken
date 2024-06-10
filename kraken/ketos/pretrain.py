@@ -123,6 +123,10 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
               show_default=True,
               default=RECOGNITION_PRETRAIN_HYPER_PARAMS['cos_t_max'],
               help='Epoch of minimal learning rate for cosine LR scheduler.')
+@click.option('--cos-min-lr',
+              show_default=True,
+              default=RECOGNITION_PRETRAIN_HYPER_PARAMS['cos_min_lr'],
+              help='Minimal final learning rate for cosine LR scheduler.')
 @click.option('-p', '--partition', show_default=True, default=0.9,
               help='Ground truth data partition ratio between train/validation set')
 @click.option('--fixed-splits/--ignore-fixed-splits', show_default=True, default=False,
@@ -133,19 +137,10 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
 @click.option('-e', '--evaluation-files', show_default=True, default=None, multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
-@click.option('--workers', show_default=True, default=1, type=click.IntRange(1), help='Number of worker processes.')
+@click.option('--workers', show_default=True, default=1, type=click.IntRange(0), help='Number of worker processes.')
 @click.option('--threads', show_default=True, default=1, type=click.IntRange(1), help='Maximum size of OpenMP/BLAS thread pool.')
 @click.option('--load-hyper-parameters/--no-load-hyper-parameters', show_default=True, default=False,
               help='When loading an existing model, retrieve hyperparameters from the model')
-@click.option('--repolygonize/--no-repolygonize', show_default=True,
-              default=False, help='Repolygonizes line data in ALTO/PageXML '
-              'files. This ensures that the trained model is compatible with the '
-              'segmenter in kraken even if the original image files either do '
-              'not contain anything but transcriptions and baseline information '
-              'or the polygon data was created using a different method. Will '
-              'be ignored in `path` mode. Note that this option will be slow '
-              'and will not scale input images to the same size as the segmenter '
-              'does.')
 @click.option('--force-binarization/--no-binarization', show_default=True,
               default=False, help='Forces input images to be binary, otherwise '
               'the appropriate color format will be auto-determined through the '
@@ -179,14 +174,15 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
               default=RECOGNITION_PRETRAIN_HYPER_PARAMS['logit_temp'],
               help='Multiplicative factor for the logits used in contrastive loss.')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
+@click.option('--legacy-polygons', show_default=True, default=False, is_flag=True, help='Use the legacy polygon extractor.')
 def pretrain(ctx, batch_size, pad, output, spec, load, freq, quit, epochs,
              min_epochs, lag, min_delta, device, precision, optimizer, lrate, momentum,
              weight_decay, warmup, schedule, gamma, step_size, sched_patience,
-             cos_max, partition, fixed_splits, training_files,
-             evaluation_files, workers, threads, load_hyper_parameters, repolygonize,
+             cos_max, cos_min_lr, partition, fixed_splits, training_files,
+             evaluation_files, workers, threads, load_hyper_parameters,
              force_binarization, format_type, augment,
              mask_probability, mask_width, num_negatives, logit_temp,
-             ground_truth):
+             ground_truth, legacy_polygons):
     """
     Trains a model from image-text pairs.
     """
@@ -226,6 +222,7 @@ def pretrain(ctx, batch_size, pad, output, spec, load, freq, quit, epochs,
                          'step_size': step_size,
                          'rop_patience': sched_patience,
                          'cos_t_max': cos_max,
+                         'cos_min_lr': cos_min_lr,
                          'augment': augment,
                          'mask_prob': mask_probability,
                          'mask_width': mask_width,
@@ -258,7 +255,8 @@ def pretrain(ctx, batch_size, pad, output, spec, load, freq, quit, epochs,
                                      output=output,
                                      spec=spec,
                                      model=load,
-                                     load_hyper_parameters=load_hyper_parameters)
+                                     load_hyper_parameters=load_hyper_parameters,
+                                     legacy_polygons=legacy_polygons)
 
     data_module = PretrainDataModule(batch_size=hyper_params.pop('batch_size'),
                                      pad=hyper_params.pop('pad'),
@@ -271,9 +269,9 @@ def pretrain(ctx, batch_size, pad, output, spec, load, freq, quit, epochs,
                                      height=model.height,
                                      width=model.width,
                                      channels=model.channels,
-                                     repolygonize=repolygonize,
                                      force_binarization=force_binarization,
-                                     format_type=format_type)
+                                     format_type=format_type,
+                                     legacy_polygons=legacy_polygons,)
 
     model.len_train_set = len(data_module.train_dataloader())
 

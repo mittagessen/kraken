@@ -21,6 +21,7 @@ Command line drivers for recognition functionality.
 import dataclasses
 import logging
 import os
+import uuid
 import shlex
 import warnings
 from functools import partial
@@ -162,12 +163,11 @@ def segmenter(legacy, model, text_direction, scale, maxcolseps, black_colseps,
             fp = cast('IO[Any]', fp)
             logger.info('Serializing as {} into {}'.format(ctx.meta['output_mode'], output))
             from kraken import serialization
-            fp.write(serialization.serialize_segmentation(res,
-                                                          image_name=ctx.meta['base_image'],
-                                                          image_size=im.size,
-                                                          template=ctx.meta['output_template'],
-                                                          template_source='custom' if ctx.meta['output_mode'] == 'template' else 'native',
-                                                          processing_steps=ctx.meta['steps']))
+            fp.write(serialization.serialize(res,
+                                             image_size=im.size,
+                                             template=ctx.meta['output_template'],
+                                             template_source='custom' if ctx.meta['output_mode'] == 'template' else 'native',
+                                             processing_steps=ctx.meta['steps']))
     else:
         with click.open_file(output, 'w') as fp:
             fp = cast('IO[Any]', fp)
@@ -179,7 +179,6 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore, input,
 
     import dataclasses
     import json
-    import uuid
 
     from kraken import rpred
     from kraken.containers import BBoxLine, Segmentation
@@ -215,8 +214,10 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore, input,
         if no_segmentation:
             bounds = Segmentation(type='bbox',
                                   text_direction='horizontal-lr',
-                                  lines=[BBoxLine(id=uuid.uuid4(),
-                                                  bbox=((0, 0), (0, im.size[1]), im.size, (im.size[0], 0)))])
+                                  imagename=ctx.meta['base_image'],
+                                  script_detection=False,
+                                  lines=[BBoxLine(id=str(uuid.uuid4()),
+                                                  bbox=(0, 0, im.size[1], im.size[0]))])
         else:
             raise click.UsageError('No line segmentation given. Add one with the input or run `segment` first.')
     elif no_segmentation:
@@ -227,10 +228,12 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore, input,
     if bounds.script_detection:
         it = rpred.mm_rpred(model, im, bounds, pad,
                             bidi_reordering=bidi_reordering,
-                            tags_ignore=tags_ignore)
+                            tags_ignore=tags_ignore,
+                            no_legacy_polygons=ctx.meta['no_legacy_polygons'])
     else:
         it = rpred.rpred(model['default'], im, bounds, pad,
-                         bidi_reordering=bidi_reordering)
+                         bidi_reordering=bidi_reordering,
+                         no_legacy_polygons=ctx.meta['no_legacy_polygons'])
 
     preds = []
 
@@ -302,8 +305,10 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore, input,
               help='On compatible devices, uses autocast for `segment` which lower the memory usage.')
 @click.option('--threads', default=1, show_default=True, type=click.IntRange(1),
               help='Size of thread pools for intra-op parallelization')
+@click.option('--no-legacy-polygons', 'no_legacy_polygons', is_flag=True, default=False,
+              help="Force disable legacy polygon extraction")
 def cli(input, batch_input, suffix, verbose, format_type, pdf_format,
-        serializer, template, device, raise_on_error, autocast, threads):
+        serializer, template, device, raise_on_error, autocast, threads, no_legacy_polygons):
     """
     Base command for recognition functionality.
 
@@ -334,6 +339,8 @@ def cli(input, batch_input, suffix, verbose, format_type, pdf_format,
     ctx.meta['steps'] = []
     ctx.meta["autocast"] = autocast
     ctx.meta['threads'] = threads
+    ctx.meta['no_legacy_polygons'] = no_legacy_polygons
+
     log.set_logger(logger, level=30 - min(10 * verbose, 20))
 
 
@@ -345,10 +352,10 @@ def process_pipeline(subcommands, input, batch_input, suffix, verbose, format_ty
     """
     import glob
     import tempfile
-    import uuid
 
     from threadpoolctl import threadpool_limits
 
+    from kraken.containers import ProcessingStep
     from kraken.lib.progress import KrakenProgressBar
 
     ctx = click.get_current_context()
@@ -399,7 +406,10 @@ def process_pipeline(subcommands, input, batch_input, suffix, verbose, format_ty
                     progress.update(pdf_parse_task, total=num_pages)
                     logger.warning(f'{fpath} is not a PDF file. Skipping.')
         input = new_input
-        ctx.meta['steps'].insert(0, {'category': 'preprocessing', 'description': 'PDF image extraction', 'settings': {}})
+        ctx.meta['steps'].insert(0, ProcessingStep(id=str(uuid.uuid4()),
+                                                   category='preprocessing',
+                                                   description='PDF image extraction',
+                                                   settings={}))
 
     for io_pair in input:
         ctx.meta['first_process'] = True
@@ -444,16 +454,19 @@ def binarize(ctx, threshold, zoom, escale, border, perc, range, low, high):
     """
     Binarizes page images.
     """
-    ctx.meta['steps'].append({'category': 'preprocessing',
-                              'description': 'Image binarization',
-                              'settings': {'threshold': threshold,
-                                           'zoom': zoom,
-                                           'escale': escale,
-                                           'border': border,
-                                           'perc': perc,
-                                           'range': range,
-                                           'low': low,
-                                           'high': high}})
+    from kraken.containers import ProcessingStep
+
+    ctx.meta['steps'].append(ProcessingStep(id=str(uuid.uuid4()),
+                                            category='preprocessing',
+                                            description='Image binarization',
+                                            settings={'threshold': threshold,
+                                                      'zoom': zoom,
+                                                      'escale': escale,
+                                                      'border': border,
+                                                      'perc': perc,
+                                                      'range': range,
+                                                      'low': low,
+                                                      'high': high}))
 
     return partial(binarizer, threshold, zoom, escale, border, perc, range,
                    low, high)
@@ -486,6 +499,8 @@ def segment(ctx, model, boxes, text_direction, scale, maxcolseps,
     """
     Segments page images into text lines.
     """
+    from kraken.containers import ProcessingStep
+
     if model and boxes:
         logger.warning(f'Baseline model ({model}) given but legacy segmenter selected. Forcing to -bl.')
         boxes = False
@@ -493,10 +508,11 @@ def segment(ctx, model, boxes, text_direction, scale, maxcolseps,
     if boxes is False:
         if not model:
             model = SEGMENTATION_DEFAULT_MODEL
-        ctx.meta['steps'].append({'category': 'processing',
-                                  'description': 'Baseline and region segmentation',
-                                  'settings': {'model': os.path.basename(model),
-                                               'text_direction': text_direction}})
+        ctx.meta['steps'].append(ProcessingStep(id=str(uuid.uuid4()),
+                                                category='processing',
+                                                description='Baseline and region segmentation',
+                                                settings={'model': os.path.basename(model),
+                                                          'text_direction': text_direction}))
 
         # first try to find the segmentation model by its given name,
         # then look in the kraken config folder
@@ -522,14 +538,15 @@ def segment(ctx, model, boxes, text_direction, scale, maxcolseps,
 
         message('\u2713', fg='green')
     else:
-        ctx.meta['steps'].append({'category': 'processing',
-                                  'description': 'bounding box segmentation',
-                                  'settings': {'text_direction': text_direction,
-                                               'scale': scale,
-                                               'maxcolseps': maxcolseps,
-                                               'black_colseps': black_colseps,
-                                               'remove_hlines': remove_hlines,
-                                               'pad': pad}})
+        ctx.meta['steps'].append(ProcessingStep(id=str(uuid.uuid4()),
+                                                category='processing',
+                                                description='bounding box segmentation',
+                                                settings={'text_direction': text_direction,
+                                                          'scale': scale,
+                                                          'maxcolseps': maxcolseps,
+                                                          'black_colseps': black_colseps,
+                                                          'remove_hlines': remove_hlines,
+                                                          'pad': pad}))
 
     return partial(segmenter, boxes, model, text_direction, scale, maxcolseps,
                    black_colseps, remove_hlines, pad, mask, ctx.meta['device'])
@@ -594,6 +611,8 @@ def ocr(ctx, model, pad, reorder, base_dir, no_segmentation, text_direction):
     """
     from kraken.lib import models
 
+    from kraken.containers import ProcessingStep
+
     if ctx.meta['input_format_type'] != 'image' and no_segmentation:
         raise click.BadParameter('no_segmentation mode is incompatible with page/alto inputs')
 
@@ -631,12 +650,13 @@ def ocr(ctx, model, pad, reorder, base_dir, no_segmentation, text_direction):
         nn.update(nm)
         nm = nn
 
-    ctx.meta['steps'].append({'category': 'processing',
-                              'description': 'Text line recognition',
-                              'settings': {'text_direction': text_direction,
-                                           'models': ' '.join(os.path.basename(v) for v in model.values()),
-                                           'pad': pad,
-                                           'bidi_reordering': reorder}})
+    ctx.meta['steps'].append(ProcessingStep(id=str(uuid.uuid4()),
+                                            category='processing',
+                                            description='Text line recognition',
+                                            settings={'text_direction': text_direction,
+                                                      'models': ' '.join(os.path.basename(v) for v in model.values()),
+                                                      'pad': pad,
+                                                      'bidi_reordering': reorder}))
 
     # set output mode
     ctx.meta['text_direction'] = text_direction

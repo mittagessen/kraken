@@ -115,6 +115,10 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
               show_default=True,
               default=READING_ORDER_HYPER_PARAMS['cos_t_max'],
               help='Epoch of minimal learning rate for cosine LR scheduler.')
+@click.option('--cos-min-lr',
+              show_default=True,
+              default=READING_ORDER_HYPER_PARAMS['cos_min_lr'],
+              help='Minimal final learning rate for cosine LR scheduler.')
 @click.option('-p', '--partition', show_default=True, default=0.9,
               help='Ground truth data partition ratio between train/validation set')
 @click.option('-t', '--training-files', show_default=True, default=None, multiple=True,
@@ -123,7 +127,7 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
 @click.option('-e', '--evaluation-files', show_default=True, default=None, multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
-@click.option('--workers', show_default=True, default=1, type=click.IntRange(1), help='Number of worker proesses.')
+@click.option('--workers', show_default=True, default=1, type=click.IntRange(0), help='Number of worker proesses.')
 @click.option('--threads', show_default=True, default=1, type=click.IntRange(1), help='Maximum size of OpenMP/BLAS thread pool.')
 @click.option('--load-hyper-parameters/--no-load-hyper-parameters', show_default=True, default=False,
               help='When loading an existing model, retrieve hyper-parameters from the model')
@@ -143,9 +147,9 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
 def rotrain(ctx, batch_size, output, load, freq, quit, epochs, min_epochs, lag,
             min_delta, device, precision, optimizer, lrate, momentum,
             weight_decay, warmup, schedule, gamma, step_size, sched_patience,
-            cos_max, partition, training_files, evaluation_files, workers,
-            threads, load_hyper_parameters, format_type, pl_logger, log_dir,
-            level, reading_order, ground_truth):
+            cos_max, cos_min_lr, partition, training_files, evaluation_files,
+            workers, threads, load_hyper_parameters, format_type, pl_logger,
+            log_dir, level, reading_order, ground_truth):
     """
     Trains a baseline labeling model for layout analysis
     """
@@ -189,6 +193,7 @@ def rotrain(ctx, batch_size, output, load, freq, quit, epochs, min_epochs, lag,
                          'step_size': step_size,
                          'rop_patience': sched_patience,
                          'cos_t_max': cos_max,
+                         'cos_min_lr': cos_min_lr,
                          'pl_logger': pl_logger,
                          }
                         )

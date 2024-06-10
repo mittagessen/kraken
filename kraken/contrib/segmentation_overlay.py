@@ -46,8 +46,14 @@ def slugify(value):
               'be ignored in `path` mode. Note, that this option will be slow '
               'and will not scale input images to the same size as the segmenter '
               'does.')
+@click.option('-tl', '--topline', 'topline', show_default=True, flag_value='topline',
+              help='Switch for the baseline location in the scripts. ')
+@click.option('-cl', '--centerline', 'topline', flag_value='centerline')
+@click.option('-bl', '--baseline', 'topline', flag_value='baseline', default='baseline')
+@click.option('--height-scale', default=1800, show_default=True,
+              help='Maximum height of input image in height dimension')
 @click.argument('files', nargs=-1)
-def cli(model, text_direction, repolygonize, files):
+def cli(model, text_direction, repolygonize, topline, height_scale, files):
     """
     A script producing overlays of lines and regions from either ALTO or
     PageXML files or run a model to do the same.
@@ -62,14 +68,23 @@ def cli(model, text_direction, repolygonize, files):
     from kraken import blla
     from kraken.lib import segmentation, vgsl, xml
 
+    loc = {'topline': True,
+           'baseline': False,
+           'centerline': None}
+
+    topline = loc[topline]
+
     if model is None:
         for doc in files:
             click.echo(f'Processing {doc} ', nl=False)
-            data = xml.XMLPage(doc)
+            data = xml.XMLPage(doc).to_container()
             if repolygonize:
                 im = Image.open(data.imagename).convert('L')
                 lines = data.lines
-                polygons = segmentation.calculate_polygonal_environment(im, [x.baseline for x in lines], scale=(1200, 0))
+                polygons = segmentation.calculate_polygonal_environment(im,
+                                                                        [x.baseline for x in lines],
+                                                                        scale=(height_scale, 0),
+                                                                        topline=topline)
                 data.lines = [dataclasses.replace(orig, boundary=polygon) for orig, polygon in zip(lines, polygons)]
             # reorder lines by type
             lines = defaultdict(list)

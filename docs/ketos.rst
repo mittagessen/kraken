@@ -5,12 +5,12 @@ Training
 
 This page describes the training utilities available through the ``ketos``
 command line utility in depth. For a gentle introduction on model training
-please refer to the :ref:`tutorial <training>`. 
+please refer to the :ref:`tutorial <training>`.
 
 There are currently three trainable components in the kraken processing pipeline:
 * Segmentation: finding lines and regions in images
 * Reading Order: ordering lines found in the previous segmentation step. Reading order models are closely linked to segmentation models and both are usually trained on the same dataset.
-* Recognition: recognition models transform images of lines into text. 
+* Recognition: recognition models transform images of lines into text.
 
 Depending on the use case it is not necessary to manually train new models for
 each material. The default segmentation model works well on quite a variety of
@@ -26,6 +26,7 @@ Recognition model training
 
 * The default architecture works well for decently sized datasets.
 * Use precompiled binary datasets and put them in a place where they can be memory mapped during training (local storage, not NFS or similar).
+* Fixed splits in precompiled datasets increase memory use and slow down startup as the dataset needs to be loaded once into the dataset. It is recommended to create explicit splits by compiling source XML files into separate datasets.
 * Use the ``--logger`` flag to track your training metrics across experiments using Tensorboard.
 * If the network doesn't converge before the early stopping aborts training, increase ``--min-epochs`` or ``--lag``. Use the ``--logger`` option to inspect your training loss.
 * Use the flag ``--augment`` to activate data augmentation.
@@ -127,10 +128,18 @@ compile time:
 
    $ ketos compile --random-split 0.8 0.1 0.1 ...
 
+
 The above line splits assigns 80% of the source lines to the training set, 10%
 to the validation set, and 10% to the test set. The training and validation
 sets in the dataset file are used automatically by `ketos train` (unless told
 otherwise) while the remaining 10% of the test set is selected by `ketos test`.
+
+.. warning::
+    Fixed splits in datasets are ignored during training and testing per
+    default as they require loading the entire dataset into main memory at
+    once, drastically increasing memory consumption and causing initial delays.
+    Use the `\-\-fixed-splits` option in `ketos train` and `ketos test` to
+    respect fixed splits.
 
 Recognition training
 --------------------
@@ -246,7 +255,7 @@ would be:
 
 A better configuration for large and complicated datasets such as handwritten texts:
 
-.. code-block:: console 
+.. code-block:: console
 
         $ ketos train --augment --workers 4 -d cuda -f binary --min-epochs 20 -w 0 -s '[1,120,0,1 Cr3,13,32 Do0.1,2 Mp2,2 Cr3,13,32 Do0.1,2 Mp2,2 Cr3,9,64 Do0.1,2 Mp2,2 Cr3,9,64 Do0.1,2 S1(1x0)1,3 Lbx200 Do0.1,2 Lbx200 Do.1,2 Lbx200 Do]' -r 0.0001 dataset_large.arrow
 
@@ -273,10 +282,10 @@ an exact match. Otherwise an error will be raised:
         $ ketos train -i model_5.mlmodel kamil/*.png
         Building training set  [####################################]  100%
         Building validation set  [####################################]  100%
-        [0.8616] alphabet mismatch {'~', '»', '8', '9', 'ـ'} 
+        [0.8616] alphabet mismatch {'~', '»', '8', '9', 'ـ'}
         Network codec not compatible with training set
-        [0.8620] Training data and model codec alphabets mismatch: {'ٓ', '؟', '!', 'ص', '،', 'ذ', 'ة', 'ي', 'و', 'ب', 'ز', 'ح', 'غ', '~', 'ف', ')', 'د', 'خ', 'م', '»', 'ع', 'ى', 'ق', 'ش', 'ا', 'ه', 'ك', 'ج', 'ث', '(', 'ت', 'ظ', 'ض', 'ل', 'ط', '؛', 'ر', 'س', 'ن', 'ء', 'ٔ', '«', 'ـ', 'ٕ'} 
-        
+        [0.8620] Training data and model codec alphabets mismatch: {'ٓ', '؟', '!', 'ص', '،', 'ذ', 'ة', 'ي', 'و', 'ب', 'ز', 'ح', 'غ', '~', 'ف', ')', 'د', 'خ', 'م', '»', 'ع', 'ى', 'ق', 'ش', 'ا', 'ه', 'ك', 'ج', 'ث', '(', 'ت', 'ظ', 'ض', 'ل', 'ط', '؛', 'ر', 'س', 'ن', 'ء', 'ٔ', '«', 'ـ', 'ٕ'}
+
 There are two modes dealing with mismatching alphabets, ``union`` and ``new``.
 ``union`` resizes the output layer and codec of the loaded model to include all
 characters in the new training set without removing any characters. ``new``
@@ -340,10 +349,10 @@ layers we define a network stub and index for appending:
 
 .. code-block:: console
 
-        $ ketos train -i model_1.mlmodel --append 7 -s '[Lbx256 Do]' syr/*.png 
+        $ ketos train -i model_1.mlmodel --append 7 -s '[Lbx256 Do]' syr/*.png
         Building training set  [####################################]  100%
         Building validation set  [####################################]  100%
-        [0.8014] alphabet mismatch {'8', '3', '9', '7', '܇', '݀', '݂', '4', ':', '0'} 
+        [0.8014] alphabet mismatch {'8', '3', '9', '7', '܇', '݀', '݂', '4', ':', '0'}
         Slicing and dicing model ✓
 
 The new model will behave exactly like a new one, except potentially training a
@@ -599,7 +608,7 @@ It is also possible to filter out baselines/regions selectively:
 
 Finally, we can merge baselines and regions into each other:
 
-.. code-block:: console 
+.. code-block:: console
 
         $ ketos segtrain -f xml --merge-baselines default:foo training_data/*.xml
         Training line types:
@@ -653,7 +662,7 @@ with their segmentation model in a subsequent step. The general sequence is
 therefore:
 
 .. code-block:: console
-       
+
         $ ketos segtrain -o fr_manu_seg.mlmodel -f xml french/*.xml
         ...
         $ ketos rotrain -o fr_manu_ro.mlmodel -f xml french/*.xml
@@ -671,8 +680,8 @@ serialized in the final XML output (in ALTO/PAGE XML).
         Reading order models work purely on the typology and geometric features
         of the lines and regions. They construct an approximate ordering matrix
         by feeding feature vectors of two lines (or regions) into the network
-        to decide which of those two lines precedes the other. 
-        
+        to decide which of those two lines precedes the other.
+
         These feature vectors are quite simple; just the lines' types, and
         their start, center, and end points. Therefore they can *not* reliably
         learn any ordering relying on graphical features of the input page such
@@ -705,10 +714,10 @@ sufficiently large training datasets:
         │ 3 │ ro_net.relu │ ReLU              │      0 │
         │ 4 │ ro_net.fc2  │ Linear            │     45 │
         └───┴─────────────┴───────────────────┴────────┘
-        Trainable params: 1.1 K                                                                                                                                        
-        Non-trainable params: 0                                                                                                                                        
-        Total params: 1.1 K                                                                                                                                            
-        Total estimated model params size (MB): 0                                                                                                                      
+        Trainable params: 1.1 K
+        Non-trainable params: 0
+        Total params: 1.1 K
+        Total estimated model params size (MB): 0
         stage 0/∞ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 0/35 0:00:00 • -:--:-- 0.00it/s val_spearman: 0.912 val_loss: 0.701 early_stopping: 0/300 inf
 
 During validation a metric called Spearman's footrule is computed. To calculate
@@ -756,20 +765,20 @@ adding a number of image files as the final argument:
    Evaluating $model
    Evaluating  [####################################]  100%
    === report test_model.mlmodel ===
-   
+
    7012	Characters
    6022	Errors
    14.12%	Accuracy
-   
+
    5226	Insertions
    2	Deletions
    794	Substitutions
-   
+
    Count Missed   %Right
    1567  575	63.31%	Common
    5230	 5230	0.00%	Arabic
    215	 215	0.00%	Inherited
-   
+
    Errors	Correct-Generated
    773	{ ا } - {  }
    536	{ ل } - {  }

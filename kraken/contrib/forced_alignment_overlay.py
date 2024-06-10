@@ -50,7 +50,9 @@ def _repl_alto(fname, cuts):
                     for chld in el:
                         if chld.tag.endswith('Glyph'):
                             el.remove(chld)
-                    for char in line_cuts[idx:str_len]:
+                    for char in zip(line_cuts.prediction[idx:str_len],
+                                    line_cuts.cuts[idx:str_len],
+                                    line_cuts.confidences[idx:str_len]):
                         glyph = etree.SubElement(el, 'Glyph')
                         glyph.set('ID', f'char_{char_idx}')
                         char_idx += 1
@@ -117,7 +119,7 @@ def cli(format_type, model, normalization, output, files):
         click.echo(f'Processing {doc} ', nl=False)
         data = XMLPage(doc)
         im = Image.open(data.imagename).convert('RGBA')
-        result = align.forced_align(data.to_container, net)
+        result = align.forced_align(data.to_container(), net)
         if normalization:
             for line in data._lines:
                 line["text"] = normalize(normalization, line["text"])

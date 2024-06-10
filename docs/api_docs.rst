@@ -53,28 +53,30 @@ kraken.serialization module
 Default templates
 -----------------
 
+.. _templates:
+
 ALTO 4.4
 ^^^^^^^^
 
-.. literalinclude:: ../../templates/alto
+.. literalinclude:: ../kraken/templates/alto
         :language: xml+jinja
 
 PageXML
 ^^^^^^^
 
-.. literalinclude:: ../../templates/alto
+.. literalinclude:: ../kraken/templates/alto
         :language: xml+jinja
 
 hOCR
 ^^^^
 
-.. literalinclude:: ../../templates/alto
+.. literalinclude:: ../kraken/templates/alto
         :language: xml+jinja
 
 ABBYY XML
 ^^^^^^^^^
 
-.. literalinclude:: ../../templates/abbyyxml
+.. literalinclude:: ../kraken/templates/abbyyxml
         :language: xml+jinja
 
 Containers and Helpers
@@ -96,6 +98,9 @@ kraken.containers module
         :members:
 
 .. autoapiclass:: kraken.containers.BBoxLine
+        :members:
+
+.. autoapiclass:: kraken.containers.Region
         :members:
 
 .. autoapiclass:: kraken.containers.ocr_record

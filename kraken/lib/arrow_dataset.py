@@ -23,7 +23,7 @@ import tempfile
 from collections import Counter
 from functools import partial
 from multiprocessing import Pool
-from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Literal, Callable, List, Optional, Tuple, Union
 
 import numpy as np
 import pyarrow as pa
@@ -44,7 +44,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def _extract_line(xml_record, skip_empty_lines: bool = True):
+def _extract_line(xml_record, skip_empty_lines: bool = True, legacy_polygons: bool = False):
     lines = []
     try:
         im = Image.open(xml_record.imagename)
@@ -52,8 +52,7 @@ def _extract_line(xml_record, skip_empty_lines: bool = True):
         return lines, None, None
     if is_bitonal(im):
         im = im.convert('1')
-    recs = xml_record.lines.values()
-    for idx, rec in enumerate(recs):
+    for idx, rec in enumerate(xml_record.lines):
         seg = Segmentation(text_direction='horizontal-lr',
                            imagename=xml_record.imagename,
                            type=xml_record.type,
@@ -62,12 +61,12 @@ def _extract_line(xml_record, skip_empty_lines: bool = True):
                            script_detection=False,
                            line_orders=[])
         try:
-            line_im, line = next(extract_polygons(im, seg))
+            line_im, line = next(extract_polygons(im, seg, legacy=legacy_polygons))
         except KrakenInputException:
-            logger.warning(f'Invalid line {idx} in {im.filename}')
+            logger.warning(f'Invalid line {idx} in {xml_record.imagename}')
             continue
         except Exception as e:
-            logger.warning(f'Unexpected exception {e} from line {idx} in {im.filename}')
+            logger.warning(f'Unexpected exception {e} from line {idx} in {xml_record.imagename}')
             continue
         if not line.text and skip_empty_lines:
             continue
@@ -104,27 +103,27 @@ def parse_path(path: Union[str, 'PathLike'],
     return {'image': path, 'lines': [{'text': gt}]}
 
 
-def build_binary_dataset(files: Optional[List[Union[str, 'PathLike', Dict]]] = None,
+def build_binary_dataset(files: Optional[List[Union[str, 'PathLike', 'Segmentation']]] = None,
                          output_file: Union[str, 'PathLike'] = None,
-                         format_type: str = 'xml',
+                         format_type: Literal['xml', 'alto', 'page', None] = 'xml',
                          num_workers: int = 0,
                          ignore_splits: bool = False,
                          random_split: Optional[Tuple[float, float, float]] = None,
                          force_type: Optional[str] = None,
                          recordbatch_size: int = 100,
                          skip_empty_lines: bool = True,
-                         callback: Callable[[int, int], None] = lambda chunk, lines: None) -> None:
+                         callback: Callable[[int, int], None] = lambda chunk, lines: None,
+                         legacy_polygons: bool = False) -> None:
     """
     Parses XML files and dumps the baseline-style line images and text into a
     binary dataset.
 
     Args:
-        files: List of XML input files.
+        files: List of XML input files or Segmentation container objects.
         output_file: Path to the output file.
         format_type: One of `xml`, `alto`, `page`, `path`, or None. In `None`
                      mode, the files argument is expected to be a list of
-                     dictionaries in the output format of the
-                     `kraken.lib.xml.parse_{alto,page,xml}` functions.
+                     `kraken.containers.Segmentation` objects.
         num_workers: Number of workers for parallelized extraction of line
                      images. Set to `0` to disable parallelism.
         ignore_splits: Switch to disable serialization of the explicit
@@ -141,10 +140,11 @@ def build_binary_dataset(files: Optional[List[Union[str, 'PathLike', Dict]]] = N
         skip_empty_lines: Do not compile empty text lines into the dataset.
         callback: Function called every time a new recordbatch is flushed into
                   the Arrow IPC file.
+        legacy_polygons: Use legacy polygon extraction code.
     """
 
     logger.info('Parsing XML files')
-    extract_fn = partial(_extract_line, skip_empty_lines=skip_empty_lines)
+    extract_fn = partial(_extract_line, skip_empty_lines=skip_empty_lines, legacy_polygons=legacy_polygons)
     parse_fn = None
     if format_type in ['xml', 'alto', 'page']:
         parse_fn = XMLPage
@@ -166,6 +166,8 @@ def build_binary_dataset(files: Optional[List[Union[str, 'PathLike', Dict]]] = N
         for doc in files:
             try:
                 data = parse_fn(doc)
+                if format_type in ['xml', 'alto', 'page']:
+                    data = data.to_container()
             except (FileNotFoundError, KrakenInputException, ValueError):
                 logger.warning(f'Invalid input file {doc}')
                 continue
@@ -189,13 +191,13 @@ def build_binary_dataset(files: Optional[List[Union[str, 'PathLike', Dict]]] = N
     alphabet = Counter()
     num_lines = 0
     for doc in docs:
-        if format_type in ['xml', 'alto', 'page']:
-            lines = doc.lines.values()
-        else:
+        if format_type in ['xml', 'alto', 'page', None]:
+            lines = doc.lines
+        elif format_type == 'path':
             lines = doc['lines']
         for line in lines:
             num_lines += 1
-            alphabet.update(line.text if format_type in ['xml', 'alto', 'page'] else line['text'])
+            alphabet.update(line.text if format_type in ['xml', 'alto', 'page', None] else line['text'])
 
     callback(0, num_lines)
 
@@ -216,6 +218,7 @@ def build_binary_dataset(files: Optional[List[Union[str, 'PathLike', Dict]]] = N
                           'image_type': 'raw',
                           'splits': ['train', 'eval', 'test'],
                           'im_mode': '1',
+                          'legacy_polygons': legacy_polygons,
                           'counts': Counter({'all': 0,
                                              'train': 0,
                                              'validation': 0,
@@ -309,6 +312,7 @@ def build_binary_dataset(files: Optional[List[Union[str, 'PathLike', Dict]]] = N
                     f"image_type: {metadata['lines']['image_type']}\n"
                     f"splits: {metadata['lines']['splits']}\n"
                     f"im_mode: {metadata['lines']['im_mode']}\n"
+                    f"legacy_polygons: {metadata['lines']['legacy_polygons']}\n"
                     f"lines: {metadata['lines']['counts']}\n")
 
         with pa.memory_map(tmp_file, 'rb') as source:

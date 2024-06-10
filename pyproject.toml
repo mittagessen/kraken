@@ -1,5 +1,5 @@
 [project]
 
 [build-system]
-requires = ["pbr>=5.7.0", "setuptools>=36.6.0", "wheel"]
+requires = ["pbr>=5.7.0", "setuptools>=36.6.0,<70.0.0", "wheel"]
 build-backend = "pbr.build"

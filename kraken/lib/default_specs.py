@@ -40,6 +40,7 @@ READING_ORDER_HYPER_PARAMS = {'lrate': 0.001,
                               'rop_patience': 5,
                               # cosine
                               'cos_t_max': 100,
+                              'cos_min_lr': 0.001,
                               'warmup': 0,
                               }
 
@@ -67,6 +68,7 @@ RECOGNITION_PRETRAIN_HYPER_PARAMS = {'pad': 16,
                                      'rop_patience': 5,
                                      # cosine
                                      'cos_t_max': 100,
+                                     'cos_min_lr': 1e-7,
                                      # masking parameters
                                      'mask_width': 4,
                                      'mask_prob': 0.5,
@@ -101,6 +103,7 @@ RECOGNITION_HYPER_PARAMS = {'pad': 16,
                             'rop_patience': 5,
                             # cosine
                             'cos_t_max': 50,
+                            'cos_min_lr': 1e-4,
                             'warmup': 0,
                             'freeze_backbone': 0,
                             }
@@ -129,5 +132,6 @@ SEGMENTATION_HYPER_PARAMS = {'line_width': 8,
                              'rop_patience': 5,
                              # cosine
                              'cos_t_max': 50,
+                             'cos_min_lr': 2e-5,
                              'warmup': 0,
                              }

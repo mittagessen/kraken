@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<PcGts xmlns="http://schema.primaresearch.org/PAGE/gts/pagecontent/2013-07-15" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://schema.primaresearch.org/PAGE/gts/pagecontent/2013-07-15 http://schema.primaresearch.org/PAGE/gts/pagecontent/2013-07-15/pagecontent.xsd">
+    <Metadata>
+        <Creator>TRP</Creator>
+        <Created>2016-06-16T16:57:15.027+02:00</Created>
+        <LastChange>2018-07-04T17:25:44.389+02:00</LastChange>
+    </Metadata>
+    <Page imageFilename="170025120000003,0074.jpg" imageWidth="2743" imageHeight="3965">
+        <ReadingOrder>
+            <OrderedGroup id="ro_1530717944451" caption="Regions reading order">
+                <RegionRefIndexed index="0" regionRef="region_1469098609000_462"/>
+                <RegionRefIndexed index="1" regionRef="region_1469098557906_461"/>
+                <RegionRefIndexed index="2" regionRef="TextRegion_1520586482298_194"/>
+                <RegionRefIndexed index="3" regionRef="TextRegion_1520586482298_193"/>
+            </OrderedGroup>
+        </ReadingOrder>
+        <TextRegion id="region_1469098609000_462" custom="readingOrder {index:0;} structure {type:$pag;}">
+            <Coords points="2324,171 2437,171 2436,258 2326,237"/>
+            <TextLine id="line_1469098625593_463" custom="readingOrder {index:0;} structure {type:$pag;}">
+                <Coords points="2344,182 2428,195 2420,244 2336,231"/>
+                <Baseline points="2337,226 2421,239"/>
+                <TextEquiv>
+                    <Unicode>$pag:39</Unicode>
+                </TextEquiv>
+            </TextLine>
+            <TextEquiv>
+                <Unicode>$pag:39</Unicode>
+            </TextEquiv>
+        </TextRegion>
+        <TextRegion id="region_1469098557906_461" custom="readingOrder {index:1;} structure {type:$pac;}">
+            <Coords points="738,203 2339,245 2398,294 2446,345 2574,469 2539,1873 2523,2053 2477,2182 738,2243"/>
+            <TextLine id="line_1469098649515_464" custom="readingOrder {index:0;} structure {type:$pac;}">
+                <Coords points="790,224 2398,259 2397,309 789,274"/>
+                <Baseline points="789,269 2397,304"/>
+                <TextEquiv>
+                    <Unicode></Unicode>
+                </TextEquiv>
+            </TextLine>
+            <TextLine id="line_1469098653078_465" custom="readingOrder {index:1;} structure {type:$pac;}">
+                <Coords points="786,313 2432,322 2432,372 786,363"/>
+                <Baseline points="786,358 2432,367"/>
+                <TextEquiv>
+                    <Unicode>y salvedades alli expressadas; Y fue acetada;</Unicode>
+                </TextEquiv>
+            </TextLine>
+            <TextLine id="line_1469098657875_466" custom="readingOrder {index:2;} structure {type:$pac;}">
+                <Coords points="767,399 2461,392 2461,442 767,449"/>
+                <Baseline points="767,444 2461,437"/>
+                <TextEquiv>
+                    <Unicode>y assi mismo el dho$.dicho $ofi:Patron $ant:Miguel $ant:Carreras,</Unicode>
+                </TextEquiv>
+            </TextLine>
+            <TextLine id="line_1469098662671_467" custom="readingOrder {index:3;} structure {type:$pac;}">
+                <Coords points="776,481 2487,478 2487,528 776,531"/>
+                <Baseline points="776,526 2487,523"/>
+                <TextEquiv>
+                    <Unicode>y el $ofi:Rndo$.Reverendo $ant:Miguel $ant:Carreras $ofi:pbro$.presbítero residente en la</Unicode>
+                </TextEquiv>
+            </TextLine>
+            <TextEquiv>
+                <Unicode>$-nor su hijo, De todos sus bienes, con los pactos
+y salvedades alli expressadas; Y fue acetada;
+y assi mismo el dho$.dicho $ofi:Patron $ant:Miguel $ant:Carreras,
+y el $ofi:Rndo$.Reverendo $ant:Miguel $ant:Carreras $ofi:pbro$.presbítero residente en la
+Parq.$^l$.Parroquial Igla$.Iglesia de dha$.dicha villa de $top:Canet Padre é, hijo
+hizieron donacion a la dha$.dicha $ant:Anna $ant:Maria su
+hija y hermana resp.$^e$.respectivamente por todos sus drôs$.derechos de le:$-
+$-gitima Paterna, Materna y otros de ducientas$.doscientas
+libras de moneda Bar$.barcelonesa; arca y vestidos corres:$-
+$-pondientes, con promesa de pagar en esta
+forma, ésto es arcas, ropas y joyas el dia de las
+Bodas; cien libras del dia de la fecha, á, medio
+año y las restantes cien libras del dho$.dicho dia de la
+fecha á tres años prox.$^s$.proximos venturos bajo obli:$-
+$-gacion de todos sus bienes; cuya dha$.dicha donacion
+fue echa con el pacto revercional acos:$-
+$-tumbrado; Y fue azetada por la dha$.dicha $ant:Anna
+$ant:Maria por quien fue echa la diffinición cor:$-
+$-respondiente de dhos$.dichos sus dros$.derechos a favor del dho$.dicho
+su Padre y hermano resp.$^e$.respectivamente y salvose el de
+futura sucession: Y en su consequencia hizo
+la correspondiente constitucion dotal al
+dho$.dicho $ant:Joseph $ant:Vancells su venidero esposo; y este
+acetandola prometió en su caso restituir
+bajo obligacion de todos sus bienes.</Unicode>
+            </TextEquiv>
+        </TextRegion>
+    </Page>
+</PcGts>

@@ -36,11 +36,10 @@ from .ro import roadd, rotrain
 from .segmentation import segtest, segtrain
 from .transcription import extract, transcription
 
-APP_NAME = 'kraken'
-
 logging.captureWarnings(True)
 logger = logging.getLogger('kraken')
-
+# disable annoying lightning worker seeding log messages
+logging.getLogger("lightning.fabric.utilities.seed").setLevel(logging.ERROR)
 # install rich traceback handler
 install(suppress=[click])
 
@@ -60,10 +59,10 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
 def cli(ctx, verbose, seed, deterministic):
     ctx.meta['deterministic'] = False if not deterministic else 'warn'
     if seed:
-        from pytorch_lightning import seed_everything
+        from lightning.pytorch import seed_everything
         seed_everything(seed, workers=True)
     elif deterministic:
-        from pytorch_lightning import seed_everything
+        from lightning.pytorch import seed_everything
         seed_everything(42, workers=True)
 
     ctx.meta['verbose'] = verbose
