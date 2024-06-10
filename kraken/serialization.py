@@ -152,8 +152,8 @@ def serialize(results: 'Segmentation',
             reg = reg_dict[record.regions[0]]
             regs_with_lines.add(reg.id)
             region = {'id': reg.id,
-                      'bbox': max_bbox([reg.boundary]),
-                      'boundary': [list(x) for x in reg.boundary],
+                      'bbox': max_bbox([reg.boundary]) if reg.boundary else [],
+                      'boundary': [list(x) for x in reg.boundary] if reg.boundary else [],
                       'tags': reg.tags,
                       'lines': [],
                       'type': 'region'

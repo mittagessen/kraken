@@ -107,7 +107,7 @@
                 {% if loop.previtem and loop.previtem.type == 'line' %}
                 </TextBlock>
                 {% endif %}
-                <TextBlock ID="block_{{ entity.index }}" HPOS="{{ entity.bbox[0] }}" VPOS="{{ entity.bbox[1] }}" WIDTH="{{ entity.bbox[2] - entity.bbox[0] }}" HEIGHT="{{ entity.bbox[3] - entity.bbox[1] }}" {% for type in page.region_types %}{% if type == entity.region_type %}TAGREFS="TYPE_{{ loop.index }}"{% endif %}{% endfor %}>
+                 <TextBlock ID="{{ entity.id }}" {% if entity.bbox %}HPOS="{{ entity.bbox[0] }}" VPOS="{{ entity.bbox[1] }}" WIDTH="{{ entity.bbox[2] - entity.bbox[0] }}" HEIGHT="{{ entity.bbox[3] - entity.bbox[1] }}"{% endif %} {% if entity.tags %}{% for type in page.region_types %}{% if type in entity.tags.values() %}TAGREFS="REGION_TYPE_{{ loop.index }}"{% endif %}{% endfor %}{% endif %}>
                     <Shape>
                         <Polygon POINTS="{{ entity.boundary|sum(start=[])|join(' ') }}"/>
                     </Shape>
