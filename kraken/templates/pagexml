@@ -39,7 +39,7 @@
         </TextRegion>
         {% endif %}
         <TextRegion id="{{ entity.id }}" custom="structure {type:{{ entity.region_type }};}">
-            <Coords points="{% for point in entity.boundary %}{{ point|join(',') }}{% if not loop.last %} {% endif %}{% endfor %}"/>
+            {% if entity.boundary %}<Coords points="{% for point in entity.boundary %}{{ point|join(',') }}{% if not loop.last %} {% endif %}{% endfor %}"/>{% endif %}
             {%- for line in entity.lines -%}
             {{ render_line(line) }}
             {%- endfor %}
