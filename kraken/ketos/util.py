@@ -32,12 +32,20 @@ logger = logging.getLogger('kraken')
 def _validate_manifests(ctx, param, value):
     images = []
     for manifest in value:
-        for entry in manifest.readlines():
-            im_p = entry.rstrip('\r\n')
-            if os.path.isfile(im_p):
-                images.append(im_p)
-            else:
-                logger.warning('Invalid entry "{}" in {}'.format(im_p, manifest.name))
+        try:
+            for entry in manifest.readlines():
+                im_p = entry.rstrip('\r\n')
+                if os.path.isfile(im_p):
+                    images.append(im_p)
+                else:
+                    logger.warning('Invalid entry "{}" in {}'.format(im_p, manifest.name))
+        except UnicodeDecodeError:
+            raise click.BadOptionUsage(param,
+                                       f'File {manifest.name} is not a text file. Please '
+                                        'ensure that the argument to `-t`/`-e` is a manifest '
+                                        'file containing paths to training data (one per '
+                                        'line).',
+                                       ctx=ctx)
     return images
 
 
