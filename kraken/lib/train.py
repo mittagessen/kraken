@@ -457,8 +457,10 @@ class RecognitionModel(L.LightningModule):
                 dataset.add(**sample)
             except KrakenInputException as e:
                 logger.warning(str(e))
-        if self.format_type == 'binary' and self.hparams.hyper_params['normalization']:
-            logger.debug('Rebuilding dataset using unicode normalization')
+        if self.format_type == 'binary' and (self.hparams.hyper_params['normalization'] or
+                                             self.hparams.hyper_params['normalize_whitespace'] or
+                                             self.reorder):
+            logger.debug('Text transformations modifying alphabet selected. Rebuilding alphabet')
             dataset.rebuild_alphabet()
 
         return dataset
