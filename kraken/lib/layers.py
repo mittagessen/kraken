@@ -10,11 +10,11 @@ from torch.nn import Module, Sequential
 from torch.nn import functional as F
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
-logger = logging.getLogger('coremltools')
-logger.setLevel(logging.ERROR)
+root_logger = logging.getLogger()
+level = root_logger.getEffectiveLevel()
+root_logger.setLevel(logging.ERROR)
 from coremltools.proto import NeuralNetwork_pb2  # NOQA
-
-logger.setLevel(logging.WARNING)
+root_logger.setLevel(level)
 
 # all tensors are ordered NCHW, the "feature" dimension is C, so the output of
 # an LSTM will be put into C same as the filters of a CNN.
