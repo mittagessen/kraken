@@ -121,6 +121,13 @@ class mm_rpred(object):
             valid_norm = True
             self.next_iter = self._recognize_box_line
 
+        if isinstance(nets, defaultdict) and nets.default_factory:
+            network = nets.default_factory()
+            batch, channels, height, width = network.nn.input
+            self.ts = defaultdict(lambda: ImageInputTransforms(batch, height, width, channels, (pad, 0), valid_norm))
+        else:
+            self.ts = {}
+
         if self.have_tags:
             tags = set()
             for x in bounds.lines:
@@ -148,11 +155,8 @@ class mm_rpred(object):
                 network = nets[tag]
                 batch, channels, height, width = network.nn.input
                 self.ts[tag] = ImageInputTransforms(batch, height, width, channels, (pad, 0), valid_norm)
-        elif isinstance(nets, defaultdict) and nets.default_factory:
-            network = nets.default_factory()
-            batch, channels, height, width = network.nn.input
-            self.ts = {('type', 'default'): ImageInputTransforms(batch, height, width, channels, (pad, 0), valid_norm)}
-        else:
+
+        if not isinstance(self.ts, defaultdict) and not self.ts:
             raise ValueError('No tags in input data and no default model in mapping given.')
 
         self.im = im
