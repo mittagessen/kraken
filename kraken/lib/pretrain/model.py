@@ -203,11 +203,11 @@ class PretrainDataModule(L.LightningDataModule):
             self.train_set, self.val_set = random_split(train_set, (train_len, val_len))
 
         if format_type == 'binary':
-            legacy_train_status = train_set.legacy_polygons_status
-            if val_set and val_set.legacy_polygons_status != legacy_train_status:
+            legacy_train_status = self.train_set.dataset.legacy_polygons_status
+            if self.val_set.dataset.legacy_polygons_status != legacy_train_status:
                 logger.warning('Train and validation set have different legacy '
                                f'polygon status: {legacy_train_status} and '
-                               f'{val_set.legacy_polygons_status}. Train set '
+                               f'{self.val_set.dataset.legacy_polygons_status}. Train set '
                                'status prevails.')
             if legacy_train_status == "mixed":
                 logger.warning('Mixed legacy polygon status in training dataset. Consider recompilation.')
