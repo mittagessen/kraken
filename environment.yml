@@ -4,7 +4,7 @@ channels:
   - conda-forge
 dependencies:
   - python>=3.9
-  - python-bidi
+  - python-bidi~=0.4.0
   - lxml
   - regex
   - requests

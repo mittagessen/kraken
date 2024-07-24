@@ -22,7 +22,7 @@ requirements:
      - python>=3.8,<3.12
   run:
      - python>=3.8,<3.12
-     - python-bidi
+     - python-bidi~=0.4.0
      - lxml
      - regex
      - requests
