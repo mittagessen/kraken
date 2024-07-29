@@ -217,7 +217,7 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore, input,
                                   imagename=ctx.meta['base_image'],
                                   script_detection=False,
                                   lines=[BBoxLine(id=str(uuid.uuid4()),
-                                                  bbox=(0, 0, im.size[1], im.size[0]))])
+                                                  bbox=(0, 0, im.width, im.height))])
         else:
             raise click.UsageError('No line segmentation given. Add one with the input or run `segment` first.')
     elif no_segmentation:
