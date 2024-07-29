@@ -501,8 +501,6 @@ def segment(ctx, model, boxes, text_direction, scale, maxcolseps,
     """
     from kraken.containers import ProcessingStep
 
-    print(model)
-
     if model and boxes:
         logger.warning(f'Baseline model ({model}) given but legacy segmenter selected. Forcing to -bl.')
         boxes = False
@@ -536,7 +534,8 @@ def segment(ctx, model, boxes, text_direction, scale, maxcolseps,
         for loc in locations:
             message(f'Loading ANN {loc}\t', nl=False)
             try:
-                models.append(TorchVGSLModel.load_model(loc).to(ctx.meta['device']))
+                models.append(TorchVGSLModel.load_model(loc))
+                models[-1].to(ctx.meta['device'])
             except Exception:
                 if ctx.meta['raise_failed']:
                     raise
