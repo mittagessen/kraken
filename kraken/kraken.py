@@ -532,12 +532,12 @@ def segment(ctx, model, boxes, text_direction, scale, maxcolseps,
 
 
         from kraken.lib.vgsl import TorchVGSLModel
-        models = []
+        model = []
         for loc in locations:
             message(f'Loading ANN {loc}\t', nl=False)
             try:
-                models.append(TorchVGSLModel.load_model(loc))
-                models[-1].to(ctx.meta['device'])
+                model.append(TorchVGSLModel.load_model(loc))
+                model[-1].to(ctx.meta['device'])
             except Exception:
                 if ctx.meta['raise_failed']:
                     raise
@@ -555,7 +555,7 @@ def segment(ctx, model, boxes, text_direction, scale, maxcolseps,
                                                           'remove_hlines': remove_hlines,
                                                           'pad': pad}))
 
-    return partial(segmenter, boxes, models, text_direction, scale, maxcolseps,
+    return partial(segmenter, boxes, model, text_direction, scale, maxcolseps,
                    black_colseps, remove_hlines, pad, mask, ctx.meta['device'])
 
 

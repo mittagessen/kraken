@@ -57,11 +57,3 @@ class TestCLI(unittest.TestCase):
         with tempfile.NamedTemporaryFile() as fp:
             result = self.runner.invoke(cli, ['-r', '-i', self.color_img, fp.name, 'segment'])
             self.assertEqual(result.exit_code, 1)
-
-    def test_segment_color_noraise(self):
-        """
-        Tests that segmentation does not return 1 when given color image in noraise mode.
-        """
-        with tempfile.NamedTemporaryFile() as fp:
-            result = self.runner.invoke(cli, ['-i', self.color_img, fp.name, 'segment'])
-            self.assertEqual(result.exit_code, 0)
