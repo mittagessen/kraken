@@ -351,6 +351,7 @@ def process_pipeline(subcommands, input, batch_input, suffix, verbose, format_ty
     placing their respective outputs in temporary files.
     """
     import glob
+    import os.path
     import tempfile
 
     from threadpoolctl import threadpool_limits
@@ -364,7 +365,8 @@ def process_pipeline(subcommands, input, batch_input, suffix, verbose, format_ty
     # expand batch inputs
     if batch_input and suffix:
         for batch_expr in batch_input:
-            for in_file in glob.glob(batch_expr, recursive=True):
+            for in_file in glob.glob(os.path.expanduser(batch_expr), recursive=True):
+
                 input.append((in_file, '{}{}'.format(os.path.splitext(in_file)[0], suffix)))
 
     # parse pdfs
