@@ -523,7 +523,7 @@ def _calc_seam(baseline, polygon, angle, im_feats, bias=150):
         mask[line_locs] = 0
     dist_bias = distance_transform_cdt(mask)
     # absolute mask
-    mask = np.array(make_polygonal_mask(polygon-(r_min, c_min), patch.shape[::-1])) > 128
+    mask = np.array(make_polygonal_mask(polygon-(c_min, r_min), patch.shape[::-1])) <= 128
     # dilate mask to compensate for aliasing during rotation
     mask = binary_erosion(mask, border_value=True, iterations=2)
     # combine weights with features
