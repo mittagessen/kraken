@@ -1114,7 +1114,10 @@ class SegmentationModel(L.LightningModule):
                 scheduler.step()
             # step every other scheduler epoch-wise
             elif self.trainer.is_last_batch:
-                scheduler.step()
+                if metric is None:
+                    scheduler.step()
+                else:
+                    scheduler.step(metric)
 
 
 def _configure_optimizer_and_lr_scheduler(hparams, params, len_train_set=None, loss_tracking_mode='max'):

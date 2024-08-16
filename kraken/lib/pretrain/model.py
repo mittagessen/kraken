@@ -438,7 +438,10 @@ class RecognitionPretrainModel(L.LightningModule):
                 scheduler.step()
             # step every other scheduler epoch-wise
             elif self.trainer.is_last_batch:
-                scheduler.step()
+                if metric is None:
+                    scheduler.step()
+                else:
+                    scheduler.step(metric)
 
     def setup(self, stage: Optional[str] = None):
         # finalize models in case of appending/loading
