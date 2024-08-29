@@ -139,7 +139,7 @@ def segmenter(legacy, models, text_direction, scale, maxcolseps, black_colseps,
             mask = Image.open(mask)
         except IOError as e:
             raise click.BadParameter(str(e))
-    message('Segmenting\t', nl=False)
+    message(f'Segmenting {ctx.meta["orig_file"]}\t', nl=False)
     try:
         if legacy:
             res = pageseg.segment(im,
