@@ -20,9 +20,9 @@ Legacy command line drivers for recognition training data annotation.
 """
 import logging
 import os
+import dataclasses
 import unicodedata
 import uuid
-from typing import IO, Any, cast
 
 import click
 from bidi.algorithm import get_display
@@ -151,19 +151,15 @@ def extract(ctx, binarize, normalization, normalize_whitespace, reorder,
               help='Use given model for prefill mode.')
 @click.option('--pad', show_default=True, type=(int, int), default=(0, 0),
               help='Left and right padding around lines')
-@click.option('-l', '--lines', type=click.Path(exists=True), show_default=True,
-              help='JSON file containing line coordinates')
 @click.option('-o', '--output', type=click.File(mode='wb'), default='transcription.html',
               help='Output file', show_default=True)
 @click.argument('images', nargs=-1, type=click.File(mode='rb', lazy=True))
 def transcription(ctx, text_direction, scale, bw, maxcolseps,
-                  black_colseps, font, font_style, prefill, pad, lines, output,
+                  black_colseps, font, font_style, prefill, pad, output,
                   images):
     """
     Creates transcription environments for ground truth generation.
     """
-    import json
-
     from PIL import Image
 
     from kraken import binarization, pageseg, rpred, transcribe
@@ -171,9 +167,6 @@ def transcription(ctx, text_direction, scale, bw, maxcolseps,
     from kraken.lib.progress import KrakenProgressBar
 
     ti = transcribe.TranscriptionInterface(font, font_style)
-
-    if len(images) > 1 and lines:
-        raise click.UsageError('--lines option is incompatible with multiple image files')
 
     if prefill:
         logger.info('Loading model {}'.format(prefill))
@@ -193,23 +186,15 @@ def transcription(ctx, text_direction, scale, bw, maxcolseps,
             im_bin = binarization.nlbin(im)
             im_bin = im_bin.convert('1')
             logger.info('Segmenting page')
-            if not lines:
-                res = pageseg.segment(im_bin, text_direction, scale, maxcolseps, black_colseps, pad=pad)
-            else:
-                with click.open_file(lines, 'r') as fp:
-                    try:
-                        fp = cast('IO[Any]', fp)
-                        res = json.load(fp)
-                    except ValueError as e:
-                        raise click.UsageError('{} invalid segmentation: {}'.format(lines, str(e)))
+            res = pageseg.segment(im_bin, text_direction, scale, maxcolseps, black_colseps, pad=pad)
             if prefill:
-                it = rpred.rpred(prefill, im_bin, res.copy())
+                it = rpred.rpred(prefill, im_bin, res)
                 preds = []
                 logger.info('Recognizing')
                 for pred in it:
                     logger.debug('{}'.format(pred.prediction))
                     preds.append(pred)
-                ti.add_page(im, res, records=preds)
+                ti.add_page(im, dataclasses.replace(res, lines=preds))
             else:
                 ti.add_page(im, res)
             fp.close()
