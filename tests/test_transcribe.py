@@ -8,6 +8,7 @@ from pathlib import Path
 from lxml import etree
 from PIL import Image
 
+from kraken.containers import Segmentation, BBoxLine
 from kraken.transcribe import TranscriptionInterface
 
 thisfile = Path(__file__).resolve().parent
@@ -24,8 +25,16 @@ class TestTranscriptionInterface(unittest.TestCase):
         Tests creation of transcription interfaces with segmentation.
         """
         tr = TranscriptionInterface()
-        with open(resources / 'segmentation.json') as fp:
-            seg = json.load(fp)
+
+
+        seg = Segmentation(type='bbox',
+                           imagename = resources / 'bw.png',
+                           lines=[BBoxLine(id='foo',
+                                           bbox=[200, 10, 400, 156])],
+                           text_direction='horizontal-lr',
+                           script_detection=False
+                          )
+
         with Image.open(resources / 'input.jpg') as im:
             tr.add_page(im, seg)
         fp = BytesIO()
