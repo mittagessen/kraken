@@ -30,7 +30,7 @@ from skimage.draw import polygon
 from torch.utils.data import Dataset
 from torchvision import transforms
 
-from kraken.lib.segmentation import scale_regions
+from kraken.lib.segmentation import scale_regions, to_curve
 
 if TYPE_CHECKING:
     from kraken.containers import Segmentation
@@ -46,6 +46,25 @@ logger = logging.getLogger(__name__)
 class BaselineSet(Dataset):
     """
     Dataset for training a baseline/region segmentation model.
+
+    Args:
+        line_width: Height of the baseline in the scaled input.
+        padding: Tuple of ints containing the left/right, top/bottom
+                 padding of the input images.
+        target_size: Target size of the image as a (height, width) tuple.
+        augmentation: Enable/disable augmentation.
+        valid_baselines: Sequence of valid baseline identifiers. If `None`
+                         all are valid.
+        merge_baselines: Sequence of baseline identifiers to merge.  Note
+                         that merging occurs after entities not in valid_*
+                         have been discarded.
+        valid_regions: Sequence of valid region identifiers. If `None` all
+                       are valid.
+        merge_regions: Sequence of region identifiers to merge. Note that
+                       merging occurs after entities not in valid_* have
+                       been discarded.
+        return_curves: Whether to return fitted Bézier curves in addition to
+                       the pixel heatmaps. Used during validation.
     """
     def __init__(self,
                  line_width: int = 4,
@@ -55,27 +74,8 @@ class BaselineSet(Dataset):
                  valid_baselines: Sequence[str] = None,
                  merge_baselines: Dict[str, Sequence[str]] = None,
                  valid_regions: Sequence[str] = None,
-                 merge_regions: Dict[str, Sequence[str]] = None):
-        """
-        Creates a dataset for a text-line and region segmentation model.
-
-        Args:
-            line_width: Height of the baseline in the scaled input.
-            padding: Tuple of ints containing the left/right, top/bottom
-                     padding of the input images.
-            target_size: Target size of the image as a (height, width) tuple.
-            augmentation: Enable/disable augmentation.
-            valid_baselines: Sequence of valid baseline identifiers. If `None`
-                             all are valid.
-            merge_baselines: Sequence of baseline identifiers to merge.  Note
-                             that merging occurs after entities not in valid_*
-                             have been discarded.
-            valid_regions: Sequence of valid region identifiers. If `None` all
-                           are valid.
-            merge_regions: Sequence of region identifiers to merge. Note that
-                           merging occurs after entities not in valid_* have
-                           been discarded.
-        """
+                 merge_regions: Dict[str, Sequence[str]] = None,
+                 return_curves: bool = False):
         super().__init__()
         self.imgs = []
         self.im_mode = '1'
@@ -91,6 +91,7 @@ class BaselineSet(Dataset):
         self.mreg_dict = merge_regions if merge_regions is not None else {}
         self.valid_baselines = valid_baselines
         self.valid_regions = valid_regions
+        self.return_curves = return_curves
 
         self.aug = None
         if augmentation:
@@ -162,16 +163,14 @@ class BaselineSet(Dataset):
             try:
                 logger.debug(f'Attempting to load {im}')
                 im = Image.open(im)
-                im, target = self.transform(im, target)
-                return {'image': im, 'target': target}
+                return self.transform(im, target)
             except Exception:
                 self.failed_samples.add(idx)
                 idx = np.random.randint(0, len(self.imgs))
                 logger.debug(traceback.format_exc())
                 logger.info(f'Failed. Replacing with sample {idx}')
                 return self[idx]
-        im, target = self.transform(im, target)
-        return {'image': im, 'target': target}
+        return self.transform(im, target)
 
     @staticmethod
     def _get_ortho_line(lineseg, point, line_width, offset):
@@ -194,6 +193,7 @@ class BaselineSet(Dataset):
         start_sep_cls = self.class_mapping['aux']['_start_separator']
         end_sep_cls = self.class_mapping['aux']['_end_separator']
 
+        curves = defaultdict(list)
         for key, lines in target['baselines'].items():
             try:
                 cls_idx = self.class_mapping['baselines'][key]
@@ -202,9 +202,8 @@ class BaselineSet(Dataset):
                 continue
             for line in lines:
                 # buffer out line to desired width
-                line = [k for k, g in groupby(line)]
-                line = np.array(line)*scale
-                shp_line = geom.LineString(line)
+                line = np.array([k for k, g in groupby(line)])
+                shp_line = geom.LineString(line*scale)
                 split_offset = min(5, shp_line.length/2)
                 line_pol = np.array(shp_line.buffer(self.line_width/2, cap_style=2).boundary.coords, dtype=int)
                 rr, cc = polygon(line_pol[:, 1], line_pol[:, 0], shape=image.shape[1:])
@@ -223,6 +222,9 @@ class BaselineSet(Dataset):
                 rr_s, cc_s = polygon(end_sep[:, 1], end_sep[:, 0], shape=image.shape[1:])
                 t[end_sep_cls, rr_s, cc_s] = 1
                 t[end_sep_cls, rr, cc] = 0
+                # Bézier curve fitting
+                if self.return_curves:
+                    curves[key].append(to_curve(line, orig_size))
         for key, regions in target['regions'].items():
             try:
                 cls_idx = self.class_mapping['regions'][key]
@@ -240,7 +242,7 @@ class BaselineSet(Dataset):
             o = self.aug(image=image, mask=target)
             image = torch.tensor(o['image']).permute(2, 0, 1)
             target = torch.tensor(o['mask']).permute(2, 0, 1)
-        return image, target
+        return {'image': image, 'target': target, 'curves': dict(curves) if self.return_curves else None}
 
     def __len__(self):
         return len(self.imgs)

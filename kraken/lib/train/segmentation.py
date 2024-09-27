@@ -28,6 +28,7 @@ from typing import (TYPE_CHECKING, Callable, Dict, Literal, Optional, Sequence,
                     Union)
 
 from torch.optim import lr_scheduler
+from scipy.optimize import linear_sum_assignment
 from torch.utils.data import DataLoader, Subset, random_split
 from lightning.pytorch.callbacks import EarlyStopping
 from torchmetrics.classification import (MultilabelAccuracy,
@@ -39,7 +40,7 @@ from kraken.lib.dataset import BaselineSet, ImageInputTransforms
 
 from kraken.lib.xml import XMLPage
 from kraken.lib.models import validate_hyper_parameters
-from kraken.lib.segmentation import vectorize_lines
+from kraken.lib.segmentation import vectorize_lines, to_curve
 
 from .utils import _configure_optimizer_and_lr_scheduler
 
@@ -194,7 +195,8 @@ class SegmentationModel(L.LightningModule):
                                 valid_baselines=valid_baselines,
                                 merge_baselines=merge_baselines,
                                 valid_regions=valid_regions,
-                                merge_regions=merge_regions)
+                                merge_regions=merge_regions,
+                                return_curves=True)
 
         for page in training_data:
             train_set.add(page)
@@ -206,7 +208,8 @@ class SegmentationModel(L.LightningModule):
                                   valid_baselines=valid_baselines,
                                   merge_baselines=merge_baselines,
                                   valid_regions=valid_regions,
-                                  merge_regions=merge_regions)
+                                  merge_regions=merge_regions,
+                                  return_curves=True)
 
             for page in evaluation_data:
                 val_set.add(page)
@@ -246,7 +249,7 @@ class SegmentationModel(L.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        x, y = batch['image'], batch['target']
+        x, y, y_curves = batch['image'], batch['target'], batch['curves']
         pred, _ = self.nn.nn(x)
         # scale target to output size
         y = F.interpolate(y, size=(pred.size(2), pred.size(3)), mode='nearest').int()
@@ -258,12 +261,17 @@ class SegmentationModel(L.LightningModule):
         self.val_region_mean_accuracy.update(pred_reg, y_reg)
         self.val_region_mean_iu.update(pred_reg, y_reg)
         self.val_region_freq_iu.update(pred_reg, y_reg)
-        # vectorize lines
         st_sep = self.nn.user_metadata['class_mapping']['aux']['_start_separator']
         end_sep = self.nn.user_metadata['class_mapping']['aux']['_end_separator']
-        line_idxs = sorted(self.nn.user_metadata['class_mapping']['lines'].values())
-        for line_idx in line_idxs:
-            pred_bl = vectorize_lines(pred[:, [st_sep, end_sep, line_idx], ...], text_direction='horizontal')
+
+
+        # vectorize and match lines
+        for line_cls, line_idx in self.nn.user_metadata['class_mapping']['lines'].items():
+            pred_curves = torch.stack([to_curve(pred_bl, pred.shape[:2][-1]) for pred_bl in vectorize_lines(pred[:, [st_sep, end_sep, line_idx], ...],
+                                                                                                            text_direction='horizontal')])
+            cost_curves = torch.cdist(pred_curves, y_curves[line_cls], p=1).view(len(pred_curves), -1).cpu()
+            row_ind, col_ind = linear_sum_assignment(cost_curves)
+            self.val_line_dist.update(cost_curves[row_ind, col_ind])
 
     def on_validation_epoch_end(self):
         if not self.trainer.sanity_checking:
@@ -271,6 +279,7 @@ class SegmentationModel(L.LightningModule):
             mean_accuracy = self.val_region_mean_accuracy.compute()
             mean_iu = self.val_region_mean_iu.compute()
             freq_iu = self.val_region_freq_iu.compute()
+            mean_line_dist = self.val_line_dist.compute()
 
             if mean_iu > self.best_metric:
                 logger.debug(f'Updating best region metric from {self.best_metric} ({self.best_epoch}) to {mean_iu} ({self.current_epoch})')
@@ -283,6 +292,7 @@ class SegmentationModel(L.LightningModule):
             self.log('val_region_mean_acc', mean_accuracy, on_step=False, on_epoch=True, prog_bar=True, logger=True)
             self.log('val_region_mean_iu', mean_iu, on_step=False, on_epoch=True, prog_bar=True, logger=True)
             self.log('val_region_freq_iu', freq_iu, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+            self.log('val_mean_line_dist', mean_line_dist, on_step=False, on_epoch=True, prog_bar=True, logger=True)
             self.log('val_metric', mean_iu, on_step=False, on_epoch=True, prog_bar=False, logger=True)
 
         # reset metrics even if sanity checking

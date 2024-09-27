@@ -31,6 +31,7 @@ from scipy.ndimage import (binary_erosion, distance_transform_cdt,
 from scipy.signal import convolve2d
 from scipy.spatial.distance import pdist, squareform
 from shapely.ops import nearest_points, unary_union
+from shapely.geometry import LineString
 from shapely.validation import explain_validity
 from skimage import draw, filters
 from skimage.filters import sobel
@@ -39,6 +40,8 @@ from skimage.measure import (approximate_polygon, label, regionprops,
                              subdivide_polygon)
 from skimage.morphology import skeletonize
 from skimage.transform import (AffineTransform, PiecewiseAffineTransform, warp)
+
+from scipy.special import comb
 
 from kraken.lib import default_specs
 from kraken.lib.exceptions import KrakenInputException
@@ -1385,3 +1388,57 @@ def extract_polygons(im: Image.Image,
                 logger.error('bbox {} is outside of image bounds {}'.format(box, im.size))
                 raise KrakenInputException('Line outside of image bounds')
             yield im.crop(box).rotate(angle, expand=True), box
+
+###
+# Bézier curve fitting
+###
+
+
+def Mtk(n, t, k):
+    return t**k * (1-t)**(n-k) * comb(n, k)
+
+
+def BezierCoeff(ts):
+    return [[Mtk(3, t, k) for k in range(4)] for t in ts]
+
+
+def bezier_fit(bl):
+    x = bl[:, 0]
+    y = bl[:, 1]
+    dy = y[1:] - y[:-1]
+    dx = x[1:] - x[:-1]
+    dt = (dx ** 2 + dy ** 2)**0.5
+    t = dt/dt.sum()
+    t = np.hstack(([0], t))
+    t = t.cumsum()
+
+    Pseudoinverse = np.linalg.pinv(BezierCoeff(t))  # (9,4) -> (4,9)
+
+    control_points = Pseudoinverse.dot(bl)  # (4,9)*(9,2) -> (4,2)
+    medi_ctp = control_points[1:-1, :]
+    return medi_ctp
+
+
+def to_curve(baseline: torch.FloatTensor,
+             im_size: Tuple[int, int],
+             min_points: int = 8) -> torch.FloatTensor:
+    """
+    Fits a polyline as a quadratic Bézier curve.
+
+    Args:
+        baseline: tensor of shape (S, 2) with coordinates in x, y format.
+        im_size: image size (W, H) used for control point normalization.
+        min_points: Minimal number of points in the baseline. If the input
+                    baseline contains less than `min_points` additional points
+                    will be interpolated at regular intervals along the line.
+
+    Returns:
+        Tensor of shape (8,)
+    """
+    baseline = np.array(baseline)
+    if len(baseline) < min_points:
+        ls = LineString(baseline)
+        baseline = np.stack([np.array(ls.interpolate(x, normalized=True).coords)[0] for x in np.linspace(0, 1, 8)])
+    curve = np.concatenate(([baseline[0]], bezier_fit(baseline), [baseline[-1]]))/im_size
+    curve = curve.flatten()
+    return torch.from_numpy(curve)
