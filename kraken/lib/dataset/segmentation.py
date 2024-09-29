@@ -202,7 +202,7 @@ class BaselineSet(Dataset):
                 continue
             for line in lines:
                 # buffer out line to desired width
-                line = np.array([k for k, g in groupby(line)])
+                line = np.array([k for k, g in groupby(line)], dtype=np.float32)
                 shp_line = geom.LineString(line*scale)
                 split_offset = min(5, shp_line.length/2)
                 line_pol = np.array(shp_line.buffer(self.line_width/2, cap_style=2).boundary.coords, dtype=int)
@@ -224,7 +224,9 @@ class BaselineSet(Dataset):
                 t[end_sep_cls, rr, cc] = 0
                 # Bézier curve fitting
                 if self.return_curves:
-                    curves[key].append(to_curve(line, orig_size))
+                    curves[key].append(to_curve(torch.from_numpy(line), orig_size))
+            for k, v in curves.items():
+                curves[k] = torch.stack(v)
         for key, regions in target['regions'].items():
             try:
                 cls_idx = self.class_mapping['regions'][key]

@@ -264,14 +264,17 @@ class SegmentationModel(L.LightningModule):
         st_sep = self.nn.user_metadata['class_mapping']['aux']['_start_separator']
         end_sep = self.nn.user_metadata['class_mapping']['aux']['_end_separator']
 
-
         # vectorize and match lines
-        for line_cls, line_idx in self.nn.user_metadata['class_mapping']['lines'].items():
-            pred_curves = torch.stack([to_curve(pred_bl, pred.shape[:2][-1]) for pred_bl in vectorize_lines(pred[:, [st_sep, end_sep, line_idx], ...],
-                                                                                                            text_direction='horizontal')])
-            cost_curves = torch.cdist(pred_curves, y_curves[line_cls], p=1).view(len(pred_curves), -1).cpu()
-            row_ind, col_ind = linear_sum_assignment(cost_curves)
-            self.val_line_dist.update(cost_curves[row_ind, col_ind])
+        for line_cls, line_idx in self.nn.user_metadata['class_mapping']['baselines'].items():
+            pred_bl = vectorize_lines(pred[0, [st_sep, end_sep, line_idx], ...].numpy(), text_direction='horizontal')
+            pred_curves = [to_curve(bl, pred.shape[2:][::-1]) for bl in pred_bl]
+            if pred_curves:
+                pred_curves = torch.stack(pred_curves)
+                cost_curves = torch.cdist(pred_curves, y_curves[line_cls][0], p=1).cpu()
+                row_ind, col_ind = linear_sum_assignment(cost_curves)
+                self.val_line_dist.update(cost_curves[row_ind, col_ind]/8.0)
+            else:
+                self.val_line_dist.update(torch.ones(len(y_curves[line_cls][0])))
 
     def on_validation_epoch_end(self):
         if not self.trainer.sanity_checking:

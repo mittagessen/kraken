@@ -52,6 +52,7 @@ if TYPE_CHECKING:
 
 
 _T_pil_or_np = TypeVar('_T_pil_or_np', Image.Image, np.ndarray)
+_T_tensor_or_np = TypeVar('_T_tensor_or_np', torch.Tensor, np.ndarray)
 
 logger = logging.getLogger('kraken')
 
@@ -1435,10 +1436,11 @@ def to_curve(baseline: torch.FloatTensor,
     Returns:
         Tensor of shape (8,)
     """
-    baseline = np.array(baseline)
     if len(baseline) < min_points:
         ls = LineString(baseline)
-        baseline = np.stack([np.array(ls.interpolate(x, normalized=True).coords)[0] for x in np.linspace(0, 1, 8)])
-    curve = np.concatenate(([baseline[0]], bezier_fit(baseline), [baseline[-1]]))/im_size
+        baseline = torch.stack([torch.tensor(ls.interpolate(x, normalized=True).coords)[0] for x in np.linspace(0, 1, 8)])
+    baseline = baseline.numpy()
+    curve = np.concatenate(([baseline[0]], bezier_fit(baseline), [baseline[-1]]))
+    curve = curve/im_size
     curve = curve.flatten()
-    return torch.from_numpy(curve)
+    return torch.from_numpy(curve.astype(baseline.dtype))
