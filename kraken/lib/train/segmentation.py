@@ -283,7 +283,8 @@ class SegmentationModel(L.LightningModule):
                     # num of predictions differs from target -> take n best
                     # predictions and add error penalty term for the rest.
                     if diff := abs(len(pred_curves) - len(target_curves)):
-                        costs = torch.sort(costs)[:len(target_curves)]
+                        costs, _ = torch.sort(costs)
+                        costs = costs[:len(target_curves)]
                         penalty = torch.full((diff,), 8.0)
                         costs = torch.cat([costs, penalty])
                     costs = costs/8.0
