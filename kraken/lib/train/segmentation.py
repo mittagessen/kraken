@@ -272,7 +272,7 @@ class SegmentationModel(L.LightningModule):
 
         # vectorize and match lines
         for line_cls, line_idx in self.nn.user_metadata['class_mapping']['baselines'].items():
-            pred_bl = vectorize_lines(pred[0, [st_sep, end_sep, line_idx], ...].numpy(), text_direction='horizontal')
+            pred_bl = [torch.tensor(x) for x in vectorize_lines(pred[0, [st_sep, end_sep, line_idx], ...].numpy(), text_direction='horizontal')]
             pred_curves = [to_curve(bl, pred.shape[2:][::-1]) for bl in pred_bl]
             if line_cls in y_curves:
                 target_curves = y_curves[line_cls][0]
