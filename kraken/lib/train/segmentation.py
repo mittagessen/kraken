@@ -279,7 +279,7 @@ class SegmentationModel(L.LightningModule):
                 if pred_curves:
                     pred_curves = torch.stack(pred_curves)
                     cost_curves = torch.cdist(pred_curves, target_curves, p=1).cpu()
-                    costs = cost_curves = [linear_sum_assignment(cost_curves)]
+                    costs = cost_curves[linear_sum_assignment(cost_curves)]
                     # num of predictions differs from target -> take n best
                     # predictions and add error penalty term for the rest.
                     if diff := abs(len(pred_curves) - len(target_curves)):
