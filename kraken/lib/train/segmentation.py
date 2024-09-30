@@ -267,7 +267,8 @@ class SegmentationModel(L.LightningModule):
 
         # cast pred/targets to float32 and move to CPU
         pred = pred.cpu().float()
-        y_curves = y_curves.cpu()
+        for k, v in y_curves.items():
+            y_curves[k] = v.cpu()
 
         # vectorize and match lines
         for line_cls, line_idx in self.nn.user_metadata['class_mapping']['baselines'].items():
