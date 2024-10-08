@@ -59,7 +59,7 @@ class DefaultAugmenter():
         import cv2
         cv2.setNumThreads(0)
         from albumentations import (Blur, Compose, ElasticTransform,
-                                    MedianBlur, MotionBlur, OneOf,
+                                    MedianBlur, MotionBlur, OneOf, Affine,
                                     OpticalDistortion, PixelDropout,
                                     ShiftScaleRotate, ToFloat)
 
@@ -74,7 +74,8 @@ class DefaultAugmenter():
                                     ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.2, rotate_limit=1, p=0.2),
                                     OneOf([
                                         OpticalDistortion(p=0.3),
-                                        ElasticTransform(alpha=64, sigma=25, alpha_affine=0.25, p=0.1),
+                                        ElasticTransform(alpha=64, sigma=25, p=0.1),
+                                        Affine(translate_px=(0, 5), rotate=(-3, 3), shear=(-5, 5), p=0.2)
                                     ], p=0.2),
                                    ], p=0.5)
 
