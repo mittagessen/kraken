@@ -444,7 +444,7 @@ def segtest(ctx, model, evaluation_files, device, workers, threads, threshold,
     from torch.utils.data import DataLoader
 
     from kraken.lib.progress import KrakenProgressBar
-    from kraken.lib.train import BaselineSet, ImageInputTransforms
+    from kraken.lib.dataset import BaselineSet, ImageInputTransforms
     from kraken.lib.vgsl import TorchVGSLModel
 
     logger.info('Building test set from {} documents'.format(len(test_set) + len(evaluation_files)))
