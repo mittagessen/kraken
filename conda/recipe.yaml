@@ -15,13 +15,13 @@ build:
 
 requirements:
   build:
-    - python>=3.8,<3.12
+    - python>=3.9,<3.14
     - setuptools>=36.6.0,<70.0.0
     - pbr
   host:
-     - python>=3.8,<3.12
+     - python>=3.9,<3.14
   run:
-     - python>=3.8,<3.12
+     - python>=3.9,<3.14
      - python-bidi~=0.4.0
      - lxml
      - regex
