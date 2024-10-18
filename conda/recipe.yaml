@@ -29,7 +29,7 @@ requirements:
      - click>=8.1
      - numpy~=1.23.0
      - pillow>=9.2.0
-     - scipy~=1.14.0
+     - scipy~=1.13.0
      - jinja2~=3.0
      - torchvision
      - pytorch~=2.1.0
