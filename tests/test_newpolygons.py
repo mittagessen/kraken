@@ -249,7 +249,7 @@ class TestNewPolygons(unittest.TestCase):
             fp = str(Path(tempdir) / "test.xml")
 
             self._test_ketoscli(
-                args=['train', '-f', 'xml', '-N', '1', '-q', 'fixed', '-i', self.old_model_path, '--resize', 'add', '-o', mfp, '--workers', '0', self.segmented_img],
+                args=['train', '-f', 'xml', '-N', '1', '-q', 'fixed', '-i', self.old_model_path, '--resize', 'union', '-o', mfp, '--workers', '0', self.segmented_img],
                 expect_legacy=False,
                 check_exit_code=[0, 1], # Model may not improve during training
             )
@@ -268,7 +268,7 @@ class TestNewPolygons(unittest.TestCase):
             fp = str(Path(tempdir) / "test.xml")
 
             self._test_ketoscli(
-                args=['train', '--legacy-polygons', '-f', 'xml', '-N', '1', '-q', 'fixed', '-i', self.old_model_path, '--resize', 'add', '-o', mfp, '--workers', '0', self.segmented_img],
+                args=['train', '--legacy-polygons', '-f', 'xml', '-N', '1', '-q', 'fixed', '-i', self.old_model_path, '--resize', 'union', '-o', mfp, '--workers', '0', self.segmented_img],
                 expect_legacy=True,
                 check_exit_code=[0, 1], # Model may not improve during training
             )
@@ -326,7 +326,7 @@ class TestNewPolygons(unittest.TestCase):
             fp = str(Path(tempdir) / "test.xml")
 
             self._test_ketoscli(
-                args=['pretrain', '-f', 'xml', '-N', '1', '-q', 'fixed', '-i', self.old_model_path, '--resize', 'add', '-o', mfp, '--workers', '0', self.segmented_img],
+                args=['pretrain', '-f', 'xml', '-N', '1', '-q', 'fixed', '-i', self.old_model_path, '--resize', 'union', '-o', mfp, '--workers', '0', self.segmented_img],
                 expect_legacy=False,
                 check_exit_code=[0, 1], # Model may not improve during training
             )
@@ -349,7 +349,7 @@ class TestNewPolygons(unittest.TestCase):
         if force_legacy:
             args = ['--legacy-polygons'] + args
         if from_model:
-            args = ['-i', from_model, '--resize', 'add'] + args
+            args = ['-i', from_model, '--resize', 'union'] + args
 
         print("ketos", 'train', *args)
         run = self.runner.invoke(ketos_cli, ['train'] + args)

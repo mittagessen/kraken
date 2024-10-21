@@ -25,17 +25,11 @@ Installation
 
 kraken only runs on **Linux or Mac OS X**. Windows is not supported.
 
-The latest stable releases can be installed either from `PyPi <https://pypi.org>`_:
+The latest stable releases can be installed from `PyPi <https://pypi.org>`_:
 
 ::
 
   $ pip install kraken
-
-or through `conda <https://anaconda.org>`_:
-
-::
-
-  $ conda install -c conda-forge -c mittagessen kraken
 
 If you want direct PDF and multi-image TIFF/JPEG2000 support it is necessary to
 install the `pdf` extras package for PyPi:
