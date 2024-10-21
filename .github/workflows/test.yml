@@ -61,53 +61,9 @@ jobs:
         name: pypi_packages
         path: dist/*
 
-  build-n-publish-anaconda:
-    name: Build and publish anaconda packages
-    needs: lint_and_test
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: conda-incubator/setup-miniconda@v3
-        with:
-          python-version: 3.9
-          miniforge-variant: Mambaforge
-      - name: install dependencies build
-        shell: bash -l {0}
-        run: mamba install colorama pip ruamel ruamel.yaml rich jsonschema conda-verify anaconda-client
-      - name: Build linux-64 conda package
-        uses: prefix-dev/rattler-build-action@v0.2.6
-        with:
-          recipe-path: "conda/recipe.yaml"
-          build-args: "--experimental --target-platform linux-64"
-      - name: Build osx-64 conda package
-        uses: prefix-dev/rattler-build-action@v0.2.6
-        with:
-          recipe-path: "conda/recipe.yaml"
-          build-args: "--experimental --target-platform osx-64"
-#      - name: Build osx-arm64 conda package
-#        uses: prefix-dev/rattler-build-action@v0.2.6
-#        with:
-#          recipe-path: "conda/recipe.yaml"
-#          build-args: "--experimental --target-platform osx-arm64"
-      - name: Upload conda package
-        run: |
-          for pkg in $(find output -type f \( -name "*.conda" -o -name "*.tar.bz2" \) ); do
-            echo "Uploading ${pkg}"
-            rattler-build upload anaconda -o mittagessen -a ${{ secrets.ANACONDA_TOKEN }} "${pkg}"
-          done
-      - name: Upload conda artifacts to GH storage
-        uses: actions/upload-artifact@v4
-        with:
-          name: conda_packages
-          path: output/*/*.conda
-
   autodraft-gh-release:
     name: Create github release
-    needs: [build-n-publish-anaconda, build-n-publish-pypi]
+    needs: build-n-publish-pypi
     runs-on: ubuntu-latest
 
     steps:
