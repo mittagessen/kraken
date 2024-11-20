@@ -4,7 +4,7 @@ channels:
   - conda-forge
 dependencies:
   - python>=3.9
-  - python-bidi~=0.4.0
+  - python-bidi~=0.6.0
   - lxml
   - regex
   - requests
@@ -31,5 +31,5 @@ dependencies:
   - rich
   - setuptools>=36.6.0,<70.0.0
   - pip:
-    - coremltools~=8.0
+    - coremltools~=8.1
     - file:.
