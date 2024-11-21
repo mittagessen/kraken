@@ -67,22 +67,12 @@ or
 
 respectively.
 
-Installation using Conda
-------------------------
+Development Branch Installation using Conda
+-------------------------------------------
 
-To install the stable version through `conda <https://anaconda.org>`_:
-
-.. code-block:: console
-
-   $ conda install -c conda-forge -c mittagessen kraken
-
-Again PDF/multi-page TIFF/JPEG2000 support requires some additional dependencies:
-
-.. code-block:: console
-
-   $ conda install -c conda-forge pyvips
-
-The git repository contains some environment files that aid in setting up the latest development version:
+To install the latest development branch through `conda
+<https://anaconda.org>`_  clone the kraken git repository and install with the
+provided environment files:
 
 .. code-block:: console
 

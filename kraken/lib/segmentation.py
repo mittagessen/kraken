@@ -757,14 +757,10 @@ def calculate_polygonal_environment(im: Image.Image = None,
             line = np.array(line.coords, dtype=float)
             offset_line = np.array(offset_line.coords, dtype=float)
 
-            # parallel_offset on the right reverses the coordinate order
-            if not topline:
-                offset_line = offset_line[::-1]
             # calculate magnitude-weighted average direction vector
             lengths = np.linalg.norm(np.diff(line.T), axis=0)
             p_dir = np.mean(np.diff(line.T) * lengths/lengths.sum(), axis=1)
             p_dir = (p_dir.T / np.sqrt(np.sum(p_dir**2, axis=-1)))
-
             env_up, env_bottom = _calc_roi(line, bounds, baselines[:idx] + baselines[idx+1:], suppl_obj, p_dir)
 
             polygons.append(_extract_patch(env_up,
