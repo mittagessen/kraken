@@ -48,8 +48,8 @@ def _extract_line(xml_record, skip_empty_lines: bool = True, legacy_polygons: bo
     lines = []
     try:
         im = Image.open(xml_record.imagename)
-    if is_bitonal(im):
-        im = im.convert('1')
+        if is_bitonal(im):
+            im = im.convert('1')
     except (OSError, FileNotFoundError, UnidentifiedImageError):
         return lines, None, None
     for idx, rec in enumerate(xml_record.lines):
