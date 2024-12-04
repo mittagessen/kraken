@@ -577,7 +577,17 @@ def _calc_seam(baseline, polygon, angle, im_feats, bias=150):
     return seam
 
 
-def _extract_patch(env_up, env_bottom, baseline, offset_baseline, end_points, dir_vec, topline, offset, im_feats, bounds):
+def _extract_patch(env_up,
+                   env_bottom,
+                   baseline,
+                   offset_baseline,
+                   end_points,
+                   dir_vec,
+                   topline,
+                   offset,
+                   im_feats,
+                   bounds,
+                   fixed_offset_polygons=False):
     """
     Calculate a line image patch from a ROI and the original baseline.
     """
@@ -599,16 +609,26 @@ def _extract_patch(env_up, env_bottom, baseline, offset_baseline, end_points, di
     upper_seam = geom.LineString(upper_seam).simplify(5)
     bottom_seam = geom.LineString(bottom_seam).simplify(5)
 
-    # ugly workaround against GEOM parallel_offset bug creating a
-    # MultiLineString out of offset LineString
-    if upper_seam.parallel_offset(offset//2, side='right').geom_type == 'MultiLineString' or offset == 0:
-        upper_seam = np.array(upper_seam.coords, dtype=int)
+    if not fixed_offset_polygons:
+        # ugly workaround against GEOM parallel_offset bug creating a
+        # MultiLineString out of offset LineString
+        if upper_seam.parallel_offset(offset//2, side='right').geom_type == 'MultiLineString' or offset == 0:
+            upper_seam = np.array(upper_seam.coords, dtype=int)
+        else:
+            upper_seam = np.array(upper_seam.parallel_offset(offset//2, side='right').coords, dtype=int)[::-1]
+        if bottom_seam.parallel_offset(offset//2, side='left').geom_type == 'MultiLineString' or offset == 0:
+            bottom_seam = np.array(bottom_seam.coords, dtype=int)
+        else:
+            bottom_seam = np.array(bottom_seam.parallel_offset(offset//2, side='left').coords, dtype=int)
     else:
-        upper_seam = np.array(upper_seam.parallel_offset(offset//2, side='right').coords, dtype=int)[::-1]
-    if bottom_seam.parallel_offset(offset//2, side='left').geom_type == 'MultiLineString' or offset == 0:
-        bottom_seam = np.array(bottom_seam.coords, dtype=int)
-    else:
-        bottom_seam = np.array(bottom_seam.parallel_offset(offset//2, side='left').coords, dtype=int)
+        # XXX: hacky trick to make sure dotting is included in bounding polygon by
+        #      expanding it to its maximum distance from baseline.
+        baseline = geom.LineString(baseline)
+        us_dist = upper_seam.hausdorff_distance(baseline)
+        bs_dist = bottom_seam.hausdorff_distance(baseline)
+
+        upper_seam = np.array(baseline.parallel_offset(us_dist, side='right').coords, dtype=int)[::-1]
+        bottom_seam = np.array(baseline.parallel_offset(bs_dist, side='left').coords, dtype=int)
 
     # offsetting might produce bounds outside the image. Clip it to the image bounds.
     polygon = np.concatenate(([end_points[0]], upper_seam, [end_points[-1]], bottom_seam[::-1]))
@@ -692,7 +712,8 @@ def calculate_polygonal_environment(im: Image.Image = None,
                                     im_feats: np.ndarray = None,
                                     scale: Tuple[int, int] = None,
                                     topline: bool = False,
-                                    raise_on_error: bool = False):
+                                    raise_on_error: bool = False,
+                                    fixed_offset_polygons: bool = False):
     """
     Given a list of baselines and an input image, calculates a polygonal
     environment around each baseline.
@@ -717,6 +738,8 @@ def calculate_polygonal_environment(im: Image.Image = None,
                  offset downwards. If set to None, no offset will be applied.
         raise_on_error: Raises error instead of logging them when they are
                         not-blocking
+        fixed_offset_polygons: Switch enabling bounding polygons that are a
+        fixed distance (Hausdorff) from the baseline.
     Returns:
         List of lists of coordinates. If no polygonization could be compute for
         a baseline `None` is returned instead.
@@ -772,7 +795,8 @@ def calculate_polygonal_environment(im: Image.Image = None,
                                            topline,
                                            offset,
                                            im_feats,
-                                           bounds))
+                                           bounds,
+                                           fixed_offset_polygons=fixed_offset_polygons))
         except Exception as e:
             if raise_on_error:
                 raise

@@ -168,6 +168,7 @@ def vec_lines(heatmap: torch.Tensor,
               suppl_obj: List[np.ndarray] = None,
               topline: Optional[bool] = False,
               raise_on_error: bool = False,
+              fixed_offset_polygons: bool = False,
               **kwargs) -> List[Dict[str, Any]]:
     r"""
     Computes lines from a stack of heatmaps, a class mapping, and scaling
@@ -230,7 +231,8 @@ def vec_lines(heatmap: torch.Tensor,
                                               im_feats=im_feats,
                                               suppl_obj=suppl_obj,
                                               topline=topline,
-                                              raise_on_error=raise_on_error)
+                                              raise_on_error=raise_on_error,
+                                              fixed_offset_polygons=fixed_offset_polygons)
         if pol[0] is not None:
             lines.append((bl[0], bl[1], pol[0]))
 
@@ -248,7 +250,8 @@ def segment(im: PIL.Image.Image,
             model: Union[List[vgsl.TorchVGSLModel], vgsl.TorchVGSLModel] = None,
             device: str = 'cpu',
             raise_on_error: bool = False,
-            autocast: bool = False) -> Segmentation:
+            autocast: bool = False,
+            fixed_offset_polygons: bool = False) -> Segmentation:
     r"""
     Segments a page into text lines using the baseline segmenter.
 
@@ -344,7 +347,8 @@ def segment(im: PIL.Image.Image,
                            text_direction=text_direction,
                            suppl_obj=suppl_obj,
                            topline=net.user_metadata['topline'] if 'topline' in net.user_metadata else False,
-                           raise_on_error=raise_on_error)
+                           raise_on_error=raise_on_error,
+                           fixed_offset_polygons=fixed_offset_polygons)
 
         if 'ro_model' in net.aux_layers:
             logger.info(f'Using reading order model found in segmentation model {net}.')
