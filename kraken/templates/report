@@ -3,6 +3,7 @@
 {{ report.chars }}	Characters
 {{ report.errors }}	Errors
 {{ '%0.2f'| format(report.character_accuracy) }}%	Character Accuracy
+{{ '%0.2f'| format(report.character_CI_accucary) }}%	Character Accuracy (Case-insensitive)
 {{ '%0.2f'| format(report.word_accuracy) }}%	Word Accuracy
 
 {{ report.insertions }}	Insertions
