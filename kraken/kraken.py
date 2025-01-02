@@ -29,8 +29,8 @@ from pathlib import Path
 from typing import IO, Any, Callable, Dict, List, Union, cast
 
 import click
-import importlib_resources
 from PIL import Image
+from importlib import resources
 from rich.traceback import install
 
 from kraken.lib import log
@@ -44,7 +44,7 @@ logger = logging.getLogger('kraken')
 install(suppress=[click])
 
 APP_NAME = 'kraken'
-SEGMENTATION_DEFAULT_MODEL = importlib_resources.files(APP_NAME).joinpath('blla.mlmodel')
+SEGMENTATION_DEFAULT_MODEL = resources.files(APP_NAME).joinpath('blla.mlmodel')
 DEFAULT_MODEL = ['en_best.mlmodel']
 
 # raise default max image size to 20k * 20k pixels
