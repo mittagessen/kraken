@@ -52,9 +52,6 @@ jobs:
         python -m build --sdist --wheel --outdir dist/ .
     - name: Publish a Python distribution to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
-      with:
-        user: __token__
-        password: ${{ secrets.PYPI_API_TOKEN }}
     - name: Upload PyPI artifacts to GH storage
       uses: actions/upload-artifact@v3
       with:
