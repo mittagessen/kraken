@@ -32,4 +32,5 @@ dependencies:
   - setuptools>=36.6.0,<70.0.0
   - pip:
     - coremltools~=8.1
+    - htrmopo
     - file:.

@@ -31,7 +31,15 @@ from typing import IO, Any, Callable, Dict, List, Union, cast
 import click
 from PIL import Image
 from importlib import resources
+
+from rich import print
+from rich.tree import Tree
+from rich.table import Table
+from rich.console import Group
 from rich.traceback import install
+from rich.logging import RichHandler
+from rich.markdown import Markdown
+from rich.progress import Progress
 
 from kraken.lib import log
 
@@ -677,29 +685,90 @@ def ocr(ctx, model, pad, reorder, base_dir, no_segmentation, text_direction):
 
 @cli.command('show')
 @click.pass_context
+@click.option('-V', '--metadata-version',
+              default='highest',
+              type=click.Choice(['v0', 'v1', 'highest']),
+              help='Version of metadata to fetch if multiple exist in repository.')
 @click.argument('model_id')
-def show(ctx, model_id):
+def show(ctx, metadata_version, model_id):
     """
     Retrieves model metadata from the repository.
     """
-    from kraken import repo
+    from htrmopo import get_description
+    from htrmopo.util import iso15924_to_name, iso639_3_to_name
     from kraken.lib.util import is_printable, make_printable
 
-    desc = repo.get_description(model_id)
+    def _render_creators(creators):
+        o = []
+        for creator in creators:
+            c_text = creator['name']
+            if (orcid := creator.get('orcid', None)) is not None:
+                c_text += f' ({orcid})'
+            if (affiliation := creator.get('affiliation', None)) is not None:
+                c_text += f' ({affiliation})'
+            o.append(c_text)
+        return o
 
-    chars = []
-    combining = []
-    for char in sorted(desc['graphemes']):
-        if not is_printable(char):
-            combining.append(make_printable(char))
-        else:
-            chars.append(char)
-    message(
-        'name: {}\n\n{}\n\n{}\nscripts: {}\nalphabet: {} {}\naccuracy: {:.2f}%\nlicense: {}\nauthor(s): {}\ndate: {}'.format(
-            model_id, desc['summary'], desc['description'], ' '.join(
-                desc['script']), ''.join(chars), ', '.join(combining), desc['accuracy'], desc['license']['id'], '; '.join(
-                x['name'] for x in desc['creators']), desc['publication_date']))
-    ctx.exit(0)
+    def _render_metrics(metrics):
+        return [f'{k}: {v:.2f}' for k, v in metrics.items()]
+
+    if metadata_version == 'highest':
+        metadata_version = None
+
+    try:
+        desc = get_description(model_id, version=metadata_version)
+    except ValueError as e:
+        logger.error(e)
+        ctx.exit(1)
+
+    if getattr(desc, 'software_name', None) != 'kraken' or 'kraken_pytorch' not in desc.keywords:
+        logger.error('Record exists but is not a kraken-compatible model')
+        ctx.exit(1)
+
+    if desc.version == 'v0':
+        chars = []
+        combining = []
+        for char in sorted(desc.graphemes):
+            if not is_printable(char):
+                combining.append(make_printable(char))
+            else:
+                chars.append(char)
+
+        table = Table(title=desc.summary, show_header=False)
+        table.add_column('key', justify="left", no_wrap=True)
+        table.add_column('value', justify="left", no_wrap=False)
+        table.add_row('DOI', desc.doi)
+        table.add_row('concept DOI', desc.concept_doi)
+        table.add_row('publication date', desc.publication_date.isoformat())
+        table.add_row('model type', Group(*desc.model_type))
+        table.add_row('script', Group(*[iso15924_to_name(x) for x in desc.script]))
+        table.add_row('alphabet', Group(' '.join(chars), ', '.join(combining)))
+        table.add_row('keywords', Group(*desc.keywords))
+        table.add_row('metrics', Group(*_render_metrics(desc.metrics)))
+        table.add_row('license', desc.license)
+        table.add_row('creators', Group(*_render_creators(desc.creators)))
+        table.add_row('description', desc.description)
+    elif desc.version == 'v1':
+        table = Table(title=desc.summary, show_header=False)
+        table.add_column('key', justify="left", no_wrap=True)
+        table.add_column('value', justify="left", no_wrap=False)
+        table.add_row('DOI', desc.doi)
+        table.add_row('concept DOI', desc.concept_doi)
+        table.add_row('publication date', desc.publication_date.isoformat())
+        table.add_row('model type', Group(*desc.model_type))
+        table.add_row('language', Group(*[iso639_3_to_name(x) for x in desc.language]))
+        table.add_row('script', Group(*[iso15924_to_name(x) for x in desc.script]))
+        table.add_row('keywords', Group(*desc.keywords))
+        table.add_row('datasets', Group(*desc.datasets))
+        table.add_row('metrics', Group(*_render_metrics(desc.metrics)))
+        table.add_row('base model', Group(*desc.base_model))
+        table.add_row('software', desc.software_name)
+        table.add_row('software_hints', Group(*desc.software_hints))
+        table.add_row('license', desc.license)
+        table.add_row('creators', Group(*_render_creators(desc.creators)))
+        table.add_row('description', Markdown(desc.description))
+
+    print(table)
 
 
 @cli.command('list')
@@ -708,14 +777,41 @@ def list_models(ctx):
     """
     Lists models in the repository.
     """
-    from kraken import repo
+    from htrmopo import get_listing
+    from collections import defaultdict
     from kraken.lib.progress import KrakenProgressBar
 
     with KrakenProgressBar() as progress:
         download_task = progress.add_task('Retrieving model list', total=0, visible=True if not ctx.meta['verbose'] else False)
-        model_list = repo.get_listing(lambda total, advance: progress.update(download_task, total=total, advance=advance))
-    for id, metadata in model_list.items():
-        message('{} ({}) - {}'.format(id, ', '.join(metadata['type']), metadata['summary']))
+        repository = get_listing(lambda total, advance: progress.update(download_task, total=total, advance=advance))
+    # aggregate models under their concept DOI
+    concepts = defaultdict(list)
+    for item in repository.values():
+        # both got the same DOI information
+        record = item['v0'] if item['v0'] else item['v1']
+        concepts[record.concept_doi].append(record.doi)
+
+    table = Table(show_header=True)
+    table.add_column('DOI', justify="left", no_wrap=True)
+    table.add_column('summary', justify="left", no_wrap=False)
+    table.add_column('model type', justify="left", no_wrap=False)
+    table.add_column('keywords', justify="left", no_wrap=False)
+
+    for k, v in concepts.items():
+        records = [repository[x]['v1'] if 'v1' in repository[x] else repository[x]['v0'] for x in v]
+        records = filter(lambda record: getattr(record, 'software_name', None) != 'kraken' or 'kraken_pytorch' not in record.keywords, records)
+        records = sorted(records, key=lambda x: x.publication_date, reverse=True)
+        if not len(records):
+            continue
+
+        t = Tree(k)
+        [t.add(x.doi) for x in records]
+        table.add_row(t,
+                      Group(*[''] + [x.summary for x in records]),
+                      Group(*[''] + ['; '.join(x.model_type) for x in records]),
+                      Group(*[''] + ['; '.join(x.keywords) for x in records]))
+
+    print(table)
     ctx.exit(0)
 
 
