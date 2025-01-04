@@ -59,9 +59,9 @@ class DefaultAugmenter():
         import cv2
         cv2.setNumThreads(0)
         from albumentations import (Blur, Compose, ElasticTransform,
-                                    MedianBlur, MotionBlur, OneOf, Affine,
-                                    OpticalDistortion, PixelDropout,
-                                    ShiftScaleRotate, ToFloat)
+                                    MedianBlur, MotionBlur, OneOf,
+                                    OpticalDistortion, PixelDropout, ToFloat,
+                                    SafeRotate)
 
         self._transforms = Compose([
                                     ToFloat(),
@@ -71,13 +71,12 @@ class DefaultAugmenter():
                                         MedianBlur(blur_limit=3, p=0.1),
                                         Blur(blur_limit=3, p=0.1),
                                     ], p=0.2),
-                                    ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.2, rotate_limit=1, p=0.2),
                                     OneOf([
                                         OpticalDistortion(p=0.3),
-                                        ElasticTransform(alpha=64, sigma=25, p=0.1),
-                                        Affine(translate_px=(0, 5), rotate=(-3, 3), shear=(-5, 5), p=0.2)
+                                        ElasticTransform(alpha=7, sigma=25, p=0.1),
+                                        SafeRotate(limit=(-3,3), border_mode=cv2.BORDER_CONSTANT, p=0.2)
                                     ], p=0.2),
-                                   ], p=0.5)
+                                   ], p=1.0)
 
     def __call__(self, image):
         return self._transforms(image=image)
