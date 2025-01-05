@@ -1,5 +1,5 @@
 #
-# Copyright 2015 Benjamin Kiessling
+# Copyright 2025 Benjamin Kiessling
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,15 +17,12 @@ kraken.repo
 ~~~~~~~~~~~
 
 Wrappers around the htrmopo reference implementation implementing
-kraken-specific filtering.
+kraken-specific filtering for repository querying operations.
 """
-import logging
-import warnings
-from pathlib import Path
 from collections import defaultdict
-from typing import IO, Any, Dict, List, Union, cast, Optional, TypeVar, Iterable, Literal
-
 from collections.abc import Callable
+from typing import Any, Dict, Optional, TypeVar, Literal
+
 
 from htrmopo import get_description as mopo_get_description
 from htrmopo import get_listing as mopo_get_listing
