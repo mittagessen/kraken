@@ -485,6 +485,7 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
 
     cer_list = []
     wer_list = []
+    cer_case_insensitive_list=[]
 
     with threadpool_limits(limits=threads):
         for p, net in nn.items():
@@ -531,6 +532,7 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
                                    collate_fn=collate_sequences)
 
             test_cer = CharErrorRate()
+            test_cer_case_insensitive = CharErrorRate()
             test_wer = WordErrorRate()
 
             with KrakenProgressBar() as progress:
@@ -550,6 +552,8 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
                             algn_pred.extend(algn2)
                             error += c
                             test_cer.update(x, y)
+                            # Update case-insensitive CER metric
+                            test_cer_case_insensitive.update(x.lower(), y.lower())
                             test_wer.update(x, y)
 
                     except FileNotFoundError as e:
@@ -563,12 +567,14 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
                     progress.update(pred_task, advance=1)
 
             cer_list.append(1.0 - test_cer.compute())
+            cer_case_insensitive_list.append(1.0 - test_cer_case_insensitive.compute())
             wer_list.append(1.0 - test_wer.compute())
             confusions, scripts, ins, dels, subs = compute_confusions(algn_gt, algn_pred)
             rep = render_report(p,
                                 chars,
                                 error,
                                 cer_list[-1],
+                                cer_case_insensitive_list[-1],
                                 wer_list[-1],
                                 confusions,
                                 scripts,
