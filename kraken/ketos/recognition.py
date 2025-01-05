@@ -20,14 +20,12 @@ Command line driver for recognition training and evaluation.
 """
 import logging
 import pathlib
-import random
 from typing import List
 from functools import partial
 import warnings
 
 import click
 from threadpoolctl import threadpool_limits
-import torch
 
 from kraken.lib.default_specs import RECOGNITION_HYPER_PARAMS, RECOGNITION_SPEC
 from kraken.lib.exceptions import KrakenInputException
@@ -392,11 +390,9 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
               help='Whether to honor fixed splits in binary datasets.')
 @click.argument('test_set', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 @click.option('--no-legacy-polygons', show_default=True, default=False, is_flag=True, help='Force disable the legacy polygon extractor.')
-@click.option('--sample-percentage', show_default=True, type=click.IntRange(1, 100), default=100,
-              help='Percentage of the test dataset to use for evaluation.')
 def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
          threads, reorder, base_dir, normalization, normalize_whitespace,
-         force_binarization, format_type, fixed_splits, test_set, no_legacy_polygons, sample_percentage):
+         force_binarization, format_type, fixed_splits, test_set, no_legacy_polygons):
     """
     Evaluate on a test set.
     """
@@ -516,15 +512,6 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
 
             # don't encode validation set as the alphabets may not match causing encoding failures
             ds.no_encode()
-
-            # Randomly sample a percentage of the dataset
-            if sample_percentage < 100:
-                dataset_indices = list(range(len(ds)))
-                sample_size = int(len(ds) * sample_percentage / 100)
-                sampled_indices = random.sample(dataset_indices, sample_size)
-                ds = torch.utils.data.Subset(ds, sampled_indices)
-                logger.info(f'Testing on a random {sample_percentage}% of the dataset ({sample_size} lines).')
-
             ds_loader = DataLoader(ds,
                                    batch_size=batch_size,
                                    num_workers=workers,
