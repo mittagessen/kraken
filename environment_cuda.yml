@@ -34,4 +34,5 @@ dependencies:
   - pip:
     - coremltools~=8.1
     - htrmopo
+    - platformdirs
     - file:.
