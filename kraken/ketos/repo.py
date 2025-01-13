@@ -159,21 +159,23 @@ def publish(ctx, metadata, access_token, doi, private, model):
         if len(base_model := _get_field_list('base model URL')):
             frontmatter['base_model'] = base_model
 
-    # take last metrics field, falling back to accuracy field in model metadata
-    metrics = {}
-    if nn.user_metadata.get('metrics', None) is not None:
-        if (val_accuracy := nn.user_metadata['metrics'][-1][1].get('val_accuracy', None)) is not None:
-            metrics['cer'] = 100 - (val_accuracy * 100)
-        if (val_word_accuracy := nn.user_metadata['metrics'][-1][1].get('val_word_accuracy', None)) is not None:
-            metrics['wer'] = 100 - (val_word_accuracy * 100)
-    elif (accuracy := nn.user_metadata.get('accuracy', None)) is not None:
-        metrics['cer'] = 100 - accuracy
-    frontmatter['metrics'] = metrics
     software_hints = ['kind=vgsl']
 
-    # some recognition-specific software hints
+    # take last metrics field, falling back to accuracy field in model metadata
     if nn.model_type == 'recognition':
+        metrics = {}
+        if len(nn.user_metadata.get('metrics', '')):
+            if (val_accuracy := nn.user_metadata['metrics'][-1][1].get('val_accuracy', None)) is not None:
+                metrics['cer'] = 100 - (val_accuracy * 100)
+            if (val_word_accuracy := nn.user_metadata['metrics'][-1][1].get('val_word_accuracy', None)) is not None:
+                metrics['wer'] = 100 - (val_word_accuracy * 100)
+        elif (accuracy := nn.user_metadata.get('accuracy', None)) is not None:
+            metrics['cer'] = 100 - accuracy
+        frontmatter['metrics'] = metrics
+
+        # some recognition-specific software hints and metrics
         software_hints.extend([f'seg_type={nn.seg_type}', f'one_channel_mode={nn.one_channel_mode}', f'legacy_polygons={nn.user_metadata["legacy_polygons"]}'])
+
     frontmatter['software_hints'] = software_hints
 
     frontmatter['software_name'] = 'kraken'
