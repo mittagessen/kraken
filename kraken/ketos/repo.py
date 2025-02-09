@@ -45,7 +45,7 @@ def publish(ctx, metadata, access_token, private, model):
     """
     import json
 
-    import importlib_resources
+    from importlib import resources
     from jsonschema import validate
     from jsonschema.exceptions import ValidationError
 
@@ -53,7 +53,7 @@ def publish(ctx, metadata, access_token, private, model):
     from kraken.lib import models
     from kraken.lib.progress import KrakenDownloadProgressBar
 
-    ref = importlib_resources.files('kraken').joinpath('metadata.schema.json')
+    ref = resources.files('kraken').joinpath('metadata.schema.json')
     with open(ref, 'rb') as fp:
         schema = json.load(fp)
 

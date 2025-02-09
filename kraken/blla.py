@@ -24,13 +24,14 @@ import logging
 import uuid
 from typing import Any, Callable, Dict, List, Literal, Optional, Union
 
-import importlib_resources
 import numpy as np
 import PIL
 import shapely.geometry as geom
 import torch
 import torch.nn.functional as F
 import torchvision.transforms as tf
+
+from importlib import resources
 from scipy.ndimage import gaussian_filter
 from skimage.filters import sobel
 
@@ -295,7 +296,7 @@ def segment(im: PIL.Image.Image,
     """
     if model is None:
         logger.info('No segmentation model given. Loading default model.')
-        model = vgsl.TorchVGSLModel.load_model(importlib_resources.files(__name__).joinpath('blla.mlmodel'))
+        model = vgsl.TorchVGSLModel.load_model(resources.files(__name__).joinpath('blla.mlmodel'))
 
     if isinstance(model, vgsl.TorchVGSLModel):
         model = [model]
