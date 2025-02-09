@@ -24,6 +24,9 @@ import traceback
 import dataclasses
 import multiprocessing as mp
 
+import os
+from torchvision.utils import save_image
+
 from collections import Counter
 from functools import partial
 from typing import (TYPE_CHECKING, Any, Callable, List, Literal, Optional,
@@ -59,9 +62,9 @@ class DefaultAugmenter():
         import cv2
         cv2.setNumThreads(0)
         from albumentations import (Blur, Compose, ElasticTransform,
-                                    MedianBlur, MotionBlur, OneOf, Affine,
+                                    MedianBlur, MotionBlur, OneOf, SafeRotate,
                                     OpticalDistortion, PixelDropout,
-                                    ShiftScaleRotate, ToFloat)
+                                    ToFloat)
 
         self._transforms = Compose([
                                     ToFloat(),
@@ -71,16 +74,45 @@ class DefaultAugmenter():
                                         MedianBlur(blur_limit=3, p=0.1),
                                         Blur(blur_limit=3, p=0.1),
                                     ], p=0.2),
-                                    ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.2, rotate_limit=1, p=0.2),
                                     OneOf([
                                         OpticalDistortion(p=0.3),
-                                        ElasticTransform(alpha=64, sigma=25, p=0.1),
-                                        Affine(translate_px=(0, 5), rotate=(-3, 3), shear=(-5, 5), p=0.2)
+                                        ElasticTransform(alpha=7, sigma=25, p=0.1),
+                                        SafeRotate(limit=(-3,3), border_mode=cv2.BORDER_CONSTANT, p=0.2)
                                     ], p=0.2),
                                    ], p=0.5)
 
-    def __call__(self, image):
-        return self._transforms(image=image)
+
+    def __call__(self, image, index):
+        im = image.permute((1, 2, 0)).numpy()
+        o = self._transforms(image=im)
+        im = torch.tensor(o['image'].transpose(2, 0, 1))
+
+        """
+        Saves augmented images to disk for debugging or inspection if `isSave` is set to True.
+
+        **Need improve** - User option to debug, option to set the save folder and exceptions
+
+        Parameters:
+        - isSave (bool): Flag to enable or disable saving images.
+        - index (int): Image index, used for naming the saved file.
+
+        The function creates an 'augmented_images' directory (if not already existing),
+        saves the image as 'image_{index}.png', and logs the save path.
+        """
+        isSave = False
+        if isSave:
+            # Save augmented image using torchvision's save_image
+            output_dir = "augmented_images"
+            os.makedirs(output_dir, exist_ok=True)
+
+            save_path = os.path.join(
+                output_dir,
+                f"image_{index}.png"
+            )
+            save_image(im, save_path)
+            logger.info(f"Saved augmented image to {save_path}")
+
+        return im
 
 
 class ArrowIPCRecognitionDataset(Dataset):
@@ -268,9 +300,7 @@ class ArrowIPCRecognitionDataset(Dataset):
             im = Image.open(io.BytesIO(sample['im']))
             im = self.transforms(im)
             if self.aug:
-                im = im.permute((1, 2, 0)).numpy()
-                o = self.aug(image=im)
-                im = torch.tensor(o['image'].transpose(2, 0, 1))
+                im = self.aug(image=im, index=index)
             text = self._apply_text_transform(sample)
         except Exception:
             self.failed_samples.add(index)
@@ -452,9 +482,8 @@ class PolygonGTDataset(Dataset):
                     logger.info(f'Upgrading "im_mode" from {self._im_mode.value} to {im_mode}')
                     self._im_mode.value = im_mode
             if self.aug:
-                im = im.permute((1, 2, 0)).numpy()
-                o = self.aug(image=im)
-                im = torch.tensor(o['image'].transpose(2, 0, 1))
+                im = self.aug(image=im, index=index)
+
             return {'image': im, 'target': item[1]}
         except Exception:
             self.failed_samples.add(index)
@@ -637,9 +666,7 @@ class GroundTruthDataset(Dataset):
                     logger.info(f'Upgrading "im_mode" from {self._im_mode.value} to {im_mode}')
                     self._im_mode.value = im_mode
             if self.aug:
-                im = im.permute((1, 2, 0)).numpy()
-                o = self.aug(image=im)
-                im = torch.tensor(o['image'].transpose(2, 0, 1))
+                im = self.aug(image=im, index=index)
             return {'image': im, 'target': item[1]}
         except Exception:
             raise
