@@ -6,7 +6,7 @@ import tempfile
 import pyarrow as pa
 
 from pathlib import Path
-from pytest import raises
+from pytest import raises, fixture
 
 import kraken
 from kraken.lib import xml
@@ -89,3 +89,26 @@ class TestKrakenArrowCompilation(unittest.TestCase):
                                  format_type='xml',
                                  skip_empty_lines=False)
             _validate_ds(self, tmp_file.name, 5, 1, 'kraken_recognition_baseline')
+
+    @fixture(autouse=True)
+    def caplog_fixture(self, caplog):
+        # make pytest caplog fixture available
+        self.caplog = caplog
+
+    def test_build_image_error(self):
+        """
+        Test that image load errors are handled.
+        """
+        # change resource path so it will not resolve
+        bad_box_lines = [path.with_name(f"bogus_{path.stem}") for path in self.box_lines]
+        with tempfile.NamedTemporaryFile() as tmp_file:
+            build_binary_dataset(files=bad_box_lines,
+                                 output_file=tmp_file.name,
+                                 format_type='xml')
+            # expect zero resulting lines due to image load error
+            _validate_ds(self, tmp_file.name, 0, 0, 'kraken_recognition_baseline')
+	# expect one warning log message; should include the file image filename
+        assert len(self.caplog.records) == 1
+        log_record = self.caplog.records[0]
+        assert log_record.levelname == "WARNING"
+        assert f"Invalid input file {bad_box_lines[0]}" in log_record.message
