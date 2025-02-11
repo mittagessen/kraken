@@ -67,7 +67,10 @@ def get_listing(callback: Callable[[int, int], Any] = lambda total, advance: Non
         A dictionary mapping group DOIs to one record object per deposit. The
         record of the highest available schema version is retained.
     """
-    repository = mopo_get_listing(callback, from_date)
+    kwargs = {}
+    if from_date is not None:
+        kwargs['from'] = from_date
+    repository = mopo_get_listing(callback, **kwargs)
     # aggregate models under their concept DOI
     concepts = defaultdict(list)
     for item in repository.values():
