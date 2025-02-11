@@ -773,19 +773,52 @@ def show(ctx, metadata_version, model_id):
 
 
 @cli.command('list')
+@click.option('--all', 'model_type', flag_value='all', default=True, help='List both segmentation and recognition models.')
+@click.option('--recognition', 'model_type', flag_value='recognition', help='Only list recognition models.')
+@click.option('--segmentation', 'model_type', flag_value='segmentation', help='Only list segmentation models.')
+@click.option('-l', '--language', default=None, multiple=True, help='Filter for language by ISO 639-3 codes')
+@click.option('-s', '--script', default=None, multiple=True, help='Filter for script by ISO 15924 codes')
+@click.option('-k', '--keyword', default=None, multiple=True, help='Filter by keyword.')
 @click.pass_context
-def list_models(ctx):
+def list_models(ctx, model_type, language, script, keyword):
     """
     Lists models in the repository.
+
+    Multiple filters of different type are ANDed, specifying a filter of a
+    single type multiple times will OR those values:
+
+    --script Arab --script Syrc -> Arab OR Syrc script models
+
+    --script Arab --language urd -> Arab script AND Urdu language models
     """
     from kraken.repo import get_listing
     from kraken.lib.progress import KrakenProgressBar
 
+    if language:
+        logger.warning('Filtering by language is only supported for v1 records. '
+                       'You might not find the model(s) you are looking for if '
+                       'they do not have a v1 metadata record.')
+
+    def _filter_fn(record):
+        if getattr(record, 'software_name', None) != 'kraken' and 'kraken_pytorch' not in record.keywords:
+            return False
+        if model_type != 'all' and model_type not in record.model_type:
+            return False
+        if script and not any(filter(lambda s: s in script, record.script)):
+            return False
+        if language and not any(filter(lambda s: s in language, getattr(record, 'language', tuple()))):
+            return False
+        if keyword and not any(filter(lambda s: s in keyword, record.keywords)):
+            return False
+        return True
+
     with KrakenProgressBar() as progress:
         download_task = progress.add_task('Retrieving model list', total=0, visible=True if not ctx.meta['verbose'] else False)
         repository = get_listing(callback=lambda total, advance: progress.update(download_task, total=total, advance=advance),
-                                 filter_fn=lambda record: getattr(record, 'software_name', None) == 'kraken' or 'kraken_pytorch' in record.keywords)
+                                 filter_fn=_filter_fn)
 
+    if model_type is not None:
+        repository
     table = Table(show_header=True)
     table.add_column('DOI', justify="left", no_wrap=True)
     table.add_column('summary', justify="left", no_wrap=False)
