@@ -187,6 +187,7 @@ class ROModel(L.LightningModule):
         self.log('loss',
                  loss,
                  on_step=True,
+                 on_epoch=True,
                  prog_bar=True,
                  logger=True)
         return loss
