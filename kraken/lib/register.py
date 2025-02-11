@@ -16,7 +16,7 @@
 Register for hyperparameter values
 """
 
-OPTMIZERS = ['Adam', 'AdamW', 'SGD', 'RMSprop']
+OPTIMIZERS = ['Adam', 'AdamW', 'SGD', 'RMSprop']
 SCHEDULERS = ['cosine', 'constant', 'exponential', 'step', '1cycle', 'reduceonplateau']
 STOPPERS = ['early', 'fixed']
 PRECISIONS = ['transformer-engine', 'transformer-engine-float16', '16-true', '16-mixed', 'bf16-true', 'bf16-mixed', '32-true', '64-true']
