@@ -491,7 +491,12 @@ class RecognitionModel(L.LightningModule):
                                  target,
                                  seq_lens,
                                  target_lens)
-        self.log('train_loss', loss, on_step=True, on_epoch=False, prog_bar=False, logger=True)
+        self.log('train_loss',
+                 loss,
+                 on_step=True,
+                 on_epoch=True,
+                 prog_bar=True,
+                 logger=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -894,7 +899,12 @@ class SegmentationModel(L.LightningModule):
         output, _ = self.nn.nn(input)
         output = F.interpolate(output, size=(target.size(2), target.size(3)))
         loss = self.nn.criterion(output, target)
-        self.log('train_loss', loss, on_step=True, on_epoch=False, prog_bar=False, logger=True)
+        self.log('train_loss',
+                 loss,
+                 on_step=True,
+                 on_epoch=True,
+                 prog_bar=True,
+                 logger=True)
         return loss
 
     def validation_step(self, batch, batch_idx):

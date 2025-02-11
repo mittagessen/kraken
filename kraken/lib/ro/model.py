@@ -184,7 +184,11 @@ class ROModel(L.LightningModule):
         x, y = batch['sample'], batch['target']
         logits = self.ro_net(x)
         loss = self.criterion(logits.squeeze(), y)
-        self.log('loss', loss)
+        self.log('loss',
+                 loss,
+                 on_step=True,
+                 prog_bar=True,
+                 logger=True)
         return loss
 
     def train_dataloader(self):

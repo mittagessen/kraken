@@ -409,7 +409,12 @@ class RecognitionPretrainModel(L.LightningModule):
         o = self._step(batch, batch_idx)
         if o is not None:
             _, _, loss = o
-            self.log('CE', loss)
+            self.log('CE',
+                     loss,
+                     on_step=True,
+                     on_epoch=True,
+                     prog_bar=True,
+                     logger=True)
             return loss
 
     def configure_optimizers(self):
