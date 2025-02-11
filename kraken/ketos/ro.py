@@ -26,6 +26,8 @@ from PIL import Image
 
 from kraken.ketos.util import (_expand_gt, _validate_manifests, message,
                                to_ptl_device)
+
+from kraken.lib.register import OPTIMIZERS, SCHEDULERS, STOPPERS, PRECISIONS
 from kraken.lib.default_specs import READING_ORDER_HYPER_PARAMS
 
 logging.captureWarnings(True)
@@ -50,8 +52,7 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
               '--quit',
               show_default=True,
               default=READING_ORDER_HYPER_PARAMS['quit'],
-              type=click.Choice(['early',
-                                 'fixed']),
+              type=click.Choice(STOPPERS),
               help='Stop condition for training. Set to `early` for early stopping or `fixed` for fixed number of epochs')
 @click.option('-N',
               '--epochs',
@@ -72,14 +73,11 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
               type=click.FLOAT,
               help='Minimum improvement between epochs to reset early stopping. By default it scales the delta by the best loss')
 @click.option('-d', '--device', show_default=True, default='cpu', help='Select device to use (cpu, cuda:0, cuda:1, ...)')
-@click.option('--precision', default='32', type=click.Choice(['32', '16']), help='set tensor precision')
+@click.option('--precision', default='32-true', type=click.Choice(PRECISIONS), help='set tensor precision')
 @click.option('--optimizer',
               show_default=True,
               default=READING_ORDER_HYPER_PARAMS['optimizer'],
-              type=click.Choice(['Adam',
-                                 'SGD',
-                                 'RMSprop',
-                                 'Lamb']),
+              type=click.Choice(OPTIMIZERS),
               help='Select optimizer')
 @click.option('-r', '--lrate', show_default=True, default=READING_ORDER_HYPER_PARAMS['lrate'], help='Learning rate')
 @click.option('-m', '--momentum', show_default=True, default=READING_ORDER_HYPER_PARAMS['momentum'], help='Momentum')
@@ -89,12 +87,7 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
               default=READING_ORDER_HYPER_PARAMS['warmup'], help='Number of samples to ramp up to `lrate` initial learning rate.')
 @click.option('--schedule',
               show_default=True,
-              type=click.Choice(['constant',
-                                 '1cycle',
-                                 'exponential',
-                                 'cosine',
-                                 'step',
-                                 'reduceonplateau']),
+              type=click.Choice(SCHEDULERS),
               default=READING_ORDER_HYPER_PARAMS['schedule'],
               help='Set learning rate scheduler. For 1cycle, cycle length is determined by the `--step-size` option.')
 @click.option('-g',

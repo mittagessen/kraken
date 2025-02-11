@@ -42,9 +42,9 @@ def _validate_manifests(ctx, param, value):
         except UnicodeDecodeError:
             raise click.BadOptionUsage(param,
                                        f'File {manifest.name} is not a text file. Please '
-                                        'ensure that the argument to `-t`/`-e` is a manifest '
-                                        'file containing paths to training data (one per '
-                                        'line).',
+                                       'ensure that the argument to `-t`/`-e` is a manifest '
+                                       'file containing paths to training data (one per '
+                                       'line).',
                                        ctx=ctx)
     return images
 

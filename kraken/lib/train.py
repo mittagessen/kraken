@@ -1147,8 +1147,8 @@ def _configure_optimizer_and_lr_scheduler(hparams, params, len_train_set=None, l
 
     # XXX: Warmup is not configured here because it needs to be manually done in optimizer_step()
     logger.debug(f'Constructing {optimizer} optimizer (lr: {lrate}, momentum: {momentum})')
-    if optimizer == 'Adam':
-        optim = torch.optim.Adam(params, lr=lrate, weight_decay=weight_decay)
+    if optimizer in ['Adam', 'AdamW']:
+        optim = getattr(torch.optim, optimizer)(params, lr=lrate, weight_decay=weight_decay)
     else:
         optim = getattr(torch.optim, optimizer)(params,
                                                 lr=lrate,
