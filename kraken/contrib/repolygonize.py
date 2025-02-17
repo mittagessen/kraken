@@ -18,8 +18,10 @@ import click
                    ' centerline for scripts annotated with a central line.')
 @click.option('-cl', '--centerline', 'topline', flag_value='centerline')
 @click.option('-bl', '--baseline', 'topline', flag_value='baseline', default='baseline')
+@click.option('--scale', show_default=True, type=click.INT, default=1800, help='A integer height '
+                   'containing optional scale factors of the input. Default 1800.')
 @click.argument('files', nargs=-1)
-def cli(format_type, topline, files):
+def cli(format_type, topline, scale, files):
     """
     A small script repolygonizing line boundaries in ALTO or PageXML files.
     """
@@ -102,7 +104,7 @@ def cli(format_type, topline, files):
         for x in seg.lines:
             bl = x.baseline if x.baseline is not None else [0, 0]
             baselines.append(bl)
-        o = calculate_polygonal_environment(im, baselines, scale=(1800, 0), topline=topline)
+        o = calculate_polygonal_environment(im, baselines, scale=(scale,0), topline=topline)
         repl_fn(doc, o)
 
 
