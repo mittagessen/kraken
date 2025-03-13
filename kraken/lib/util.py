@@ -99,7 +99,10 @@ def make_printable(char: str) -> str:
     elif unicodedata.category(char) in ('Cc', 'Cs', 'Co'):
         return '0x{:x}'.format(ord(char))
     else:
-        return unicodedata.name(char)
+        try:
+            return unicodedata.name(char)
+        except ValueError:
+            return '0x{:x}'.format(ord(char))
 
 
 def parse_gt_path(path: Union[str, 'PathLike'],
