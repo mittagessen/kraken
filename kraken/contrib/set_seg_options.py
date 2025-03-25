@@ -9,7 +9,12 @@ import click
 
 @click.command()
 @click.option('-b', '--bounding-region', multiple=True, help='Sets region identifiers which bound line bounding polygons')
-@click.option('--topline/--baseline', default=False, help='Sets model line type to baseline or topline')
+@click.option('--topline', 'topline',
+              help='Sets model metadata baseline location to either `--topline`, `--centerline`, or `--baseline`',
+              flag_value='topline',
+              show_default=True)
+@click.option('--centerline', 'topline', flag_value='centerline')
+@click.option('--baseline', 'topline', flag_value='topline')
 @click.option('--pad', show_default=True, type=(int, int), default=(0, 0),
               help='Padding (left/right, top/bottom) around the page image')
 @click.option('--output-identifiers', type=click.Path(exists=True), help='Path '
@@ -66,9 +71,18 @@ def cli(bounding_region, topline, pad, output_identifiers, model):
         print(f'-> adding: {br_new.difference(br)}')
         net.user_metadata["bounding_regions"] = bounding_region
 
-    print(f'Model is {"topline" if "topline" in net.user_metadata and net.user_metadata["topline"] else "baseline"}')
-    print(f'-> Setting to  {"topline" if topline else "baseline"}')
-    net.user_metadata['topline'] = topline
+    loc = {'topline': True,
+           'baseline': False,
+           'centerline': None}
+
+    rloc = {True: 'topline',
+            False: 'baseline',
+            None: 'centerline'}
+    line_loc = rloc[net.user_metadata.get('topline', False)]
+
+    print(f'Model is {line_loc}')
+    print(f'-> Setting to {topline}')
+    net.user_metadata['topline'] = loc[topline]
 
     print(f"Model has padding {net.user_metadata['hyper_params']['padding'] if 'padding' in net.user_metadata['hyper_params'] else (0, 0)}")
     print(f'-> Setting to {pad}')
