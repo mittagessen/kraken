@@ -319,8 +319,10 @@ def segment(im: PIL.Image.Image,
 
     Args:
         im: A bi-level page of mode '1' or 'L'
-        text_direction: Principal direction of the text
-                        (horizontal-lr/rl/vertical-lr/rl)
+        text_direction: Determines principal text direction for heuristic
+                        reading order determination and value for line
+                        orientation. Passed-through value for Segmentation
+                        container class.
         scale: Scale of the image. Will be auto-determined if set to `None`.
         maxcolseps: Maximum number of whitespace column separators
         black_colseps: Whether column separators are assumed to be vertical

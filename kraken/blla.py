@@ -260,7 +260,10 @@ def segment(im: PIL.Image.Image,
         im: Input image. The mode can generally be anything but it is possible
             to supply a binarized-input-only model which requires accordingly
             treated images.
-        text_direction: Passed-through value for serialization.serialize.
+        text_direction: Determines principal text direction for heuristic
+                        reading order determination and fallback value for line
+                        orientation in case of low model confidence.
+                        Passed-through value for Segmentation container class.
         mask: A bi-level mask image of the same size as `im` where 0-valued
               regions are ignored for segmentation purposes. Disables column
               detection.
