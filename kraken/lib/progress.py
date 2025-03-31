@@ -133,7 +133,7 @@ class KrakenTrainProgressBar(RichProgressBar):
 
     def _get_train_description(self, current_epoch: int) -> str:
         return f"stage {current_epoch}/" \
-               f"{self.trainer.max_epochs if self.trainer.max_epochs != -1 else '∞'}"
+               f"{self.trainer.max_epochs-1 if self.trainer.max_epochs != -1 else '∞'}"
 
 
 @dataclass
