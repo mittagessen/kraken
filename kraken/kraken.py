@@ -373,7 +373,7 @@ def process_pipeline(subcommands, input, batch_input, suffix, verbose, format_ty
     if batch_input and suffix:
         for batch_expr in batch_input:
             for in_file in glob.glob(str(Path(batch_expr).expanduser()), recursive=True):
-                input.append(Path(in_file).with_suffix(suffix))
+                input.append((Path(in_file), Path(in_file).with_suffix(suffix)))
 
     # parse pdfs
     if format_type == 'pdf':
