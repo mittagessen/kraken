@@ -523,7 +523,7 @@ def _calc_seam(baseline, polygon, angle, im_feats, bias=150):
         mask[line_locs] = 0
     dist_bias = distance_transform_cdt(mask)
     # absolute mask
-    mask = np.array(make_polygonal_mask(polygon-(r_min, c_min), patch.shape[::-1])) > 128
+    mask = np.array(make_polygonal_mask(polygon-(c_min, r_min), patch.shape[::-1])) <= 128
     # dilate mask to compensate for aliasing during rotation
     mask = binary_erosion(mask, border_value=True, iterations=2)
     # combine weights with features
@@ -757,14 +757,10 @@ def calculate_polygonal_environment(im: Image.Image = None,
             line = np.array(line.coords, dtype=float)
             offset_line = np.array(offset_line.coords, dtype=float)
 
-            # parallel_offset on the right reverses the coordinate order
-            if not topline:
-                offset_line = offset_line[::-1]
             # calculate magnitude-weighted average direction vector
             lengths = np.linalg.norm(np.diff(line.T), axis=0)
             p_dir = np.mean(np.diff(line.T) * lengths/lengths.sum(), axis=1)
             p_dir = (p_dir.T / np.sqrt(np.sum(p_dir**2, axis=-1)))
-
             env_up, env_bottom = _calc_roi(line, bounds, baselines[:idx] + baselines[idx+1:], suppl_obj, p_dir)
 
             polygons.append(_extract_patch(env_up,

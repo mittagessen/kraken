@@ -48,10 +48,11 @@ def _extract_line(xml_record, skip_empty_lines: bool = True, legacy_polygons: bo
     lines = []
     try:
         im = Image.open(xml_record.imagename)
-    except (FileNotFoundError, UnidentifiedImageError):
-        return lines, None, None
-    if is_bitonal(im):
-        im = im.convert('1')
+        if is_bitonal(im):
+            im = im.convert('1')
+    except (OSError, FileNotFoundError, UnidentifiedImageError) as err:
+        logger.warning(f'Error loading image {xml_record.imagename}: {err}')
+        return lines, None
     for idx, rec in enumerate(xml_record.lines):
         seg = Segmentation(text_direction='horizontal-lr',
                            imagename=xml_record.imagename,
@@ -79,10 +80,11 @@ def _extract_line(xml_record, skip_empty_lines: bool = True, legacy_polygons: bo
 def _extract_path_line(xml_record, skip_empty_lines: bool = True):
     try:
         im = Image.open(xml_record['image'])
-    except (FileNotFoundError, UnidentifiedImageError):
-        return [], None, None
+    except (FileNotFoundError, UnidentifiedImageError) as err:
+        logger.warning(f'Error loading image {xml_record.imagename}: {err}')
+        return [], None
     if not xml_record['lines'][0]['text'] and skip_empty_lines:
-        return [], None, None
+        return [], None
     if is_bitonal(im):
         im = im.convert('1')
     fp = io.BytesIO()

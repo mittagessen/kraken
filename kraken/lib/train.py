@@ -394,11 +394,11 @@ class RecognitionModel(L.LightningModule):
                              'command. Please add valid XML, line, or binary data.')
 
         if format_type == 'binary':
-            legacy_train_status = train_set.legacy_polygons_status
-            if val_set and val_set.legacy_polygons_status != legacy_train_status:
+            legacy_train_status = self.train_set.dataset.legacy_polygons_status
+            if self.val_set.dataset.legacy_polygons_status != legacy_train_status:
                 logger.warning('Train and validation set have different legacy '
                                f'polygon status: {legacy_train_status} and '
-                               f'{val_set.legacy_polygons_status}. Train set '
+                               f'{self.val_set.dataset.legacy_polygons_status}. Train set '
                                'status prevails.')
             if legacy_train_status == "mixed":
                 logger.warning('Mixed legacy polygon status in training dataset. Consider recompilation.')
@@ -457,8 +457,10 @@ class RecognitionModel(L.LightningModule):
                 dataset.add(**sample)
             except KrakenInputException as e:
                 logger.warning(str(e))
-        if self.format_type == 'binary' and self.hparams.hyper_params['normalization']:
-            logger.debug('Rebuilding dataset using unicode normalization')
+        if self.format_type == 'binary' and (self.hparams.hyper_params['normalization'] or
+                                             self.hparams.hyper_params['normalize_whitespace'] or
+                                             self.reorder):
+            logger.debug('Text transformations modifying alphabet selected. Rebuilding alphabet')
             dataset.rebuild_alphabet()
 
         return dataset
@@ -489,7 +491,12 @@ class RecognitionModel(L.LightningModule):
                                  target,
                                  seq_lens,
                                  target_lens)
-        self.log('train_loss', loss, on_step=True, on_epoch=False, prog_bar=False, logger=True)
+        self.log('train_loss',
+                 loss,
+                 on_step=True,
+                 on_epoch=True,
+                 prog_bar=True,
+                 logger=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -892,7 +899,12 @@ class SegmentationModel(L.LightningModule):
         output, _ = self.nn.nn(input)
         output = F.interpolate(output, size=(target.size(2), target.size(3)))
         loss = self.nn.criterion(output, target)
-        self.log('train_loss', loss, on_step=True, on_epoch=False, prog_bar=False, logger=True)
+        self.log('train_loss',
+                 loss,
+                 on_step=True,
+                 on_epoch=True,
+                 prog_bar=True,
+                 logger=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -1112,7 +1124,10 @@ class SegmentationModel(L.LightningModule):
                 scheduler.step()
             # step every other scheduler epoch-wise
             elif self.trainer.is_last_batch:
-                scheduler.step()
+                if metric is None:
+                    scheduler.step()
+                else:
+                    scheduler.step(metric)
 
 
 def _configure_optimizer_and_lr_scheduler(hparams, params, len_train_set=None, loss_tracking_mode='max'):
@@ -1132,8 +1147,8 @@ def _configure_optimizer_and_lr_scheduler(hparams, params, len_train_set=None, l
 
     # XXX: Warmup is not configured here because it needs to be manually done in optimizer_step()
     logger.debug(f'Constructing {optimizer} optimizer (lr: {lrate}, momentum: {momentum})')
-    if optimizer == 'Adam':
-        optim = torch.optim.Adam(params, lr=lrate, weight_decay=weight_decay)
+    if optimizer in ['Adam', 'AdamW']:
+        optim = getattr(torch.optim, optimizer)(params, lr=lrate, weight_decay=weight_decay)
     else:
         optim = getattr(torch.optim, optimizer)(params,
                                                 lr=lrate,

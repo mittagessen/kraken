@@ -27,6 +27,7 @@ import warnings
 import click
 from threadpoolctl import threadpool_limits
 
+from kraken.lib.register import OPTIMIZERS, SCHEDULERS, STOPPERS, PRECISIONS
 from kraken.lib.default_specs import RECOGNITION_HYPER_PARAMS, RECOGNITION_SPEC
 from kraken.lib.exceptions import KrakenInputException
 
@@ -57,8 +58,7 @@ logger = logging.getLogger('kraken')
               '--quit',
               show_default=True,
               default=RECOGNITION_HYPER_PARAMS['quit'],
-              type=click.Choice(['early',
-                                 'fixed']),
+              type=click.Choice(STOPPERS),
               help='Stop condition for training. Set to `early` for early stooping or `fixed` for fixed number of epochs')
 @click.option('-N',
               '--epochs',
@@ -81,15 +81,13 @@ logger = logging.getLogger('kraken')
 @click.option('-d', '--device', show_default=True, default='cpu', help='Select device to use (cpu, cuda:0, cuda:1, ...)')
 @click.option('--precision',
               show_default=True,
-              default='32',
-              type=click.Choice(['64', '32', 'bf16', '16']),
+              default='32-true',
+              type=click.Choice(PRECISIONS),
               help='Numerical precision to use for training. Default is 32-bit single-point precision.')
 @click.option('--optimizer',
               show_default=True,
               default=RECOGNITION_HYPER_PARAMS['optimizer'],
-              type=click.Choice(['Adam',
-                                 'SGD',
-                                 'RMSprop']),
+              type=click.Choice(OPTIMIZERS),
               help='Select optimizer')
 @click.option('-r', '--lrate', show_default=True, default=RECOGNITION_HYPER_PARAMS['lrate'], help='Learning rate')
 @click.option('-m', '--momentum', show_default=True, default=RECOGNITION_HYPER_PARAMS['momentum'], help='Momentum')
@@ -101,12 +99,7 @@ logger = logging.getLogger('kraken')
               default=RECOGNITION_HYPER_PARAMS['freeze_backbone'], help='Number of samples to keep the backbone (everything but last layer) frozen.')
 @click.option('--schedule',
               show_default=True,
-              type=click.Choice(['constant',
-                                 '1cycle',
-                                 'exponential',
-                                 'cosine',
-                                 'step',
-                                 'reduceonplateau']),
+              type=click.Choice(SCHEDULERS),
               default=RECOGNITION_HYPER_PARAMS['schedule'],
               help='Set learning rate scheduler. For 1cycle, cycle length is determined by the `--epoch` option.')
 @click.option('-g',
@@ -163,7 +156,7 @@ logger = logging.getLogger('kraken')
 @click.option('-e', '--evaluation-files', show_default=True, default=None, multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
-@click.option('--workers', show_default=True, default=1, type=click.IntRange(0), help='Number of worker processes.')
+@click.option('--workers', show_default=True, default=1, type=click.IntRange(0), help='Number of data loading worker processes.')
 @click.option('--threads', show_default=True, default=1, type=click.IntRange(1), help='Maximum size of OpenMP/BLAS thread pool.')
 @click.option('--load-hyper-parameters/--no-load-hyper-parameters', show_default=True, default=False,
               help='When loading an existing model, retrieve hyperparameters from the model')
@@ -436,7 +429,9 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
         legacy_polygons = False
 
     if legacy_polygons:
-        warnings.warn('Using legacy polygon extractor, as the model was not trained with the new method. Please retrain your model to get performance improvements.')
+        warnings.warn('Using legacy polygon extractor, as the model was not '
+                      'trained with the new method. Please retrain your model to '
+                      'get performance improvements.')
 
     pin_ds_mem = False
     if device != 'cpu':
@@ -481,6 +476,7 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
 
     cer_list = []
     wer_list = []
+    cer_case_insensitive_list = []
 
     with threadpool_limits(limits=threads):
         for p, net in nn.items():
@@ -518,6 +514,7 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
                                    collate_fn=collate_sequences)
 
             test_cer = CharErrorRate()
+            test_cer_case_insensitive = CharErrorRate()
             test_wer = WordErrorRate()
 
             with KrakenProgressBar() as progress:
@@ -537,6 +534,8 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
                             algn_pred.extend(algn2)
                             error += c
                             test_cer.update(x, y)
+                            # Update case-insensitive CER metric
+                            test_cer_case_insensitive.update(x.lower(), y.lower())
                             test_wer.update(x, y)
 
                     except FileNotFoundError as e:
@@ -550,12 +549,14 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
                     progress.update(pred_task, advance=1)
 
             cer_list.append(1.0 - test_cer.compute())
+            cer_case_insensitive_list.append(1.0 - test_cer_case_insensitive.compute())
             wer_list.append(1.0 - test_wer.compute())
             confusions, scripts, ins, dels, subs = compute_confusions(algn_gt, algn_pred)
             rep = render_report(p,
                                 chars,
                                 error,
                                 cer_list[-1],
+                                cer_case_insensitive_list[-1],
                                 wer_list[-1],
                                 confusions,
                                 scripts,

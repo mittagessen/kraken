@@ -18,20 +18,28 @@ kraken.kraken
 
 Command line drivers for recognition functionality.
 """
-import dataclasses
-import logging
 import os
 import uuid
+import click
 import shlex
+import logging
 import warnings
-from functools import partial
+import dataclasses
+
+from PIL import Image
 from pathlib import Path
+from itertools import chain
+from functools import partial
+from importlib import resources
+from platformdirs import user_data_dir
 from typing import IO, Any, Callable, Dict, List, Union, cast
 
-import click
-import importlib_resources
-from PIL import Image
+from rich import print
+from rich.tree import Tree
+from rich.table import Table
+from rich.console import Group
 from rich.traceback import install
+from rich.markdown import Markdown
 
 from kraken.lib import log
 
@@ -44,7 +52,7 @@ logger = logging.getLogger('kraken')
 install(suppress=[click])
 
 APP_NAME = 'kraken'
-SEGMENTATION_DEFAULT_MODEL = importlib_resources.files(APP_NAME).joinpath('blla.mlmodel')
+SEGMENTATION_DEFAULT_MODEL = resources.files(APP_NAME).joinpath('blla.mlmodel')
 DEFAULT_MODEL = ['en_best.mlmodel']
 
 # raise default max image size to 20k * 20k pixels
@@ -100,7 +108,7 @@ def binarizer(threshold, zoom, escale, border, perc, range, low, high, input, ou
                                                  sub_line_segmentation=ctx.meta["subline_segmentation"]))
         else:
             form = None
-            ext = os.path.splitext(output)[1]
+            ext = Path(output).suffix
             if ext in ['.jpg', '.jpeg', '.JPG', '.JPEG', '']:
                 form = 'png'
                 if ext:
@@ -115,7 +123,7 @@ def binarizer(threshold, zoom, escale, border, perc, range, low, high, input, ou
     message('\u2713', fg='green')
 
 
-def segmenter(legacy, model, text_direction, scale, maxcolseps, black_colseps,
+def segmenter(legacy, models, text_direction, scale, maxcolseps, black_colseps,
               remove_hlines, pad, mask, device, input, output) -> None:
     import json
 
@@ -140,7 +148,7 @@ def segmenter(legacy, model, text_direction, scale, maxcolseps, black_colseps,
             mask = Image.open(mask)
         except IOError as e:
             raise click.BadParameter(str(e))
-    message('Segmenting\t', nl=False)
+    message(f'Segmenting {ctx.meta["orig_file"]}\t', nl=False)
     try:
         if legacy:
             res = pageseg.segment(im,
@@ -152,7 +160,7 @@ def segmenter(legacy, model, text_direction, scale, maxcolseps, black_colseps,
                                   pad=pad,
                                   mask=mask)
         else:
-            res = blla.segment(im, text_direction, mask=mask, model=model, device=device,
+            res = blla.segment(im, text_direction, mask=mask, model=models, device=device,
                                raise_on_error=ctx.meta['raise_failed'], autocast=ctx.meta["autocast"])
     except Exception:
         if ctx.meta['raise_failed']:
@@ -219,7 +227,7 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore, input,
                                   imagename=ctx.meta['base_image'],
                                   script_detection=False,
                                   lines=[BBoxLine(id=str(uuid.uuid4()),
-                                                  bbox=(0, 0, im.size[1], im.size[0]))])
+                                                  bbox=(0, 0, im.width, im.height))])
         else:
             raise click.UsageError('No line segmentation given. Add one with the input or run `segment` first.')
     elif no_segmentation:
@@ -372,8 +380,8 @@ def process_pipeline(subcommands, input, batch_input, suffix, verbose, format_ty
     # expand batch inputs
     if batch_input and suffix:
         for batch_expr in batch_input:
-            for in_file in glob.glob(batch_expr, recursive=True):
-                input.append((in_file, '{}{}'.format(os.path.splitext(in_file)[0], suffix)))
+            for in_file in glob.glob(str(Path(batch_expr).expanduser()), recursive=True):
+                input.append((Path(in_file), Path(in_file).with_suffix(suffix)))
 
     # parse pdfs
     if format_type == 'pdf':
@@ -482,7 +490,7 @@ def binarize(ctx, threshold, zoom, escale, border, perc, range, low, high):
 
 @cli.command('segment')
 @click.pass_context
-@click.option('-i', '--model', default=None, show_default=True,
+@click.option('-i', '--model', default=None, show_default=True, multiple=True,
               help='Baseline detection model to use')
 @click.option('-x/-bl', '--boxes/--baseline', default=True, show_default=True,
               help='Switch between legacy box segmenter and neural baseline segmenter')
@@ -513,38 +521,45 @@ def segment(ctx, model, boxes, text_direction, scale, maxcolseps,
         logger.warning(f'Baseline model ({model}) given but legacy segmenter selected. Forcing to -bl.')
         boxes = False
 
+    model = [Path(m) for m in model]
     if boxes is False:
         if not model:
-            model = SEGMENTATION_DEFAULT_MODEL
+            model = [SEGMENTATION_DEFAULT_MODEL]
         ctx.meta['steps'].append(ProcessingStep(id=str(uuid.uuid4()),
                                                 category='processing',
                                                 description='Baseline and region segmentation',
-                                                settings={'model': os.path.basename(model),
+                                                settings={'model': [m.name for m in model],
                                                           'text_direction': text_direction}))
 
-        # first try to find the segmentation model by its given name,
-        # then look in the kraken config folder
-        location = None
-        search = [model, os.path.join(click.get_app_dir(APP_NAME), model)]
-        for loc in search:
-            if os.path.isfile(loc):
-                location = loc
-                break
-        if not location:
-            raise click.BadParameter(f'No model for {model} found')
+        # first try to find the segmentation models by their given names, then
+        # look in the kraken config folder
+        locations = []
+        for m in model:
+            location = None
+            search = chain([m],
+                           Path(user_data_dir('htrmopo')).rglob(str(m)),
+                           Path(click.get_app_dir('kraken')).rglob(str(m)))
+            for loc in search:
+                if loc.is_file():
+                    location = loc
+                    locations.append(loc)
+                    break
+            if not location:
+                raise click.BadParameter(f'No model for {str(m)} found')
 
         from kraken.lib.vgsl import TorchVGSLModel
-        message(f'Loading ANN {model}\t', nl=False)
-        try:
-            model = TorchVGSLModel.load_model(location)
-            model.to(ctx.meta['device'])
-        except Exception:
-            if ctx.meta['raise_failed']:
-                raise
-            message('\u2717', fg='red')
-            ctx.exit(1)
-
-        message('\u2713', fg='green')
+        model = []
+        for loc in locations:
+            message(f'Loading ANN {loc}\t', nl=False)
+            try:
+                model.append(TorchVGSLModel.load_model(loc))
+                model[-1].to(ctx.meta['device'])
+            except Exception:
+                if ctx.meta['raise_failed']:
+                    raise
+                message('\u2717', fg='red')
+                ctx.exit(1)
+            message('\u2713', fg='green')
     else:
         ctx.meta['steps'].append(ProcessingStep(id=str(uuid.uuid4()),
                                                 category='processing',
@@ -631,11 +646,12 @@ def ocr(ctx, model, pad, reorder, base_dir, no_segmentation, text_direction):
     nm: Dict[str, models.TorchSeqRecognizer] = {}
     ign_tags = model.pop('ignore')
     for k, v in model.items():
-        search = [v,
-                  os.path.join(click.get_app_dir(APP_NAME), v)]
+        search = chain([Path(v)],
+                       Path(user_data_dir('htrmopo')).rglob(v),
+                       Path(click.get_app_dir('kraken')).rglob(v))
         location = None
         for loc in search:
-            if os.path.isfile(loc):
+            if loc.is_file():
                 location = loc
                 break
         if not location:
@@ -662,7 +678,7 @@ def ocr(ctx, model, pad, reorder, base_dir, no_segmentation, text_direction):
                                             category='processing',
                                             description='Text line recognition',
                                             settings={'text_direction': text_direction,
-                                                      'models': ' '.join(os.path.basename(v) for v in model.values()),
+                                                      'models': ' '.join(Path(v).name for v in model.values()),
                                                       'pad': pad,
                                                       'bidi_reordering': reorder}))
 
@@ -678,46 +694,154 @@ def ocr(ctx, model, pad, reorder, base_dir, no_segmentation, text_direction):
 
 @cli.command('show')
 @click.pass_context
+@click.option('-V', '--metadata-version',
+              default='highest',
+              type=click.Choice(['v0', 'v1', 'highest']),
+              help='Version of metadata to fetch if multiple exist in repository.')
 @click.argument('model_id')
-def show(ctx, model_id):
+def show(ctx, metadata_version, model_id):
     """
     Retrieves model metadata from the repository.
     """
-    from kraken import repo
+    from htrmopo.util import iso15924_to_name, iso639_3_to_name
+    from kraken.repo import get_description
     from kraken.lib.util import is_printable, make_printable
 
-    desc = repo.get_description(model_id)
+    def _render_creators(creators):
+        o = []
+        for creator in creators:
+            c_text = creator['name']
+            if (orcid := creator.get('orcid', None)) is not None:
+                c_text += f' ({orcid})'
+            if (affiliation := creator.get('affiliation', None)) is not None:
+                c_text += f' ({affiliation})'
+            o.append(c_text)
+        return o
 
-    chars = []
-    combining = []
-    for char in sorted(desc['graphemes']):
-        if not is_printable(char):
-            combining.append(make_printable(char))
-        else:
-            chars.append(char)
-    message(
-        'name: {}\n\n{}\n\n{}\nscripts: {}\nalphabet: {} {}\naccuracy: {:.2f}%\nlicense: {}\nauthor(s): {}\ndate: {}'.format(
-            model_id, desc['summary'], desc['description'], ' '.join(
-                desc['script']), ''.join(chars), ', '.join(combining), desc['accuracy'], desc['license']['id'], '; '.join(
-                x['name'] for x in desc['creators']), desc['publication_date']))
-    ctx.exit(0)
+    def _render_metrics(metrics):
+        if metrics:
+            return [f'{k}: {v:.2f}' for k, v in metrics.items()]
+        return ''
+
+    if metadata_version == 'highest':
+        metadata_version = None
+
+    try:
+        desc = get_description(model_id,
+                               version=metadata_version,
+                               filter_fn=lambda record: getattr(record, 'software_name', None) == 'kraken' or 'kraken_pytorch' in record.keywords)
+    except ValueError as e:
+        logger.error(e)
+        ctx.exit(1)
+
+    if desc.version == 'v0':
+        chars = []
+        combining = []
+        for char in sorted(desc.graphemes):
+            if not is_printable(char):
+                combining.append(make_printable(char))
+            else:
+                chars.append(char)
+
+        table = Table(title=desc.summary, show_header=False)
+        table.add_column('key', justify="left", no_wrap=True)
+        table.add_column('value', justify="left", no_wrap=False)
+        table.add_row('DOI', desc.doi)
+        table.add_row('concept DOI', desc.concept_doi)
+        table.add_row('publication date', desc.publication_date.isoformat())
+        table.add_row('model type', Group(*desc.model_type))
+        table.add_row('script', Group(*[iso15924_to_name(x) for x in desc.script]))
+        table.add_row('alphabet', Group(' '.join(chars), ', '.join(combining)))
+        table.add_row('keywords', Group(*desc.keywords))
+        table.add_row('metrics', Group(*_render_metrics(desc.metrics)))
+        table.add_row('license', desc.license)
+        table.add_row('creators', Group(*_render_creators(desc.creators)))
+        table.add_row('description', desc.description)
+    elif desc.version == 'v1':
+        table = Table(title=desc.summary, show_header=False)
+        table.add_column('key', justify="left", no_wrap=True)
+        table.add_column('value', justify="left", no_wrap=False)
+        table.add_row('DOI', desc.doi)
+        table.add_row('concept DOI', desc.concept_doi)
+        table.add_row('publication date', desc.publication_date.isoformat())
+        table.add_row('model type', Group(*desc.model_type))
+        table.add_row('language', Group(*[iso639_3_to_name(x) for x in desc.language]))
+        table.add_row('script', Group(*[iso15924_to_name(x) for x in desc.script]))
+        table.add_row('keywords', Group(*desc.keywords) if desc.keywords else '')
+        table.add_row('datasets', Group(*desc.datasets) if desc.datasets else '')
+        table.add_row('metrics', Group(*_render_metrics(desc.metrics)) if desc.metrics else '')
+        table.add_row('base model', Group(*desc.base_model) if desc.base_model else '')
+        table.add_row('software', desc.software_name)
+        table.add_row('software_hints', Group(*desc.software_hints) if desc.software_hints else '')
+        table.add_row('license', desc.license)
+        table.add_row('creators', Group(*_render_creators(desc.creators)))
+        table.add_row('description', Markdown(desc.description))
+
+    print(table)
 
 
 @cli.command('list')
+@click.option('--all', 'model_type', flag_value='all', default=True, help='List both segmentation and recognition models.')
+@click.option('--recognition', 'model_type', flag_value='recognition', help='Only list recognition models.')
+@click.option('--segmentation', 'model_type', flag_value='segmentation', help='Only list segmentation models.')
+@click.option('-l', '--language', default=None, multiple=True, help='Filter for language by ISO 639-3 codes')
+@click.option('-s', '--script', default=None, multiple=True, help='Filter for script by ISO 15924 codes')
+@click.option('-k', '--keyword', default=None, multiple=True, help='Filter by keyword.')
 @click.pass_context
-def list_models(ctx):
+def list_models(ctx, model_type, language, script, keyword):
     """
     Lists models in the repository.
+
+    Multiple filters of different type are ANDed, specifying a filter of a
+    single type multiple times will OR those values:
+
+    --script Arab --script Syrc -> Arab OR Syrc script models
+
+    --script Arab --language urd -> Arab script AND Urdu language models
     """
-    from kraken import repo
+    from kraken.repo import get_listing
     from kraken.lib.progress import KrakenProgressBar
+
+    if language:
+        logger.warning('Filtering by language is only supported for v1 records. '
+                       'You might not find the model(s) you are looking for if '
+                       'they do not have a v1 metadata record.')
+
+    def _filter_fn(record):
+        if getattr(record, 'software_name', None) != 'kraken' and 'kraken_pytorch' not in record.keywords:
+            return False
+        if model_type != 'all' and model_type not in record.model_type:
+            return False
+        if script and not any(filter(lambda s: s in script, record.script)):
+            return False
+        if language and not any(filter(lambda s: s in language, getattr(record, 'language', tuple()))):
+            return False
+        if keyword and not any(filter(lambda s: s in keyword, record.keywords)):
+            return False
+        return True
 
     with KrakenProgressBar() as progress:
         download_task = progress.add_task('Retrieving model list', total=0, visible=True if not ctx.meta['verbose'] else False)
-        model_list = repo.get_listing(lambda total, advance: progress.update(download_task, total=total, advance=advance))
-    for id, metadata in model_list.items():
-        message('{} ({}) - {}'.format(id, ', '.join(metadata['type']), metadata['summary']))
-    ctx.exit(0)
+        repository = get_listing(callback=lambda total, advance: progress.update(download_task, total=total, advance=advance),
+                                 filter_fn=_filter_fn)
+
+    if model_type is not None:
+        repository
+    table = Table(show_header=True)
+    table.add_column('DOI', justify="left", no_wrap=True)
+    table.add_column('summary', justify="left", no_wrap=False)
+    table.add_column('model type', justify="left", no_wrap=False)
+    table.add_column('keywords', justify="left", no_wrap=False)
+
+    for k, records in repository.items():
+        t = Tree(k)
+        [t.add(x.doi) for x in records]
+        table.add_row(t,
+                      Group(*[''] + [x.summary for x in records]),
+                      Group(*[''] + ['; '.join(x.model_type) for x in records]),
+                      Group(*[''] + ['; '.join(x.keywords) for x in records]))
+
+    print(table)
 
 
 @cli.command('get')
@@ -727,20 +851,24 @@ def get(ctx, model_id):
     """
     Retrieves a model from the repository.
     """
-    from kraken import repo
+    from htrmopo import get_model
+
+    from kraken.repo import get_description
     from kraken.lib.progress import KrakenDownloadProgressBar
 
     try:
-        os.makedirs(click.get_app_dir(APP_NAME))
-    except OSError:
-        pass
+        get_description(model_id,
+                        filter_fn=lambda record: getattr(record, 'software_name', None) == 'kraken' or 'kraken_pytorch' in record.keywords)
+    except ValueError as e:
+        logger.error(e)
+        ctx.exit(1)
 
     with KrakenDownloadProgressBar() as progress:
         download_task = progress.add_task('Processing', total=0, visible=True if not ctx.meta['verbose'] else False)
-        filename = repo.get_model(model_id, click.get_app_dir(APP_NAME),
-                                  lambda total, advance: progress.update(download_task, total=total, advance=advance))
-    message(f'Model name: {filename}')
-    ctx.exit(0)
+        model_dir = get_model(model_id,
+                              callback=lambda total, advance: progress.update(download_task, total=total, advance=advance))
+    model_candidates = list(filter(lambda x: x.suffix == '.mlmodel', model_dir.iterdir()))
+    message(f'Model dir: {model_dir} (model files: {", ".join(x.name for x in model_candidates)})')
 
 
 if __name__ == '__main__':

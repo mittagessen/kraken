@@ -9,14 +9,19 @@ from typing import (Any, Callable, Dict, Iterable, List, Optional, Sequence,
                     Tuple, Union)
 
 import torch
-from coremltools.models import MLModel, datatypes
-from coremltools.models.neural_network import NeuralNetworkBuilder
 from google.protobuf.message import DecodeError
 from torch import nn
 
 from kraken.lib import layers
 from kraken.lib.codec import PytorchCodec
 from kraken.lib.exceptions import KrakenInvalidModelException
+
+root_logger = logging.getLogger()
+level = root_logger.getEffectiveLevel()
+root_logger.setLevel(logging.ERROR)
+from coremltools.models import MLModel, datatypes
+from coremltools.models.neural_network import NeuralNetworkBuilder
+root_logger.setLevel(level)
 
 # all tensors are ordered NCHW, the "feature" dimension is C, so the output of
 # an LSTM will be put into C same as the filters of a CNN.

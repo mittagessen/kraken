@@ -23,7 +23,6 @@ from typing import Any, Dict, List
 
 from jinja2 import Environment, PackageLoader
 
-from kraken.lib.exceptions import KrakenInputException
 from kraken.lib.util import get_im_str
 
 logger = logging.getLogger()
@@ -44,18 +43,17 @@ class TranscriptionInterface(object):
         self.line_idx = 1
         self.seg_idx = 1
 
-    def add_page(self, im, segmentation=None, records=None):
+    def add_page(self, im, segmentation = None):
         """
         Adds an image to the transcription interface, optionally filling in
         information from a list of ocr_record objects.
 
         Args:
-            im (PIL.Image): Input image
-            segmentation (dict): Output of the segment method.
-            records (list): A list of ocr_record objects.
+            im: Input image
+            segmentation: Output of the segment method.
         """
         im_str = get_im_str(im)
-        logger.info('Adding page {} with {} lines'.format(im_str, len(segmentation) if segmentation else len(records)))
+        logger.info(f'Adding page {im_str} with {len(segmentation.lines)} lines')
         page = {}
         fd = BytesIO()
         im.save(fd, format='png', optimize=True)
@@ -64,37 +62,22 @@ class TranscriptionInterface(object):
         logger.debug('Base64 encoding image')
         page['img'] = 'data:image/png;base64,' + base64.b64encode(fd.getvalue()).decode('ascii')
         page['lines'] = []
-        if records:
-            logger.debug('Adding records.')
-            self.text_direction = segmentation['text_direction']
-            for record, bbox in zip(records, segmentation['boxes']):
-                page['lines'].append({'index': self.line_idx, 'text': record.prediction,
-                                      'left': 100*int(bbox[0]) / im.size[0],
-                                      'top': 100*int(bbox[1]) / im.size[1],
-                                      'width': 100*(bbox[2] - bbox[0])/im.size[0],
-                                      'height': 100*(int(bbox[3]) - int(bbox[1]))/im.size[1],
-                                      'bbox': '{}, {}, {}, {}'.format(int(bbox[0]),
-                                                                      int(bbox[1]),
-                                                                      int(bbox[2]),
-                                                                      int(bbox[3]))})
-
-                self.line_idx += 1
-        elif segmentation:
-            logger.debug('Adding segmentations.')
-            self.text_direction = segmentation['text_direction']
-            for bbox in segmentation['boxes']:
-                page['lines'].append({'index': self.line_idx,
-                                      'left': 100*int(bbox[0]) / im.size[0],
-                                      'top': 100*int(bbox[1]) / im.size[1],
-                                      'width': 100*(bbox[2] - bbox[0])/im.size[0],
-                                      'height': 100*(int(bbox[3]) - int(bbox[1]))/im.size[1],
-                                      'bbox': '{}, {}, {}, {}'.format(int(bbox[0]),
-                                                                      int(bbox[1]),
-                                                                      int(bbox[2]),
-                                                                      int(bbox[3]))})
-                self.line_idx += 1
-        else:
-            raise KrakenInputException('Neither segmentations nor records given')
+        logger.debug('Adding segmentation.')
+        self.text_direction = segmentation.text_direction
+        for line in segmentation.lines:
+            bbox = line.bbox
+            page['lines'].append({'index': self.line_idx,
+                                  'left': 100*int(bbox[0]) / im.size[0],
+                                  'top': 100*int(bbox[1]) / im.size[1],
+                                  'width': 100*(bbox[2] - bbox[0])/im.size[0],
+                                  'height': 100*(int(bbox[3]) - int(bbox[1]))/im.size[1],
+                                  'bbox': '{}, {}, {}, {}'.format(int(bbox[0]),
+                                                                  int(bbox[1]),
+                                                                  int(bbox[2]),
+                                                                  int(bbox[3]))})
+            if line.text:
+                page['lines'][-1]['text'] = line.prediction
+            self.line_idx += 1
         self.pages.append(page)
 
     def write(self, fd):

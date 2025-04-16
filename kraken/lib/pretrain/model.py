@@ -203,11 +203,11 @@ class PretrainDataModule(L.LightningDataModule):
             self.train_set, self.val_set = random_split(train_set, (train_len, val_len))
 
         if format_type == 'binary':
-            legacy_train_status = train_set.legacy_polygons_status
-            if val_set and val_set.legacy_polygons_status != legacy_train_status:
+            legacy_train_status = self.train_set.dataset.legacy_polygons_status
+            if self.val_set.dataset.legacy_polygons_status != legacy_train_status:
                 logger.warning('Train and validation set have different legacy '
                                f'polygon status: {legacy_train_status} and '
-                               f'{val_set.legacy_polygons_status}. Train set '
+                               f'{self.val_set.dataset.legacy_polygons_status}. Train set '
                                'status prevails.')
             if legacy_train_status == "mixed":
                 logger.warning('Mixed legacy polygon status in training dataset. Consider recompilation.')
@@ -409,7 +409,12 @@ class RecognitionPretrainModel(L.LightningModule):
         o = self._step(batch, batch_idx)
         if o is not None:
             _, _, loss = o
-            self.log('CE', loss)
+            self.log('CE',
+                     loss,
+                     on_step=True,
+                     on_epoch=True,
+                     prog_bar=True,
+                     logger=True)
             return loss
 
     def configure_optimizers(self):
@@ -438,7 +443,10 @@ class RecognitionPretrainModel(L.LightningModule):
                 scheduler.step()
             # step every other scheduler epoch-wise
             elif self.trainer.is_last_batch:
-                scheduler.step()
+                if metric is None:
+                    scheduler.step()
+                else:
+                    scheduler.step(metric)
 
     def setup(self, stage: Optional[str] = None):
         # finalize models in case of appending/loading

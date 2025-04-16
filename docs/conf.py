@@ -50,12 +50,12 @@ language = 'en'
 pygments_style = 'sphinx'
 todo_include_todos = False
 
-
 html_theme = 'alabaster'
 html_theme_options = {
     'github_user': 'mittagessen',
     'github_repo': 'kraken',
 }
+html_logo = '_static/kraken.png'
 
 html_static_path = ['_static']
 html_css_files = [

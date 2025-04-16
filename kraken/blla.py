@@ -24,13 +24,14 @@ import logging
 import uuid
 from typing import Any, Callable, Dict, List, Literal, Optional, Union
 
-import importlib_resources
 import numpy as np
 import PIL
 import shapely.geometry as geom
 import torch
 import torch.nn.functional as F
 import torchvision.transforms as tf
+
+from importlib import resources
 from scipy.ndimage import gaussian_filter
 from skimage.filters import sobel
 
@@ -259,7 +260,10 @@ def segment(im: PIL.Image.Image,
         im: Input image. The mode can generally be anything but it is possible
             to supply a binarized-input-only model which requires accordingly
             treated images.
-        text_direction: Passed-through value for serialization.serialize.
+        text_direction: Determines principal text direction for heuristic
+                        reading order determination and fallback value for line
+                        orientation in case of low model confidence.
+                        Passed-through value for Segmentation container class.
         mask: A bi-level mask image of the same size as `im` where 0-valued
               regions are ignored for segmentation purposes. Disables column
               detection.
@@ -295,7 +299,7 @@ def segment(im: PIL.Image.Image,
     """
     if model is None:
         logger.info('No segmentation model given. Loading default model.')
-        model = vgsl.TorchVGSLModel.load_model(importlib_resources.files(__name__).joinpath('blla.mlmodel'))
+        model = vgsl.TorchVGSLModel.load_model(resources.files(__name__).joinpath('blla.mlmodel'))
 
     if isinstance(model, vgsl.TorchVGSLModel):
         model = [model]

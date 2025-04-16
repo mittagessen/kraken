@@ -4,32 +4,34 @@ channels:
   - conda-forge
 dependencies:
   - python>=3.9
-  - python-bidi
+  - python-bidi~=0.6.0
   - lxml
   - regex
   - requests
   - click>=8.1
-  - numpy~=1.23.0
+  - numpy~=2.0.0
   - pillow~=9.2.0
-  - scipy~=1.10.0
+  - scipy~=1.13.0
   - jinja2~=3.0
   - conda-forge::torchvision-cpu>=0.5.0
-  - conda-forge::pytorch-cpu~=2.1.0
+  - conda-forge::pytorch-cpu~=2.4.0
   - jsonschema
   - scikit-learn~=1.2.1
-  - scikit-image~=0.21.0
-  - shapely~=1.8.5
+  - scikit-image~=0.24.0
+  - shapely>=2.0.6,~=2.0.6
   - pyvips
   - imagemagick>=7.1.0
   - pyarrow
   - importlib-resources>=1.3.0
-  - conda-forge::lightning~=2.2.0
+  - conda-forge::lightning~=2.4.0
   - conda-forge::torchmetrics>=1.1.0
-  - conda-forge::threadpoolctl~=3.4
+  - conda-forge::threadpoolctl~=3.5.0
   - pip
   - albumentations
   - rich
   - setuptools>=36.6.0,<70.0.0
   - pip:
-    - coremltools~=6.0
+    - coremltools~=8.1
+    - htrmopo
+    - platformdirs
     - file:.

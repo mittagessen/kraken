@@ -25,17 +25,11 @@ Installation
 
 kraken only runs on **Linux or Mac OS X**. Windows is not supported.
 
-The latest stable releases can be installed either from `PyPi <https://pypi.org>`_:
+The latest stable releases can be installed from `PyPi <https://pypi.org>`_:
 
 ::
 
   $ pip install kraken
-
-or through `conda <https://anaconda.org>`_:
-
-::
-
-  $ conda install -c conda-forge -c mittagessen kraken
 
 If you want direct PDF and multi-image TIFF/JPEG2000 support it is necessary to
 install the `pdf` extras package for PyPi:
@@ -136,6 +130,19 @@ Funding
 =======
 
 kraken is developed at the `École Pratique des Hautes Études <https://www.ephe.psl.eu>`_, `Université PSL <https://www.psl.eu>`_.
+
+.. container:: twocol
+
+   .. container::
+
+        .. image:: https://raw.githubusercontent.com/mittagessen/kraken/main/docs/_static/normal-reproduction-low-resolution.jpg
+          :width: 100
+          :alt: Co-financed by the European Union
+
+   .. container::
+
+        This project was funded in part by the European Union. (ERC, MiDRASH,
+        project number 101071829).
 
 .. container:: twocol
 

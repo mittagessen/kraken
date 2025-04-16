@@ -21,10 +21,10 @@ from collections import Counter
 from functools import partial
 from typing import Any, Dict, List, Sequence, Tuple, Union
 
-import importlib_resources
 import torch
 import torch.nn.functional as F
 from torchvision import transforms
+from importlib import resources
 
 from kraken.lib import functional_im_transforms as F_t
 from kraken.lib.exceptions import KrakenInputException
@@ -319,7 +319,7 @@ def compute_confusions(algn1: Sequence[str], algn2: Sequence[str]):
         script substitutions.
     """
     counts: Dict[Tuple[str, str], int] = Counter()
-    ref = importlib_resources.files(__name__).joinpath('scripts.json')
+    ref = resources.files(__name__).joinpath('scripts.json')
     with ref.open('rb') as fp:
         script_map = json.load(fp)
 

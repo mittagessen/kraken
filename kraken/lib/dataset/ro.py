@@ -72,6 +72,7 @@ class PairWiseROSet(Dataset):
         self.data = []
 
         if mode in ['alto', 'page', 'xml']:
+            docs = []
             for file in files:
                 try:
                     doc = XMLPage(file, filetype=mode)
@@ -90,32 +91,34 @@ class PairWiseROSet(Dataset):
                             if tag not in self.class_mapping:
                                 self.class_mapping[tag] = self.num_classes
                                 self.num_classes += 1
-                    # traverse RO and substitute features.
-                    w, h = doc.image_size
-                    sorted_lines = []
-                    for line in order:
-                        line_coords = np.array(line.baseline) / (w, h)
-                        line_center = np.mean(line_coords, axis=0)
-                        cl = torch.zeros(self.num_classes, dtype=torch.float)
-                        # if class is not in class mapping default to None class (idx 0)
-                        cl[self.class_mapping.get(line.tags['type'], 0)] = 1
-                        line_data = {'type': line.tags['type'],
-                                     'features': torch.cat((cl,  # one hot encoded line type
-                                                            torch.tensor(line_center, dtype=torch.float),  # line center
-                                                            torch.tensor(line_coords[0, :], dtype=torch.float),  # start_point coord
-                                                            torch.tensor(line_coords[-1, :], dtype=torch.float),  # end point coord)
-                                                            )
-                                                           )
-                                     }
-                        sorted_lines.append(line_data)
-                    if len(sorted_lines) > 1:
-                        self.data.append(sorted_lines)
-                        self._num_pairs += int(factorial(len(sorted_lines))/factorial(len(sorted_lines)-2))
-                    else:
-                        logger.info(f'Page {doc} has less than 2 lines. Skipping')
+                    docs.append((doc.image_size, order))
                 except KrakenInputException as e:
                     logger.warning(e)
                     continue
+
+            for (w, h), order in docs:
+                # traverse RO and substitute features.
+                sorted_lines = []
+                for line in order:
+                    line_coords = np.array(line.baseline) / (w, h)
+                    line_center = np.mean(line_coords, axis=0)
+                    cl = torch.zeros(self.num_classes, dtype=torch.float)
+                    # if class is not in class mapping default to None class (idx 0)
+                    cl[self.class_mapping.get(line.tags['type'], 0)] = 1
+                    line_data = {'type': line.tags['type'],
+                                 'features': torch.cat((cl,  # one hot encoded line type
+                                                        torch.tensor(line_center, dtype=torch.float),  # line center
+                                                        torch.tensor(line_coords[0, :], dtype=torch.float),  # start_point coord
+                                                        torch.tensor(line_coords[-1, :], dtype=torch.float),  # end point coord)
+                                                        )
+                                                       )
+                                 }
+                    sorted_lines.append(line_data)
+                if len(sorted_lines) > 1:
+                    self.data.append(sorted_lines)
+                    self._num_pairs += int(factorial(len(sorted_lines))/factorial(len(sorted_lines)-2))
+                else:
+                    logger.info(f'Page {doc} has less than 2 lines. Skipping')
         else:
             raise Exception('invalid dataset mode')
 
@@ -173,6 +176,7 @@ class PageWiseROSet(Dataset):
         self.data = []
 
         if mode in ['alto', 'page', 'xml']:
+            docs = []
             for file in files:
                 try:
                     doc = XMLPage(file, filetype=mode)
@@ -191,31 +195,33 @@ class PageWiseROSet(Dataset):
                             if tag not in self.class_mapping:
                                 self.class_mapping[tag] = self.num_classes
                                 self.num_classes += 1
-                    # traverse RO and substitute features.
-                    w, h = doc.image_size
-                    sorted_lines = []
-                    for line in order:
-                        line_coords = np.array(line.baseline) / (w, h)
-                        line_center = np.mean(line_coords, axis=0)
-                        cl = torch.zeros(self.num_classes, dtype=torch.float)
-                        # if class is not in class mapping default to None class (idx 0)
-                        cl[self.class_mapping.get(line.tags['type'], 0)] = 1
-                        line_data = {'type': line.tags['type'],
-                                     'features': torch.cat((cl,  # one hot encoded line type
-                                                            torch.tensor(line_center, dtype=torch.float),  # line center
-                                                            torch.tensor(line_coords[0, :], dtype=torch.float),  # start_point coord
-                                                            torch.tensor(line_coords[-1, :], dtype=torch.float),  # end point coord)
-                                                            )
-                                                           )
-                                     }
-                        sorted_lines.append(line_data)
-                    if len(sorted_lines) > 1:
-                        self.data.append(sorted_lines)
-                    else:
-                        logger.info(f'Page {doc} has less than 2 lines. Skipping')
+                    docs.append((doc.image_size, order))
                 except KrakenInputException as e:
                     logger.warning(e)
                     continue
+
+            for (w, h), order in docs:
+                # traverse RO and substitute features.
+                sorted_lines = []
+                for line in order:
+                    line_coords = np.array(line.baseline) / (w, h)
+                    line_center = np.mean(line_coords, axis=0)
+                    cl = torch.zeros(self.num_classes, dtype=torch.float)
+                    # if class is not in class mapping default to None class (idx 0)
+                    cl[self.class_mapping.get(line.tags['type'], 0)] = 1
+                    line_data = {'type': line.tags['type'],
+                                 'features': torch.cat((cl,  # one hot encoded line type
+                                                        torch.tensor(line_center, dtype=torch.float),  # line center
+                                                        torch.tensor(line_coords[0, :], dtype=torch.float),  # start_point coord
+                                                        torch.tensor(line_coords[-1, :], dtype=torch.float),  # end point coord)
+                                                        )
+                                                       )
+                                 }
+                    sorted_lines.append(line_data)
+                if len(sorted_lines) > 1:
+                    self.data.append(sorted_lines)
+                else:
+                    logger.info(f'Page {doc} has less than 2 lines. Skipping')
         else:
             raise Exception('invalid dataset mode')
 

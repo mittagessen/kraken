@@ -1,5 +1,5 @@
 {%+ macro render_line(line) +%}
-            <TextLine id="{{ line.id }}">
+            <TextLine id="{{ line.id }}" {% if line.tags and "type" in line.tags %}custom="structure {type:{{ line.tags["type"] }};}"{% endif %}>
                 {% if line.boundary %}
                 <Coords points="{% for point in line.boundary %}{{ point|join(',') }}{% if not loop.last %} {% endif %}{% endfor %}"/>
                 {% endif %}
@@ -42,8 +42,8 @@
         {% if loop.previtem and loop.previtem.type == 'line' %}
         </TextRegion>
         {% endif %}
-        <TextRegion id="{{ entity.id }}" custom="structure {type:{{ entity.region_type }};}">
-            <Coords points="{% for point in entity.boundary %}{{ point|join(',') }}{% if not loop.last %} {% endif %}{% endfor %}"/>
+        <TextRegion id="{{ entity.id }}" {% if entity.tags and "type" in entity.tags %}custom="structure {type:{{ entity.tags["type"] }};}"{% endif %}>
+            {% if entity.boundary %}<Coords points="{% for point in entity.boundary %}{{ point|join(',') }}{% if not loop.last %} {% endif %}{% endfor %}"/>{% endif %}
             {%- for line in entity.lines -%}
             {{ render_line(line) }}
             {%- endfor %}
