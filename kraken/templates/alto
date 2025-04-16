@@ -9,7 +9,10 @@
                             <Polygon POINTS="{{ line.boundary|sum(start=[])|join(' ') }}"/>
                         </Shape>
                         {% endif %}
-                            {% if line.recognition|length() == 0 %}
+                        {% if line.text is string %}
+                        <String CONTENT="{{line.text}}" />
+                        {% else %}
+                        {% if line.recognition|length() == 0 %}
                         <String CONTENT=""/>
                         {% else %}
                         {% for segment in line.recognition %}
@@ -35,6 +38,7 @@
                         </String>
                         {% endif %}
                         {% endfor %}
+                        {% endif %}
                         {% endif %}
                     </TextLine>
 {%+ endmacro %}

@@ -76,7 +76,9 @@ def serialize(results: 'Segmentation',
               scripts: Optional[Iterable[str]] = None,
               template: ['PathLike', str] = 'alto',
               template_source: Literal['native', 'custom'] = 'native',
-              processing_steps: Optional[List['ProcessingStep']] = None) -> str:
+              processing_steps: Optional[List['ProcessingStep']] = None,
+              sub_line_segmentation: bool = True
+              ) -> str:
     """
     Serializes recognition and segmentation results into an output document.
 
@@ -102,6 +104,9 @@ def serialize(results: 'Segmentation',
                          outside the kraken package.
         processing_steps: A list of ProcessingStep container classes describing
                           the processing kraken performed on the inputs.
+        sub_line_segmentation: Switch to enable the computation of subline
+                               segmentation (char/word). Records the
+                               transcription in line["text"] if set to false
 
     Returns:
         The rendered template
@@ -179,35 +184,38 @@ def serialize(results: 'Segmentation',
         if record.type == 'baselines':
             line['baseline'] = [list(x) for x in record.baseline]
 
-        splits = regex.split(r'(\s+)', getattr(record, 'prediction', ''))
-        line_offset = 0
-        logger.debug(f'Record contains {len(splits)} segments')
-        for segment in splits:
-            if len(segment) == 0:
-                continue
-            seg_cuts = record.cuts[line_offset:line_offset + len(segment)]
-            seg_bbox = max_bbox(seg_cuts)
-            seg_struct = {'bbox': seg_bbox,
-                          'confidences': record.confidences[line_offset:line_offset + len(segment)],
-                          'cuts': seg_cuts,
-                          'text': segment,
-                          'recognition': [{'bbox': max_bbox([cut]),
-                                           'boundary': cut,
-                                           'confidence': conf,
-                                           'text': char,
-                                           'index': cid}
-                                          for conf, cut, char, cid in
-                                          zip(record.confidences[line_offset:line_offset + len(segment)],
-                                              seg_cuts,
-                                              segment,
-                                              range(char_idx, char_idx + len(segment)))],
-                          'index': seg_idx}
-            if record.type == 'baselines':
-                seg_struct['boundary'] = record[line_offset:line_offset + len(segment)][1]
-            line['recognition'].append(seg_struct)
-            char_idx += len(segment)
-            seg_idx += 1
-            line_offset += len(segment)
+        if sub_line_segmentation:
+            splits = regex.split(r'(\s+)', getattr(record, 'prediction', ''))
+            line_offset = 0
+            logger.debug(f'Record contains {len(splits)} segments')
+            for segment in splits:
+                if len(segment) == 0:
+                    continue
+                seg_cuts = record.cuts[line_offset:line_offset + len(segment)]
+                seg_bbox = max_bbox(seg_cuts)
+                seg_struct = {'bbox': seg_bbox,
+                              'confidences': record.confidences[line_offset:line_offset + len(segment)],
+                              'cuts': seg_cuts,
+                              'text': segment,
+                              'recognition': [{'bbox': max_bbox([cut]),
+                                               'boundary': cut,
+                                               'confidence': conf,
+                                               'text': char,
+                                               'index': cid}
+                                              for conf, cut, char, cid in
+                                              zip(record.confidences[line_offset:line_offset + len(segment)],
+                                                  seg_cuts,
+                                                  segment,
+                                                  range(char_idx, char_idx + len(segment)))],
+                              'index': seg_idx}
+                if record.type == 'baselines':
+                    seg_struct['boundary'] = record[line_offset:line_offset + len(segment)][1]
+                line['recognition'].append(seg_struct)
+                char_idx += len(segment)
+                seg_idx += 1
+                line_offset += len(segment)
+        else:
+            line["text"] = getattr(record, 'prediction', '')
         cur_ent.append(line)
 
     # serialize all remaining (line-less) regions
