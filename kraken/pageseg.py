@@ -423,7 +423,7 @@ def segment(im: PIL.Image.Image,
     if isinstance(pad, int):
         pad = (pad, pad)
     lines = [(max(x[0]-pad[0], 0), x[1], min(x[2]+pad[1], im.size[0]), x[3]) for x in lines]
-    lines = [BBoxLine(id=str(uuid.uuid4()), bbox=line) for line in rotate_lines(lines, 360-angle, offset).tolist()]
+    lines = [BBoxLine(id=f'_{uuid.uuid4()}', bbox=line) for line in rotate_lines(lines, 360-angle, offset).tolist()]
 
     return Segmentation(text_direction=text_direction,
                         imagename=getattr(im, 'filename', None),

@@ -224,7 +224,7 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore, input,
                                   text_direction='horizontal-lr',
                                   imagename=ctx.meta['base_image'],
                                   script_detection=False,
-                                  lines=[BBoxLine(id=str(uuid.uuid4()),
+                                  lines=[BBoxLine(id=f'_{uuid.uuid4()}',
                                                   bbox=(0, 0, im.width, im.height))])
         else:
             raise click.UsageError('No line segmentation given. Add one with the input or run `segment` first.')
@@ -401,7 +401,7 @@ def process_pipeline(subcommands, input, batch_input, suffix, verbose, format_ty
                     dest_dict = {'idx': -1, 'src': fpath, 'uuid': None}
                     for i in range(0, n_pages):
                         dest_dict['idx'] += 1
-                        dest_dict['uuid'] = str(uuid.uuid4())
+                        dest_dict['uuid'] = f'_{uuid.uuid4()}'
                         fd, filename = tempfile.mkstemp(suffix='.png')
                         os.close(fd)
                         doc = pyvips.Image.new_from_file(fpath, dpi=300, page=i, access="sequential")
@@ -414,7 +414,7 @@ def process_pipeline(subcommands, input, batch_input, suffix, verbose, format_ty
                     progress.update(pdf_parse_task, total=num_pages)
                     logger.warning(f'{fpath} is not a PDF file. Skipping.')
         input = new_input
-        ctx.meta['steps'].insert(0, ProcessingStep(id=str(uuid.uuid4()),
+        ctx.meta['steps'].insert(0, ProcessingStep(id=f'_{uuid.uuid4()}',
                                                    category='preprocessing',
                                                    description='PDF image extraction',
                                                    settings={}))
@@ -464,7 +464,7 @@ def binarize(ctx, threshold, zoom, escale, border, perc, range, low, high):
     """
     from kraken.containers import ProcessingStep
 
-    ctx.meta['steps'].append(ProcessingStep(id=str(uuid.uuid4()),
+    ctx.meta['steps'].append(ProcessingStep(id=f'_{uuid.uuid4()}',
                                             category='preprocessing',
                                             description='Image binarization',
                                             settings={'threshold': threshold,
@@ -517,7 +517,7 @@ def segment(ctx, model, boxes, text_direction, scale, maxcolseps,
     if boxes is False:
         if not model:
             model = [SEGMENTATION_DEFAULT_MODEL]
-        ctx.meta['steps'].append(ProcessingStep(id=str(uuid.uuid4()),
+        ctx.meta['steps'].append(ProcessingStep(id=f'_{uuid.uuid4()}',
                                                 category='processing',
                                                 description='Baseline and region segmentation',
                                                 settings={'model': [m.name for m in model],
@@ -553,7 +553,7 @@ def segment(ctx, model, boxes, text_direction, scale, maxcolseps,
                 ctx.exit(1)
             message('\u2713', fg='green')
     else:
-        ctx.meta['steps'].append(ProcessingStep(id=str(uuid.uuid4()),
+        ctx.meta['steps'].append(ProcessingStep(id=f'_{uuid.uuid4()}',
                                                 category='processing',
                                                 description='bounding box segmentation',
                                                 settings={'text_direction': text_direction,
@@ -666,7 +666,7 @@ def ocr(ctx, model, pad, reorder, base_dir, no_segmentation, text_direction):
         nn.update(nm)
         nm = nn
 
-    ctx.meta['steps'].append(ProcessingStep(id=str(uuid.uuid4()),
+    ctx.meta['steps'].append(ProcessingStep(id=f'_{uuid.uuid4()}',
                                             category='processing',
                                             description='Text line recognition',
                                             settings={'text_direction': text_direction,

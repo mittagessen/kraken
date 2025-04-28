@@ -88,6 +88,6 @@ class TranscriptionInterface(object):
             fd (File): File descriptor (mode='rb') to write to.
         """
         logger.info('Rendering and writing transcription.')
-        fd.write(self.tmpl.render(uuid=str(uuid.uuid4()), pages=self.pages,
+        fd.write(self.tmpl.render(uuid=f'_{uuid.uuid4()}', pages=self.pages,
                                   font=self.font,
                                   text_direction=self.text_direction).encode('utf-8'))

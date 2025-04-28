@@ -141,7 +141,7 @@ def parse_gt_path(path: Union[str, 'PathLike'],
     if not gt and skip_empty_lines:
         raise KrakenInputException(f'No text for ground truth line {path}.')
 
-    return BBoxLine(id=uuid.uuid4(),
+    return BBoxLine(id=f'_{uuid.uuid4()}',
                     bbox=((0, 0), (w, 0), (w, h), (0, h)),
                     text=gt,
                     base_dir=base_dir,

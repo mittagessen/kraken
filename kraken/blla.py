@@ -156,7 +156,7 @@ def vec_regions(heatmap: torch.Tensor, cls_map: Dict, scale: float, **kwargs) ->
         logger.debug(f'Vectorizing regions of type {region_type}')
         regions[region_type] = vectorize_regions(heatmap[idx])
     for reg_type, regs in regions.items():
-        regions[reg_type] = [Region(id=str(uuid.uuid4()), boundary=x, tags={'type': reg_type}) for x in scale_regions(regs, scale)]
+        regions[reg_type] = [Region(id=f'_{uuid.uuid4()}', boundary=x, tags={'type': reg_type}) for x in scale_regions(regs, scale)]
     return regions
 
 
@@ -395,7 +395,7 @@ def segment(im: PIL.Image.Image,
             line_ls = geom.LineString(line['baseline'])
             if is_in_region(line_ls, reg):
                 line_regs.append(reg_id)
-        blls.append(BaselineLine(id=str(uuid.uuid4()), baseline=line['baseline'], boundary=line['boundary'], tags=line['tags'], regions=line_regs))
+        blls.append(BaselineLine(id=f'_{uuid.uuid4()}', baseline=line['baseline'], boundary=line['boundary'], tags=line['tags'], regions=line_regs))
 
     return Segmentation(text_direction=text_direction,
                         imagename=getattr(im, 'filename', None),

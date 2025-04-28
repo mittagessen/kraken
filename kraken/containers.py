@@ -94,6 +94,7 @@ class BaselineLine:
     tags: Optional[Dict[str, str]] = None
     split: Optional[Literal['train', 'validation', 'test']] = None
     regions: Optional[List[str]] = None
+    language: Optional[List[str]] = None
 
 
 @dataclass
@@ -131,6 +132,7 @@ class BBoxLine:
     split: Optional[Literal['train', 'validation', 'test']] = None
     regions: Optional[List[str]] = None
     text_direction: Literal['horizontal-lr', 'horizontal-rl', 'vertical-lr', 'vertical-rl'] = 'horizontal-lr'
+    language: Optional[List[str]] = None
 
 
 @dataclass
@@ -149,6 +151,7 @@ class Region:
     boundary: List[Tuple[int, int]]
     imagename: Optional[Union[str, 'PathLike']] = None
     tags: Optional[Dict[str, str]] = None
+    language: Optional[List[str]] = None
 
 
 @dataclass
@@ -183,6 +186,7 @@ class Segmentation:
     lines: Optional[List[Union[BaselineLine, BBoxLine]]] = None
     regions: Optional[Dict[str, List[Region]]] = None
     line_orders: Optional[List[List[int]]] = None
+    language: Optional[List[str]] = None
 
     def __post_init__(self):
         if not self.regions:
@@ -191,6 +195,8 @@ class Segmentation:
             self.lines = []
         if not self.line_orders:
             self.line_orders = []
+        if not self.language:
+            self.language = None
         if len(self.lines) and not isinstance(self.lines[0], BBoxLine) and not isinstance(self.lines[0], BaselineLine):
             line_cls = BBoxLine if self.type == 'bbox' else BaselineLine
             self.lines = [line_cls(**line) for line in self.lines]
