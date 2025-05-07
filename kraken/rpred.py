@@ -185,7 +185,12 @@ class mm_rpred(object):
         use_legacy_polygons = self._choose_legacy_polygon_extractor(net)
 
         seg = dataclasses.replace(self.bounds, lines=[line])
-        box, coords = next(extract_polygons(self.im, seg, legacy=use_legacy_polygons))
+        try:
+            box, coords = next(extract_polygons(self.im, seg, legacy=use_legacy_polygons))
+        except KrakenInputException as e:
+            logger.warning(f'Extracting line failed: {e}')
+            return BBoxOCRRecord('', [], [], line)
+
         self.box = box
 
         # check if boxes are non-zero in any dimension
