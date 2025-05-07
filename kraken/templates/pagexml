@@ -6,6 +6,9 @@
                 {% if line.baseline %}
                 <Baseline points="{% for point in line.baseline %}{{ point|join(',') }}{% if not loop.last %} {% endif %}{% endfor %}"/>
                 {% endif %}
+                {% if line.text is string %}
+                    <TextEquiv><Unicode>{{ line.text|e }}</Unicode></TextEquiv>
+                {% else %}
                 {% for segment in line.recognition %}
                 <Word id="segment_{{ segment.index }}">
                     {% if segment.boundary %}
@@ -23,6 +26,7 @@
                 </Word>
                 {% endfor %}
                 {%+ if line.confidences|length %}<TextEquiv conf="{{ (line.confidences|sum / line.confidences|length)|round(4) }}"><Unicode>{% for segment in line.recognition %}{{ segment.text|e }}{% endfor %}</Unicode></TextEquiv>{% endif +%}
+                {% endif %}
             </TextLine>
 {%+ endmacro %}
 <?xml version="1.0" encoding="UTF-8"?>

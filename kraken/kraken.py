@@ -104,7 +104,8 @@ def binarizer(threshold, zoom, escale, border, perc, range, low, high, input, ou
                                                  image_size=res.size,
                                                  template=ctx.meta['output_template'],
                                                  template_source='custom' if ctx.meta['output_mode'] == 'template' else 'native',
-                                                 processing_steps=ctx.meta['steps']))
+                                                 processing_steps=ctx.meta['steps'],
+                                                 sub_line_segmentation=ctx.meta["subline_segmentation"]))
         else:
             form = None
             ext = Path(output).suffix
@@ -175,7 +176,8 @@ def segmenter(legacy, models, text_direction, scale, maxcolseps, black_colseps,
                                              image_size=im.size,
                                              template=ctx.meta['output_template'],
                                              template_source='custom' if ctx.meta['output_mode'] == 'template' else 'native',
-                                             processing_steps=ctx.meta['steps']))
+                                             processing_steps=ctx.meta['steps'],
+                                             sub_line_segmentation=ctx.meta["subline_segmentation"]))
     else:
         with click.open_file(output, 'w') as fp:
             fp = cast('IO[Any]', fp)
@@ -265,7 +267,8 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore, input,
                                              scripts=tags,
                                              template=ctx.meta['output_template'],
                                              template_source='custom' if ctx.meta['output_mode'] == 'template' else 'native',
-                                             processing_steps=ctx.meta['steps']))
+                                             processing_steps=ctx.meta['steps'],
+                                             sub_line_segmentation=ctx.meta["subline_segmentation"]))
         else:
             fp.write('\n'.join(s.prediction for s in preds))
         message('\u2713', fg='green')
@@ -315,8 +318,12 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore, input,
               help='Size of thread pools for intra-op parallelization')
 @click.option('--no-legacy-polygons', 'no_legacy_polygons', is_flag=True, default=False,
               help="Force disable legacy polygon extraction")
+@click.option('--subline-segmentation/--no-subline-segmentation', 'subline_segmentation',
+              is_flag=True, default=True,
+              help="Enable/disable subline segmentation in the serialization format (Default: enabled)")
 def cli(input, batch_input, suffix, verbose, format_type, pdf_format,
-        serializer, template, device, raise_on_error, autocast, threads, no_legacy_polygons):
+        serializer, template, device, raise_on_error, autocast, threads, no_legacy_polygons,
+        subline_segmentation):
     """
     Base command for recognition functionality.
 
@@ -348,6 +355,7 @@ def cli(input, batch_input, suffix, verbose, format_type, pdf_format,
     ctx.meta["autocast"] = autocast
     ctx.meta['threads'] = threads
     ctx.meta['no_legacy_polygons'] = no_legacy_polygons
+    ctx.meta['subline_segmentation'] = subline_segmentation
 
     log.set_logger(logger, level=30 - min(10 * verbose, 20))
 
