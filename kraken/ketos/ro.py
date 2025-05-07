@@ -61,7 +61,7 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
               help='Number of epochs to train for')
 @click.option('--min-epochs',
               show_default=True,
-              default=['min_epochs'],
+              default=READING_ORDER_HYPER_PARAMS['min_epochs'],
               help='Minimal number of epochs to train for when using early stopping.')
 @click.option('--lag',
               show_default=True,
