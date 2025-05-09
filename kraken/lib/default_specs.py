@@ -22,6 +22,7 @@ RECOGNITION_SPEC = '[1,120,0,1 Cr3,13,32 Do0.1,2 Mp2,2 Cr3,13,32 Do0.1,2 Mp2,2 C
 READING_ORDER_HYPER_PARAMS = {'lrate': 0.001,
                               'freq': 1.0,
                               'batch_size': 15000,
+                              'min_epochs': 500,
                               'epochs': 3000,
                               'lag': 300,
                               'min_delta': None,
