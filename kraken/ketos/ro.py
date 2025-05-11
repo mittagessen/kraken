@@ -246,7 +246,7 @@ def rotrain(ctx, batch_size, output, load, freq, quit, epochs, min_epochs, lag,
                             min_epochs=hyper_params['min_epochs'],
                             enable_progress_bar=True if not ctx.meta['verbose'] else False,
                             deterministic=ctx.meta['deterministic'],
-                            precision=int(precision),
+                            precision=precision,
                             pl_logger=pl_logger,
                             log_dir=log_dir,
                             **val_check_interval)
