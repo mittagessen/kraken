@@ -45,18 +45,31 @@ class PairWiseROSet(Dataset):
                  mode: Optional[Literal['alto', 'page', 'xml']] = 'xml',
                  level: Literal['regions', 'baselines'] = 'baselines',
                  ro_id: Optional[str] = None,
-                 class_mapping: Optional[Dict[str, int]] = None):
+                 class_mapping: Optional[Dict[str, int]] = None,
+                 valid_baselines: Sequence[str] = None,
+                 merge_baselines: Dict[str, Sequence[str]] = None,
+                 valid_regions: Sequence[str] = None,
+                 merge_regions: Dict[str, Sequence[str]] = None) -> None:
         """
         Samples pairs lines/regions from XML files for training a reading order
         model .
 
         Args:
-            mode: Either alto, page, xml, None. In alto, page, and xml
-                  mode the baseline paths and image data is retrieved from an
-                  ALTO/PageXML file. In `None` mode data is iteratively added
-                  through the `add` method.
+            mode: Selects type of data source files. 
+            level: Computes reading order tuples on line or region level.
             ro_id: ID of the reading order to sample from. Defaults to
                    `line_implicit`/`region_implicit`.
+            class_mapping: Explicit class mapping to use. No sanity checks are performed.
+            valid_baselines: Sequence of valid baseline identifiers. If `None`
+                             all are valid.
+            merge_baselines: Sequence of baseline identifiers to merge.  Note
+                             that merging occurs after entities not in valid_*
+                             have been discarded.
+            valid_regions: Sequence of valid region identifiers. If `None` all
+                           are valid.
+            merge_regions: Sequence of region identifiers to merge. Note that
+                           merging occurs after entities not in valid_* have
+                           been discarded.
         """
         super().__init__()
 
@@ -150,18 +163,31 @@ class PageWiseROSet(Dataset):
                  mode: Optional[Literal['alto', 'page', 'xml']] = 'xml',
                  level: Literal['regions', 'baselines'] = 'baselines',
                  ro_id: Optional[str] = None,
-                 class_mapping: Optional[Dict[str, int]] = None):
+                 class_mapping: Optional[Dict[str, int]] = None,
+                 valid_baselines: Sequence[str] = None,
+                 merge_baselines: Dict[str, Sequence[str]] = None,
+                 valid_regions: Sequence[str] = None,
+                 merge_regions: Dict[str, Sequence[str]] = None) -> None:
         """
-        Samples pairs lines/regions from XML files for training a reading order
-        model .
+        Samples pairs lines/regions from XML files for evaluating a reading order
+        model.
 
         Args:
-            mode: Either alto, page, xml, None. In alto, page, and xml
-                  mode the baseline paths and image data is retrieved from an
-                  ALTO/PageXML file. In `None` mode data is iteratively added
-                  through the `add` method.
+            mode: Selects type of data source files. 
+            level: Computes reading order tuples on line or region level.
             ro_id: ID of the reading order to sample from. Defaults to
                    `line_implicit`/`region_implicit`.
+            class_mapping: Explicit class mapping to use. No sanity checks are performed.
+            valid_baselines: Sequence of valid baseline identifiers. If `None`
+                             all are valid.
+            merge_baselines: Sequence of baseline identifiers to merge.  Note
+                             that merging occurs after entities not in valid_*
+                             have been discarded.
+            valid_regions: Sequence of valid region identifiers. If `None` all
+                           are valid.
+            merge_regions: Sequence of region identifiers to merge. Note that
+                           merging occurs after entities not in valid_* have
+                           been discarded.
         """
         super().__init__()
 

@@ -25,7 +25,7 @@ import click
 from PIL import Image
 
 from kraken.ketos.util import (_expand_gt, _validate_manifests, message,
-                               to_ptl_device)
+                               to_ptl_device, _validate_merging)
 
 from kraken.lib.register import OPTIMIZERS, SCHEDULERS, STOPPERS, PRECISIONS
 from kraken.lib.default_specs import READING_ORDER_HYPER_PARAMS
@@ -128,6 +128,28 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
               help='Sets the training data format. In ALTO and PageXML mode all '
               'data is extracted from xml files containing both baselines and a '
               'link to source images.')
+@click.option('--suppress-regions/--no-suppress-regions', show_default=True,
+              default=False, help='Disables region segmentation training.')
+@click.option('--suppress-baselines/--no-suppress-baselines', show_default=True,
+              default=False, help='Disables baseline segmentation training.')
+@click.option('-vr', '--valid-regions', show_default=True, default=None, multiple=True,
+              help='Valid region types in training data. May be used multiple times.')
+@click.option('-vb', '--valid-baselines', show_default=True, default=None, multiple=True,
+              help='Valid baseline types in training data. May be used multiple times.')
+@click.option('-mr',
+              '--merge-regions',
+              show_default=True,
+              default=None,
+              help='Region merge mapping. One or more mappings of the form `$target:$src` where $src is merged into $target.',
+              multiple=True,
+              callback=_validate_merging)
+@click.option('-mb',
+              '--merge-baselines',
+              show_default=True,
+              default=None,
+              help='Baseline type merge mapping. Same syntax as `--merge-regions`',
+              multiple=True,
+              callback=_validate_merging)
 @click.option('--logger', 'pl_logger', show_default=True, type=click.Choice(['tensorboard']), default=None,
               help='Logger used by PyTorch Lightning to track metrics such as loss and accuracy.')
 @click.option('--log-dir', show_default=True, type=click.Path(exists=True, dir_okay=True, writable=True),
@@ -141,7 +163,9 @@ def rotrain(ctx, batch_size, output, load, freq, quit, epochs, min_epochs, lag,
             min_delta, device, precision, optimizer, lrate, momentum,
             weight_decay, warmup, schedule, gamma, step_size, sched_patience,
             cos_max, cos_min_lr, partition, training_files, evaluation_files,
-            workers, threads, load_hyper_parameters, format_type, pl_logger,
+            workers, threads, load_hyper_parameters, format_type,
+            suppress_regions, suppress_baselines, valid_regions,
+            valid_baselines, merge_regions, merge_baselines, pl_logger,
             log_dir, level, reading_order, ground_truth):
     """
     Trains a baseline labeling model for layout analysis
@@ -150,7 +174,7 @@ def rotrain(ctx, batch_size, output, load, freq, quit, epochs, min_epochs, lag,
 
     from threadpoolctl import threadpool_limits
 
-    from kraken.lib.ro import ROModel
+    from kraken.lib.ro import ROModel, RODataModule
     from kraken.lib.train import KrakenTrainer
 
     if not (0 <= freq <= 1) and freq % 1.0 != 0:
@@ -213,31 +237,40 @@ def rotrain(ctx, batch_size, output, load, freq, quit, epochs, min_epochs, lag,
     else:
         val_check_interval = {'val_check_interval': hyper_params['freq']}
 
+    class_mapping = None
+
     if load:
-        model = ROModel.load_from_checkpoint(load,
-                                             training_data=ground_truth,
-                                             evaluation_data=evaluation_files,
-                                             partition=partition,
-                                             num_workers=workers,
-                                             load_hyper_parameters=load_hyper_parameters,
-                                             format_type=format_type)
-    else:
-        model = ROModel(hyper_params,
-                        output=output,
-                        training_data=ground_truth,
-                        evaluation_data=evaluation_files,
-                        partition=partition,
-                        num_workers=workers,
-                        load_hyper_parameters=load_hyper_parameters,
-                        format_type=format_type,
-                        level=level,
-                        reading_order=reading_order)
+        model = ROModel.load_from_checkpoint(load)
+        class_mapping = model.hparams.class_mapping
+
+    dm = RODataModule(batch_size=hyper_params.pop('batch_size'),
+                      training_data=ground_truth,
+                      evaluation_data=evaluation_files,
+                      partition=partition,
+                      num_workers=workers,
+                      format_type=format_type,
+                      class_mapping=class_mapping,
+                      suppress_regions=suppress_regions,
+                      suppress_baselines=suppress_baselines,
+                      valid_regions=valid_regions,
+                      valid_baselines=valid_baselines,
+                      merge_regions=merge_regions,
+                      merge_baselines=merge_baselines,
+                      reading_order=reading_order)
+
+    dm.setup('fit')
+
+    if not load:
+        model = ROModel(feature_dim=dm.get_feature_dim(),
+                        class_mapping=dm.get_class_mapping(),
+                        hyper_params=hyper_params,
+                        output=output)
 
     message(f'Training RO on following {level} types:')
-    for k, v in model.train_set.dataset.class_mapping.items():
+    for k, v in dm.get_class_mapping().items():
         message(f'  {k}\t{v}')
 
-    if len(model.train_set) == 0:
+    if len(dm.train_set) == 0:
         raise click.UsageError('No valid training data was provided to the train command. Use `-t` or the `ground_truth` argument.')
 
     trainer = KrakenTrainer(accelerator=accelerator,
@@ -252,7 +285,7 @@ def rotrain(ctx, batch_size, output, load, freq, quit, epochs, min_epochs, lag,
                             **val_check_interval)
 
     with threadpool_limits(limits=threads):
-        trainer.fit(model)
+        trainer.fit(model, dm)
 
     if model.best_epoch == -1:
         logger.warning('Model did not improve during training.')
@@ -283,7 +316,7 @@ def roadd(ctx, output, ro_model, seg_model):
     message(f'Adding {ro_model} reading order model to {seg_model}.')
     ro_net = ROModel.load_from_checkpoint(ro_model)
     message('Line classes known to RO model:')
-    for k, v in ro_net.class_mapping.items():
+    for k, v in ro_net.hparams.class_mapping.items():
         message(f'  {k}\t{v}')
     seg_net = vgsl.TorchVGSLModel.load_model(seg_model)
     if seg_net.model_type != 'segmentation':
@@ -291,12 +324,12 @@ def roadd(ctx, output, ro_model, seg_model):
     message('Line classes known to segmentation model:')
     for k, v in seg_net.user_metadata['class_mapping']['baselines'].items():
         message(f'  {k}\t{v}')
-    diff = set(ro_net.class_mapping.keys()).symmetric_difference(set(seg_net.user_metadata['class_mapping']['baselines'].keys()))
+    diff = set(ro_net.hparams.class_mapping.keys()).symmetric_difference(set(seg_net.user_metadata['class_mapping']['baselines'].keys()))
     diff.discard('default')
     if len(diff):
         raise click.UsageError(f'Model {seg_model} and {ro_model} class mappings mismatch.')
 
     seg_net.aux_layers = {'ro_model': ro_net.ro_net}
-    seg_net.user_metadata['ro_class_mapping'] = ro_net.class_mapping
+    seg_net.user_metadata['ro_class_mapping'] = ro_net.hparams.class_mapping
     message(f'Saving combined model to {output}')
     seg_net.save_model(output)

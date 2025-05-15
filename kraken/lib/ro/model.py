@@ -29,6 +29,7 @@ import torch.nn.functional as F
 from lightning.pytorch.callbacks import EarlyStopping, LearningRateMonitor
 from torch.optim import lr_scheduler
 from torch.utils.data import DataLoader, Subset
+from torchmetrics.aggregation import MeanMetric
 
 from kraken.lib import default_specs
 from kraken.lib.dataset import PageWiseROSet, PairWiseROSet
@@ -63,19 +64,115 @@ class DummyVGSLModel:
 def spearman_footrule_distance(s, t):
     return (s - t).abs().sum() / (0.5 * (len(s) ** 2 - (len(s) % 2)))
 
-
-class ROModel(L.LightningModule):
+class RODataModule(L.LightningDataModule):
     def __init__(self,
-                 hyper_params: Dict[str, Any] = None,
-                 output: str = 'model',
+                 batch_size: int = 16000,
                  training_data: Union[Sequence[Union['PathLike', str]], Sequence[Dict[str, Any]]] = None,
                  evaluation_data: Optional[Union[Sequence[Union['PathLike', str]], Sequence[Dict[str, Any]]]] = None,
                  partition: Optional[float] = 0.9,
                  num_workers: int = 1,
                  format_type: Literal['alto', 'page', 'xml'] = 'xml',
-                 load_hyper_parameters: bool = False,
                  level: Literal['baselines', 'regions'] = 'baselines',
+                 class_mapping: Optional[Dict[str, int]] = None,
+                 suppress_regions: bool = False,
+                 suppress_baselines: bool = False,
+                 valid_regions: Optional[Sequence[str]] = None,
+                 valid_baselines: Optional[Sequence[str]] = None,
+                 merge_regions: Optional[Dict[str, str]] = None,
+                 merge_baselines: Optional[Dict[str, str]] = None,
                  reading_order: Optional[str] = None):
+        super().__init__()
+
+        self.save_hyperparameters()
+        
+    def setup(self, stage: str):
+        """
+        Builds the datasets.
+        """
+        training_data = self.hparams.training_data
+        evaluation_data = self.hparams.evaluation_data
+        partition = self.hparams.partition
+
+        suppress_regions = self.hparams.suppress_regions
+        suppress_baselines = self.hparams.suppress_baselines
+        valid_regions = self.hparams.valid_regions
+        valid_baselines = self.hparams.valid_baselines
+        merge_regions = self.hparams.merge_regions
+        merge_baselines = self.hparams.merge_baselines
+
+        if not valid_regions:
+            valid_regions = None
+        if not valid_baselines:
+            valid_baselines = None
+
+        if suppress_regions:
+            valid_regions = []
+            merge_regions = None
+        if suppress_baselines:
+            valid_baselines = []
+            merge_baselines = None
+
+        if not evaluation_data:
+            np.random.shuffle(training_data)
+            training_data = training_data[:int(partition*len(training_data))]
+            evaluation_data = training_data[int(partition*len(training_data)):]
+        train_set = PairWiseROSet(training_data,
+                                  mode=self.hparams.format_type,
+                                  level=self.hparams.level,
+                                  ro_id=self.hparams.reading_order,
+                                  class_mapping=self.hparams.class_mapping,
+                                  valid_baselines=valid_baselines,
+                                  merge_baselines=merge_baselines,
+                                  valid_regions=valid_regions,
+                                  merge_regions=merge_regions)
+        self.train_set = Subset(train_set, range(len(train_set)))
+        self.class_mapping = train_set.class_mapping
+        val_set = PageWiseROSet(evaluation_data,
+                                mode=self.hparams.format_type,
+                                class_mapping=self.class_mapping,
+                                level=self.hparams.level,
+                                ro_id=self.hparams.reading_order,
+                                valid_baselines=valid_baselines,
+                                merge_baselines=merge_baselines,
+                                valid_regions=valid_regions,
+                                merge_regions=merge_regions)
+
+        self.val_set = Subset(val_set, range(len(val_set)))
+
+        if len(self.train_set) == 0 or len(self.val_set) == 0:
+            raise ValueError('No valid training data was provided to the train '
+                             'command. Please add valid XML, line, or binary data.')
+
+        logger.info(f'Training set {len(self.train_set)} lines, validation set '
+                    f'{len(self.val_set)} lines')
+
+    def train_dataloader(self):
+        return DataLoader(self.train_set,
+                          batch_size=self.hparams.batch_size,
+                          num_workers=self.hparams.num_workers,
+                          pin_memory=True,
+                          shuffle=False)
+
+    def val_dataloader(self):
+        return DataLoader(self.val_set,
+                          shuffle=False,
+                          batch_size=self.hparams.batch_size,
+                          num_workers=self.hparams.num_workers,
+                          pin_memory=True)
+
+    def get_feature_dim(self):
+        return self.train_set.dataset.get_feature_dim()
+
+    def get_class_mapping(self):
+        return self.class_mapping
+
+
+class ROModel(L.LightningModule):
+    def __init__(self,
+                 feature_dim: int,
+                 class_mapping: Dict[str, int],
+                 hyper_params: Dict[str, Any] = None,
+                 output: 'os.PathLike' = 'model') -> None:
         """
         A LightningModule encapsulating the unsupervised pretraining setup for
         a text recognition model.
@@ -96,40 +193,14 @@ class ROModel(L.LightningModule):
         if hyper_params:
             self.hyper_params.update(hyper_params)
 
-        if not evaluation_data:
-            np.random.shuffle(training_data)
-            training_data = training_data[:int(partition*len(training_data))]
-            evaluation_data = training_data[int(partition*len(training_data)):]
-        train_set = PairWiseROSet(training_data,
-                                  mode=format_type,
-                                  level=level,
-                                  ro_id=reading_order)
-        self.train_set = Subset(train_set, range(len(train_set)))
-        self.class_mapping = train_set.class_mapping
-        val_set = PageWiseROSet(evaluation_data,
-                                mode=format_type,
-                                class_mapping=train_set.class_mapping,
-                                level=level,
-                                ro_id=reading_order)
-        self.val_set = Subset(val_set, range(len(val_set)))
-
-        if len(self.train_set) == 0 or len(self.val_set) == 0:
-            raise ValueError('No valid training data was provided to the train '
-                             'command. Please add valid XML, line, or binary data.')
-
-        logger.info(f'Training set {len(self.train_set)} lines, validation set '
-                    f'{len(self.val_set)} lines')
-
         self.output = output
         self.criterion = torch.nn.BCEWithLogitsLoss()
-
-        self.num_workers = num_workers
 
         self.best_epoch = -1
         self.best_metric = torch.inf
 
         logger.info('Creating new RO model')
-        self.ro_net = MLP(train_set.get_feature_dim(), train_set.get_feature_dim() * 2)
+        self.ro_net = MLP(feature_dim, feature_dim * 2)
 
         if 'file_system' in torch.multiprocessing.get_all_sharing_strategies():
             logger.debug('Setting multiprocessing tensor sharing strategy to file_system')
@@ -137,8 +208,8 @@ class ROModel(L.LightningModule):
 
         self.nn = DummyVGSLModel(ptl_module=self)
 
-        self.val_losses = []
-        self.val_spearman = []
+        self.val_losses = MeanMetric()
+        self.val_spearman = MeanMetric()
 
         self.save_hyperparameters()
 
@@ -160,13 +231,13 @@ class ROModel(L.LightningModule):
         spearman_dist = spearman_footrule_distance(torch.tensor(range(num_lines)), path)
         self.log('val_spearman', spearman_dist)
         loss = self.criterion(logits, ys.squeeze())
-        self.val_losses.append(loss.cpu())
-        self.val_spearman.append(spearman_dist.cpu())
+        self.val_losses.update(loss)
+        self.val_spearman.update(spearman_dist)
 
     def on_validation_epoch_end(self):
         if not self.trainer.sanity_checking:
-            val_metric = np.mean(self.val_spearman)
-            val_loss = np.mean(self.val_losses)
+            val_metric = self.val_spearman.compute()
+            val_loss = self.val_losses.compute()
 
             if val_metric < self.best_metric:
                 logger.debug(f'Updating best metric from {self.best_metric} ({self.best_epoch}) to {val_metric} ({self.current_epoch})')
@@ -177,8 +248,8 @@ class ROModel(L.LightningModule):
             self.log('val_metric', val_metric, on_step=False, on_epoch=True, prog_bar=False, logger=True)
             self.log('val_loss', val_loss, on_step=False, on_epoch=True, prog_bar=True, logger=True)
 
-        self.val_spearman.clear()
-        self.val_losses.clear()
+        self.val_spearman.reset()
+        self.val_losses.reset()
 
     def training_step(self, batch, batch_idx):
         x, y = batch['sample'], batch['target']
@@ -191,18 +262,6 @@ class ROModel(L.LightningModule):
                  prog_bar=True,
                  logger=True)
         return loss
-
-    def train_dataloader(self):
-        return DataLoader(self.train_set,
-                          batch_size=self.hyper_params['batch_size'],
-                          num_workers=self.num_workers,
-                          pin_memory=True)
-
-    def val_dataloader(self):
-        return DataLoader(self.val_set,
-                          batch_size=1,
-                          num_workers=self.num_workers,
-                          pin_memory=True)
 
     def save_checkpoint(self, filename):
         self.trainer.save_checkpoint(filename)
@@ -227,7 +286,6 @@ class ROModel(L.LightningModule):
     def configure_optimizers(self):
         return _configure_optimizer_and_lr_scheduler(self.hparams.hyper_params,
                                                      self.ro_net.parameters(),
-                                                     len_train_set=len(self.train_set),
                                                      loss_tracking_mode='min')
 
     def optimizer_step(self, epoch, batch_idx, optimizer, optimizer_closure):
