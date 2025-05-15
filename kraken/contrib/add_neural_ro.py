@@ -37,7 +37,7 @@ def cli(format_type, model, files):
     except:
         from kraken.lib.ro import ROModel
         net = ROModel.load_from_checkpoint(model)
-        ro_class_mapping = net.class_mapping
+        ro_class_mapping = net.hparams.class_mapping
         ro_model = net.ro_net
 
     for doc in files:
