@@ -605,7 +605,9 @@ class TorchVGSLModel(object):
     def build_ro(self,
                  input: Tuple[int, int, int, int],
                  blocks: List[str],
-                 idx: int) -> Union[Tuple[None, None, None], Tuple[Tuple[int, int, int, int], str, Callable]]:
+                 idx: int,
+                 target_output_shape: Optional[Tuple[int, int, int, int]] = None) -> Union[Tuple[None, None, None],
+                                                                                            Tuple[Tuple[int, int, int, int], str, Callable]]:
         """
         Builds a RO determination layer.
         """

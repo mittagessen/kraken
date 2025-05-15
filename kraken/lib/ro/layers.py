@@ -37,6 +37,7 @@ class MLP(nn.Module):
         """
         Calculates the output shape from input 4D tuple NCHW.
         """
+        self.output_shape = input
         return input
 
     def get_spec(self, name) -> 'VGSLBlock':
