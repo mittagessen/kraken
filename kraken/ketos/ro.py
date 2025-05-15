@@ -291,7 +291,9 @@ def roadd(ctx, output, ro_model, seg_model):
     message('Line classes known to segmentation model:')
     for k, v in seg_net.user_metadata['class_mapping']['baselines'].items():
         message(f'  {k}\t{v}')
-    if ro_net.class_mapping.keys() != seg_net.user_metadata['class_mapping']['baselines'].keys():
+    diff = set(ro_net.class_mapping.keys()).symmetric_difference(set(seg_net.user_metadata['class_mapping']['baselines'].keys()))
+    diff.discard('default')
+    if len(diff):
         raise click.UsageError(f'Model {seg_model} and {ro_model} class mappings mismatch.')
 
     seg_net.aux_layers = {'ro_model': ro_net.ro_net}
