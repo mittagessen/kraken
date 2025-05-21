@@ -164,12 +164,10 @@ def _validate_merging(ctx, param, value):
               default=False, help='Forces input images to be binary, otherwise '
               'the appropriate color format will be auto-determined through the '
               'network specification. Will be ignored in `path` mode.')
-@click.option('-f', '--format-type', type=click.Choice(['path', 'xml', 'alto', 'page']), default='xml',
+@click.option('-f', '--format-type', type=click.Choice(['xml', 'alto', 'page']), default='xml',
               help='Sets the training data format. In ALTO and PageXML mode all '
               'data is extracted from xml files containing both baselines and a '
-              'link to source images. In `path` mode arguments are image files '
-              'sharing a prefix up to the last extension with JSON `.path` files '
-              'containing the baseline information.')
+              'link to source images.')
 @click.option('--suppress-regions/--no-suppress-regions', show_default=True,
               default=False, help='Disables region segmentation training.')
 @click.option('--suppress-baselines/--no-suppress-baselines', show_default=True,
@@ -388,12 +386,10 @@ def segtrain(ctx, output, spec, line_width, pad, load, freq, quit, epochs,
               default=False, help='Forces input images to be binary, otherwise '
               'the appropriate color format will be auto-determined through the '
               'network specification. Will be ignored in `path` mode.')
-@click.option('-f', '--format-type', type=click.Choice(['path', 'xml', 'alto', 'page']), default='xml',
+@click.option('-f', '--format-type', type=click.Choice(['xml', 'alto', 'page']), default='xml',
               help='Sets the training data format. In ALTO and PageXML mode all '
               'data is extracted from xml files containing both baselines and a '
-              'link to source images. In `path` mode arguments are image files '
-              'sharing a prefix up to the last extension with JSON `.path` files '
-              'containing the baseline information.')
+              'link to source images.')
 @click.option('--suppress-regions/--no-suppress-regions', show_default=True,
               default=False, help='Disables region segmentation training.')
 @click.option('--suppress-baselines/--no-suppress-baselines', show_default=True,
@@ -436,133 +432,137 @@ def segtest(ctx, model, evaluation_files, device, workers, threads, threshold,
     from threadpoolctl import threadpool_limits
     from torch.utils.data import DataLoader
 
+    from lightning.fabric import Fabric
+
+    from kraken.lib.xml import XMLPage
     from kraken.lib.progress import KrakenProgressBar
     from kraken.lib.train import BaselineSet, ImageInputTransforms
     from kraken.lib.vgsl import TorchVGSLModel
 
     logger.info('Building test set from {} documents'.format(len(test_set) + len(evaluation_files)))
 
-    message('Loading model {}\t'.format(model), nl=False)
-    nn = TorchVGSLModel.load_model(model)
-    message('\u2713', fg='green')
-
-    test_set = list(test_set)
-    if evaluation_files:
-        test_set.extend(evaluation_files)
-
-    if len(test_set) == 0:
-        raise click.UsageError('No evaluation data was provided to the test command. Use `-e` or the `test_set` argument.')
-
-    _batch, _channels, _height, _width = nn.input
-    transforms = ImageInputTransforms(
-        _batch,
-        _height, _width, _channels, 0,
-        valid_norm=False, force_binarization=force_binarization
-    )
-    if 'file_system' in torch.multiprocessing.get_all_sharing_strategies():
-        logger.debug('Setting multiprocessing tensor sharing strategy to file_system')
-        torch.multiprocessing.set_sharing_strategy('file_system')
-
-    if not valid_regions:
-        valid_regions = None
-    if not valid_baselines:
-        valid_baselines = None
-
-    if suppress_regions:
-        valid_regions = []
-        merge_regions = None
-    if suppress_baselines:
-        valid_baselines = []
-        merge_baselines = None
-
-    test_set = BaselineSet(test_set,
-                           line_width=nn.user_metadata["hyper_params"]["line_width"],
-                           im_transforms=transforms,
-                           mode=format_type,
-                           augmentation=False,
-                           valid_baselines=valid_baselines,
-                           merge_baselines=merge_baselines,
-                           valid_regions=valid_regions,
-                           merge_regions=merge_regions)
-
-    test_set.class_mapping = nn.user_metadata["class_mapping"]
-    test_set.num_classes = sum([len(classDict) for classDict in test_set.class_mapping.values()])
-
-    baselines_diff = set(test_set.class_stats["baselines"].keys()).difference(test_set.class_mapping["baselines"].keys())
-    regions_diff = set(test_set.class_stats["regions"].keys()).difference(test_set.class_mapping["regions"].keys())
-
-    if baselines_diff:
-        message(f'Model baseline types missing in test set: {", ".join(sorted(list(baselines_diff)))}')
-
-    if regions_diff:
-        message(f'Model region types missing in the test set: {", ".join(sorted(list(regions_diff)))}')
-
     try:
         accelerator, device = to_ptl_device(device)
-        if device:
-            device = f'{accelerator}:{device}'
-        else:
-            device = accelerator
     except Exception as e:
         raise click.BadOptionUsage('device', str(e))
 
-    if len(test_set) == 0:
-        raise click.UsageError('No evaluation data was provided to the test command. Use `-e` or the `test_set` argument.')
+    fabric = Fabric(accelerator=accelerator, devices=device)
 
-    ds_loader = DataLoader(test_set, batch_size=1, num_workers=workers, pin_memory=True)
+    with torch.inference_mode(), threadpool_limits(limits=threads), fabric.init_tensor(), fabric.init_module():
+        message('Loading model {}\t'.format(model), nl=False)
+        nn = TorchVGSLModel.load_model(model)
+        message('\u2713', fg='green')
 
-    nn.to(device)
-    nn.eval()
-    nn.set_num_threads(1)
-    pages = []
+        test_set = list(test_set)
+        if evaluation_files:
+            test_set.extend(evaluation_files)
 
-    lines_idx = list(test_set.class_mapping["baselines"].values())
-    regions_idx = list(test_set.class_mapping["regions"].values())
+        if len(test_set) == 0:
+            raise click.UsageError('No evaluation data was provided to the test command. Use `-e` or the `test_set` argument.')
 
-    with KrakenProgressBar() as progress:
-        batches = len(ds_loader)
-        pred_task = progress.add_task('Evaluating', total=batches, visible=True if not ctx.meta['verbose'] else False)
-        with threadpool_limits(limits=threads):
-            for batch in ds_loader:
-                x, y = batch['image'], batch['target']
-                try:
-                    pred, _ = nn.nn(x)
-                    # scale target to output size
-                    y = F.interpolate(y, size=(pred.size(2), pred.size(3))).squeeze(0).bool()
-                    pred = pred.squeeze() > threshold
-                    pred = pred.view(pred.size(0), -1)
-                    y = y.view(y.size(0), -1)
-                    pages.append({
-                        'intersections': (y & pred).sum(dim=1, dtype=torch.double),
-                        'unions': (y | pred).sum(dim=1, dtype=torch.double),
-                        'corrects': torch.eq(y, pred).sum(dim=1, dtype=torch.double),
-                        'cls_cnt': y.sum(dim=1, dtype=torch.double),
-                        'all_n': torch.tensor(y.size(1), dtype=torch.double, device=device)
-                    })
-                    if lines_idx:
-                        y_baselines = y[lines_idx].sum(dim=0, dtype=torch.bool)
-                        pred_baselines = pred[lines_idx].sum(dim=0, dtype=torch.bool)
-                        pages[-1]["baselines"] = {
-                            'intersections': (y_baselines & pred_baselines).sum(dim=0, dtype=torch.double),
-                            'unions': (y_baselines | pred_baselines).sum(dim=0, dtype=torch.double),
-                        }
-                    if regions_idx:
-                        y_regions_idx = y[regions_idx].sum(dim=0, dtype=torch.bool)
-                        pred_regions_idx = pred[regions_idx].sum(dim=0, dtype=torch.bool)
-                        pages[-1]["regions"] = {
-                            'intersections': (y_regions_idx & pred_regions_idx).sum(dim=0, dtype=torch.double),
-                            'unions': (y_regions_idx | pred_regions_idx).sum(dim=0, dtype=torch.double),
-                        }
+        _batch, _channels, _height, _width = nn.input
+        transforms = ImageInputTransforms(
+            _batch,
+            _height, _width, _channels, 0,
+            valid_norm=False, force_binarization=force_binarization
+        )
 
-                except FileNotFoundError as e:
-                    batches -= 1
-                    progress.update(pred_task, total=batches)
-                    logger.warning('{} {}. Skipping.'.format(e.strerror, e.filename))
-                except KrakenInputException as e:
-                    batches -= 1
-                    progress.update(pred_task, total=batches)
-                    logger.warning(str(e))
-                progress.update(pred_task, advance=1)
+        if 'file_system' in torch.multiprocessing.get_all_sharing_strategies():
+            logger.debug('Setting multiprocessing tensor sharing strategy to file_system')
+            torch.multiprocessing.set_sharing_strategy('file_system')
+
+        if not valid_regions:
+            valid_regions = None
+        if not valid_baselines:
+            valid_baselines = None
+
+        if suppress_regions:
+            valid_regions = []
+            merge_regions = None
+        if suppress_baselines:
+            valid_baselines = []
+            merge_baselines = None
+
+        test_ds = BaselineSet(line_width=nn.user_metadata["hyper_params"]["line_width"],
+                              im_transforms=transforms,
+                              augmentation=False,
+                              valid_baselines=valid_baselines,
+                              merge_baselines=merge_baselines,
+                              valid_regions=valid_regions,
+                              merge_regions=merge_regions)
+
+        for doc in test_set:
+            try:
+                test_ds.add(XMLPage(doc).to_container())
+            except Exception as e:
+                logger.warning(f'Failed to parse {doc}: {e}')
+
+        test_ds.class_mapping = nn.user_metadata["class_mapping"]
+        test_ds.num_classes = sum([len(classDict) for classDict in test_ds.class_mapping.values()])
+
+        baselines_diff = set(test_ds.class_stats["baselines"].keys()).difference(test_ds.class_mapping["baselines"].keys())
+        regions_diff = set(test_ds.class_stats["regions"].keys()).difference(test_ds.class_mapping["regions"].keys())
+
+        if baselines_diff:
+            message(f'Model baseline types missing in test set: {", ".join(sorted(list(baselines_diff)))}')
+
+        if regions_diff:
+            message(f'Model region types missing in the test set: {", ".join(sorted(list(regions_diff)))}')
+
+        if len(test_ds) == 0:
+            raise click.UsageError('No evaluation data was provided to the test command. Use `-e` or the `test_set` argument.')
+
+        ds_loader = DataLoader(test_ds, batch_size=1, num_workers=workers, pin_memory=True)
+
+        pages = []
+
+        lines_idx = list(test_ds.class_mapping["baselines"].values())
+        regions_idx = list(test_ds.class_mapping["regions"].values())
+
+        with KrakenProgressBar() as progress:
+            batches = len(ds_loader)
+            pred_task = progress.add_task('Evaluating', total=batches, visible=True if not ctx.meta['verbose'] else False)
+            with threadpool_limits(limits=threads):
+                for batch in ds_loader:
+                    x, y = batch['image'], batch['target']
+                    try:
+                        pred, _ = nn.nn(x)
+                        # scale target to output size
+                        y = F.interpolate(y, size=(pred.size(2), pred.size(3))).squeeze(0).bool()
+                        pred = pred.squeeze() > threshold
+                        pred = pred.view(pred.size(0), -1)
+                        y = y.view(y.size(0), -1)
+                        pages.append({
+                            'intersections': (y & pred).sum(dim=1, dtype=torch.double),
+                            'unions': (y | pred).sum(dim=1, dtype=torch.double),
+                            'corrects': torch.eq(y, pred).sum(dim=1, dtype=torch.double),
+                            'cls_cnt': y.sum(dim=1, dtype=torch.double),
+                            'all_n': torch.tensor(y.size(1), dtype=torch.double, device=device)
+                        })
+                        if lines_idx:
+                            y_baselines = y[lines_idx].sum(dim=0, dtype=torch.bool)
+                            pred_baselines = pred[lines_idx].sum(dim=0, dtype=torch.bool)
+                            pages[-1]["baselines"] = {
+                                'intersections': (y_baselines & pred_baselines).sum(dim=0, dtype=torch.double),
+                                'unions': (y_baselines | pred_baselines).sum(dim=0, dtype=torch.double),
+                            }
+                        if regions_idx:
+                            y_regions_idx = y[regions_idx].sum(dim=0, dtype=torch.bool)
+                            pred_regions_idx = pred[regions_idx].sum(dim=0, dtype=torch.bool)
+                            pages[-1]["regions"] = {
+                                'intersections': (y_regions_idx & pred_regions_idx).sum(dim=0, dtype=torch.double),
+                                'unions': (y_regions_idx | pred_regions_idx).sum(dim=0, dtype=torch.double),
+                            }
+
+                    except FileNotFoundError as e:
+                        batches -= 1
+                        progress.update(pred_task, total=batches)
+                        logger.warning('{} {}. Skipping.'.format(e.strerror, e.filename))
+                    except KrakenInputException as e:
+                        batches -= 1
+                        progress.update(pred_task, total=batches)
+                        logger.warning(str(e))
+                    progress.update(pred_task, advance=1)
 
     # Accuracy / pixel
     corrects = torch.stack([x['corrects'] for x in pages], -1).sum(dim=-1)
@@ -608,11 +608,11 @@ def segtest(ctx, model, evaluation_files, device, workers, threads, threshold,
     class_iu = class_iu.tolist()
     class_pixel_accuracy = class_pixel_accuracy.tolist()
     for (cat, class_name), iu, pix_acc in zip(
-        [(cat, key) for (cat, subcategory) in test_set.class_mapping.items() for key in subcategory],
+        [(cat, key) for (cat, subcategory) in test_ds.class_mapping.items() for key in subcategory],
         class_iu,
         class_pixel_accuracy
     ):
-        table.add_row(cat, class_name, f'{pix_acc:.3f}', f'{iu:.3f}', f'{test_set.class_stats[cat][class_name]}' if cat != "aux" else 'N/A')
+        table.add_row(cat, class_name, f'{pix_acc:.3f}', f'{iu:.3f}', f'{test_ds.class_stats[cat][class_name]}' if cat != "aux" else 'N/A')
 
     console = Console()
     console.print(table)
