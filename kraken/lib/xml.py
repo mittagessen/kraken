@@ -112,7 +112,7 @@ class XMLPage(object):
                 raise ValueError('Parsing {} failed: {}'.format(self.filename, e))
             image = doc.find('.//{*}fileName')
             if image is None or not image.text:
-                raise ValueError('No valid image filename found in ALTO file {self.filename}')
+                raise ValueError(f'No valid image filename found in ALTO file {self.filename}')
 
             self.imagename = base_directory.joinpath(image.text)
             page = doc.find('.//{*}Page')
