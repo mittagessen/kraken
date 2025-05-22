@@ -276,10 +276,22 @@ class RecognitionModel(L.LightningModule):
         valid_norm = True
         if format_type in ['xml', 'page', 'alto']:
             logger.info(f'Parsing {len(training_data)} XML files for training data')
-            training_data = [{'page': XMLPage(file, format_type).to_container()} for file in training_data]
+            _training_data = []
+            for file in training_data:
+                try:
+                    _training_data.append({'page': XMLPage(file, format_type).to_container()})
+                except Exception as e:
+                    logger.warning(f'Failed to parse {file}: {e}')
+            training_data = _training_data
             if evaluation_data:
                 logger.info(f'Parsing {len(evaluation_data)} XML files for validation data')
-                evaluation_data = [{'page': XMLPage(file, format_type).to_container()} for file in evaluation_data]
+                _evaluation_data = []
+                for file in evaluation_data:
+                    try:
+                        _evaluation_data.append({'page': XMLPage(file, format_type).to_container()})
+                    except Exception as e:
+                        logger.warning(f'Failed to parse {file}: {e}')
+                evaluation_data = _evaluation_data
             if binary_dataset_split:
                 logger.warning('Internal binary dataset splits are enabled but using non-binary dataset files. Will be ignored.')
                 binary_dataset_split = False
@@ -803,10 +815,22 @@ class SegmentationModel(L.LightningModule):
 
         if format_type in ['xml', 'page', 'alto']:
             logger.info(f'Parsing {len(training_data)} XML files for training data')
-            training_data = [XMLPage(file, format_type).to_container() for file in training_data]
+            _training_data = []
+            for file in training_data:
+                try:
+                    _training_data.append(XMLPage(file, format_type).to_container())
+                except Exception as e:
+                    logger.warning(f'Failed to parse {file}: {e}')
+            training_data = _training_data
             if evaluation_data:
+                _evaluation_data = []
                 logger.info(f'Parsing {len(evaluation_data)} XML files for validation data')
-                evaluation_data = [XMLPage(file, format_type).to_container() for file in evaluation_data]
+                for file in evaluation_data:
+                    try:
+                        _evaluation_data.append(XMLPage(file, format_type).to_container())
+                    except Exception as e:
+                        logger.warning(f'Failed to parse {file}: {e}')
+                evaluation_data = _evaluation_data
         elif not format_type:
             pass
         else:
