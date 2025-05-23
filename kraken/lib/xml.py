@@ -25,7 +25,7 @@ from typing import (TYPE_CHECKING, Any, Dict, List, Literal, Optional,
 
 from lxml import etree
 
-from kraken.containers import BaselineLine, Region, Segmentation
+from kraken.containers import BBoxLine, BaselineLine, Region, Segmentation
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +60,17 @@ alto_regions = {'TextBlock': 'text',
 
 
 class XMLPage(object):
+    """
+    Parses XML facsimiles in ALTO or PageXML format.
 
+    The parser is able to deal with most (but not all) features supported by
+    those standards. In particular, any data below the line level is discarded.
+
+    Args:
+        filename: Path to the XML file
+        filetype: Selector for explicit subparser choice.
+        linetype: Parse line data as baselines or bounding box type.
+    """
     type: Literal['baselines', 'bbox'] = 'baselines'
     base_dir: Optional[Literal['L', 'R']] = None
     imagename: 'PathLike' = None
@@ -73,10 +83,12 @@ class XMLPage(object):
 
     def __init__(self,
                  filename: Union[str, 'PathLike'],
-                 filetype: Literal['xml', 'alto', 'page'] = 'xml'):
+                 filetype: Literal['xml', 'alto', 'page'] = 'xml',
+                 linetype: Literal['baselines', 'bbox'] = 'baselines'):
         super().__init__()
         self.filename = Path(filename)
         self.filetype = filetype
+        self.type = linetype
 
         self._regions = {}
         self._lines = {}
@@ -150,17 +162,17 @@ class XMLPage(object):
                 boundary = None
                 if coords is not None:
                     boundary = self._parse_alto_pointstype(coords.get('POINTS'))
-                elif (region.get('HPOS') is not None and region.get('VPOS') is not None and
-                      region.get('WIDTH') is not None and region.get('HEIGHT') is not None):
+                else:
+                    reg_pos = region.get('HPOS'), region.get('VPOS'), region.get('WIDTH'), region.get('HEIGHT')
+                    try:
+                        x_min, y_min, width, height = map(int, map(float, reg_pos))
+                        boundary = [(x_min, y_min),
+                                    (x_min, y_min + height),
+                                    (x_min + width, y_min + height),
+                                    (x_min + width, y_min)]
+                    except ValueError:
+                        pass
                     # use rectangular definition
-                    x_min = int(float(region.get('HPOS')))
-                    y_min = int(float(region.get('VPOS')))
-                    width = int(float(region.get('WIDTH')))
-                    height = int(float(region.get('HEIGHT')))
-                    boundary = [(x_min, y_min),
-                                (x_min, y_min + height),
-                                (x_min + width, y_min + height),
-                                (x_min + width, y_min)]
                 rtype = region.get('TYPE')
                 # fall back to default region type if nothing is given
                 tagrefs = region.get('TAGREFS')
@@ -177,24 +189,34 @@ class XMLPage(object):
 
                 # parse lines in region
                 for line in region.iterfind('./{*}TextLine'):
-                    if line.get('BASELINE') is None:
-                        logger.info('TextLine {} without baseline'.format(line.get('ID')))
-                        continue
-                    pol = line.find('./{*}Shape/{*}Polygon')
-                    boundary = None
-                    if pol is not None:
-                        try:
-                            boundary = self._parse_alto_pointstype(pol.get('POINTS'))
-                        except ValueError:
-                            logger.info('TextLine {} without polygon'.format(line.get('ID')))
-                    else:
-                        logger.info('TextLine {} without polygon'.format(line.get('ID')))
+                    line_id = line.get('ID')
+                    if self.type == 'baselines':
+                        if line.get('BASELINE') is None:
+                            logger.info(f'TextLine {line_id} without baseline')
+                            continue
+                        pol = line.find('./{*}Shape/{*}Polygon')
+                        boundary = None
+                        if pol is not None:
+                            try:
+                                boundary = self._parse_alto_pointstype(pol.get('POINTS'))
+                            except ValueError:
+                                logger.info(f'TextLine {line_id} without polygon')
+                        else:
+                            logger.info(f'TextLine {line_id} without polygon')
 
-                    baseline = None
-                    try:
-                        baseline = self._parse_alto_pointstype(line.get('BASELINE'))
-                    except ValueError:
-                        logger.info('TextLine {} without baseline'.format(line.get('ID')))
+                        baseline = None
+                        try:
+                            baseline = self._parse_alto_pointstype(line.get('BASELINE'))
+                        except ValueError:
+                            logger.info(f'TextLine {line_id} without baseline')
+                    elif self.type == 'bbox':
+                        line_pos = line.get('HPOS'), line.get('VPOS'), line.get('WIDTH'), line.get('HEIGHT')
+                        try:
+                            x_min, y_min, width, height = map(int, map(float, line_pos))
+                            bbox = (x_min, y_min, x_min+width, y_min+height)
+                        except ValueError:
+                            logger.info(f'TextLine {line_id} without complete bounding box data')
+                            continue
 
                     text = ''
                     for el in line.xpath(".//*[local-name() = 'String'] | .//*[local-name() = 'SP']"):
@@ -214,15 +236,26 @@ class XMLPage(object):
                                     tags[ttype] = ltype
                             if ltype in ['train', 'validation', 'test']:
                                 split_type = ltype
-                    self._lines[line.get('ID')] = BaselineLine(id=line.get('ID'),
-                                                               baseline=baseline,
-                                                               boundary=boundary,
-                                                               text=text,
-                                                               tags=tags,
-                                                               split=split_type,
-                                                               regions=[region_id])
+
+                    if self.type == 'baselines':
+                        line_obj = BaselineLine(id=line_id,
+                                                baseline=baseline,
+                                                boundary=boundary,
+                                                text=text,
+                                                tags=tags,
+                                                split=split_type,
+                                                regions=[region_id])
+                    elif self.type == 'bbox':
+                        line_obj = BBoxLine(id=line_id,
+                                            bbox=bbox,
+                                            text=text,
+                                            tags=tags,
+                                            split=split_type,
+                                            regions=[region_id])
+
+                    self._lines[line_id] = line_obj
                     # register implicit reading order
-                    self._orders['line_implicit']['order'].append(line.get('ID'))
+                    self._orders['line_implicit']['order'].append(line_id)
 
             self._regions = region_data
 
@@ -593,10 +626,10 @@ class XMLPage(object):
         """
         Returns a Segmentation object.
         """
-        return Segmentation(type='baselines',
+        return Segmentation(type=self.type,
                             imagename=self.imagename,
                             text_direction='horizontal_lr',
                             script_detection=True,
                             lines=self.get_sorted_lines(),
                             regions=self._regions,
-                            line_orders=[])
+                            line_orders=list(self.reading_orders.values()))
