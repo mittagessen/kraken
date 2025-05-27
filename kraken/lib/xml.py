@@ -121,192 +121,204 @@ class XMLPage(object):
             try:
                 doc = etree.parse(fp)
             except etree.XMLSyntaxError as e:
-                raise ValueError('Parsing {} failed: {}'.format(self.filename, e))
-            image = doc.find('.//{*}fileName')
-            if image is None or not image.text:
-                raise ValueError(f'No valid image filename found in ALTO file {self.filename}')
+                raise ValueError(f'Parsing {self.filename} failed: {e}')
 
-            self.imagename = base_directory.joinpath(image.text)
-            page = doc.find('.//{*}Page')
+        if (image := doc.find('.//{*}fileName')) is None or not image.text:
+            raise ValueError(f'No valid image filename found in ALTO file {self.filename}')
+
+        self.imagename = base_directory.joinpath(image.text)
+
+        if (page := doc.find('.//{*}Page')) is None:
+            raise ValueError(f'No "Page" element found in ALTO file {self.filename}')
+
+        try:
             self.image_size = int(page.get('WIDTH')), int(page.get('HEIGHT'))
+        except ValueError as e:
+            raise ValueError(f'Invalid image dimensions in {self.filename}: {e}')
 
-            # find all image regions in order
-            regions = []
-            for el in doc.iterfind('./{*}Layout/{*}Page/{*}PrintSpace/{*}*'):
-                for block_type in alto_regions.keys():
-                    if el.tag.endswith(block_type):
-                        regions.append(el)
-            # find overall dimensions to filter out dummy TextBlocks
-            ps = doc.find('./{*}Layout/{*}Page/{*}PrintSpace')
-            x_min = int(float(ps.get('HPOS')))
-            y_min = int(float(ps.get('VPOS')))
-            width = int(float(ps.get('WIDTH')))
-            height = int(float(ps.get('HEIGHT')))
+        page_default_lang = [page.get('LANG')]
 
-            # parse tagrefs
-            cls_map = {}
-            tags = doc.find('.//{*}Tags')
-            if tags is not None:
-                for x in ['StructureTag', 'LayoutTag', 'OtherTag']:
-                    for tag in tags.findall('./{{*}}{}'.format(x)):
-                        cls_map[tag.get('ID')] = (x[:-3].lower(), tag.get('LABEL'))
+        # find all image regions in order
+        regions = []
+        for el in doc.iterfind('./{*}Layout/{*}Page/{*}PrintSpace/{*}*'):
+            for block_type in alto_regions.keys():
+                if el.tag.endswith(block_type):
+                    regions.append(el)
 
-            self._tag_set = set(('default',))
+        # parse tagrefs
+        cls_map = {}
+        if (tags := doc.find('.//{*}Tags')) is not None:
+            for x in ['StructureTag', 'LayoutTag', 'OtherTag']:
+                for tag in tags.findall(f'./{{*}}{x}'):
+                    cls_map[tag.get('ID')] = (x[:-3].lower(), tag.get('TYPE'), tag.get('LABEL'))
 
-            # parse region type and coords
-            region_data = defaultdict(list)
-            for region in regions:
-                region_id = region.get('ID')
-                # try to find shape object
-                coords = region.find('./{*}Shape/{*}Polygon')
-                boundary = None
-                if coords is not None:
-                    boundary = self._parse_alto_pointstype(coords.get('POINTS'))
-                else:
-                    reg_pos = region.get('HPOS'), region.get('VPOS'), region.get('WIDTH'), region.get('HEIGHT')
+        self._tag_set = set(('default',))
+
+        # parse region type and coords
+        region_data = defaultdict(list)
+        for region in regions:
+            region_id = region.get('ID')
+            region_default_lang = [region.get('LANG')]
+            region_default_direction = region.get('BASEDIRECTION', None)
+
+            # try to find shape object
+            coords = region.find('./{*}Shape/{*}Polygon')
+            boundary = None
+            if coords is not None:
+                boundary = self._parse_alto_pointstype(coords.get('POINTS'))
+            else:
+                # use rectangular definition
+                reg_pos = region.get('HPOS'), region.get('VPOS'), region.get('WIDTH'), region.get('HEIGHT')
+                try:
+                    x_min, y_min, width, height = map(int, map(float, reg_pos))
+                    boundary = [(x_min, y_min),
+                                (x_min, y_min + height),
+                                (x_min + width, y_min + height),
+                                (x_min + width, y_min)]
+                except ValueError:
+                    pass
+            # parse region tags
+            tags = self._parse_alto_tagrefs(cls_map, region.get('TAGREFS'))
+            tag_type = tags.pop('region') if 'region' in tags else tags.pop('type', None)
+            if (rtype := region.get('TYPE')) is None:
+                rtype = tag_type
+            if rtype is None:
+                rtype = alto_regions[region.tag.split('}')[-1]]
+            tags['type'] = rtype
+            region_data[rtype].append(Region(id=region_id, boundary=boundary, tags=tags))
+            # register implicit reading order
+            self._orders['region_implicit']['order'].append(region_id)
+
+            # parse lines in region
+            for line in region.iterfind('./{*}TextLine'):
+                line_id = line.get('ID')
+                if self.type == 'baselines':
                     try:
-                        x_min, y_min, width, height = map(int, map(float, reg_pos))
-                        boundary = [(x_min, y_min),
-                                    (x_min, y_min + height),
-                                    (x_min + width, y_min + height),
-                                    (x_min + width, y_min)]
+                        baseline = self._parse_alto_pointstype(line.get('BASELINE'))
                     except ValueError:
-                        pass
-                    # use rectangular definition
-                rtype = region.get('TYPE')
-                # fall back to default region type if nothing is given
-                tagrefs = region.get('TAGREFS')
-                if tagrefs is not None and rtype is None:
-                    for tagref in tagrefs.split():
-                        ttype, rtype = cls_map.get(tagref, (None, None))
-                        if rtype is not None and ttype:
-                            break
-                if rtype is None:
-                    rtype = alto_regions[region.tag.split('}')[-1]]
-                region_data[rtype].append(Region(id=region_id, boundary=boundary, tags={'type': rtype}))
-                # register implicit reading order
-                self._orders['region_implicit']['order'].append(region_id)
+                        logger.info(f'TextLine {line_id} without baseline')
+                        continue
 
-                # parse lines in region
-                for line in region.iterfind('./{*}TextLine'):
-                    line_id = line.get('ID')
-                    if self.type == 'baselines':
-                        if line.get('BASELINE') is None:
-                            logger.info(f'TextLine {line_id} without baseline')
-                            continue
+                    boundary = None
+                    try:
                         pol = line.find('./{*}Shape/{*}Polygon')
-                        boundary = None
-                        if pol is not None:
-                            try:
-                                boundary = self._parse_alto_pointstype(pol.get('POINTS'))
-                            except ValueError:
-                                logger.info(f'TextLine {line_id} without polygon')
-                        else:
-                            logger.info(f'TextLine {line_id} without polygon')
+                        boundary = self._parse_alto_pointstype(pol.get('POINTS'))
+                    except ValueError:
+                        logger.info(f'TextLine {line_id} without polygon')
 
-                        baseline = None
-                        try:
-                            baseline = self._parse_alto_pointstype(line.get('BASELINE'))
-                        except ValueError:
-                            logger.info(f'TextLine {line_id} without baseline')
-                    elif self.type == 'bbox':
-                        line_pos = line.get('HPOS'), line.get('VPOS'), line.get('WIDTH'), line.get('HEIGHT')
-                        try:
-                            x_min, y_min, width, height = map(int, map(float, line_pos))
-                            bbox = (x_min, y_min, x_min+width, y_min+height)
-                        except ValueError:
-                            logger.info(f'TextLine {line_id} without complete bounding box data')
-                            continue
+                elif self.type == 'bbox':
+                    line_pos = line.get('HPOS'), line.get('VPOS'), line.get('WIDTH'), line.get('HEIGHT')
+                    try:
+                        x_min, y_min, width, height = map(int, map(float, line_pos))
+                        bbox = (x_min, y_min, x_min+width, y_min+height)
+                    except ValueError:
+                        logger.info(f'TextLine {line_id} without complete bounding box data')
+                        continue
 
-                    text = ''
-                    for el in line.xpath(".//*[local-name() = 'String'] | .//*[local-name() = 'SP']"):
-                        text += el.get('CONTENT') if el.get('CONTENT') else ' '
-                    # find line type
-                    tags = {'type': 'default'}
-                    split_type = None
-                    tagrefs = line.get('TAGREFS')
-                    if tagrefs is not None:
-                        for tagref in tagrefs.split():
-                            ttype, ltype = cls_map.get(tagref, (None, None))
-                            if ltype is not None:
-                                self._tag_set.add(ltype)
-                                if ttype == 'other':
-                                    tags['type'] = ltype
-                                else:
-                                    tags[ttype] = ltype
-                            if ltype in ['train', 'validation', 'test']:
-                                split_type = ltype
+                text = ''
+                for el in line.xpath(".//*[local-name() = 'String'] | .//*[local-name() = 'SP']"):
+                    text += el.get('CONTENT') if el.get('CONTENT') else ' '
+                # parse tags
+                tags = self._parse_alto_tagrefs(cls_map, line.get('TAGREFS'), type='default')
 
-                    if self.type == 'baselines':
-                        line_obj = BaselineLine(id=line_id,
-                                                baseline=baseline,
-                                                boundary=boundary,
-                                                text=text,
-                                                tags=tags,
-                                                split=split_type,
-                                                regions=[region_id])
-                    elif self.type == 'bbox':
-                        line_obj = BBoxLine(id=line_id,
-                                            bbox=bbox,
+                # add inherited language values from attributes
+                if (line_lang := line.get('LANG', None)) is not None:
+                    if 'language' in tags:
+                        tag_val = tags['language']
+                        if isinstance(tag_val, list):
+                            tag_val.append(line_lang)
+                        elif tag_val is not None:
+                            tag_val = [tag_val, line_lang]
+                        tags['language'] = tag_val
+                    else:
+                        tags['language'] = line_lang
+                elif region_default_lang[0] is not None and 'language' not in tags:
+                    tags['language'] = region_default_lang
+                elif page_default_lang[0] is not None and 'language' not in tags:
+                    tags['language'] = page_default_lang
+
+                # get base text direction
+                line_dir = {'ltr': 'L',
+                            'rtl': 'R',
+                            'ttb': 'L',
+                            'btt': 'R'}.get(line.get('BASEDIRECTION'), None)
+                if region_default_direction and line_dir is None:
+                    line_dir = region_default_direction
+
+                if self.type == 'baselines':
+                    line_obj = BaselineLine(id=line_id,
+                                            baseline=baseline,
+                                            boundary=boundary,
                                             text=text,
                                             tags=tags,
-                                            split=split_type,
+                                            language=tags.pop('language', None),
+                                            split=tags.pop('split', None),
+                                            base_dir=line_dir,
                                             regions=[region_id])
+                elif self.type == 'bbox':
+                    line_obj = BBoxLine(id=line_id,
+                                        bbox=bbox,
+                                        text=text,
+                                        tags=tags,
+                                        language=tags.pop('language', None),
+                                        split=tags.pop('split', None),
+                                        base_dir=line_dir,
+                                        regions=[region_id])
 
-                    self._lines[line_id] = line_obj
-                    # register implicit reading order
-                    self._orders['line_implicit']['order'].append(line_id)
+                self._lines[line_id] = line_obj
+                # register implicit reading order
+                self._orders['line_implicit']['order'].append(line_id)
 
-            self._regions = region_data
+        self._regions = region_data
 
-            if len(self._tag_set) > 1:
-                self.has_tags = True
+        if len(self._tag_set) > 1:
+            self.has_tags = True
+        else:
+            self.has_tags = False
+
+        # parse explicit reading orders if they exist
+        ro_el = doc.find('.//{*}ReadingOrder')
+        if ro_el is not None:
+            reading_orders = ro_el.getchildren()
+            # UnorderedGroup at top-level => treated as multiple reading orders
+            if len(reading_orders) == 1 and reading_orders[0].tag.endswith('UnorderedGroup'):
+                reading_orders = reading_orders[0].getchildren()
             else:
-                self.has_tags = False
+                reading_orders = [reading_orders]
 
-            # parse explicit reading orders if they exist
-            ro_el = doc.find('.//{*}ReadingOrder')
-            if ro_el is not None:
-                reading_orders = ro_el.getchildren()
-                # UnorderedGroup at top-level => treated as multiple reading orders
-                if len(reading_orders) == 1 and reading_orders[0].tag.endswith('UnorderedGroup'):
-                    reading_orders = reading_orders[0].getchildren()
+            def _parse_group(el):
+                nonlocal is_valid
+
+                _ro = []
+                if el.tag.endswith('UnorderedGroup'):
+                    _ro = [_parse_group(x) for x in el.iterchildren()]
+                    is_total = False  # NOQA
+                elif el.tag.endswith('OrderedGroup'):
+                    _ro.extend(_parse_group(x) for x in el.iterchildren())
                 else:
-                    reading_orders = [reading_orders]
+                    ref = el.get('REF')
+                    res = doc.find(f'.//{{*}}*[@ID="{ref}"]')
+                    if res is None:
+                        logger.warning(f'Nonexistent element with ID {ref} in reading order. Skipping RO {ro.get("ID")}.')
+                        is_valid = False
+                        return _ro
+                    tag = res.tag.split('}')[-1]
+                    if tag not in alto_regions.keys() and tag != 'TextLine':
+                        logger.warning(f'Sub-line element with ID {ref} in reading order. Skipping RO {ro.get("ID")}.')
+                        is_valid = False
+                        return _ro
+                    return ref
+                return _ro
 
-                def _parse_group(el):
-                    nonlocal is_valid
-
-                    _ro = []
-                    if el.tag.endswith('UnorderedGroup'):
-                        _ro = [_parse_group(x) for x in el.iterchildren()]
-                        is_total = False  # NOQA
-                    elif el.tag.endswith('OrderedGroup'):
-                        _ro.extend(_parse_group(x) for x in el.iterchildren())
-                    else:
-                        ref = el.get('REF')
-                        res = doc.find(f'.//{{*}}*[@ID="{ref}"]')
-                        if res is None:
-                            logger.warning(f'Nonexistent element with ID {ref} in reading order. Skipping RO {ro.get("ID")}.')
-                            is_valid = False
-                            return _ro
-                        tag = res.tag.split('}')[-1]
-                        if tag not in alto_regions.keys() and tag != 'TextLine':
-                            logger.warning(f'Sub-line element with ID {ref} in reading order. Skipping RO {ro.get("ID")}.')
-                            is_valid = False
-                            return _ro
-                        return ref
-                    return _ro
-
-                for ro in reading_orders:
-                    is_total = True
-                    is_valid = True
-                    joint_order = _parse_group(ro)
-                    if is_valid:
-                        tag = ro.get('TAGREFS')
-                        self._orders[ro.get('ID')] = {'order': joint_order,
-                                                      'is_total': is_total,
-                                                      'description': cls_map[tag] if tag and tag in cls_map else ''}
+            for ro in reading_orders:
+                is_total = True
+                is_valid = True
+                joint_order = _parse_group(ro)
+                if is_valid:
+                    tag = ro.get('TAGREFS')
+                    self._orders[ro.get('ID')] = {'order': joint_order,
+                                                  'is_total': is_total,
+                                                  'description': cls_map[tag] if tag and tag in cls_map else ''}
         self.filetype = 'alto'
 
     def _parse_page(self):
@@ -317,165 +329,191 @@ class XMLPage(object):
                 doc = etree.parse(fp)
             except etree.XMLSyntaxError as e:
                 raise ValueError(f'Parsing {self.filename} failed: {e}')
-            image = doc.find('.//{*}Page')
-            if image is None or image.get('imageFilename') is None:
-                raise ValueError(f'No valid image filename found in PageXML file {self.filename}')
+
+        if (image := doc.find('.//{*}Page')) is None or image.get('imageFilename') is None:
+            raise ValueError(f'No valid image filename found in PageXML file {self.filename}')
+        page_default_direction = {'left-to-right': 'L',
+                                  'right-to-left': 'R',
+                                  'top-to-bottom': 'L',
+                                  'bottom-to-top': 'R'}.get(image.get('readingDirection'), None)
+        self.imagename = base_directory.joinpath(image.get('imageFilename'))
+        self.image_size = int(image.get('imageWidth')), int(image.get('imageHeight'))
+
+        # find all image regions
+        regions = [reg for reg in image.iterfind('./{*}*')]
+        # parse region type and coords
+        region_data = defaultdict(list)
+        tr_region_order = []
+
+        self._tag_set = set(('default',))
+        tmp_transkribus_line_order = defaultdict(list)
+
+        for region in regions:
+            if not any([True if region.tag.endswith(k) else False for k in page_regions.keys()]):
+                continue
+            region_id = region.get('id')
+            coords = region.find('./{*}Coords')
             try:
-                self.base_dir = {'left-to-right': 'L',
-                                 'right-to-left': 'R',
-                                 'top-to-bottom': 'L',
-                                 'bottom-to-top': 'R',
-                                 None: None}[image.get('readingDirection')]
-            except KeyError:
-                logger.warning(f'Invalid value {image.get("readingDirection")} encountered in page-level reading direction.')
-            self.imagename = base_directory.joinpath(image.get('imageFilename'))
-            self.image_size = int(image.get('imageWidth')), int(image.get('imageHeight'))
+                coords = self._parse_page_coords(coords.get('points'))
+            except Exception:
+                logger.warning(f'Region {region_id} without coordinates')
+                coords = None
+            rtype = region.get('type')
+            # parse transkribus-style custom field if possible
+            custom_str = region.get('custom')
+            if custom_str:
+                cs = self._parse_page_custom(custom_str)
+                if not rtype and 'structure' in cs and 'type' in cs['structure']:
+                    rtype = cs['structure'][0]['type']
+                # transkribus-style reading order
+                if 'readingOrder' in cs and 'index' in cs['readingOrder']:
+                    tr_region_order.append((region_id, int(cs['readingOrder']['index'])))
+            # fall back to default region type if nothing is given
+            if not rtype:
+                rtype = page_regions[region.tag.split('}')[-1]]
+            region_data[rtype].append(Region(id=region_id, boundary=coords, tags={'type': rtype}))
 
-            # find all image regions
-            regions = [reg for reg in image.iterfind('./{*}*')]
-            # parse region type and coords
-            region_data = defaultdict(list)
-            tr_region_order = []
+            region_default_direction = {'left-to-right': 'L',
+                                        'right-to-left': 'R',
+                                        'top-to-bottom': 'L',
+                                        'bottom-to-top': 'R'}.get(region.get('readingDirection'), None)
 
-            self._tag_set = set(('default',))
-            tmp_transkribus_line_order = defaultdict(list)
+            # register implicit reading order
+            self._orders['region_implicit']['order'].append(region_id)
 
-            for region in regions:
-                if not any([True if region.tag.endswith(k) else False for k in page_regions.keys()]):
-                    continue
-                coords = region.find('./{*}Coords')
-                if coords is not None and not coords.get('points').isspace() and len(coords.get('points')):
-                    try:
-                        coords = self._parse_page_coords(coords.get('points'))
-                    except Exception:
-                        logger.warning('Region {} without coordinates'.format(region.get('id')))
-                        coords = None
+            # parse line information
+            for line in region.iterfind('./{*}TextLine'):
+                line_id = line.get('id')
+                base = line.find('./{*}Baseline')
+                baseline = None
+                try:
+                    baseline = self._parse_page_coords(base.get('points'))
+                except Exception:
+                    logger.info(f'TextLine {line_id} without baseline')
+                    if self.type == 'baselines':
+                        continue
+
+                pol = line.find('./{*}Coords')
+                boundary = None
+                try:
+                    boundary = self._parse_page_coords(pol.get('points'))
+                except Exception:
+                    logger.info(f'TextLine {line_id} without polygon')
+                    if self.type == 'bbox':
+                        continue
+
+                text = ''
+                manual_transcription = line.find('./{*}TextEquiv')
+                if manual_transcription is not None:
+                    transcription = manual_transcription
                 else:
-                    logger.warning('Region {} without coordinates'.format(region.get('id')))
-                    coords = None
-                rtype = region.get('type')
-                # parse transkribus-style custom field if possible
-                custom_str = region.get('custom')
+                    transcription = line
+                for el in transcription.findall('.//{*}Unicode'):
+                    if el.text:
+                        text += el.text
+                # retrieve line tags if custom string is set and contains
+                tags = {'type': 'default'}
+                custom_str = line.get('custom')
                 if custom_str:
                     cs = self._parse_page_custom(custom_str)
-                    if not rtype and 'structure' in cs and 'type' in cs['structure']:
-                        rtype = cs['structure']['type']
-                    # transkribus-style reading order
-                    if 'readingOrder' in cs and 'index' in cs['readingOrder']:
-                        tr_region_order.append((region.get('id'), int(cs['readingOrder']['index'])))
-                # fall back to default region type if nothing is given
-                if not rtype:
-                    rtype = page_regions[region.tag.split('}')[-1]]
-                region_data[rtype].append(Region(id=region.get('id'), boundary=coords, tags={'type': rtype}))
+                    if 'structure' in cs and 'type' in cs['structure']:
+                        tags['type'] = cs['structure'][0]['type']
+                        self._tag_set.add(tags['type'])
+                    # retrieve data split if encoded in custom string.
+                    if 'split' in cs and 'type' in cs['split'] and cs['split']['type'] in ['train', 'validation', 'test']:
+                        tags['split'] = cs['split'][0]['type']
+                        self._tag_set.add(tags['split'])
+                    if 'readingOrder' in cs and 'index' in cs['readingOrder'][0]:
+                        # look up region index from parent
+                        reg_cus = self._parse_page_custom(line.getparent().get('custom'))
+                        if 'readingOrder' not in reg_cus or 'index' not in reg_cus['readingOrder']:
+                            logger.warning('Incomplete `custom` attribute reading order found.')
+                        else:
+                            tmp_transkribus_line_order[int(reg_cus['readingOrder'][0]['index'])].append((int(cs['readingOrder'][0]['index']), line_id))
+                    if 'language' in cs:
+                        tags['language'] = [lang['type'] for lang in cs['language']]
+                        self.tag_set.update(lang['type'] for lang in cs['language'])
+
+                # get base text direction
+                line_dir = {'left-to-right': 'L',
+                            'right-to-left': 'R',
+                            'top-to-bottom': 'L',
+                            'bottom-to-top': 'R'}.get(line.get('readingDirection'), None)
+                if region_default_direction and line_dir is None:
+                    line_dir = region_default_direction
+                elif page_default_direction and line_dir is None:
+                    line_dir = page_default_direction
+
+                if self.type == 'baselines':
+                    line_obj = BaselineLine(id=line_id,
+                                            baseline=baseline,
+                                            boundary=boundary,
+                                            text=text,
+                                            tags=tags,
+                                            language=tags.pop('language', None),
+                                            split=tags.pop('split', None),
+                                            base_dir=line_dir,
+                                            regions=[region_id])
+                elif self.type == 'bbox':
+                    flat_box = [point for pol in boundary for point in pol]
+                    xmin, xmax = min(flat_box[::2]), max(flat_box[::2])
+                    ymin, ymax = min(flat_box[1::2]), max(flat_box[1::2])
+                    line_obj = BBoxLine(id=line_id,
+                                        bbox=(xmin, ymin, xmax, ymax),
+                                        text=text,
+                                        tags=tags,
+                                        language=tags.pop('language', None),
+                                        split=tags.pop('split', None),
+                                        base_dir=line_dir,
+                                        regions=[region_id])
+
+                self._lines[line_id] = line_obj
                 # register implicit reading order
-                self._orders['region_implicit']['order'].append(region.get('id'))
+                self._orders['line_implicit']['order'].append(line_id)
 
-                # parse line information
-                for line in region.iterfind('./{*}TextLine'):
-                    pol = line.find('./{*}Coords')
-                    boundary = None
-                    if pol is not None and not pol.get('points').isspace() and len(pol.get('points')):
-                        try:
-                            boundary = self._parse_page_coords(pol.get('points'))
-                        except Exception:
-                            logger.info('TextLine {} without polygon'.format(line.get('id')))
-                    else:
-                        logger.info('TextLine {} without polygon'.format(line.get('id')))
-                    base = line.find('./{*}Baseline')
-                    baseline = None
-                    if base is not None and not base.get('points').isspace() and len(base.get('points')):
-                        try:
-                            baseline = self._parse_page_coords(base.get('points'))
-                        except Exception:
-                            logger.info('TextLine {} without baseline'.format(line.get('id')))
-                            continue
-                    else:
-                        logger.info('TextLine {} without baseline'.format(line.get('id')))
-                        continue
-                    text = ''
-                    manual_transcription = line.find('./{*}TextEquiv')
-                    if manual_transcription is not None:
-                        transcription = manual_transcription
-                    else:
-                        transcription = line
-                    for el in transcription.findall('.//{*}Unicode'):
-                        if el.text:
-                            text += el.text
-                    # retrieve line tags if custom string is set and contains
-                    tags = {'type': 'default'}
-                    split_type = None
-                    custom_str = line.get('custom')
-                    if custom_str:
-                        cs = self._parse_page_custom(custom_str)
-                        if 'structure' in cs and 'type' in cs['structure']:
-                            tags['type'] = cs['structure']['type']
-                            self._tag_set.add(tags['type'])
-                        # retrieve data split if encoded in custom string.
-                        if 'split' in cs and 'type' in cs['split'] and cs['split']['type'] in ['train', 'validation', 'test']:
-                            split_type = cs['split']['type']
-                            tags['split'] = split_type
-                            self._tag_set.add(split_type)
-                        if 'readingOrder' in cs and 'index' in cs['readingOrder']:
-                            # look up region index from parent
-                            reg_cus = self._parse_page_custom(line.getparent().get('custom'))
-                            if 'readingOrder' not in reg_cus or 'index' not in reg_cus['readingOrder']:
-                                logger.warning('Incomplete `custom` attribute reading order found.')
-                            else:
-                                tmp_transkribus_line_order[int(reg_cus['readingOrder']['index'])].append((int(cs['readingOrder']['index']), line.get('id')))
+        # add transkribus-style region order
+        self._orders['region_transkribus'] = {'order': [x[0] for x in sorted(tr_region_order, key=lambda k: k[1])],
+                                              'is_total': True if len(set(map(lambda x: x[0], tr_region_order))) == len(tr_region_order) else False,
+                                              'description': 'Explicit region order from `custom` attribute'}
 
-                    self._lines[line.get('id')] = BaselineLine(id=line.get('id'),
-                                                               baseline=baseline,
-                                                               boundary=boundary,
-                                                               text=text,
-                                                               tags=tags,
-                                                               split=split_type,
-                                                               regions=[region.get('id')])
-                    # register implicit reading order
-                    self._orders['line_implicit']['order'].append(line.get('id'))
+        self._regions = region_data
 
-            # add transkribus-style region order
-            self._orders['region_transkribus'] = {'order': [x[0] for x in sorted(tr_region_order, key=lambda k: k[1])],
-                                                  'is_total': True if len(set(map(lambda x: x[0], tr_region_order))) == len(tr_region_order) else False,
-                                                  'description': 'Explicit region order from `custom` attribute'}
+        if tmp_transkribus_line_order:
+            # sort by regions
+            tmp_reg_order = sorted(((k, v) for k, v in tmp_transkribus_line_order.items()), key=lambda k: k[0])
+            # flatten
+            tr_line_order = []
+            for _, lines in tmp_reg_order:
+                tr_line_order.extend([x[1] for x in sorted(lines, key=lambda k: k[0])])
+            self._orders['line_transkribus'] = {'order': tr_line_order,
+                                                'is_total': True,
+                                                'description': 'Explicit line order from `custom` attribute'}
 
-            self._regions = region_data
+        # parse explicit reading orders if they exist
+        ro_el = doc.find('.//{*}ReadingOrder')
+        if ro_el is not None:
+            reading_orders = ro_el.getchildren()
+            # UnorderedGroup at top-level => treated as multiple reading orders
+            if len(reading_orders) == 1 and reading_orders[0].tag.endswith('UnorderedGroup'):
+                reading_orders = reading_orders.getchildren()
 
-            if tmp_transkribus_line_order:
-                # sort by regions
-                tmp_reg_order = sorted(((k, v) for k, v in tmp_transkribus_line_order.items()), key=lambda k: k[0])
-                # flatten
-                tr_line_order = []
-                for _, lines in tmp_reg_order:
-                    tr_line_order.extend([x[1] for x in sorted(lines, key=lambda k: k[0])])
-                self._orders['line_transkribus'] = {'order': tr_line_order,
-                                                    'is_total': True,
-                                                    'description': 'Explicit line order from `custom` attribute'}
+            def _parse_group(el):
 
-            # parse explicit reading orders if they exist
-            ro_el = doc.find('.//{*}ReadingOrder')
-            if ro_el is not None:
-                reading_orders = ro_el.getchildren()
-                # UnorderedGroup at top-level => treated as multiple reading orders
-                if len(reading_orders) == 1 and reading_orders[0].tag.endswith('UnorderedGroup'):
-                    reading_orders = reading_orders.getchildren()
+                _ro = []
+                if el.tag.endswith('UnorderedGroup'):
+                    _ro = [_parse_group(x) for x in el.iterchildren()]
+                    is_total = False  # NOQA
+                elif el.tag.endswith('OrderedGroup'):
+                    _ro.extend(_parse_group(x) for x in el.iterchildren())
+                else:
+                    return el.get('regionRef')
+                return _ro
 
-                def _parse_group(el):
-
-                    _ro = []
-                    if el.tag.endswith('UnorderedGroup'):
-                        _ro = [_parse_group(x) for x in el.iterchildren()]
-                        is_total = False  # NOQA
-                    elif el.tag.endswith('OrderedGroup'):
-                        _ro.extend(_parse_group(x) for x in el.iterchildren())
-                    else:
-                        return el.get('regionRef')
-                    return _ro
-
-                for ro in reading_orders:
-                    is_total = True
-                    self._orders[ro.get('id')] = {'order': _parse_group(ro),
-                                                  'is_total': is_total,
-                                                  'description': ro.get('caption') if ro.get('caption') else ''}
+            for ro in reading_orders:
+                is_total = True
+                self._orders[ro.get('id')] = {'order': _parse_group(ro),
+                                              'is_total': is_total,
+                                              'description': ro.get('caption') if ro.get('caption') else ''}
 
         if len(self._tag_set) > 1:
             self.has_tags = True
@@ -595,7 +633,7 @@ class XMLPage(object):
 
     @staticmethod
     def _parse_page_custom(s):
-        o = {}
+        o = defaultdict(list)
         s = s.strip()
         l_chunks = [l_chunk for l_chunk in s.split('}') if l_chunk.strip()]
         if l_chunks:
@@ -606,8 +644,8 @@ class XMLPage(object):
                 for val in vals:
                     key, *val = val.split(':')
                     tag_vals[key] = ":".join(val)
-                o[tag.strip()] = tag_vals
-        return o
+                o[tag.strip()].append(tag_vals)
+        return dict(o)
 
     @staticmethod
     def _parse_page_coords(coords):
@@ -615,6 +653,23 @@ class XMLPage(object):
         points = [int(c) for point in points for c in point.split(',')]
         pts = zip(points[::2], points[1::2])
         return [k for k, g in groupby(pts)]
+
+    def _parse_alto_tagrefs(self, tag_map, tagrefs, **kwargs):
+        tags = kwargs
+        if tagrefs is not None:
+            for tagref in tagrefs.split():
+                tref, tag_type, tag_label = tag_map.get(tagref, (None, None, None))
+                if all((tag_type, tag_label)):
+                    self._tag_set.add(tag_label)
+                    tag_val = tags.pop(tag_type, None)
+                    if isinstance(tag_val, list):
+                        tag_val.append(tag_label)
+                    elif tag_val is not None:
+                        tag_val = [tag_val, tag_label]
+                    else:
+                        tag_val = tag_label
+                    tags[tag_type] = tag_val
+        return tags
 
     def __str__(self):
         return f'XMLPage {self.filename} (format: {self.filetype}, image: {self.imagename})'
