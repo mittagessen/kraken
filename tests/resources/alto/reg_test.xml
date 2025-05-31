@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<alto xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xmlns="http://www.loc.gov/standards/alto/ns-v4#"
+      xsi:schemaLocation="http://www.loc.gov/standards/alto/ns-v4# http://www.loc.gov/standards/alto/v4/alto-4-3.xsd">
+  <Description>
+    <MeasurementUnit>pixel</MeasurementUnit>
+    <sourceImageInformation>
+      <fileName>bsb00084914_00007.jpg</fileName>
+    </sourceImageInformation>
+  </Description>
+  <Layout>
+    <Page WIDTH="3177"
+          HEIGHT="4308"
+          PHYSICAL_IMG_NR="6"
+          ID="eSc_dummypage_">
+      <PrintSpace HPOS="0"
+                  VPOS="0"
+                  WIDTH="3177"
+                  HEIGHT="4308">
+        <TextBlock HPOS="808.0"
+                   VPOS="606.0"
+                   WIDTH="1947.0"
+                   HEIGHT="2634.0"
+                   ID="eSc_textblock_10523"
+                   TAGREFS="BT2 lang_0"
+                   BASEDIRECTION="rtl"
+                   LANG="heb">
+          <Shape><Polygon POINTS="812 606 2755 648 2723 3192 808 3240"/></Shape>
+        </TextBlock>
+        <TextBlock HPOS="596.0"
+                   VPOS="2850.0"
+                   WIDTH="133.0"
+                   HEIGHT="158.0"
+                   ID="eSc_textblock_11229">
+        </TextBlock>
+        <TextBlock ID="eSc_textblock_11230"></TextBlock>
+      </PrintSpace>
+    </Page>
+  </Layout>
+</alto>

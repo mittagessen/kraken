@@ -6,12 +6,17 @@
     <MeasurementUnit>pixel</MeasurementUnit>
     <sourceImageInformation>
       <fileName>bsb00084914_00007.jpg</fileName>
-
     </sourceImageInformation>
   </Description>
 
   <Tags>
     <OtherTag ID="BT2" LABEL="Main" DESCRIPTION="Main"/>
+    <OtherTag ID="lang_0" LABEL="deu" TYPE="language" DESCRIPTION="ISO 693-3 language code."/>
+    <OtherTag ID="lang_1" LABEL="eng" TYPE="language" DESCRIPTION="ISO 693-3 language code."/>
+    <OtherTag ID="type_label_0" LABEL="heading" TYPE="type" DESCRIPTION="dummy type labels"/>
+    <OtherTag ID="dummy_label_0" LABEL="foo" TYPE="label_0" DESCRIPTION="dummy labels"/>
+    <OtherTag ID="dummy_label_1" LABEL="bar" TYPE="label_1" DESCRIPTION="dummy labels"/>
+    <OtherTag ID="dummy_label_2" LABEL="baz" TYPE="label_1" DESCRIPTION="dummy labels"/>
     <OtherTag ID="BT103" LABEL="Margin" DESCRIPTION="Margin"/>
     <OtherTag ID="BT104" LABEL="Paratext" DESCRIPTION="Paratext"/>
     <OtherTag ID="ro_0" LABEL="Order inserting marginalia and paratext at their proper position in the main text."/>
@@ -149,7 +154,8 @@
     <Page WIDTH="3177"
           HEIGHT="4308"
           PHYSICAL_IMG_NR="6"
-          ID="eSc_dummypage_">
+          ID="eSc_dummypage_"
+          LANG="hbo">
       <PrintSpace HPOS="0"
                   VPOS="0"
                   WIDTH="3177"
@@ -160,13 +166,16 @@
                    WIDTH="1947.0"
                    HEIGHT="2634.0"
                    ID="eSc_textblock_10523"
-                   TAGREFS="BT2">
+                   TAGREFS="BT2 lang_0"
+                   BASEDIRECTION="rtl"
+                   LANG="heb">
           <Shape><Polygon POINTS="812 606 2755 648 2723 3192 808 3240"/></Shape>
 
 
           <TextLine ID="eSc_line_192895"
-
                     BASELINE="848 682 934 678 1027 689 1214 696 2731 700"
+                    BASEDIRECTION="ltr"
+                    LANG="iai"
                     HPOS="844.0"
                     VPOS="635.0"
                     WIDTH="1883.0"
@@ -182,8 +191,8 @@
 
 
           <TextLine ID="eSc_line_192874"
-
                     BASELINE="851 775 909 786 1078 786 1221 796 2469 789 2724 782"
+                    BASEDIRECTION="ttb"
                     HPOS="848.0"
                     VPOS="710.0"
                     WIDTH="1872.0"
@@ -278,12 +287,12 @@
 
 
           <TextLine ID="eSc_line_192896"
-
                     BASELINE="823 872 923 883 1132 879 1257 886 2706 875"
                     HPOS="819.0"
                     VPOS="818.0"
                     WIDTH="1883.0"
-                    HEIGHT="140.0">
+                    HEIGHT="140.0"
+                    TAGREFS="type_label_0">
             <Shape><Polygon POINTS="819 868 873 818 902 843 973 829 1085 854 1189 843 1218 861 1247 847 1293 858 1333 822 1351 840 1398 829 1534 875 1566 843 1592 865 1717 854 1735 840 1854 865 1904 818 1940 854 1965 843 1991 861 2059 858 2077 840 2174 858 2303 858 2321 840 2357 854 2479 854 2501 840 2569 858 2666 840 2702 872 2691 922 2623 926 2601 947 2540 951 2490 922 2447 947 2425 929 2382 936 2353 922 2318 951 2267 936 2242 958 2217 940 2030 947 1976 929 1868 947 1847 926 1811 947 1771 926 1735 951 1703 933 1685 951 1638 954 1599 929 1577 940 1523 919 1444 944 1394 926 1358 944 1293 944 1261 922 1142 947 1078 919 1038 929 973 915 934 929 844 872"/></Shape>
 	    <String CONTENT="שהגוים קרובי תשובה הם שלא לחייב את ישרﭏ ˙ משל למה הדבר דומה"
                     HPOS="819.0"
@@ -363,13 +372,10 @@
 
 
           <TextLine ID="eSc_line_192879"
-
-                    BASELINE="805 1371 934 1385 1624 1382 2497 1378 2734 1371"
                     HPOS="801.0"
                     VPOS="1321.0"
                     WIDTH="1930.0"
                     HEIGHT="132.0">
-            <Shape><Polygon POINTS="801 1367 930 1328 991 1346 1056 1331 1088 1349 1146 1328 1225 1349 1243 1335 1344 1331 1405 1349 1462 1331 1491 1357 1530 1339 1584 1339 1617 1357 1638 1335 1822 1342 1976 1328 2062 1346 2127 1328 2163 1360 2185 1339 2210 1360 2307 1331 2350 1349 2386 1324 2422 1346 2530 1331 2566 1349 2605 1324 2641 1339 2659 1321 2731 1367 2720 1403 2663 1443 2609 1425 2526 1446 2497 1428 2472 1446 2429 1425 2397 1446 2350 1428 2285 1439 2249 1421 2185 1436 1865 1439 1786 1425 1581 1453 1552 1436 1308 1443 1268 1425 1214 1446 1196 1432 1067 1428 1038 1450 1006 1425 880 1428 808 1371"/></Shape>
             <String CONTENT="וגו&#39;"
                     ID="eSc_string_14"
                     HPOS="801.0"
@@ -550,7 +556,8 @@
                     HPOS="830.0"
                     VPOS="1802.0"
                     WIDTH="1854.0"
-                    HEIGHT="136.0">
+                    HEIGHT="136.0"
+                    TAGREFS="dummy_label_0 dummy_label_1">
             <Shape><Polygon POINTS="830 1856 833 1802 902 1827 948 1809 981 1838 1139 1802 1232 1802 1297 1834 1329 1809 1372 1830 1401 1812 1477 1841 1520 1820 1570 1830 1595 1816 1689 1820 1728 1841 1786 1816 1818 1848 1858 1823 1911 1848 1940 1827 2120 1830 2138 1845 2192 1816 2213 1834 2238 1820 2253 1834 2386 1823 2407 1838 2436 1812 2504 1845 2551 1816 2616 1827 2648 1802 2684 1848 2670 1902 2616 1917 2573 1902 2548 1927 2508 1899 2447 1927 2418 1906 2185 1931 2152 1906 2113 1935 1901 1913 1861 1938 1768 1917 1710 1938 1667 1917 1437 1935 1394 1909 1250 1935 1207 1913 1164 1927 1142 1906 1060 1927 999 1902 945 1909 905 1884 855 1888 833 1870"/></Shape>
 	    <String CONTENT="לדרכך וגו&#39; ˙ ואת יהוא בן נמשי וגו&#39; ˙ שאין ת&#39;ל&#39; תחתיך אלא שאי אפשר"
                     HPOS="830.0"
@@ -567,7 +574,9 @@
                     HPOS="819.0"
                     VPOS="1899.0"
                     WIDTH="1876.0"
-                    HEIGHT="136.0">
+                    HEIGHT="136.0"
+                    TAGREFS="dummy_label_1 dummy_label_2">
+
             <Shape><Polygon POINTS="819 1956 858 1920 934 1927 977 1899 1020 1924 1067 1927 1114 1906 1139 1931 1250 1938 1340 1938 1390 1913 1437 1942 1638 1924 1667 1942 1876 1935 1901 1909 1962 1935 2008 1924 2181 1938 2379 1913 2429 1935 2497 1913 2548 1931 2580 1902 2601 1920 2666 1920 2695 1956 2684 2003 2601 2003 2569 2021 2519 2003 2486 2024 2451 1999 2357 2017 2300 2006 2253 2028 2210 2013 2181 2028 2073 1996 1991 2035 1951 2010 1825 2010 1811 2024 1681 2010 1534 2028 1451 2010 1279 2021 1247 1992 1221 2013 1175 2017 1114 1992 1088 2017 1053 2003 1013 2024 912 1992 840 2013 823 2003"/></Shape>
 	    <String CONTENT="בנבואתך ˙ יונה תבע כבוד הבן ולא תבע כבוד האב ˙ שנ&#39; ויהי דבר ייי אל יונה"
                     HPOS="819.0"
@@ -907,7 +916,7 @@
 
 
           <TextLine ID="eSc_line_192873"
-
+                    TAGREFS="lang_1"
                     BASELINE="823 3037 1847 3037 1908 3029 2497 3022 2537 3015 2663 3015 2706 2994"
                     HPOS="819.0"
                     VPOS="2943.0"
@@ -1049,7 +1058,7 @@
 
 
           <TextLine ID="eSc_line_192872"
-
+                    BASEDIRECTION="btt"
                     BASELINE="600 2918 740 2918"
                     HPOS="600"
                     VPOS="2878"

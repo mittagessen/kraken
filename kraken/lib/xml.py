@@ -123,6 +123,9 @@ class XMLPage(object):
             except etree.XMLSyntaxError as e:
                 raise ValueError(f'Parsing {self.filename} failed: {e}')
 
+        if (mu := doc.find('.//{*}MeasurementUnit')) is not None and mu.text.strip() != 'pixel':
+            raise ValueError(f'Measurement unit in ALTO file {self.filename} is "{mu.text.strip()} not "pixel".')
+
         if (image := doc.find('.//{*}fileName')) is None or not image.text:
             raise ValueError(f'No valid image filename found in ALTO file {self.filename}')
 
@@ -133,7 +136,7 @@ class XMLPage(object):
 
         try:
             self.image_size = int(page.get('WIDTH')), int(page.get('HEIGHT'))
-        except ValueError as e:
+        except (ValueError, TypeError) as e:
             raise ValueError(f'Invalid image dimensions in {self.filename}: {e}')
 
         page_default_lang = [page.get('LANG')]
@@ -158,13 +161,14 @@ class XMLPage(object):
         region_data = defaultdict(list)
         for region in regions:
             region_id = region.get('ID')
-            region_default_lang = [region.get('LANG')]
-            region_default_direction = region.get('BASEDIRECTION', None)
+            region_default_direction = {'ltr': 'L',
+                                        'rtl': 'R',
+                                        'ttb': 'L',
+                                        'btt': 'R'}.get(region.get('BASEDIRECTION'), None)
 
             # try to find shape object
-            coords = region.find('./{*}Shape/{*}Polygon')
             boundary = None
-            if coords is not None:
+            if (coords := region.find('./{*}Shape/{*}Polygon')) is not None:
                 boundary = self._parse_alto_pointstype(coords.get('POINTS'))
             else:
                 # use rectangular definition
@@ -175,7 +179,7 @@ class XMLPage(object):
                                 (x_min, y_min + height),
                                 (x_min + width, y_min + height),
                                 (x_min + width, y_min)]
-                except ValueError:
+                except (ValueError, TypeError):
                     pass
             # parse region tags
             tags = self._parse_alto_tagrefs(cls_map, region.get('TAGREFS'))
@@ -185,7 +189,25 @@ class XMLPage(object):
             if rtype is None:
                 rtype = alto_regions[region.tag.split('}')[-1]]
             tags['type'] = rtype
-            region_data[rtype].append(Region(id=region_id, boundary=boundary, tags=tags))
+
+            region_default_lang = []
+            if (reg_lang := tags.get('language')) is not None:
+                if isinstance(reg_lang, str):
+                    reg_lang = [reg_lang]
+                region_default_lang.extend(reg_lang)
+            if (reg_lang := region.get('LANG')) is not None:
+                region_default_lang.append(reg_lang)
+            if not len(region_default_lang):
+                region_default_lang.append(None)
+
+            robj_lang = region_default_lang if region_default_lang[0] is not None else None
+            if page_default_lang and not robj_lang:
+                robj_lang = page_default_lang
+
+            region_data[rtype].append(Region(id=region_id,
+                                             boundary=boundary,
+                                             tags=tags,
+                                             language=robj_lang))
             # register implicit reading order
             self._orders['region_implicit']['order'].append(region_id)
 
@@ -211,8 +233,8 @@ class XMLPage(object):
                     try:
                         x_min, y_min, width, height = map(int, map(float, line_pos))
                         bbox = (x_min, y_min, x_min+width, y_min+height)
-                    except ValueError:
-                        logger.info(f'TextLine {line_id} without complete bounding box data')
+                    except (ValueError, TypeError):
+                        logger.info(f'TextLine {line_id} without complete bounding box data.')
                         continue
 
                 text = ''
@@ -625,7 +647,10 @@ class XMLPage(object):
             A list of tuples [(x0, y0), (x1, y1), ...]
         """
         float_re = re.compile(r'[-+]?(\d+(\.\d*)?|\.\d+)([eE][-+]?\d+)?')
-        points = [float(point.group()) for point in float_re.finditer(coords)]
+        try:
+            points = [int(float(point.group())) for point in float_re.finditer(coords)]
+        except (ValueError, TypeError):
+            raise ValueError(f'Invalid points sequence string: {coords}')
         if len(points) % 2:
             raise ValueError(f'Odd number of points in points sequence: {points}')
         pts = zip(points[::2], points[1::2])
@@ -655,7 +680,7 @@ class XMLPage(object):
         return [k for k, g in groupby(pts)]
 
     def _parse_alto_tagrefs(self, tag_map, tagrefs, **kwargs):
-        tags = kwargs
+        tags = {}
         if tagrefs is not None:
             for tagref in tagrefs.split():
                 tref, tag_type, tag_label = tag_map.get(tagref, (None, None, None))
@@ -669,6 +694,10 @@ class XMLPage(object):
                     else:
                         tag_val = tag_label
                     tags[tag_type] = tag_val
+        # set default values
+        for k, v in kwargs.items():
+            if k not in tags:
+                tags[k] = v
         return tags
 
     def __str__(self):
