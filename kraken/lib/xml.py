@@ -25,6 +25,9 @@ from typing import (TYPE_CHECKING, Any, Dict, List, Literal, Optional,
 
 from lxml import etree
 
+from iso639 import Lang
+from iso639.exceptions import InvalidLanguageValue
+
 from kraken.containers import BBoxLine, BaselineLine, Region, Segmentation
 
 logger = logging.getLogger(__name__)
@@ -139,7 +142,7 @@ class XMLPage(object):
         except (ValueError, TypeError) as e:
             raise ValueError(f'Invalid image dimensions in {self.filename}: {e}')
 
-        page_default_lang = [page.get('LANG')]
+        page_default_lang = page.get('LANG')
 
         # find all image regions in order
         regions = []
@@ -201,7 +204,7 @@ class XMLPage(object):
                 region_default_lang.append(None)
 
             robj_lang = region_default_lang if region_default_lang[0] is not None else None
-            if page_default_lang and not robj_lang:
+            if page_default_lang is not None and not robj_lang:
                 robj_lang = page_default_lang
 
             region_data[rtype].append(Region(id=region_id,
@@ -254,9 +257,9 @@ class XMLPage(object):
                         tags['language'] = tag_val
                     else:
                         tags['language'] = line_lang
-                elif region_default_lang[0] is not None and 'language' not in tags:
+                elif region_default_lang is not None and 'language' not in tags:
                     tags['language'] = region_default_lang
-                elif page_default_lang[0] is not None and 'language' not in tags:
+                elif page_default_lang is not None and 'language' not in tags:
                     tags['language'] = page_default_lang
 
                 # get base text direction
@@ -358,11 +361,12 @@ class XMLPage(object):
                                   'right-to-left': 'R',
                                   'top-to-bottom': 'L',
                                   'bottom-to-top': 'R'}.get(image.get('readingDirection'), None)
+
+        page_default_lang = self._parse_page_langs(image)
+
         self.imagename = base_directory.joinpath(image.get('imageFilename'))
         self.image_size = int(image.get('imageWidth')), int(image.get('imageHeight'))
 
-        # find all image regions
-        regions = [reg for reg in image.iterfind('./{*}*')]
         # parse region type and coords
         region_data = defaultdict(list)
         tr_region_order = []
@@ -370,7 +374,7 @@ class XMLPage(object):
         self._tag_set = set(('default',))
         tmp_transkribus_line_order = defaultdict(list)
 
-        for region in regions:
+        for region in image.iterfind('./{*}*'):
             if not any([True if region.tag.endswith(k) else False for k in page_regions.keys()]):
                 continue
             region_id = region.get('id')
@@ -380,25 +384,32 @@ class XMLPage(object):
             except Exception:
                 logger.warning(f'Region {region_id} without coordinates')
                 coords = None
+            tags = {}
             rtype = region.get('type')
             # parse transkribus-style custom field if possible
-            custom_str = region.get('custom')
-            if custom_str:
+            region_default_lang = self._parse_page_langs(region, page_default_lang)
+            if (custom_str := region.get('custom')) is not None:
                 cs = self._parse_page_custom(custom_str)
                 if not rtype and 'structure' in cs and 'type' in cs['structure']:
                     rtype = cs['structure'][0]['type']
                 # transkribus-style reading order
-                if 'readingOrder' in cs and 'index' in cs['readingOrder']:
-                    tr_region_order.append((region_id, int(cs['readingOrder']['index'])))
+                if (reg_ro := cs.get('readingOrder')) is not None and (reg_ro_idx := reg_ro[0].get('index')) is not None:
+                    tr_region_order.append((region_id, int(reg_ro_idx)))
+                tags.update(cs)
+
+            if region_default_lang is None:
+                region_default_lang = page_default_lang
+
             # fall back to default region type if nothing is given
             if not rtype:
                 rtype = page_regions[region.tag.split('}')[-1]]
-            region_data[rtype].append(Region(id=region_id, boundary=coords, tags={'type': rtype}))
+            tags['type'] = rtype
+            region_data[rtype].append(Region(id=region_id, boundary=coords, tags=tags, language=region_default_lang))
 
             region_default_direction = {'left-to-right': 'L',
                                         'right-to-left': 'R',
                                         'top-to-bottom': 'L',
-                                        'bottom-to-top': 'R'}.get(region.get('readingDirection'), None)
+                                        'bottom-to-top': 'R'}.get(region.get('readingDirection'))
 
             # register implicit reading order
             self._orders['region_implicit']['order'].append(region_id)
@@ -442,19 +453,17 @@ class XMLPage(object):
                         tags['type'] = cs['structure'][0]['type']
                         self._tag_set.add(tags['type'])
                     # retrieve data split if encoded in custom string.
-                    if 'split' in cs and 'type' in cs['split'] and cs['split']['type'] in ['train', 'validation', 'test']:
-                        tags['split'] = cs['split'][0]['type']
+                    if (split := cs.get('split')) is not None and split[0].get('type') in ['train', 'validation', 'test']:
+                        tags['split'] = split[0]['type']
                         self._tag_set.add(tags['split'])
-                    if 'readingOrder' in cs and 'index' in cs['readingOrder'][0]:
+                    if (line_ro := cs.get('readingOrder')) is not None and (line_ro_idx := line_ro[0].get('index')) is not None:
                         # look up region index from parent
                         reg_cus = self._parse_page_custom(line.getparent().get('custom'))
                         if 'readingOrder' not in reg_cus or 'index' not in reg_cus['readingOrder']:
                             logger.warning('Incomplete `custom` attribute reading order found.')
                         else:
-                            tmp_transkribus_line_order[int(reg_cus['readingOrder'][0]['index'])].append((int(cs['readingOrder'][0]['index']), line_id))
-                    if 'language' in cs:
-                        tags['language'] = [lang['type'] for lang in cs['language']]
-                        self.tag_set.update(lang['type'] for lang in cs['language'])
+                            tmp_transkribus_line_order[int(reg_cus['readingOrder'][0]['index'])].append((int(line_ro_idx), line_id))
+                    tags.update(cs)
 
                 # get base text direction
                 line_dir = {'left-to-right': 'L',
@@ -466,13 +475,15 @@ class XMLPage(object):
                 elif page_default_direction and line_dir is None:
                     line_dir = page_default_direction
 
+                line_langs = self._parse_page_langs(line, page_default_lang, region_default_lang)
+
                 if self.type == 'baselines':
                     line_obj = BaselineLine(id=line_id,
                                             baseline=baseline,
                                             boundary=boundary,
                                             text=text,
                                             tags=tags,
-                                            language=tags.pop('language', None),
+                                            language=line_langs,
                                             split=tags.pop('split', None),
                                             base_dir=line_dir,
                                             regions=[region_id])
@@ -484,7 +495,7 @@ class XMLPage(object):
                                         bbox=(xmin, ymin, xmax, ymax),
                                         text=text,
                                         tags=tags,
-                                        language=tags.pop('language', None),
+                                        language=line_langs,
                                         split=tags.pop('split', None),
                                         base_dir=line_dir,
                                         regions=[region_id])
@@ -668,9 +679,44 @@ class XMLPage(object):
                 vals = [val.strip() for val in vals.split(';') if val.strip()]
                 for val in vals:
                     key, *val = val.split(':')
-                    tag_vals[key] = ":".join(val)
+                    tag_vals[key] = ":".join(val).strip()
                 o[tag.strip()].append(tag_vals)
         return dict(o)
+
+    def _parse_page_langs(self,
+                          el,
+                          page_default_lang: Optional[List[str]] = None,
+                          region_default_lang: Optional[List[str]] = None):
+        """
+        Determines the language(s) of an element from custom string,
+        attributes, and any inherited values.
+        """
+        el_langs = []
+        if (custom_str := el.get('custom')) is not None:
+            cs = self._parse_page_custom(custom_str)
+            if (lang := cs.get('language')) is not None:
+                for lang_val in lang:
+                    if (lang_val_type := lang_val.get('type')) is not None:
+                        try:
+                            lang_val_type = Lang(lang_val_type).pt3
+                        except InvalidLanguageValue:
+                            pass
+                        el_langs.append(lang_val_type)
+        if (lang := el.get('primaryLanguage')) is not None:
+            try:
+                lang = Lang(lang).pt3
+            except InvalidLanguageValue:
+                pass
+            el_langs.append(lang)
+        if (lang := el.get('secondaryLanguage')) is not None:
+            try:
+                lang = Lang(lang).pt3
+            except InvalidLanguageValue:
+                pass
+            el_langs.append(lang)
+        if not len(el_langs):
+            return region_default_lang if region_default_lang is not None else page_default_lang
+        return el_langs
 
     @staticmethod
     def _parse_page_coords(coords):

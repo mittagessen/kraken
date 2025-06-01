@@ -5,28 +5,28 @@
         <Created>2018-12-24T11:28:19+07:00</Created>
         <LastChange>2019-02-05T09:16:48Z</LastChange>
     </Metadata>
-    <Page imageFilename="cPAS-2000.jpg" imageWidth="3631" imageHeight="4734">
+    <Page imageFilename="cPAS-2000.jpg" imageWidth="3631" imageHeight="4734" readingDirection="left-to-right">
         <ImageRegion id="Image_1546920812718_13712" custom="readingOrder {index:0;} structure {type:Image/Drawing/Figure;}">
             <Coords points="1411,257 2265,257 2265,379 1411,379"/>
         </ImageRegion>
-        <TextRegion id="region_1546920829334_13716" custom="readingOrder {index:1;} structure {type:Machine\u0020Printed\u0020text;}">
+        <TextRegion id="region_1546920829334_13716" custom="readingOrder {index:1;} structure {type:Machine\u0020Printed\u0020text;} language {type: hbo;}" readingDirection="bottom-to-top">
             <Coords points="3217,273 3217,364 3352,364 3352,273"/>
             <TextLine id="line_1546920829350_13719" custom="readingOrder {index:0;}">
                 <Coords points="3217,314 3351,310 3352,360 3218,364"/>
                 <Baseline points="3218,359 3352,355"/>
             </TextLine>
         </TextRegion>
-        <TextRegion id="TextRegion_1546921002631_14111" custom="readingOrder {index:2;} structure {type:Machine\u0020Printed\u0020text;}">
+        <TextRegion id="TextRegion_1546921002631_14111" custom="readingOrder {index:2;} structure {type:Machine\u0020Printed\u0020text;} language {type: heb;} language {type: deu;}" readingDirection="right-to-left" primaryLanguage="English">
             <Coords points="350,486 711,473 1649,454 1791,486 1791,555 1786,2846 1781,3485 1767,4121 1756,4287 345,4287 324,3905 247,3874 247,3823 324,3803 319,3663 255,3660 252,3588 329,3577 321,3266 250,3255 250,3185 330,3146 341,2881 270,2863 270,2779 338,2771 343,2640 266,2618 264,2543 319,2542 336,2485 261,2465 264,2397 341,2377 338,2094 264,2085 265,1988 328,1988 349,1629 265,1617 267,1524 329,1517 344,1101 264,1053 266,645"/>
-            <TextLine id="line_1546920834046_13727" custom="readingOrder {index:0;}">
+            <TextLine id="line_1546920834046_13727" custom="readingOrder {index:0;}" readingDirection="left-to-right">
                 <Coords points="350,505 1790,486 1791,536 351,555"/>
                 <Baseline points="351,550 1791,531"/>
             </TextLine>
-            <TextLine id="line_1546920836027_13735" custom="readingOrder {index:1;}">
+            <TextLine id="line_1546920836027_13735" custom="readingOrder {index:1;}" readingDirection="top-to-bottom">
                 <Coords points="361,583 1197,576 1197,626 361,633"/>
                 <Baseline points="361,628 1197,621"/>
             </TextLine>
-            <TextLine id="line_1546920840864_13743" custom="readingOrder {index:2;}">
+            <TextLine id="line_1546920840864_13743" custom="readingOrder {index:2;} language {type: deu;}">
                 <Coords points="266,664 1768,645 1769,695 267,714"/>
                 <Baseline points="267,709 1769,690"/>
             </TextLine>
@@ -211,7 +211,7 @@
                 <Baseline points="345,4278 1756,4282"/>
             </TextLine>
         </TextRegion>
-        <TextRegion id="TextRegion_1546921232608_14500" custom="readingOrder {index:3;} structure {type:Machine\u0020Printed\u0020text;}">
+        <TextRegion id="TextRegion_1546921232608_14500" custom="readingOrder {index:3;} structure {type:Machine\u0020Printed\u0020text;}" primaryLanguage="Polish" secondaryLanguage="German">
             <Coords points="1894,1808 1906,474 2032,448 3279,440 3319,474 3349,800 3349,852 3346,3273 3338,4221 3331,4314 3168,4314 3122,4273 1892,4221 1820,4145 1803,4080 1876,4072 1882,3868 1816,3827 1807,3765 1876,3748 1891,3551 1824,3529 1812,3454 1884,3437 1874,3360 1815,3273 1815,3218 1862,3197 1891,1924 1825,1913 1829,1837"/>
             <TextLine id="line_1546921013585_14117" custom="readingOrder {index:0;}">
                 <Coords points="1906,490 3318,474 3319,524 1907,540"/>

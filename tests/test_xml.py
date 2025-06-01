@@ -185,3 +185,61 @@ class TestXMLParser(unittest.TestCase):
         with raises(ValueError):
             xml.XMLPage(self.invalid_page_docs / 'dims.xml')
 
+    def test_page_basedirection(self):
+        """
+        Test proper handling of base direction attribute, including inheritance
+        from regions.
+        """
+        seg = xml.XMLPage(self.page_doc).to_container()
+        base_dirs = [x.base_dir for x in seg.lines]
+        self.assertEqual(base_dirs, ['R', 'L', 'L', 'R', 'R', 'R', 'R', 'R',
+                                     'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R',
+                                     'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R',
+                                     'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R',
+                                     'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R',
+                                     'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R',
+                                     'R', 'L', 'L', 'L', 'L', 'L', 'L', 'L',
+                                     'L', 'L', 'L', 'L', 'L', 'L', 'L', 'L',
+                                     'L', 'L', 'L', 'L', 'L', 'L', 'L', 'L',
+                                     'L', 'L', 'L', 'L', 'L', 'L', 'L', 'L',
+                                     'L', 'L', 'L', 'L', 'L', 'L', 'L', 'L',
+                                     'L', 'L', 'L', 'L', 'L', 'L', 'L', 'L',
+                                     'L'])
+
+    def test_page_language_parsing(self):
+        """
+        Test proper handling of language attribute, custom string and
+        inheritance from page and region.
+        """
+        seg = xml.XMLPage(self.page_doc).to_container()
+        languages = [x.language for x in seg.lines]
+        self.assertEqual(languages, [['hbo'],
+                                     ['heb', 'deu', 'eng'], ['heb', 'deu', 'eng'], ['deu'],
+                                     ['heb', 'deu', 'eng'], ['heb', 'deu', 'eng'], ['heb', 'deu', 'eng'],
+                                     ['heb', 'deu', 'eng'], ['heb', 'deu', 'eng'], ['heb', 'deu', 'eng'],
+                                     ['heb', 'deu', 'eng'], ['heb', 'deu', 'eng'], ['heb', 'deu', 'eng'],
+                                     ['heb', 'deu', 'eng'], ['heb', 'deu', 'eng'], ['heb', 'deu', 'eng'],
+                                     ['heb', 'deu', 'eng'], ['heb', 'deu', 'eng'], ['heb', 'deu', 'eng'],
+                                     ['heb', 'deu', 'eng'], ['heb', 'deu', 'eng'], ['heb', 'deu', 'eng'],
+                                     ['heb', 'deu', 'eng'], ['heb', 'deu', 'eng'], ['heb', 'deu', 'eng'],
+                                     ['heb', 'deu', 'eng'], ['heb', 'deu', 'eng'], ['heb', 'deu', 'eng'],
+                                     ['heb', 'deu', 'eng'], ['heb', 'deu', 'eng'], ['heb', 'deu', 'eng'],
+                                     ['heb', 'deu', 'eng'], ['heb', 'deu', 'eng'], ['heb', 'deu', 'eng'],
+                                     ['heb', 'deu', 'eng'], ['heb', 'deu', 'eng'], ['heb', 'deu', 'eng'],
+                                     ['heb', 'deu', 'eng'], ['heb', 'deu', 'eng'], ['heb', 'deu', 'eng'],
+                                     ['heb', 'deu', 'eng'], ['heb', 'deu', 'eng'], ['heb', 'deu', 'eng'],
+                                     ['heb', 'deu', 'eng'], ['heb', 'deu', 'eng'], ['heb', 'deu', 'eng'],
+                                     ['heb', 'deu', 'eng'], ['heb', 'deu', 'eng'], ['heb', 'deu', 'eng'],
+                                     ['pol', 'deu'], ['pol', 'deu'], ['pol', 'deu'], ['pol', 'deu'], ['pol', 'deu'],
+                                     ['pol', 'deu'], ['pol', 'deu'], ['pol', 'deu'], ['pol', 'deu'], ['pol', 'deu'],
+                                     ['pol', 'deu'], ['pol', 'deu'], ['pol', 'deu'], ['pol', 'deu'], ['pol', 'deu'],
+                                     ['pol', 'deu'], ['pol', 'deu'], ['pol', 'deu'], ['pol', 'deu'], ['pol', 'deu'],
+                                     ['pol', 'deu'], ['pol', 'deu'], ['pol', 'deu'], ['pol', 'deu'], ['pol', 'deu'],
+                                     ['pol', 'deu'], ['pol', 'deu'], ['pol', 'deu'], ['pol', 'deu'], ['pol', 'deu'],
+                                     ['pol', 'deu'], ['pol', 'deu'], ['pol', 'deu'], ['pol', 'deu'], ['pol', 'deu'],
+                                     ['pol', 'deu'], ['pol', 'deu'], ['pol', 'deu'], ['pol', 'deu'], ['pol', 'deu'],
+                                     ['pol', 'deu'], ['pol', 'deu'], ['pol', 'deu'], ['pol', 'deu'], ['pol', 'deu'],
+                                     ['pol', 'deu'], ['pol', 'deu'], ['pol', 'deu']])
+        reg_langs = [x.language for x in seg.regions['text']]
+        self.assertEqual(reg_langs, [['hbo'], ['heb', 'deu', 'eng'], ['pol', 'deu']])
+
