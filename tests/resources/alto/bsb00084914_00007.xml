@@ -1036,7 +1036,8 @@
                     HPOS="276"
                     VPOS="2591"
                     WIDTH="436"
-                    HEIGHT="87">
+                    HEIGHT="87"
+                    TAGREFS="lang_0 lang_1">
             <Shape><Polygon POINTS="276 2598 373 2598 448 2591 545 2598 624 2591 712 2595 709 2674 631 2670 538 2677 455 2670 373 2678 276 2678"/></Shape>
 	    <String CONTENT="על ישרﭏ"
                     HPOS="276"

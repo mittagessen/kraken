@@ -104,17 +104,16 @@ class TestXMLParser(unittest.TestCase):
         """
         seg = xml.XMLPage(self.alto_doc).to_container()
         languages = [x.language for x in seg.lines]
-        self.assertEqual(languages, ['iai', ['deu', 'heb'], ['deu', 'heb'],
-                                    ['deu', 'heb'], ['deu', 'heb'], ['deu',
-                                    'heb'], ['deu', 'heb'], ['deu', 'heb'],
-                                    ['deu', 'heb'], ['deu', 'heb'], ['deu',
-                                    'heb'], ['deu', 'heb'], ['deu', 'heb'],
-                                    ['deu', 'heb'], ['deu', 'heb'], ['deu',
-                                    'heb'], ['deu', 'heb'], ['deu', 'heb'],
-                                    ['deu', 'heb'], ['deu', 'heb'], ['deu',
-                                    'heb'], ['deu', 'heb'], ['deu', 'heb'],
-                                    'eng', ['deu', 'heb'], ['hbo'], ['hbo'],
-                                    ['hbo'], ['hbo'], ['hbo']])
+        self.assertEqual(languages, [['iai'], ['deu', 'heb'], ['deu', 'heb'],
+                                     ['deu', 'heb'], ['deu', 'heb'], ['deu', 'heb'],
+                                     ['deu', 'heb'], ['deu', 'heb'], ['deu', 'heb'],
+                                     ['deu', 'heb'], ['deu', 'heb'], ['deu', 'heb'],
+                                     ['deu', 'heb'], ['deu', 'heb'], ['deu', 'heb'],
+                                     ['deu', 'heb'], ['deu', 'heb'], ['deu', 'heb'],
+                                     ['deu', 'heb'], ['deu', 'heb'], ['deu', 'heb'],
+                                     ['deu', 'heb'], ['deu', 'heb'], ['eng'],
+                                     ['deu', 'heb'], ['hbo'], ['hbo'], ['hbo'],
+                                     ['deu', 'eng'], ['hbo']])
         reg_langs = [x.language for x in seg.regions['text']]
         self.assertEqual(reg_langs, [['deu', 'heb'], ['hbo'], ['hbo'], ['hbo'], ['hbo']])
 
@@ -140,18 +139,19 @@ class TestXMLParser(unittest.TestCase):
                                      {'type': 'default'}, {'type': 'default'},
                                      {'type': 'default'}, {'type': 'default'},
                                      {'type': 'default'}, {'type': 'default'},
-                                     {'type': 'default'}, {'label_0': 'foo', 'label_1': 'bar', 'type': 'default'},
+                                     {'type': 'default'},
+                                     {'label_0': 'foo', 'label_1': 'bar', 'type': 'default'},
                                      {'label_1': ['bar', 'baz'], 'type': 'default'},
                                      {'type': 'default'}, {'type': 'default'},
                                      {'type': 'default'}, {'type': 'default'},
                                      {'type': 'default'}, {'type': 'default'},
                                      {'type': 'default'}, {'type': 'default'},
                                      {'type': 'default'}, {'type': 'default'},
+                                     {'language': 'eng', 'type': 'default'},
                                      {'type': 'default'}, {'type': 'default'},
                                      {'type': 'default'}, {'type': 'default'},
-                                     {'type': 'default'}, {'type': 'default'},
+                                     {'language': ['deu', 'eng'], 'type': 'default'},
                                      {'type': 'default'}])
-
 
     def test_alto_baseline_linetype(self):
         """

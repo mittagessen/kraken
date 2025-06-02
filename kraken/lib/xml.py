@@ -193,24 +193,14 @@ class XMLPage(object):
                 rtype = alto_regions[region.tag.split('}')[-1]]
             tags['type'] = rtype
 
-            region_default_lang = []
-            if (reg_lang := tags.get('language')) is not None:
-                if isinstance(reg_lang, str):
-                    reg_lang = [reg_lang]
-                region_default_lang.extend(reg_lang)
-            if (reg_lang := region.get('LANG')) is not None:
-                region_default_lang.append(reg_lang)
-            if not len(region_default_lang):
-                region_default_lang.append(None)
-
-            robj_lang = region_default_lang if region_default_lang[0] is not None else None
-            if page_default_lang is not None and not robj_lang:
-                robj_lang = page_default_lang
+            region_default_lang = self._parse_alto_langs(region,
+                                                         cls_map,
+                                                         [page_default_lang] if page_default_lang is not None else None)
 
             region_data[rtype].append(Region(id=region_id,
                                              boundary=boundary,
                                              tags=tags,
-                                             language=robj_lang))
+                                             language=region_default_lang))
             # register implicit reading order
             self._orders['region_implicit']['order'].append(region_id)
 
@@ -245,22 +235,7 @@ class XMLPage(object):
                     text += el.get('CONTENT') if el.get('CONTENT') else ' '
                 # parse tags
                 tags = self._parse_alto_tagrefs(cls_map, line.get('TAGREFS'), type='default')
-
-                # add inherited language values from attributes
-                if (line_lang := line.get('LANG', None)) is not None:
-                    if 'language' in tags:
-                        tag_val = tags['language']
-                        if isinstance(tag_val, list):
-                            tag_val.append(line_lang)
-                        elif tag_val is not None:
-                            tag_val = [tag_val, line_lang]
-                        tags['language'] = tag_val
-                    else:
-                        tags['language'] = line_lang
-                elif region_default_lang is not None and 'language' not in tags:
-                    tags['language'] = region_default_lang
-                elif page_default_lang is not None and 'language' not in tags:
-                    tags['language'] = page_default_lang
+                line_langs = self._parse_alto_langs(line, cls_map, region_default_lang)
 
                 # get base text direction
                 line_dir = {'ltr': 'L',
@@ -276,7 +251,7 @@ class XMLPage(object):
                                             boundary=boundary,
                                             text=text,
                                             tags=tags,
-                                            language=tags.pop('language', None),
+                                            language=line_langs,
                                             split=tags.pop('split', None),
                                             base_dir=line_dir,
                                             regions=[region_id])
@@ -285,7 +260,7 @@ class XMLPage(object):
                                         bbox=bbox,
                                         text=text,
                                         tags=tags,
-                                        language=tags.pop('language', None),
+                                        language=line_langs,
                                         split=tags.pop('split', None),
                                         base_dir=line_dir,
                                         regions=[region_id])
@@ -475,7 +450,7 @@ class XMLPage(object):
                 elif page_default_direction and line_dir is None:
                     line_dir = page_default_direction
 
-                line_langs = self._parse_page_langs(line, page_default_lang, region_default_lang)
+                line_langs = self._parse_page_langs(line, region_default_lang)
 
                 if self.type == 'baselines':
                     line_obj = BaselineLine(id=line_id,
@@ -685,8 +660,7 @@ class XMLPage(object):
 
     def _parse_page_langs(self,
                           el,
-                          page_default_lang: Optional[List[str]] = None,
-                          region_default_lang: Optional[List[str]] = None):
+                          default_lang: Optional[List[str]] = None):
         """
         Determines the language(s) of an element from custom string,
         attributes, and any inherited values.
@@ -715,7 +689,7 @@ class XMLPage(object):
                 pass
             el_langs.append(lang)
         if not len(el_langs):
-            return region_default_lang if region_default_lang is not None else page_default_lang
+            return default_lang
         return el_langs
 
     @staticmethod
@@ -745,6 +719,24 @@ class XMLPage(object):
             if k not in tags:
                 tags[k] = v
         return tags
+
+    def _parse_alto_langs(self,
+                          el,
+                          tag_map: Dict[str, str],
+                          default_lang: Optional[List[str]] = None):
+        el_langs = []
+        tags = self._parse_alto_tagrefs(tag_map, el.get('TAGREFS'))
+        if (tag_langs := tags.get('language')) is not None:
+            if isinstance(tag_langs, list):
+                el_langs.extend(tag_langs)
+            else:
+                el_langs.append(tag_langs)
+        if (el_lang := el.get('LANG')) is not None:
+            el_langs.append(el_lang)
+
+        if not len(el_langs):
+            return default_lang
+        return el_langs
 
     def __str__(self):
         return f'XMLPage {self.filename} (format: {self.filetype}, image: {self.imagename})'
