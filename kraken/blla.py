@@ -403,4 +403,4 @@ def segment(im: PIL.Image.Image,
                         lines=blls,
                         regions=regions,
                         script_detection=script_detection,
-                        line_orders=[order] if order else [])
+                        line_orders=[order] if order is not None else [])
