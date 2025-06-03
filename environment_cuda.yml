@@ -35,4 +35,5 @@ dependencies:
     - coremltools~=8.1
     - htrmopo
     - platformdirs
+    - iso639-lang
     - file:.
