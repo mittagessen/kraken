@@ -877,6 +877,11 @@ def neural_reading_order(lines: Sequence[Dict],
     Returns:
         The indices of the ordered input.
     """
+    if len(lines) == 0:
+        return None
+    elif len(lines) == 1:
+        return torch.tensor([0])
+
     lines = [(line['tags']['type'], line['baseline'], line['boundary']) for line in lines]
     # construct all possible pairs
     h, w = im_size
