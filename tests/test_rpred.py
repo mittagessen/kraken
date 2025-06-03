@@ -258,18 +258,17 @@ class TestRecognition(unittest.TestCase):
         """
         Tests correct handling of invalid bbox line coordinates.
         """
-        with raises(KrakenInputException):
-            pred = rpred(self.model, self.im, self.invalid_box_seg, True)
-            next(pred)
+        pred = rpred(self.model, self.im, self.invalid_box_seg, True)
+        rec = next(pred)
+        self.assertEqual(len(rec), 0)
 
-    @pytest.mark.xfail
     def test_rpred_bl_outbounds(self):
         """
         Tests correct handling of invalid baseline coordinates.
         """
-        with raises(KrakenInputException):
-            pred = rpred(self.model, self.im, self.invalid_bl_seg, True)
-            next(pred)
+        pred = rpred(self.model, self.im, self.invalid_bl_seg, True)
+        rec = next(pred)
+        self.assertEqual(len(rec), 0)
 
     def test_simple_bbox_rpred(self):
         """
