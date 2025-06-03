@@ -25,6 +25,7 @@ import shapely.geometry as geom
 import torch
 import torch.nn.functional as F
 from PIL import Image
+from itertools import chain
 from shapely.ops import split
 from skimage.draw import polygon
 from torch.utils.data import Dataset
@@ -41,6 +42,16 @@ __all__ = ['BaselineSet']
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+def _get_tag_values(tags: Dict):
+    tag_vals = []
+    for val in tags.values():
+        if isinstance(val, list):
+            tag_vals.extend(chain.from_iterable([v] if not isinstance(v, dict) else v.values() for v in val))
+        else:
+            tag_vals.append(val)
+    return set(tag_vals)
 
 
 class BaselineSet(Dataset):
@@ -131,8 +142,9 @@ class BaselineSet(Dataset):
 
         baselines_ = defaultdict(list)
         for line in doc.lines:
-            if self.valid_baselines is None or set(line.tags.values()).intersection(self.valid_baselines):
-                tags = set(line.tags.values()).intersection(self.valid_baselines) if self.valid_baselines else line.tags.values()
+            tag_vals = _get_tag_values(line.tags)
+            if self.valid_baselines is None or tag_vals.intersection(self.valid_baselines):
+                tags = tag_vals.intersection(self.valid_baselines) if self.valid_baselines else tag_vals
                 tags = set([self.mbl_dict.get(v, v) for v in tags])
                 for tag in tags:
                     baselines_[tag].append(line.baseline)
@@ -147,7 +159,7 @@ class BaselineSet(Dataset):
             if self.valid_regions is None or k in self.valid_regions:
                 reg_type = self.mreg_dict.get(k, k)
                 regions_[reg_type].extend(v)
-                self.class_stats['baselines'][reg_type] += len(v)
+                self.class_stats['regions'][reg_type] += len(v)
                 if reg_type not in self.class_mapping['regions']:
                     self.num_classes += 1
                     self.class_mapping['regions'][reg_type] = self.num_classes - 1

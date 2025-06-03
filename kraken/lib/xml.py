@@ -299,12 +299,12 @@ class XMLPage(object):
                     ref = el.get('REF')
                     res = doc.find(f'.//{{*}}*[@ID="{ref}"]')
                     if res is None:
-                        logger.warning(f'Nonexistent element with ID {ref} in reading order. Skipping RO {ro.get("ID")}.')
+                        logger.info(f'Nonexistent element with ID {ref} in reading order. Skipping RO {ro.get("ID")}.')
                         is_valid = False
                         return _ro
                     tag = res.tag.split('}')[-1]
                     if tag not in alto_regions.keys() and tag != 'TextLine':
-                        logger.warning(f'Sub-line element with ID {ref} in reading order. Skipping RO {ro.get("ID")}.')
+                        logger.info(f'Sub-line element with ID {ref} in reading order. Skipping RO {ro.get("ID")}.')
                         is_valid = False
                         return _ro
                     return ref
@@ -357,7 +357,7 @@ class XMLPage(object):
             try:
                 coords = self._parse_page_coords(coords.get('points'))
             except Exception:
-                logger.warning(f'Region {region_id} without coordinates')
+                logger.info(f'Region {region_id} without coordinates')
                 coords = None
             tags = {}
             rtype = region.get('type')
@@ -365,7 +365,7 @@ class XMLPage(object):
             region_default_lang = self._parse_page_langs(region, page_default_lang)
             if (custom_str := region.get('custom')) is not None:
                 cs = self._parse_page_custom(custom_str)
-                if not rtype and 'structure' in cs and 'type' in cs['structure']:
+                if not rtype and 'structure' in cs and 'type' in cs['structure'][0]:
                     rtype = cs['structure'][0]['type']
                 # transkribus-style reading order
                 if (reg_ro := cs.get('readingOrder')) is not None and (reg_ro_idx := reg_ro[0].get('index')) is not None:
@@ -378,6 +378,7 @@ class XMLPage(object):
             # fall back to default region type if nothing is given
             if not rtype:
                 rtype = page_regions[region.tag.split('}')[-1]]
+
             tags['type'] = rtype
             region_data[rtype].append(Region(id=region_id, boundary=coords, tags=tags, language=region_default_lang))
 
@@ -435,7 +436,7 @@ class XMLPage(object):
                         # look up region index from parent
                         reg_cus = self._parse_page_custom(line.getparent().get('custom'))
                         if 'readingOrder' not in reg_cus or 'index' not in reg_cus['readingOrder']:
-                            logger.warning('Incomplete `custom` attribute reading order found.')
+                            logger.info('Incomplete `custom` attribute reading order found.')
                         else:
                             tmp_transkribus_line_order[int(reg_cus['readingOrder'][0]['index'])].append((int(line_ro_idx), line_id))
                     tags.update(cs)
