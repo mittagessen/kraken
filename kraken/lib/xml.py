@@ -425,12 +425,12 @@ class XMLPage(object):
                 custom_str = line.get('custom')
                 if custom_str:
                     cs = self._parse_page_custom(custom_str)
-                    if 'structure' in cs and 'type' in cs['structure']:
-                        tags['type'] = cs['structure'][0]['type']
+                    if (structure := cs.get('structure')) is not None and (ltype := structure[0].get('type')):
+                        tags['type'] = ltype
                         self._tag_set.add(tags['type'])
                     # retrieve data split if encoded in custom string.
-                    if (split := cs.get('split')) is not None and split[0].get('type') in ['train', 'validation', 'test']:
-                        tags['split'] = split[0]['type']
+                    if (split := cs.get('split')) is not None and (stype := split[0].get('type')) in ['train', 'validation', 'test']:
+                        tags['split'] = stype
                         self._tag_set.add(tags['split'])
                     if (line_ro := cs.get('readingOrder')) is not None and (line_ro_idx := line_ro[0].get('index')) is not None:
                         # look up region index from parent

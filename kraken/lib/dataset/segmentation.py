@@ -44,14 +44,14 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def _get_tag_values(tags: Dict):
-    tag_vals = []
-    for val in tags.values():
-        if isinstance(val, list):
-            tag_vals.extend(chain.from_iterable([v] if not isinstance(v, dict) else v.values() for v in val))
-        else:
-            tag_vals.append(val)
-    return set(tag_vals)
+def _get_type(tags: Dict) -> str:
+    ot = tags.get('type')
+    if isinstance(ot, str):
+        return ot
+    elif isinstance(ot, dict) and (tt := ot.get('type')) is not None:
+        return tt
+    else:
+        return 'default'
 
 
 class BaselineSet(Dataset):
@@ -142,17 +142,15 @@ class BaselineSet(Dataset):
 
         baselines_ = defaultdict(list)
         for line in doc.lines:
-            tag_vals = _get_tag_values(line.tags)
-            if self.valid_baselines is None or tag_vals.intersection(self.valid_baselines):
-                tags = tag_vals.intersection(self.valid_baselines) if self.valid_baselines else tag_vals
-                tags = set([self.mbl_dict.get(v, v) for v in tags])
-                for tag in tags:
-                    baselines_[tag].append(line.baseline)
-                    self.class_stats['baselines'][tag] += 1
+            tag_val = _get_type(line.tags)
+            if self.valid_baselines is None or tag_val in self.valid_baselines:
+                tag = self.mbl_dict.get(tag_val, tag_val)
+                baselines_[tag].append(line.baseline)
+                self.class_stats['baselines'][tag] += 1
 
-                    if tag not in self.class_mapping['baselines']:
-                        self.num_classes += 1
-                        self.class_mapping['baselines'][tag] = self.num_classes - 1
+                if tag not in self.class_mapping['baselines']:
+                    self.num_classes += 1
+                    self.class_mapping['baselines'][tag] = self.num_classes - 1
 
         regions_ = defaultdict(list)
         for k, v in doc.regions.items():

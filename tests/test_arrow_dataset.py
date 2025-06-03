@@ -107,7 +107,7 @@ class TestKrakenArrowCompilation(unittest.TestCase):
                                  format_type='xml')
             # expect zero resulting lines due to image load error
             _validate_ds(self, tmp_file.name, 0, 0, 'kraken_recognition_baseline')
-	# expect one warning log message; should include the file image filename
+        # expect one warning log message; should include the file image filename
         assert len(self.caplog.records) == 1
         log_record = self.caplog.records[0]
         assert log_record.levelname == "WARNING"
