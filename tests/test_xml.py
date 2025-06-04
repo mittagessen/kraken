@@ -240,6 +240,6 @@ class TestXMLParser(unittest.TestCase):
                                      ['pol', 'deu'], ['pol', 'deu'], ['pol', 'deu'], ['pol', 'deu'], ['pol', 'deu'],
                                      ['pol', 'deu'], ['pol', 'deu'], ['pol', 'deu'], ['pol', 'deu'], ['pol', 'deu'],
                                      ['pol', 'deu'], ['pol', 'deu'], ['pol', 'deu']])
-        reg_langs = [x.language for x in seg.regions['text']]
+        reg_langs = [x.language for x in seg.regions['Machine\\u0020Printed\\u0020text']]
         self.assertEqual(reg_langs, [['hbo'], ['heb', 'deu', 'eng'], ['pol', 'deu']])
 
