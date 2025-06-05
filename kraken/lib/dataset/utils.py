@@ -319,7 +319,7 @@ def compute_confusions(algn1: Sequence[str], algn2: Sequence[str]):
         script substitutions.
     """
     counts: Dict[Tuple[str, str], int] = Counter()
-    ref = resources.files(__name__).joinpath('scripts.json')
+    ref = resources.files('kraken.lib.dataset').joinpath('scripts.json')
     with ref.open('rb') as fp:
         script_map = json.load(fp)
 

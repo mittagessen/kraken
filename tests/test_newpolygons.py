@@ -319,7 +319,7 @@ class TestNewPolygons(unittest.TestCase):
             fp = str(Path(tempdir) / "test.xml")
 
             self._test_ketoscli(
-                args=['pretrain', '-f', 'xml', '-N', '1', '-q', 'fixed', '-i', self.old_model_path, '--resize', 'union', '-o', mfp, '--workers', '0', self.segmented_img],
+                args=['pretrain', '-f', 'xml', '-N', '1', '-q', 'fixed', '-i', self.old_model_path, '-o', mfp, '--workers', '0', self.segmented_img],
                 expect_legacy=False,
                 check_exit_code=[0, 1], # Model may not improve during training
             )
