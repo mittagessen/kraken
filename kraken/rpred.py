@@ -22,8 +22,8 @@ import dataclasses
 import logging
 from collections import defaultdict
 from functools import partial
-from typing import (TYPE_CHECKING, Dict, Generator, List, Optional, Sequence,
-                    Tuple, Union)
+from typing import (TYPE_CHECKING, Dict, Generator, List, Optional, Tuple,
+                    Union)
 import warnings
 
 from kraken.containers import BaselineOCRRecord, BBoxOCRRecord, ocr_record
@@ -41,6 +41,16 @@ if TYPE_CHECKING:
 __all__ = ['mm_rpred', 'rpred']
 
 logger = logging.getLogger(__name__)
+
+
+def _get_type(tags: Dict) -> str:
+    ot = tags.get('type')
+    if isinstance(ot, str):
+        return ot
+    elif isinstance(ot, dict) and (tt := ot.get('type')) is not None:
+        return tt
+    else:
+        return 'default'
 
 
 class mm_rpred(object):
@@ -87,9 +97,9 @@ class mm_rpred(object):
         seg_types = set(recognizer.seg_type for recognizer in nets.values())
         if isinstance(nets, defaultdict):
             seg_types.add(nets.default_factory().seg_type)
-            self._resolve_tags_to_model = partial(_resolve_tags_to_model, default=nets.default_factory())
+            self._resolve_type_to_model = partial(_resolve_type_to_model, default=nets.default_factory())
         else:
-            self._resolve_tags_to_model = _resolve_tags_to_model
+            self._resolve_type_to_model = _resolve_type_to_model
 
         if not tags_ignore:
             tags_ignore = []
@@ -131,7 +141,7 @@ class mm_rpred(object):
         if self.have_tags:
             tags = set()
             for x in bounds.lines:
-                tags.update(x.tags.items())
+                tags.update([_get_type(x.tags)])
 
             im_str = get_im_str(im)
             logger.info(f'Running {len(nets)} multi-script recognizers on {im_str} with {self.len} lines')
@@ -175,12 +185,11 @@ class mm_rpred(object):
         line.text_direction = self.bounds.text_direction
 
         if self.have_tags and self.tags_ignore:
-            for tag in line.tags.items():
-                if tag in self.tags_ignore:
-                    logger.info(f'Ignoring line segment with tags {line.tags} based on {tag}.')
-                    return BBoxOCRRecord('', (), (), line)
+            if (ltype := _get_type(line.tags)) in self.tags_ignore:
+                logger.info(f'Ignoring line segment with type {ltype}.')
+                return BBoxOCRRecord('', (), (), line)
 
-        tag, net = self._resolve_tags_to_model(line.tags, self.nets)
+        tag, net = self._resolve_type_to_model(line.tags, self.nets)
 
         use_legacy_polygons = self._choose_legacy_polygon_extractor(net)
 
@@ -249,14 +258,13 @@ class mm_rpred(object):
 
     def _recognize_baseline_line(self, line):
         if self.have_tags and self.tags_ignore is not None:
-            for tag in line.tags.items():
-                if tag in self.tags_ignore:
-                    logger.info(f'Ignoring line segment with tags {line.tags} based on {tag}.')
-                    return BaselineOCRRecord('', [], [], line)
+            if (ltype := _get_type(line.tags)) in self.tags_ignore:
+                logger.info(f'Ignoring line segment with type {ltype}.')
+                return BBoxOCRRecord('', (), (), line)
 
         seg = dataclasses.replace(self.bounds, lines=[line])
 
-        tag, net = self._resolve_tags_to_model(line.tags, self.nets)
+        tag, net = self._resolve_type_to_model(line.tags, self.nets)
 
         use_legacy_polygons = self._choose_legacy_polygon_extractor(net)
 
@@ -329,7 +337,6 @@ class mm_rpred(object):
         return False
 
 
-
 def rpred(network: 'TorchSeqRecognizer',
           im: 'Image.Image',
           bounds: 'Segmentation',
@@ -358,18 +365,22 @@ def rpred(network: 'TorchSeqRecognizer',
     return mm_rpred(defaultdict(lambda: network), im, bounds, pad, bidi_reordering, no_legacy_polygons=no_legacy_polygons)
 
 
-def _resolve_tags_to_model(tags: Optional[Sequence[Dict[str, str]]],
+def _resolve_type_to_model(tags: Optional[Dict],
                            model_map: Dict[Tuple[str, str], 'TorchSeqRecognizer'],
                            default: Optional['TorchSeqRecognizer'] = None) -> 'TorchSeqRecognizer':
     """
-    Resolves a sequence of tags
+    Resolves a line type to a model.
     """
-    if not tags and default:
-        return ('type', 'default'), default
-    elif tags:
-        for tag in tags.items():
-            if tag in model_map:
-                return tag, model_map[tag]
-    if tags and default:
-        return next(iter(tags.items())), default
-    raise KrakenInputException(f'No model for tags {tags}')
+    tag = None
+    if tags is not None:
+        try:
+            tag = _get_type(tags)
+        except Exception:
+            pass
+    if not tag and default:
+        return 'default', default
+    elif tag in model_map:
+        return tag, model_map[tag]
+    elif tag and default:
+        return tag, default
+    raise KrakenInputException(f'No model for type {tag}')

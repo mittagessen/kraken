@@ -199,7 +199,6 @@ class TestNewPolygons(unittest.TestCase):
             expect_legacy=False,
         )
 
-    @unittest.skip('fails randomly')
     def test_ketoscli_train_new_model(self):
         """
         Test `ketos train` with new model, check that it uses new polygon extraction method
@@ -219,7 +218,6 @@ class TestNewPolygons(unittest.TestCase):
                 expect_legacy=False,
             )
 
-    @unittest.skip('fails randomly')
     def test_ketoscli_train_new_model_force_legacy(self):
         """
         Test `ketos train` training new model, check that it uses legacy polygon extraction method if forced
@@ -239,7 +237,6 @@ class TestNewPolygons(unittest.TestCase):
                 expect_legacy=True,
             )
 
-    @unittest.skip('fails randomly')
     def test_ketoscli_train_old_model(self):
         """
         Test `ketos train` finetuning old model, check that it uses new polygon extraction method
@@ -258,7 +255,6 @@ class TestNewPolygons(unittest.TestCase):
                 expect_legacy=False,
             )
 
-    @unittest.skip('fails randomly')
     def test_ketoscli_train_old_model_force_legacy(self):
         """
         Test `ketos train` finetuning old model, check that it uses legacy polygon extraction method if forced
@@ -277,7 +273,6 @@ class TestNewPolygons(unittest.TestCase):
                 expect_legacy=True,
             )
 
-    @unittest.expectedFailure
     def test_ketoscli_pretrain_new_model(self):
         """
         Test `ketos pretrain` with new model, check that it uses new polygon extraction method
@@ -296,7 +291,6 @@ class TestNewPolygons(unittest.TestCase):
                 expect_legacy=False,
             )
 
-    @unittest.expectedFailure
     def test_ketoscli_pretrain_new_model_force_legacy(self):
         """
         Test `ketos pretrain` with new model, check that it uses legacy polygon extraction method if forced
@@ -316,7 +310,6 @@ class TestNewPolygons(unittest.TestCase):
                 expect_legacy=True,
             )
 
-    @unittest.expectedFailure
     def test_ketoscli_pretrain_old_model(self):
         """
         Test `ketos pretrain` with old model, check that it uses new polygon extraction method
