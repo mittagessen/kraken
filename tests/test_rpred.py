@@ -310,11 +310,11 @@ class TestRecognition(unittest.TestCase):
         """
         Tests mm_rpred recognition with ignore tags.
         """
-        pred = mm_rpred({('type', 'default'): self.model},
+        pred = mm_rpred({'default': self.model},
                         self.overfit_line,
                         self.tagged_box_seg,
                         True,
-                        tags_ignore=[('type', 'foobar')])
+                        tags_ignore=['foobar'])
         record = next(pred)
         self.assertEqual(record.prediction, '')
         record = next(pred)
@@ -337,11 +337,11 @@ class TestRecognition(unittest.TestCase):
         """
         Tests baseline recognition with ignore tags.
         """
-        pred = mm_rpred({('type', 'default'): self.model},
+        pred = mm_rpred({'default': self.model},
                         self.overfit_line,
                         self.tagged_bl_seg,
                         True,
-                        tags_ignore=[('type', 'foobar')])
+                        tags_ignore=['foobar'])
         record = next(pred)
         self.assertEqual(record.prediction, '')
         record = next(pred)

@@ -260,7 +260,7 @@ class mm_rpred(object):
         if self.have_tags and self.tags_ignore is not None:
             if (ltype := _get_type(line.tags)) in self.tags_ignore:
                 logger.info(f'Ignoring line segment with type {ltype}.')
-                return BBoxOCRRecord('', (), (), line)
+                return BaselineOCRRecord('', (), (), line)
 
         seg = dataclasses.replace(self.bounds, lines=[line])
 
