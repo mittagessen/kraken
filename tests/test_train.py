@@ -7,6 +7,7 @@ from pathlib import Path
 from pytest import raises
 
 import kraken
+from kraken.containers import BaselineLine, Segmentation
 from kraken.lib import xml
 from kraken.lib.exceptions import KrakenInputException
 from kraken.lib.train import KrakenTrainer, RecognitionModel, SegmentationModel
@@ -189,10 +190,25 @@ class TestKrakenTrainer(unittest.TestCase):
 
     def test_krakentrainer_rec_bl_dict(self):
         """
-        Tests recognition trainer constructor with dictionary style training data.
+        Tests recognition trainer constructor with container class training data.
         """
-        training_data = [{'image': resources / 'bw.png', 'text': 'foo', 'baseline': [[10, 10], [300, 10]], 'boundary': [[10, 5], [300, 5], [300, 15], [10, 15]]}]
-        evaluation_data = [{'image': resources / 'bw.png', 'text': 'foo', 'baseline': [[10, 10], [300, 10]], 'boundary': [[10, 5], [300, 5], [300, 15], [10, 15]]}]
+        training_data = [Segmentation(type='baselines',
+                                      text_direction='horizontal-lr',
+                                      imagename=resources / 'bw.png',
+                                      script_detection=False,
+                                      lines=[BaselineLine(id=f'foobar',
+                                                          baseline=[[10, 10], [300, 10]],
+                                                          text='foo',
+                                                          boundary=[[10, 5], [300, 5], [300, 15], [10, 15]])])]
+        evaluation_data = [Segmentation(type='baselines',
+                                        text_direction='horizontal-lr',
+                                        imagename=resources / 'bw.png',
+                                        script_detection=False,
+                                        lines=[BaselineLine(id=f'foobar',
+                                                            baseline=[[10, 10], [300, 10]],
+                                                            text='foo',
+                                                            boundary=[[10, 5], [300, 5], [300, 15], [10, 15]])])]
+
         module = RecognitionModel(format_type=None,
                                   training_data=training_data,
                                   evaluation_data=evaluation_data)
