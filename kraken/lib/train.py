@@ -367,7 +367,7 @@ class RecognitionModel(L.LightningModule):
                                                height,
                                                width,
                                                channels,
-                                               (self.hparams.hyper_params['pad'], 0),
+                                               (self.hyper_params['pad'], 0),
                                                valid_norm,
                                                force_binarization)
 
@@ -457,11 +457,11 @@ class RecognitionModel(L.LightningModule):
                        DatasetClass,
                        training_data,
                        **kwargs):
-        dataset = DatasetClass(normalization=self.hparams.hyper_params['normalization'],
-                               whitespace_normalization=self.hparams.hyper_params['normalize_whitespace'],
+        dataset = DatasetClass(normalization=self.hyper_params['normalization'],
+                               whitespace_normalization=self.hyper_params['normalize_whitespace'],
                                reorder=self.reorder,
                                im_transforms=self.transforms,
-                               augmentation=self.hparams.hyper_params['augment'],
+                               augmentation=self.hyper_params['augment'],
                                **kwargs)
 
         for sample in training_data:
@@ -469,8 +469,8 @@ class RecognitionModel(L.LightningModule):
                 dataset.add(**sample)
             except KrakenInputException as e:
                 logger.warning(str(e))
-        if self.format_type == 'binary' and (self.hparams.hyper_params['normalization'] or
-                                             self.hparams.hyper_params['normalize_whitespace'] or
+        if self.format_type == 'binary' and (self.hyper_params['normalization'] or
+                                             self.hyper_params['normalize_whitespace'] or
                                              self.reorder):
             logger.debug('Text transformations modifying alphabet selected. Rebuilding alphabet')
             dataset.rebuild_alphabet()
@@ -521,9 +521,9 @@ class RecognitionModel(L.LightningModule):
         self.val_cer.update(pred, decoded_targets)
         self.val_wer.update(pred, decoded_targets)
 
-        if self.logger and self.trainer.state.stage != 'sanity_check' and self.hparams.hyper_params["batch_size"] * batch_idx < 16:
-            for i in range(self.hparams.hyper_params["batch_size"]):
-                count = self.hparams.hyper_params["batch_size"] * batch_idx + i
+        if self.logger and self.trainer.state.stage != 'sanity_check' and self.hyper_params["batch_size"] * batch_idx < 16:
+            for i in range(self.hyper_params["batch_size"]):
+                count = self.hyper_params["batch_size"] * batch_idx + i
                 if count < 16:
                     self.logger.experiment.add_image(f'Validation #{count}, target: {decoded_targets[i]}',
                                                      batch['image'][i],
@@ -642,7 +642,7 @@ class RecognitionModel(L.LightningModule):
             if self.format_type != 'path' and self.nn.seg_type == 'bbox':
                 logger.warning('Neural network has been trained on bounding box image information but training set is polygonal.')
 
-            self.nn.hyper_params = self.hparams.hyper_params
+            self.nn.hyper_params = self.hyper_params
             self.nn.model_type = 'recognition'
 
             if not self.nn.seg_type:
@@ -656,7 +656,7 @@ class RecognitionModel(L.LightningModule):
 
     def train_dataloader(self):
         return DataLoader(self.train_set,
-                          batch_size=self.hparams.hyper_params['batch_size'],
+                          batch_size=self.hyper_params['batch_size'],
                           num_workers=self.num_workers,
                           pin_memory=True,
                           shuffle=True,
@@ -665,7 +665,7 @@ class RecognitionModel(L.LightningModule):
     def val_dataloader(self):
         return DataLoader(self.val_set,
                           shuffle=False,
-                          batch_size=self.hparams.hyper_params['batch_size'],
+                          batch_size=self.hyper_params['batch_size'],
                           num_workers=self.num_workers,
                           pin_memory=True,
                           collate_fn=collate_sequences,
@@ -673,10 +673,10 @@ class RecognitionModel(L.LightningModule):
 
     def configure_callbacks(self):
         callbacks = []
-        if self.hparams.hyper_params['quit'] == 'early':
+        if self.hyper_params['quit'] == 'early':
             callbacks.append(EarlyStopping(monitor='val_accuracy',
                                            mode='max',
-                                           patience=self.hparams.hyper_params['lag'],
+                                           patience=self.hyper_params['lag'],
                                            stopping_threshold=1.0))
 
         return callbacks
@@ -688,7 +688,7 @@ class RecognitionModel(L.LightningModule):
     # batch-wise learning rate warmup. In lr_scheduler_step() calls to the
     # scheduler are then only performed at the end of the epoch.
     def configure_optimizers(self):
-        return _configure_optimizer_and_lr_scheduler(self.hparams.hyper_params,
+        return _configure_optimizer_and_lr_scheduler(self.hyper_params,
                                                      self.nn.nn.parameters(),
                                                      len_train_set=len(self.train_set),
                                                      loss_tracking_mode='max')
@@ -699,13 +699,13 @@ class RecognitionModel(L.LightningModule):
 
         # linear warmup between 0 and the initial learning rate `lrate` in `warmup`
         # steps.
-        if self.hparams.hyper_params['warmup'] and self.trainer.global_step < self.hparams.hyper_params['warmup']:
-            lr_scale = min(1.0, float(self.trainer.global_step + 1) / self.hparams.hyper_params['warmup'])
+        if self.hyper_params['warmup'] and self.trainer.global_step < self.hyper_params['warmup']:
+            lr_scale = min(1.0, float(self.trainer.global_step + 1) / self.hyper_params['warmup'])
             for pg in optimizer.param_groups:
-                pg["lr"] = lr_scale * self.hparams.hyper_params['lrate']
+                pg["lr"] = lr_scale * self.hyper_params['lrate']
 
     def lr_scheduler_step(self, scheduler, metric):
-        if not self.hparams.hyper_params['warmup'] or self.trainer.global_step >= self.hparams.hyper_params['warmup']:
+        if not self.hyper_params['warmup'] or self.trainer.global_step >= self.hyper_params['warmup']:
             # step OneCycleLR each batch if not in warmup phase
             if isinstance(scheduler, lr_scheduler.OneCycleLR):
                 scheduler.step()
@@ -843,7 +843,7 @@ class SegmentationModel(L.LightningModule):
                                           height,
                                           width,
                                           channels,
-                                          self.hparams.hyper_params['padding'],
+                                          self.hyper_params.hyper_params['padding'],
                                           valid_norm=False,
                                           force_binarization=force_binarization)
 
@@ -869,9 +869,9 @@ class SegmentationModel(L.LightningModule):
             valid_baselines = []
             merge_baselines = None
 
-        train_set = BaselineSet(line_width=self.hparams.hyper_params['line_width'],
+        train_set = BaselineSet(line_width=self.hyper_params['line_width'],
                                 im_transforms=transforms,
-                                augmentation=self.hparams.hyper_params['augment'],
+                                augmentation=self.hyper_params['augment'],
                                 valid_baselines=valid_baselines,
                                 merge_baselines=merge_baselines,
                                 valid_regions=valid_regions,
@@ -881,7 +881,7 @@ class SegmentationModel(L.LightningModule):
             train_set.add(page)
 
         if evaluation_data:
-            val_set = BaselineSet(line_width=self.hparams.hyper_params['line_width'],
+            val_set = BaselineSet(line_width=self.hyper_params['line_width'],
                                   im_transforms=transforms,
                                   augmentation=False,
                                   valid_baselines=valid_baselines,
@@ -1055,7 +1055,7 @@ class SegmentationModel(L.LightningModule):
                 self.val_set.dataset.class_mapping = self.nn.user_metadata['class_mapping']
 
             # updates model's hyper params with user-defined ones
-            self.nn.hyper_params = self.hparams.hyper_params
+            self.nn.hyper_params = self.hyper_params
 
             # change topline/baseline switch
             loc = {None: 'centerline',
@@ -1110,10 +1110,10 @@ class SegmentationModel(L.LightningModule):
 
     def configure_callbacks(self):
         callbacks = []
-        if self.hparams.hyper_params['quit'] == 'early':
+        if self.hyper_params['quit'] == 'early':
             callbacks.append(EarlyStopping(monitor='val_mean_iu',
                                            mode='max',
-                                           patience=self.hparams.hyper_params['lag'],
+                                           patience=self.hyper_params['lag'],
                                            stopping_threshold=1.0))
 
         return callbacks
@@ -1125,7 +1125,7 @@ class SegmentationModel(L.LightningModule):
     # batch-wise learning rate warmup. In lr_scheduler_step() calls to the
     # scheduler are then only performed at the end of the epoch.
     def configure_optimizers(self):
-        return _configure_optimizer_and_lr_scheduler(self.hparams.hyper_params,
+        return _configure_optimizer_and_lr_scheduler(self.hyper_params,
                                                      self.nn.nn.parameters(),
                                                      len_train_set=len(self.train_set),
                                                      loss_tracking_mode='max')
@@ -1136,13 +1136,13 @@ class SegmentationModel(L.LightningModule):
 
         # linear warmup between 0 and the initial learning rate `lrate` in `warmup`
         # steps.
-        if self.hparams.hyper_params['warmup'] and self.trainer.global_step < self.hparams.hyper_params['warmup']:
-            lr_scale = min(1.0, float(self.trainer.global_step + 1) / self.hparams.hyper_params['warmup'])
+        if self.hyper_params['warmup'] and self.trainer.global_step < self.hyper_params['warmup']:
+            lr_scale = min(1.0, float(self.trainer.global_step + 1) / self.hyper_params['warmup'])
             for pg in optimizer.param_groups:
-                pg["lr"] = lr_scale * self.hparams.hyper_params['lrate']
+                pg["lr"] = lr_scale * self.hyper_params['lrate']
 
     def lr_scheduler_step(self, scheduler, metric):
-        if not self.hparams.hyper_params['warmup'] or self.trainer.global_step >= self.hparams.hyper_params['warmup']:
+        if not self.hyper_params['warmup'] or self.trainer.global_step >= self.hyper_params['warmup']:
             # step OneCycleLR each batch if not in warmup phase
             if isinstance(scheduler, lr_scheduler.OneCycleLR):
                 scheduler.step()
