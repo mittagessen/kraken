@@ -44,14 +44,14 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def _get_type(tags: Dict) -> str:
+def _get_type(tags: Dict, default='default') -> str:
+    if tags is None:
+        return default
     ot = tags.get('type')
-    if isinstance(ot, str):
-        return ot
-    elif isinstance(ot, dict) and (tt := ot.get('type')) is not None:
+    if (tt := ot.get('type')) is not None:
         return tt
     else:
-        return 'default'
+        return default
 
 
 class BaselineSet(Dataset):

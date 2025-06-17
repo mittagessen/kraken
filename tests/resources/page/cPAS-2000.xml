@@ -11,7 +11,7 @@
         </ImageRegion>
         <TextRegion id="region_1546920829334_13716" custom="readingOrder {index:1;} structure {type:Machine\u0020Printed\u0020text;} language {type: hbo;}" readingDirection="bottom-to-top">
             <Coords points="3217,273 3217,364 3352,364 3352,273"/>
-            <TextLine id="line_1546920829350_13719" custom="readingOrder {index:0;}">
+            <TextLine id="line_1546920829350_13719" custom="readingOrder {index:0;} split {type: train;}">
                 <Coords points="3217,314 3351,310 3352,360 3218,364"/>
                 <Baseline points="3218,359 3352,355"/>
             </TextLine>
@@ -30,7 +30,7 @@
                 <Coords points="266,664 1768,645 1769,695 267,714"/>
                 <Baseline points="267,709 1769,690"/>
             </TextLine>
-            <TextLine id="line_1546920842471_13751" custom="readingOrder {index:3;}">
+            <TextLine id="line_1546920842471_13751" custom="readingOrder {index:3;} split {type: validation;}">
                 <Coords points="360,739 787,738 787,788 360,789"/>
                 <Baseline points="360,784 787,783"/>
             </TextLine>
@@ -110,11 +110,11 @@
                 <Coords points="355,2245 1771,2241 1771,2291 355,2295"/>
                 <Baseline points="355,2290 1771,2286"/>
             </TextLine>
-            <TextLine id="line_1546920915437_13911" custom="readingOrder {index:23;}">
+            <TextLine id="line_1546920915437_13911" custom="readingOrder {index:23;} split {type: train;}">
                 <Coords points="353,2326 1104,2326 1104,2376 353,2376"/>
                 <Baseline points="353,2371 1104,2371"/>
             </TextLine>
-            <TextLine id="line_1546920918356_13919" custom="readingOrder {index:24;}">
+            <TextLine id="line_1546920918356_13919" custom="readingOrder {index:24;} split {type: invalid;}">
                 <Coords points="272,2403 1775,2396 1775,2446 272,2453"/>
                 <Baseline points="272,2448 1775,2441"/>
             </TextLine>

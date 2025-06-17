@@ -189,15 +189,17 @@ class XMLPage(object):
             tag_type = tags.pop('region') if 'region' in tags else tags.pop('type', None)
             if (rtype := region.get('TYPE')) is None:
                 rtype = tag_type
+            else:
+                rtype = {'type': rtype}
             if rtype is None:
-                rtype = alto_regions[region.tag.split('}')[-1]]
+                rtype = {'type': alto_regions[region.tag.split('}')[-1]]}
             tags['type'] = rtype
 
             region_default_lang = self._parse_alto_langs(region,
                                                          cls_map,
                                                          [page_default_lang] if page_default_lang is not None else None)
 
-            region_data[rtype].append(Region(id=region_id,
+            region_data[rtype['type']].append(Region(id=region_id,
                                              boundary=boundary,
                                              tags=tags,
                                              language=region_default_lang))
@@ -234,8 +236,12 @@ class XMLPage(object):
                 for el in line.xpath(".//*[local-name() = 'String'] | .//*[local-name() = 'SP']"):
                     text += el.get('CONTENT') if el.get('CONTENT') else ' '
                 # parse tags
-                tags = self._parse_alto_tagrefs(cls_map, line.get('TAGREFS'), type='default')
+                tags = self._parse_alto_tagrefs(cls_map, line.get('TAGREFS'))
                 line_langs = self._parse_alto_langs(line, cls_map, region_default_lang)
+                line_split = None
+                if (split := tags.get('split', None)) is not None and len(split) == 1:
+                    line_split = split[0]['type']
+                    tags.pop('split')
 
                 # get base text direction
                 line_dir = {'ltr': 'L',
@@ -250,18 +256,18 @@ class XMLPage(object):
                                             baseline=baseline,
                                             boundary=boundary,
                                             text=text,
-                                            tags=tags,
+                                            tags=tags if tags else None,
                                             language=line_langs,
-                                            split=tags.pop('split', None),
+                                            split=line_split,
                                             base_dir=line_dir,
                                             regions=[region_id])
                 elif self.type == 'bbox':
                     line_obj = BBoxLine(id=line_id,
                                         bbox=bbox,
                                         text=text,
-                                        tags=tags,
+                                        tags=tags if tags else None,
                                         language=line_langs,
-                                        split=tags.pop('split', None),
+                                        split=line_split,
                                         base_dir=line_dir,
                                         regions=[region_id])
 
@@ -379,7 +385,7 @@ class XMLPage(object):
             if not rtype:
                 rtype = page_regions[region.tag.split('}')[-1]]
 
-            tags['type'] = rtype
+            tags['type'] = {'type': rtype}
             region_data[rtype].append(Region(id=region_id, boundary=coords, tags=tags, language=region_default_lang))
 
             region_default_direction = {'left-to-right': 'L',
@@ -421,17 +427,13 @@ class XMLPage(object):
                     if el.text:
                         text += el.text
                 # retrieve line tags if custom string is set and contains
-                tags = {'type': 'default'}
+                tags = {}
                 custom_str = line.get('custom')
                 if custom_str:
                     cs = self._parse_page_custom(custom_str)
                     if (structure := cs.get('structure')) is not None and (ltype := structure[0].get('type')):
-                        tags['type'] = ltype
-                        self._tag_set.add(tags['type'])
-                    # retrieve data split if encoded in custom string.
-                    if (split := cs.get('split')) is not None and (stype := split[0].get('type')) in ['train', 'validation', 'test']:
-                        tags['split'] = stype
-                        self._tag_set.add(tags['split'])
+                        tags['type'] = {'type': ltype}
+                        self._tag_set.add(ltype)
                     if (line_ro := cs.get('readingOrder')) is not None and (line_ro_idx := line_ro[0].get('index')) is not None:
                         # look up region index from parent
                         reg_cus = self._parse_page_custom(line.getparent().get('custom'))
@@ -452,6 +454,10 @@ class XMLPage(object):
                     line_dir = page_default_direction
 
                 line_langs = self._parse_page_langs(line, region_default_lang)
+                line_split = None
+                if (split := tags.get('split', None)) is not None and len(split) == 1:
+                    line_split = split[0]['type']
+                    tags.pop('split')
 
                 if self.type == 'baselines':
                     line_obj = BaselineLine(id=line_id,
@@ -460,7 +466,7 @@ class XMLPage(object):
                                             text=text,
                                             tags=tags,
                                             language=line_langs,
-                                            split=tags.pop('split', None),
+                                            split=line_split,
                                             base_dir=line_dir,
                                             regions=[region_id])
                 elif self.type == 'bbox':
@@ -472,7 +478,7 @@ class XMLPage(object):
                                         text=text,
                                         tags=tags,
                                         language=line_langs,
-                                        split=tags.pop('split', None),
+                                        split=line_split,
                                         base_dir=line_dir,
                                         regions=[region_id])
 
@@ -705,13 +711,14 @@ class XMLPage(object):
         if tagrefs is not None:
             for tagref in tagrefs.split():
                 tref, tag_type, tag_label = tag_map.get(tagref, (None, None, None))
+                tag_label = [{'type': tag_label}]
                 if all((tag_type, tag_label)):
-                    self._tag_set.add(tag_label)
+                    self._tag_set.add(tag_label[0]['type'])
                     tag_val = tags.pop(tag_type, None)
                     if isinstance(tag_val, list):
-                        tag_val.append(tag_label)
+                        tag_val.extend(tag_label)
                     elif tag_val is not None:
-                        tag_val = [tag_val, tag_label]
+                        tag_val = [tag_val] + tag_label
                     else:
                         tag_val = tag_label
                     tags[tag_type] = tag_val
@@ -729,9 +736,9 @@ class XMLPage(object):
         tags = self._parse_alto_tagrefs(tag_map, el.get('TAGREFS'))
         if (tag_langs := tags.get('language')) is not None:
             if isinstance(tag_langs, list):
-                el_langs.extend(tag_langs)
+                el_langs.extend([tl['type'] for tl in tag_langs])
             else:
-                el_langs.append(tag_langs)
+                el_langs.append(tag_langs['type'])
         if (el_lang := el.get('LANG')) is not None:
             el_langs.append(el_lang)
 

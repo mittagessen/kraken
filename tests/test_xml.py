@@ -134,24 +134,28 @@ class TestXMLParser(unittest.TestCase):
         """
         seg = xml.XMLPage(self.alto_doc).to_container()
         line_tags = [line.tags for line in seg.lines]
-        self.assertEqual(line_tags, [{'type': 'default'}, {'type': 'default'},
-                                     {'type': 'heading'}, {'type': 'default'},
-                                     {'type': 'default'}, {'type': 'default'},
-                                     {'type': 'default'}, {'type': 'default'},
-                                     {'type': 'default'}, {'type': 'default'},
-                                     {'type': 'default'},
-                                     {'label_0': 'foo', 'label_1': 'bar', 'type': 'default'},
-                                     {'label_1': ['bar', 'baz'], 'type': 'default'},
-                                     {'type': 'default'}, {'type': 'default'},
-                                     {'type': 'default'}, {'type': 'default'},
-                                     {'type': 'default'}, {'type': 'default'},
-                                     {'type': 'default'}, {'type': 'default'},
-                                     {'type': 'default'}, {'type': 'default'},
-                                     {'language': 'eng', 'type': 'default'},
-                                     {'type': 'default'}, {'type': 'default'},
-                                     {'type': 'default'}, {'type': 'default'},
-                                     {'language': ['deu', 'eng'], 'type': 'default'},
-                                     {'type': 'default'}])
+        self.assertEqual(line_tags, [None, None, {'type': [{'type': 'heading'}]},
+                                     None, None, None, None, None, None, None, None,
+                                     {'label_0': [{'type': 'foo'}], 'label_1': [{'type': 'bar'}]},
+                                     {'label_1': [{'type': 'bar'}, {'type': 'baz'}]},
+                                     None, None, None, None, None, None, None, None, None, None,
+                                     {'language': [{'type': 'eng'}]}, None, None, None, None,
+                                     {'language': [{'type': 'deu'}, {'type': 'eng'}]}, None])
+
+    def test_alto_split_parsing(self):
+        """
+        Test correct parsing of splits.
+        """
+        seg = xml.XMLPage(self.alto_doc).to_container()
+        line_tags = [line.tags for line in seg.lines]
+        self.assertEqual(line_tags, [None, None, {'type': [{'type': 'heading'}]},
+                                     None, None, None, None, None, None, None, None,
+                                     {'label_0': [{'type': 'foo'}], 'label_1': [{'type': 'bar'}]},
+                                     {'label_1': [{'type': 'bar'}, {'type': 'baz'}]},
+                                     None, None, None, None, None, None, None, None, None, None,
+                                     {'language': [{'type': 'eng'}]}, None, None, None, None,
+                                     {'language': [{'type': 'deu'}, {'type': 'eng'}]}, None])
+
 
     def test_alto_baseline_linetype(self):
         """
@@ -205,6 +209,28 @@ class TestXMLParser(unittest.TestCase):
                                      'L', 'L', 'L', 'L', 'L', 'L', 'L', 'L',
                                      'L', 'L', 'L', 'L', 'L', 'L', 'L', 'L',
                                      'L'])
+
+    def test_page_split_parsing(self):
+        """
+        Test correct parsing of splits.
+        """
+        seg = xml.XMLPage(self.page_doc).to_container()
+        base_dirs = [x.split for x in seg.lines]
+        self.assertEqual(base_dirs, ['train', None, None, None, 'validation', None,
+                                     None, None, None, None, None, None, None,
+                                     None, None, None, None, None, None, None,
+                                     None, None, None, None, 'train',
+                                     'invalid', None, None, None, None, None,
+                                     None, None, None, None, None, None, None,
+                                     None, None, None, None, None, None, None,
+                                     None, None, None, None, None, None, None,
+                                     None, None, None, None, None, None, None,
+                                     None, None, None, None, None, None, None,
+                                     None, None, None, None, None, None, None,
+                                     None, None, None, None, None, None, None,
+                                     None, None, None, None, None, None, None,
+                                     None, None, None, None, None, None, None,
+                                     None, None, None])
 
     def test_page_language_parsing(self):
         """
