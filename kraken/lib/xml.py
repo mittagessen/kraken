@@ -190,19 +190,19 @@ class XMLPage(object):
             if (rtype := region.get('TYPE')) is None:
                 rtype = tag_type
             else:
-                rtype = {'type': rtype}
+                rtype = [{'type': rtype}]
             if rtype is None:
-                rtype = {'type': alto_regions[region.tag.split('}')[-1]]}
+                rtype = [{'type': alto_regions[region.tag.split('}')[-1]]}]
             tags['type'] = rtype
 
             region_default_lang = self._parse_alto_langs(region,
                                                          cls_map,
                                                          [page_default_lang] if page_default_lang is not None else None)
 
-            region_data[rtype['type']].append(Region(id=region_id,
-                                             boundary=boundary,
-                                             tags=tags,
-                                             language=region_default_lang))
+            region_data[rtype[0]['type']].append(Region(id=region_id,
+                                                        boundary=boundary,
+                                                        tags=tags,
+                                                        language=region_default_lang))
             # register implicit reading order
             self._orders['region_implicit']['order'].append(region_id)
 
@@ -289,8 +289,6 @@ class XMLPage(object):
             # UnorderedGroup at top-level => treated as multiple reading orders
             if len(reading_orders) == 1 and reading_orders[0].tag.endswith('UnorderedGroup'):
                 reading_orders = reading_orders[0].getchildren()
-            else:
-                reading_orders = [reading_orders]
 
             def _parse_group(el):
                 nonlocal is_valid
