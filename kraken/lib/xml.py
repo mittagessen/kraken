@@ -238,8 +238,6 @@ class XMLPage(object):
                 # UnorderedGroup at top-level => treated as multiple reading orders
                 if len(reading_orders) == 1 and reading_orders[0].tag.endswith('UnorderedGroup'):
                     reading_orders = reading_orders[0].getchildren()
-                else:
-                    reading_orders = [reading_orders]
 
                 def _parse_group(el):
                     nonlocal is_valid
