@@ -131,14 +131,8 @@ def serialize(results: 'Segmentation',
     for line in results.lines:
         if line.tags is not None:
             types.extend((k, v) for k, v in line.tags.items())
-    page['line_types'] = list(set(types))
-    page['region_types'] = list(results.regions.keys())
 
-    # map reading orders indices to line IDs
-    ros = []
-    for ro in results.line_orders:
-        ros.append([results.lines[idx].id for idx in ro])
-    page['line_orders'] = ros
+    page['line_orders'] = [ro['order'] for ro in results.line_orders]
     # build region ID to region dict
     reg_dict = {}
     for key, regs in results.regions.items():

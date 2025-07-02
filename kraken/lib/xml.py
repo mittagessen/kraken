@@ -383,7 +383,7 @@ class XMLPage(object):
             if not rtype:
                 rtype = page_regions[region.tag.split('}')[-1]]
 
-            tags['type'] = {'type': rtype}
+            tags['type'] = [{'type': rtype}]
             region_data[rtype].append(Region(id=region_id, boundary=coords, tags=tags, language=region_default_lang))
 
             region_default_direction = {'left-to-right': 'L',

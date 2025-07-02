@@ -1,5 +1,5 @@
 {%+ macro render_line(line) +%}
-            <TextLine id="{{ line.id }}" {% if line.tags and "type" in line.tags %}custom="structure {type:{{ line.tags["type"] }};}"{% endif %}>
+            <TextLine id="{{ line.id }}" {% if line.tags %}custom="{%- for k, v in line.tags | dictsort -%}{%- for tag in v -%}{{ k }} {{ '{' }}{%- for tk, tv in tag.items() -%}{{ tk }}:{{ tv }};{%- endfor -%}{{ '} ' }}{%- endfor -%}{%- endfor -%}"{% endif %}>
                 {% if line.boundary %}
                 <Coords points="{% for point in line.boundary %}{{ point|join(',') }}{% if not loop.last %} {% endif %}{% endfor %}"/>
                 {% endif %}
@@ -42,7 +42,7 @@
         {% if loop.previtem and loop.previtem.type == 'line' %}
         </TextRegion>
         {% endif %}
-        <TextRegion id="{{ entity.id }}" {% if entity.tags and "type" in entity.tags %}custom="structure {type:{{ entity.tags["type"] }};}"{% endif %}>
+        <TextRegion id="{{ entity.id }}" {% if entity.tags %}custom="{%- for k, v in entity.tags | dictsort -%}{%- for tag in v -%}{{ k }} {{ '{' }}{%- for tk, tv in tag.items() -%}{{ tk }}:{{ tv }};{%- endfor -%}{{ '} ' }}{%- endfor -%}{%- endfor -%}"{% endif %}>
             {% if entity.boundary %}<Coords points="{% for point in entity.boundary %}{{ point|join(',') }}{% if not loop.last %} {% endif %}{% endfor %}"/>{% endif %}
             {%- for line in entity.lines -%}
             {{ render_line(line) }}
