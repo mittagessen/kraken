@@ -118,13 +118,23 @@ def serialize(results: 'Segmentation',
                             'writing_mode': writing_mode,
                             'scripts': scripts,
                             'date': datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                            'base_dir': [rec.base_dir for rec in results.lines][0] if len(results.lines) else None,
                             'seg_type': results.type}
     metadata = {'processing_steps': processing_steps,
                 'version': importlib.metadata.version('kraken')}
 
     seg_idx = 0
     char_idx = 0
+
+    # build region and line type dict
+    # types = []
+    # for line in results.lines:
+    #     if line.tags is not None:
+    #         for k, v in line.tags:
+    #             for t in v:
+    #                 types.extend((k, v) for k, v in line.tags.items())
+
+    # page['line_types'] = list(set(types))
+    # page['region_types'] = list(results.regions.keys())
 
     # build region and line type dict
     types = []
@@ -155,6 +165,7 @@ def serialize(results: 'Segmentation',
                       'boundary': [list(x) for x in reg.boundary] if reg.boundary else [],
                       'tags': reg.tags,
                       'lines': [],
+                      'language': reg.language,
                       'type': 'region'
                       }
             page['entities'].append(region)
@@ -171,6 +182,8 @@ def serialize(results: 'Segmentation',
                                                                                                    [record.bbox[2], record.bbox[1]],
                                                                                                    [record.bbox[2], record.bbox[3]],
                                                                                                    [record.bbox[0], record.bbox[3]]],
+                'language': record.language,
+                'base_dir': record.base_dir,
                 'type': 'line'
                 }
         if record.tags is not None:
