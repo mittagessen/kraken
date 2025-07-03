@@ -43,14 +43,14 @@ __all__ = ['mm_rpred', 'rpred']
 logger = logging.getLogger(__name__)
 
 
-def _get_type(tags: Dict) -> str:
-    ot = tags.get('type')
-    if isinstance(ot, str):
-        return ot
-    elif isinstance(ot, dict) and (tt := ot.get('type')) is not None:
+def _get_type(tags: Dict, default='default') -> str:
+    if tags is None:
+        return default
+    ot = tags.get('type')[0]
+    if (tt := ot.get('type')) is not None:
         return tt
     else:
-        return 'default'
+        return default
 
 
 class mm_rpred(object):
