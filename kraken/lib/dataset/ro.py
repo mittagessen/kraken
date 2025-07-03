@@ -22,8 +22,9 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 
-from kraken.lib.exceptions import KrakenInputException
 from kraken.lib.xml import XMLPage
+from kraken.lib.dataset.utils import _get_type
+from kraken.lib.exceptions import KrakenInputException
 
 if TYPE_CHECKING:
     from os import PathLike
@@ -45,6 +46,8 @@ class PairWiseROSet(Dataset):
                  mode: Optional[Literal['alto', 'page', 'xml']] = 'xml',
                  level: Literal['regions', 'baselines'] = 'baselines',
                  ro_id: Optional[str] = None,
+                 valid_entities: Sequence[str] = None,
+                 merge_entities: Dict[str, Sequence[str]] = None,
                  class_mapping: Optional[Dict[str, int]] = None):
         """
         Samples pairs lines/regions from XML files for training a reading order
@@ -57,6 +60,11 @@ class PairWiseROSet(Dataset):
                   through the `add` method.
             ro_id: ID of the reading order to sample from. Defaults to
                    `line_implicit`/`region_implicit`.
+            valid_entities: Sequence of valid baseline/regions identifiers. If `None`
+                             all are valid.
+            merge_entities: Sequence of baseline/region identifiers to merge.  Note
+                             that merging occurs after entities not in valid_*
+                             have been discarded.
         """
         super().__init__()
 
@@ -65,9 +73,14 @@ class PairWiseROSet(Dataset):
         if class_mapping:
             self.class_mapping = class_mapping
             self.num_classes = len(class_mapping) + 1
+            valid_entities = None
+            merge_entities = None
         else:
             self.num_classes = 1
             self.class_mapping = {}
+
+        self.m_dict = merge_entities if merge_entities is not None else {}
+        self.valid_entities = valid_entities
 
         self.data = []
 
@@ -87,7 +100,9 @@ class PairWiseROSet(Dataset):
                     else:
                         raise ValueError(f'Invalid RO type {level}')
                     for el in order:
-                        for tag in el.tags.values():
+                        tag_val = _get_type(el.tags)
+                        if self.valid_entities is None or tag_val in self.valid_entities:
+                            tag = self.m_dict.get(tag_val, tag_val)
                             if tag not in self.class_mapping:
                                 self.class_mapping[tag] = self.num_classes
                                 self.num_classes += 1
@@ -104,8 +119,8 @@ class PairWiseROSet(Dataset):
                     line_center = np.mean(line_coords, axis=0)
                     cl = torch.zeros(self.num_classes, dtype=torch.float)
                     # if class is not in class mapping default to None class (idx 0)
-                    cl[self.class_mapping.get(line.tags['type'], 0)] = 1
-                    line_data = {'type': line.tags['type'],
+                    cl[self.class_mapping.get(_get_type(line.tags), 0)] = 1
+                    line_data = {'type': _get_type(line.tags),
                                  'features': torch.cat((cl,  # one hot encoded line type
                                                         torch.tensor(line_center, dtype=torch.float),  # line center
                                                         torch.tensor(line_coords[0, :], dtype=torch.float),  # start_point coord
@@ -150,6 +165,8 @@ class PageWiseROSet(Dataset):
                  mode: Optional[Literal['alto', 'page', 'xml']] = 'xml',
                  level: Literal['regions', 'baselines'] = 'baselines',
                  ro_id: Optional[str] = None,
+                 valid_entities: Sequence[str] = None,
+                 merge_entities: Dict[str, Sequence[str]] = None,
                  class_mapping: Optional[Dict[str, int]] = None):
         """
         Samples pairs lines/regions from XML files for training a reading order
@@ -162,6 +179,11 @@ class PageWiseROSet(Dataset):
                   through the `add` method.
             ro_id: ID of the reading order to sample from. Defaults to
                    `line_implicit`/`region_implicit`.
+            valid_entities: Sequence of valid baseline/regions identifiers. If `None`
+                             all are valid.
+            merge_entities: Sequence of baseline/region identifiers to merge.  Note
+                             that merging occurs after entities not in valid_*
+                             have been discarded.
         """
         super().__init__()
 
@@ -169,9 +191,14 @@ class PageWiseROSet(Dataset):
         if class_mapping:
             self.class_mapping = class_mapping
             self.num_classes = len(class_mapping) + 1
+            valid_entities = None
+            merge_entities = None
         else:
             self.num_classes = 1
             self.class_mapping = {}
+
+        self.m_dict = merge_entities if merge_entities is not None else {}
+        self.valid_entities = valid_entities
 
         self.data = []
 
@@ -191,7 +218,9 @@ class PageWiseROSet(Dataset):
                     else:
                         raise ValueError(f'Invalid RO type {level}')
                     for el in order:
-                        for tag in el.tags.values():
+                        tag_val = _get_type(el.tags)
+                        if self.valid_entities is None or tag_val in self.valid_entities:
+                            tag = self.m_dict.get(tag_val, tag_val)
                             if tag not in self.class_mapping:
                                 self.class_mapping[tag] = self.num_classes
                                 self.num_classes += 1
@@ -208,8 +237,8 @@ class PageWiseROSet(Dataset):
                     line_center = np.mean(line_coords, axis=0)
                     cl = torch.zeros(self.num_classes, dtype=torch.float)
                     # if class is not in class mapping default to None class (idx 0)
-                    cl[self.class_mapping.get(line.tags['type'], 0)] = 1
-                    line_data = {'type': line.tags['type'],
+                    cl[self.class_mapping.get(_get_type(line.tags), 0)] = 1
+                    line_data = {'type': _get_type(line.tags),
                                  'features': torch.cat((cl,  # one hot encoded line type
                                                         torch.tensor(line_center, dtype=torch.float),  # line center
                                                         torch.tensor(line_coords[0, :], dtype=torch.float),  # start_point coord

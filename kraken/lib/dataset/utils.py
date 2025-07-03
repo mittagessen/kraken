@@ -31,11 +31,22 @@ from kraken.lib.exceptions import KrakenInputException
 from kraken.lib.lineest import CenterNormalizer
 
 __all__ = ['ImageInputTransforms',
-           'collate_sequences']
+           'collate_sequences',
+           '_get_type']
 
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+def _get_type(tags: Dict, default='default') -> str:
+    if tags is None:
+        return default
+    ot = tags.get('type')[0]
+    if (tt := ot.get('type')) is not None:
+        return tt
+    else:
+        return default
 
 
 class ImageInputTransforms(transforms.Compose):

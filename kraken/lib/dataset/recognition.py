@@ -77,10 +77,9 @@ class DefaultAugmenter():
                                     OneOf([
                                         OpticalDistortion(p=0.3),
                                         ElasticTransform(alpha=7, sigma=25, p=0.1),
-                                        SafeRotate(limit=(-3,3), border_mode=cv2.BORDER_CONSTANT, p=0.2)
+                                        SafeRotate(limit=(-3, 3), border_mode=cv2.BORDER_CONSTANT, p=0.2)
                                     ], p=0.2),
                                    ], p=0.5)
-
 
     def __call__(self, image, index):
         im = image.permute((1, 2, 0)).numpy()

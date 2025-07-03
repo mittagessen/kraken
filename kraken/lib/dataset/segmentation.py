@@ -25,12 +25,12 @@ import shapely.geometry as geom
 import torch
 import torch.nn.functional as F
 from PIL import Image
-from itertools import chain
 from shapely.ops import split
 from skimage.draw import polygon
 from torch.utils.data import Dataset
 from torchvision import transforms
 
+from kraken.lib.dataset.utils import _get_type
 from kraken.lib.segmentation import scale_regions
 
 if TYPE_CHECKING:
@@ -42,16 +42,6 @@ __all__ = ['BaselineSet']
 import logging
 
 logger = logging.getLogger(__name__)
-
-
-def _get_type(tags: Dict, default='default') -> str:
-    if tags is None:
-        return default
-    ot = tags.get('type')[0]
-    if (tt := ot.get('type')) is not None:
-        return tt
-    else:
-        return default
 
 
 class BaselineSet(Dataset):
