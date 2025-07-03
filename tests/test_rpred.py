@@ -230,10 +230,10 @@ class TestRecognition(unittest.TestCase):
                                            imagename = resources / 'bw.png',
                                            lines=[BBoxLine(id='foo',
                                                            bbox=[0, 0, 2544, 156],
-                                                           tags={'type': 'foobar'}),
+                                                           tags={'type': [{'type': 'foobar'}]}),
                                                   BBoxLine(id='bar',
                                                            bbox=[0, 0, 2544, 156],
-                                                           tags={'type': 'default'})
+                                                           tags={'type': [{'type': 'default'}]})
                                                  ],
                                            text_direction='horizontal-lr',
                                            script_detection=True
@@ -243,11 +243,11 @@ class TestRecognition(unittest.TestCase):
                                           lines=[BaselineLine(id='foo',
                                                               baseline=[[0, 10], [2543, 10]],
                                                               boundary=[[0, 0], [2543, 0], [2543, 155], [0, 155]],
-                                                              tags={'type': 'foobar'}),
+                                                              tags={'type': [{'type': 'foobar'}]}),
                                                  BaselineLine(id='bar',
                                                               baseline=[[0, 10], [2543, 10]],
                                                               boundary=[[0, 0], [2543, 0], [2543, 155], [0, 155]],
-                                                              tags={'type': 'default'}),
+                                                              tags={'type': [{'type': 'default'}]})
                                                 ],
                                            text_direction='horizontal-lr',
                                            script_detection=True

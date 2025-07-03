@@ -430,8 +430,7 @@ class XMLPage(object):
                 if custom_str:
                     cs = self._parse_page_custom(custom_str)
                     if (structure := cs.get('structure')) is not None and (ltype := structure[0].get('type')):
-                        tags['type'] = {'type': ltype}
-                        self._tag_set.add(ltype)
+                        tags['type'] = [{'type': ltype}]
                     if (line_ro := cs.get('readingOrder')) is not None and (line_ro_idx := line_ro[0].get('index')) is not None:
                         # look up region index from parent
                         reg_cus = self._parse_page_custom(line.getparent().get('custom'))
