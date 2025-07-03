@@ -29,6 +29,27 @@ logging.captureWarnings(True)
 logger = logging.getLogger('kraken')
 
 
+def _validate_merging(ctx, param, value):
+    """
+    Maps baseline/region merging to a dict of merge structures.
+    """
+    if not value:
+        return None
+    merge_dict: Dict[str, str] = {}
+    try:
+        for m in value:
+            lexer = shlex.shlex(m, posix=True)
+            lexer.wordchars += r'\/.+-()=^&;,.'
+            tokens = list(lexer)
+            if len(tokens) != 3:
+                raise ValueError
+            k, _, v = tokens
+            merge_dict[v] = k  # type: ignore
+    except Exception:
+        raise click.BadParameter('Mappings must be in format target:src')
+    return merge_dict
+
+
 def _validate_manifests(ctx, param, value):
     images = []
     for manifest in value:

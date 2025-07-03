@@ -27,7 +27,7 @@ import click
 from PIL import Image
 
 from kraken.ketos.util import (_expand_gt, _validate_manifests, message,
-                               to_ptl_device)
+                               to_ptl_device, _validate_merging)
 
 from kraken.lib.register import OPTIMIZERS, SCHEDULERS, STOPPERS, PRECISIONS
 from kraken.lib.default_specs import (SEGMENTATION_HYPER_PARAMS,
@@ -39,27 +39,6 @@ logger = logging.getLogger('kraken')
 
 # raise default max image size to 20k * 20k pixels
 Image.MAX_IMAGE_PIXELS = 20000 ** 2
-
-
-def _validate_merging(ctx, param, value):
-    """
-    Maps baseline/region merging to a dict of merge structures.
-    """
-    if not value:
-        return None
-    merge_dict: Dict[str, str] = {}
-    try:
-        for m in value:
-            lexer = shlex.shlex(m, posix=True)
-            lexer.wordchars += r'\/.+-()=^&;,.'
-            tokens = list(lexer)
-            if len(tokens) != 3:
-                raise ValueError
-            k, _, v = tokens
-            merge_dict[v] = k  # type: ignore
-    except Exception:
-        raise click.BadParameter('Mappings must be in format target:src')
-    return merge_dict
 
 
 @click.command('segtrain')

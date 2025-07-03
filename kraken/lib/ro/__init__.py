@@ -16,4 +16,4 @@
 Tools for trainable reading order.
 """
 
-from .model import ROModel  # NOQA
+from .model import ROModel, RODataModule  # NOQA
