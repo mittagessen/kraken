@@ -319,10 +319,10 @@ class XMLPage(object):
                 is_valid = True
                 joint_order = _parse_group(ro)
                 if is_valid:
-                    tag = ro.get('TAGREFS')
+                    tags = self._parse_alto_tagrefs(cls_map, ro.get('TAGREFS'))
                     self._orders[ro.get('ID')] = {'order': joint_order,
                                                   'is_total': is_total,
-                                                  'description': cls_map[tag] if tag and tag in cls_map else ''}
+                                                  'description': tags.get('type', '')}
         self.filetype = 'alto'
 
     def _parse_page(self):

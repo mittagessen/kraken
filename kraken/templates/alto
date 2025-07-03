@@ -2,8 +2,12 @@
               'preprocessing': 'preOperation',
               'postprocessing': 'postOperation'}
 %}
+{% set ws_join = joiner(" ") %}
 {%+ macro render_line(page, line) +%}
-                    <TextLine ID="{{ line.id }}" HPOS="{{ line.bbox[0] }}" VPOS="{{ line.bbox[1] }}" WIDTH="{{ line.bbox[2] - line.bbox[0] }}" HEIGHT="{{ line.bbox[3] - line.bbox[1] }}" {% if line.baseline %}BASELINE="{{ line.baseline|sum(start=[])|join(' ') }}"{% endif %} {% if line.tags %}TAGREFS="{% for type in page.line_types %}{% if type[0] in line.tags and line.tags[type[0]] == type[1] %}LINE_TYPE_{{ loop.index }}{% endif %}{% endfor %}"{% endif %}>
+                    <TextLine ID="{{ line.id }}" HPOS="{{ line.bbox[0] }}" VPOS="{{ line.bbox[1] }}" WIDTH="{{ line.bbox[2] - line.bbox[0] }}" HEIGHT="{{ line.bbox[3] - line.bbox[1] }}"
+                    {%- if line.baseline %} BASELINE="{{ line.baseline|sum(start=[])|join(' ') }}"{% endif %}
+                    {%- if line.tags %} TAGREFS="{% set types = [] %}{% for type, label in page.typology | sort %}{% if type in line.tags %}{% set outer_loop = loop %}{% for tag_val in line.tags[type] %}{% if tag_val["type"] == label -%}{% set _ = types.append('TYPE_' ~ outer_loop.index) %}{% endif %}{% endfor %}{% endif %}{% endfor %}{{ types | join(' ') }}"{% endif %}
+                    {%- if line.base_dir %} BASEDIRECTION="{{ {"L": "rtl", "R": "rtl"}[line.base_dir] }}"{% endif %}>
                         {% if line.boundary %}
                         <Shape>
                             <Polygon POINTS="{{ line.boundary|sum(start=[])|join(' ') }}"/>
@@ -75,11 +79,8 @@
         {% endif %}
     </Description>
     <Tags>
-    {% for type, label in page.line_types %}
-        <OtherTag DESCRIPTION="line type" ID="LINE_TYPE_{{ loop.index }}" TYPE="{{ type }}" LABEL="{{ label }}"/>
-    {% endfor %}
-    {% for label in page.region_types %}
-        <OtherTag DESCRIPTION="region type" ID="REGION_TYPE_{{ loop.index }}" TYPE="region" LABEL="{{ label }}"/>
+    {% for type, label in page.typology | sort %}
+        <OtherTag DESCRIPTION="" ID="TYPE_{{ loop.index }}" TYPE="{{ type }}" LABEL="{{ label }}"/>
     {% endfor %}
     </Tags>
     {% if page.line_orders|length() > 0 %}
@@ -111,7 +112,7 @@
                 {% if loop.previtem and loop.previtem.type == 'line' %}
                 </TextBlock>
                 {% endif %}
-                <TextBlock ID="{{ entity.id }}" {% if entity.bbox %}HPOS="{{ entity.bbox[0] }}" VPOS="{{ entity.bbox[1] }}" WIDTH="{{ entity.bbox[2] - entity.bbox[0] }}" HEIGHT="{{ entity.bbox[3] - entity.bbox[1] }}"{% endif %} {% if entity.tags %}{% for type in page.region_types %}{% if type in entity.tags.values() %}TAGREFS="REGION_TYPE_{{ loop.index }}"{% endif %}{% endfor %}{% endif %}>
+                <TextBlock ID="{{ entity.id }}" {% if entity.bbox %}HPOS="{{ entity.bbox[0] }}" VPOS="{{ entity.bbox[1] }}" WIDTH="{{ entity.bbox[2] - entity.bbox[0] }}" HEIGHT="{{ entity.bbox[3] - entity.bbox[1] }}"{% endif %}{%- if entity.tags %} TAGREFS="{% set types = [] %}{% for type, label in page.typology | sort %}{% if type in entity.tags %}{% set outer_loop = loop %}{% for tag_val in entity.tags[type] %}{% if tag_val["type"] == label -%}{% set _ = types.append('TYPE_' ~ outer_loop.index) %}{% endif %}{% endfor %}{% endif %}{% endfor %}{{ types | join(' ') }}"{% endif %}
                     {% if entity.bbox %}<Shape>
                         <Polygon POINTS="{{ entity.boundary|sum(start=[])|join(' ') }}"/>
                     </Shape>{% endif %}

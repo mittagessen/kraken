@@ -126,23 +126,20 @@ def serialize(results: 'Segmentation',
     char_idx = 0
 
     # build region and line type dict
-    # types = []
-    # for line in results.lines:
-    #     if line.tags is not None:
-    #         for k, v in line.tags:
-    #             for t in v:
-    #                 types.extend((k, v) for k, v in line.tags.items())
-
-    # page['line_types'] = list(set(types))
-    # page['region_types'] = list(results.regions.keys())
-
-    # build region and line type dict
     types = []
     for line in results.lines:
         if line.tags is not None:
-            types.extend((k, v) for k, v in line.tags.items())
+            for k, v in line.tags.items():
+                types.extend((k, t['type']) for t in v if 'type' in t)
+    for regs in results.regions.values():
+        for reg in regs:
+            if reg.tags is not None:
+                for k, v in reg.tags.items():
+                    types.extend((k, t['type']) for t in v if 'type' in t)
 
-    page['line_orders'] = [ro['order'] for ro in results.line_orders]
+    page['typology'] = list(set(types))
+
+    page['line_orders'] = [ro['order'] for ro in results.line_orders if not ro['description'].startswith('Implicit')]
     # build region ID to region dict
     reg_dict = {}
     for key, regs in results.regions.items():
