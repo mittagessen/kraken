@@ -77,6 +77,7 @@ class RODataModule(L.LightningDataModule):
                  class_mapping: Optional[Dict[str, int]] = None,
                  valid_entities: Optional[Sequence[str]] = None,
                  merge_entities: Optional[Dict[str, str]] = None,
+                 merge_all_entities: bool = False,
                  reading_order: Optional[str] = None):
         super().__init__()
 
@@ -92,6 +93,7 @@ class RODataModule(L.LightningDataModule):
 
         valid_entities = self.hparams.valid_entities
         merge_entities = self.hparams.merge_entities
+        merge_all_entities = self.hparams.merge_all_entities
 
         if not valid_entities:
             valid_entities = None
@@ -106,7 +108,8 @@ class RODataModule(L.LightningDataModule):
                                   ro_id=self.hparams.reading_order,
                                   class_mapping=self.hparams.class_mapping,
                                   valid_entities=valid_entities,
-                                  merge_entities=merge_entities)
+                                  merge_entities=merge_entities,
+                                  merge_all_entities=merge_all_entities)
         self.train_set = Subset(train_set, range(len(train_set)))
         self.class_mapping = train_set.class_mapping
         val_set = PageWiseROSet(evaluation_data,
@@ -115,7 +118,8 @@ class RODataModule(L.LightningDataModule):
                                 level=self.hparams.level,
                                 ro_id=self.hparams.reading_order,
                                 valid_entities=valid_entities,
-                                merge_entities=merge_entities)
+                                merge_entities=merge_entities,
+                                merge_all_entities=merge_all_entities)
 
         self.val_set = Subset(val_set, range(len(val_set)))
 

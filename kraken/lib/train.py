@@ -738,6 +738,8 @@ class SegmentationModel(L.LightningModule):
                  valid_baselines: Optional[Sequence[str]] = None,
                  merge_regions: Optional[Dict[str, str]] = None,
                  merge_baselines: Optional[Dict[str, str]] = None,
+                 merge_all_baselines: Optional[str] = None,
+                 merge_all_regions: Optional[str] = None,
                  bounding_regions: Optional[Sequence[str]] = None,
                  resize: Literal['fail', 'both', 'new', 'add', 'union'] = 'fail',
                  topline: Union[bool, None] = False):
@@ -875,7 +877,9 @@ class SegmentationModel(L.LightningModule):
                                 valid_baselines=valid_baselines,
                                 merge_baselines=merge_baselines,
                                 valid_regions=valid_regions,
-                                merge_regions=merge_regions)
+                                merge_regions=merge_regions,
+                                merge_all_baselines=merge_all_baselines,
+                                merge_all_regions=merge_all_regions)
 
         for page in training_data:
             train_set.add(page)
@@ -887,7 +891,9 @@ class SegmentationModel(L.LightningModule):
                                   valid_baselines=valid_baselines,
                                   merge_baselines=merge_baselines,
                                   valid_regions=valid_regions,
-                                  merge_regions=merge_regions)
+                                  merge_regions=merge_regions,
+                                  merge_all_baselines=merge_all_baselines,
+                                  merge_all_regions=merge_all_regions)
 
             for page in evaluation_data:
                 val_set.add(page)

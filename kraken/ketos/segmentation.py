@@ -171,6 +171,14 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
               help='Baseline type merge mapping. Same syntax as `--merge-regions`',
               multiple=True,
               callback=_validate_merging)
+@click.option('--merge-all-baselines', show_default=True, default=None,
+              help='Merges all baseline types into the argument identifier')
+@click.option('--merge-all-regions', show_default=True, default=None,
+              help='Merges all region types into the argument identifiers')
+@click.option('--suppress-baselines/--no-suppress-baselines', show_default=True, default=False,
+              help='Suppresses all baseline.')
+@click.option('--suppress-regions/--no-suppress-regions', show_default=True, default=False,
+              help='Supppresses all regions.')
 @click.option('-br', '--bounding-regions', show_default=True, default=None, multiple=True,
               help='Regions treated as boundaries for polygonization purposes. May be used multiple times.')
 @click.option('--augment/--no-augment',
@@ -206,8 +214,9 @@ def segtrain(ctx, output, spec, line_width, pad, load, freq, quit, epochs,
              evaluation_files, workers, threads, load_hyper_parameters,
              force_binarization, format_type, suppress_regions,
              suppress_baselines, valid_regions, valid_baselines, merge_regions,
-             merge_baselines, bounding_regions, augment, resize, topline,
-             pl_logger, log_dir, ground_truth):
+             merge_baselines, merge_all_baselines, merge_all_regions,
+             suppress_baselines, suppress_regions, bounding_regions, augment,
+             resize, topline, pl_logger, log_dir, ground_truth):
     """
     Trains a baseline labeling model for layout analysis
     """
@@ -309,6 +318,10 @@ def segtrain(ctx, output, spec, line_width, pad, load, freq, quit, epochs,
                               valid_baselines=valid_baselines,
                               merge_regions=merge_regions,
                               merge_baselines=merge_baselines,
+                              merge_all_baselines=merge_all_baselines,
+                              merge_all_regions=merge_all_regions,
+                              suppress_baselines=suppress_baselines,
+                              suppress_regions=suppress_regions,
                               bounding_regions=bounding_regions,
                               resize=resize,
                               topline=topline)
@@ -373,10 +386,6 @@ def segtrain(ctx, output, spec, line_width, pad, load, freq, quit, epochs,
               'link to source images. In `path` mode arguments are image files '
               'sharing a prefix up to the last extension with JSON `.path` files '
               'containing the baseline information.')
-@click.option('--suppress-regions/--no-suppress-regions', show_default=True,
-              default=False, help='Disables region segmentation training.')
-@click.option('--suppress-baselines/--no-suppress-baselines', show_default=True,
-              default=False, help='Disables baseline segmentation training.')
 @click.option('-vr', '--valid-regions', show_default=True, default=None, multiple=True,
               help='Valid region types in training data. May be used multiple times.')
 @click.option('-vb', '--valid-baselines', show_default=True, default=None, multiple=True,
@@ -395,15 +404,24 @@ def segtrain(ctx, output, spec, line_width, pad, load, freq, quit, epochs,
               help='Baseline type merge mapping. Same syntax as `--merge-regions`',
               multiple=True,
               callback=_validate_merging)
+@click.option('--suppress-regions/--no-suppress-regions', show_default=True,
+              default=False, help='Disables region segmentation training.')
+@click.option('--suppress-baselines/--no-suppress-baselines', show_default=True,
+              default=False, help='Disables baseline segmentation training.')
+@click.option('--merge-all-baselines', show_default=True, default=None,
+              help='Merges all baseline types into the argument identifier')
+@click.option('--merge-all-regions', show_default=True, default=None,
+              help='Merges all region types into the argument identifiers')
 @click.option('-br', '--bounding-regions', show_default=True, default=None, multiple=True,
               help='Regions treated as boundaries for polygonization purposes. May be used multiple times.')
 @click.option("--threshold", type=click.FloatRange(.01, .99), default=.3, show_default=True,
               help="Threshold for heatmap binarization. Training threshold is .3, prediction is .5")
 @click.argument('test_set', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def segtest(ctx, model, evaluation_files, device, workers, threads, threshold,
-            force_binarization, format_type, test_set, suppress_regions,
-            suppress_baselines, valid_regions, valid_baselines, merge_regions,
-            merge_baselines, bounding_regions):
+            force_binarization, format_type, test_set, valid_regions,
+            valid_baselines, merge_regions, merge_baselines, suppress_regions,
+            suppress_baselines, merge_all_baselines, merge_all_regions,
+            bounding_regions):
     """
     Evaluate on a test set.
     """
@@ -462,7 +480,11 @@ def segtest(ctx, model, evaluation_files, device, workers, threads, threshold,
                            valid_baselines=valid_baselines,
                            merge_baselines=merge_baselines,
                            valid_regions=valid_regions,
-                           merge_regions=merge_regions)
+                           merge_regions=merge_regions,
+                           merge_all_baselines=merge_all_baselines,
+                           merge_all_regions=merge_all_regions,
+                           suppress_baselines=suppress_baselines,
+                           suppress_regions=suppress_regions)
 
     test_set.class_mapping = nn.user_metadata["class_mapping"]
     test_set.num_classes = sum([len(classDict) for classDict in test_set.class_mapping.values()])

@@ -141,6 +141,10 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
               help='Baseline/region merge mapping. One or more mappings of the form `$target:$src` where $src is merged into $target.',
               multiple=True,
               callback=_validate_merging)
+@click.option('--merge-all-entities/--no-merge-all-entities',
+              show_default=True,
+              default=False,
+              help='Merges all baselines/regions into a single class after filtering with `--valid-entities`')
 @click.option('--logger', 'pl_logger', show_default=True, type=click.Choice(['tensorboard']), default=None,
               help='Logger used by PyTorch Lightning to track metrics such as loss and accuracy.')
 @click.option('--log-dir', show_default=True, type=click.Path(exists=True, dir_okay=True, writable=True),
@@ -156,8 +160,8 @@ def rotrain(ctx, batch_size, output, load, freq, quit, epochs, min_epochs, lag,
             cos_max, cos_min_lr, partition, training_files, evaluation_files,
             workers, threads, load_hyper_parameters, format_type,
             suppress_regions, suppress_baselines, valid_entities,
-            merge_entities, pl_logger, log_dir, level, reading_order,
-            ground_truth):
+            merge_entities, merge_all_entities, pl_logger, log_dir, level,
+            reading_order, ground_truth):
     """
     Trains a baseline labeling model for layout analysis
     """
@@ -245,6 +249,7 @@ def rotrain(ctx, batch_size, output, load, freq, quit, epochs, min_epochs, lag,
                       suppress_baselines=suppress_baselines,
                       valid_entities=valid_entities,
                       merge_entities=merge_entities,
+                      merge_all_entities=merge_all_entities,
                       reading_order=reading_order)
 
     dm.setup('fit')
