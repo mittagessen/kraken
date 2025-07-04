@@ -18,9 +18,10 @@ kraken.ketos.util
 
 Command line driver helpers
 """
-import glob
-import logging
 import os
+import glob
+import shlex
+import logging
 from typing import List, Optional, Tuple
 
 import click
@@ -39,7 +40,7 @@ def _validate_merging(ctx, param, value):
     try:
         for m in value:
             lexer = shlex.shlex(m, posix=True)
-            lexer.wordchars += r'\/.+-()=^&;,.'
+            lexer.wordchars += r'\/.+-()=^&;,.$'
             tokens = list(lexer)
             if len(tokens) != 3:
                 raise ValueError
