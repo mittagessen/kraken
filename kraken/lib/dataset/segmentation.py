@@ -58,7 +58,8 @@ class BaselineSet(Dataset):
                  merge_all_baselines: Optional[str] = None,
                  valid_regions: Sequence[str] = None,
                  merge_regions: Dict[str, Sequence[str]] = None,
-                 merge_all_regions: Optional[str] = None):
+                 merge_all_regions: Optional[str] = None,
+                 class_mapping: Optional[Dict[str, int]] = None) -> None:
         """
         Creates a dataset for a text-line and region segmentation model.
 
@@ -83,6 +84,7 @@ class BaselineSet(Dataset):
                            been discarded.
             merge_all_regions: Merges all region types into the argument
                                identifier (after) valid_regions filtering.
+            class_mapping: Explicit class map.
         """
         super().__init__()
         self.imgs = []
@@ -90,11 +92,17 @@ class BaselineSet(Dataset):
         self.pad = padding
         self.targets = []
         # n-th entry contains semantic of n-th class
-        self.class_mapping = {'aux': {'_start_separator': 0, '_end_separator': 1}, 'baselines': {}, 'regions': {}}
+        if class_mapping:
+            self.class_mapping = class_mapping
+            self.num_classes = sum(len(v) for v in self.class_mapping.values())
+            self.freeze_cls_map = True
+        else:
+            self.class_mapping = {'aux': {'_start_separator': 0, '_end_separator': 1}, 'baselines': {}, 'regions': {}}
+            self.num_classes = 2
+            self.freeze_cls_map = False
         # keep track of samples that failed to load
         self.failed_samples = set()
         self.class_stats = {'baselines': defaultdict(int), 'regions': defaultdict(int)}
-        self.num_classes = 2
         self.mbl_dict = merge_baselines if merge_baselines is not None else {}
         self.mreg_dict = merge_regions if merge_regions is not None else {}
         self.valid_baselines = valid_baselines
@@ -146,29 +154,36 @@ class BaselineSet(Dataset):
                 tag = self.mbl_dict.get(tag_val, tag_val)
                 if self.merge_all_baselines:
                     tag = self.merge_all_baselines
-                baselines_[tag].append(line.baseline)
-                self.class_stats['baselines'][tag] += 1
 
+                if tag not in self.class_mapping['baselines'] and self.freeze_cls_map:
+                    continue
                 if tag not in self.class_mapping['baselines']:
                     self.num_classes += 1
                     self.class_mapping['baselines'][tag] = self.num_classes - 1
 
+                baselines_[tag].append(line.baseline)
+                self.class_stats['baselines'][tag] += 1
+
         regions_ = defaultdict(list)
         for k, v in doc.regions.items():
+            v = [x for x in v if x.boundary]
             if self.valid_regions is None or k in self.valid_regions:
                 reg_type = self.mreg_dict.get(k, k)
                 if self.merge_all_regions:
                     reg_type = self.merge_all_regions
-                regions_[reg_type].extend(v)
-                self.class_stats['regions'][reg_type] += len(v)
-                if reg_type not in self.class_mapping['regions']:
+                if reg_type not in self.class_mapping['regions'] and self.freeze_cls_map:
+                    continue
+                elif reg_type not in self.class_mapping['regions']:
                     self.num_classes += 1
                     self.class_mapping['regions'][reg_type] = self.num_classes - 1
-                self.class_stats['regions'][reg_type] += 1
+                regions_[reg_type].extend(v)
+                self.class_stats['regions'][reg_type] += len(v)
         self.targets.append({'baselines': baselines_, 'regions': regions_})
         self.imgs.append(doc.imagename)
 
     def __getitem__(self, idx):
+        if len(self.failed_samples) == len(self):
+            raise ValueError(f'All {len(self)} samples in dataset invalid.')
         im = self.imgs[idx]
         target = self.targets[idx]
         if not isinstance(im, Image.Image):
