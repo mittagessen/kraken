@@ -18,6 +18,18 @@ handwritten and printed documents, a reading order model might not perform
 better than the default heuristic for simple text flows, and there are
 recognition models for some types of material available in the repository.
 
+The main ``ketos`` command has some common options that configure how most of
+its sub-commands use computational resources:
+
+======================================================= ======
+option                                                  action
+======================================================= ======
+-d, \--device                                           Select device to use (cpu, cuda:0, cuda:1,...). GPU acceleration requires CUDA.
+\--precision                                            The precision to run neural network operations in. On GPU, bfloat16 can lead to considerable speedup.
+\--workers                                              Number of workers processes to spawn for data loading, transformation, or compilation.
+\--threads                                              Number of threads to use for intra-op parallelization like OpenMP, BLAS, ...
+
+
 Best practices
 --------------
 
@@ -31,11 +43,11 @@ Recognition model training
 * If the network doesn't converge before the early stopping aborts training, increase ``--min-epochs`` or ``--lag``. Use the ``--logger`` option to inspect your training loss.
 * Use the flag ``--augment`` to activate data augmentation.
 * Increase the amount of ``--workers`` to speedup data loading. This is essential when you use the ``--augment`` option.
-* When using an Nvidia GPU, set the ``--precision`` option to 16 to use automatic mixed precision (AMP). This can provide significant speedup without any loss in accuracy.
-* Use option -B to scale batch size until GPU utilization reaches 100%. When using a larger batch size, it is recommended to use option -r to scale the learning rate by the square root of the batch size (1e-3 * sqrt(batch_size)).
-* When fine-tuning, it is recommended to use `new` mode not `union` as the network will rapidly unlearn missing labels in the new dataset.
+* When using an Nvidia GPU, set the ``--precision`` option to ``bf16-mixed`` to use automatic mixed precision (AMP). This can provide significant speedup without any loss in accuracy.
+* Use option ``-B`` to scale batch size until GPU utilization reaches 100%. When using a larger batch size, it is recommended to use option -r to scale the learning rate by the square root of the batch size (1e-3 * sqrt(batch_size)).
+* When fine-tuning, it is recommended to use ``new`` mode not ``union`` as the network will rapidly unlearn missing labels in the new dataset.
 * If the new dataset is fairly dissimilar or your base model has been pretrained with ketos pretrain, use ``--warmup`` in conjunction with ``--freeze-backbone`` for one 1 or 2 epochs.
-* Upload your models to the model repository.
+* Upload your models to the :ref:`model repository <repo>`.
 
 Segmentation model training
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -109,7 +121,7 @@ separate parsing workers with the ``--workers`` option:
 
 .. code-block:: console
 
-   $ ketos compile --workers 8 -f xml ...
+   $ ketos --workers 8 compile -f xml ...
 
 In addition, binary datasets can contain fixed splits which allow
 reproducibility and comparability between training and evaluation runs.
@@ -170,7 +182,6 @@ option                                                  action
 \--min-epochs                                           Minimum number of epochs to train for when using early stopping.
 \--lag                                                  Number of epochs to wait before stopping
                                                         training without improvement. Only used when using early stopping.
--d, \--device                                           Select device to use (cpu, cuda:0, cuda:1,...). GPU acceleration requires CUDA.
 \--optimizer                                            Select optimizer (Adam, SGD, RMSprop).
 -r, \--lrate                                            Learning rate  [default: 0.001]
 -m, \--momentum                                         Momentum used with SGD optimizer. Ignored otherwise.
@@ -198,7 +209,6 @@ option                                                  action
                                                         extension with JSON `.path` files containing the baseline information.
                                                         In `binary` mode arguments are precompiled binary dataset files.
 \--augment / \--no-augment                              Enables/disables data augmentation.
-\--workers                                              Number of OpenMP threads and workers used to perform neural network passes and load samples from the dataset.
 ======================================================= ======
 
 From Scratch
@@ -251,13 +261,13 @@ would be:
 
 .. code-block:: console
 
-        $ ketos train -d cuda -f binary dataset.arrow
+        $ ketos -d cuda train -f binary dataset.arrow
 
 A better configuration for large and complicated datasets such as handwritten texts:
 
 .. code-block:: console
 
-        $ ketos train --augment --workers 4 -d cuda -f binary --min-epochs 20 -w 0 -s '[1,120,0,1 Cr3,13,32 Do0.1,2 Mp2,2 Cr3,13,32 Do0.1,2 Mp2,2 Cr3,9,64 Do0.1,2 Mp2,2 Cr3,9,64 Do0.1,2 S1(1x0)1,3 Lbx200 Do0.1,2 Lbx200 Do.1,2 Lbx200 Do]' -r 0.0001 dataset_large.arrow
+        $ ketos --workers 4 -d cuda train --augment-f binary --min-epochs 20 -w 0 -s '[1,120,0,1 Cr3,13,32 Do0.1,2 Mp2,2 Cr3,13,32 Do0.1,2 Mp2,2 Cr3,9,64 Do0.1,2 Mp2,2 Cr3,9,64 Do0.1,2 S1(1x0)1,3 Lbx200 Do0.1,2 Lbx200 Do.1,2 Lbx200 Do]' -r 0.0001 dataset_large.arrow
 
 This configuration is slower to train and often requires a couple of epochs to
 output any sensible text at all. Therefore we tell ketos to train for at least
@@ -548,13 +558,13 @@ segmentation training. CUDA acceleration:
 
 .. code-block:: console
 
-        $ ketos segtrain -d cuda -f xml training_data/*.xml
+        $ ketos -d cuda segtrain -f xml training_data/*.xml
 
 Defining custom architectures:
 
 .. code-block:: console
 
-        $ ketos segtrain -d cuda -s '[1,1200,0,3 Cr7,7,64,2,2 Gn32 Cr3,3,128,2,2 Gn32 Cr3,3,128 Gn32 Cr3,3,256 Gn32]' -f xml training_data/*.xml
+        $ ketos -d cuda segtrain -s '[1,1200,0,3 Cr7,7,64,2,2 Gn32 Cr3,3,128,2,2 Gn32 Cr3,3,128 Gn32 Cr3,3,256 Gn32]' -f xml training_data/*.xml
 
 Fine tuning/transfer learning with last layer adaptation and slicing:
 
