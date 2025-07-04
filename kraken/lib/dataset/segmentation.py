@@ -18,7 +18,7 @@ Utility functions for data loading and training of VGSL networks.
 import traceback
 from collections import defaultdict
 from itertools import groupby
-from typing import TYPE_CHECKING, Any, Callable, Dict, Sequence, Tuple
+from typing import TYPE_CHECKING, Any, Callable, Dict, Sequence, Tuple, Optional
 
 import numpy as np
 import shapely.geometry as geom
@@ -55,8 +55,12 @@ class BaselineSet(Dataset):
                  augmentation: bool = False,
                  valid_baselines: Sequence[str] = None,
                  merge_baselines: Dict[str, Sequence[str]] = None,
+                 suppress_baselines: bool = False,
+                 merge_all_baselines: Optional[str] = None,
                  valid_regions: Sequence[str] = None,
-                 merge_regions: Dict[str, Sequence[str]] = None):
+                 merge_regions: Dict[str, Sequence[str]] = None,
+                 suppress_regions: bool = False,
+                 merge_all_regions: Optional[str] = None):
         """
         Creates a dataset for a text-line and region segmentation model.
 
@@ -71,11 +75,18 @@ class BaselineSet(Dataset):
             merge_baselines: Sequence of baseline identifiers to merge.  Note
                              that merging occurs after entities not in valid_*
                              have been discarded.
+            suppress_baselines: Suppresses all baselines.
+            merge_all_baselines: Merges all baseline types into the argument
+                                 identifier. Baselines are still filtered by
+                                 `valid_baselines`.
             valid_regions: Sequence of valid region identifiers. If `None` all
                            are valid.
             merge_regions: Sequence of region identifiers to merge. Note that
                            merging occurs after entities not in valid_* have
                            been discarded.
+            suppress_regions: Suppresses all regions.
+            merge_all_regions: Merges all region types into the argument
+                               identifier (after) valid_regions filtering.
         """
         super().__init__()
         self.imgs = []
@@ -92,6 +103,10 @@ class BaselineSet(Dataset):
         self.mreg_dict = merge_regions if merge_regions is not None else {}
         self.valid_baselines = valid_baselines
         self.valid_regions = valid_regions
+        self.suppress_baselines = suppress_baselines
+        self.suppress_regions = suppress_regions
+        self.merge_all_baselines = merge_all_baselines
+        self.merge_all_regions = merge_all_regions
 
         self.aug = None
         if augmentation:
@@ -131,27 +146,33 @@ class BaselineSet(Dataset):
             raise ValueError(f'{doc} is of type {doc.type}. Expected "baselines".')
 
         baselines_ = defaultdict(list)
-        for line in doc.lines:
-            tag_val = _get_type(line.tags)
-            if self.valid_baselines is None or tag_val in self.valid_baselines:
-                tag = self.mbl_dict.get(tag_val, tag_val)
-                baselines_[tag].append(line.baseline)
-                self.class_stats['baselines'][tag] += 1
+        if not self.suppress_baselines:
+            for line in doc.lines:
+                tag_val = _get_type(line.tags)
+                if self.valid_baselines is None or tag_val in self.valid_baselines:
+                    tag = self.mbl_dict.get(tag_val, tag_val)
+                    if self.merge_all_baselines:
+                        tag = self.merge_all_baselines
+                    baselines_[tag].append(line.baseline)
+                    self.class_stats['baselines'][tag] += 1
 
-                if tag not in self.class_mapping['baselines']:
-                    self.num_classes += 1
-                    self.class_mapping['baselines'][tag] = self.num_classes - 1
+                    if tag not in self.class_mapping['baselines']:
+                        self.num_classes += 1
+                        self.class_mapping['baselines'][tag] = self.num_classes - 1
 
         regions_ = defaultdict(list)
-        for k, v in doc.regions.items():
-            if self.valid_regions is None or k in self.valid_regions:
-                reg_type = self.mreg_dict.get(k, k)
-                regions_[reg_type].extend(v)
-                self.class_stats['regions'][reg_type] += len(v)
-                if reg_type not in self.class_mapping['regions']:
-                    self.num_classes += 1
-                    self.class_mapping['regions'][reg_type] = self.num_classes - 1
-                self.class_stats['regions'][reg_type] += 1
+        if not self.suppress_regions:
+            for k, v in doc.regions.items():
+                if self.valid_regions is None or k in self.valid_regions:
+                    if self.merge_all_regions:
+                        tag = self.merge_all_regions
+                    reg_type = self.mreg_dict.get(k, k)
+                    regions_[reg_type].extend(v)
+                    self.class_stats['regions'][reg_type] += len(v)
+                    if reg_type not in self.class_mapping['regions']:
+                        self.num_classes += 1
+                        self.class_mapping['regions'][reg_type] = self.num_classes - 1
+                    self.class_stats['regions'][reg_type] += 1
         self.targets.append({'baselines': baselines_, 'regions': regions_})
         self.imgs.append(doc.imagename)
 
