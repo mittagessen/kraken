@@ -27,7 +27,7 @@ import warnings
 import click
 from threadpoolctl import threadpool_limits
 
-from kraken.lib.register import OPTIMIZERS, SCHEDULERS, STOPPERS, PRECISIONS
+from kraken.lib.register import OPTIMIZERS, SCHEDULERS, STOPPERS
 from kraken.lib.default_specs import RECOGNITION_HYPER_PARAMS, RECOGNITION_SPEC
 from kraken.lib.exceptions import KrakenInputException
 
@@ -78,12 +78,6 @@ logger = logging.getLogger('kraken')
               default=RECOGNITION_HYPER_PARAMS['min_delta'],
               type=click.FLOAT,
               help='Minimum improvement between epochs to reset early stopping. Default is scales the delta by the best loss')
-@click.option('-d', '--device', show_default=True, default='cpu', help='Select device to use (cpu, cuda:0, cuda:1, ...)')
-@click.option('--precision',
-              show_default=True,
-              default='32-true',
-              type=click.Choice(PRECISIONS),
-              help='Numerical precision to use for training. Default is 32-bit single-point precision.')
 @click.option('--optimizer',
               show_default=True,
               default=RECOGNITION_HYPER_PARAMS['optimizer'],
@@ -156,8 +150,6 @@ logger = logging.getLogger('kraken')
 @click.option('-e', '--evaluation-files', show_default=True, default=None, multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
-@click.option('--workers', show_default=True, default=1, type=click.IntRange(0), help='Number of data loading worker processes.')
-@click.option('--threads', show_default=True, default=1, type=click.IntRange(1), help='Maximum size of OpenMP/BLAS thread pool.')
 @click.option('--load-hyper-parameters/--no-load-hyper-parameters', show_default=True, default=False,
               help='When loading an existing model, retrieve hyperparameters from the model')
 @click.option('--force-binarization/--no-binarization', show_default=True,
@@ -182,14 +174,13 @@ logger = logging.getLogger('kraken')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 @click.option('--legacy-polygons', show_default=True, default=False, is_flag=True, help='Use the legacy polygon extractor.')
 def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
-          min_epochs, lag, min_delta, device, precision, optimizer, lrate,
-          momentum, weight_decay, warmup, freeze_backbone, schedule, gamma,
-          step_size, sched_patience, cos_max, cos_min_lr, partition,
-          fixed_splits, normalization, normalize_whitespace, codec, resize,
-          reorder, base_dir, training_files, evaluation_files, workers,
-          threads, load_hyper_parameters, force_binarization,
-          format_type, augment, pl_logger, log_dir, ground_truth,
-          legacy_polygons):
+          min_epochs, lag, min_delta, optimizer, lrate, momentum, weight_decay,
+          warmup, freeze_backbone, schedule, gamma, step_size, sched_patience,
+          cos_max, cos_min_lr, partition, fixed_splits, normalization,
+          normalize_whitespace, codec, resize, reorder, base_dir,
+          training_files, evaluation_files, load_hyper_parameters,
+          force_binarization, format_type, augment, pl_logger, log_dir,
+          ground_truth, legacy_polygons):
     """
     Trains a model from image-text pairs.
     """
@@ -268,7 +259,7 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
         codec = json.load(codec)
 
     try:
-        accelerator, device = to_ptl_device(device)
+        accelerator, device = to_ptl_device(ctx.meta['device'])
     except Exception as e:
         raise click.BadOptionUsage('device', str(e))
 
@@ -287,7 +278,7 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
                              evaluation_data=evaluation_files,
                              partition=partition,
                              binary_dataset_split=fixed_splits,
-                             num_workers=workers,
+                             num_workers=ctx.meta['workers'],
                              load_hyper_parameters=load_hyper_parameters,
                              force_binarization=force_binarization,
                              format_type=format_type,
@@ -308,7 +299,7 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
 
     trainer = KrakenTrainer(accelerator=accelerator,
                             devices=device,
-                            precision=precision,
+                            precision=ctx.meta['precision'],
                             max_epochs=hyper_params['epochs'] if hyper_params['quit'] == 'fixed' else -1,
                             min_epochs=hyper_params['min_epochs'],
                             freeze_backbone=hyper_params['freeze_backbone'],
@@ -318,7 +309,7 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
                             log_dir=log_dir,
                             **val_check_interval)
     try:
-        with threadpool_limits(limits=threads):
+        with threadpool_limits(limits=ctx.meta['threads']):
             trainer.fit(model)
     except KrakenInputException as e:
         if e.args[0].startswith('Training data and model codec alphabets mismatch') and resize == 'fail':
@@ -349,15 +340,8 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
 @click.option('-e', '--evaluation-files', show_default=True, default=None, multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with paths to evaluation data.')
-@click.option('-d', '--device', show_default=True, default='cpu', help='Select device to use (cpu, cuda:0, cuda:1, ...)')
 @click.option('--pad', show_default=True, type=click.INT, default=16, help='Left and right '
               'padding around lines')
-@click.option('--workers', show_default=True, default=1,
-              type=click.IntRange(0),
-              help='Number of worker processes when running on CPU.')
-@click.option('--threads', show_default=True, default=1,
-              type=click.IntRange(1),
-              help='Max size of thread pools for OpenMP/BLAS operations.')
 @click.option('--reorder/--no-reorder', show_default=True, default=True, help='Reordering of code points to display order')
 @click.option('--base-dir', show_default=True, default='auto',
               type=click.Choice(['L', 'R', 'auto']), help='Set base text '
@@ -383,19 +367,21 @@ def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
               help='Whether to honor fixed splits in binary datasets.')
 @click.argument('test_set', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 @click.option('--no-legacy-polygons', show_default=True, default=False, is_flag=True, help='Force disable the legacy polygon extractor.')
-def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
-         threads, reorder, base_dir, normalization, normalize_whitespace,
-         force_binarization, format_type, fixed_splits, test_set, no_legacy_polygons):
+def test(ctx, batch_size, model, evaluation_files, pad, reorder, base_dir,
+         normalization, normalize_whitespace, force_binarization, format_type,
+         fixed_splits, test_set, no_legacy_polygons):
     """
     Evaluate on a test set.
     """
     if not model:
         raise click.UsageError('No model to evaluate given.')
 
+    import torch
     import numpy as np
     from torch.utils.data import DataLoader
 
     from torchmetrics.text import CharErrorRate, WordErrorRate
+    from lightning.fabric import Fabric
 
     from kraken.lib import models, util
     from kraken.lib.dataset import (ArrowIPCRecognitionDataset,
@@ -411,16 +397,26 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
     legacy_polygons = None
     incoherent_legacy_polygons = False
 
-    nn = {}
-    for p in model:
-        message('Loading model {}\t'.format(p), nl=False)
-        nn[p] = models.load_any(p, device)
-        message('\u2713', fg='green')
-        model_legacy_polygons = nn[p].nn.use_legacy_polygons
-        if legacy_polygons is None:
-            legacy_polygons = model_legacy_polygons
-        elif legacy_polygons != model_legacy_polygons:
-            incoherent_legacy_polygons = True
+    try:
+        accelerator, device = to_ptl_device(ctx.meta['device'])
+    except Exception as e:
+        raise click.BadOptionUsage('device', str(e))
+
+    fabric = Fabric(accelerator=accelerator,
+                    devices=device,
+                    precision=ctx.meta['precision'])
+
+    with fabric.init_tensor(), fabric.init_module():
+        nn = {}
+        for p in model:
+            message('Loading model {}\t'.format(p), nl=False)
+            nn[p] = models.load_any(p)
+            message('\u2713', fg='green')
+            model_legacy_polygons = nn[p].nn.use_legacy_polygons
+            if legacy_polygons is None:
+                legacy_polygons = model_legacy_polygons
+            elif legacy_polygons != model_legacy_polygons:
+                incoherent_legacy_polygons = True
 
     if incoherent_legacy_polygons and not no_legacy_polygons:
         logger.warning('Models use different polygon extractors. Legacy polygon extractor will be used ; use --no-legacy-polygons to force disable it.')
@@ -478,7 +474,7 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
     wer_list = []
     cer_case_insensitive_list = []
 
-    with threadpool_limits(limits=threads):
+    with torch.inference_mode(), threadpool_limits(limits=ctx.meta['threads']), fabric.init_tensor(), fabric.init_module():
         for p, net in nn.items():
             algn_gt: List[str] = []
             algn_pred: List[str] = []
@@ -509,7 +505,7 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
             ds.no_encode()
             ds_loader = DataLoader(ds,
                                    batch_size=batch_size,
-                                   num_workers=workers,
+                                   num_workers=ctx.meta['workers'],
                                    pin_memory=pin_ds_mem,
                                    collate_fn=collate_sequences)
 

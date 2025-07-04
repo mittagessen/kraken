@@ -23,7 +23,7 @@ import logging
 import click
 from PIL import Image
 
-from kraken.lib.register import OPTIMIZERS, SCHEDULERS, STOPPERS, PRECISIONS
+from kraken.lib.register import OPTIMIZERS, SCHEDULERS, STOPPERS
 from kraken.lib.default_specs import (RECOGNITION_PRETRAIN_HYPER_PARAMS,
                                       RECOGNITION_SPEC)
 
@@ -76,12 +76,6 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
               default=RECOGNITION_PRETRAIN_HYPER_PARAMS['min_delta'],
               type=click.FLOAT,
               help='Minimum improvement between epochs to reset early stopping. Default is scales the delta by the best loss')
-@click.option('-d', '--device', show_default=True, default='cpu', help='Select device to use (cpu, cuda:0, cuda:1, ...)')
-@click.option('--precision',
-              show_default=True,
-              default='32-true',
-              type=click.Choice(PRECISIONS),
-              help='Numerical precision to use for training. Default is 32-bit single-point precision.')
 @click.option('--optimizer',
               show_default=True,
               default=RECOGNITION_PRETRAIN_HYPER_PARAMS['optimizer'],
@@ -130,8 +124,6 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
 @click.option('-e', '--evaluation-files', show_default=True, default=None, multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
-@click.option('--workers', show_default=True, default=1, type=click.IntRange(0), help='Number of data loading worker processes.')
-@click.option('--threads', show_default=True, default=1, type=click.IntRange(1), help='Maximum size of OpenMP/BLAS thread pool.')
 @click.option('--load-hyper-parameters/--no-load-hyper-parameters', show_default=True, default=False,
               help='When loading an existing model, retrieve hyperparameters from the model')
 @click.option('--force-binarization/--no-binarization', show_default=True,
@@ -169,13 +161,13 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 @click.option('--legacy-polygons', show_default=True, default=False, is_flag=True, help='Use the legacy polygon extractor.')
 def pretrain(ctx, batch_size, pad, output, spec, load, freq, quit, epochs,
-             min_epochs, lag, min_delta, device, precision, optimizer, lrate, momentum,
+             min_epochs, lag, min_delta, optimizer, lrate, momentum,
              weight_decay, warmup, schedule, gamma, step_size, sched_patience,
              cos_max, cos_min_lr, partition, fixed_splits, training_files,
-             evaluation_files, workers, threads, load_hyper_parameters,
-             force_binarization, format_type, augment,
-             mask_probability, mask_width, num_negatives, logit_temp,
-             ground_truth, legacy_polygons):
+             evaluation_files, load_hyper_parameters,
+             force_binarization, format_type, augment, mask_probability,
+             mask_width, num_negatives, logit_temp, ground_truth,
+             legacy_polygons):
     """
     Trains a model from image-text pairs.
     """
@@ -235,7 +227,7 @@ def pretrain(ctx, batch_size, pad, output, spec, load, freq, quit, epochs,
         raise click.UsageError('No training data was provided to the train command. Use `-t` or the `ground_truth` argument.')
 
     try:
-        accelerator, device = to_ptl_device(device)
+        accelerator, device = to_ptl_device(ctx.meta['device'])
     except Exception as e:
         raise click.BadOptionUsage('device', str(e))
 
@@ -258,7 +250,7 @@ def pretrain(ctx, batch_size, pad, output, spec, load, freq, quit, epochs,
                                      evaluation_data=evaluation_files,
                                      partition=partition,
                                      binary_dataset_split=fixed_splits,
-                                     num_workers=workers,
+                                     num_workers=ctx.meta['workers'],
                                      height=model.height,
                                      width=model.width,
                                      channels=model.channels,
@@ -270,14 +262,14 @@ def pretrain(ctx, batch_size, pad, output, spec, load, freq, quit, epochs,
 
     trainer = KrakenTrainer(accelerator=accelerator,
                             devices=device,
-                            precision=precision,
+                            precision=ctx.meta['precision'],
                             max_epochs=hyper_params['epochs'] if hyper_params['quit'] == 'fixed' else -1,
                             min_epochs=hyper_params['min_epochs'],
                             enable_progress_bar=True if not ctx.meta['verbose'] else False,
                             deterministic=ctx.meta['deterministic'],
                             **val_check_interval)
 
-    with threadpool_limits(limits=threads):
+    with threadpool_limits(limits=ctx.meta['threads']):
         trainer.fit(model, datamodule=data_module)
 
     if model.best_epoch == -1:

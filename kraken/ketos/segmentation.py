@@ -27,7 +27,7 @@ from PIL import Image
 from kraken.ketos.util import (_expand_gt, _validate_manifests, message,
                                to_ptl_device, _validate_merging)
 
-from kraken.lib.register import OPTIMIZERS, SCHEDULERS, STOPPERS, PRECISIONS
+from kraken.lib.register import OPTIMIZERS, SCHEDULERS, STOPPERS
 from kraken.lib.default_specs import (SEGMENTATION_HYPER_PARAMS,
                                       SEGMENTATION_SPEC)
 from kraken.lib.exceptions import KrakenInputException
@@ -82,11 +82,6 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
               type=click.FLOAT,
               help='Minimum improvement between epochs to reset early stopping. By default it scales the delta by the best loss')
 @click.option('-d', '--device', show_default=True, default='cpu', help='Select device to use (cpu, cuda:0, cuda:1, ...)')
-@click.option('--precision',
-              show_default=True,
-              default='32-true',
-              type=click.Choice(PRECISIONS),
-              help='Numerical precision to use for training. Default is 32-bit single-point precision.')
 @click.option('--optimizer',
               show_default=True,
               default=SEGMENTATION_HYPER_PARAMS['optimizer'],
@@ -134,7 +129,6 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
 @click.option('--workers', show_default=True, default=1, type=click.IntRange(0), help='Number of data loading worker processes.')
-@click.option('--threads', show_default=True, default=1, type=click.IntRange(1), help='Maximum size of OpenMP/BLAS thread pool.')
 @click.option('--load-hyper-parameters/--no-load-hyper-parameters', show_default=True, default=False,
               help='When loading an existing model, retrieve hyper-parameters from the model')
 @click.option('--force-binarization/--no-binarization', show_default=True,
@@ -202,10 +196,10 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
               help='Path to directory where the logger will store the logs. If not set, a directory will be created in the current working directory.')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def segtrain(ctx, output, spec, line_width, pad, load, freq, quit, epochs,
-             min_epochs, lag, min_delta, device, precision, optimizer, lrate,
+             min_epochs, lag, min_delta, device, optimizer, lrate,
              momentum, weight_decay, warmup, schedule, gamma, step_size,
              sched_patience, cos_max, cos_min_lr, partition, training_files,
-             evaluation_files, workers, threads, load_hyper_parameters,
+             evaluation_files, workers, load_hyper_parameters,
              force_binarization, format_type, suppress_regions,
              suppress_baselines, valid_regions, valid_baselines, merge_regions,
              merge_baselines, merge_all_baselines, merge_all_regions,
@@ -330,7 +324,7 @@ def segtrain(ctx, output, spec, line_width, pad, load, freq, quit, epochs,
 
     trainer = KrakenTrainer(accelerator=accelerator,
                             devices=device,
-                            precision=precision,
+                            precision=ctx.meta['precision'],
                             max_epochs=hyper_params['epochs'] if hyper_params['quit'] == 'fixed' else -1,
                             min_epochs=hyper_params['min_epochs'],
                             enable_progress_bar=True if not ctx.meta['verbose'] else False,
@@ -339,7 +333,7 @@ def segtrain(ctx, output, spec, line_width, pad, load, freq, quit, epochs,
                             log_dir=log_dir,
                             **val_check_interval)
 
-    with threadpool_limits(limits=threads):
+    with threadpool_limits(limits=ctx.meta['threads']):
         trainer.fit(model)
 
     if model.best_epoch == -1:
@@ -363,11 +357,6 @@ def segtrain(ctx, output, spec, line_width, pad, load, freq, quit, epochs,
 @click.option('-e', '--evaluation-files', show_default=True, default=None, multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with paths to evaluation data.')
-@click.option('-d', '--device', show_default=True, default='cpu', help='Select device to use (cpu, cuda:0, cuda:1, ...)')
-@click.option('--workers', default=1, show_default=True, type=click.IntRange(0),
-              help='Number of worker processes for data loading.')
-@click.option('--threads', default=1, show_default=True, type=click.IntRange(1),
-              help='Size of thread pools for intra-op parallelization')
 @click.option('--force-binarization/--no-binarization', show_default=True,
               default=False, help='Forces input images to be binary, otherwise '
               'the appropriate color format will be auto-determined through the '
@@ -409,9 +398,9 @@ def segtrain(ctx, output, spec, line_width, pad, load, freq, quit, epochs,
 @click.option("--threshold", type=click.FloatRange(.01, .99), default=.3, show_default=True,
               help="Threshold for heatmap binarization. Training threshold is .3, prediction is .5")
 @click.argument('test_set', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
-def segtest(ctx, model, evaluation_files, device, workers, threads, threshold,
-            force_binarization, format_type, test_set, valid_regions,
-            valid_baselines, merge_regions, merge_baselines, suppress_regions,
+def segtest(ctx, model, evaluation_files, threshold, force_binarization,
+            format_type, test_set, valid_regions, valid_baselines,
+            merge_regions, merge_baselines, suppress_regions,
             suppress_baselines, merge_all_baselines, merge_all_regions,
             bounding_regions):
     """
@@ -424,15 +413,30 @@ def segtest(ctx, model, evaluation_files, device, workers, threads, threshold,
     import torch.nn.functional as F
     from threadpoolctl import threadpool_limits
     from torch.utils.data import DataLoader
+    from lightning.fabric import Fabric
 
+    from kraken.lib.xml import XMLPage
+    from kraken.lib.vgsl import TorchVGSLModel
     from kraken.lib.progress import KrakenProgressBar
     from kraken.lib.train import BaselineSet, ImageInputTransforms
-    from kraken.lib.vgsl import TorchVGSLModel
 
     logger.info('Building test set from {} documents'.format(len(test_set) + len(evaluation_files)))
 
     message('Loading model {}\t'.format(model), nl=False)
-    nn = TorchVGSLModel.load_model(model)
+
+    try:
+        accelerator, device = to_ptl_device(ctx.meta['device'])
+    except Exception as e:
+        raise click.BadOptionUsage('device', str(e))
+
+    fabric = Fabric(accelerator=accelerator,
+                    devices=device,
+                    precision=ctx.meta['precision'])
+
+    with fabric.init_tensor(), fabric.init_module():
+        nn = TorchVGSLModel.load_model(model)
+        nn.eval()
+
     message('\u2713', fg='green')
 
     test_set = list(test_set)
@@ -464,25 +468,25 @@ def segtest(ctx, model, evaluation_files, device, workers, threads, threshold,
         valid_baselines = []
         merge_baselines = None
 
-    test_set = BaselineSet(test_set,
-                           line_width=nn.user_metadata["hyper_params"]["line_width"],
-                           im_transforms=transforms,
-                           mode=format_type,
-                           augmentation=False,
-                           valid_baselines=valid_baselines,
-                           merge_baselines=merge_baselines,
-                           valid_regions=valid_regions,
-                           merge_regions=merge_regions,
-                           merge_all_baselines=merge_all_baselines,
-                           merge_all_regions=merge_all_regions,
-                           suppress_baselines=suppress_baselines,
-                           suppress_regions=suppress_regions)
+    dataset = BaselineSet(line_width=nn.user_metadata["hyper_params"]["line_width"],
+                          im_transforms=transforms,
+                          augmentation=False,
+                          valid_baselines=valid_baselines,
+                          merge_baselines=merge_baselines,
+                          valid_regions=valid_regions,
+                          merge_regions=merge_regions,
+                          merge_all_baselines=merge_all_baselines,
+                          merge_all_regions=merge_all_regions,
+                          class_mapping=nn.user_metadata["class_mapping"])
 
-    test_set.class_mapping = nn.user_metadata["class_mapping"]
-    test_set.num_classes = sum([len(classDict) for classDict in test_set.class_mapping.values()])
+    for file in test_set:
+        try:
+            dataset.add(XMLPage(file).to_container())
+        except Exception as e:
+            logger.warning(str(e))
 
-    baselines_diff = set(test_set.class_stats["baselines"].keys()).difference(test_set.class_mapping["baselines"].keys())
-    regions_diff = set(test_set.class_stats["regions"].keys()).difference(test_set.class_mapping["regions"].keys())
+    baselines_diff = set(dataset.class_stats["baselines"].keys()).difference(dataset.class_mapping["baselines"].keys())
+    regions_diff = set(dataset.class_stats["regions"].keys()).difference(dataset.class_mapping["regions"].keys())
 
     if baselines_diff:
         message(f'Model baseline types missing in test set: {", ".join(sorted(list(baselines_diff)))}')
@@ -490,32 +494,20 @@ def segtest(ctx, model, evaluation_files, device, workers, threads, threshold,
     if regions_diff:
         message(f'Model region types missing in the test set: {", ".join(sorted(list(regions_diff)))}')
 
-    try:
-        accelerator, device = to_ptl_device(device)
-        if device:
-            device = f'{accelerator}:{device}'
-        else:
-            device = accelerator
-    except Exception as e:
-        raise click.BadOptionUsage('device', str(e))
-
-    if len(test_set) == 0:
+    if len(dataset) == 0:
         raise click.UsageError('No evaluation data was provided to the test command. Use `-e` or the `test_set` argument.')
 
-    ds_loader = DataLoader(test_set, batch_size=1, num_workers=workers, pin_memory=True)
+    ds_loader = DataLoader(dataset, batch_size=1, num_workers=ctx.meta['workers'], pin_memory=True)
 
-    nn.to(device)
-    nn.eval()
-    nn.set_num_threads(1)
     pages = []
 
-    lines_idx = list(test_set.class_mapping["baselines"].values())
-    regions_idx = list(test_set.class_mapping["regions"].values())
+    lines_idx = list(dataset.class_mapping["baselines"].values())
+    regions_idx = list(dataset.class_mapping["regions"].values())
 
     with KrakenProgressBar() as progress:
         batches = len(ds_loader)
         pred_task = progress.add_task('Evaluating', total=batches, visible=True if not ctx.meta['verbose'] else False)
-        with threadpool_limits(limits=threads):
+        with torch.inference_mode(), threadpool_limits(limits=ctx.meta['threads']), fabric.init_tensor():
             for batch in ds_loader:
                 x, y = batch['image'], batch['target']
                 try:
@@ -530,7 +522,7 @@ def segtest(ctx, model, evaluation_files, device, workers, threads, threshold,
                         'unions': (y | pred).sum(dim=1, dtype=torch.double),
                         'corrects': torch.eq(y, pred).sum(dim=1, dtype=torch.double),
                         'cls_cnt': y.sum(dim=1, dtype=torch.double),
-                        'all_n': torch.tensor(y.size(1), dtype=torch.double, device=device)
+                        'all_n': torch.tensor(y.size(1), dtype=torch.double)
                     })
                     if lines_idx:
                         y_baselines = y[lines_idx].sum(dim=0, dtype=torch.bool)
@@ -546,12 +538,7 @@ def segtest(ctx, model, evaluation_files, device, workers, threads, threshold,
                             'intersections': (y_regions_idx & pred_regions_idx).sum(dim=0, dtype=torch.double),
                             'unions': (y_regions_idx | pred_regions_idx).sum(dim=0, dtype=torch.double),
                         }
-
-                except FileNotFoundError as e:
-                    batches -= 1
-                    progress.update(pred_task, total=batches)
-                    logger.warning('{} {}. Skipping.'.format(e.strerror, e.filename))
-                except KrakenInputException as e:
+                except Exception as e:
                     batches -= 1
                     progress.update(pred_task, total=batches)
                     logger.warning(str(e))
@@ -601,11 +588,11 @@ def segtest(ctx, model, evaluation_files, device, workers, threads, threshold,
     class_iu = class_iu.tolist()
     class_pixel_accuracy = class_pixel_accuracy.tolist()
     for (cat, class_name), iu, pix_acc in zip(
-        [(cat, key) for (cat, subcategory) in test_set.class_mapping.items() for key in subcategory],
+        [(cat, key) for (cat, subcategory) in dataset.class_mapping.items() for key in subcategory],
         class_iu,
         class_pixel_accuracy
     ):
-        table.add_row(cat, class_name, f'{pix_acc:.3f}', f'{iu:.3f}', f'{test_set.class_stats[cat][class_name]}' if cat != "aux" else 'N/A')
+        table.add_row(cat, class_name, f'{pix_acc:.3f}', f'{iu:.3f}', f'{dataset.class_stats[cat][class_name]}' if cat != "aux" else 'N/A')
 
     console = Console()
     console.print(table)

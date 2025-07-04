@@ -26,7 +26,6 @@ from .util import _validate_manifests
 @click.command('compile')
 @click.pass_context
 @click.option('-o', '--output', show_default=True, type=click.Path(), default='dataset.arrow', help='Output dataset file')
-@click.option('--workers', show_default=True, default=1, help='Number of parallel workers for text line extraction.')
 @click.option('-f', '--format-type', type=click.Choice(['path', 'xml', 'alto', 'page']), default='xml', show_default=True,
               help='Sets the training data format. In ALTO and PageXML mode all '
               'data is extracted from xml files containing both baselines and a '
@@ -58,8 +57,9 @@ from .util import _validate_manifests
 @click.option('--legacy-polygons', show_default=True, default=False, is_flag=True,
               help='Use the old polygon extractor.')
 @click.argument('ground_truth', nargs=-1, type=click.Path(exists=True, dir_okay=False))
-def compile(ctx, output, workers, format_type, files, random_split, force_type,
-            save_splits, skip_empty_lines, recordbatch_size, ground_truth, legacy_polygons):
+def compile(ctx, output, format_type, files, random_split, force_type,
+            save_splits, skip_empty_lines, recordbatch_size, ground_truth,
+            legacy_polygons):
     """
     Precompiles a binary dataset from a collection of XML files.
     """
@@ -92,7 +92,7 @@ def compile(ctx, output, workers, format_type, files, random_split, force_type,
         arrow_dataset.build_binary_dataset(ground_truth,
                                            output,
                                            format_type,
-                                           workers,
+                                           ctx.meta['workers'],
                                            save_splits,
                                            random_split,
                                            force_type,

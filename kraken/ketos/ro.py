@@ -27,7 +27,7 @@ from PIL import Image
 from kraken.ketos.util import (_expand_gt, _validate_manifests, message,
                                to_ptl_device, _validate_merging)
 
-from kraken.lib.register import OPTIMIZERS, SCHEDULERS, STOPPERS, PRECISIONS
+from kraken.lib.register import OPTIMIZERS, SCHEDULERS, STOPPERS
 from kraken.lib.default_specs import READING_ORDER_HYPER_PARAMS
 
 logging.captureWarnings(True)
@@ -72,8 +72,6 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
               default=READING_ORDER_HYPER_PARAMS['min_delta'],
               type=click.FLOAT,
               help='Minimum improvement between epochs to reset early stopping. By default it scales the delta by the best loss')
-@click.option('-d', '--device', show_default=True, default='cpu', help='Select device to use (cpu, cuda:0, cuda:1, ...)')
-@click.option('--precision', default='32-true', type=click.Choice(PRECISIONS), help='set tensor precision')
 @click.option('--optimizer',
               show_default=True,
               default=READING_ORDER_HYPER_PARAMS['optimizer'],
@@ -151,12 +149,12 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
               help='Select reading order to train. Defaults to `line_implicit`/`region_implicit`')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def rotrain(ctx, batch_size, output, load, freq, quit, epochs, min_epochs, lag,
-            min_delta, device, precision, optimizer, lrate, momentum,
-            weight_decay, warmup, schedule, gamma, step_size, sched_patience,
-            cos_max, cos_min_lr, partition, training_files, evaluation_files,
-            workers, threads, load_hyper_parameters, format_type,
-            valid_entities, merge_entities, merge_all_entities, pl_logger,
-            log_dir, level, reading_order, ground_truth):
+            min_delta, optimizer, lrate, momentum, weight_decay, warmup,
+            schedule, gamma, step_size, sched_patience, cos_max, cos_min_lr,
+            partition, training_files, evaluation_files, workers, threads,
+            load_hyper_parameters, format_type, valid_entities, merge_entities,
+            merge_all_entities, pl_logger, log_dir, level, reading_order,
+            ground_truth):
     """
     Trains a baseline labeling model for layout analysis
     """
@@ -218,7 +216,7 @@ def rotrain(ctx, batch_size, output, load, freq, quit, epochs, min_epochs, lag,
         raise click.UsageError('No training data was provided to the train command. Use `-t` or the `ground_truth` argument.')
 
     try:
-        accelerator, device = to_ptl_device(device)
+        accelerator, device = to_ptl_device(ctx.meta['device'])
     except Exception as e:
         raise click.BadOptionUsage('device', str(e))
 
@@ -266,7 +264,7 @@ def rotrain(ctx, batch_size, output, load, freq, quit, epochs, min_epochs, lag,
                             min_epochs=hyper_params['min_epochs'],
                             enable_progress_bar=True if not ctx.meta['verbose'] else False,
                             deterministic=ctx.meta['deterministic'],
-                            precision=precision,
+                            precision=ctx.meta['precision'],
                             pl_logger=pl_logger,
                             log_dir=log_dir,
                             **val_check_interval)
