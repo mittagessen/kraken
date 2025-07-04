@@ -177,7 +177,7 @@ class TestNewPolygons(unittest.TestCase):
         Test `ketos test` with old model, check that it uses legacy polygon extraction method
         """
         self._test_ketoscli(
-            args=['test', '-m', self.old_model_path, '-f', 'xml', '--workers', '0', self.segmented_img],
+            args=['--workers', '0', 'test', '-m', self.old_model_path, '-f', 'xml', self.segmented_img],
             expect_legacy=True,
         )
 
@@ -186,7 +186,7 @@ class TestNewPolygons(unittest.TestCase):
         Test `ketos test` with old model, check that it does not use legacy polygon extraction method
         """
         self._test_ketoscli(
-            args=['test', '--no-legacy-polygons', '-m', self.old_model_path, '-f', 'xml', '--workers', '0', self.segmented_img],
+            args=['--workers', '0', 'test', '--no-legacy-polygons', '-m', self.old_model_path, '-f', 'xml', self.segmented_img],
             expect_legacy=False,
         )
 
@@ -195,7 +195,7 @@ class TestNewPolygons(unittest.TestCase):
         Test `ketos test` with new model, check that it uses new polygon extraction method
         """
         self._test_ketoscli(
-            args=['test', '-m', self.new_model_path, '-f', 'xml', '--workers', '0', self.segmented_img],
+            args=['--workers', '0', 'test', '-m', self.new_model_path, '-f', 'xml', self.segmented_img],
             expect_legacy=False,
         )
 
@@ -208,7 +208,7 @@ class TestNewPolygons(unittest.TestCase):
             fp = str(Path(tempdir) / "test.xml")
 
             self._test_ketoscli(
-                args=['train', '-f', 'xml', '-N', '1', '-q', 'fixed', '-o', mfp, '--workers', '0', self.segmented_img],
+                args=['--workers', '0', 'train', '-f', 'xml', '-N', '1', '-q', 'fixed', '-o', mfp, self.segmented_img],
                 expect_legacy=False,
                 check_exit_code=[0, 1], # Model may not improve during training
             )
@@ -227,7 +227,7 @@ class TestNewPolygons(unittest.TestCase):
             fp = str(Path(tempdir) / "test.xml")
 
             self._test_ketoscli(
-                args=['train', '--legacy-polygons', '-f', 'xml', '-N', '1', '-q', 'fixed', '-o', mfp, '--workers', '0', self.segmented_img],
+                args=['--workers', '0', 'train', '--legacy-polygons', '-f', 'xml', '-N', '1', '-q', 'fixed', '-o', mfp, self.segmented_img],
                 expect_legacy=True,
                 check_exit_code=[0, 1], # Model may not improve during training
             )
@@ -246,7 +246,7 @@ class TestNewPolygons(unittest.TestCase):
             fp = str(Path(tempdir) / "test.xml")
 
             self._test_ketoscli(
-                args=['train', '-f', 'xml', '-N', '1', '-q', 'fixed', '-i', self.old_model_path, '--resize', 'union', '-o', mfp, '--workers', '0', self.segmented_img],
+                args=['--workers', '0', 'train', '-f', 'xml', '-N', '1', '-q', 'fixed', '-i', self.old_model_path, '--resize', 'union', '-o', mfp, self.segmented_img],
                 expect_legacy=False,
                 check_exit_code=[0, 1], # Model may not improve during training
             )
@@ -264,7 +264,7 @@ class TestNewPolygons(unittest.TestCase):
             fp = str(Path(tempdir) / "test.xml")
 
             self._test_ketoscli(
-                args=['train', '--legacy-polygons', '-f', 'xml', '-N', '1', '-q', 'fixed', '-i', self.old_model_path, '--resize', 'union', '-o', mfp, '--workers', '0', self.segmented_img],
+                args=['--workers', '0', 'train', '--legacy-polygons', '-f', 'xml', '-N', '1', '-q', 'fixed', '-i', self.old_model_path, '--resize', 'union', '-o', mfp, self.segmented_img],
                 expect_legacy=True,
                 check_exit_code=[0, 1], # Model may not improve during training
             )
@@ -282,7 +282,7 @@ class TestNewPolygons(unittest.TestCase):
             fp = str(Path(tempdir) / "test.xml")
 
             self._test_ketoscli(
-                args=['pretrain', '-f', 'xml', '-N', '1', '-q', 'fixed', '-o', mfp, '--workers', '0', self.segmented_img],
+                args=['--workers', '0', 'pretrain', '-f', 'xml', '-N', '1', '-q', 'fixed', '-o', mfp, self.segmented_img],
                 expect_legacy=False,
                 check_exit_code=[0, 1], # Model may not improve during training
             )
@@ -300,7 +300,7 @@ class TestNewPolygons(unittest.TestCase):
             fp = str(Path(tempdir) / "test.xml")
 
             self._test_ketoscli(
-                args=['pretrain', '--legacy-polygons', '-f', 'xml', '-N', '1', '-q', 'fixed', '-o', mfp, '--workers', '0', self.segmented_img],
+                args=['--workers', '0', 'pretrain', '--legacy-polygons', '-f', 'xml', '-N', '1', '-q', 'fixed', '-o', mfp, self.segmented_img],
                 expect_legacy=True,
                 check_exit_code=[0, 1], # Model may not improve during training
             )
@@ -319,7 +319,7 @@ class TestNewPolygons(unittest.TestCase):
             fp = str(Path(tempdir) / "test.xml")
 
             self._test_ketoscli(
-                args=['pretrain', '-f', 'xml', '-N', '1', '-q', 'fixed', '-i', self.old_model_path, '-o', mfp, '--workers', '0', self.segmented_img],
+                args=['--workers', '0', 'pretrain', '-f', 'xml', '-N', '1', '-q', 'fixed', '-i', self.old_model_path, '-o', mfp, self.segmented_img],
                 expect_legacy=False,
                 check_exit_code=[0, 1], # Model may not improve during training
             )
@@ -374,7 +374,7 @@ class TestNewPolygons(unittest.TestCase):
             mfp2 = str(Path(tempdir) / "model2")
 
             self._test_ketoscli(
-                args=['compile', '--workers', '0', '-f', 'xml', '-o', dset, self.segmented_img],
+                args=['--workers', '0', 'compile', '-f', 'xml', '-o', dset, self.segmented_img],
                 expect_legacy=False,
                 patching_dir="kraken.lib.arrow_dataset",
             )
@@ -393,7 +393,7 @@ class TestNewPolygons(unittest.TestCase):
             mfp2 = str(Path(tempdir) / "model2")
 
             self._test_ketoscli(
-                args=['compile', '--workers', '0', '--legacy-polygons', '-f', 'xml', '-o', dset, self.segmented_img],
+                args=['--workers', '0', 'compile', '--legacy-polygons', '-f', 'xml', '-o', dset, self.segmented_img],
                 expect_legacy=True,
                 patching_dir="kraken.lib.arrow_dataset",
             )
@@ -422,7 +422,7 @@ class TestNewPolygons(unittest.TestCase):
             mfp2 = str(Path(tempdir) / "model2")
 
             self._test_ketoscli(
-                args=['compile', '--workers', '0', '-f', 'xml', '-o', dset, self.segmented_img],
+                args=['--workers', '0', 'compile', '-f', 'xml', '-o', dset, self.segmented_img],
                 expect_legacy=False,
                 patching_dir="kraken.lib.arrow_dataset",
             )
@@ -439,7 +439,7 @@ class TestNewPolygons(unittest.TestCase):
             mfp = str(Path(tempdir) / "model")
 
             self._test_ketoscli(
-                args=['compile', '--workers', '0', '-f', 'xml', '-o', dset, self.segmented_img, self.arrow_data],
+                args=['--workers', '0', 'compile', '-f', 'xml', '-o', dset, self.segmented_img, self.arrow_data],
                 expect_legacy=False,
                 patching_dir="kraken.lib.arrow_dataset",
             )
