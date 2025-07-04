@@ -30,7 +30,7 @@ jobs:
           flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
       - name: Run tests, except training tests
         run: |
-          pytest
+          pytest -k 'not test_train'
 
   build-n-publish-pypi:
     name: Build and publish Python 🐍 distributions 📦 to PyPI and TestPyPI
