@@ -210,7 +210,6 @@ def boundary_tracing(region):
     current = start
     backtrack = backtrack_start
     boundary = []
-    counter = 0
 
     while True:
         neighbors_current = moore_neighborhood(current, backtrack)
@@ -220,7 +219,6 @@ def boundary_tracing(region):
         boundary.append(current)
         backtrack = neighbors_current[idx-1]
         current = neighbors_current[idx]
-        counter += 1
 
         if (np.all(current == start) and np.all(backtrack == backtrack_start)):
             break
