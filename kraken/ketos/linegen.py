@@ -68,6 +68,9 @@ def line_generator(ctx, font, maxlines, encoding, normalization, renormalize,
                    legacy, output, text):
     """
     Generates artificial text line training data.
+
+    linegen is DEPRECATED and has been replaced by Pangoline
+    (https://github.com/mittagessen/pangoline) which allows creation of page-wise training data.
     """
     import errno
     import logging
@@ -88,6 +91,10 @@ def line_generator(ctx, font, maxlines, encoding, normalization, renormalize,
     logging.captureWarnings(True)
     logger = logging.getLogger('kraken')
 
+    logger.warning('linegen is DEPRECATED and has been replaced by Pangoline '
+                   '(https://github.com/mittagessen/pangoline) which allows '
+                   'creation of page-wise training data.')
+)
     lines: Set[str] = set()
     if not text:
         return
