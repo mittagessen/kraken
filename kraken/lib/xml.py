@@ -220,7 +220,7 @@ class XMLPage(object):
                     try:
                         pol = line.find('./{*}Shape/{*}Polygon')
                         boundary = self._parse_alto_pointstype(pol.get('POINTS'))
-                    except ValueError:
+                    except (ValueError, AttributeError):
                         logger.info(f'TextLine {line_id} without polygon')
 
                 elif self.type == 'bbox':
