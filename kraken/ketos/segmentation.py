@@ -175,10 +175,6 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
               help='Merges all baseline types into the argument identifier')
 @click.option('--merge-all-regions', show_default=True, default=None,
               help='Merges all region types into the argument identifiers')
-@click.option('--suppress-baselines/--no-suppress-baselines', show_default=True, default=False,
-              help='Suppresses all baseline.')
-@click.option('--suppress-regions/--no-suppress-regions', show_default=True, default=False,
-              help='Supppresses all regions.')
 @click.option('-br', '--bounding-regions', show_default=True, default=None, multiple=True,
               help='Regions treated as boundaries for polygonization purposes. May be used multiple times.')
 @click.option('--augment/--no-augment',
@@ -215,8 +211,8 @@ def segtrain(ctx, output, spec, line_width, pad, load, freq, quit, epochs,
              force_binarization, format_type, suppress_regions,
              suppress_baselines, valid_regions, valid_baselines, merge_regions,
              merge_baselines, merge_all_baselines, merge_all_regions,
-             suppress_baselines, suppress_regions, bounding_regions, augment,
-             resize, topline, pl_logger, log_dir, ground_truth):
+             bounding_regions, augment, resize, topline, pl_logger, log_dir,
+             ground_truth):
     """
     Trains a baseline labeling model for layout analysis
     """
@@ -320,8 +316,6 @@ def segtrain(ctx, output, spec, line_width, pad, load, freq, quit, epochs,
                               merge_baselines=merge_baselines,
                               merge_all_baselines=merge_all_baselines,
                               merge_all_regions=merge_all_regions,
-                              suppress_baselines=suppress_baselines,
-                              suppress_regions=suppress_regions,
                               bounding_regions=bounding_regions,
                               resize=resize,
                               topline=topline)

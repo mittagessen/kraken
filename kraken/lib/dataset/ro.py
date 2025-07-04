@@ -76,12 +76,14 @@ class PairWiseROSet(Dataset):
         if class_mapping:
             self.class_mapping = class_mapping
             self.num_classes = len(class_mapping) + 1
+            self.freeze_cls_map = True
             valid_entities = None
             merge_entities = None
             merge_all_entities = None
         else:
             self.num_classes = 1
             self.class_mapping = {}
+            self.freeze_cls_map = False
 
         self.m_dict = merge_entities if merge_entities is not None else {}
         self.merge_all_entities = merge_all_entities
@@ -111,6 +113,8 @@ class PairWiseROSet(Dataset):
                             tag = self.m_dict.get(tag_val, tag_val)
                             if self.merge_all_entities:
                                 tag = None
+                            elif tag not in self.class_mapping and self.freeze_cls_map:
+                                continue
                             elif tag not in self.class_mapping:
                                 self.class_mapping[tag] = self.num_classes
                                 self.num_classes += 1
@@ -200,11 +204,14 @@ class PageWiseROSet(Dataset):
         if class_mapping:
             self.class_mapping = class_mapping
             self.num_classes = len(class_mapping) + 1
+            self.freeze_cls_map = True
             valid_entities = None
             merge_entities = None
+            merge_all_entities = False
         else:
             self.num_classes = 1
             self.class_mapping = {}
+            self.freeze_cls_map = False
 
         self.m_dict = merge_entities if merge_entities is not None else {}
         self.merge_all_entities = merge_all_entities
@@ -234,6 +241,8 @@ class PageWiseROSet(Dataset):
                             tag = self.m_dict.get(tag_val, tag_val)
                             if self.merge_all_entities:
                                 tag = None
+                            elif tag not in self.class_mapping and self.freeze_cls_map:
+                                continue
                             elif tag not in self.class_mapping:
                                 self.class_mapping[tag] = self.num_classes
                                 self.num_classes += 1

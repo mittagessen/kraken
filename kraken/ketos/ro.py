@@ -128,10 +128,6 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
               help='Sets the training data format. In ALTO and PageXML mode all '
               'data is extracted from xml files containing both baselines and a '
               'link to source images.')
-@click.option('--suppress-regions/--no-suppress-regions', show_default=True,
-              default=False, help='Disables region segmentation training.')
-@click.option('--suppress-baselines/--no-suppress-baselines', show_default=True,
-              default=False, help='Disables baseline segmentation training.')
 @click.option('-ve', '--valid-entities', show_default=True, default=None, multiple=True,
               help='Valid entities types in training data. May be used multiple times.')
 @click.option('-me',
@@ -159,9 +155,8 @@ def rotrain(ctx, batch_size, output, load, freq, quit, epochs, min_epochs, lag,
             weight_decay, warmup, schedule, gamma, step_size, sched_patience,
             cos_max, cos_min_lr, partition, training_files, evaluation_files,
             workers, threads, load_hyper_parameters, format_type,
-            suppress_regions, suppress_baselines, valid_entities,
-            merge_entities, merge_all_entities, pl_logger, log_dir, level,
-            reading_order, ground_truth):
+            valid_entities, merge_entities, merge_all_entities, pl_logger,
+            log_dir, level, reading_order, ground_truth):
     """
     Trains a baseline labeling model for layout analysis
     """
@@ -245,8 +240,6 @@ def rotrain(ctx, batch_size, output, load, freq, quit, epochs, min_epochs, lag,
                       num_workers=workers,
                       format_type=format_type,
                       class_mapping=class_mapping,
-                      suppress_regions=suppress_regions,
-                      suppress_baselines=suppress_baselines,
                       valid_entities=valid_entities,
                       merge_entities=merge_entities,
                       merge_all_entities=merge_all_entities,
