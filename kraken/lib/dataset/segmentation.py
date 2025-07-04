@@ -156,9 +156,9 @@ class BaselineSet(Dataset):
         regions_ = defaultdict(list)
         for k, v in doc.regions.items():
             if self.valid_regions is None or k in self.valid_regions:
-                if self.merge_all_regions:
-                    tag = self.merge_all_regions
                 reg_type = self.mreg_dict.get(k, k)
+                if self.merge_all_regions:
+                    reg_type = self.merge_all_regions
                 regions_[reg_type].extend(v)
                 self.class_stats['regions'][reg_type] += len(v)
                 if reg_type not in self.class_mapping['regions']:

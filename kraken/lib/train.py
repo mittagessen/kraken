@@ -845,7 +845,7 @@ class SegmentationModel(L.LightningModule):
                                           height,
                                           width,
                                           channels,
-                                          self.hyper_params.hyper_params['padding'],
+                                          self.hyper_params['padding'],
                                           valid_norm=False,
                                           force_binarization=force_binarization)
 
