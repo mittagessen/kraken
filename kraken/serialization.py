@@ -260,7 +260,7 @@ def render_report(model: str,
                   chars: int,
                   errors: int,
                   char_accuracy: float,
-                  char_CI_accucary: float, #Case insensitive
+                  char_CI_accucary: float,  # Case insensitive
                   word_accuracy: float,
                   char_confusions: 'Counter',
                   scripts: 'Counter',

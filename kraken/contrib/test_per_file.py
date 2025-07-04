@@ -8,29 +8,25 @@ import logging
 from typing import List
 from collections import defaultdict
 
-import click
-
 from threadpoolctl import threadpool_limits
 import numpy as np
 from torch.utils.data import DataLoader
 from torchmetrics.text import CharErrorRate, WordErrorRate
 
-from kraken.lib.default_specs import RECOGNITION_HYPER_PARAMS, RECOGNITION_SPEC
+from kraken.lib.default_specs import RECOGNITION_HYPER_PARAMS
 from kraken.lib.exceptions import KrakenInputException
 from kraken.lib import models
-from kraken.lib.dataset import (ImageInputTransforms,
-                                PolygonGTDataset, collate_sequences,
-                                compute_confusions, global_align)
+from kraken.lib.dataset import (ImageInputTransforms, PolygonGTDataset,
+                                collate_sequences, global_align)
 from kraken.lib.progress import KrakenProgressBar
 from kraken.lib.xml import XMLPage
 from kraken.ketos.util import _expand_gt, _validate_manifests, message
-from kraken.serialization import render_report
 
 logging.captureWarnings(True)
 logger = logging.getLogger('kraken')
 
-@click.command()
 
+@click.command()
 @click.pass_context
 @click.option('-B', '--batch-size', show_default=True, type=click.INT,
               default=RECOGNITION_HYPER_PARAMS['batch_size'], help='Batch sample size')
@@ -87,7 +83,7 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
     test_set = list(test_set)
     if evaluation_files:
         test_set.extend(evaluation_files)
-    
+
     test_set = [{'page': XMLPage(file, filetype=format_type).to_container(),
                  'source': str(file)} for file in test_set]
     valid_norm = False
@@ -100,7 +96,7 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
 
     grouped_files = defaultdict(list)
     for entry in test_set:
-        grouped_files[entry['source']].append(entry['page'])        
+        grouped_files[entry['source']].append(entry['page'])
 
     with threadpool_limits(limits=threads):
         for p, net in nn.items():
@@ -119,10 +115,10 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
 
                 # Create a new dataset
                 ds = PolygonGTDataset(normalization=normalization,
-                                  whitespace_normalization=normalize_whitespace,
-                                  reorder=reorder,
-                                  im_transforms=ts)
-                
+                                      whitespace_normalization=normalize_whitespace,
+                                      reorder=reorder,
+                                      im_transforms=ts)
+
                 for page in pages:
                     try:
                         ds.add(page=page)
@@ -131,10 +127,10 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
 
                 ds.no_encode()
                 ds_loader = DataLoader(ds,
-                                   batch_size=batch_size,
-                                   num_workers=workers,
-                                   pin_memory=pin_ds_mem,
-                                   collate_fn=collate_sequences)
+                                       batch_size=batch_size,
+                                       num_workers=workers,
+                                       pin_memory=pin_ds_mem,
+                                       collate_fn=collate_sequences)
 
                 # Set up per-file metrics and counters.
                 file_cer = CharErrorRate()
@@ -147,8 +143,9 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
                 # Evaluate with a per-file progress bar.
                 with KrakenProgressBar() as progress:
                     total_batches = len(ds_loader)
-                    pred_task = progress.add_task(f"Evaluating {source}", total=total_batches,
-                                            visible=True if not ctx.meta.get('verbose', False) else False)
+                    pred_task = progress.add_task(f"Evaluating {source}",
+                                                  total=total_batches,
+                                                  visible=True if not ctx.meta.get('verbose', False) else False)
                     for batch in ds_loader:
                         im = batch['image']
                         text = batch['target']
@@ -184,13 +181,13 @@ def test(ctx, batch_size, model, evaluation_files, device, pad, workers,
                 )
                 message(report_line.rjust(40))
 
-            
             avg_cer = np.mean(aggregated_cer)
             avg_wer = np.mean(aggregated_wer)
 
             message('Aggregated results for model {}:'.format(p))
             message('Average character accuracy: {:0.2f}%'.format(avg_cer * 100))
             message('Average word accuracy: {:0.2f}%'.format(avg_wer * 100))
-      
+
+
 if __name__ == '__main__':
     test()

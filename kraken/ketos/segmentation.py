@@ -20,8 +20,6 @@ Command line driver for segmentation training and evaluation.
 """
 import logging
 import pathlib
-import shlex
-from typing import Dict
 
 import click
 from PIL import Image

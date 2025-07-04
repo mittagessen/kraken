@@ -22,7 +22,7 @@ import os
 import glob
 import shlex
 import logging
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Dict
 
 import click
 

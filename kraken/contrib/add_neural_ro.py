@@ -5,6 +5,7 @@ ALTO document.
 """
 import click
 
+
 @click.command()
 @click.option('-f', '--format-type', type=click.Choice(['alto']), default='alto',
               help='Sets the input document format. In ALTO and PageXML mode all '
@@ -24,7 +25,6 @@ def cli(format_type, model, files):
 
     import uuid
 
-    from kraken import blla
     from kraken.lib import segmentation, vgsl, xml
 
     from lxml import etree
@@ -33,8 +33,8 @@ def cli(format_type, model, files):
     try:
         net = vgsl.TorchVGSLModel.load_model(model)
         ro_class_mapping = net.user_metadata['ro_class_mapping']
-        ro_net = net.aux_layers['ro_model']
-    except:
+        ro_model = net.aux_layers['ro_model']
+    except Exception:
         from kraken.lib.ro import ROModel
         net = ROModel.load_from_checkpoint(model)
         ro_class_mapping = net.hparams.class_mapping
@@ -44,7 +44,7 @@ def cli(format_type, model, files):
         click.echo(f'Processing {doc} ', nl=False)
         doc = xml.XMLPage(doc)
         if doc.filetype != 'alto':
-            click.echo(f'Not an ALTO file. Skipping.')
+            click.echo('Not an ALTO file. Skipping.')
             continue
         seg = doc.to_container()
         lines = list(map(asdict, seg.lines))
@@ -53,13 +53,13 @@ def cli(format_type, model, files):
                                                    model=ro_model,
                                                    im_size=doc.image_size[::-1],
                                                    class_mapping=ro_class_mapping)
-        # reorder 
+        # reorder
         lines = [lines[idx] for idx in _order]
         # add ReadingOrder block to ALTO
         tree = etree.parse(doc.filename)
         alto = tree.getroot()
         if alto.find('./{*}ReadingOrder'):
-            click.echo(f'Addition to files with explicit reading order not yet supported. Skipping.')
+            click.echo('Addition to files with explicit reading order not yet supported. Skipping.')
             continue
         ro = etree.Element('ReadingOrder')
         og = etree.SubElement(ro, 'OrderedGroup')
