@@ -21,7 +21,9 @@ Command line driver for synthetic recognition training data generation.
 import click
 
 
-@click.command('linegen', deprecated=True)
+@click.command('linegen', deprecated='linegen is DEPRECATED and has been '
+               'replaced by Pangoline (https://github.com/mittagessen/pangoline) '
+               'which allows creation of page-wise training data.')
 @click.pass_context
 @click.option('-f', '--font', default='sans',
               help='Font family to render texts in.')
@@ -69,8 +71,6 @@ def line_generator(ctx, font, maxlines, encoding, normalization, renormalize,
     """
     Generates artificial text line training data.
 
-    linegen is DEPRECATED and has been replaced by Pangoline
-    (https://github.com/mittagessen/pangoline) which allows creation of page-wise training data.
     """
     import errno
     import logging
