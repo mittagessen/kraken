@@ -327,7 +327,7 @@ Masking
 It is possible to keep the segmenter from finding text lines and regions on
 certain areas of the input image. This is done through providing a binary mask
 image that has the same size as the input image where blocked out regions are
-black and valid regions white:
+white and valid regions black:
 
 .. code-block:: console
 
