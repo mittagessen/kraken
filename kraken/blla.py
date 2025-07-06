@@ -239,7 +239,7 @@ def vec_lines(heatmap: torch.Tensor,
     sc = scale_polygonal_lines([x[1:] for x in lines], scale)
 
     lines = list(zip([x[0] for x in lines], [x[0] for x in sc], [x[1] for x in sc]))
-    return [{'tags': {'type': bl_type}, 'baseline': bl, 'boundary': pl} for bl_type, bl, pl in lines]
+    return [{'tags': {'type': [{'type': bl_type}]}, 'baseline': bl, 'boundary': pl} for bl_type, bl, pl in lines]
 
 
 def segment(im: PIL.Image.Image,
