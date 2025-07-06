@@ -89,7 +89,7 @@ def cli(model, text_direction, repolygonize, topline, height_scale, files):
             # reorder lines by type
             lines = defaultdict(list)
             for line in data.lines:
-                lines[line.tags['type']].append(line)
+                lines[line.tags['type'][0]['type']].append(line)
             im = Image.open(data.imagename).convert('RGBA')
             for t, ls in lines.items():
                 tmp = Image.new('RGBA', im.size, (0, 0, 0, 0))
