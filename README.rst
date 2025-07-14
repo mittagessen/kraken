@@ -44,25 +44,6 @@ or install `pyvips` manually with pip:
 
   $ pip install pyvips
 
-Conda environment files are provided for the seamless installation of the main
-branch as well:
-
-::
-
-  $ git clone https://github.com/mittagessen/kraken.git
-  $ cd kraken
-  $ conda env create -f environment.yml
-
-or:
-
-::
-
-  $ git clone https://github.com/mittagessen/kraken.git
-  $ cd kraken
-  $ conda env create -f environment_cuda.yml
-
-for CUDA acceleration with the appropriate hardware.
-
 Finally you'll have to scrounge up a model to do the actual recognition of
 characters. To download the default model for printed French text and place it
 in the kraken directory for the current user:
