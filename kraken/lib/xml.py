@@ -188,7 +188,7 @@ class XMLPage(object):
             tags = self._parse_alto_tagrefs(cls_map, region.get('TAGREFS'))
             tag_type = tags.pop('region') if 'region' in tags else tags.pop('type', None)
             if (rtype := region.get('TYPE')) is None:
-                rtype = tag_type
+                rtype = [{'type': tag_type}]
             else:
                 rtype = [{'type': rtype}]
             if rtype is None:
