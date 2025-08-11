@@ -145,7 +145,7 @@ def publish(ctx, metadata, access_token, doi, private, model):
                 frontmatter['license'] = license
                 break
             else:
-                message(f'Not a valid license identifer. Did you mean {lic}?')
+                message(f'Not a valid license identifier. Did you mean {lic}?')
 
         message('To stop adding values to the following fields, enter an empty field.')
 
