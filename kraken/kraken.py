@@ -616,7 +616,7 @@ def _validate_mm(ctx, param, value):
               'documentation for more information about tag handling.')
 @click.option('-p', '--pad', show_default=True, type=click.INT, default=16, help='Left and right '
               'padding around lines')
-@click.option('-t', '--temperature', show_default=True, type=click.FLOAT, default=2.0, help='Softmax temperature')
+@click.option('-t', '--temperature', show_default=True, type=click.FLOAT, default=1.0, help='Softmax temperature')
 @click.option('-n', '--reorder/--no-reorder', show_default=True, default=True,
               help='Reorder code points to logical order')
 @click.option('--base-dir', show_default=True, default='auto',

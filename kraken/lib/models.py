@@ -35,7 +35,7 @@ class TorchSeqRecognizer(object):
     def __init__(self,
                  nn: TorchVGSLModel,
                  decoder=kraken.lib.ctc_decoder.greedy_decoder,
-                 temperature: float = 2.0,
+                 temperature: float = 1.0,
                  train: bool = False,
                  device: str = 'cpu'):
         """
