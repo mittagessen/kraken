@@ -6,10 +6,10 @@ Wrapper around TorchVGSLModel including a variety of forward pass helpers for
 sequence classification.
 """
 from os.path import abspath, expanduser, expandvars
-from typing import TYPE_CHECKING, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, List, Optional, Union
 
-import numpy as np
 import torch
+import numpy as np
 
 import kraken.lib.ctc_decoder
 import kraken.lib.lineest
@@ -35,6 +35,7 @@ class TorchSeqRecognizer(object):
     def __init__(self,
                  nn: TorchVGSLModel,
                  decoder=kraken.lib.ctc_decoder.greedy_decoder,
+                 temperature: float = 2.0,
                  train: bool = False,
                  device: str = 'cpu'):
         """
@@ -42,6 +43,7 @@ class TorchSeqRecognizer(object):
 
         Args:
             nn: Neural network used for recognition.
+            temperature: Softmax temperature.
             decoder: Decoder function used for mapping softmax activations to
                      labels and positions.
             train: Enables or disables gradient calculation and dropout.
@@ -71,6 +73,7 @@ class TorchSeqRecognizer(object):
             self.nn.eval()
         self.codec = self.nn.codec
         self.decoder = decoder
+        self.temperature = temperature
         self.train = train
         self.device = device
         if nn.model_type not in [None, 'recognition']:
@@ -87,7 +90,7 @@ class TorchSeqRecognizer(object):
         self.device = device
         self.nn.to(device)
 
-    def forward(self, line: torch.Tensor, lens: torch.Tensor = None) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
+    def forward(self, line: torch.Tensor, lens: torch.Tensor = None) -> Union[np.ndarray, tuple[np.ndarray, np.ndarray]]:
         """
         Performs a forward pass on a torch tensor of one or more lines with
         shape (N, C, H, W) and returns a numpy array (N, W, C).
@@ -97,7 +100,7 @@ class TorchSeqRecognizer(object):
             lens: Optional tensor containing sequence lengths if N > 1
 
         Returns:
-            Tuple with (N, W, C) shaped numpy array and final output sequence
+            tuple with (N, W, C) shaped numpy array and final output sequence
             lengths.
 
         Raises:
@@ -109,12 +112,13 @@ class TorchSeqRecognizer(object):
         o, olens = self.nn.nn(line, lens)
         if o.size(2) != 1:
             raise KrakenInputException('Expected dimension 3 to be 1, actual {}'.format(o.size()))
+        o = (o/self.temperature).softmax(-1)
         self.outputs = o.detach().squeeze(2).float().cpu().numpy()
         if olens is not None:
             olens = olens.cpu().numpy()
         return self.outputs, olens
 
-    def predict(self, line: torch.Tensor, lens: Optional[torch.Tensor] = None) -> List[List[Tuple[str, int, int, float]]]:
+    def predict(self, line: torch.Tensor, lens: Optional[torch.Tensor] = None) -> List[List[tuple[str, int, int, float]]]:
         """
         Performs a forward pass on a torch tensor of a line with shape (N, C, H, W)
         and returns the decoding as a list of tuples (string, start, end,
@@ -158,7 +162,7 @@ class TorchSeqRecognizer(object):
             dec_strs.append(''.join(x[0] for x in self.codec.decode(locs)))
         return dec_strs
 
-    def predict_labels(self, line: torch.tensor, lens: torch.Tensor = None) -> List[List[Tuple[int, int, int, float]]]:
+    def predict_labels(self, line: torch.tensor, lens: torch.Tensor = None) -> List[List[tuple[int, int, int, float]]]:
         """
         Performs a forward pass on a torch tensor of a line with shape (N, C, H, W)
         and returns a list of tuples (class, start, end, max). Max is the

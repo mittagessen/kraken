@@ -18,13 +18,13 @@ kraken.rpred
 
 Generators for recognition on lines images.
 """
-import dataclasses
 import logging
+import warnings
+import dataclasses
+
 from collections import defaultdict
 from functools import partial
-from typing import (TYPE_CHECKING, Dict, Generator, List, Optional, Tuple,
-                    Union)
-import warnings
+from typing import TYPE_CHECKING, Dict, Generator, Optional, Union
 
 from kraken.containers import BaselineOCRRecord, BBoxOCRRecord, ocr_record
 from kraken.lib.dataset import ImageInputTransforms
@@ -58,12 +58,12 @@ class mm_rpred(object):
     Multi-model version of kraken.rpred.rpred
     """
     def __init__(self,
-                 nets: Dict[Tuple[str, str], 'TorchSeqRecognizer'],
+                 nets: Dict[tuple[str, str], 'TorchSeqRecognizer'],
                  im: 'Image.Image',
                  bounds: 'Segmentation',
                  pad: int = 16,
                  bidi_reordering: Union[bool, str] = True,
-                 tags_ignore: Optional[List[Tuple[str, str]]] = None,
+                 tags_ignore: Optional[list[tuple[str, str]]] = None,
                  no_legacy_polygons: bool = False) -> Generator[ocr_record, None, None]:
         """
         Multi-model version of kraken.rpred.rpred.
@@ -83,7 +83,7 @@ class mm_rpred(object):
                              Unicode bidirectional algorithm for correct
                              display. Set to L|R to override default text
                              direction.
-            tags_ignore: List of tag key-value pairs to ignore during
+            tags_ignore: list of tag key-value pairs to ignore during
                          recognition
 
         Yields:
@@ -362,11 +362,12 @@ def rpred(network: 'TorchSeqRecognizer',
         An ocr_record containing the recognized text, absolute character
         positions, and confidence values for each character.
     """
-    return mm_rpred(defaultdict(lambda: network), im, bounds, pad, bidi_reordering, no_legacy_polygons=no_legacy_polygons)
+    return mm_rpred(defaultdict(lambda: network), im, bounds, pad,
+                    bidi_reordering, no_legacy_polygons=no_legacy_polygons)
 
 
 def _resolve_type_to_model(tags: Optional[Dict],
-                           model_map: Dict[Tuple[str, str], 'TorchSeqRecognizer'],
+                           model_map: Dict[tuple[str, str], 'TorchSeqRecognizer'],
                            default: Optional['TorchSeqRecognizer'] = None) -> 'TorchSeqRecognizer':
     """
     Resolves a line type to a model.
