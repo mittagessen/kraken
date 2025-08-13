@@ -25,7 +25,6 @@ Extracted label sequences are converted into the code point domain using kraken.
 
 import collections
 from itertools import groupby
-from typing import List, Tuple
 
 import numpy as np
 from scipy.ndimage import measurements
@@ -34,7 +33,7 @@ from scipy.special import logsumexp
 __all__ = ['beam_decoder', 'greedy_decoder', 'blank_threshold_decoder']
 
 
-def beam_decoder(outputs: np.ndarray, beam_size: int = 3) -> List[Tuple[int, int, int, float]]:
+def beam_decoder(outputs: np.ndarray, beam_size: int = 3) -> list[tuple[int, int, int, float]]:
     """
     Translates back the network output to a label sequence using
     same-prefix-merge beam search decoding as described in [0].
@@ -53,7 +52,7 @@ def beam_decoder(outputs: np.ndarray, beam_size: int = 3) -> List[Tuple[int, int
     """
     c, w = outputs.shape
     probs = np.log(outputs)
-    beam = [(tuple(), (0.0, float('-inf')))]  # type: List[Tuple[Tuple, Tuple[float, float]]]
+    beam = [(tuple(), (0.0, float('-inf')))]  # type: list[tuple[tuple, tuple[float, float]]]
 
     # loop over each time step
     for t in range(w):
@@ -98,7 +97,7 @@ def beam_decoder(outputs: np.ndarray, beam_size: int = 3) -> List[Tuple[int, int
     return [(c, start, end, max(outputs[c, start:end+1])) for (c, start, end) in beam[0][0]]
 
 
-def greedy_decoder(outputs: np.ndarray) -> List[Tuple[int, int, int, float]]:
+def greedy_decoder(outputs: np.ndarray) -> list[tuple[int, int, int, float]]:
     """
     Translates back the network output to a label sequence using greedy/best
     path decoding as described in [0].
@@ -125,7 +124,7 @@ def greedy_decoder(outputs: np.ndarray) -> List[Tuple[int, int, int, float]]:
     return classes
 
 
-def blank_threshold_decoder(outputs: np.ndarray, threshold: float = 0.5) -> List[Tuple[int, int, int, float]]:
+def blank_threshold_decoder(outputs: np.ndarray, threshold: float = 0.5) -> list[tuple[int, int, int, float]]:
     """
     Translates back the network output to a label sequence as the original
     ocropy/clstm.

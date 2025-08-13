@@ -17,8 +17,8 @@ Processing for baseline segmenter output
 """
 import logging
 from collections import defaultdict
-from typing import (TYPE_CHECKING, Dict, List, Literal, Optional, Sequence,
-                    Tuple, Union, TypeVar, Any, Generator)
+from typing import (TYPE_CHECKING, Dict, Literal, Optional, Sequence, Union,
+                    TypeVar, Any, Generator)
 
 import numpy as np
 import shapely.geometry as geom
@@ -84,7 +84,7 @@ class FastPiecewiseAffineTransform(PiecewiseAffineTransform):
         return result
 
 
-def reading_order(lines: Sequence[Tuple[slice, slice]], text_direction: Literal['lr', 'rl'] = 'lr') -> np.ndarray:
+def reading_order(lines: Sequence[tuple[slice, slice]], text_direction: Literal['lr', 'rl'] = 'lr') -> np.ndarray:
     """Given the list of lines (a list of 2D slices), computes
     the partial reading order.  The output is a binary 2D array
     such that order[i,j] is true if line i comes before line j
@@ -132,7 +132,7 @@ def reading_order(lines: Sequence[Tuple[slice, slice]], text_direction: Literal[
     return order
 
 
-def topsort(order: np.ndarray) -> List[int]:
+def topsort(order: np.ndarray) -> list[int]:
     """Given a binary array defining a partial order (o[i,j]==True means i<j),
     compute a topological sort.  This is a quick and dirty implementation
     that works for up to a few thousand elements."""
@@ -179,7 +179,7 @@ def boundary_tracing(region):
         region: object obtained with skimage.measure.regionprops().
 
     Returns:
-        List of coordinates of pixels in the boundary.
+        list of coordinates of pixels in the boundary.
     """
 
     # creating the binary image
@@ -397,7 +397,7 @@ def _rotate(image: _T_pil_or_np,
             scale: float,
             cval: int = 0,
             order: int = 0,
-            use_skimage_warp: bool = False) -> Tuple[AffineTransform, _T_pil_or_np]:
+            use_skimage_warp: bool = False) -> tuple[AffineTransform, _T_pil_or_np]:
     """
     Rotate an image at an angle with optional scaling
 
@@ -462,7 +462,7 @@ def line_regions(line, regions):
 
     Args:
         line (list): Polyline representing the line.
-        regions (list): List of region polygons
+        regions (list): list of region polygons
 
     Returns:
         A list of regions that contain the line mid-point.
@@ -685,10 +685,10 @@ def _calc_roi(line, bounds, baselines, suppl_obj, p_dir):
 
 
 def calculate_polygonal_environment(im: Image.Image = None,
-                                    baselines: Sequence[Sequence[Tuple[int, int]]] = None,
-                                    suppl_obj: Sequence[Sequence[Tuple[int, int]]] = None,
+                                    baselines: Sequence[Sequence[tuple[int, int]]] = None,
+                                    suppl_obj: Sequence[Sequence[tuple[int, int]]] = None,
                                     im_feats: np.ndarray = None,
-                                    scale: Tuple[int, int] = None,
+                                    scale: tuple[int, int] = None,
                                     topline: bool = False,
                                     raise_on_error: bool = False):
     """
@@ -697,8 +697,8 @@ def calculate_polygonal_environment(im: Image.Image = None,
 
     Args:
         im: grayscale input image (mode 'L')
-        baselines: List of lists containing a single baseline per entry.
-        suppl_obj: List of lists containing additional polylines that should be
+        baselines: list of lists containing a single baseline per entry.
+        suppl_obj: list of lists containing additional polylines that should be
                    considered hard boundaries for polygonizaton purposes. Can
                    be used to prevent polygonization into non-text areas such
                    as illustrations or to compute the polygonization of a
@@ -716,7 +716,7 @@ def calculate_polygonal_environment(im: Image.Image = None,
         raise_on_error: Raises error instead of logging them when they are
                         not-blocking
     Returns:
-        List of lists of coordinates. If no polygonization could be compute for
+        list of lists of coordinates. If no polygonization could be compute for
         a baseline `None` is returned instead.
     """
     if scale is not None and (scale[0] > 0 or scale[1] > 0):
@@ -790,8 +790,8 @@ def polygonal_reading_order(lines: Sequence[Dict],
     and applies it to the input.
 
     Args:
-        lines: List of tuples containing the baseline and its polygonization.
-        regions: List of region polygons.
+        lines: list of tuples containing the baseline and its polygonization.
+        regions: list of region polygons.
         text_direction: Set principal text direction for column ordering. Can
                         be 'lr' or 'rl'
 
@@ -861,7 +861,7 @@ def is_in_region(line: geom.LineString, region: geom.Polygon) -> bool:
 def neural_reading_order(lines: Sequence[Dict],
                          text_direction: str = 'lr',
                          regions: Optional[Sequence[geom.Polygon]] = None,
-                         im_size: Tuple[int, int] = None,
+                         im_size: tuple[int, int] = None,
                          model: 'TorchVGSLModel' = None,
                          class_mapping: Dict[str, int] = None) -> Sequence[int]:
     """
@@ -869,7 +869,7 @@ def neural_reading_order(lines: Sequence[Dict],
     and applies it to the input.
 
     Args:
-        lines: List of tuples containing the baseline and its polygonization.
+        lines: list of tuples containing the baseline and its polygonization.
         model: torch Module for
 
     Returns:
@@ -954,13 +954,13 @@ def _greedy_order_decoder(P):
     return torch.tensor(best_path)
 
 
-def scale_regions(regions: Sequence[Tuple[List[int], List[int]]],
-                  scale: Union[float, Tuple[float, float]]) -> Sequence[Tuple[List, List]]:
+def scale_regions(regions: Sequence[tuple[list[int], list[int]]],
+                  scale: Union[float, tuple[float, float]]) -> Sequence[tuple[list, list]]:
     """
     Scales baselines/polygon coordinates by a certain factor.
 
     Args:
-        lines: List of tuples containing the baseline and its polygonization.
+        lines: list of tuples containing the baseline and its polygonization.
         scale: Scaling factor
     """
     if isinstance(scale, float):
@@ -971,12 +971,12 @@ def scale_regions(regions: Sequence[Tuple[List[int], List[int]]],
     return scaled_regions
 
 
-def scale_polygonal_lines(lines: Sequence[Tuple[List, List]], scale: Union[float, Tuple[float, float]]) -> Sequence[Tuple[List, List]]:
+def scale_polygonal_lines(lines: Sequence[tuple[list, list]], scale: Union[float, tuple[float, float]]) -> Sequence[tuple[list, list]]:
     """
     Scales baselines/polygon coordinates by a certain factor.
 
     Args:
-        lines: List of tuples containing the baseline and its polygonization.
+        lines: list of tuples containing the baseline and its polygonization.
         scale: Scaling factor
     """
     if isinstance(scale, float):
@@ -1007,10 +1007,10 @@ def _test_intersect(bp, uv, bs):
     return np.array(points)
 
 
-def compute_polygon_section(baseline: Sequence[Tuple[int, int]],
-                            boundary: Sequence[Tuple[int, int]],
+def compute_polygon_section(baseline: Sequence[tuple[int, int]],
+                            boundary: Sequence[tuple[int, int]],
                             dist1: int,
-                            dist2: int) -> Tuple[Tuple[int, int]]:
+                            dist2: int) -> tuple[tuple[int, int]]:
     """
     Given a baseline, polygonal boundary, and two points on the baseline return
     the rectangle formed by the orthogonal cuts on that baseline segment. The
@@ -1080,8 +1080,8 @@ def compute_polygon_section(baseline: Sequence[Tuple[int, int]],
 
 
 def _bevelled_warping_envelope(baseline: np.ndarray,
-                               output_bl_start: Tuple[float, float],
-                               output_shape: Tuple[int, int]) -> Tuple[List[Tuple[int, int]], List[Tuple[int, int]]]:
+                               output_bl_start: tuple[float, float],
+                               output_shape: tuple[int, int]) -> tuple[list[tuple[int, int]], list[tuple[int, int]]]:
     """
     Calculates the source and target envelope for a piecewise affine transform
     """
@@ -1143,7 +1143,7 @@ def _bevelled_warping_envelope(baseline: np.ndarray,
     return source_envelope, target_envelope
 
 
-def make_polygonal_mask(polygon: np.ndarray, shape: Tuple[int, int]) -> Image.Image:
+def make_polygonal_mask(polygon: np.ndarray, shape: tuple[int, int]) -> Image.Image:
     """
     Creates a mask from a polygon.
 
@@ -1171,7 +1171,7 @@ def apply_polygonal_mask(img: Image.Image, polygon: np.ndarray, cval: int = 0) -
 
 def extract_polygons(im: Image.Image,
                      bounds: "Segmentation",
-                     legacy: bool = False) -> Generator[Tuple[Image.Image, Union["BBoxLine", "BaselineLine"],], None, None]:
+                     legacy: bool = False) -> Generator[tuple[Image.Image, Union["BBoxLine", "BaselineLine"],], None, None]:
     """
     Yields the subimages of image im defined in the list of bounding polygons
     with baselines preserving order.

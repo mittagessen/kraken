@@ -23,7 +23,7 @@ import tempfile
 from collections import Counter
 from functools import partial
 from multiprocessing import Pool
-from typing import TYPE_CHECKING, Literal, Callable, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Literal, Callable, Optional, Union
 
 import numpy as np
 import pyarrow as pa
@@ -105,12 +105,12 @@ def parse_path(path: Union[str, 'PathLike'],
     return {'image': path, 'lines': [{'text': gt}]}
 
 
-def build_binary_dataset(files: Optional[List[Union[str, 'PathLike', 'Segmentation']]] = None,
+def build_binary_dataset(files: Optional[list[Union[str, 'PathLike', 'Segmentation']]] = None,
                          output_file: Union[str, 'PathLike'] = None,
                          format_type: Literal['xml', 'alto', 'page', None] = 'xml',
                          num_workers: int = 0,
                          ignore_splits: bool = False,
-                         random_split: Optional[Tuple[float, float, float]] = None,
+                         random_split: Optional[tuple[float, float, float]] = None,
                          force_type: Optional[str] = None,
                          recordbatch_size: int = 100,
                          skip_empty_lines: bool = True,
@@ -121,7 +121,7 @@ def build_binary_dataset(files: Optional[List[Union[str, 'PathLike', 'Segmentati
     binary dataset.
 
     Args:
-        files: List of XML input files or Segmentation container objects.
+        files: list of XML input files or Segmentation container objects.
         output_file: Path to the output file.
         format_type: One of `xml`, `alto`, `page`, `path`, or None. In `None`
                      mode, the files argument is expected to be a list of
