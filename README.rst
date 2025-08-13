@@ -23,26 +23,51 @@ kraken's main features are:
 Installation
 ============
 
-kraken only runs on **Linux or Mac OS X**. Windows is not supported.
+Kraken can be run on Linux or Mac OS X (both x64 and ARM). Installation is
+through the on-board *pip* utility. To not pollute the global state of your
+distribution's package manager it is recommended to use virtual environments.
+If you do not have a setup or do not wish to handle virtual environments
+yourself you can use `pipx`.
 
-The latest stable releases can be installed from `PyPi <https://pypi.org>`_:
+.. code-block:: console
 
-::
+   $ sudo apt install pipx
+   $ pipx install kraken
+
+kraken works both on Linux and Mac OS X and with any python interpreter between
+3.9 and 3.11. It is possible the installation fails because `pipx` defaults to
+an unsupported interpreter version. In that case you need to install a
+compatible interpreter version such as 3.11 and then specify this version
+explicitly:
+
+.. code-block:: console
+
+   $ sudo apt install python3.11-full
+   $ pipx install --python python3.11 kraken
+
+
+Installation using pip
+----------------------
+
+Create and activate a separate virtual environment using whatever tool you
+like.
+
+.. code-block:: console
 
   $ pip install kraken
+
+or by running pip in the git repository:
+
+.. code-block:: console
+
+  $ pip install .
 
 If you want direct PDF and multi-image TIFF/JPEG2000 support it is necessary to
 install the `pdf` extras package for PyPi:
 
-::
+.. code-block:: console
 
-  $ pip install kraken[pdf]
-
-or install `pyvips` manually with pip:
-
-::
-
-  $ pip install pyvips
+   $ pip install kraken[pdf]
 
 Finally you'll have to scrounge up a model to do the actual recognition of
 characters. To download the default model for printed French text and place it
