@@ -112,7 +112,7 @@ class TorchSeqRecognizer(object):
         o, olens = self.nn.nn(line, lens)
         if o.size(2) != 1:
             raise KrakenInputException('Expected dimension 3 to be 1, actual {}'.format(o.size()))
-        o = (o/self.temperature).softmax(0)
+        o = (o/self.temperature).softmax(1)
         self.outputs = o.detach().squeeze(2).float().cpu().numpy()
         if olens is not None:
             olens = olens.cpu().numpy()
