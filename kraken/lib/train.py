@@ -491,7 +491,7 @@ class RecognitionModel(L.LightningModule):
             o = self.net(input)
 
         seq_lens = o[1]
-        output = o[0]
+        output = o[0].log_softmax(1)
         target_lens = target[1]
         target = target[0]
         # height should be 1 by now
