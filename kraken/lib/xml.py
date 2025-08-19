@@ -708,17 +708,20 @@ class XMLPage(object):
         if tagrefs is not None:
             for tagref in tagrefs.split():
                 tref, tag_type, tag_label = tag_map.get(tagref, (None, None, None))
+                if not tag_type and not tag_label:
+                    continue
+                elif not tag_type and tag_label:
+                    tag_type = 'type'
                 tag_label = [{'type': tag_label}]
-                if all((tag_type, tag_label)):
-                    self._tag_set.add(tag_label[0]['type'])
-                    tag_val = tags.pop(tag_type, None)
-                    if isinstance(tag_val, list):
-                        tag_val.extend(tag_label)
-                    elif tag_val is not None:
-                        tag_val = [tag_val] + tag_label
-                    else:
-                        tag_val = tag_label
-                    tags[tag_type] = tag_val
+                self._tag_set.add(tag_label[0]['type'])
+                tag_val = tags.pop(tag_type, None)
+                if isinstance(tag_val, list):
+                    tag_val.extend(tag_label)
+                elif tag_val is not None:
+                    tag_val = [tag_val] + tag_label
+                else:
+                    tag_val = tag_label
+                tags[tag_type] = tag_val
         # set default values
         for k, v in kwargs.items():
             if k not in tags:
@@ -727,8 +730,8 @@ class XMLPage(object):
 
     def _parse_alto_langs(self,
                           el,
-                          tag_map: Dict[str, str],
-                          default_lang: Optional[List[str]] = None):
+                          tag_map: dict[str, str],
+                          default_lang: Optional[list[str]] = None):
         el_langs = []
         tags = self._parse_alto_tagrefs(tag_map, el.get('TAGREFS'))
         if (tag_langs := tags.get('language')) is not None:
@@ -741,6 +744,7 @@ class XMLPage(object):
 
         if not len(el_langs):
             return default_lang
+
         return el_langs
 
     def __str__(self):

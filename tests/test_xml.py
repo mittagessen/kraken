@@ -114,8 +114,11 @@ class TestXMLParser(unittest.TestCase):
                                      ['deu', 'heb'], ['deu', 'heb'], ['eng'],
                                      ['deu', 'heb'], ['hbo'], ['hbo'], ['hbo'],
                                      ['deu', 'eng'], ['hbo']])
-        reg_langs = [x.language for x in seg.regions['text']]
-        self.assertEqual(reg_langs, [['deu', 'heb'], ['hbo'], ['hbo'], ['hbo'], ['hbo']])
+        for k, langs in [('Main', [['deu', 'heb']]),
+                         ('Paratext', [['hbo'], ['hbo'], ['hbo']]),
+                         ('Margin', [['hbo']])]:
+            self.assertEqual([x.language for x in seg.regions[k]],
+                             langs)
 
     def test_alto_fallback_region_boundaries(self):
         """
