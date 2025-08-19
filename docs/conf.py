@@ -7,7 +7,7 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = 'kraken'
-copyright = '2015-2024, Benjamin Kiessling'
+copyright = '2015-2025, Benjamin Kiessling'
 author = 'Benjamin Kiessling'
 
 from subprocess import Popen, PIPE
