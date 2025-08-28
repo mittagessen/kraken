@@ -185,7 +185,8 @@ def segmenter(legacy, models, text_direction, scale, maxcolseps, black_colseps,
     message('\u2713', fg='green')
 
 
-def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore, input, output) -> None:
+def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore,
+               input, output) -> None:
 
     import dataclasses
     import json
@@ -615,6 +616,7 @@ def _validate_mm(ctx, param, value):
               'documentation for more information about tag handling.')
 @click.option('-p', '--pad', show_default=True, type=click.INT, default=16, help='Left and right '
               'padding around lines')
+@click.option('-t', '--temperature', show_default=True, type=click.FLOAT, default=1.0, help='Softmax temperature')
 @click.option('-n', '--reorder/--no-reorder', show_default=True, default=True,
               help='Reorder code points to logical order')
 @click.option('--base-dir', show_default=True, default='auto',
@@ -628,7 +630,8 @@ def _validate_mm(ctx, param, value):
               show_default=True,
               type=click.Choice(['horizontal-tb', 'vertical-lr', 'vertical-rl']),
               help='Sets principal text direction in serialization output')
-def ocr(ctx, model, pad, reorder, base_dir, no_segmentation, text_direction):
+def ocr(ctx, model, pad, temperature, reorder, base_dir, no_segmentation,
+        text_direction):
     """
     Recognizes text in line images.
     """
@@ -659,6 +662,7 @@ def ocr(ctx, model, pad, reorder, base_dir, no_segmentation, text_direction):
         message(f'Loading ANN {v}\t', nl=False)
         try:
             rnn = models.load_any(location, device=ctx.meta['device'])
+            rnn.temperature = temperature
             nm[k] = rnn
         except Exception:
             if ctx.meta['raise_failed']:

@@ -2,7 +2,7 @@
 Layers for VGSL models
 """
 import logging
-from typing import Iterable, List, Optional, Tuple
+from typing import Iterable, Optional
 
 import numpy as np
 import torch
@@ -27,7 +27,7 @@ class MultiParamSequential(Sequential):
     Sequential variant accepting multiple arguments.
     """
 
-    def forward(self, *inputs, output_shape: Optional[Tuple[int, int]] = None):
+    def forward(self, *inputs, output_shape: Optional[tuple[int, int]] = None):
         modules = self._modules.values()
         i = 0
         for module in modules:
@@ -43,7 +43,7 @@ class MultiParamParallel(Module):
     """
     Parallel module.
     """
-    def forward(self, *inputs, output_shape: Optional[Tuple[int, int]] = None):
+    def forward(self, *inputs, output_shape: Optional[tuple[int, int]] = None):
         outputs = []
         seq_lens = None
         for module in self._modules.values():
@@ -58,12 +58,12 @@ class MultiParamParallel(Module):
 
 
 def PeepholeLSTMCell(input: torch.Tensor,
-                     hidden: Tuple[torch.Tensor, torch.Tensor],
+                     hidden: tuple[torch.Tensor, torch.Tensor],
                      w_ih: torch.Tensor,
                      w_hh: torch.Tensor,
                      w_ip: torch.Tensor,
                      w_fp: torch.Tensor,
-                     w_op: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+                     w_op: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
     """
     An LSTM cell with peephole connections without biases.
 
@@ -136,7 +136,7 @@ class PeepholeBidiLSTM(Module):
 
         self.input_size = input_size
         self.hidden_size = hidden_size
-        self._all_weights: List[List[str]] = []
+        self._all_weights: list[list[str]] = []
         gate_size = 4 * hidden_size
         for direction in range(2):
             w_ih = torch.nn.Parameter(torch.Tensor(gate_size, input_size))
@@ -156,7 +156,7 @@ class PeepholeBidiLSTM(Module):
                 setattr(self, name, param)
             self._all_weights.append(param_names)
 
-    def forward(self, input: torch.Tensor, output_shape: Optional[List[int]] = None) -> torch.Tensor:
+    def forward(self, input: torch.Tensor, output_shape: Optional[list[int]] = None) -> torch.Tensor:
         layer = (Recurrent(PeepholeLSTMCell), Recurrent(PeepholeLSTMCell, reverse=True))
         func = StackedRNN(layer, 1, 2)
         input = input.transpose(0, 1)
@@ -191,13 +191,13 @@ class Addition(Module):
     def forward(self,
                 inputs: torch.Tensor,
                 seq_len: Optional[torch.Tensor] = None,
-                output_shape: Optional[List[int]] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+                output_shape: Optional[list[int]] = None) -> tuple[torch.Tensor, Optional[torch.Tensor]]:
         out = inputs.unfold(self.dim, self.chunk_size, self.chunk_size)
         out = out.sum(self.dim, keepdim=True)
         out = out.transpose(-1, self.dim).squeeze(-1)
         return out, seq_len
 
-    def get_shape(self, input: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
+    def get_shape(self, input: tuple[int, int, int, int]) -> tuple[int, int, int, int]:
         """
         Calculates the output shape from input 4D tuple NCHW.
         """
@@ -244,10 +244,10 @@ class Identity(Module):
     def forward(self,
                 inputs: torch.Tensor,
                 seq_len: Optional[torch.Tensor] = None,
-                output_shape: Optional[Tuple[int, int]] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+                output_shape: Optional[tuple[int, int]] = None) -> tuple[torch.Tensor, Optional[torch.Tensor]]:
         return inputs, seq_len
 
-    def get_shape(self, input: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
+    def get_shape(self, input: tuple[int, int, int, int]) -> tuple[int, int, int, int]:
         self.output_shape = input
         return input
 
@@ -299,7 +299,7 @@ class Reshape(Module):
     def forward(self,
                 input: torch.Tensor,
                 seq_len: Optional[torch.Tensor] = None,
-                output_shape: Optional[Tuple[int, int]] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+                output_shape: Optional[tuple[int, int]] = None) -> tuple[torch.Tensor, Optional[torch.Tensor]]:
         initial_len = input.shape[3]
         # split dimension src_dim into part_a x part_b
         input = input.reshape(input.shape[:self.src_dim] + (self.part_a, self.part_b) + input.shape[self.src_dim + 1:])
@@ -320,7 +320,7 @@ class Reshape(Module):
             seq_len = (seq_len * (float(initial_len)/o.shape[3])).int()
         return o, seq_len
 
-    def get_shape(self, input: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
+    def get_shape(self, input: tuple[int, int, int, int]) -> tuple[int, int, int, int]:
         input_shape = torch.zeros([x if x else 1 for x in input])
         with torch.no_grad():
             o, _ = self.forward(input_shape)
@@ -355,7 +355,7 @@ class MaxPool(Module):
     A simple wrapper for MaxPool layers
     """
 
-    def __init__(self, kernel_size: Tuple[int, int], stride: Tuple[int, int]) -> None:
+    def __init__(self, kernel_size: tuple[int, int], stride: tuple[int, int]) -> None:
         """
         A wrapper around MaxPool layers with serialization and layer arithmetic.
         """
@@ -367,13 +367,13 @@ class MaxPool(Module):
     def forward(self,
                 inputs: torch.Tensor,
                 seq_len: Optional[torch.Tensor] = None,
-                output_shape: Optional[Tuple[int, int]] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+                output_shape: Optional[tuple[int, int]] = None) -> tuple[torch.Tensor, Optional[torch.Tensor]]:
         o = self.layer(inputs)
         if seq_len is not None:
             seq_len = torch.floor((seq_len-(self.kernel_size[1]-1)-1).float()/self.stride[1]+1).int()
         return o, seq_len
 
-    def get_shape(self, input: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
+    def get_shape(self, input: tuple[int, int, int, int]) -> tuple[int, int, int, int]:
         self.output_shape = (input[0],
                              input[1],
                              int(np.floor((input[2]-(self.kernel_size[0]-1)-1)/self.stride[0]+1) if input[2] != 0 else 0),
@@ -419,10 +419,10 @@ class Dropout(Module):
     def forward(self,
                 inputs: torch.Tensor,
                 seq_len: Optional[torch.Tensor] = None,
-                output_shape: Optional[Tuple[int, int]] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+                output_shape: Optional[tuple[int, int]] = None) -> tuple[torch.Tensor, Optional[torch.Tensor]]:
         return self.layer(inputs), seq_len
 
-    def get_shape(self, input: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
+    def get_shape(self, input: tuple[int, int, int, int]) -> tuple[int, int, int, int]:
         self.output_shape = input
         return input
 
@@ -464,10 +464,11 @@ class TransposedSummarizingRNN(Module):
         Args:
             input_size:
             hidden_size:
-            direction (str):
-            transpose (bool): Transpose width/height dimension
-            summarize (bool): Only return the last time step.
-            legacy (str): Set to `clstm` for clstm rnns and `ocropy` for ocropus models.
+            direction: Enables bidirectional ('b') or unidirectional mode (any
+                       other value).
+            transpose: Transpose width/height dimension
+            summarize: Only return the last time step.
+            legacy: Set to `clstm` for clstm rnns and `ocropy` for ocropus models.
 
         Shape:
             - Inputs: :math:`(N, C, H, W)` where `N` batches, `C` channels, `H`
@@ -498,7 +499,7 @@ class TransposedSummarizingRNN(Module):
     def forward(self,
                 inputs: torch.Tensor,
                 seq_len: Optional[torch.Tensor] = None,
-                output_shape: Optional[Tuple[int, int]] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+                output_shape: Optional[tuple[int, int]] = None) -> tuple[torch.Tensor, Optional[torch.Tensor]]:
         # NCHW -> HNWC
         inputs = inputs.permute(2, 0, 3, 1)
         if self.transpose:
@@ -531,7 +532,7 @@ class TransposedSummarizingRNN(Module):
             raise Exception('Do not use summarizing layer in x-axis with batching/sequences')
         return o.permute(1, 3, 0, 2), seq_len
 
-    def get_shape(self, input: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
+    def get_shape(self, input: tuple[int, int, int, int]) -> tuple[int, int, int, int]:
         """
         Calculates the output shape from input 4D tuple (batch, channel, input_size, seq_len).
         """
@@ -667,13 +668,16 @@ class LinSoftmax(Module):
     A wrapper for linear projection + softmax dealing with dimensionality mangling.
     """
 
-    def __init__(self, input_size: int, output_size: int, augmentation: bool = False) -> None:
+    def __init__(self,
+                 input_size: int,
+                 output_size: int,
+                 augmentation: bool = False) -> None:
         """
 
         Args:
             input_size: Number of inputs in the feature dimension
             output_size: Number of outputs in the feature dimension
-            augmentation (bool): Enables 1-augmentation of input vectors
+            augmentation: Enables 1-augmentation of input vectors
 
         Shape:
             - Inputs: :math:`(N, C, H, W)` where `N` batches, `C` channels, `H`
@@ -693,7 +697,7 @@ class LinSoftmax(Module):
     def forward(self,
                 inputs: torch.Tensor,
                 seq_len: Optional[torch.Tensor] = None,
-                output_shape: Optional[Tuple[int, int]] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+                output_shape: Optional[tuple[int, int]] = None) -> tuple[torch.Tensor, Optional[torch.Tensor]]:
         # move features (C) to last dimension for linear activation
         # NCHW -> NWHC
         inputs = inputs.transpose(1, 3)
@@ -701,15 +705,10 @@ class LinSoftmax(Module):
         if self.augmentation:
             inputs = torch.cat([torch.ones(inputs.shape[:3] + (1,)), inputs], dim=3)
         o = self.lin(inputs)
-        # switch between log softmax (needed by ctc) and regular (for inference).
-        if not self.training:
-            o = F.softmax(o, dim=3)
-        else:
-            o = F.log_softmax(o, dim=3)
         # and swap again
         return o.transpose(1, 3), seq_len
 
-    def get_shape(self, input: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
+    def get_shape(self, input: tuple[int, int, int, int]) -> tuple[int, int, int, int]:
         """
         Calculates the output shape from input 4D tuple NCHW.
         """
@@ -750,7 +749,7 @@ class LinSoftmax(Module):
 
         Args:
             output_size (int): Desired output size after resizing
-            del_indices (list): List of connection to outputs to remove.
+            del_indices (list): list of connection to outputs to remove.
         """
         if not del_indices:
             del_indices = []
@@ -777,10 +776,10 @@ class ActConv2D(Module):
     def __init__(self,
                  in_channels: int,
                  out_channels: int,
-                 kernel_size: Tuple[int, int],
-                 stride: Tuple[int, int],
+                 kernel_size: tuple[int, int],
+                 stride: tuple[int, int],
                  nl: str = 'l',
-                 dilation: Tuple[int, int] = (1, 1),
+                 dilation: tuple[int, int] = (1, 1),
                  transposed: bool = False) -> None:
         super().__init__()
         self.in_channels = in_channels
@@ -828,7 +827,7 @@ class ActConv2D(Module):
     def forward(self,
                 inputs: torch.Tensor,
                 seq_len: Optional[torch.Tensor] = None,
-                output_shape: Optional[Tuple[int, int]] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+                output_shape: Optional[tuple[int, int]] = None) -> tuple[torch.Tensor, Optional[torch.Tensor]]:
         if self.transposed:
             o = self.co(inputs, output_size=output_shape)
         else:
@@ -849,7 +848,7 @@ class ActConv2D(Module):
                     (seq_len+2*self.padding[1]-self.dilation[1]*(self.kernel_size[1]-1)-1).float()/self.stride[1]+1), min=1).int()
         return o, seq_len
 
-    def get_shape(self, input: Tuple[int, int, int, int], target_shape: Optional[Tuple[int, int, int, int]] = None) -> Tuple[int, int, int, int]:
+    def get_shape(self, input: tuple[int, int, int, int], target_shape: Optional[tuple[int, int, int, int]] = None) -> tuple[int, int, int, int]:
         if self.transposed:
             """ For transposed convolution, there is some flexibility. """
             min_y = int((input[2] - 1) * self.stride[0] - 2 * self.padding[0] + self.dilation[0] * (self.kernel_size[0] - 1) + 1 if input[2] != 0 else 0)
@@ -921,8 +920,8 @@ class ActConv2D(Module):
         resizes both tensors to a new output size.
 
         Args:
-            output_size (int): Desired output dimensionality after resizing
-            del_indices (list): List of connection to outputs to remove.
+            output_size: Desired output dimensionality after resizing
+            del_indices: list of connection to outputs to remove.
         """
         if not del_indices:
             del_indices = []
@@ -961,14 +960,14 @@ class GroupNorm(Module):
     def forward(self,
                 inputs: torch.Tensor,
                 seq_len: Optional[torch.Tensor],
-                output_shape: Optional[Tuple[int, int]] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+                output_shape: Optional[tuple[int, int]] = None) -> tuple[torch.Tensor, Optional[torch.Tensor]]:
         t = inputs.dtype
         # XXX: verify that pytorch AMP casts the inputs to float32 correctly at
         # some point.
         o = self.layer(inputs.type(torch.float32))
         return o.type(t), seq_len
 
-    def get_shape(self, input: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
+    def get_shape(self, input: tuple[int, int, int, int]) -> tuple[int, int, int, int]:
         self.output_shape = input
         return self.output_shape  # type: ignore
 
