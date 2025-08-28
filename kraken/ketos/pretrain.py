@@ -174,12 +174,6 @@ def pretrain(ctx, batch_size, pad, output, spec, load, freq, quit, epochs,
     if not (0 <= freq <= 1) and freq % 1.0 != 0:
         raise click.BadOptionUsage('freq', 'freq needs to be either in the interval [0,1.0] or a positive integer.')
 
-    if augment:
-        try:
-            import albumentations  # NOQA
-        except ImportError:
-            raise click.BadOptionUsage('augment', 'augmentation needs the `albumentations` package installed.')
-
     import shutil
 
     from threadpoolctl import threadpool_limits

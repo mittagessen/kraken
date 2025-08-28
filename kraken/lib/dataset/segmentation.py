@@ -112,13 +112,6 @@ class BaselineSet(Dataset):
 
         self.aug = None
         if augmentation:
-            import cv2
-            cv2.setNumThreads(0)
-            from albumentations import (Blur, Compose, ElasticTransform,
-                                        HueSaturationValue, MedianBlur,
-                                        MotionBlur, OneOf, OpticalDistortion,
-                                        ShiftScaleRotate, ToFloat)
-
             self.aug = Compose([
                                 ToFloat(),
                                 OneOf([
