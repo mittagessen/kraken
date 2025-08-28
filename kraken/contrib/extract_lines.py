@@ -52,7 +52,7 @@ def cli(format_type, model, legacy_polygons, files):
                     metadata = json.loads(raw_metadata[b'lines'])
                     for idx in range(metadata['counts']['all']):
                         sample = ds_table.column('lines')[idx].as_py()
-                        im = Image.open(io.BytesIO(sample['im']))
+                        im = Image.open(io.BytesIO(sample['im'])).convert('RGB')
                         im.save('{}.{}.jpg'.format(splitext(doc)[0], idx))
                         with open('{}.{}.gt.txt'.format(splitext(doc)[0], idx), 'w') as fp:
                             fp.write(sample['text'])
