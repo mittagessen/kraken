@@ -44,7 +44,7 @@ Training data formats
 ---------------------
 
 Recognition training supports the XML formats described in the :ref:`data
-format <formats>` section, compiled binary dataset files created from XML
+format <ketos_format>` section, compiled binary dataset files created from XML
 files, and a legacy format of line strip images with separate transcription
 text files. For performance reasons it is recommended to use binary datasets
 whenever possible.
@@ -382,6 +382,8 @@ with `sample.codec` containing:
 
 Unsupervised recognition pretraining
 ------------------------------------
+
+.. _pretrain:
 
 Text recognition models can be pretrained in an unsupervised fashion from text
 line images, both in bounding box and baseline format. The pretraining is

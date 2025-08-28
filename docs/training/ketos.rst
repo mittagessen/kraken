@@ -13,6 +13,12 @@ There are currently three trainable components in the kraken processing pipeline
 * :ref:`Reading Order <rotrain>`: ordering lines found in the previous segmentation step. Reading order models are closely linked to segmentation models and both are usually trained on the same dataset.
 * :ref:`Recognition <rectrain>`: recognition models transform images of lines into text.
 
+Related to recognition training are various ways to reduce training data
+requirements:
+
+* :ref:`Synthetic training data <ketos_synth>`: rendering synthetic training data from digital texts and typefaces.
+* :ref:`Semi-supervised pretraining <pretrain>`: pretraining the weights of a recognition model from segmented pages without transcription.
+
 Depending on the use case it is not necessary to manually train new models for
 each material. The default segmentation model works well on quite a variety of
 handwritten and printed documents, a reading order model might not perform
@@ -118,7 +124,6 @@ compile time:
 .. code-block:: console
 
    $ ketos compile --random-split 0.8 0.1 0.1 ...
-
 
 The above line splits assigns 80% of the source lines to the training set, 10%
 to the validation set, and 10% to the test set. The training and validation
