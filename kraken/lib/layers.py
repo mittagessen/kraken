@@ -665,7 +665,7 @@ class TransposedSummarizingRNN(Module):
 
 class LinSoftmax(Module):
     """
-    A wrapper for linear projection + softmax dealing with dimensionality mangling.
+    A wrapper for linear projection with dimensionality mangling.
     """
 
     def __init__(self,
@@ -731,12 +731,10 @@ class LinSoftmax(Module):
         Serializes the module using a NeuralNetworkBuilder.
         """
         lin_name = '{}_lin'.format(name)
-        softmax_name = '{}_softmax'.format(name)
         builder.add_inner_product(lin_name, self.lin.weight.data.numpy(),
                                   self.lin.bias.data.numpy(),
                                   self.input_size, self.output_size,
                                   has_bias=True, input_name=input, output_name=lin_name)
-        builder.add_softmax(softmax_name, lin_name, name)
         return name
 
     def resize(self, output_size: int, del_indices: Optional[Iterable[int]] = None) -> None:

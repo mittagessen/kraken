@@ -110,22 +110,6 @@ class TestLayers(unittest.TestCase):
         o = lin(torch.randn(1, 20, 12, 24))
         self.assertEqual(o[0].shape, (1, 10, 12, 24))
 
-    def test_linsoftmax_train(self):
-        """
-        Test function of linear layer in training mode (log_softmax)
-        """
-        lin = layers.LinSoftmax(20, 10).train()
-        o = lin(torch.randn(1, 20, 12, 24))
-        self.assertLess(o[0].max(), 0)
-
-    def test_linsoftmax_test(self):
-        """
-        Test function of linear layer in eval mode (softmax)
-        """
-        lin = layers.LinSoftmax(20, 10).eval()
-        o = lin(torch.randn(1, 20, 12, 24))
-        self.assertGreaterEqual(o[0].min(), 0)
-
     def test_linsoftmax_aug(self):
         """
         Test basic function of linear layer with 1-augmentation.
@@ -133,22 +117,6 @@ class TestLayers(unittest.TestCase):
         lin = layers.LinSoftmax(20, 10, True)
         o = lin(torch.randn(1, 20, 12, 24))
         self.assertEqual(o[0].shape, (1, 10, 12, 24))
-
-    def test_linsoftmax_aug_train(self):
-        """
-        Test function of linear layer in training mode (log_softmax) with 1-augmentation
-        """
-        lin = layers.LinSoftmax(20, 10, True).train()
-        o = lin(torch.randn(1, 20, 12, 24))
-        self.assertLess(o[0].max(), 0)
-
-    def test_linsoftmax_aug_test(self):
-        """
-        Test function of linear layer in eval mode (softmax) with 1-augmentation
-        """
-        lin = layers.LinSoftmax(20, 10, True).eval()
-        o = lin(torch.randn(1, 20, 12, 24))
-        self.assertGreaterEqual(o[0].min(), 0)
 
     def test_actconv2d_lin(self):
         """
