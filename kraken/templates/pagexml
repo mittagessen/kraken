@@ -2,7 +2,6 @@
             <TextLine id="{{ line.id }}"
                       {%- if line.tags %} custom="{% set items = [] -%}
                           {%- for k, v in line.tags | dictsort -%}
-                            {%- if k != 'type' -%}
                               {%- for tag in v -%}
                                 {% set tag_str = [k ~ ' {'] %}
                                 {%- for tk, tv in tag.items() -%}
@@ -11,7 +10,6 @@
                                 {% set _ = tag_str.append('}') %}
                                 {% set _ = items.append(tag_str|join()) %}
                               {%- endfor -%}
-                            {%- endif -%}
                           {%- endfor -%}
                           {{ items | join(' ') }}"
                       {%- endif -%}
@@ -61,7 +59,6 @@
         <TextRegion id="{{ entity.id }}"
                     {%- if entity.tags %} custom="{% set items = [] -%}
                     {%- for k, v in entity.tags | dictsort -%}
-                      {%- if k != 'type' -%}
                         {%- for tag in v -%}
                           {% set tag_str = [k ~ ' {'] %}
                           {%- for tk, tv in tag.items() -%}
@@ -70,7 +67,6 @@
                           {% set _ = tag_str.append('}') %}
                           {% set _ = items.append(tag_str|join()) %}
                         {%- endfor -%}
-                      {%- endif -%}
                     {%- endfor -%}
                     {{ items | join(' ') }}"
                     {%- endif -%}

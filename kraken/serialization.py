@@ -126,26 +126,16 @@ def serialize(results: 'Segmentation',
     char_idx = 0
 
     # build region and line type dict
-    def _get_type(tags: Dict) -> str:
-        ot = tags.get('type')
-        if isinstance(ot, str):
-            return ot
-        elif isinstance(ot, dict) and (tt := ot.get('type')) is not None:
-            return tt
-        else:
-            return 'default'
-
     types = []
-    languages = []
     for line in results.lines:
         if line.tags is not None:
-            types.append(_get_type(line.tags))
-        if line.language:
-            languages.extend(languages)
-
-    page['line_types'] = list(set(types))
-    page['languages'] = list(set(languages))
-    page['region_types'] = list(results.regions.keys())
+            for k, v in line.tags.items():
+                types.extend((k, t['type']) for t in v if 'type' in t)
+    for regs in results.regions.values():
+        for reg in regs:
+            if reg.tags is not None:
+                for k, v in reg.tags.items():
+                    types.extend((k, t['type']) for t in v if 'type' in t)
 
     page['typology'] = list(set(types))
 
