@@ -36,6 +36,8 @@ jobs:
     name: Build and publish Python 🐍 distributions 📦 to PyPI and TestPyPI
     needs: lint_and_test
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
     if: startsWith(github.ref, 'refs/tags/')
 
     steps:
