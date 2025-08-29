@@ -139,7 +139,7 @@ def serialize(results: 'Segmentation',
     languages = []
     for line in results.lines:
         if line.tags is not None:
-            types.append(_get_type(tags))
+            types.append(_get_type(line.tags))
         if line.language:
             languages.extend(languages)
 
