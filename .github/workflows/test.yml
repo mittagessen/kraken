@@ -53,7 +53,7 @@ jobs:
     - name: Publish a Python distribution to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
     - name: Upload PyPI artifacts to GH storage
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: pypi_packages
         path: dist/*
