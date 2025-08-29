@@ -30,7 +30,6 @@ from kraken.ketos.util import (_expand_gt, _validate_manifests, message,
 from kraken.lib.register import OPTIMIZERS, SCHEDULERS, STOPPERS
 from kraken.lib.default_specs import (SEGMENTATION_HYPER_PARAMS,
                                       SEGMENTATION_SPEC)
-from kraken.lib.exceptions import KrakenInputException
 
 logging.captureWarnings(True)
 logger = logging.getLogger('kraken')

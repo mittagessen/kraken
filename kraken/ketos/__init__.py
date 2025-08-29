@@ -29,13 +29,11 @@ from kraken.lib import log
 from kraken.lib.register import PRECISIONS
 
 from .dataset import compile
-from .linegen import line_generator
 from .pretrain import pretrain
 from .recognition import test, train
 from .repo import publish
 from .ro import roadd, rotrain
 from .segmentation import segtest, segtrain
-from .transcription import extract, transcription
 
 logging.captureWarnings(True)
 logger = logging.getLogger('kraken')
@@ -93,11 +91,6 @@ cli.add_command(segtest)
 cli.add_command(publish)
 cli.add_command(rotrain)
 cli.add_command(roadd)
-
-# deprecated commands
-cli.add_command(line_generator)
-cli.add_command(extract)
-cli.add_command(transcription)
 
 if __name__ == '__main__':
     cli()
