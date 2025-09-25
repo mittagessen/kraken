@@ -156,7 +156,7 @@ def vec_regions(heatmap: torch.Tensor, cls_map: Dict, scale: float, **kwargs) ->
         logger.debug(f'Vectorizing regions of type {region_type}')
         regions[region_type] = vectorize_regions(heatmap[idx])
     for reg_type, regs in regions.items():
-        regions[reg_type] = [Region(id=f'_{uuid.uuid4()}', boundary=x, tags={'type': reg_type}) for x in scale_regions(regs, scale)]
+        regions[reg_type] = [Region(id=f'_{uuid.uuid4()}', boundary=x, tags={'type': [{'type': reg_type}]}) for x in scale_regions(regs, scale)]
     return regions
 
 
