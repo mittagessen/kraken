@@ -269,7 +269,7 @@ To OCR an image using the previously downloaded model and output a plain text fi
 
 .. code-block:: console
 
-  $ kraken -i image .tif image.txt segment -bl ocr -m catmus-print-fondue-large.mlmodel
+  $ kraken -i image.tif image.txt segment -bl ocr -m catmus-print-fondue-large.mlmodel
   Loading ANN /home/mittagessen/git/kraken/kraken/blla.mlmodel	✓
   Loading ANN catmus-print-fondue-large.mlmodel	✓
   Segmenting image.tif	✓
