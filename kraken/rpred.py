@@ -24,7 +24,7 @@ import dataclasses
 
 from collections import defaultdict
 from functools import partial
-from typing import TYPE_CHECKING, Dict, Generator, Optional, Union
+from typing import TYPE_CHECKING, Generator, Optional, Union
 
 from kraken.containers import BaselineOCRRecord, BBoxOCRRecord, ocr_record
 from kraken.lib.dataset import ImageInputTransforms
@@ -43,10 +43,10 @@ __all__ = ['mm_rpred', 'rpred']
 logger = logging.getLogger(__name__)
 
 
-def _get_type(tags: Dict, default='default') -> str:
+def _get_type(tags: dict, default='default') -> str:
     if tags is None:
         return default
-    ot = tags.get('type', default=[{'type': default}])[0]
+    ot = tags.get('type', [{'type': default}])[0]
     if (tt := ot.get('type')) is not None:
         return tt
     else:
@@ -58,12 +58,12 @@ class mm_rpred(object):
     Multi-model version of kraken.rpred.rpred
     """
     def __init__(self,
-                 nets: Dict[tuple[str, str], 'TorchSeqRecognizer'],
+                 nets: dict[str, 'TorchSeqRecognizer'],
                  im: 'Image.Image',
                  bounds: 'Segmentation',
                  pad: int = 16,
                  bidi_reordering: Union[bool, str] = True,
-                 tags_ignore: Optional[list[tuple[str, str]]] = None,
+                 tags_ignore: Optional[list[str]] = None,
                  no_legacy_polygons: bool = False) -> Generator[ocr_record, None, None]:
         """
         Multi-model version of kraken.rpred.rpred.
@@ -366,8 +366,8 @@ def rpred(network: 'TorchSeqRecognizer',
                     bidi_reordering, no_legacy_polygons=no_legacy_polygons)
 
 
-def _resolve_type_to_model(tags: Optional[Dict],
-                           model_map: Dict[tuple[str, str], 'TorchSeqRecognizer'],
+def _resolve_type_to_model(tags: Optional[dict],
+                           model_map: dict[str, 'TorchSeqRecognizer'],
                            default: Optional['TorchSeqRecognizer'] = None) -> 'TorchSeqRecognizer':
     """
     Resolves a line type to a model.

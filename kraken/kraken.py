@@ -234,7 +234,6 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore,
     elif no_segmentation:
         logger.warning('no_segmentation mode enabled but segmentation defined. Ignoring --no-segmentation option.')
 
-    tags = set()
     # script detection
     if bounds.script_detection:
         it = rpred.mm_rpred(model, im, bounds, pad,
@@ -265,7 +264,7 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore,
             fp.write(serialization.serialize(results=results,
                                              image_size=Image.open(ctx.meta['base_image']).size,
                                              writing_mode=ctx.meta['text_direction'],
-                                             scripts=tags,
+                                             scripts=None,
                                              template=ctx.meta['output_template'],
                                              template_source='custom' if ctx.meta['output_mode'] == 'template' else 'native',
                                              processing_steps=ctx.meta['steps'],
@@ -596,9 +595,9 @@ def _validate_mm(ctx, param, value):
                 raise ValueError
             k, _, v = tokens
             if v == 'ignore':
-                model_dict['ignore'].append(('type', k))  # type: ignore
+                model_dict['ignore'].append(k)  # type: ignore
             else:
-                model_dict[('type', k)] = Path(v)
+                model_dict[k] = Path(v)
     except Exception:
         raise click.BadParameter('Mappings must be in format tag:model')
     return model_dict

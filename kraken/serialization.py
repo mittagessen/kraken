@@ -77,8 +77,7 @@ def serialize(results: 'Segmentation',
               template: ['PathLike', str] = 'alto',
               template_source: Literal['native', 'custom'] = 'native',
               processing_steps: Optional[List['ProcessingStep']] = None,
-              sub_line_segmentation: bool = True
-              ) -> str:
+              sub_line_segmentation: bool = True) -> str:
     """
     Serializes recognition and segmentation results into an output document.
 
