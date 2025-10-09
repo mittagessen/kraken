@@ -42,9 +42,8 @@ logger = logging.getLogger(__name__)
 def _get_type(tags: Dict, default='default') -> str:
     if tags is None:
         return default
-    if (ot := tags.get('type')) is None:
-        return default
-    if (tt := ot[0].get('type')) is not None:
+    ot = tags.get('type', default=[{'type': default}])[0]
+    if (tt := ot.get('type')) is not None:
         return tt
     else:
         return default
