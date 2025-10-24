@@ -34,7 +34,7 @@ from typing import (TYPE_CHECKING, Any, Callable, List, Literal, Optional,
 
 from PIL import Image
 from ctypes import c_char
-from torchvision import transforms
+from torchvision.transforms import v2
 from torch.utils.data import Dataset
 
 from kraken.containers import BaselineLine, BBoxLine, Segmentation
@@ -57,15 +57,17 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class DefaultAugmenter():
+class DefaultLineAugmenter():
+    """
+    Default augmentation of whole line images.
+    """
     def __init__(self):
-        import cv2
-        cv2.setNumThreads(0)
-        from albumentations import (Blur, Compose, ElasticTransform,
-                                    MedianBlur, MotionBlur, OneOf, SafeRotate,
-                                    OpticalDistortion, PixelDropout,
-                                    ToFloat)
+        self._transforms = v2.RandomApply([v2.ToImage(),
+                                           v2.RandomErasing(p=0.2, scale=(0.001, 0.05)),
+                                           v2.RandomChoice([], p=0.2),
+                                           v2.RandomChoice([], p=0.2),
 
+                                           ], p=0.5)
         self._transforms = Compose([
                                     ToFloat(),
                                     PixelDropout(p=0.2),
