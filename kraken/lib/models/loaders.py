@@ -31,9 +31,8 @@ __all__ = ['load_models', 'load_coreml', 'load_safetensors']
 def _coreml_lin(spec):
     weights = {}
     for layer in spec:
-        ltype, *parts = layer.name.split('_')
-        if ltype == 'O':
-            name, _ = layer.name.rsplit('_', 1)
+        if layer.WhichOneof('layer') == 'innerProduct':
+            name = layer.name.removesuffix('_lin')
             lin = layer.innerProduct
             weights[f'nn.{name}.lin.weight'] = torch.Tensor(lin.weights.floatValue).view(lin.outputChannels, lin.inputChannels)
             weights[f'nn.{name}.lin.bias'] = torch.Tensor(lin.bias.floatValue)
@@ -43,12 +42,11 @@ def _coreml_lin(spec):
 def _coreml_rnn(spec):
     weights = {}
     for layer in spec:
-        ltype, *parts = layer.name.split('_')
-        if ltype == 'L':
-            arch = layer.WhichOneof('layer')
+        if (arch := layer.WhichOneof('layer')) in ['uniDirectionalLSTM' , 'biDirectionalLSTM']:
             rnn = getattr(layer, arch)
             output_size = rnn.outputVectorSize
-
+            input_size = rnn.inputVectorSize
+            name = layer.name.removesuffix('_transposed')
             def _deserialize_weights(params, direction):
                 # ih_matrix
                 weight_ih = torch.Tensor([params.inputGateWeightMatrix.floatValue,  # wi
@@ -60,15 +58,15 @@ def _coreml_rnn(spec):
                                           params.forgetGateRecursionMatrix.floatValue,  # wf
                                           params.blockInputRecursionMatrix.floatValue,  # wz/wg
                                           params.outputGateRecursionMatrix.floatValue])  # wo
-                weights[f'nn.{layer.name}.weight_ih_l0{"_reverse" if direction == "bwd" else ""}'] = weight_ih.view(-1, 2*output_size)
-                weights[f'nn.{layer.name}.weight_hh_l0{"_reverse" if direction == "bwd" else ""}'] = weight_hh.view(-1, output_size)
+                weights[f'nn.{name}.layer.weight_ih_l0{"_reverse" if direction == "bwd" else ""}'] = weight_ih.view(-1, input_size)
+                weights[f'nn.{name}.layer.weight_hh_l0{"_reverse" if direction == "bwd" else ""}'] = weight_hh.view(-1, output_size)
                 biases = torch.Tensor([params.inputGateBiasVector.floatValue,  # bi
                                        params.forgetGateBiasVector.floatValue,  # bf
                                        params.blockInputBiasVector.floatValue,  # bz/bg
-                                       params.outputGateBiasVector.floatValue])  # bo
-                weights[f'nn.{layer.name}.bias_hh_l0{"_reverse" if direction == "bwd" else ""}'] = biases
+                                       params.outputGateBiasVector.floatValue]).view(-1)  # bo
+                weights[f'nn.{name}.layer.bias_hh_l0{"_reverse" if direction == "bwd" else ""}'] = biases
                 # no ih_biases
-                weights[f'nn.{layer.name}.bias_ih_l0{"_reverse" if direction == "bwd" else ""}'] = torch.zeros_like(biases)
+                weights[f'nn.{name}.layer.bias_ih_l0{"_reverse" if direction == "bwd" else ""}'] = torch.zeros_like(biases)
 
             fwd_params = rnn.weightParams if arch == 'uniDirectionalLSTM' else rnn.weightParams[0]
             _deserialize_weights(fwd_params, 'fwd')
@@ -82,9 +80,8 @@ def _coreml_rnn(spec):
 def _coreml_conv(spec):
     weights = {}
     for layer in spec:
-        ltype, *parts = layer.name.split('_')
-        if ltype == 'C':
-            name, _ = layer.name.rsplit('_', 1)
+        if layer.WhichOneof('layer') == 'convolution':
+            name = layer.name.removesuffix('_conv')
             conv = layer.convolution
             in_channels = conv.kernelChannels
             out_channels = conv.outputChannels
@@ -100,13 +97,11 @@ def _coreml_conv(spec):
 def _coreml_groupnorm(spec):
     weights = {}
     for layer in spec:
-        ltype, *parts = layer.name.split('_')
-        if ltype == 'Gn':
-            name, _ = layer.name.rsplit('_', 1)
+        if layer.WhichOneof('layer') == 'custom' and layer.custom.className == 'groupnorm':
             gn = layer.custom
-            in_channels = layer.parameters['in_channels'].intValue
-            weights[f'nn.{name}.layer.weight'] = torch.Tensor(gn.weights[0].floatValue).resize_as_(in_channels)
-            weights[f'nn.{name}.layer.bias'] = torch.Tensor(gn.weights[1].floatValue).resize_as_(in_channels)
+            in_channels = gn.parameters['in_channels'].intValue
+            weights[f'nn.{layer.name}.layer.weight'] = torch.Tensor(gn.weights[0].floatValue).view(in_channels)
+            weights[f'nn.{layer.name}.layer.bias'] = torch.Tensor(gn.weights[1].floatValue).view(in_channels)
     return weights
 
 
