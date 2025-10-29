@@ -26,6 +26,7 @@ _T_tasks = NewType('_T_tasks', Literal['segmentation', 'recognition', 'reading_o
 
 __all__ = ['load_models', 'load_coreml', 'load_safetensors']
 
+
 # deserializers for coreml layers with weights
 def _coreml_lin(spec):
     weights = {}
@@ -98,6 +99,14 @@ def _coreml_conv(spec):
 
 def _coreml_groupnorm(spec):
     weights = {}
+    for layer in spec:
+        ltype, *parts = layer.name.split('_')
+        if ltype == 'Gn':
+            name, _ = layer.name.rsplit('_', 1)
+            gn = layer.custom
+            in_channels = layer.parameters['in_channels'].intValue
+            weights[f'nn.{name}.layer.weight'] = torch.Tensor(gn.weights[0].floatValue).resize_as_(in_channels)
+            weights[f'nn.{name}.layer.bias'] = torch.Tensor(gn.weights[1].floatValue).resize_as_(in_channels)
     return weights
 
 
@@ -144,31 +153,34 @@ def load_safetensors(path: Union[str, PathLike], tasks: Optional[Sequence[_T_tas
     """
     Loads one or more models in safetensors format and returns them.
     """
-    from safetensors import safe_open
+    from safetensors import safe_open, SafetensorError
     weights = defaultdict(dict)
     models = {}
-    with safe_open(path, framework="pt") as f:
-        if (metadata := f.metadata()) is not None:
-            model_map = json.loads(metadata.get('kraken_meta', 'null'))
-            prefixes = list(model_map.keys())
-            # construct models
-            for prefix in prefixes:
-                if (min_ver := Version(model_map[prefix].get('_kraken_min_version'))) > (inst_ver := Version(importlib.metadata.version('kraken'))):
-                    logger.warning(f'Model {prefix} in model file {path} requires minimum kraken version {min_ver} (installed {inst_ver})')
+    try:
+        with safe_open(path, framework="pt") as f:
+            if (metadata := f.metadata()) is not None:
+                model_map = json.loads(metadata.get('kraken_meta', 'null'))
+                prefixes = list(model_map.keys())
+                # construct models
+                for prefix in prefixes:
+                    if (min_ver := Version(model_map[prefix].get('_kraken_min_version'))) > (inst_ver := Version(importlib.metadata.version('kraken'))):
+                        logger.warning(f'Model {prefix} in model file {path} requires minimum kraken version {min_ver} (installed {inst_ver})')
+                        continue
+                    if tasks and not set(tasks).intersection(set(model_map[prefix].get('model_type', []))):
+                        logger.info(f'Model {prefix} in model file {path} not in demanded tasks {tasks}')
+                        continue
+                    model_map[prefix].pop('_tasks')
+                    models[prefix] = create_model(model_map[prefix].get('_model'), **model_map[prefix])
+            else:
+                raise ValueError(f'No model metadata found in {path}.')
+            for k in f.offset_keys():
+                try:
+                    prefix = prefixes[list(map(k.startswith, prefixes)).index(True)]
+                    weights[prefix][k.removeprefix(f'{prefix}.')] = f.get_tensor(k)
+                except ValueError:
                     continue
-                if tasks and not set(tasks).intersection(set(model_map[prefix].get('model_type', []))):
-                    logger.info(f'Model {prefix} in model file {path} not in demanded tasks {tasks}')
-                    continue
-                model_map[prefix].pop('_tasks')
-                models[prefix] = create_model(model_map[prefix].get('_model'), **model_map[prefix])
-        else:
-            raise ValueError(f'No model metadata found in {path}.')
-        for k in f.offset_keys():
-            try:
-                prefix = prefixes[list(map(k.startswith, prefixes)).index(True)]
-                weights[prefix][k.removeprefix(f'{prefix}.')] = f.get_tensor(k)
-            except ValueError:
-                continue
+    except SafetensorError as e:
+        raise ValueError(f'Invalid model file {path}') from e
     # load weights into models
     for prefix, weight in weights.items():
         models[prefix].load_state_dict(weight)
@@ -197,17 +209,15 @@ def load_coreml(path: Union[str, PathLike], tasks: Optional[Sequence[_T_tasks]] 
         raise ValueError(f'Failure parsing model protobuf: {e}') from e
 
     metadata = json.loads(mlmodel.user_defined_metadata.get('kraken_meta', '{}'))
-    # merge codec in general metadata
-    if 'codec' in mlmodel.user_defined_metadata:
-        metadata['codec'] = json.loads(mlmodel.user_defined_metadata['codec'])
 
     if tasks and not metadata['model_type'] not in tasks:
         logger.info(f'Model file {path} not in demanded tasks {tasks}')
         return []
 
     model = create_model('TorchVGSLModel',
-                         spec=mlmodel.user_defined_metadata['vgsl'],
-                         metadata=metadata)
+                         vgsl=mlmodel.user_defined_metadata['vgsl'],
+                         codec=json.loads(mlmodel.user_defined_metadata.get('codec', 'null')),
+                         **metadata)
 
     # construct state dict
     weights = {}
