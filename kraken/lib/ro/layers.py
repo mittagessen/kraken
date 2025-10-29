@@ -6,27 +6,48 @@ from typing import TYPE_CHECKING, Tuple
 import torch
 from torch import nn
 
+from kraken.lib.models import BaseModel
+from kraken.registry import register
+
+import logging
+
+logger = logging.getLogger(__name__)
+
 if TYPE_CHECKING:
     from kraken.lib.vgsl import VGSLBlock
 
-# all tensors are ordered NCHW, the "feature" dimension is C, so the output of
-# an LSTM will be put into C same as the filters of a CNN.
-
-__all__ = ['MLP']
+__all__ = ['ROMLP']
 
 
-class MLP(nn.Module):
+@register(type='model')
+class ROMLP(nn.Module, BaseModel):
     """
     A simple 2 layer MLP for reading order determination.
     """
-    def __init__(self, feature_size: int, hidden_size: int):
-        super(MLP, self).__init__()
+    user_metadata = {}
+    _kraken_min_version = '5.0.0'
+    model_type = ['reading_order']
+
+    def __init__(self, **kwargs):
+        super().__init__()
+        if (feature_size := kwargs.get('feature_size', None)) is None:
+            raise ValueError('`feature_size` is missing in model arguments.')
+        if (hidden_size := kwargs.get('hidden_size', None)) is None:
+            raise ValueError('`hidden_size` is missing in model arguments.')
+        if kwargs.get('class_mapping', None) is None:
+            logger.warning(f'Class mapping missing in reading order model arguments.')
+
+        self.user_metadata = kwargs
         self.fc1 = nn.Linear(feature_size, hidden_size)
         self.relu = nn.ReLU()
         self.fc2 = nn.Linear(hidden_size, 1)
         self.feature_size = feature_size
         self.hidden_size = hidden_size
-        self.class_mapping = None
+
+    @property
+    def hyper_params(self):
+        return {'feature_size': self.feature_size,
+                'hidden_size': self.hidden_size}
 
     def forward(self, x):
         x = self.fc1(x)

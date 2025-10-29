@@ -1,0 +1,80 @@
+"""
+kraken.lib.models.writers
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Implementations for model writing in different formats.
+"""
+import json
+import uuid
+import logging
+
+from os import PathLike
+from pathlib import Path
+from typing import Union, TYPE_CHECKING
+
+from kraken.registry import register, WRITER_REGISTRY
+from kraken.lib.models.base import BaseModel
+
+if TYPE_CHECKING:
+    from kraken.lib.vgsl import TorchVGSLModel
+
+logger = logging.getLogger(__name__)
+
+_all_ = ['write_models', 'write_safetensors', 'write_coreml']
+
+
+def write_models(objs: list[BaseModel], path: Union[str, PathLike]) -> PathLike:
+    """
+    Tries to write a list of models to a file. Writers are tried in order of
+    registration.
+
+    """
+    if (path := Path(path)).exists():
+        raise ValueError(f'{path} already exists.')
+    for name, cfg in WRITER_REGISTRY.items():
+        try:
+            return getattr(cfg['_module'], name)(objs, path)
+        except ValueError:
+            continue
+    raise ValueError(f'No writer found for {path}')
+
+
+@register(type='writer')
+def write_safetensors(objs: list[BaseModel], path: Union[str, PathLike]) -> PathLike:
+    from safetensors.torch import save_file
+    # assign unique prefixes to each model in model list
+    prefixes = {str(uuid.uuid4()): model for model in objs}
+    metadatas = {k: {'_kraken_min_version': v._kraken_min_version,
+                     '_tasks': v.model_type,
+                     '_model': v.__class__.__name__,
+                     **v.user_metadata} for k, v in prefixes.items()}
+
+    weights = {}
+    for prefix, model in prefixes.items():
+        for name in (state_dict := model.state_dict()):
+            weights[f'{prefix}.{name}'] = state_dict[name]
+    save_file(weights,
+              filename=path,
+              metadata={'kraken_meta': json.dumps(metadatas)})
+    return Path(path)
+
+
+@register(type='writer')
+def write_coreml(obj: list['TorchVGSLModel'], path: Union[str, PathLike]) -> PathLike:
+    from kraken.lib.vgsl import TorchVGSLModel
+
+    if len(obj) != 1:
+        raise ValueError('CoreML writer only support writing one model at a time.')
+    if not isinstance(obj, TorchVGSLModel):
+        raise ValueError(f'CoreML writer only serializes TorchVGSLModel objects, not {obj}.')
+
+    path = Path(path)
+    # coreml refuses to serialize into a path that doesn't have a '.mlmodel'
+    # suffix
+    if path.suffix != '.mlmodel':
+        path = path.with_suffix('.mlmodel')
+    if path.exists():
+        raise ValueError(f'{path} already exists.')
+
+    obj.save_model(path.as_posix())
+    return path

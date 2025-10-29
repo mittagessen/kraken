@@ -23,7 +23,7 @@ import logging
 import click
 from PIL import Image
 
-from kraken.lib.register import OPTIMIZERS, SCHEDULERS, STOPPERS
+from kraken.registry import OPTIMIZERS, SCHEDULERS, STOPPERS
 from kraken.lib.default_specs import (RECOGNITION_PRETRAIN_HYPER_PARAMS,
                                       RECOGNITION_SPEC)
 

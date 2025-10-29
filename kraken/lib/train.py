@@ -41,7 +41,6 @@ from kraken.lib.dataset import (ArrowIPCRecognitionDataset, BaselineSet,
                                 GroundTruthDataset, ImageInputTransforms,
                                 PolygonGTDataset, collate_sequences)
 from kraken.lib.exceptions import KrakenEncodeException, KrakenInputException
-from kraken.lib.models import validate_hyper_parameters
 from kraken.lib.util import make_printable, parse_gt_path
 from kraken.lib.xml import XMLPage
 
@@ -811,7 +810,6 @@ class SegmentationModel(L.LightningModule):
         if hyper_params:
             hyper_params_.update(hyper_params)
 
-        validate_hyper_parameters(hyper_params_)
         self.hyper_params = hyper_params_
         self.save_hyperparameters()
 

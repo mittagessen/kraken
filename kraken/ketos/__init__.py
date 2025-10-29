@@ -26,7 +26,7 @@ from PIL import Image
 from rich.traceback import install
 
 from kraken.lib import log
-from kraken.lib.register import PRECISIONS
+from kraken.registry import PRECISIONS
 
 from .dataset import compile
 from .pretrain import pretrain

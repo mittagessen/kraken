@@ -27,7 +27,7 @@ from PIL import Image
 from kraken.ketos.util import (_expand_gt, _validate_manifests, message,
                                to_ptl_device, _validate_merging)
 
-from kraken.lib.register import OPTIMIZERS, SCHEDULERS, STOPPERS
+from kraken.registry import OPTIMIZERS, SCHEDULERS, STOPPERS
 from kraken.lib.default_specs import (SEGMENTATION_HYPER_PARAMS,
                                       SEGMENTATION_SPEC)
 

@@ -4,8 +4,10 @@ Layers for VGSL models
 from typing import TYPE_CHECKING, Optional, Tuple
 
 import torch
-from torch.nn import Embedding, Linear, Module
+from torch.nn import Embedding, Linear
 
+from kraken.registry import register
+from kraken.lib.models import BaseModel
 from kraken.lib.pretrain.util import compute_mask_indices, sample_negatives
 
 if TYPE_CHECKING:
@@ -17,11 +19,14 @@ if TYPE_CHECKING:
 __all__ = ['Wav2Vec2Mask']
 
 
-class Wav2Vec2Mask(Module):
+@register(type='model')
+class Wav2Vec2Mask(nn.Module, BaseModel):
     """
     A layer for Wav2Vec2-style masking. Needs to be placed just before
     recurrent/contextual layers.
     """
+    user_metadata = {}
+    _kraken_min_version = '5.0.0'
 
     def __init__(self,
                  context_encoder_input_dim: int,
