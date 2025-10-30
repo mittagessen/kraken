@@ -71,7 +71,6 @@ class BaseModel(ABC):
         """
         return None
 
-
     @property
     @abstractmethod
     def model_type(self) -> _T_tasks:
@@ -86,4 +85,11 @@ class BaseModel(ABC):
 
     @abstractmethod
     def state_dict(self):
+        pass
+
+    @abstractmethod
+    def prepare_for_inference(self, config: 'InferenceConfig'):
+        """
+        Prepares the model for inference.
+        """
         pass
