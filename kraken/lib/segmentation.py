@@ -40,7 +40,6 @@ from skimage.measure import (approximate_polygon, label, regionprops,
 from skimage.morphology import skeletonize
 from skimage.transform import (AffineTransform, PiecewiseAffineTransform, warp)
 
-from kraken.lib import default_specs
 from kraken.lib.exceptions import KrakenInputException
 
 if TYPE_CHECKING:
@@ -750,7 +749,7 @@ def calculate_polygonal_environment(im: Image.Image = None,
         try:
             end_points = (line[0], line[-1])
             line = geom.LineString(line)
-            offset = default_specs.SEGMENTATION_HYPER_PARAMS['line_width'] if topline is not None else 0
+            offset = 4 if topline is not None else 0
             offset_line = line.parallel_offset(offset, side='left' if topline else 'right')
             line = np.array(line.coords, dtype=float)
             offset_line = np.array(offset_line.coords, dtype=float)
@@ -1383,4 +1382,4 @@ def extract_polygons(im: Image.Image,
                     box[1::2] >= [im.size[1], im.size[1]]):
                 logger.error('bbox {} is outside of image bounds {}'.format(box, im.size))
                 raise KrakenInputException('Line outside of image bounds')
-            yield im.crop(box).rotate(angle, expand=True), box
+            yield im.crop(box).rotate(angle, expand=True), line
