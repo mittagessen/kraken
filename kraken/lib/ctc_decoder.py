@@ -55,8 +55,7 @@ def greedy_decoder(outputs: Union[torch.Tensor, np.ndarray],
         maximum value of the time steps corresponding to a single decoded
         label.
     """
-    if isinstance(outputs, np.ndarray):
-        outputs = torch.from_numpy(outputs)
+    outputs = torch.as_tensor(outputs)
     if outputs.dim() == 2:
         outputs = outputs.unsqueeze(0)
     if outputs.shape[0] == 1 and seq_lens is None:
