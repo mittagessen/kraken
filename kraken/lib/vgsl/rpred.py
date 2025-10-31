@@ -59,25 +59,32 @@ class VGSLRecognitionInference:
             _empty_record_cls = BBoxOCRRecord
 
         batch, channels, height, width = self.input
-        transforms = ImageInputTransforms(batch, height, width, channels, (self._inf_config.padding, 0), valid_norm)
+        transforms = ImageInputTransforms(batch,
+                                          height,
+                                          width,
+                                          channels,
+                                          (self._inf_config.padding, 0),
+                                          valid_norm,
+                                          dtype=self._m_dtype)
         _exl = partial(_extract_line, im, segmentation)
 
-        for im, line_idx in self._line_extraction_pool.imap_unordered(_exl, range(self._len)):
-            if im is None or 0 in im.size:
-                rec_results[line_idx] = _empty_record_cls('', [], [], segmentation.lines[line_idx])
-            ts_im = transforms(im)
-            if ts_im.max() == ts_im.min():
-                rec_results[line_idx] = _empty_record_cls('', [], [], segmentation.lines[line_idx])
-            input_queue.append((ts_im, im.size, line_idx))
-            # feed the input queue through the network
-            if len(input_queue) == self._inf_config.batch_size or len(input_queue) == rec_results.count(None):
-                for rec, idx in self._line_iter(input_queue, segmentation):
-                    logger.debug(f'Inserting batch result at index {idx}: {rec}')
-                    rec_results[idx] = rec
-                input_queue.clear()
-            if rec_results[next_idx_to_emit] is not None:
-                yield rec_results[next_idx_to_emit]
-                next_idx_to_emit += 1
+        with self._fabric.init_tensor():
+            for im, line_idx in self._line_extraction_pool.imap_unordered(_exl, range(self._len)):
+                if im is None or 0 in im.size:
+                    rec_results[line_idx] = _empty_record_cls('', [], [], segmentation.lines[line_idx])
+                ts_im = transforms(im)
+                if ts_im.max() == ts_im.min():
+                    rec_results[line_idx] = _empty_record_cls('', [], [], segmentation.lines[line_idx])
+                input_queue.append((ts_im, im.size, line_idx))
+                # feed the input queue through the network
+                if len(input_queue) == self._inf_config.batch_size or len(input_queue) == rec_results.count(None):
+                    for rec, idx in self._line_iter(input_queue, segmentation):
+                        logger.debug(f'Inserting batch result at index {idx}: {rec}')
+                        rec_results[idx] = rec
+                    input_queue.clear()
+                if rec_results[next_idx_to_emit] is not None:
+                    yield rec_results[next_idx_to_emit]
+                    next_idx_to_emit += 1
 
     def _recognize_box_lines(self,
                              lines: list[tuple['torch.Tensor', tuple[int, int], int]],
