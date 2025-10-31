@@ -456,7 +456,7 @@ class TorchVGSLModel(nn.Module,
         if self.model_type == 'recognition' and not getattr(self, '_line_extraction_pool', None):
             self._line_extraction_pool = Pool(self._inf_config.num_line_workers)
             import atexit
-            atexit.register(self._clean_up_pool, self._line_extraction_pool)
+            atexit.register(self._line_extraction_pool.terminate)
 
         self._fabric = Fabric(accelerator=self._inf_config.accelerator,
                               devices=self._inf_config.device,
@@ -464,10 +464,6 @@ class TorchVGSLModel(nn.Module,
 
         self._m_dtype = next(self.parameters()).dtype
         self._m_device = next(self.parameters()).device
-
-    @staticmethod
-    def _clean_up_pool(p):
-        p.terminate()
 
     @torch.inference_mode()
     def predict(self, **kwargs):
