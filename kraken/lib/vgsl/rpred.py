@@ -37,6 +37,7 @@ class VGSLRecognitionInference:
     def __init__(self):
         super().__init__()
 
+    @torch.inference_mode()
     def _recognition_pred(self,
                           im: 'Image.Image',
                           segmentation: 'Segmentation') -> Generator[ocr_record, None, None]:
