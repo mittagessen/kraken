@@ -450,6 +450,8 @@ class TorchVGSLModel(nn.Module,
         """
         if (isinstance(config, RecognitionInferenceConfig) and self.model_type != 'recognition') or  (isinstance(config, SegmentationInferenceConfig) and self.model_type != 'segmentation'):
             raise ValueError(f'{self} is a {self.model_type} model. Got incompatible {config.__class__.__name}.')
+
+        self.eval()
         self._inf_config = config
         # create line extraction worker pool
         from torch.multiprocessing import Pool
@@ -471,9 +473,9 @@ class TorchVGSLModel(nn.Module,
         Runs prediction on the model.
         """
         if self.model_type == 'recognition':
-            self._recognition_pred(**kwargs)
+            return self._recognition_pred(**kwargs)
         elif self.model_type == 'segmentation': 
-            self._segmentation_pred(**kwargs)
+            return self._segmentation_pred(**kwargs)
 
     def resize_output(self, output_size: int, del_indices: Optional[Iterable] = None) -> None:
         """
