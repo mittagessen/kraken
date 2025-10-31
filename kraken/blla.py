@@ -327,7 +327,7 @@ def segment(im: PIL.Image.Image,
             logger.debug(f'Baseline location: {loc}')
         rets = compute_segmentation_map(im, mask, net, device, autocast=autocast)
         _regions = vec_regions(**rets)
-        for reg_key, reg_val in vec_regions(**rets).items():
+        for reg_key, reg_val in _regions.items():
             if reg_key not in regions:
                 regions[reg_key] = []
             regions[reg_key].extend(reg_val)
