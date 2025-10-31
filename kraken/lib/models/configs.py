@@ -95,6 +95,8 @@ class SegmentationInferenceConfig(Config):
 
         text_direction (Literal['horizontal-lr', 'horizontal-rl', 'vertical-lr', 'vertical-rl'], defaults to 'horizontal-lr'):
             Sets the principal text direction and line orientation of the input page.
+        input_padding (int or tuple[int, int] or tuple[int, int, int, int], defaults to 0):
+            Padding to add around the input image.
 
         > Parameters for the legacy bounding box segmenter
 
@@ -107,7 +109,6 @@ class SegmentationInferenceConfig(Config):
 
         bbox_line_padding (Union[int, tuple[int, int]], defaults to 0):
             Padding to be added around left/right side of bounding boxes in bbox *line* segmenter.
-
     """
     def __init__(self, **kwargs):
         self.text_direction = kwargs.pop('text_direction', 'horizontal-lr')
@@ -116,6 +117,8 @@ class SegmentationInferenceConfig(Config):
         self.legacy_black_colseps = kwargs.pop('legacy_black_colseps', False)
         self.legacy_no_hlines = kwargs.pop('legacy_no_hlines', True)
         self.bbox_line_padding = kwargs.pop('bbox_line_padding', 0)
+        self.input_padding = kwargs.pop('input_padding', 0)
+
         super().__init__(**kwargs)
 
 
