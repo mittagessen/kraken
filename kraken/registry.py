@@ -83,7 +83,3 @@ def create_model(name, **kwargs):
     cls = getattr(cfg['_module'], name)
 
     return cls(**kwargs)
-
-
-def create_task(name, **kwargs):
-    pass
