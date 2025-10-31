@@ -55,6 +55,8 @@ class RecognitionInferenceConfig(Config):
 
         padding (int, defaults to 16):
             Extra blank padding to the left and right of text line
+        num_line_workers (int, defaults to 2):
+            Number of worker processes to extract lines from images.
         no_legacy_polygons (bool, defaults to False):
             disables the fast path for polygonal line extraction
 
@@ -71,6 +73,7 @@ class RecognitionInferenceConfig(Config):
         import kraken.lib.ctc_decoder
         self.temperature = kwargs.pop('temperature', 1.0)
         self.padding = kwargs.pop('padding', 16)
+        self.num_line_workers = kwargs.pop('num_line_workers', 2)
         self.no_legacy_polygons = kwargs.pop('no_legacy_polygons', False)
         self.decoder = kwargs.pop('decoder', kraken.lib.ctc_decoder.greedy_decoder)
         self.bidi_reordering = kwargs.pop('bidi_reordering', True)
