@@ -1,0 +1,53 @@
+from kraken.lib.models import TrainingConfig
+
+
+class VGSLRecognitionTrainingConfig(TrainingConfig):
+    """
+    Base configuration for training a VGSL recognition model with CTC loss.
+
+    Arg:
+        paddding (int, defaults to 16):
+            Padding around start/end of line image.
+        normalization (str, defaults to None):
+            Unicode normalization
+        normalize_whitespace (bool, defaults to True):
+            Flag to normalize all whitespace in training data to U+0020.
+        freeze_backbone: (int, defaults to 0):
+            Freezes the backbone (everything before the recurrent layers) of
+            the network for `n` iterations.
+    """
+    def __init__(self, **kwargs):
+        self.spec = kwargs.pop('spec', '[1,120,0,1 Cr3,13,32 Do0.1,2 Mp2,2 Cr3,13,32 Do0.1,2 Mp2,2 Cr3,9,64 Do0.1,2 Mp2,2 Cr3,9,64 Do0.1,2 S1(1x0)1,3 Lbx200 Do0.1,2 Lbx200 Do0.1,2 Lbx200 Do]')
+        self.padding = kwargs.pop('padding', 16)
+        self.normalization = kwargs.pop('normalization', None)
+        self.normalize_whitespace = kwargs.pop('normalize_whitespace', True)
+        self.freeze_backbone = kwargs.pop('freeze_backbone', 0)
+        kwargs.setdefault('quit', 'early')
+        kwargs.setdefault('lrate', 1e-3)
+        super().__init__(**kwargs)
+
+
+class BLLASegmentationTrainingConfig(TrainingConfig):
+    """
+    Base configuration for training a BLLA VGSL recognition model.
+
+    Arg:
+        line_width (int, defaults to 8):
+
+        padding (tuple[int, int], defaults to (0, 0)):
+
+    """
+    def __init__(self, **kwargs):
+        self.spec = kwargs.pop('spec', '[1,1800,0,3 Cr7,7,64,2,2 Gn32 Cr3,3,128,2,2 Gn32 Cr3,3,128 Gn32 Cr3,3,256 Gn32 Cr3,3,256 Gn32 Lbx32 Lby32 Cr1,1,32 Gn32 Lby32 Lbx32]')
+        self.line_width = kwargs.pop('line_width', 8)
+        self.padding = kwargs.pop('padding', (0, 0))
+
+        kwargs.setdefault('quit', 'fixed')
+        kwargs.setdefault('epochs', 50)
+        kwargs.setdefault('lrate', 2e-4)
+        kwargs.setdefault('weight_decay', 1e-5)
+        kwargs.setdefault('cos_t_max', 50)
+        kwargs.setdefault('cos_min_lr', 2e-5)
+        super().__init__(**kwargs)
+
+
