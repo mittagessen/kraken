@@ -11,6 +11,7 @@ from collections.abc import Generator
 import torch
 from google.protobuf.message import DecodeError
 from torch import nn
+from lightning.fabric import Fabric
 
 from kraken.lib.vgsl import layers
 from kraken.lib.vgsl.rpred import VGSLRecognitionInference
@@ -456,6 +457,13 @@ class TorchVGSLModel(nn.Module,
             self._line_extraction_pool = Pool(self._inf_config.num_line_workers)
             import atexit
             atexit.register(self._clean_up_pool, self._line_extraction_pool)
+
+        self._fabric = Fabric(accelerator=self._inf_config.accelerator,
+                              devices=self._inf_config.device,
+                              precision=self._inf_config.precision)
+
+        self._m_dtype = next(self.parameters()).dtype
+        self._m_device = next(self.parameters()).device
 
     @staticmethod
     def _clean_up_pool(p):
