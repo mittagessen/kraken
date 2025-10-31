@@ -178,7 +178,6 @@ class mm_rpred(object):
         self.no_legacy_polygons = no_legacy_polygons
 
     def _recognize_box_line(self, line):
-        xmin, ymin, xmax, ymax = line.bbox
         prediction = ''
         cuts = []
         confidences = []
@@ -195,7 +194,7 @@ class mm_rpred(object):
 
         seg = dataclasses.replace(self.bounds, lines=[line])
         try:
-            box, coords = next(extract_polygons(self.im, seg, legacy=use_legacy_polygons))
+            box, line = next(extract_polygons(self.im, seg, legacy=use_legacy_polygons))
         except KrakenInputException as e:
             logger.warning(f'Extracting line failed: {e}')
             return BBoxOCRRecord('', [], [], line)
@@ -233,6 +232,7 @@ class mm_rpred(object):
         pred = ''.join(x[0] for x in preds)
         pos = []
         conf = []
+        coords = line.bbox
 
         for _, start, end, c in preds:
             if self.bounds.text_direction.startswith('horizontal'):
