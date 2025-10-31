@@ -31,6 +31,7 @@ import torch
 import torch.nn.functional as F
 import torchvision.transforms as tf
 
+from torchvision.transforms import v2
 from importlib import resources
 from scipy.ndimage import gaussian_filter
 from skimage.filters import sobel
@@ -94,7 +95,7 @@ def compute_segmentation_map(im: PIL.Image.Image,
         padding = (padding[0], padding[0], padding[1], padding[1])
 
     transforms = dataset.ImageInputTransforms(batch, height, width, channels, padding, valid_norm=False)
-    tf_idx, _ = next(filter(lambda x: isinstance(x[1], tf.ToTensor), enumerate(transforms.transforms)))
+    tf_idx, _ = next(filter(lambda x: isinstance(x[1], v2.PILToTensor), enumerate(transforms.transforms)))
     res_tf = tf.Compose(transforms.transforms[:tf_idx])
     scal_im = np.array(res_tf(im).convert('L'))
 
