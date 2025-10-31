@@ -31,6 +31,11 @@ class Config:
             Decides how kraken will compile the forward pass of the model. If
             not given compilation will be disabled. To enable with default
             parameters set an empty dictionary.
+
+        > Error handling parameters
+        raise_on_error (bool, defaults to False):
+            Causes an exception to be raised instead of internal handling when
+            functional blocks that can fail for misshapen input crash.
     """
     def __init__(self, **kwargs):
         super().__init__()
@@ -39,6 +44,7 @@ class Config:
         self.device = kwargs.pop('device', 'auto')
         self.batch_size = kwargs.pop('batch_size', 1)
         self.compile_config = kwargs.pop('compile', None)
+        self.raise_on_error = kwargs.pop('raise_on_error', False)
 
 
 class RecognitionInferenceConfig(Config):
