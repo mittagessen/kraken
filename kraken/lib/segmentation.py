@@ -781,7 +781,7 @@ def calculate_polygonal_environment(im: Image.Image = None,
     return polygons
 
 
-def polygonal_reading_order(lines: Sequence[Dict],
+def polygonal_reading_order(lines: list['BaselineLine'], 
                             text_direction: Literal['lr', 'rl'] = 'lr',
                             regions: Optional[Sequence[geom.Polygon]] = None) -> Sequence[int]:
     """
@@ -797,7 +797,7 @@ def polygonal_reading_order(lines: Sequence[Dict],
     Returns:
         The indices of the ordered input.
     """
-    lines = [(line['tags']['type'], line['baseline'], line['boundary']) for line in lines]
+    lines = [line.baseline for line in lines]
 
     bounds = []
     if regions is None:
@@ -805,7 +805,7 @@ def polygonal_reading_order(lines: Sequence[Dict],
     region_lines = [[] for _ in range(len(regions))]
     indizes = {}
     for line_idx, line in enumerate(lines):
-        s_line = geom.LineString(line[1])
+        s_line = geom.LineString(line)
         in_region = False
         for idx, reg in enumerate(regions):
             if is_in_region(s_line, reg):

@@ -20,7 +20,6 @@ import logging
 import re
 from os import PathLike
 from typing import (Any, Callable, Iterable, Optional, Sequence, Union)
-from collections.abc import Generator
 
 import torch
 from google.protobuf.message import DecodeError
@@ -462,7 +461,7 @@ class TorchVGSLModel(nn.Module,
         """
         Configures the model for inference.
         """
-        if (isinstance(config, RecognitionInferenceConfig) and self.model_type != 'recognition') or  (isinstance(config, SegmentationInferenceConfig) and self.model_type != 'segmentation'):
+        if (isinstance(config, RecognitionInferenceConfig) and self.model_type != 'recognition') or (isinstance(config, SegmentationInferenceConfig) and self.model_type != 'segmentation'):
             raise ValueError(f'{self} is a {self.model_type} model. Got incompatible {config.__class__.__name}.')
 
         self.eval()
@@ -488,7 +487,7 @@ class TorchVGSLModel(nn.Module,
         """
         if self.model_type == 'recognition':
             return self._recognition_pred(**kwargs)
-        elif self.model_type == 'segmentation': 
+        elif self.model_type == 'segmentation':
             return self._segmentation_pred(**kwargs)
 
     def resize_output(self, output_size: int, del_indices: Optional[Iterable] = None) -> None:
