@@ -63,5 +63,3 @@ class BLLASegmentationTrainingConfig(TrainingConfig):
         kwargs.setdefault('cos_t_max', 50)
         kwargs.setdefault('cos_min_lr', 2e-5)
         super().__init__(**kwargs)
-
-
