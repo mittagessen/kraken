@@ -481,14 +481,25 @@ class TorchVGSLModel(nn.Module,
         self._m_device = next(self.parameters()).device
 
     @torch.inference_mode()
-    def predict(self, **kwargs):
+    def predict(self, *args, **kwargs):
         """
-        Runs prediction on the model.
+        Runs prediction with the model.
+
+        Args:
+
+            > For text recognition models
+
+            im (PIL.Image.Image): Input image
+            segmentation (Segmentation): The segmentation for the input image.
+
+            > For layout analysis models
+
+            im (PIL.Image.Image): Input image.
         """
         if self.model_type == 'recognition':
-            return self._recognition_pred(**kwargs)
+            return self._recognition_pred(*args, **kwargs)
         elif self.model_type == 'segmentation':
-            return self._segmentation_pred(**kwargs)
+            return self._segmentation_pred(*args, **kwargs)
 
     def resize_output(self, output_size: int, del_indices: Optional[Iterable] = None) -> None:
         """

@@ -133,7 +133,11 @@ class VGSLRecognitionInference:
                     ymax = y + self._scale_val(end, 0, lines[idx][1][1])
                     pos.append([[xmin, ymin], [xmax, ymin], [xmax, ymax], [xmin, ymax]])
                 conf.append(c)
-            rec = BBoxOCRRecord(pred_str, pos, conf, segmentation.lines[lines[idx][2]])
+            rec = BBoxOCRRecord(pred_str,
+                                pos,
+                                conf,
+                                segmentation.lines[lines[idx][2]],
+                                logits=pred if self._inf_config.return_logits else None)
             if self._inf_config.bidi_reordering:
                 logger.debug('BiDi reordering record.')
                 yield rec.logical_order(base_dir=self._inf_config.bidi_reordering if self._inf_config.bidi_reordering in ('L', 'R') else None), lines[idx][2]
@@ -165,7 +169,12 @@ class VGSLRecognitionInference:
                 pos.append([self._scale_val(start, 0, lines[idx][1][0]),
                             self._scale_val(end, 0, lines[idx][1][0])])
                 conf.append(c)
-            rec = BaselineOCRRecord(pred_str, pos, conf, segmentation.lines[lines[idx][2]])
+            rec = BaselineOCRRecord(pred_str,
+                                    pos,
+                                    conf,
+                                    segmentation.lines[lines[idx][2]],
+                                    logits=pred if self._inf_config.return_logits else None)
+
             if self._inf_config.bidi_reordering:
                 logger.debug('BiDi reordering record.')
                 yield rec.logical_order(base_dir=self._inf_config.bidi_reordering if self._inf_config.bidi_reordering in ('L', 'R') else None), lines[idx][2]

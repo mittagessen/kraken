@@ -29,6 +29,7 @@ import numpy as np
 from kraken.lib.segmentation import compute_polygon_section
 
 if TYPE_CHECKING:
+    import torch
     from os import PathLike
 
 
@@ -214,11 +215,13 @@ class ocr_record(ABC):
                                                          tuple[int, int],
                                                          tuple[int, int]]]],
                  confidences: list[float],
-                 display_order: bool = True) -> None:
+                 display_order: bool = True,
+                 logits: Optional['torch.FloatTensor'] = None) -> None:
         self._prediction = prediction
         self._cuts = cuts
         self._confidences = confidences
         self._display_order = display_order
+        self.logits = logits
 
     @property
     @abstractmethod
@@ -292,6 +295,7 @@ class BaselineOCRRecord(ocr_record, BaselineLine):
                        code point, in logical order (`False`) the n-th code
                        point corresponds to the n-th read code point. See [UAX
                        #9](https://unicode.org/reports/tr9) for more details.
+        logits: The logits for the prediction.
 
     Notes:
         When slicing the record the behavior of the cuts is changed from
@@ -310,7 +314,8 @@ class BaselineOCRRecord(ocr_record, BaselineLine):
                  confidences: list[float],
                  line: Union[BaselineLine, dict[str, Any]],
                  base_dir: Optional[Literal['L', 'R']] = None,
-                 display_order: bool = True) -> None:
+                 display_order: bool = True,
+                 logits: Optional['torch.FloatTensor'] = None) -> None:
         if not isinstance(line, dict):
             line = asdict(line)
         if line['type'] != 'baselines':
@@ -318,7 +323,7 @@ class BaselineOCRRecord(ocr_record, BaselineLine):
         BaselineLine.__init__(self, **line)
         self._line_base_dir = self.base_dir
         self.base_dir = base_dir
-        ocr_record.__init__(self, prediction, cuts, confidences, display_order)
+        ocr_record.__init__(self, prediction, cuts, confidences, display_order, logits)
 
     def __repr__(self) -> str:
         return f'pred: {self.prediction} baseline: {self.baseline} boundary: {self.boundary} confidences: {self.confidences}'
@@ -470,6 +475,7 @@ class BBoxOCRRecord(ocr_record, BBoxLine):
                        code point, in logical order (`False`) the n-th code
                        point corresponds to the n-th read code point. See [UAX
                        #9](https://unicode.org/reports/tr9) for more details.
+        logits: The logits for the prediction.
 
     Notes:
         When slicing the record the behavior of the cuts is changed from
@@ -492,7 +498,8 @@ class BBoxOCRRecord(ocr_record, BBoxLine):
                  confidences: list[float],
                  line: Union[BBoxLine, dict[str, Any]],
                  base_dir: Optional[Literal['L', 'R']] = None,
-                 display_order: bool = True) -> None:
+                 display_order: bool = True,
+                 logits: Optional['torch.FloatTensor'] = None) -> None:
         if not isinstance(line, dict):
             line = asdict(line)
         if line['type'] != 'bbox':
@@ -500,7 +507,7 @@ class BBoxOCRRecord(ocr_record, BBoxLine):
         BBoxLine.__init__(self, **line)
         self._line_base_dir = self.base_dir
         self.base_dir = base_dir
-        ocr_record.__init__(self, prediction, cuts, confidences, display_order)
+        ocr_record.__init__(self, prediction, cuts, confidences, display_order, logits)
 
     def __repr__(self) -> str:
         return f'pred: {self.prediction} bbox: {self.bbox} confidences: {self.confidences}'
