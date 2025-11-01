@@ -109,6 +109,15 @@ class SegmentationInferenceConfig(Config):
 
         bbox_line_padding (Union[int, tuple[int, int]], defaults to 0):
             Padding to be added around left/right side of bounding boxes in bbox *line* segmenter.
+
+        > Parameters for reading order determination
+
+        bbox_ro_fn (Callable, defaults t kraken.lib.segmentation.reading_order):
+            Function to compute the basic reading order of a set of lines in
+            bbox format.
+        baseline_ro_fn (Callable, defaults to kraken.lib.segmentation.polygonal_reading_order):
+            Function to compute the basic reading order of a set of lines in
+            baseline format.
     """
     def __init__(self, **kwargs):
         self.text_direction = kwargs.pop('text_direction', 'horizontal-lr')
@@ -118,7 +127,9 @@ class SegmentationInferenceConfig(Config):
         self.legacy_no_hlines = kwargs.pop('legacy_no_hlines', True)
         self.bbox_line_padding = kwargs.pop('bbox_line_padding', 0)
         self.input_padding = kwargs.pop('input_padding', 0)
-
+        from kraken.lib.segmentation import reading_order, polygonal_reading_order
+        self.bbox_ro_fn = kwargs.pop('bbox_ro_fn', reading_order)
+        self.baseline_ro_fn = kwargs.pop('baseline_ro_fn', polygonal_reading_order)
         super().__init__(**kwargs)
 
 
