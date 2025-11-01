@@ -272,7 +272,7 @@ Text Normalization and Unicode
 .. note:
 
    The description of the different behaviors of Unicode text below are highly
-   abbreviated. If confusion arrises it is recommended to take a look at the
+   abbreviated. If confusion arises it is recommended to take a look at the
    linked documents which are more exhaustive and include visual examples.
 
 Text can be encoded in multiple different ways when using Unicode. For many
