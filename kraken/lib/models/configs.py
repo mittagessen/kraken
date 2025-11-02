@@ -107,6 +107,12 @@ class SegmentationInferenceConfig(Config):
         legacy_black_colseps: bool = False,
         legacy_no_hlines: bool = True,
 
+        > Parameters for baseline segmenters
+
+        no_legacy_polygons (bool, defaults to False):
+            Disables the legacy polygon extractor even if the model has been
+            trained with it.
+
         > Parameters for bounding box segmenters (currently only the legacy segmenter)
 
         bbox_line_padding (Union[int, tuple[int, int]], defaults to 0):
@@ -127,6 +133,7 @@ class SegmentationInferenceConfig(Config):
         self.legacy_maxcolseps = kwargs.pop('legacy_maxcolseps', 2)
         self.legacy_black_colseps = kwargs.pop('legacy_black_colseps', False)
         self.legacy_no_hlines = kwargs.pop('legacy_no_hlines', True)
+        self.no_legacy_polygons = kwargs.pop('no_legacy_polygons', False)
         self.bbox_line_padding = kwargs.pop('bbox_line_padding', 0)
         self.input_padding = kwargs.pop('input_padding', 0)
         from kraken.lib.segmentation import reading_order, polygonal_reading_order

@@ -17,6 +17,7 @@ VGSL recognition inference subclass
 """
 import torch
 import logging
+import warnings
 import dataclasses
 import torch.nn.functional as F
 from collections.abc import Generator
@@ -37,11 +38,11 @@ __all__ = ['VGSLRecognitionInference']
 logger = logging.getLogger(__name__)
 
 
-def _extract_line(im, segmentation, line_idx):
+def _extract_line(im, segmentation, line_idx, legacy: bool = False):
     line = segmentation.lines[line_idx]
     seg = dataclasses.replace(segmentation, lines=[line])
     try:
-        im, _ = next(extract_polygons(im, seg, legacy=False))
+        im, _ = next(extract_polygons(im, seg, legacy=legacy))
         return im, line_idx
     except Exception:
         return None, line_idx
@@ -81,7 +82,22 @@ class VGSLRecognitionInference:
                                           (self._inf_config.padding, 0),
                                           valid_norm,
                                           dtype=self._m_dtype)
-        _exl = partial(_extract_line, im, segmentation)
+
+        if self.use_legacy_polygons and segmentation.type == 'baselines':
+            if self._inf_config.no_legacy_polygons:
+                warnings.warn('Enforcing use of the new polygon extractor for '
+                              'models trained with old version. Accuracy may be '
+                              'affected.')
+                legacy = False
+            else:
+                warnings.warn('Using legacy polygon extractor, as the model was '
+                              'not trained with the new method. Please retrain '
+                              'your model to get speed improvement.')
+                legacy = True
+        else:
+            legacy = False
+
+        _exl = partial(_extract_line, im, segmentation, legacy=legacy)
 
         with self._fabric.init_tensor():
             for im, line_idx in self._line_extraction_pool.imap_unordered(_exl, range(self._len)):
