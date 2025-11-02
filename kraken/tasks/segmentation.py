@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Union, Optional
 from kraken.registry import register
 from kraken.containers import Segmentation, BaselineLine
 from kraken.lib.segmentation import is_in_region
-from kraken.lib.models import load_models, SegmentationInferenceConfig
+from kraken.models import load_models, SegmentationInferenceConfig
 
 if TYPE_CHECKING:
     from os import PathLike

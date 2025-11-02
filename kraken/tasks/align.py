@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Union
 from kraken.registry import register
 from kraken.lib.vgsl import TorchVGSLModel
 from kraken.containers import Segmentation, BaselineOCRRecord
-from kraken.lib.models import load_models, RecognitionInferenceConfig
+from kraken.models import load_models, RecognitionInferenceConfig
 
 if TYPE_CHECKING:
     from os import PathLike

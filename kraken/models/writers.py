@@ -1,5 +1,5 @@
 """
-kraken.lib.models.writers
+kraken.models.writers
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Implementations for model writing in different formats.
@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Union, TYPE_CHECKING
 
 from kraken.registry import register, WRITER_REGISTRY
-from kraken.lib.models.base import BaseModel
+from kraken.models.base import BaseModel
 
 if TYPE_CHECKING:
     from kraken.lib.vgsl import TorchVGSLModel

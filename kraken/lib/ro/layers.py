@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Tuple
 import torch
 from torch import nn
 
-from kraken.lib.models import BaseModel
+from kraken.models import BaseModel
 from kraken.registry import register
 
 import logging

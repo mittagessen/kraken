@@ -7,7 +7,7 @@ import torch
 from torch.nn import Embedding, Linear
 
 from kraken.registry import register
-from kraken.lib.models import BaseModel
+from kraken.models import BaseModel
 from kraken.lib.pretrain.util import compute_mask_indices, sample_negatives
 
 if TYPE_CHECKING:

@@ -31,7 +31,7 @@ from kraken.lib.vgsl import layers
 from kraken.lib.vgsl.rpred import VGSLRecognitionInference
 from kraken.lib.vgsl.spred import VGSLSegmentationInference
 from kraken.registry import register
-from kraken.lib.models import BaseModel, Config, RecognitionInferenceConfig, SegmentationInferenceConfig
+from kraken.models import BaseModel, Config, RecognitionInferenceConfig, SegmentationInferenceConfig
 from kraken.lib.codec import PytorchCodec
 from kraken.lib.exceptions import KrakenInvalidModelException
 

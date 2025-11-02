@@ -1,5 +1,5 @@
 """
-kraken.lib.models.loaders
+kraken.models.loaders
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Implementation for model metadata and weight loading from various formats.
@@ -17,7 +17,7 @@ from collections.abc import Sequence
 from packaging.version import Version
 
 from kraken.registry import register, create_model, LOADER_REGISTRY
-from kraken.lib.models.base import BaseModel
+from kraken.models.base import BaseModel
 
 logger = logging.getLogger(__name__)
 

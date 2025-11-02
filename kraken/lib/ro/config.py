@@ -1,4 +1,4 @@
-from kraken.lib.models import TrainingConfig
+from kraken.models import TrainingConfig
 
 
 class ROTrainingConfig(TrainingConfig):
