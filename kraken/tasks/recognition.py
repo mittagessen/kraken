@@ -8,15 +8,15 @@ import torch
 from torch import nn
 
 from collections.abc import Generator
-from typing import TYPE_CHECKING, List, Optional, Union
+from typing import TYPE_CHECKING, Union
 
 from kraken.registry import register
-from kraken.containers import ocr_record
 from kraken.lib.models import load_models, RecognitionInferenceConfig
 
 if TYPE_CHECKING:
     from os import PathLike
-
+    from PIL import Image
+    from kraken.containers import Segmentation, ocr_record
 
 __all__ = ['RecognitionTaskModel']
 
@@ -43,7 +43,7 @@ class RecognitionTaskModel(nn.Module):
         if not len(models):
             raise ValueError('No recognition model in model list {models}.')
         if len(models) > 1:
-            logger.warning(f'More than one recognition model in model collection. Using first model.')
+            logger.warning('More than one recognition model in model collection. Using first model.')
 
         self.net = models[0]
         self.one_channel_mode = self.net.one_channel_mode
@@ -53,7 +53,7 @@ class RecognitionTaskModel(nn.Module):
     def predict(self,
                 im: 'Image.Image',
                 segmentation: 'Segmentation',
-                config: RecognitionInferenceConfig) -> Generator[ocr_record, None, None]:
+                config: RecognitionInferenceConfig) -> Generator['ocr_record', None, None]:
         self.net.prepare_for_inference(config)
         return self.net.predict(im=im, segmentation=segmentation)
 

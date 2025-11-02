@@ -56,6 +56,8 @@ class RecognitionInferenceConfig(Config):
 
         temperature (float, defaults to 1.0):
             The value used to smoothen the softmax distribution of the output cofidences.
+        return_line_image (bool defaults to False):
+            Switch to add the extracted line image to the output records.
         return_logits (bool, default to False):
             Switch to add raw logits to output records.
 
@@ -81,6 +83,7 @@ class RecognitionInferenceConfig(Config):
         import kraken.lib.ctc_decoder
         self.temperature = kwargs.pop('temperature', 1.0)
         self.return_logits = kwargs.pop('return_logits', False)
+        self.return_line_image = kwargs.pop('return_line_image', False)
         self.padding = kwargs.pop('padding', 16)
         self.num_line_workers = kwargs.pop('num_line_workers', 2)
         self.no_legacy_polygons = kwargs.pop('no_legacy_polygons', False)

@@ -90,7 +90,7 @@ class VGSLRecognitionInference:
                 ts_im = transforms(im)
                 if ts_im.max() == ts_im.min():
                     rec_results[line_idx] = _empty_record_cls('', [], [], segmentation.lines[line_idx])
-                input_queue.append((ts_im, im.size, line_idx))
+                input_queue.append((ts_im, im, line_idx))
                 # feed the input queue through the network
                 if len(input_queue) == self._inf_config.batch_size or len(input_queue) == rec_results.count(None):
                     for rec, idx in self._line_iter(input_queue, segmentation):
@@ -102,7 +102,7 @@ class VGSLRecognitionInference:
                     next_idx_to_emit += 1
 
     def _recognize_box_lines(self,
-                             lines: list[tuple['torch.Tensor', tuple[int, int], int]],
+                             lines: list[tuple['torch.Tensor', 'Image.Image', int]],
                              segmentation: 'Segmentation') -> Generator[tuple[BBoxOCRRecord, int], None, None]:
         max_len = max([seq.shape[2] for seq, *_ in lines])
         seqs = torch.stack([F.pad(seq, pad=(0, max_len-seq.shape[2])) for seq, *_ in lines])
@@ -115,7 +115,7 @@ class VGSLRecognitionInference:
             # scale between network output and network input
             self.net_scale = lines[idx][0].shape[2]/olen.item()
             # scale between network input and original line
-            self.in_scale = lines[idx][1]/(lines[idx][0].shape[2]-2*self._inf_config.padding)
+            self.in_scale = lines[idx][1].width/(lines[idx][0].shape[2]-2*self._inf_config.padding)
 
             # XXX: fix bounding box calculation ocr_record for multi-codepoint labels.
             pred_str = ''.join(x[0] for x in pred)
@@ -124,20 +124,21 @@ class VGSLRecognitionInference:
             for _, start, end, c in pred:
                 if segmentation.text_direction.startswith('horizontal'):
                     x, ymin, _, ymax = segmentation.lines[lines[idx][2]].bbox
-                    xmin = x + self._scale_val(start, 0, lines[idx][1][0])
-                    xmax = x + self._scale_val(end, 0, lines[idx][1][0])
+                    xmin = x + self._scale_val(start, 0, lines[idx][1].width)
+                    xmax = x + self._scale_val(end, 0, lines[idx][1].width)
                     pos.append([[xmin, ymin], [xmin, ymax], [xmax, ymax], [xmax, ymin]])
                 else:
                     xmin, y, xmax, _ = segmentation.lines[lines[idx][2]].bbox
-                    ymin = y + self._scale_val(start, 0, lines[idx][1][1])
-                    ymax = y + self._scale_val(end, 0, lines[idx][1][1])
+                    ymin = y + self._scale_val(start, 0, lines[idx][1].height)
+                    ymax = y + self._scale_val(end, 0, lines[idx][1].height)
                     pos.append([[xmin, ymin], [xmax, ymin], [xmax, ymax], [xmin, ymax]])
                 conf.append(c)
             rec = BBoxOCRRecord(pred_str,
                                 pos,
                                 conf,
                                 segmentation.lines[lines[idx][2]],
-                                logits=pred if self._inf_config.return_logits else None)
+                                logits=pred if self._inf_config.return_logits else None,
+                                image=lines[idx][1] if self._inf_config.return_line_image else None)
             if self._inf_config.bidi_reordering:
                 logger.debug('BiDi reordering record.')
                 yield rec.logical_order(base_dir=self._inf_config.bidi_reordering if self._inf_config.bidi_reordering in ('L', 'R') else None), lines[idx][2]
@@ -146,7 +147,7 @@ class VGSLRecognitionInference:
                 yield rec.display_order(None), lines[idx][2]
 
     def _recognize_baseline_lines(self,
-                                  lines: list[tuple['torch.Tensor', tuple[int, int], int]],
+                                  lines: list[tuple['torch.Tensor', 'Image.Image', int]],
                                   segmentation: 'Segmentation') -> Generator[tuple[BaselineOCRRecord, int], None, None]:
         max_len = max([seq.shape[2] for seq, *_ in lines])
         seqs = torch.stack([F.pad(seq, pad=(0, max_len-seq.shape[2])) for seq, *_ in lines])
@@ -155,25 +156,27 @@ class VGSLRecognitionInference:
         preds, olens = self._rec_predict(seqs, seq_lens)
 
         for idx, (pred, olen) in enumerate(zip(preds, olens)):
-            # calculate recognized LSTM locations of characters
-            # scale between network output and network input
+            # calculate recognized LSTM locations of characters scale between
+            # network output and network input. It should stay fixed, as the
+            # reduction factor is constant, but non-divisibility can cause
+            # slight differences between lines.
             self.net_scale = lines[idx][0].shape[2]/olen.item()
             # scale between network input and original line
-            self.in_scale = lines[idx][1][0]/(lines[idx][0].shape[2]-2*self._inf_config.padding)
-
+            self.in_scale = lines[idx][1].width/(lines[idx][0].shape[2]-2*self._inf_config.padding)
             # XXX: fix bounding box calculation ocr_record for multi-codepoint labels.
             pred_str = ''.join(x[0] for x in pred)
             pos = []
             conf = []
             for _, start, end, c in pred:
-                pos.append([self._scale_val(start, 0, lines[idx][1][0]),
-                            self._scale_val(end, 0, lines[idx][1][0])])
+                pos.append([self._scale_val(start, 0, lines[idx][1].width),
+                            self._scale_val(end, 0, lines[idx][1].width)])
                 conf.append(c)
             rec = BaselineOCRRecord(pred_str,
                                     pos,
                                     conf,
                                     segmentation.lines[lines[idx][2]],
-                                    logits=pred if self._inf_config.return_logits else None)
+                                    logits=self.outputs[idx, ..., :olen].clone() if self._inf_config.return_logits else None,
+                                    image=lines[idx][1] if self._inf_config.return_line_image else None)
 
             if self._inf_config.bidi_reordering:
                 logger.debug('BiDi reordering record.')

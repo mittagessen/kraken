@@ -31,7 +31,7 @@ from kraken.lib.segmentation import compute_polygon_section
 if TYPE_CHECKING:
     import torch
     from os import PathLike
-
+    from PIL import Image
 
 __all__ = ['ocr_line',
            'BaselineLine',
@@ -216,12 +216,14 @@ class ocr_record(ABC):
                                                          tuple[int, int]]]],
                  confidences: list[float],
                  display_order: bool = True,
-                 logits: Optional['torch.FloatTensor'] = None) -> None:
+                 logits: Optional['torch.FloatTensor'] = None,
+                 image: Optional['Image.Image'] = None) -> None:
         self._prediction = prediction
         self._cuts = cuts
         self._confidences = confidences
         self._display_order = display_order
         self.logits = logits
+        self.image = image
 
     @property
     @abstractmethod
@@ -296,6 +298,7 @@ class BaselineOCRRecord(ocr_record, BaselineLine):
                        point corresponds to the n-th read code point. See [UAX
                        #9](https://unicode.org/reports/tr9) for more details.
         logits: The logits for the prediction.
+        image: The line image used to produce the prediction.
 
     Notes:
         When slicing the record the behavior of the cuts is changed from
@@ -309,13 +312,15 @@ class BaselineOCRRecord(ocr_record, BaselineLine):
     """
     type = 'baselines'
 
-    def __init__(self, prediction: str,
+    def __init__(self,
+                 prediction: str,
                  cuts: list[tuple[int, int]],
                  confidences: list[float],
                  line: Union[BaselineLine, dict[str, Any]],
                  base_dir: Optional[Literal['L', 'R']] = None,
                  display_order: bool = True,
-                 logits: Optional['torch.FloatTensor'] = None) -> None:
+                 logits: Optional['torch.FloatTensor'] = None,
+                 image: Optional['Image.Image'] = None) -> None:
         if not isinstance(line, dict):
             line = asdict(line)
         if line['type'] != 'baselines':
@@ -323,7 +328,7 @@ class BaselineOCRRecord(ocr_record, BaselineLine):
         BaselineLine.__init__(self, **line)
         self._line_base_dir = self.base_dir
         self.base_dir = base_dir
-        ocr_record.__init__(self, prediction, cuts, confidences, display_order, logits)
+        ocr_record.__init__(self, prediction, cuts, confidences, display_order, logits, image)
 
     def __repr__(self) -> str:
         return f'pred: {self.prediction} baseline: {self.baseline} boundary: {self.boundary} confidences: {self.confidences}'
@@ -449,7 +454,9 @@ class BaselineOCRRecord(ocr_record, BaselineLine):
                                 confidences=confidences,
                                 line=line,
                                 base_dir=base_dir,
-                                display_order=not self._display_order)
+                                display_order=not self._display_order,
+                                logits=self.logits,
+                                image=self.image)
         return rec
 
 
@@ -476,6 +483,7 @@ class BBoxOCRRecord(ocr_record, BBoxLine):
                        point corresponds to the n-th read code point. See [UAX
                        #9](https://unicode.org/reports/tr9) for more details.
         logits: The logits for the prediction.
+        image: The line image used to produce the prediction.
 
     Notes:
         When slicing the record the behavior of the cuts is changed from
@@ -499,7 +507,8 @@ class BBoxOCRRecord(ocr_record, BBoxLine):
                  line: Union[BBoxLine, dict[str, Any]],
                  base_dir: Optional[Literal['L', 'R']] = None,
                  display_order: bool = True,
-                 logits: Optional['torch.FloatTensor'] = None) -> None:
+                 logits: Optional['torch.FloatTensor'] = None,
+                 image: Optional['Image.Image'] = None) -> None:
         if not isinstance(line, dict):
             line = asdict(line)
         if line['type'] != 'bbox':
@@ -507,7 +516,7 @@ class BBoxOCRRecord(ocr_record, BBoxLine):
         BBoxLine.__init__(self, **line)
         self._line_base_dir = self.base_dir
         self.base_dir = base_dir
-        ocr_record.__init__(self, prediction, cuts, confidences, display_order, logits)
+        ocr_record.__init__(self, prediction, cuts, confidences, display_order, logits, image)
 
     def __repr__(self) -> str:
         return f'pred: {self.prediction} bbox: {self.bbox} confidences: {self.confidences}'
@@ -621,5 +630,7 @@ class BBoxOCRRecord(ocr_record, BBoxLine):
                             confidences=confidences,
                             line=line,
                             base_dir=base_dir,
-                            display_order=not self._display_order)
+                            display_order=not self._display_order,
+                            logits=self.logits,
+                            image=self.image)
         return rec
