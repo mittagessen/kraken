@@ -4,13 +4,9 @@ kraken.lib.models.configs
 
 Base classes for configurations
 """
-from abc import ABC, abstractmethod
-from typing import Union, Literal, NewType
-
-__all__ = ['BaseModel']
-
 import logging
 
+__all__ = ['Config', 'RecognitionInferenceConfig', 'SegmentationInferenceConfig', 'TrainingConfig']
 logger = logging.getLogger(__name__)
 
 
@@ -164,7 +160,7 @@ class TrainingConfig(Config):
         momentum (float, defaults to 0.9):
             Momentum parameter. Ignored if optimizer doesn't use it.
         weight_decay (float, defaults to 0.0):
-            Weight decay. Ignored if optimizer doesn't support it. 
+            Weight decay. Ignored if optimizer doesn't support it.
 
         > Learning rate scheduling parameters
 
@@ -173,7 +169,7 @@ class TrainingConfig(Config):
         warmup (int, defaults to 0):
             Number of iterations to warmup learning rate.
         step_size (int, defaults to 10):
-            Learning rate decay in stepped schedule. 
+            Learning rate decay in stepped schedule.
         gamma (float, defaults to 0.1):
             Learning rate decay in exponential schedule.
         rop_factor (float, defaults to 0.1):

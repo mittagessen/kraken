@@ -82,7 +82,7 @@ class ForcedAlignmentTaskModel(nn.Module):
                                f'{2*len(labels)} (length of "{record.text}" after encoding).')
                 records.append(record.__class__('', [], [], segmentation.lines[idx]))
                 continue
-            emission = record.logits.squeeze().T
+            emission = record.logits.squeeze().log_softmax(0).T
             trellis = get_trellis(emission, labels)
             path = backtrack(trellis, emission, labels)
             path = merge_repeats(path, do_text)

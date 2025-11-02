@@ -94,6 +94,9 @@ class mm_rpred(object):
             KrakenInputException if the mapping between segmentation tags and
             networks is incomplete.
         """
+        warnings.warn('`rpred.mm_rpred` is deprecated and will be removed with kraken 8. Use `RecognitionTaskModel` instead.',
+                      DeprecationWarning)
+
         seg_types = set(recognizer.seg_type for recognizer in nets.values())
         if isinstance(nets, defaultdict):
             seg_types.add(nets.default_factory().seg_type)

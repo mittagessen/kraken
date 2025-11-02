@@ -4,12 +4,15 @@ kraken.lib.models.base
 
 Base metaclass for models
 """
+import logging
+
 from abc import ABC, abstractmethod
-from typing import Union, Literal, NewType
+from typing import Union, Literal, NewType, TYPE_CHECKING
 
 __all__ = ['BaseModel']
 
-import logging
+if TYPE_CHECKING:
+    from kraken.lib.models.configs import Config 
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +91,7 @@ class BaseModel(ABC):
         pass
 
     @abstractmethod
-    def prepare_for_inference(self, config: 'InferenceConfig'):
+    def prepare_for_inference(self, config: 'Config'):
         """
         Prepares the model for inference.
         """

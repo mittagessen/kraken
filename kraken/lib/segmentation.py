@@ -781,7 +781,7 @@ def calculate_polygonal_environment(im: Image.Image = None,
     return polygons
 
 
-def polygonal_reading_order(lines: list['BaselineLine'], 
+def polygonal_reading_order(lines: list['BaselineLine'],
                             text_direction: Literal['lr', 'rl'] = 'lr',
                             regions: Optional[Sequence[geom.Polygon]] = None) -> Sequence[int]:
     """

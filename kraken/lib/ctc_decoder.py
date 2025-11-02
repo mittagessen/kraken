@@ -22,15 +22,12 @@ more complex beam search decoder.
 
 Extracted label sequences are converted into the code point domain using kraken.lib.codec.PytorchCodec.
 """
-
-import collections
-from itertools import groupby
-
 import torch
 import numpy as np
-from scipy.ndimage import measurements
-from scipy.special import logsumexp
+
 from typing import Union
+from itertools import groupby
+
 
 __all__ = ['greedy_decoder']
 
@@ -61,7 +58,7 @@ def greedy_decoder(outputs: Union[torch.Tensor, np.ndarray],
     if outputs.shape[0] == 1 and seq_lens is None:
         seq_lens = torch.tensor([outputs.shape[-1]])
     elif seq_lens is None:
-        raise ValueError(f'seq_lens need to be set for batch decoding.')
+        raise ValueError('seq_lens need to be set for batch decoding.')
 
     dec = []
     for seq, seq_len in zip(outputs, seq_lens):

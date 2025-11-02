@@ -17,7 +17,7 @@ Model constructor, task, and hyperparameter registries.
 """
 import inspect
 import importlib
-from functools import partial 
+from functools import partial
 from collections import OrderedDict
 
 from typing import Literal
@@ -46,7 +46,7 @@ def register(type: Literal['loader', 'model', 'task']):
     def wrapper(cls, registry=None):
         if cls.__name__ in registry:
             raise ValueError(f'{cls.__name__} already registered.')
-            
+
         argspec = inspect.getfullargspec(cls.__init__)
         arg_names = list(filter(lambda x: x != 'self', argspec.args))
 
@@ -60,7 +60,7 @@ def register(type: Literal['loader', 'model', 'task']):
             if i >= required:
                 value = argspec.defaults[i - required]
             else:
-                value = None 
+                value = None
             schema[name] = value
 
         registry[cls.__name__] = schema

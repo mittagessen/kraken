@@ -42,11 +42,12 @@ def _coreml_lin(spec):
 def _coreml_rnn(spec):
     weights = {}
     for layer in spec:
-        if (arch := layer.WhichOneof('layer')) in ['uniDirectionalLSTM' , 'biDirectionalLSTM']:
+        if (arch := layer.WhichOneof('layer')) in ['uniDirectionalLSTM', 'biDirectionalLSTM']:
             rnn = getattr(layer, arch)
             output_size = rnn.outputVectorSize
             input_size = rnn.inputVectorSize
             name = layer.name.removesuffix('_transposed')
+
             def _deserialize_weights(params, direction):
                 # ih_matrix
                 weight_ih = torch.Tensor([params.inputGateWeightMatrix.floatValue,  # wi

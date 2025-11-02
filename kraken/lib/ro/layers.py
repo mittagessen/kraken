@@ -35,7 +35,7 @@ class ROMLP(nn.Module, BaseModel):
         if (hidden_size := kwargs.get('hidden_size', None)) is None:
             raise ValueError('`hidden_size` is missing in model arguments.')
         if kwargs.get('class_mapping', None) is None:
-            logger.warning(f'Class mapping missing in reading order model arguments.')
+            logger.warning('Class mapping missing in reading order model arguments.')
 
         self.user_metadata = kwargs
         self.fc1 = nn.Linear(feature_size, hidden_size)

@@ -27,7 +27,6 @@ import numpy as np
 import PIL
 from scipy.ndimage import gaussian_filter, maximum_filter, uniform_filter
 
-from kraken.registry import register
 from kraken.containers import BBoxLine, Segmentation
 from kraken.lib import morph, sl
 from kraken.lib.exceptions import KrakenInputException

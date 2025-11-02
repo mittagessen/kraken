@@ -15,9 +15,10 @@
 """
 VGSL plumbing
 """
+import re
 import json
 import logging
-import re
+import warnings
 from os import PathLike
 from typing import (Any, Callable, Iterable, Optional, Sequence, Union)
 
@@ -37,8 +38,8 @@ from kraken.lib.exceptions import KrakenInvalidModelException
 root_logger = logging.getLogger()
 level = root_logger.getEffectiveLevel()
 root_logger.setLevel(logging.ERROR)
-from coremltools.models import MLModel, datatypes
-from coremltools.models.neural_network import NeuralNetworkBuilder
+from coremltools.models import MLModel, datatypes  # NOQA
+from coremltools.models.neural_network import NeuralNetworkBuilder  # NOQA
 root_logger.setLevel(level)
 
 # all tensors are ordered NCHW, the "feature" dimension is C, so the output of
@@ -287,6 +288,9 @@ class TorchVGSLModel(nn.Module,
             string, protobuf file, or without appropriate metadata).
             FileNotFoundError if the path doesn't point to a file.
         """
+        warnings.warn('`TorchVGSLModel.load_model` is deprecated and will be removed with kraken 8. Use `kraken.registry.load_model` instead.',
+                      DeprecationWarning)
+
         if isinstance(path, PathLike):
             path = path.as_posix()
         try:

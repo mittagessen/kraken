@@ -19,13 +19,11 @@ kraken.blla
 Trainable layout analysis tools for kraken for line and region detection. The
 line recognizer uses the baseline paradigm.
 """
-
-import logging
-import uuid
-from typing import Any, Callable, Dict, List, Literal, Optional, Union
-
-import numpy as np
 import PIL
+import uuid
+import logging
+import warnings
+import numpy as np
 import shapely.geometry as geom
 import torch
 import torch.nn.functional as F
@@ -35,6 +33,8 @@ from torchvision.transforms import v2
 from importlib import resources
 from scipy.ndimage import gaussian_filter
 from skimage.filters import sobel
+from typing import Any, Callable, Literal, Optional, Union, TYPE_CHECKING
+
 
 from kraken.containers import BaselineLine, Region, Segmentation
 from kraken.lib import dataset, vgsl
@@ -49,14 +49,17 @@ from kraken.lib.util import get_im_str, is_bitonal
 
 __all__ = ['segment']
 
+if TYPE_CHECKING:
+    from PIL import Image
+
 logger = logging.getLogger(__name__)
 
 
-def compute_segmentation_map(im: PIL.Image.Image,
+def compute_segmentation_map(im: 'Image.Image',
                              mask: Optional[np.ndarray] = None,
                              model: vgsl.TorchVGSLModel = None,
                              device: str = 'cpu',
-                             autocast: bool = False) -> Dict[str, Any]:
+                             autocast: bool = False) -> dict[str, Any]:
     """
     Args:
         im: Input image
@@ -69,7 +72,7 @@ def compute_segmentation_map(im: PIL.Image.Image,
 
     Returns:
         A dictionary containing the heatmaps ('heatmap', torch.Tensor), class
-        map ('cls_map', Dict[str, Dict[str, int]]), the bounding regions for
+        map ('cls_map', dict[str, dict[str, int]]), the bounding regions for
         polygonization purposes ('bounding_regions', List[str]), the scale
         between the input image and the network output ('scale', float), and
         the scaled input image to the network ('scal_im', PIL.Image.Image).
@@ -136,14 +139,14 @@ def compute_segmentation_map(im: PIL.Image.Image,
             'scal_im': scal_im}
 
 
-def vec_regions(heatmap: torch.Tensor, cls_map: Dict, scale: float, **kwargs) -> Dict[str, List[Region]]:
+def vec_regions(heatmap: torch.Tensor, cls_map: dict, scale: float, **kwargs) -> dict[str, list[Region]]:
     """
     Computes regions from a stack of heatmaps, a class mapping, and scaling
     factor.
 
     Args:
         heatmap: A stack of heatmaps of shape `NxHxW` output from the network.
-        cls_map: Dictionary mapping string identifiers to indices on the stack
+        cls_map: dictionary mapping string identifiers to indices on the stack
                  of heatmaps.
         scale: Scaling factor between heatmap and unscaled input image.
 
@@ -162,22 +165,22 @@ def vec_regions(heatmap: torch.Tensor, cls_map: Dict, scale: float, **kwargs) ->
 
 
 def vec_lines(heatmap: torch.Tensor,
-              cls_map: Dict[str, Dict[str, int]],
+              cls_map: dict[str, dict[str, int]],
               scale: float,
               text_direction: str = 'horizontal-lr',
-              regions: List[np.ndarray] = None,
+              regions: list[np.ndarray] = None,
               scal_im: np.ndarray = None,
-              suppl_obj: List[np.ndarray] = None,
+              suppl_obj: list[np.ndarray] = None,
               topline: Optional[bool] = False,
               raise_on_error: bool = False,
-              **kwargs) -> List[Dict[str, Any]]:
+              **kwargs) -> list[dict[str, Any]]:
     r"""
     Computes lines from a stack of heatmaps, a class mapping, and scaling
     factor.
 
     Args:
         heatmap: A stack of heatmaps of shape `NxHxW` output from the network.
-        cls_map: Dictionary mapping string identifiers to indices on the stack
+        cls_map: dictionary mapping string identifiers to indices on the stack
                  of heatmaps.
         scale: Scaling factor between heatmap and unscaled input image.
         text_direction: Text directions used as hints in the reading order
@@ -247,7 +250,7 @@ def segment(im: PIL.Image.Image,
             text_direction: Literal['horizontal-lr', 'horizontal-rl', 'vertical-lr', 'vertical-rl'] = 'horizontal-lr',
             mask: Optional[np.ndarray] = None,
             reading_order_fn: Callable = polygonal_reading_order,
-            model: Union[List[vgsl.TorchVGSLModel], vgsl.TorchVGSLModel] = None,
+            model: Union[list[vgsl.TorchVGSLModel], vgsl.TorchVGSLModel] = None,
             device: str = 'cpu',
             raise_on_error: bool = False,
             autocast: bool = False) -> Segmentation:
@@ -298,6 +301,9 @@ def segment(im: PIL.Image.Image,
         are high. In addition, neural reading order determination is disabled
         when more than one model outputs lines.
     """
+    warnings.warn('`blla.segment)` is deprecated and will be removed with kraken 8. Use `SegmentationTaskModel` instead.',
+                  DeprecationWarning)
+
     if model is None:
         logger.info('No segmentation model given. Loading default model.')
         model = vgsl.TorchVGSLModel.load_model(resources.files(__name__).joinpath('blla.mlmodel'))
