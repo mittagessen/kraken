@@ -148,7 +148,7 @@ The full metadata record of a particular model can be accessed using the `show` 
 
 The contents of the metadata record can vary between individual records as many
 are in the legacy `v0` schema format and do not contain information such as
-model provenance, software compatiblity hints, etc.
+model provenance, software compatibility hints, etc.
 
 If a suitable model has been decided upon it can be retrieved using the ``get``
 subcommand:
