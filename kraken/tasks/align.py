@@ -61,6 +61,24 @@ class ForcedAlignmentTaskModel(nn.Module):
                 im: 'Image.Image',
                 segmentation: 'Segmentation',
                 config: RecognitionInferenceConfig) -> Segmentation:
+        """
+        Aligns the transcription of an image with the output of the text
+        recognition model, producing approximate character locations.
+
+        When the character sets of transcription and recognition model differ,
+        the affected code points in the furnished transcription will silently
+        be ignored. In case inference fails on a line, a record without
+        cuts/confidences is returned. 
+
+        Args:
+            im: The input image
+            segmentation: A segmentation with transcriptions to align.
+            config: A recognition inference configuration. The task model will
+                    automatically set some required configuration flags on it.
+
+        Returns:
+            A single segmentation that contains the aligned `ocr_record` objects. 
+        """
         if not config.return_logits:
             logger.info('Forced alignment requires logits in output records. Enabling.')
             config.return_logits = True
