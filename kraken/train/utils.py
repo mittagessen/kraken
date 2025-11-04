@@ -179,7 +179,7 @@ class KrakenSaveModel(Callback):
             trainer.model.best_model = f'{trainer.model.output}_{trainer.model.best_epoch}.mlmodel'
 
 
-def _configure_optimizer_and_lr_scheduler(hparams, params, len_train_set=None, loss_tracking_mode='max'):
+def configure_optimizer_and_lr_scheduler(hparams, params, len_train_set=None, loss_tracking_mode='max'):
     optimizer = hparams.get("optimizer")
     lrate = hparams.get("lrate")
     momentum = hparams.get("momentum")

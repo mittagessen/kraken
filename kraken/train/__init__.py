@@ -1,3 +1,3 @@
-from .util import KrakenTrainer  # NOQA
-from .crnn import RecognitionModel  # NOQA
-from .blla import SegmentationModel  # NOQA
+from .utils import KrakenTrainer  # NOQA
+#from .crnn import RecognitionModel  # NOQA
+from .blla import *  # NOQA

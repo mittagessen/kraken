@@ -49,17 +49,11 @@ class BaselineSet(Dataset):
     Dataset for training a baseline/region segmentation model.
     """
     def __init__(self,
+                 class_mapping: dict[str, dict[str, int]],
                  line_width: int = 4,
                  padding: Tuple[int, int, int, int] = (0, 0, 0, 0),
                  im_transforms: Callable[[Any], torch.Tensor] = transforms.Compose([]),
-                 augmentation: bool = False,
-                 valid_baselines: Sequence[str] = None,
-                 merge_baselines: Dict[str, Sequence[str]] = None,
-                 merge_all_baselines: Optional[str] = None,
-                 valid_regions: Sequence[str] = None,
-                 merge_regions: Dict[str, Sequence[str]] = None,
-                 merge_all_regions: Optional[str] = None,
-                 class_mapping: Optional[Dict[str, int]] = None) -> None:
+                 augmentation: bool = False) -> None:
         """
         Creates a dataset for a text-line and region segmentation model.
 
@@ -67,50 +61,22 @@ class BaselineSet(Dataset):
             line_width: Height of the baseline in the scaled input.
             padding: Tuple of ints containing the left/right, top/bottom
                      padding of the input images.
-            target_size: Target size of the image as a (height, width) tuple.
             augmentation: Enable/disable augmentation.
-            valid_baselines: Sequence of valid baseline identifiers. If `None`
-                             all are valid.
-            merge_baselines: Sequence of baseline identifiers to merge.  Note
-                             that merging occurs after entities not in valid_*
-                             have been discarded.
-            merge_all_baselines: Merges all baseline types into the argument
-                                 identifier. Baselines are still filtered by
-                                 `valid_baselines`.
-            valid_regions: Sequence of valid region identifiers. If `None` all
-                           are valid.
-            merge_regions: Sequence of region identifiers to merge. Note that
-                           merging occurs after entities not in valid_* have
-                           been discarded.
-            merge_all_regions: Merges all region types into the argument
-                               identifier (after) valid_regions filtering.
-            class_mapping: Explicit class map.
+            class_mapping: class map.
         """
         super().__init__()
         self.imgs = []
         self.im_mode = '1'
         self.pad = padding
         self.targets = []
-        # n-th entry contains semantic of n-th class
-        if class_mapping:
-            self.class_mapping = class_mapping
-            self.num_classes = sum(len(v) for v in self.class_mapping.values())
-            self.freeze_cls_map = True
-        else:
-            self.class_mapping = {'aux': {'_start_separator': 0, '_end_separator': 1}, 'baselines': {}, 'regions': {}}
-            self.num_classes = 2
-            self.freeze_cls_map = False
+        self.class_mapping = class_mapping
+        self.num_classes = sum(len(v) for v in self.class_mapping.values())
+
         # keep track of samples that failed to load
         self.failed_samples = set()
         self.class_stats = {'baselines': defaultdict(int), 'regions': defaultdict(int)}
-        self.mbl_dict = merge_baselines if merge_baselines is not None else {}
-        self.mreg_dict = merge_regions if merge_regions is not None else {}
-        self.valid_baselines = valid_baselines
-        self.valid_regions = valid_regions
-        self.merge_all_baselines = merge_all_baselines
-        self.merge_all_regions = merge_all_regions
-
         self.aug = None
+
         if augmentation:
             import cv2
             cv2.setNumThreads(0)
@@ -133,6 +99,7 @@ class BaselineSet(Dataset):
                                 ], p=0.2),
                                 HueSaturationValue(hue_shift_limit=20, sat_shift_limit=0.1, val_shift_limit=0.1, p=0.3),
                                ], p=0.5)
+
         self.line_width = line_width
         self.transforms = im_transforms
         self.seg_type = None
@@ -149,37 +116,26 @@ class BaselineSet(Dataset):
 
         baselines_ = defaultdict(list)
         for line in doc.lines:
-            tag_val = _get_type(line.tags)
-            if self.valid_baselines is None or tag_val in self.valid_baselines:
-                tag = self.mbl_dict.get(tag_val, tag_val)
-                if self.merge_all_baselines:
-                    tag = self.merge_all_baselines
-
-                if tag not in self.class_mapping['baselines'] and self.freeze_cls_map:
-                    continue
-                if tag not in self.class_mapping['baselines']:
-                    self.num_classes += 1
-                    self.class_mapping['baselines'][tag] = self.num_classes - 1
-
-                baselines_[tag].append(line.baseline)
-                self.class_stats['baselines'][tag] += 1
+            tag = _get_type(line.tags)
+            try:
+                idx = self.class_mapping['baselines'][tag]
+                baselines_[idx].append(line.baseline)
+                self.class_stats['baselines'][idx] += 1
+            except KeyError:
+                continue
 
         regions_ = defaultdict(list)
         for k, v in doc.regions.items():
-            v = [x for x in v if x.boundary]
-            if self.valid_regions is None or k in self.valid_regions:
-                reg_type = self.mreg_dict.get(k, k)
-                if self.merge_all_regions:
-                    reg_type = self.merge_all_regions
-                if reg_type not in self.class_mapping['regions'] and self.freeze_cls_map:
-                    continue
-                elif reg_type not in self.class_mapping['regions']:
-                    self.num_classes += 1
-                    self.class_mapping['regions'][reg_type] = self.num_classes - 1
-                regions_[reg_type].extend(v)
-                self.class_stats['regions'][reg_type] += len(v)
+            try:
+                idx = self.class_mapping['regions'][k]
+                v = [x for x in v if x.boundary]
+                regions_[idx].extend(v)
+                self.class_stats['regions'][idx] += len(v)
+            except KeyError:
+                continue
         self.targets.append({'baselines': baselines_, 'regions': regions_})
         self.imgs.append(doc.imagename)
+        self.num_classes = sum(len(v) for v in self.class_mapping.values())
 
     def __getitem__(self, idx):
         if len(self.failed_samples) == len(self):

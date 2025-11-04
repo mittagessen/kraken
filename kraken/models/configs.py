@@ -6,7 +6,16 @@ Base classes for configurations
 """
 import logging
 
-__all__ = ['Config', 'RecognitionInferenceConfig', 'SegmentationInferenceConfig', 'TrainingConfig']
+from collections import defaultdict
+
+__all__ = ['Config',
+           'RecognitionInferenceConfig',
+           'SegmentationInferenceConfig',
+           'TrainingConfig',
+           'TrainingDataConfig',
+           'RecognitionTrainingDataConfig',
+           'SegmentationTrainingDataConfig']
+
 logger = logging.getLogger(__name__)
 
 
@@ -41,6 +50,114 @@ class Config:
         self.batch_size = kwargs.pop('batch_size', 1)
         self.compile_config = kwargs.pop('compile', None)
         self.raise_on_error = kwargs.pop('raise_on_error', False)
+
+
+class TrainingDataConfig:
+    """
+    Generic configuration for datasets for all tasks.
+
+    Arg:
+        > Universal parameters
+
+        training_data (list of paths):
+            A list of training data files.
+        evaluation_data (list of paths, optional):
+            A list of evaluation data files.
+        partition (float, defaults to 0.9):
+            Automatic partition of training data files of no evaluation data is
+            defined.
+        num_workers (int, defaults to 1):
+            Number of dataloader workers.
+        augment (bool, defaults to False):
+            Switch to enable augmentation.
+    """
+    def __init__(self, **kwargs):
+        super().__init__()
+        self.training_data = kwargs.pop('training_data', None)
+        self.evaluation_data = kwargs.pop('evaluation_data', None)
+        self.partition = kwargs.pop('partition', 0.9)
+        self.num_workers = kwargs.pop('num_workers', 1)
+        self.augment = kwargs.pop('augment', False)
+
+
+class SegmentationTrainingDataConfig(TrainingDataConfig):
+    """
+    Configuration for segmentation training data.
+
+    Arg:
+        > Universal parameters
+
+        format_type (Literal['alto', 'page', 'xml'] defaults to 'xml'):
+            Format of the training data.
+        suppress_regions (bool, defaults to False):
+            Suppresses all regions in the dataset.
+        suppress_baselines (bool, defaults to False)
+            Suppresses all baselines in the dataset. 
+        line_class_mapping (dict[str, int], defaults to defaultdict):
+            Mapping between line class identifiers and integer labels.
+        region_class_mapping (dict[str, int], defaults to None):
+            Mapping between region class identifiers and integer labels. Same
+            semantics as `line_class_mapping`.
+        topline (Union[bool, None], defaults to False):
+            Indicator of baseline position in dataset. False = baseline, True =
+            topline, None = centerline.
+
+    Notes:
+        line_class_mapping and region_class_mapping share a label space, i.e.,
+        duplicate label values will result in merging of classes. This feature
+        can be used to merge multiple line or region types into a single class:
+
+        ```
+        line_class_mapping = OrderedDict([('line_type_1', 2), ('line_type_2', 2)])
+        ```
+
+        will merge 'line_type_1' and 'line_type_2' in the detector. The
+        OrderedDict is necessary to make the reverse lookup of labels to
+        identifiers deterministic (the first occurence of the type will be used
+        as the identifier in the output).
+
+        Regions or baselines can be suppressed to train only on one or the
+        other. To do so, set line_class_mapping or region_class_mapping to an
+        empty dictionary.
+
+        The values for both mappings default to a modified defaultdict that
+        assigns a unique label to each line/region class in the training data.
+    """
+    def __init__(self, **kwargs):
+        counter = {'i': 2}
+
+        def idx_factory():
+            val = counter['i']
+            counter['i'] += 1
+            return val
+
+        self.format_type = kwargs.pop('format_type', 'xml')
+        self.line_class_mapping = kwargs.pop('line_class_mapping', defaultdict(idx_factory))
+        self.region_class_mapping = kwargs.pop('region_class_mapping', defaultdict(idx_factory))
+        self.topline = kwargs.pop('topline', False)
+        super().__init__(**kwargs)
+
+
+class RecognitionTrainingDataConfig(TrainingDataConfig):
+    """
+    Configuration for recognition training data.
+
+    Arg:
+        > Text recognition parameters
+
+        binary_dataset_split (bool, defaults to False):
+            Flag to retrieve fixed splits from binary datasets.
+        format_type (Literal['alto', 'page', 'xml', 'binary'], defaults to 'xml'):
+            Format of the training data.
+        codec: (Union[dict[str, Sequence[int]], Sequence[str], str], defaults to None):
+            Codec mapping one or more Unicode code points to one or more
+            integers.
+    """
+    def __init__(self, **kwargs):
+        self.binary_dataset_split = kwargs.pop('binary_dataset_split', False)
+        self.format_type = kwargs.pop('format_type', 'xml')
+        self.codec = kwargs.pop('codec', None)
+        super().__init__(**kwargs)
 
 
 class RecognitionInferenceConfig(Config):
@@ -153,8 +270,6 @@ class TrainingConfig(Config):
             Number of epochs to train for.
         freq (float, defaults to 1.0):
             Evaluation and checkpoint saving frequency
-        augment (bool, defaults to False):
-            Switch to enable/disable augmentation.
         checkpoint_path (PathLike, defaults to `model`):
             Path prefix to save checkpoints during training.
 
@@ -203,7 +318,6 @@ class TrainingConfig(Config):
     def __init__(self, **kwargs):
         self.epochs = kwargs.pop('epochs', -1)
         self.freq = kwargs.pop('freq', 1.0)
-        self.augment = kwargs.pop('augment', False)
         self.checkpoint_path = kwargs.pop('checkpoint_path', 'model')
         self.optimizer = kwargs.pop('optimizer', 'AdamW')
         self.lrate = kwargs.pop('lrate', 1e-5)
