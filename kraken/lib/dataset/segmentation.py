@@ -149,6 +149,7 @@ class BaselineSet(Dataset):
                 im, target = self.transform(im, target)
                 return {'image': im, 'target': target}
             except Exception:
+                raise
                 self.failed_samples.add(idx)
                 idx = np.random.randint(0, len(self.imgs))
                 logger.debug(traceback.format_exc())
@@ -178,12 +179,7 @@ class BaselineSet(Dataset):
         start_sep_cls = self.class_mapping['aux']['_start_separator']
         end_sep_cls = self.class_mapping['aux']['_end_separator']
 
-        for key, lines in target['baselines'].items():
-            try:
-                cls_idx = self.class_mapping['baselines'][key]
-            except KeyError:
-                # skip lines of classes not present in the training set
-                continue
+        for cls_idx, lines in target['baselines'].items():
             for line in lines:
                 # buffer out line to desired width
                 line = [k for k, g in groupby(line)]
@@ -207,12 +203,7 @@ class BaselineSet(Dataset):
                 rr_s, cc_s = polygon(end_sep[:, 1], end_sep[:, 0], shape=image.shape[1:])
                 t[end_sep_cls, rr_s, cc_s] = 1
                 t[end_sep_cls, rr, cc] = 0
-        for key, regions in target['regions'].items():
-            try:
-                cls_idx = self.class_mapping['regions'][key]
-            except KeyError:
-                # skip regions of classes not present in the training set
-                continue
+        for cls_idx, regions in target['regions'].items():
             for region in regions:
                 region = np.array(scale_regions([region.boundary], scale)[0])
                 rr, cc = polygon(region[:, 1], region[:, 0], shape=image.shape[1:])

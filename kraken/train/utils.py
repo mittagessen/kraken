@@ -180,19 +180,19 @@ class KrakenSaveModel(Callback):
 
 
 def configure_optimizer_and_lr_scheduler(hparams, params, len_train_set=None, loss_tracking_mode='max'):
-    optimizer = hparams.get("optimizer")
-    lrate = hparams.get("lrate")
-    momentum = hparams.get("momentum")
-    weight_decay = hparams.get("weight_decay")
-    schedule = hparams.get("schedule")
-    gamma = hparams.get("gamma")
-    cos_t_max = hparams.get("cos_t_max")
-    cos_min_lr = hparams.get("cos_min_lr")
-    step_size = hparams.get("step_size")
-    rop_factor = hparams.get("rop_factor")
-    rop_patience = hparams.get("rop_patience")
-    epochs = hparams.get("epochs")
-    completed_epochs = hparams.get("completed_epochs")
+    optimizer = hparams.optimizer
+    lrate = hparams.lrate
+    momentum = hparams.momentum
+    weight_decay = hparams.weight_decay
+    schedule = hparams.schedule
+    gamma = hparams.gamma
+    cos_t_max = hparams.cos_t_max
+    cos_min_lr = hparams.cos_min_lr
+    step_size = hparams.step_size
+    rop_factor = hparams.rop_factor
+    rop_patience = hparams.rop_patience
+    epochs = hparams.epochs
+    completed_epochs = hparams.completed_epochs
 
     # XXX: Warmup is not configured here because it needs to be manually done in optimizer_step()
     logger.debug(f'Constructing {optimizer} optimizer (lr: {lrate}, momentum: {momentum})')

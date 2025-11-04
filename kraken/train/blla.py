@@ -48,14 +48,14 @@ __all__ = ['BLLASegmentationDataModule', 'BLLASegmentationModel']
 
 class BLLASegmentationDataModule(L.LightningDataModule):
     def __init__(self,
-                 config: BLLASegmentationTrainingDataConfig,
+                 data_config: BLLASegmentationTrainingDataConfig,
                  parsing_callback: Callable[[int, int], None] = lambda pos, total: None):
         """
         A LightningDataModule encapsulating the training data for a page
         segmentation model.
 
         Args:
-            config: Configuration object to set dataset parameters.
+            data_config: Configuration object to set dataset parameters.
             parsing_callback: A callback that will be called after each input
                               file has been parsed with the current position
                               and total number of files to process. Will be
@@ -65,49 +65,49 @@ class BLLASegmentationDataModule(L.LightningDataModule):
         super().__init__()
         self.save_hyperparameters()
 
-        if config.format_type in ['xml', 'page', 'alto']:
-            total = len(config.training_data) + len(config.evaluation_data if config.evaluation_data else 0)
-            logger.info(f'Parsing {len(config.training_data)} XML files for training data')
+        if data_config.format_type in ['xml', 'page', 'alto']:
+            total = len(data_config.training_data) + len(data_config.evaluation_data if data_config.evaluation_data else 0)
+            logger.info(f'Parsing {len(data_config.training_data)} XML files for training data')
             training_data = []
-            for pos, file in enumerate(config.training_data):
+            for pos, file in enumerate(data_config.training_data):
                 try:
-                    training_data.append(XMLPage(file, filetype=config.format_type).to_container())
+                    training_data.append(XMLPage(file, filetype=data_config.format_type).to_container())
                 except Exception as e:
                     logger.warning(f'Failed to parse {file}: {e}')
                 parsing_callback(pos, total)
-            if config.evaluation_data:
+            if data_config.evaluation_data:
                 evaluation_data = []
-                logger.info(f'Parsing {len(config.evaluation_data)} XML files for validation data')
-                for pos, file in enumerate(config.evaluation_data, len(config.training_data)):
+                logger.info(f'Parsing {len(data_config.evaluation_data)} XML files for validation data')
+                for pos, file in enumerate(data_config.evaluation_data, len(data_config.training_data)):
                     try:
-                        evaluation_data.append(XMLPage(file, filetype=config.format_type).to_container())
+                        evaluation_data.append(XMLPage(file, filetype=data_config.format_type).to_container())
                     except Exception as e:
                         logger.warning(f'Failed to parse {file}: {e}')
                 parsing_callback(pos, total)
-        elif config.format_type is None:
-            training_data = config.training_data
-            evaluation_data = config.evaluation_data
+        elif data_config.format_type is None:
+            training_data = data_config.training_data
+            evaluation_data = data_config.evaluation_data
         else:
-            raise ValueError(f'format_type {config.format_type} not in [alto, page, xml, None].')
+            raise ValueError(f'format_type {data_config.format_type} not in [alto, page, xml, None].')
 
         if not training_data:
             raise ValueError('No training data provided. Please add some.')
 
-        train_set = BaselineSet(line_width=config.line_width,
+        train_set = BaselineSet(line_width=data_config.line_width,
                                 im_transforms=None,  # transforms get filled in once we have access to model hyperparams
-                                augmentation=config.augment,
+                                augmentation=data_config.augment,
                                 class_mapping={'aux': {'_start_separator': 0, '_end_separator': 1},
-                                               'baselines': config.line_class_mapping,
-                                               'regions': config.region_class_mapping})
+                                               'baselines': data_config.line_class_mapping,
+                                               'regions': data_config.region_class_mapping})
 
         for page in training_data:
             train_set.add(page)
 
         if evaluation_data:
-            val_set = BaselineSet(line_width=config.line_width,
+            val_set = BaselineSet(line_width=data_config.line_width,
                                   im_transforms=None,
                                   augmentation=False,
-                                  class_mapping={k: dict(v) for k, v in train_set.items()})  # might be a defaultdict
+                                  class_mapping={k: dict(v) for k, v in train_set.class_mapping.items()})  # might be a defaultdict
 
             for page in evaluation_data:
                 val_set.add(page)
@@ -115,7 +115,7 @@ class BLLASegmentationDataModule(L.LightningDataModule):
             train_set = Subset(train_set, range(len(train_set)))
             val_set = Subset(val_set, range(len(val_set)))
         else:
-            train_len = int(len(train_set)*config.partition)
+            train_len = int(len(train_set)*data_config.partition)
             val_len = len(train_set) - train_len
             logger.info(f'No explicit validation data provided. Splitting off '
                         f'{val_len} (of {len(train_set)}) samples to validation '
@@ -139,13 +139,13 @@ class BLLASegmentationDataModule(L.LightningDataModule):
                                               self.trainer.lightning_module.channels,
                                               self.trainer.lightning_module.hparams.config.padding,
                                               valid_norm=False)
-            self.train_set.transforms = transforms
-            self.val_set.transforms = transforms
+            self.train_set.dataset.transforms = transforms
+            self.val_set.dataset.transforms = transforms
 
     def train_dataloader(self):
         return DataLoader(self.train_set,
                           batch_size=1,
-                          num_workers=self.hyper_params.config.num_workers,
+                          num_workers=self.hparams.data_config.num_workers,
                           shuffle=True,
                           pin_memory=True)
 
@@ -153,7 +153,7 @@ class BLLASegmentationDataModule(L.LightningDataModule):
         return DataLoader(self.val_set,
                           shuffle=False,
                           batch_size=1,
-                          num_workers=self.hyper_params.config.num_workers,
+                          num_workers=self.hparams.data_config.num_workers,
                           pin_memory=True)
 
 
@@ -177,9 +177,9 @@ class BLLASegmentationModel(L.LightningModule):
             self.net = model
 
             if self.net.model_type not in [None, 'segmentation']:
-                raise ValueError(f'Model {model} is of type {self.nn.model_type} while `segmentation` is expected.')
+                raise ValueError(f'Model {model} is of type {self.net.model_type} while `segmentation` is expected.')
 
-            self.batch, self.channels, self.height, self.width = self.nn.input
+            self.batch, self.channels, self.height, self.width = self.net.input
         else:
             self.net = None
 
@@ -257,15 +257,16 @@ class BLLASegmentationModel(L.LightningModule):
     def setup(self, stage: Optional[str] = None):
         # finalize models in case of appending/loading
         if stage in [None, 'fit']:
+            set_class_mapping = self.trainer.datamodule.train_set.dataset.class_mapping
             if not self.net:
                 vgsl = self.hparams.config.spec.strip()
-                self.config.spec = f'[{vgsl[1:-1]} O2l{self.trainer.datamodule.train_set.dataset.num_classes}]'
+                self.hparams.config.spec = f'[{vgsl[1:-1]} O2l{self.trainer.datamodule.train_set.dataset.num_classes}]'
                 logger.info(f'Creating model {vgsl} with {self.trainer.datamodule.train_set.dataset.num_classes} outputs')
-                net = create_model('TorchVGSLModel', self.config)
-                net.user_metadata['topline'] = self.trainer.datamodule.hparams.topline
-                self.net = net
+                self.net = create_model('TorchVGSLModel',
+                                        vgsl=self.hparams.config.spec,
+                                        topline=self.trainer.datamodule.hparams.data_config.topline,
+                                        class_mapping=set_class_mapping)
             else:
-                set_class_mapping = self.trainer.datamodule.train_set.dataset.class_mapping
                 net_class_mapping = self.net.user_metadata['class_mapping']
                 if set_class_mapping['baselines'].keys() != net_class_mapping['baselines'].keys() or \
                    set_class_mapping['regions'].keys() != net_class_mapping['regions'].keys():
@@ -347,10 +348,10 @@ class BLLASegmentationModel(L.LightningModule):
                    True: 'topline',
                    False: 'baseline'}
 
-            topline = self.trainer.datamodule.hparams.topline
-            if topline != (from_loc := self.net_user_metadata.get('topline', 'unset')):
+            topline = self.trainer.datamodule.hparams.data_config.topline
+            if topline != (from_loc := self.net.user_metadata.get('topline', 'unset')):
                 logger.warning(f'Changing baseline location from {from_loc} to {loc[topline]}.')
-            self.net_user_metadata['topline'] = topline
+            self.net.user_metadata['topline'] = topline
 
             logger.info('Training line types:')
             for k, v in set_class_mapping['baselines'].items():
@@ -387,8 +388,8 @@ class BLLASegmentationModel(L.LightningModule):
     # scheduler are then only performed at the end of the epoch.
     def configure_optimizers(self):
         return configure_optimizer_and_lr_scheduler(self.hparams.config,
-                                                    self.nn.nn.parameters(),
-                                                    len_train_set=len(self.train_set),
+                                                    self.net.parameters(),
+                                                    len_train_set=len(self.trainer.datamodule.train_set),
                                                     loss_tracking_mode='max')
 
     def optimizer_step(self, epoch, batch_idx, optimizer, optimizer_closure):

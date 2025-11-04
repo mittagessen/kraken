@@ -181,7 +181,6 @@ class TorchVGSLModel(nn.Module,
                                               'seg_type': None,
                                               'one_channel_mode': None,
                                               'model_type': None,
-                                              'hyper_params': {},
                                               'legacy_polygons': False}  # enable new polygons by default on new models
 
         self.user_metadata.update(**kwargs)
@@ -386,6 +385,8 @@ class TorchVGSLModel(nn.Module,
         Args:
             path: Target destination
         """
+        warnings.warn('`TorchVGSLModel.save_model` is deprecated and will be removed '
+                      'with kraken 8. Use `kraken.models.write_models` instead.', DeprecationWarning)
         inputs = [('input', datatypes.Array(*self.input))]
         outputs = [('output', datatypes.Array(*self.output))]
         net_builder = NeuralNetworkBuilder(inputs, outputs)
@@ -460,6 +461,9 @@ class TorchVGSLModel(nn.Module,
         """
         self.codec = codec
         self.user_metadata['codec'] = json.dumps(self.codec.c2l)
+
+    def forward(self, x: torch.Tensor, seq_lens: Optional[torch.Tensor] = None):
+        return self.nn(x, seq_lens)
 
     def prepare_for_inference(self, config: Config):
         """
