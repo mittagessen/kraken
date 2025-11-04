@@ -22,10 +22,20 @@ class VGSLRecognitionTrainingDataConfig(RecognitionTrainingDataConfig):
     Training data configuration for training VGSL recognition models.
 
     Arg:
+        normalization (str, defaults to None):
+            Unicode normalization
+        normalize_whitespace (bool, defaults to True):
+            Flag to normalize all whitespace in training data to U+0020.
+        bidi_reordering (bool, defaults to True):
+            Reorder code points according to the Unicode bidirectional
+            algorithm. Set to L|R to override default text direction.
         legacy_polygons (bool, defaults to False):
             Whether to use the slow legacy polygon extractor for training.
     """
     def __init__(**kwargs):
+        self.normalization = kwargs.pop('normalization', None)
+        self.normalize_whitespace = kwargs.pop('normalize_whitespace', True)
+        self.bidi_reordering = kwargs.pop('bidi_reordering', True)
         self.legacy_polygons = kwargs.pop('legacy_polygons', False)
         super().__init__(**kwargs)
 
@@ -50,10 +60,6 @@ class VGSLRecognitionTrainingConfig(TrainingConfig):
     Arg:
         paddding (int, defaults to 16):
             Padding around start/end of line image.
-        normalization (str, defaults to None):
-            Unicode normalization
-        normalize_whitespace (bool, defaults to True):
-            Flag to normalize all whitespace in training data to U+0020.
         freeze_backbone (int, defaults to 0):
             Freezes the backbone (everything before the recurrent layers) of
             the network for `n` iterations.
@@ -62,8 +68,6 @@ class VGSLRecognitionTrainingConfig(TrainingConfig):
     def __init__(self, **kwargs):
         self.spec = kwargs.pop('spec', '[1,120,0,1 Cr3,13,32 Do0.1,2 Mp2,2 Cr3,13,32 Do0.1,2 Mp2,2 Cr3,9,64 Do0.1,2 Mp2,2 Cr3,9,64 Do0.1,2 S1(1x0)1,3 Lbx200 Do0.1,2 Lbx200 Do0.1,2 Lbx200 Do]')
         self.padding = kwargs.pop('padding', 16)
-        self.normalization = kwargs.pop('normalization', None)
-        self.normalize_whitespace = kwargs.pop('normalize_whitespace', True)
         self.freeze_backbone = kwargs.pop('freeze_backbone', 0)
         self.resize = kwargs.pop('resize', 'fail')
         kwargs.setdefault('quit', 'early')

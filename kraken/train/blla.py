@@ -29,7 +29,6 @@ from torch.utils.data import DataLoader, Subset, random_split
 from torchmetrics.classification import MultilabelAccuracy, MultilabelJaccardIndex
 
 from kraken.lib.xml import XMLPage
-from kraken.registry import create_model
 from kraken.lib.vgsl import BLLASegmentationTrainingConfig, BLLASegmentationTrainingDataConfig
 from kraken.lib.dataset import BaselineSet, ImageInputTransforms
 from kraken.train.utils import configure_optimizer_and_lr_scheduler
@@ -262,6 +261,7 @@ class BLLASegmentationModel(L.LightningModule):
                 vgsl = self.hparams.config.spec.strip()
                 self.hparams.config.spec = f'[{vgsl[1:-1]} O2l{self.trainer.datamodule.train_set.dataset.num_classes}]'
                 logger.info(f'Creating model {vgsl} with {self.trainer.datamodule.train_set.dataset.num_classes} outputs')
+                from kraken.models import create_model
                 self.net = create_model('TorchVGSLModel',
                                         vgsl=self.hparams.config.spec,
                                         topline=self.trainer.datamodule.hparams.data_config.topline,

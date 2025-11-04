@@ -63,8 +63,10 @@ class TrainingDataConfig:
             A list of training data files.
         evaluation_data (list of paths, optional):
             A list of evaluation data files.
+        test_data (list of paths, optional):
+            A list of evaluation data files.
         partition (float, defaults to 0.9):
-            Automatic partition of training data files of no evaluation data is
+            Automatic partition of training data files if no evaluation data is
             defined.
         num_workers (int, defaults to 1):
             Number of dataloader workers.
@@ -75,6 +77,7 @@ class TrainingDataConfig:
         super().__init__()
         self.training_data = kwargs.pop('training_data', None)
         self.evaluation_data = kwargs.pop('evaluation_data', None)
+        self.test_data = kwargs.pop('test_data', None)
         self.partition = kwargs.pop('partition', 0.9)
         self.num_workers = kwargs.pop('num_workers', 1)
         self.augment = kwargs.pop('augment', False)
@@ -92,7 +95,7 @@ class SegmentationTrainingDataConfig(TrainingDataConfig):
         suppress_regions (bool, defaults to False):
             Suppresses all regions in the dataset.
         suppress_baselines (bool, defaults to False)
-            Suppresses all baselines in the dataset. 
+            Suppresses all baselines in the dataset.
         line_class_mapping (dict[str, int], defaults to defaultdict):
             Mapping between line class identifiers and integer labels.
         region_class_mapping (dict[str, int], defaults to None):
@@ -224,12 +227,6 @@ class SegmentationInferenceConfig(Config):
         legacy_black_colseps: bool = False,
         legacy_no_hlines: bool = True,
 
-        > Parameters for baseline segmenters
-
-        no_legacy_polygons (bool, defaults to False):
-            Disables the legacy polygon extractor even if the model has been
-            trained with it.
-
         > Parameters for bounding box segmenters (currently only the legacy segmenter)
 
         bbox_line_padding (Union[int, tuple[int, int]], defaults to 0):
@@ -250,7 +247,6 @@ class SegmentationInferenceConfig(Config):
         self.legacy_maxcolseps = kwargs.pop('legacy_maxcolseps', 2)
         self.legacy_black_colseps = kwargs.pop('legacy_black_colseps', False)
         self.legacy_no_hlines = kwargs.pop('legacy_no_hlines', True)
-        self.no_legacy_polygons = kwargs.pop('no_legacy_polygons', False)
         self.bbox_line_padding = kwargs.pop('bbox_line_padding', 0)
         self.input_padding = kwargs.pop('input_padding', 0)
         from kraken.lib.segmentation import reading_order, polygonal_reading_order
@@ -268,6 +264,8 @@ class TrainingConfig(Config):
 
         epochs (int, optional with early stopping):
             Number of epochs to train for.
+        completed_epochs (int):
+            How many epochs of the schedule have already been completed.
         freq (float, defaults to 1.0):
             Evaluation and checkpoint saving frequency
         checkpoint_path (PathLike, defaults to `model`):
@@ -317,6 +315,7 @@ class TrainingConfig(Config):
     """
     def __init__(self, **kwargs):
         self.epochs = kwargs.pop('epochs', -1)
+        self.completed_epochs = kwargs.pop('completed_epochs', 0)
         self.freq = kwargs.pop('freq', 1.0)
         self.checkpoint_path = kwargs.pop('checkpoint_path', 'model')
         self.optimizer = kwargs.pop('optimizer', 'AdamW')

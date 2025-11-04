@@ -68,18 +68,3 @@ def register(type: Literal['loader', 'model', 'task']):
 
     return partial(wrapper, registry=_REGISTRIES[type])
 
-
-def create_model(name, *args, **kwargs):
-    """
-    Constructs an empty model from the model registry.
-    """
-    if not type(name) in (type, str):
-        raise ValueError(f'`{name}` is neither type nor string.')
-
-    if name not in MODEL_REGISTRY:
-        raise ValueError(f'`{name}` is not in model registry.')
-
-    cfg = MODEL_REGISTRY[name]
-    cls = getattr(cfg['_module'], name)
-
-    return cls(*args, **kwargs)

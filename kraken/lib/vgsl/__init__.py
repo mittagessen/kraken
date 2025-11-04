@@ -1,2 +1,2 @@
-from .model import TorchVGSLModel  # NOQA
-from .config import VGSLRecognitionTrainingConfig, BLLASegmentationTrainingConfig  # NOQA 
+from .model import *  # NOQA
+from .configs import *  # NOQA

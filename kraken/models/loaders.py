@@ -16,9 +16,9 @@ from collections import defaultdict
 from collections.abc import Sequence
 from packaging.version import Version
 
-from kraken.registry import register, create_model, LOADER_REGISTRY
+from kraken.registry import register, LOADER_REGISTRY
 from kraken.models.base import BaseModel
-
+from kraken.models.utils import create_model
 logger = logging.getLogger(__name__)
 
 
@@ -138,7 +138,7 @@ def load_models(path: Union[str, 'PathLike'], tasks: Optional[Sequence[_T_tasks]
         raise ValueError(f'{path} is not a regular file.')
     for name, cfg in LOADER_REGISTRY.items():
         try:
-            return getattr(cfg['_module'], name)(path)
+            return getattr(cfg['_module'], name)(path, tasks=tasks)
         except ValueError:
             continue
     raise ValueError(f'No loader found for {path}')

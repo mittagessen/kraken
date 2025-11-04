@@ -12,7 +12,7 @@ from typing import Union, Literal, NewType, TYPE_CHECKING
 __all__ = ['BaseModel']
 
 if TYPE_CHECKING:
-    from kraken.models.configs import Config 
+    from kraken.models.configs import Config
 
 logger = logging.getLogger(__name__)
 
