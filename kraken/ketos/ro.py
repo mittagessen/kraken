@@ -118,8 +118,6 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
 @click.option('-e', '--evaluation-files', show_default=True, default=None, multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
-@click.option('--workers', show_default=True, default=1, type=click.IntRange(0), help='Number of worker proesses.')
-@click.option('--threads', show_default=True, default=1, type=click.IntRange(1), help='Maximum size of OpenMP/BLAS thread pool.')
 @click.option('--load-hyper-parameters/--no-load-hyper-parameters', show_default=True, default=False,
               help='When loading an existing model, retrieve hyper-parameters from the model')
 @click.option('-f', '--format-type', type=click.Choice(['xml', 'alto', 'page']), default='xml',
@@ -151,10 +149,9 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
 def rotrain(ctx, batch_size, output, load, freq, quit, epochs, min_epochs, lag,
             min_delta, optimizer, lrate, momentum, weight_decay, warmup,
             schedule, gamma, step_size, sched_patience, cos_max, cos_min_lr,
-            partition, training_files, evaluation_files, workers, threads,
-            load_hyper_parameters, format_type, valid_entities, merge_entities,
-            merge_all_entities, pl_logger, log_dir, level, reading_order,
-            ground_truth):
+            partition, training_files, evaluation_files, load_hyper_parameters,
+            format_type, valid_entities, merge_entities, merge_all_entities,
+            pl_logger, log_dir, level, reading_order, ground_truth):
     """
     Trains a baseline labeling model for layout analysis
     """
@@ -235,7 +232,7 @@ def rotrain(ctx, batch_size, output, load, freq, quit, epochs, min_epochs, lag,
                       training_data=ground_truth,
                       evaluation_data=evaluation_files,
                       partition=partition,
-                      num_workers=workers,
+                      num_workers=ctx.meta['workers'],
                       format_type=format_type,
                       class_mapping=class_mapping,
                       valid_entities=valid_entities,
@@ -269,7 +266,7 @@ def rotrain(ctx, batch_size, output, load, freq, quit, epochs, min_epochs, lag,
                             log_dir=log_dir,
                             **val_check_interval)
 
-    with threadpool_limits(limits=threads):
+    with threadpool_limits(limits=ctx.meta['threads']):
         trainer.fit(model, dm)
 
     if model.best_epoch == -1:

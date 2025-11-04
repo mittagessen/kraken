@@ -80,7 +80,6 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
               default=SEGMENTATION_HYPER_PARAMS['min_delta'],
               type=click.FLOAT,
               help='Minimum improvement between epochs to reset early stopping. By default it scales the delta by the best loss')
-@click.option('-d', '--device', show_default=True, default='cpu', help='Select device to use (cpu, cuda:0, cuda:1, ...)')
 @click.option('--optimizer',
               show_default=True,
               default=SEGMENTATION_HYPER_PARAMS['optimizer'],
@@ -127,7 +126,6 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
 @click.option('-e', '--evaluation-files', show_default=True, default=None, multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
-@click.option('--workers', show_default=True, default=1, type=click.IntRange(0), help='Number of data loading worker processes.')
 @click.option('--load-hyper-parameters/--no-load-hyper-parameters', show_default=True, default=False,
               help='When loading an existing model, retrieve hyper-parameters from the model')
 @click.option('--force-binarization/--no-binarization', show_default=True,
@@ -195,15 +193,14 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
               help='Path to directory where the logger will store the logs. If not set, a directory will be created in the current working directory.')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def segtrain(ctx, output, spec, line_width, pad, load, freq, quit, epochs,
-             min_epochs, lag, min_delta, device, optimizer, lrate,
-             momentum, weight_decay, warmup, schedule, gamma, step_size,
-             sched_patience, cos_max, cos_min_lr, partition, training_files,
-             evaluation_files, workers, load_hyper_parameters,
-             force_binarization, format_type, suppress_regions,
-             suppress_baselines, valid_regions, valid_baselines, merge_regions,
-             merge_baselines, merge_all_baselines, merge_all_regions,
-             bounding_regions, augment, resize, topline, pl_logger, log_dir,
-             ground_truth):
+             min_epochs, lag, min_delta, optimizer, lrate, momentum,
+             weight_decay, warmup, schedule, gamma, step_size, sched_patience,
+             cos_max, cos_min_lr, partition, training_files, evaluation_files,
+             load_hyper_parameters, force_binarization, format_type,
+             suppress_regions, suppress_baselines, valid_regions,
+             valid_baselines, merge_regions, merge_baselines,
+             merge_all_baselines, merge_all_regions, bounding_regions, augment,
+             resize, topline, pl_logger, log_dir, ground_truth):
     """
     Trains a baseline labeling model for layout analysis
     """
@@ -279,7 +276,7 @@ def segtrain(ctx, output, spec, line_width, pad, load, freq, quit, epochs,
     topline = loc[topline]
 
     try:
-        accelerator, device = to_ptl_device(device)
+        accelerator, device = to_ptl_device(ctx.meta['device'])
     except Exception as e:
         raise click.BadOptionUsage('device', str(e))
 
@@ -295,7 +292,7 @@ def segtrain(ctx, output, spec, line_width, pad, load, freq, quit, epochs,
                               training_data=ground_truth,
                               evaluation_data=evaluation_files,
                               partition=partition,
-                              num_workers=workers,
+                              num_workers=ctx.meta['workers'],
                               load_hyper_parameters=load_hyper_parameters,
                               force_binarization=force_binarization,
                               format_type=format_type,
