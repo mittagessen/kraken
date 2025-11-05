@@ -183,7 +183,7 @@ class CRNNRecognitionDataModule(L.LightningDataModule):
             train_set = self.train_set.dataset
             val_set = self.val_set.dataset
 
-            self.trainer.lightning_module.net.use_legacy_polygons = False
+            self.use_legacy_polygons = False
 
             # existing binary datasets might have been compiled with the legacy polygonizer
             if self.hparams.data_config.format_type == 'binary' and self.train_set:
@@ -197,7 +197,7 @@ class CRNNRecognitionDataModule(L.LightningDataModule):
                     logger.warning('Mixed legacy polygon status in training dataset. Consider recompilation.')
                     legacy_train_status = False
                 logger.warning(f'Setting dataset legacy polygon status to {legacy_train_status} based on training set.')
-                self.trainer.lightning_module.net.use_legacy_polygons = legacy_train_status
+                self.use_legacy_polygons = legacy_train_status
 
             train_set.transforms = transforms
             val_set.transforms = transforms
@@ -326,20 +326,25 @@ class CRNNRecognitionModel(L.LightningModule):
                  on_step=True,
                  on_epoch=True,
                  prog_bar=True,
-                 logger=True)
+                 logger=True,
+                 batch_size=batch['image'].shape[0])
         return loss
 
     def validation_step(self, batch, batch_idx):
-        pred = ''.join([x[0] for x in self.net._rec_predict(batch['image'], batch['seq_lens'])])
+        preds, olens = self.net.forward(batch['image'], batch['seq_lens'])
+        preds = preds.squeeze(2)
         idx = 0
-        decoded_targets = []
+        targets = []
+        # decode packed target
         for offset in batch['target_lens']:
-            decoded_targets.append(''.join([x[0] for x in self._val_codec.decode([(x, 0, 0, 0) for x in batch['target'][idx:idx+offset]])]))
+            targets.append(''.join([x[0] for x in self._val_codec.decode([(x, 0, 0, 0) for x in batch['target'][idx:idx+offset]])]))
             idx += offset
-        self.val_cer.update(pred, decoded_targets)
-        self.val_wer.update(pred, decoded_targets)
+        for pred, target in zip([self.net.codec.decode(locs) for locs in RecognitionInferenceConfig().decoder(preds, olens)], targets):
+            pred_str = ''.join(x[0] for x in pred)
+            self.val_cer.update(pred_str, target)
+            self.val_wer.update(pred_str, target)
 
-        if self.logger and self.trainer.state.stage != 'sanity_check' and self.hparams.config.batch_size * batch_idx < 16:
+        if self.logger and self.trainer.state.stage != 'sanity_check' and self.hparams.config.batch_size * batch_idx < 16 and getattr(self.logger.experiment, 'add_image', None) is not None:
             for i in range(self.hparams.config.batch_size):
                 count = self.hparams.config.batch_sizd * batch_idx + i
                 if count < 16:
@@ -414,36 +419,37 @@ class CRNNRecognitionModel(L.LightningModule):
             self.val_cer = CharErrorRate()
             self.val_wer = WordErrorRate()
 
-            if (codec := self.trainer.data_module.hparams.config.codec):
+            if (codec := self.trainer.datamodule.hparams.data_config.codec):
                 if not isinstance(codec, PytorchCodec):
                     logger.info('Instantiating codec')
-                    self.trainer.data_module.hparams.config.codec = PytorchCodec(codec)
-                for k, v in self.trainer.data_module.hparams.config.codec.c2l.items():
+                    self.trainer.datamodule.hparams.config.codec = PytorchCodec(codec)
+                for k, v in self.trainer.datamodule.hparams.data_config.codec.c2l.items():
                     char = make_printable(k)
                     if char == k:
                         char = '\t' + char
                     logger.info(f'{char}\t{v}')
 
             logger.info('Encoding training set')
-            train_set = self.trainer.data_module.train_set.dataset
+            train_set = self.trainer.datamodule.train_set.dataset
+            val_set = self.trainer.datamodule.val_set.dataset
 
-            if self.logger:
+            if self.logger and getattr(self.logger.experiment, 'add_image', None) is not None:
                 train_set.no_encode()
-                for i, idx in enumerate(torch.randint(len(train_set), min(len(train_set), 16))):
+                for i, idx in enumerate(torch.randint(len(train_set), (min(len(train_set), 16),))):
                     sample = train_set[idx.item()]
                     self.logger.experiment.add_image(f'train_set sample #{i}: {sample["target"]}', sample['image'])
 
-            if self.model:
+            if self.net:
                 # prefer explicitly given codec over network codec if mode is 'new'
-                if self.hparams.config.resize == 'new' and self.trainer.data_module.hparams.config.codec:
-                    codec = self.trainer.data_module.hparams.config.codec
+                if self.hparams.config.resize == 'new' and self.trainer.datamodule.hparams.data_config.codec:
+                    codec = self.trainer.datamodule.hparams.data_config.codec
                 else:
                     codec = self.net.codec
 
                 codec.strict = True
 
                 try:
-                    train_set.dataset(codec)
+                    train_set.encode(codec)
                 except KrakenEncodeException:
                     alpha_diff = set(train_set.alphabet).difference(
                         set(codec.c2l.keys())
@@ -457,7 +463,7 @@ class CRNNRecognitionModel(L.LightningModule):
                         logger.info(f'Resizing last layer in network to {train_codec.max_label+1} outputs')
                         self.net.resize_output(train_codec.max_label + 1)
                         train_set.encode(train_codec)
-                    elif self.resize == 'new':
+                    elif self.hparams.config.resize == 'new':
                         logger.info('Resizing network or given codec to '
                                     f'{len(train_set.alphabet)} '
                                     'code sequences')
@@ -475,7 +481,7 @@ class CRNNRecognitionModel(L.LightningModule):
                 self.net.codec.strict = False
                 self.hparams.config.spec = self.net.spec
             else:
-                codec = self.trainer.data_module.hparams.config.codec
+                codec = self.trainer.datamodule.hparams.data_config.codec
                 train_set.encode(codec)
                 logger.info(f'Creating new model {self.hparams.config.spec} with {train_set.codec.max_label+1} outputs')
                 vgsl = self.hparams.config.spec.strip()
@@ -483,18 +489,18 @@ class CRNNRecognitionModel(L.LightningModule):
                 from kraken.models import create_model
                 self.net = create_model('TorchVGSLModel',
                                         vgsl=self.hparams.config.spec)
-                self.net.use_legacy_polygons = self.legacy_polygons
+                self.net.use_legacy_polygons = self.trainer.datamodule.use_legacy_polygons
                 # initialize weights
-                self.nn.init_weights()
-                self.nn.add_codec(self.train_set.dataset.codec)
+                self.net.init_weights()
+                self.net.add_codec(train_set.codec)
 
-            val_diff = set(self.val_set.dataset.alphabet).difference(
-                set(self.train_set.dataset.codec.c2l.keys())
+            val_diff = set(val_set.alphabet).difference(
+                set(train_set.codec.c2l.keys())
             )
             logger.info(f'Adding {len(val_diff)} dummy labels to validation set codec.')
 
             self._val_codec = self.net.codec.add_labels(val_diff)
-            self.trainer.data_module.val_set.dataset.encode(self._val_codec)
+            val_set.encode(self._val_codec)
 
             if self.net.one_channel_mode and train_set.im_mode != self.net.one_channel_mode:
                 logger.warning(f'Neural network has been trained on mode {self.net.one_channel_mode} images, '
@@ -545,7 +551,7 @@ class CRNNRecognitionModel(L.LightningModule):
     def configure_optimizers(self):
         return configure_optimizer_and_lr_scheduler(self.hparams.config,
                                                     self.net.parameters(),
-                                                    len_train_set=len(self.train_set),
+                                                    len_train_set=len(self.trainer.datamodule.train_set),
                                                     loss_tracking_mode='max')
 
     def optimizer_step(self, epoch, batch_idx, optimizer, optimizer_closure):
