@@ -32,7 +32,7 @@ class VGSLRecognitionTrainingDataConfig(RecognitionTrainingDataConfig):
         legacy_polygons (bool, defaults to False):
             Whether to use the slow legacy polygon extractor for training.
     """
-    def __init__(**kwargs):
+    def __init__(self, **kwargs):
         self.normalization = kwargs.pop('normalization', None)
         self.normalize_whitespace = kwargs.pop('normalize_whitespace', True)
         self.bidi_reordering = kwargs.pop('bidi_reordering', True)

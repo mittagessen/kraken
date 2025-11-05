@@ -206,7 +206,7 @@ def load_coreml(path: Union[str, PathLike], tasks: Optional[Sequence[_T_tasks]] 
 
     metadata = json.loads(mlmodel.user_defined_metadata.get('kraken_meta', '{}'))
 
-    if tasks and not metadata['model_type'] not in tasks:
+    if tasks and metadata['model_type'] not in tasks:
         logger.info(f'Model file {path} not in demanded tasks {tasks}')
         return []
 

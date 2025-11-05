@@ -476,7 +476,7 @@ class TorchVGSLModel(nn.Module,
         self._inf_config = config
         # create line extraction worker pool
         from torch.multiprocessing import Pool
-        if self.model_type == 'recognition' and not getattr(self, '_line_extraction_pool', None):
+        if self.model_type == 'recognition' and getattr(self, '_line_extraction_pool', None) is None:
             self._line_extraction_pool = Pool(self._inf_config.num_line_workers)
             import atexit
             atexit.register(self._line_extraction_pool.terminate)

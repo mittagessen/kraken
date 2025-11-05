@@ -44,7 +44,7 @@ def _star_fun(fun, kwargs):
     return None
 
 
-def _validation_worker_init_fn(worker_id):
+def validation_worker_init_fn(worker_id):
     """ Fix random seeds so that augmentation always produces the same
         results when validating. Temporarily increase the logging level
         for lightning because otherwise it will display a message
@@ -101,7 +101,7 @@ class KrakenTrainer(L.Trainer):
         if freeze_backbone > 0:
             kwargs['callbacks'].append(KrakenFreezeBackbone(freeze_backbone))
 
-        kwargs['callbacks'].extend([KrakenSetOneChannelMode(), KrakenSaveModel()])
+        kwargs['callbacks'].extend([KrakenSetOneChannelMode()])
         super().__init__(*args, **kwargs)
         self.automatic_optimization = False
 
