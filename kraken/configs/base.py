@@ -1,6 +1,6 @@
 """
-kraken.models.configs
-~~~~~~~~~~~~~~~~~~~~~~~~~
+kraken.configs.base
+~~~~~~~~~~~~~~~~~~~
 
 Base classes for configurations
 """

@@ -18,12 +18,14 @@ Training loop interception helpers
 import torch
 import logging
 import warnings
-from typing import TYPE_CHECKING, Optional, Union
-
 import lightning as L
+
+from collections import Counter
+from dataclasses import dataclass
+from torch.optim import lr_scheduler
+from typing import TYPE_CHECKING, Optional, Union
 from lightning.pytorch.callbacks import (BaseFinetuning, Callback,
                                          LearningRateMonitor)
-from torch.optim import lr_scheduler
 
 from kraken.lib import progress
 from kraken.lib.exceptions import KrakenInputException
@@ -32,6 +34,49 @@ if TYPE_CHECKING:
     from os import PathLike
 
 logger = logging.getLogger(__name__)
+
+__all__ = ['SegmentationTestMetrics',
+           'RecognitionTestMetrics',
+           'KrakenTrainer',
+           'configure_optimizer_and_lr_scheduler',
+           'validation_worker_init_fn']
+
+
+class TestMetrics:
+    pass
+
+
+@dataclass
+class SegmentationTestMetrics(TestMetrics):
+    """
+    A container class of baseline and region segmentation metrics for a
+    collection of pages.
+    """
+    class_pixel_accuracy: torch.FloatTensor
+    mean_accuracy: torch.FloatTensor
+    class_iu: torch.FloatTensor
+    mean_iu: torch.FloatTensor
+    freq_iu: torch.FloatTensor
+    line_iu: torch.FloatTensor
+    region_iu: torch.FloatTensor
+
+
+@dataclass
+class RecognitionTestMetrics(TestMetrics):
+    """
+    A container class of text recognition test metrics for a collection of
+    pages.
+    """
+    character_counts: Counter
+    num_errors: int
+    cer: float
+    wer: float
+    case_insensitive_cer: float
+    confusions: Counter
+    scripts: Counter
+    insertions: int
+    deletes: int
+    substitutions: Counter
 
 
 def _star_fun(fun, kwargs):
@@ -104,6 +149,10 @@ class KrakenTrainer(L.Trainer):
         kwargs['callbacks'].extend([KrakenSetOneChannelMode()])
         super().__init__(*args, **kwargs)
         self.automatic_optimization = False
+
+    def test(self, *args, **kwargs) -> TestMetrics:
+        super().test(*args, **kwargs)
+        return self.test_metrics
 
     def fit(self, *args, **kwargs):
         with warnings.catch_warnings():

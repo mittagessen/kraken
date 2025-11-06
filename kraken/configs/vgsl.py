@@ -12,9 +12,21 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
 # or implied. See the License for the specific language governing
 # permissions and limitations under the License.
-from kraken.models import (TrainingConfig,
-                           RecognitionTrainingDataConfig,
-                           SegmentationTrainingDataConfig)
+
+"""
+kraken.configs.vgsl
+~~~~~~~~~~~~~~~~~~~
+
+Configurations for VGSL (segmentation and recognition) model training.
+"""
+from kraken.configs.base import (TrainingConfig,
+                                 RecognitionTrainingDataConfig,
+                                 SegmentationTrainingDataConfig)
+
+__all__ = ['VGSLRecognitionTrainingDataConfig',
+           'BLLASegmentationTrainingDataConfig',
+           'VGSLRecognitionTrainingConfig',
+           'BLLASegmentationTrainingConfig']
 
 
 class VGSLRecognitionTrainingDataConfig(RecognitionTrainingDataConfig):

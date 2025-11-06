@@ -22,7 +22,6 @@ import lightning as L
 
 
 from functools import partial
-from dataclasses import dataclass
 from typing import Optional, Union, TYPE_CHECKING
 from collections import Counter
 from collections.abc import Callable
@@ -35,14 +34,15 @@ from kraken.lib.xml import XMLPage
 from kraken.lib.codec import PytorchCodec
 from kraken.lib.util import make_printable
 from kraken.containers import Segmentation
-from kraken.models import RecognitionInferenceConfig
+from kraken.configs import (RecognitionInferenceConfig,
+                            VGSLRecognitionTrainingConfig,
+                            VGSLRecognitionTrainingDataConfig)
 from kraken.lib.dataset import compute_confusions, global_align
 from kraken.lib.dataset import (ArrowIPCRecognitionDataset, GroundTruthDataset,
                                 ImageInputTransforms, PolygonGTDataset,
                                 collate_sequences)
 from kraken.lib.exceptions import KrakenEncodeException, KrakenInputException
-from kraken.lib.vgsl import VGSLRecognitionTrainingConfig, VGSLRecognitionTrainingDataConfig
-from kraken.train.utils import validation_worker_init_fn, configure_optimizer_and_lr_scheduler
+from kraken.train.utils import validation_worker_init_fn, configure_optimizer_and_lr_scheduler, RecognitionTestMetrics
 
 logger = logging.getLogger(__name__)
 
@@ -51,24 +51,6 @@ if TYPE_CHECKING:
     from kraken.models import BaseModel
 
 __all__ = ['CRNNRecognitionDataModule', 'CRNNRecognitionModel']
-
-
-@dataclass
-class RecognitionTestMetrics:
-    """
-    A container class of text recognition test metrics for a collection of
-    pages.
-    """
-    character_counts: Counter
-    num_errors: int
-    cer: float
-    wer: float
-    case_insensitive_cer: float
-    confusions: Counter
-    scripts: Counter
-    insertions: int
-    deletes: int
-    substitutions: Counter 
 
 
 class CRNNRecognitionDataModule(L.LightningDataModule):
@@ -113,8 +95,8 @@ class CRNNRecognitionDataModule(L.LightningDataModule):
                 return data
 
             training_data = _parse_xml_set('training', all_files[0])
-            evaluation_data = _parse_xml_set('training', all_files[1])
-            test_data = _parse_xml_set('training', all_files[2])
+            evaluation_data = _parse_xml_set('evaluation', all_files[1])
+            test_data = _parse_xml_set('test', all_files[2])
             DatasetClass = partial(PolygonGTDataset, legacy_polygons=data_config.legacy_polygons)
         elif data_config.format_type == 'binary':
             DatasetClass = ArrowIPCRecognitionDataset
@@ -125,7 +107,7 @@ class CRNNRecognitionDataModule(L.LightningDataModule):
             raise ValueError(f'format_type {data_config.format_type} not in [xml, page, alto, binary].')
 
         if training_data and evaluation_data:
-            train_set = self._build_dataset(DatasetClass, training_data)
+            train_set = self._build_dataset(DatasetClass, training_data, augmentation=data_config.augment)
             self.train_set = Subset(train_set, range(len(train_set)))
             val_set = self._build_dataset(DatasetClass, evaluation_data)
             self.val_set = Subset(val_set, range(len(val_set)))
@@ -140,6 +122,8 @@ class CRNNRecognitionDataModule(L.LightningDataModule):
         elif test_data:
             test_set = self._build_dataset(DatasetClass, test_data)
             self.test_set = Subset(test_set, range(len(test_set)))
+        else:
+            raise ValueError('Invalid specification of training/evaluation/test data.')
 
     def _build_dataset(self,
                        DatasetClass,
@@ -149,7 +133,6 @@ class CRNNRecognitionDataModule(L.LightningDataModule):
                                whitespace_normalization=self.hparams.data_config.normalize_whitespace,
                                reorder=self.hparams.data_config.bidi_reordering,
                                im_transforms=None,
-                               augmentation=self.hparams.data_config.augment,
                                **kwargs)
 
         for sample in training_data:
@@ -348,11 +331,11 @@ class CRNNRecognitionModel(L.LightningModule):
             for i in range(self.hparams.config.batch_size):
                 count = self.hparams.config.batch_sizd * batch_idx + i
                 if count < 16:
-                    self.logger.experiment.add_image(f'Validation #{count}, target: {decoded_targets[i]}',
+                    self.logger.experiment.add_image(f'Validation #{count}, target: {targets[i]}',
                                                      batch['image'][i],
                                                      self.global_step,
                                                      dataformats="CHW")
-                    self.logger.experiment.add_text(f'Validation #{count}, target: {decoded_targets[i]}',
+                    self.logger.experiment.add_text(f'Validation #{count}, target: {targets[i]}',
                                                     pred[i],
                                                     self.global_step)
 

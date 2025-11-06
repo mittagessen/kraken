@@ -29,15 +29,17 @@ from torch.utils.data import DataLoader, Subset, random_split
 from torchmetrics.classification import MultilabelAccuracy, MultilabelJaccardIndex
 
 from kraken.lib.xml import XMLPage
-from kraken.lib.vgsl import BLLASegmentationTrainingConfig, BLLASegmentationTrainingDataConfig
 from kraken.lib.dataset import BaselineSet, ImageInputTransforms
-from kraken.train.utils import configure_optimizer_and_lr_scheduler
+from kraken.configs import BLLASegmentationTrainingConfig, BLLASegmentationTrainingDataConfig
+from kraken.train.utils import configure_optimizer_and_lr_scheduler, SegmentationTestMetrics
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, Union
 
 if TYPE_CHECKING:
+    from os import PathLike
     from kraken.models import BaseModel
+    from kraken.containers import Segmentation
 
 logger = logging.getLogger(__name__)
 
@@ -64,82 +66,106 @@ class BLLASegmentationDataModule(L.LightningDataModule):
         super().__init__()
         self.save_hyperparameters()
 
+        all_files = [getattr(data_config, x) for x in ['training_data', 'evaluation_data', 'test_data']]
+        total = sum(len(x) for x in all_files if x)
+
         if data_config.format_type in ['xml', 'page', 'alto']:
-            total = len(data_config.training_data) + len(data_config.evaluation_data if data_config.evaluation_data else 0)
-            logger.info(f'Parsing {len(data_config.training_data)} XML files for training data')
-            training_data = []
-            for pos, file in enumerate(data_config.training_data):
-                try:
-                    training_data.append(XMLPage(file, filetype=data_config.format_type).to_container())
-                except Exception as e:
-                    logger.warning(f'Failed to parse {file}: {e}')
-                parsing_callback(pos, total)
-            if data_config.evaluation_data:
-                evaluation_data = []
-                logger.info(f'Parsing {len(data_config.evaluation_data)} XML files for validation data')
-                for pos, file in enumerate(data_config.evaluation_data, len(data_config.training_data)):
+
+            def _parse_xml_set(ds_type, dataset) -> list[dict[str, 'Segmentation']]:
+                if not dataset:
+                    return None
+                logger.info(f'Parsing {len(dataset) if dataset else 0} XML files for {ds_type} data')
+                data = []
+                for pos, file in enumerate(dataset):
                     try:
-                        evaluation_data.append(XMLPage(file, filetype=data_config.format_type).to_container())
+                        data.append(XMLPage(file, filetype=data_config.format_type).to_container())
                     except Exception as e:
                         logger.warning(f'Failed to parse {file}: {e}')
-                parsing_callback(pos, total)
+                    parsing_callback(pos, total)
+                return data
+
+            training_data = _parse_xml_set('training', all_files[0])
+            evaluation_data = _parse_xml_set('evaluation', all_files[1])
+            self.test_data = _parse_xml_set('test', all_files[2])
         elif data_config.format_type is None:
             training_data = data_config.training_data
+            logger.info(f'Using {len(training_data) if training_data else 0} Segmentation objects for training data')
             evaluation_data = data_config.evaluation_data
+            logger.info(f'Using {len(evaluation_data) if evaluation_data else 0} Segmentation objects for evaluation data')
+            self.test_data = data_config.test_data
+            logger.info(f'Using {len(self.test_data) if data_config.test_data else 0} Segmentation objects for test data')
         else:
             raise ValueError(f'format_type {data_config.format_type} not in [alto, page, xml, None].')
 
-        if not training_data:
-            raise ValueError('No training data provided. Please add some.')
+        if training_data and evaluation_data:
+            train_set = self._build_dataset(training_data,
+                                            augmentation=data_config.augment,
+                                            im_transforms=None,
+                                            class_mapping={'aux': {'_start_separator': 0, '_end_separator': 1},
+                                                           'baselines': self.hparams.data_config.line_class_mapping,
+                                                           'regions': self.hparams.data_config.region_class_mapping})
+            self.train_set = Subset(train_set, range(len(train_set)))
+            val_set = self._build_dataset(evaluation_data,
+                                          im_transforms=None,
+                                          class_mapping={'aux': {'_start_separator': 0, '_end_separator': 1},
+                                                         'baselines': self.hparams.data_config.line_class_mapping,
+                                                         'regions': self.hparams.data_config.region_class_mapping})
 
-        train_set = BaselineSet(line_width=data_config.line_width,
-                                im_transforms=None,  # transforms get filled in once we have access to model hyperparams
-                                augmentation=data_config.augment,
-                                class_mapping={'aux': {'_start_separator': 0, '_end_separator': 1},
-                                               'baselines': data_config.line_class_mapping,
-                                               'regions': data_config.region_class_mapping})
+            self.val_set = Subset(val_set, range(len(val_set)))
+        elif training_data:
+            train_set = self._build_dataset(training_data,
+                                            augmentation=data_config.augment,
+                                            im_transforms=None,
+                                            class_mapping={'aux': {'_start_separator': 0, '_end_separator': 1},
+                                                           'baselines': self.hparams.data_config.line_class_mapping,
+                                                           'regions': self.hparams.data_config.region_class_mapping})
 
-        for page in training_data:
-            train_set.add(page)
-
-        if evaluation_data:
-            val_set = BaselineSet(line_width=data_config.line_width,
-                                  im_transforms=None,
-                                  augmentation=False,
-                                  class_mapping={k: dict(v) for k, v in train_set.class_mapping.items()})  # might be a defaultdict
-
-            for page in evaluation_data:
-                val_set.add(page)
-
-            train_set = Subset(train_set, range(len(train_set)))
-            val_set = Subset(val_set, range(len(val_set)))
-        else:
             train_len = int(len(train_set)*data_config.partition)
             val_len = len(train_set) - train_len
             logger.info(f'No explicit validation data provided. Splitting off '
                         f'{val_len} (of {len(train_set)}) samples to validation '
                         'set.')
-            train_set, val_set = random_split(train_set, (train_len, val_len))
+            self.train_set, self.val_set = random_split(train_set, (train_len, val_len))
+        elif self.test_data:
+            pass
+        else:
+            raise ValueError('Invalid specification of training/evaluation/test data.')
 
-        if len(train_set) == 0:
-            raise ValueError('No valid training data provided. Please add some.')
+    def _build_dataset(self,
+                       data,
+                       **kwargs):
+        dataset = BaselineSet(line_width=self.hparams.data_config.line_width,
+                              **kwargs)
 
-        if len(val_set) == 0:
-            raise ValueError('No valid validation data provided. Please add some.')
+        for page in data:
+            dataset.add(page)
 
-        self.train_set = train_set
-        self.val_set = val_set
+        return dataset
 
     def setup(self, stage: str = None):
+        transforms = ImageInputTransforms(1,
+                                          self.trainer.lightning_module.height,
+                                          self.trainer.lightning_module.width,
+                                          self.trainer.lightning_module.channels,
+                                          self.trainer.lightning_module.hparams.config.padding,
+                                          valid_norm=False)
+
         if stage == 'fit' or stage is None:
-            transforms = ImageInputTransforms(1,
-                                              self.trainer.lightning_module.height,
-                                              self.trainer.lightning_module.width,
-                                              self.trainer.lightning_module.channels,
-                                              self.trainer.lightning_module.hparams.config.padding,
-                                              valid_norm=False)
+            if len(self.train_set) == 0:
+                raise ValueError('No valid training data provided. Please add some.')
+            if len(self.val_set) == 0:
+                raise ValueError('No valid validation data provided. Please add some.')
             self.train_set.dataset.transforms = transforms
             self.val_set.dataset.transforms = transforms
+        elif stage == 'test':
+            if len(self.test_data) == 0:
+                raise ValueError('No valid test data provided. Please add some.')
+            test_set = self._build_dataset(self.test_data,
+                                           im_transforms=transforms,
+                                           class_mapping=self.trainer.lightning_module.net.user_metadata['class_mapping'])
+            self.test_set = Subset(test_set, range(len(test_set)))
+            if len(self.test_set) == 0:
+                raise ValueError('No valid test data provided. Please add some.')
 
     def train_dataloader(self):
         return DataLoader(self.train_set,
@@ -150,6 +176,13 @@ class BLLASegmentationDataModule(L.LightningDataModule):
 
     def val_dataloader(self):
         return DataLoader(self.val_set,
+                          shuffle=False,
+                          batch_size=1,
+                          num_workers=self.hparams.data_config.num_workers,
+                          pin_memory=True)
+
+    def test_dataloader(self):
+        return DataLoader(self.test_set,
                           shuffle=False,
                           batch_size=1,
                           num_workers=self.hparams.data_config.num_workers,
@@ -170,7 +203,7 @@ class BLLASegmentationModel(L.LightningModule):
             model: Loaded model when instantiating from weights.
         """
         super().__init__()
-        self.save_hyperparameters()
+        self.save_hyperparameters(ignore=['model'])
 
         if model:
             self.net = model
@@ -252,6 +285,73 @@ class BLLASegmentationModel(L.LightningModule):
         self.val_mean_accuracy.reset()
         self.val_mean_iu.reset()
         self.val_freq_iu.reset()
+
+    def on_test_epoch_start(self):
+        self.pages = []
+
+    def test_step(self, batch, batch_idx, test_dataloader=0):
+        x, y = batch['image'], batch['target']
+        pred, _ = self.net(x)
+        # scale target to output size
+        y = F.interpolate(y, size=(pred.size(2), pred.size(3))).squeeze(0).bool()
+        pred = pred.squeeze() > 0.5
+        pred = pred.view(pred.size(0), -1)
+        y = y.view(y.size(0), -1)
+        if self.line_cls_idxs:
+            y_baselines = y[self.line_cls_idxs].sum(dim=0, dtype=torch.bool)
+            pred_baselines = pred[self.line_cls_idxs].sum(dim=0, dtype=torch.bool)
+            baseline_metrics = {'intersections': (y_baselines & pred_baselines).sum(dim=0),
+                                'unions': (y_baselines | pred_baselines).sum(dim=0)}
+
+        if self.region_cls_idxs:
+            y_region_cls_idxs = y[self.region_cls_idxs].sum(dim=0, dtype=torch.bool)
+            pred_region_cls_idxs = pred[self.region_cls_idxs].sum(dim=0, dtype=torch.bool)
+            region_metrics = {'intersections': (y_region_cls_idxs & pred_region_cls_idxs).sum(dim=0),
+                              'unions': (y_region_cls_idxs | pred_region_cls_idxs).sum(dim=0)}
+
+        self.pages.append({'intersections': (y & pred).sum(dim=1),
+                           'unions': (y | pred).sum(dim=1),
+                           'corrects': torch.eq(y, pred).sum(dim=1),
+                           'cls_cnt': y.sum(dim=1),
+                           'all_n': torch.tensor(y.size(1)),
+                           'baselines': baseline_metrics,
+                           'regions': region_metrics})
+
+    def on_test_epoch_end(self):
+        corrects = torch.stack([x['corrects'] for x in self.pages], -1).sum(dim=-1)
+        all_n = torch.stack([x['all_n'] for x in self.pages]).sum()  # Number of pixel for all pages
+
+        class_pixel_accuracy = corrects / all_n
+        mean_accuracy = torch.mean(class_pixel_accuracy)
+
+        intersections = torch.stack([x['intersections'] for x in self.pages], -1).sum(dim=-1)
+        unions = torch.stack([x['unions'] for x in self.pages], -1).sum(dim=-1)
+        smooth = torch.finfo(torch.float).eps
+        class_iu = (intersections + smooth) / (unions + smooth)
+        mean_iu = torch.mean(class_iu)
+
+        cls_cnt = torch.stack([x['cls_cnt'] for x in self.pages]).sum()
+        freq_iu = torch.sum(cls_cnt / cls_cnt.sum() * class_iu.sum())
+
+        self.test_metrics = SegmentationTestMetrics(class_pixel_accuracy=class_pixel_accuracy,
+                                                    mean_accuracy=mean_accuracy,
+                                                    class_iu=class_iu,
+                                                    mean_iu=mean_iu,
+                                                    freq_iu=freq_iu)
+
+        if self.line_cls_idxs:
+            line_intersections = torch.stack([x["baselines"]['intersections'] for x in self.pages]).sum()
+            line_unions = torch.stack([x["baselines"]['unions'] for x in self.pages]).sum()
+            smooth = torch.finfo(torch.float).eps
+            line_iu = (line_intersections + smooth) / (line_unions + smooth)
+            self.test_metrics.line_iu = line_iu
+
+        if self.region_cls_idxs:
+            region_intersections = torch.stack([x["regions"]['intersections'] for x in self.pages]).sum()
+            region_unions = torch.stack([x["regions"]['unions'] for x in self.pages]).sum()
+            smooth = torch.finfo(torch.float).eps
+            region_iu = (region_intersections + smooth) / (region_unions + smooth)
+            self.test_metrics.region_iu = region_iu
 
     def setup(self, stage: Optional[str] = None):
         # finalize models in case of appending/loading
@@ -369,6 +469,22 @@ class BLLASegmentationModel(L.LightningModule):
             self.val_mean_accuracy = MultilabelAccuracy(average='macro', num_labels=num_classes)
             self.val_mean_iu = MultilabelJaccardIndex(average='macro', num_labels=num_classes)
             self.val_freq_iu = MultilabelJaccardIndex(average='weighted', num_labels=num_classes)
+        elif stage == 'test':
+            self.line_cls_idxs = list(self.trainer.datamodule.test_set.dataset.class_mapping['baselines'].values())
+            self.region_cls_idxs = list(self.trainer.datamodule.test_set.dataset.class_mapping['regions'].values())
+
+    @classmethod
+    def load_from_weights(cls,
+                          config: BLLASegmentationTrainingConfig,
+                          path: Union[str, 'PathLike']) -> 'BLLASegmentationModel':
+        """
+        Initializes the module from a model weights file.
+        """
+        from kraken.models import load_models
+        models = load_models(path, tasks=['segmentation'])
+        if len(models) != 1:
+            raise ValueError(f'Found {len(models)} segmentation models in model file.')
+        return cls(config=config, model=models[0])
 
     def configure_callbacks(self):
         callbacks = []
