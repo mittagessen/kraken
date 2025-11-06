@@ -270,6 +270,8 @@ class TrainingConfig(Config):
             Evaluation and checkpoint saving frequency
         checkpoint_path (PathLike, defaults to `model`):
             Path prefix to save checkpoints during training.
+        weights_format (Literal[safetensors, coreml], defaults to 'safetensors'):
+            Weight format to convert checkpoint at end of training to.
 
         > Optimizer configuration
 
@@ -318,6 +320,7 @@ class TrainingConfig(Config):
         self.completed_epochs = kwargs.pop('completed_epochs', 0)
         self.freq = kwargs.pop('freq', 1.0)
         self.checkpoint_path = kwargs.pop('checkpoint_path', 'model')
+        self.weights_format = kwargs.pop('weights_format', 'safetensors')
         self.optimizer = kwargs.pop('optimizer', 'AdamW')
         self.lrate = kwargs.pop('lrate', 1e-5)
         self.momentum = kwargs.pop('momentum', 0.9)
