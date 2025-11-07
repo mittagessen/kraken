@@ -16,7 +16,7 @@
 Utility functions for data loading and training of VGSL networks.
 """
 from math import factorial
-from typing import TYPE_CHECKING, Dict, Literal, Optional, Sequence, Union
+from typing import TYPE_CHECKING, Literal, Optional, Sequence, Union
 
 import numpy as np
 import torch
@@ -42,14 +42,12 @@ class PairWiseROSet(Dataset):
 
     Returns random pairs of lines from the same page.
     """
-    def __init__(self, files: Sequence[Union['PathLike', str]] = None,
+    def __init__(self,
+                 files: Sequence[Union['PathLike', str]],
+                 class_mapping: dict[str, int],
                  mode: Optional[Literal['alto', 'page', 'xml']] = 'xml',
                  level: Literal['regions', 'baselines'] = 'baselines',
-                 ro_id: Optional[str] = None,
-                 valid_entities: Sequence[str] = None,
-                 merge_entities: Dict[str, Sequence[str]] = None,
-                 merge_all_entities: bool = False,
-                 class_mapping: Optional[Dict[str, int]] = None) -> None:
+                 ro_id: Optional[str] = None) -> None:
         """
         Samples pairs lines/regions from XML files for training a reading order
         model .
@@ -59,13 +57,6 @@ class PairWiseROSet(Dataset):
             level: Computes reading order tuples on line or region level.
             ro_id: ID of the reading order to sample from. Defaults to
                    `line_implicit`/`region_implicit`.
-            valid_entities: Sequence of valid baseline/regions identifiers. If `None`
-                             all are valid.
-            merge_entities: Sequence of baseline/region identifiers to merge.  Note
-                             that merging occurs after entities not in valid_*
-                             have been discarded.
-            merge_all_entities: Merges all entities types into default (after
-                                filtering with valid_entities).
             class_mapping: Explicit class mapping to use. No sanity checks are
                            performed. Takes precedence over valid_*, merge_*.
         """
@@ -73,21 +64,8 @@ class PairWiseROSet(Dataset):
 
         self._num_pairs = 0
         self.failed_samples = []
-        if class_mapping:
-            self.class_mapping = class_mapping
-            self.num_classes = len(class_mapping) + 1
-            self.freeze_cls_map = True
-            valid_entities = None
-            merge_entities = None
-            merge_all_entities = None
-        else:
-            self.num_classes = 1
-            self.class_mapping = {}
-            self.freeze_cls_map = False
-
-        self.m_dict = merge_entities if merge_entities is not None else {}
-        self.merge_all_entities = merge_all_entities
-        self.valid_entities = valid_entities
+        self.class_mapping = class_mapping
+        self.num_classes = len(class_mapping) + 1
 
         self.data = []
 
@@ -108,17 +86,14 @@ class PairWiseROSet(Dataset):
                         raise ValueError(f'Invalid RO type {level}')
                     _order = []
                     for el in order:
-                        tag_val = _get_type(el.tags)
-                        if self.valid_entities is None or tag_val in self.valid_entities:
-                            tag = self.m_dict.get(tag_val, tag_val)
-                            if self.merge_all_entities:
-                                tag = None
-                            elif tag not in self.class_mapping and self.freeze_cls_map:
-                                continue
-                            elif tag not in self.class_mapping:
-                                self.class_mapping[tag] = self.num_classes
-                                self.num_classes += 1
+                        tag = _get_type(el.tags)
+                        try:
+                            idx = self.class_mapping[tag]
                             _order.append((tag, el))
+                            self.class_stats['baselines'][idx] += 1
+                            self.num_classes = len(self.class_mapping) + 1
+                        except KeyError:
+                            continue
                     docs.append((doc.image_size, _order))
                 except KrakenInputException as e:
                     logger.warning(e)
@@ -174,14 +149,12 @@ class PageWiseROSet(Dataset):
 
     Returns all lines from the same page.
     """
-    def __init__(self, files: Sequence[Union['PathLike', str]] = None,
+    def __init__(self,
+                 files: Sequence[Union['PathLike', str]],
+                 class_mapping: dict[str, int],
                  mode: Optional[Literal['alto', 'page', 'xml']] = 'xml',
                  level: Literal['regions', 'baselines'] = 'baselines',
-                 ro_id: Optional[str] = None,
-                 valid_entities: Sequence[str] = None,
-                 merge_entities: Dict[str, Sequence[str]] = None,
-                 merge_all_entities: bool = False,
-                 class_mapping: Optional[Dict[str, int]] = None) -> None:
+                 ro_id: Optional[str] = None) -> None:
         """
         Samples pairs lines/regions from XML files for evaluating a reading order
         model.
@@ -201,21 +174,8 @@ class PageWiseROSet(Dataset):
         super().__init__()
 
         self.failed_samples = []
-        if class_mapping:
-            self.class_mapping = class_mapping
-            self.num_classes = len(class_mapping) + 1
-            self.freeze_cls_map = True
-            valid_entities = None
-            merge_entities = None
-            merge_all_entities = False
-        else:
-            self.num_classes = 1
-            self.class_mapping = {}
-            self.freeze_cls_map = False
-
-        self.m_dict = merge_entities if merge_entities is not None else {}
-        self.merge_all_entities = merge_all_entities
-        self.valid_entities = valid_entities
+        self.class_mapping = class_mapping
+        self.num_classes = len(class_mapping) + 1
 
         self.data = []
 
@@ -236,17 +196,13 @@ class PageWiseROSet(Dataset):
                         raise ValueError(f'Invalid RO type {level}')
                     _order = []
                     for el in order:
-                        tag_val = _get_type(el.tags)
-                        if self.valid_entities is None or tag_val in self.valid_entities:
-                            tag = self.m_dict.get(tag_val, tag_val)
-                            if self.merge_all_entities:
-                                tag = None
-                            elif tag not in self.class_mapping and self.freeze_cls_map:
-                                continue
-                            elif tag not in self.class_mapping:
-                                self.class_mapping[tag] = self.num_classes
-                                self.num_classes += 1
+                        tag = _get_type(el.tags)
+                        try:
+                            self.class_mapping[tag]
                             _order.append((tag, el))
+                            self.num_classes = len(self.class_mapping) + 1
+                        except KeyError:
+                            continue
                     docs.append((doc.image_size, _order))
                 except KrakenInputException as e:
                     logger.warning(e)
