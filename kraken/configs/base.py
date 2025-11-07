@@ -171,7 +171,7 @@ class RecognitionTrainingDataConfig(TrainingDataConfig):
 
 class RecognitionInferenceConfig(Config):
     """
-    Configuration for segmentation inference.
+    Configuration for recognition inference.
 
     Arg:
         > Universal parameters
@@ -191,6 +191,8 @@ class RecognitionInferenceConfig(Config):
             Number of worker processes to extract lines from images.
         no_legacy_polygons (bool, defaults to False):
             disables the fast path for polygonal line extraction
+        text_direction (Literal['horizontal-tb', 'vertical-lr', 'vertical-rl'], defaults to 'horizontal-tb'):
+            Sets the orientation of bounding box segmentation data
 
         > CTC model parameters
 
@@ -211,6 +213,7 @@ class RecognitionInferenceConfig(Config):
         self.no_legacy_polygons = kwargs.pop('no_legacy_polygons', False)
         self.decoder = kwargs.pop('decoder', kraken.lib.ctc_decoder.greedy_decoder)
         self.bidi_reordering = kwargs.pop('bidi_reordering', True)
+        self.text_direction = kwargs.pop('text_direction', 'horizontal-tb')
         super().__init__(**kwargs)
 
 
