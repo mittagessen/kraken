@@ -67,6 +67,10 @@ class RecognitionTaskModel(nn.Module):
         Yields:
             One ocr_record for each line.
         """
+        if config.precision in ['bf16-true', '16-true']:
+            logger.warning(f'Selected float precision {config.precision} is '
+                           'fixed length 16 bit and likely to cause unstable '
+                           'recogntion. Proceed with caution.')
         self.net.prepare_for_inference(config)
         return self.net.predict(im=im, segmentation=segmentation)
 
