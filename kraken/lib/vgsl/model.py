@@ -1,26 +1,46 @@
+#
+# Copyright 2025 Benjamin Kiessling
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
+# or implied. See the License for the specific language governing
+# permissions and limitations under the License.
 """
 VGSL plumbing
 """
+import re
 import json
 import logging
-import re
+import warnings
 from os import PathLike
-from typing import (Any, Callable, Dict, Iterable, Optional, Sequence,
-                    Union)
+from typing import (Any, Callable, Iterable, Optional, Sequence, Union)
 
 import torch
 from google.protobuf.message import DecodeError
 from torch import nn
+from lightning.fabric import Fabric
 
-from kraken.lib import layers
+from kraken.lib.vgsl import layers
+from kraken.models import BaseModel
+from kraken.registry import register
+from kraken.lib.vgsl.rpred import VGSLRecognitionInference
+from kraken.lib.vgsl.spred import VGSLSegmentationInference
+from kraken.configs import Config, RecognitionInferenceConfig, SegmentationInferenceConfig
 from kraken.lib.codec import PytorchCodec
 from kraken.lib.exceptions import KrakenInvalidModelException
 
 root_logger = logging.getLogger()
 level = root_logger.getEffectiveLevel()
 root_logger.setLevel(logging.ERROR)
-from coremltools.models import MLModel, datatypes
-from coremltools.models.neural_network import NeuralNetworkBuilder
+from coremltools.models import MLModel, datatypes  # NOQA
+from coremltools.models.neural_network import NeuralNetworkBuilder  # NOQA
 root_logger.setLevel(level)
 
 # all tensors are ordered NCHW, the "feature" dimension is C, so the output of
@@ -31,7 +51,7 @@ __all__ = ['TorchVGSLModel']
 logger = logging.getLogger(__name__)
 
 
-class VGSLBlock(object):
+class VGSLBlock:
     def __init__(self, block: str, layer: str, name: str, idx: int):
         if name:
             name = name[1:-1]
@@ -56,7 +76,11 @@ class VGSLBlock(object):
         return self._layer
 
 
-class TorchVGSLModel(object):
+@register(type='model')
+class TorchVGSLModel(nn.Module,
+                     BaseModel,
+                     VGSLRecognitionInference,
+                     VGSLSegmentationInference):
     """
     Class building a torch module from a VSGL spec.
 
@@ -72,7 +96,7 @@ class TorchVGSLModel(object):
 
     Attributes:
         input: Expected input tensor as a 4-tuple.
-        nn: Stack of layers parsed from the spec.
+        net: Stack of layers parsed from the spec.
         criterion: Fully parametrized loss function.
         user_metadata: dict with user defined metadata. Is flushed into
                              model file during saving/overwritten by loading
@@ -82,8 +106,15 @@ class TorchVGSLModel(object):
                                 models trained on binarized images, 'L' for
                                 grayscale, and None otherwise.
     """
+    user_metadata = {}
+    _kraken_min_version = '5.0.0'
+    codec: Optional[PytorchCodec] = None
+    spec: str
+    named_spec: list[str]
+    nn: nn.Module
+    criterion: nn.Module
 
-    def __init__(self, spec: str) -> None:
+    def __init__(self, **kwargs) -> None:
         """
         Constructs a torch module from a (subset of) VSGL spec.
 
@@ -130,31 +161,39 @@ class TorchVGSLModel(object):
                   S[{name}]<d>(<a>x<b>)<e>,<f> Splits one dimension, moves one part to another
                     dimension.
         """
-        self.spec = spec
+        super().__init__()
+        if (vgsl := kwargs.pop('vgsl', None)) is None:
+            raise ValueError('vgsl specification argument is missing in args.')
+        self.spec = vgsl
+
+        if (codec := kwargs.get('codec', None)) is not None:
+            self.add_codec(PytorchCodec(codec))
+
         self.named_spec: list[str] = []
         self.ops = [self.build_addition, self.build_identity, self.build_rnn,
                     self.build_dropout, self.build_maxpool, self.build_conv,
                     self.build_output, self.build_reshape, self.build_wav2vec2,
                     self.build_groupnorm, self.build_series,
                     self.build_parallel, self.build_ro]
-        self.codec: Optional[PytorchCodec] = None
-        self.criterion: Any = None
+
         self.nn = layers.MultiParamSequential()
-        self.user_metadata: Dict[str, Any] = {'accuracy': [],
+        self.user_metadata: dict[str, Any] = {'accuracy': [],
                                               'metrics': [],
                                               'seg_type': None,
                                               'one_channel_mode': None,
                                               'model_type': None,
-                                              'hyper_params': {},
                                               'legacy_polygons': False}  # enable new polygons by default on new models
+
+        self.user_metadata.update(**kwargs)
+
         self._aux_layers = nn.ModuleDict()
 
         self.idx = -1
-        spec = spec.strip()
-        if spec[0] != '[' or spec[-1] != ']':
+        vgsl = vgsl.strip()
+        if vgsl[0] != '[' or vgsl[-1] != ']':
             raise ValueError('Non-sequential models not supported')
-        spec = spec[1:-1]
-        blocks = spec.split(' ')
+        vgsl = vgsl[1:-1]
+        blocks = vgsl.split(' ')
         self.named_spec.append(blocks[0])
         pattern = re.compile(r'(\d+),(\d+),(\d+),(\d+)')
         m = pattern.match(blocks.pop(0))
@@ -164,6 +203,7 @@ class TorchVGSLModel(object):
         self.input = (batch, channels, height, width)
         named_spec, self.nn, self.output = self._parse(self.input, blocks)
         self.named_spec.extend(str(x) for x in named_spec)
+        self.user_metadata['vgsl'] = '[' + ' '.join(self.named_spec) + ']'
         self.init_weights()
 
     def _parse(self,
@@ -232,37 +272,6 @@ class TorchVGSLModel(object):
         self.spec = '[' + ' '.join(self.named_spec) + ']'
         self.init_weights(slice(idx, -1))
 
-    def to(self, device: Union[str, torch.device]) -> None:
-        self.nn = self.nn.to(device)
-        if self.criterion:
-            self.criterion = self.criterion.to(device)
-
-    def eval(self) -> None:
-        """
-        Sets the model to evaluation/inference mode, disabling dropout and
-        gradient calculation.
-        """
-        self.nn.eval()
-        torch.set_grad_enabled(False)
-
-    def train(self) -> None:
-        """
-        Sets the model to training mode (enables dropout layers and disables
-        softmax on CTC layers).
-        """
-        self.nn.train()
-        # set last layer back to eval mode if not CTC output layer
-        # (log_softmax/softmax switch).
-        if not self.criterion:
-            self.nn[-1].eval()
-        torch.set_grad_enabled(True)
-
-    def set_num_threads(self, num: int) -> None:
-        """
-        Sets number of OpenMP threads to use.
-        """
-        torch.set_num_threads(num)
-
     @classmethod
     def load_model(cls, path: Union[str, PathLike]):
         """
@@ -279,6 +288,9 @@ class TorchVGSLModel(object):
             string, protobuf file, or without appropriate metadata).
             FileNotFoundError if the path doesn't point to a file.
         """
+        warnings.warn('`TorchVGSLModel.load_model` is deprecated and will be removed with kraken 8. Use `kraken.registry.load_model` instead.',
+                      DeprecationWarning)
+
         if isinstance(path, PathLike):
             path = path.as_posix()
         try:
@@ -289,8 +301,10 @@ class TorchVGSLModel(object):
             raise KrakenInvalidModelException('Failure parsing model protobuf: {}'.format(str(e))) from e
         if 'vgsl' not in mlmodel.user_defined_metadata:
             raise KrakenInvalidModelException('No VGSL spec in model metadata')
-        vgsl_spec = mlmodel.user_defined_metadata['vgsl']
-        nn = cls(vgsl_spec)
+
+        nn = cls(vgsl=mlmodel.user_defined_metadata['vgsl'],
+                 codec=json.loads(mlmodel.user_defined_metadata.get('codec', 'null')),
+                 **json.loads(mlmodel.user_defined_metadata['kraken_meta']))
 
         def _deserialize_layers(name, layer):
             logger.debug(f'Deserializing layer {name} with type {type(layer)}')
@@ -309,19 +323,6 @@ class TorchVGSLModel(object):
             logger.info('Deserializing auxiliary layers.')
             nn.aux_layers = {k: cls(v).nn.get_submodule(k) for k, v in json.loads(mlmodel.user_defined_metadata['aux_layers']).items()}
 
-        if 'codec' in mlmodel.user_defined_metadata:
-            nn.add_codec(PytorchCodec(json.loads(mlmodel.user_defined_metadata['codec'])))
-
-        nn.user_metadata: Dict[str, Any] = {'accuracy': [],
-                                            'metrics': [],
-                                            'seg_type': 'bbox',
-                                            'one_channel_mode': '1',
-                                            'model_type': None,
-                                            'hyper_params': {},
-                                            'legacy_polygons': True}  # disable new polygons by default on load
-
-        if 'kraken_meta' in mlmodel.user_defined_metadata:
-            nn.user_metadata.update(json.loads(mlmodel.user_defined_metadata['kraken_meta']))
         return nn
 
     @property
@@ -336,7 +337,7 @@ class TorchVGSLModel(object):
 
     @property
     def model_type(self):
-        return self.user_metadata['model_type']
+        return self.user_metadata.get('model_type', None)
 
     @model_type.setter
     def model_type(self, val: str):
@@ -346,7 +347,7 @@ class TorchVGSLModel(object):
 
     @property
     def seg_type(self):
-        return self.user_metadata['seg_type']
+        return self.user_metadata.get('seg_type', None)
 
     @seg_type.setter
     def seg_type(self, val: str):
@@ -359,7 +360,7 @@ class TorchVGSLModel(object):
         return self.user_metadata['hyper_params']
 
     @hyper_params.setter
-    def hyper_params(self, val: Dict[str, Any]):
+    def hyper_params(self, val: dict[str, Any]):
         self.user_metadata['hyper_params'].update(val)
 
     @property
@@ -367,7 +368,7 @@ class TorchVGSLModel(object):
         return self._aux_layers
 
     @aux_layers.setter
-    def aux_layers(self, val: Dict[str, torch.nn.Module]):
+    def aux_layers(self, val: dict[str, torch.nn.Module]):
         self._aux_layers.update(val)
 
     @property
@@ -385,6 +386,8 @@ class TorchVGSLModel(object):
         Args:
             path: Target destination
         """
+        warnings.warn('`TorchVGSLModel.save_model` is deprecated and will be removed '
+                      'with kraken 8. Use `kraken.models.write_models` instead.', DeprecationWarning)
         inputs = [('input', datatypes.Array(*self.input))]
         outputs = [('output', datatypes.Array(*self.output))]
         net_builder = NeuralNetworkBuilder(inputs, outputs)
@@ -412,7 +415,6 @@ class TorchVGSLModel(object):
 
             mlmodel = MLModel(net_builder.spec)
             mlmodel.short_description = 'kraken model'
-            mlmodel.user_defined_metadata['vgsl'] = '[' + ' '.join(self.named_spec) + ']'
             if self.codec:
                 mlmodel.user_defined_metadata['codec'] = json.dumps(self.codec.c2l)
             if self.user_metadata:
@@ -422,12 +424,6 @@ class TorchVGSLModel(object):
             mlmodel.save(path)
         finally:
             self.nn.to(prev_device)
-
-    def add_codec(self, codec: PytorchCodec) -> None:
-        """
-        Adds a PytorchCodec to the model.
-        """
-        self.codec = codec
 
     def init_weights(self, idx: slice = slice(0, None)) -> None:
         """
@@ -459,6 +455,60 @@ class TorchVGSLModel(object):
                 for p in m.parameters():
                     torch.nn.init.uniform_(p.data, -0.1, 0.1)
         self.nn[idx].apply(_wi)
+
+    def add_codec(self, codec: PytorchCodec) -> None:
+        """
+        Adds a PytorchCodec to the model.
+        """
+        self.codec = codec
+        self.user_metadata['codec'] = json.dumps(self.codec.c2l)
+
+    def forward(self, x: torch.Tensor, seq_lens: Optional[torch.Tensor] = None):
+        return self.nn(x, seq_lens)
+
+    def prepare_for_inference(self, config: Config):
+        """
+        Configures the model for inference.
+        """
+        if (isinstance(config, RecognitionInferenceConfig) and self.model_type != 'recognition') or (isinstance(config, SegmentationInferenceConfig) and self.model_type != 'segmentation'):
+            raise ValueError(f'{self} is a {self.model_type} model. Got incompatible {config.__class__.__name}.')
+
+        self.eval()
+        self._inf_config = config
+        # create line extraction worker pool
+        from torch.multiprocessing import Pool
+        if self.model_type == 'recognition' and getattr(self, '_line_extraction_pool', None) is None:
+            self._line_extraction_pool = Pool(self._inf_config.num_line_workers)
+            import atexit
+            atexit.register(self._line_extraction_pool.terminate)
+
+        self._fabric = Fabric(accelerator=self._inf_config.accelerator,
+                              devices=self._inf_config.device,
+                              precision=self._inf_config.precision)
+
+        self._m_dtype = next(self.parameters()).dtype
+        self._m_device = next(self.parameters()).device
+
+    @torch.inference_mode()
+    def predict(self, *args, **kwargs):
+        """
+        Runs prediction with the model.
+
+        Args:
+
+            > For text recognition models
+
+            im (PIL.Image.Image): Input image
+            segmentation (Segmentation): The segmentation for the input image.
+
+            > For layout analysis models
+
+            im (PIL.Image.Image): Input image.
+        """
+        if self.model_type == 'recognition':
+            return self._recognition_pred(*args, **kwargs)
+        elif self.model_type == 'segmentation':
+            return self._segmentation_pred(*args, **kwargs)
 
     def resize_output(self, output_size: int, del_indices: Optional[Iterable] = None) -> None:
         """

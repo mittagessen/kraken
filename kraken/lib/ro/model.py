@@ -33,7 +33,7 @@ from torchmetrics.aggregation import MeanMetric
 
 from kraken.lib import default_specs
 from kraken.lib.dataset import PageWiseROSet, PairWiseROSet
-from kraken.lib.ro.layers import MLP
+from kraken.lib.ro.layers import ROMLP
 from kraken.lib.segmentation import _greedy_order_decoder
 from kraken.lib.train import _configure_optimizer_and_lr_scheduler
 
@@ -184,7 +184,7 @@ class ROModel(L.LightningModule):
         self.best_metric = torch.inf
 
         logger.info('Creating new RO model')
-        self.ro_net = MLP(feature_dim, feature_dim * 2)
+        self.ro_net = ROMLP(feature_dim, feature_dim * 2)
 
         if 'file_system' in torch.multiprocessing.get_all_sharing_strategies():
             logger.debug('Setting multiprocessing tensor sharing strategy to file_system')

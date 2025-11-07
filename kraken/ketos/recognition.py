@@ -27,7 +27,7 @@ import warnings
 import click
 from threadpoolctl import threadpool_limits
 
-from kraken.lib.register import OPTIMIZERS, SCHEDULERS, STOPPERS
+from kraken.registry import OPTIMIZERS, SCHEDULERS, STOPPERS
 from kraken.lib.default_specs import RECOGNITION_HYPER_PARAMS, RECOGNITION_SPEC
 from kraken.lib.exceptions import KrakenInputException
 

@@ -21,9 +21,10 @@ align
 A character alignment module using a network output lattice and ground truth to
 accuractely determine grapheme locations in input data.
 """
-import dataclasses
 import logging
-from dataclasses import dataclass
+import warnings
+
+from dataclasses import replace, dataclass
 from typing import TYPE_CHECKING, Literal, Optional
 
 import torch
@@ -51,13 +52,12 @@ def forced_align(doc: Segmentation, model: 'TorchSeqRecognizer', base_dir: Optio
     Returns:
         A Segmentation object where the record's contain the aligned text.
     """
+    warnings.warn('`forced_align` is deprecated and will be removed with kraken 8. Use `ForcedAlignmentTaskModel` instead.',
+                  DeprecationWarning)
     im = Image.open(doc.imagename)
     predictor = rpred.rpred(model, im, doc)
 
     records = []
-
-    # enable training mode in last layer to get log_softmax output
-    model.nn.nn[-1].training = True
 
     for idx, line in enumerate(doc.lines):
         # convert text to display order
@@ -70,7 +70,7 @@ def forced_align(doc: Segmentation, model: 'TorchSeqRecognizer', base_dir: Optio
                            f'{2*len(labels)} (length of "{line.text}" after encoding).')
             records.append(BaselineOCRRecord('', [], [], line))
             continue
-        emission = torch.tensor(model.outputs).squeeze().T
+        emission = torch.tensor(model.outputs).squeeze().log_softmax(0).T
         trellis = get_trellis(emission, labels)
         path = backtrack(trellis, emission, labels)
         path = merge_repeats(path, do_text)
@@ -83,7 +83,7 @@ def forced_align(doc: Segmentation, model: 'TorchSeqRecognizer', base_dir: Optio
                         predictor._scale_val(seg.end, 0, predictor.box.size[0])))
             conf.append(seg.score)
         records.append(BaselineOCRRecord(pred, pos, conf, line, display_order=True))
-    return dataclasses.replace(doc, lines=records)
+    return replace(doc, lines=records)
 
 
 """

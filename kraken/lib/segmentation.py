@@ -40,7 +40,6 @@ from skimage.measure import (approximate_polygon, label, regionprops,
 from skimage.morphology import skeletonize
 from skimage.transform import (AffineTransform, PiecewiseAffineTransform, warp)
 
-from kraken.lib import default_specs
 from kraken.lib.exceptions import KrakenInputException
 
 if TYPE_CHECKING:
@@ -750,7 +749,7 @@ def calculate_polygonal_environment(im: Image.Image = None,
         try:
             end_points = (line[0], line[-1])
             line = geom.LineString(line)
-            offset = default_specs.SEGMENTATION_HYPER_PARAMS['line_width'] if topline is not None else 0
+            offset = 4 if topline is not None else 0
             offset_line = line.parallel_offset(offset, side='left' if topline else 'right')
             line = np.array(line.coords, dtype=float)
             offset_line = np.array(offset_line.coords, dtype=float)
@@ -782,7 +781,7 @@ def calculate_polygonal_environment(im: Image.Image = None,
     return polygons
 
 
-def polygonal_reading_order(lines: Sequence[Dict],
+def polygonal_reading_order(lines: list['BaselineLine'],
                             text_direction: Literal['lr', 'rl'] = 'lr',
                             regions: Optional[Sequence[geom.Polygon]] = None) -> Sequence[int]:
     """
@@ -798,7 +797,7 @@ def polygonal_reading_order(lines: Sequence[Dict],
     Returns:
         The indices of the ordered input.
     """
-    lines = [(line['tags']['type'], line['baseline'], line['boundary']) for line in lines]
+    lines = [line.baseline for line in lines]
 
     bounds = []
     if regions is None:
@@ -806,7 +805,7 @@ def polygonal_reading_order(lines: Sequence[Dict],
     region_lines = [[] for _ in range(len(regions))]
     indizes = {}
     for line_idx, line in enumerate(lines):
-        s_line = geom.LineString(line[1])
+        s_line = geom.LineString(line)
         in_region = False
         for idx, reg in enumerate(regions):
             if is_in_region(s_line, reg):
@@ -1383,4 +1382,4 @@ def extract_polygons(im: Image.Image,
                     box[1::2] >= [im.size[1], im.size[1]]):
                 logger.error('bbox {} is outside of image bounds {}'.format(box, im.size))
                 raise KrakenInputException('Line outside of image bounds')
-            yield im.crop(box).rotate(angle, expand=True), box
+            yield im.crop(box).rotate(angle, expand=True), line

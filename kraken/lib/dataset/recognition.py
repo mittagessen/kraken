@@ -172,7 +172,7 @@ class ArrowIPCRecognitionDataset(Dataset):
         if augmentation:
             self.aug = DefaultAugmenter()
 
-        self.im_mode = self.transforms.mode
+        self._im_mode = mp.Value(c_char, b'1')
 
     def add(self, file: Union[str, 'PathLike']) -> None:
         """
@@ -203,9 +203,6 @@ class ArrowIPCRecognitionDataset(Dataset):
         if self._split_filter and metadata['counts'][self._split_filter] == 0:
             logger.warning(f'No explicit split for "{self._split_filter}" in dataset {file} (with splits {metadata["counts"].items()}).')
             return
-        if metadata['im_mode'] > self.im_mode and self.transforms.mode >= metadata['im_mode']:
-            logger.info(f'Upgrading "im_mode" from {self.im_mode} to {metadata["im_mode"]}.')
-            self.im_mode = metadata['im_mode']
         # centerline normalize raw bbox dataset
         if self.seg_type == 'bbox' and metadata['image_type'] == 'raw':
             self.transforms.valid_norm = True
@@ -300,6 +297,18 @@ class ArrowIPCRecognitionDataset(Dataset):
             im = self.transforms(im)
             if self.aug:
                 im = self.aug(image=im, index=index)
+            if im.shape[0] == 3:
+                im_mode = b'R'
+            elif im.shape[0] == 1:
+                im_mode = b'L'
+            if is_bitonal(im):
+                im_mode = b'1'
+
+            with self._im_mode.get_lock():
+                if im_mode > self._im_mode.value:
+                    logger.info(f'Upgrading "im_mode" from {self._im_mode.value} to {im_mode}')
+                    self._im_mode.value = im_mode
+
             text = self._apply_text_transform(sample)
         except Exception:
             self.failed_samples.add(index)
@@ -312,6 +321,13 @@ class ArrowIPCRecognitionDataset(Dataset):
 
     def __len__(self) -> int:
         return self._num_lines
+
+    @property
+    def im_mode(self):
+        return {b'1': '1',
+                b'L': 'L',
+                b'R': 'RGB'}[self._im_mode.value]
+
 
 
 class PolygonGTDataset(Dataset):

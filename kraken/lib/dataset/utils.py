@@ -24,6 +24,7 @@ from typing import Any, Dict, List, Sequence, Tuple, Union
 import torch
 import torch.nn.functional as F
 from torchvision import transforms
+from torchvision.transforms import v2
 from importlib import resources
 
 from kraken.lib import functional_im_transforms as F_t
@@ -57,7 +58,8 @@ class ImageInputTransforms(transforms.Compose):
                  channels: int,
                  pad: Union[int, Tuple[int, int], Tuple[int, int, int, int]],
                  valid_norm: bool = True,
-                 force_binarization: bool = False) -> None:
+                 force_binarization: bool = False,
+                 dtype: torch.dtype = torch.float32) -> None:
         """
         Container for image input transforms for recognition and segmentation
         networks.
@@ -73,6 +75,7 @@ class ImageInputTransforms(transforms.Compose):
                         standard scaling.
             force_binarization: Forces binarization of input images using the
                                 nlbin algorithm.
+            dtype: Data type of the output tensors.
         """
         super().__init__(None)
 
@@ -81,7 +84,8 @@ class ImageInputTransforms(transforms.Compose):
         self._force_binarization = force_binarization
         self._batch = batch
         self._channels = channels
-        self.pad = pad
+        self._pad = pad
+        self._dtype = dtype
 
         self._create_transforms()
 
@@ -131,7 +135,8 @@ class ImageInputTransforms(transforms.Compose):
                 self.transforms.append(transforms.Lambda(partial(F_t.pil_fixed_resize, scale=self._scale)))
         if self._pad:
             self.transforms.append(transforms.Pad(self._pad, fill=255))
-        self.transforms.append(transforms.ToTensor())
+        self.transforms.append(v2.PILToTensor())
+        self.transforms.append(v2.ToDtype(self._dtype, scale=True))
         # invert
         self.transforms.append(transforms.Lambda(F_t.tensor_invert))
         self.transforms.append(transforms.Lambda(partial(F_t.tensor_permute, perm=perm)))
