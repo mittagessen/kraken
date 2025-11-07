@@ -24,7 +24,6 @@ import lightning as L
 from functools import partial
 from typing import Optional, Union, TYPE_CHECKING
 from collections import Counter
-from collections.abc import Callable
 from torch.optim import lr_scheduler
 from lightning.pytorch.callbacks import EarlyStopping
 from torchmetrics.text import CharErrorRate, WordErrorRate
@@ -55,25 +54,18 @@ __all__ = ['CRNNRecognitionDataModule', 'CRNNRecognitionModel']
 
 class CRNNRecognitionDataModule(L.LightningDataModule):
     def __init__(self,
-                 data_config: VGSLRecognitionTrainingDataConfig,
-                 parsing_callback: Callable[[int, int], None] = lambda pos, total: None):
+                 data_config: VGSLRecognitionTrainingDataConfig):
         """
         A LightningDataModule encapsulating the training data for a page
         segmentation model.
 
         Args:
             data_config: Configuration object to set dataset parameters.
-            parsing_callback: A callback that will be called after each input
-                              file has been parsed with the current position
-                              and total number of files to process. Will be
-                              ignored if the training data aready contains
-                              `Segmentation` objects.
         """
         super().__init__()
         self.save_hyperparameters()
 
         all_files = [getattr(data_config, x) for x in ['training_data', 'evaluation_data', 'test_data']]
-        total = sum(len(x) for x in all_files if x)
 
         DatasetClass = GroundTruthDataset
         if data_config.format_type in ['xml', 'page', 'alto']:
@@ -91,7 +83,6 @@ class CRNNRecognitionDataModule(L.LightningDataModule):
                         data.append({'page': XMLPage(file, filetype=data_config.format_type).to_container()})
                     except Exception as e:
                         logger.warning(f'Failed to parse {file}: {e}')
-                    parsing_callback(pos, total)
                 return data
 
             training_data = _parse_xml_set('training', all_files[0])
@@ -179,7 +170,7 @@ class CRNNRecognitionDataModule(L.LightningDataModule):
                 if legacy_train_status == "mixed":
                     logger.warning('Mixed legacy polygon status in training dataset. Consider recompilation.')
                     legacy_train_status = False
-                logger.warning(f'Setting dataset legacy polygon status to {legacy_train_status} based on training set.')
+                logger.info(f'Setting dataset legacy polygon status to {legacy_train_status} based on training set.')
                 self.use_legacy_polygons = legacy_train_status
 
             train_set.transforms = transforms
@@ -423,11 +414,12 @@ class CRNNRecognitionModel(L.LightningModule):
                     self.logger.experiment.add_image(f'train_set sample #{i}: {sample["target"]}', sample['image'])
 
             if self.net:
-                # prefer explicitly given codec over network codec if mode is 'new'
-                if self.hparams.config.resize == 'new' and self.trainer.datamodule.hparams.data_config.codec:
+                if self.hparams.config.resize == 'new' and self.trainer.datamodule.hparams.data_config.codec is not None:
                     codec = self.trainer.datamodule.hparams.data_config.codec
-                else:
+                elif self.net.codec is not None:
                     codec = self.net.codec
+                else:
+                    raise ValueError('No valid codec found in model.')
 
                 codec.strict = True
 
@@ -441,28 +433,32 @@ class CRNNRecognitionModel(L.LightningModule):
                         raise ValueError(f'Training data and model codec alphabets mismatch: {alpha_diff}')
                     elif self.hparams.config.resize == 'union':
                         logger.info(f'Resizing codec to include {len(alpha_diff)} new code points.')
-                        train_codec = codec.add_labels(alpha_diff)
-                        self.net.add_codec(train_codec)
+                        codec = codec.add_labels(alpha_diff)
+                        self.net.add_codec(codec)
                         logger.info(f'Resizing last layer in network to {train_codec.max_label+1} outputs')
-                        self.net.resize_output(train_codec.max_label + 1)
-                        train_set.encode(train_codec)
+                        self.net.resize_output(codec.max_label + 1)
+                        train_set.encode(codec)
                     elif self.hparams.config.resize == 'new':
                         logger.info('Resizing network or given codec to '
                                     f'{len(train_set.alphabet)} '
                                     'code sequences')
                         # same codec procedure as above, just with merging.
                         train_set.encode(None)
-                        train_codec, del_labels = codec.merge(train_set.codec)
+                        codec, del_labels = codec.merge(train_set.codec)
                         # Switch codec.
-                        self.net.add_codec(train_codec)
+                        self.net.add_codec(codec)
                         logger.info(f'Deleting {len(del_labels)} output classes from network '
                                     f'({len(codec)-len(del_labels)} retained)')
-                        self.net.resize_output(train_codec.max_label + 1, del_labels)
-                        train_set.encode(train_codec)
+                        self.net.resize_output(codec.max_label + 1, del_labels)
+                        train_set.encode(codec)
                     else:
                         raise ValueError(f'invalid resize parameter value {self.hparams.config.resize}')
-                self.net.codec.strict = False
+                codec.strict = False
+                self.net.add_codec(codec)
                 self.hparams.config.spec = self.net.spec
+
+                if train_set.seg_type != self.net.seg_type:
+                    logger.warning(f'Neural network has been trained on {self.net.seg_type} image information but training set is {train_set.seg_type}.')
             else:
                 codec = self.trainer.datamodule.hparams.data_config.codec
                 train_set.encode(codec)
@@ -472,7 +468,6 @@ class CRNNRecognitionModel(L.LightningModule):
                 from kraken.models import create_model
                 self.net = create_model('TorchVGSLModel',
                                         vgsl=self.hparams.config.spec)
-                self.net.use_legacy_polygons = self.trainer.datamodule.use_legacy_polygons
                 # initialize weights
                 self.net.init_weights()
                 self.net.add_codec(train_set.codec)
@@ -489,23 +484,46 @@ class CRNNRecognitionModel(L.LightningModule):
                 logger.warning(f'Neural network has been trained on mode {self.net.one_channel_mode} images, '
                                f'training set contains mode {train_set.im_mode} data. Consider binarizing your data.')
 
-            if train_set.seg_type != self.net.seg_type:
-                logger.warning('Neural network has been trained on {self.net.seg_type} image information but training set is {train_set.seg_type}.')
-
             self.net.model_type = 'recognition'
 
             if not self.net.seg_type:
                 logger.info(f'Setting seg_type to {train_set.seg_type}.')
                 self.net.seg_type = train_set.seg_type
+
+            if self.trainer.datamodule.hparams.data_config.format_type != 'binary' and self.trainer.datamodule.hparams.data_config.legacy_polygons:
+                logger.warning('The model will be flagged to use legacy polygon extractor.')
+                self.net.use_legacy_polygons = True
+            elif self.trainer.datamodule.use_legacy_polygons:
+                logger.warning('Dataset was compiled with legacy polygon extractor. Consider recompiling your dataset.')
+                self.net.use_legacy_polygons = True
+            elif not (self.trainer.datamodule.use_legacy_polygons and self.trainer.datamodule.hparams.data_config.legacy_polygons):
+                logger.info('Setting model polygonizer flag to new polygonizer.')
+                self.net.use_legacy_polygons = False
+
+            self.trainer.datamodule.hparams.data_config.codec = self.net.codec
         elif stage == 'test':
             self.test_cer = CharErrorRate()
             self.test_cer_case_insensitive = CharErrorRate()
             self.test_wer = WordErrorRate()
 
+    def on_load_checkpoint(self, checkpoint):
+        """
+        Reconstruct the model from the spec here and not in setup() as
+        otherwise the weight loading will fail.
+        """
+        from kraken.lib import vgsl  # NOQA
+        from kraken.models import create_model
+        if not isinstance(checkpoint['hyper_parameters']['config'], VGSLRecognitionTrainingConfig):
+            raise ValueError('Checkpoint is not a recognition model.')
+        self.net = create_model('TorchVGSLModel',
+                                vgsl=checkpoint['hyper_parameters']['config'].spec)
+        self.net.add_codec(checkpoint['datamodule_hyper_parameters']['data_config'].codec)
+        self.batch, self.channels, self.height, self.width = self.net.input
+
     @classmethod
     def load_from_weights(cls,
-                          config: VGSLRecognitionTrainingConfig,
-                          path: Union[str, 'PathLike']) -> 'CRNNRecognitionModel':
+                          path: Union[str, 'PathLike'],
+                          config: VGSLRecognitionTrainingConfig) -> 'CRNNRecognitionModel':
         """
         Initializes the module from a model weights file.
         """

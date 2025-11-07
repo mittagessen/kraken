@@ -33,7 +33,6 @@ from kraken.lib.dataset import BaselineSet, ImageInputTransforms
 from kraken.configs import BLLASegmentationTrainingConfig, BLLASegmentationTrainingDataConfig
 from kraken.train.utils import configure_optimizer_and_lr_scheduler, SegmentationTestMetrics
 
-from collections.abc import Callable
 from typing import TYPE_CHECKING, Optional, Union
 
 if TYPE_CHECKING:
@@ -49,25 +48,18 @@ __all__ = ['BLLASegmentationDataModule', 'BLLASegmentationModel']
 
 class BLLASegmentationDataModule(L.LightningDataModule):
     def __init__(self,
-                 data_config: BLLASegmentationTrainingDataConfig,
-                 parsing_callback: Callable[[int, int], None] = lambda pos, total: None):
+                 data_config: BLLASegmentationTrainingDataConfig):
         """
         A LightningDataModule encapsulating the training data for a page
         segmentation model.
 
         Args:
             data_config: Configuration object to set dataset parameters.
-            parsing_callback: A callback that will be called after each input
-                              file has been parsed with the current position
-                              and total number of files to process. Will be
-                              ignored if the training data aready contains
-                              `Segmentation` objects.
         """
         super().__init__()
         self.save_hyperparameters()
 
         all_files = [getattr(data_config, x) for x in ['training_data', 'evaluation_data', 'test_data']]
-        total = sum(len(x) for x in all_files if x)
 
         if data_config.format_type in ['xml', 'page', 'alto']:
 
@@ -81,7 +73,6 @@ class BLLASegmentationDataModule(L.LightningDataModule):
                         data.append(XMLPage(file, filetype=data_config.format_type).to_container())
                     except Exception as e:
                         logger.warning(f'Failed to parse {file}: {e}')
-                    parsing_callback(pos, total)
                 return data
 
             training_data = _parse_xml_set('training', all_files[0])
@@ -473,10 +464,24 @@ class BLLASegmentationModel(L.LightningModule):
             self.line_cls_idxs = list(self.trainer.datamodule.test_set.dataset.class_mapping['baselines'].values())
             self.region_cls_idxs = list(self.trainer.datamodule.test_set.dataset.class_mapping['regions'].values())
 
+    def on_load_checkpoint(self, checkpoint):
+        """
+        Reconstruct the model from the spec here and not in setup() as
+        otherwise the weight loading will fail.
+        """
+        from kraken.lib import vgsl  # NOQA
+        from kraken.models import create_model
+        if not isinstance(checkpoint['hyper_parameters']['config'], BLLASegmentationTrainingConfig):
+            raise ValueError('Checkpoint is not a recognition model.')
+
+        self.net = create_model('TorchVGSLModel',
+                                vgsl=checkpoint['hyper_parameters']['config'].spec)
+        self.batch, self.channels, self.height, self.width = self.net.input
+
     @classmethod
     def load_from_weights(cls,
-                          config: BLLASegmentationTrainingConfig,
-                          path: Union[str, 'PathLike']) -> 'BLLASegmentationModel':
+                          path: Union[str, 'PathLike'],
+                          config: BLLASegmentationTrainingConfig) -> 'BLLASegmentationModel':
         """
         Initializes the module from a model weights file.
         """
