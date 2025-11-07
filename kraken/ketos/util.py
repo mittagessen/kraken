@@ -20,14 +20,48 @@ Command line driver helpers
 """
 import os
 import glob
+import yaml
 import shlex
 import logging
-from typing import List, Optional, Tuple, Dict
+from typing import Optional, Any
 
 import click
 
 logging.captureWarnings(True)
 logger = logging.getLogger('kraken')
+
+
+def _recursive_update(a: dict[str, Any],
+                      b: dict[str, Any]) -> dict[str, Any]:
+    """Like standard ``dict.update()``, but recursive so sub-dict gets updated.
+
+    Ignore elements present in ``b`` but not in ``a``. Unless ``strict`` is set to
+    `True`, in which case a `ValueError` exception will be raised.
+    """
+    for k, v in b.items():
+        if isinstance(v, dict) and isinstance(a.get(k), dict):
+            a[k] = _recursive_update(a[k], v)
+        else:
+            a[k] = b[k]
+    return a
+
+
+def _load_config(ctx: click.Context,
+                 param: click.Parameter,
+                 path: 'PathLike') -> None:
+    """
+    Fetch parameters values from configuration file and sets them as defaults.
+    """
+    logger.info(f"Load configuration matching {path}")
+    if path:
+        try:
+            conf = yaml.safe_load(path)
+            # Update the default_map.
+            if ctx.default_map is None:
+                ctx.default_map = {}
+            ctx.default_map = _recursive_update(ctx.default_map, conf)
+        except FileNotFoundError:
+            logger.critical(f"No configuration file {path} found.")
 
 
 def _validate_merging(ctx, param, value):
@@ -36,7 +70,7 @@ def _validate_merging(ctx, param, value):
     """
     if not value:
         return None
-    merge_dict: Dict[str, str] = {}
+    merge_dict: dict[str, str] = {}
     try:
         for m in value:
             lexer = shlex.shlex(m, posix=True)
@@ -53,6 +87,8 @@ def _validate_merging(ctx, param, value):
 
 def _validate_manifests(ctx, param, value):
     images = []
+    if value is None:
+        return None 
     for manifest in value:
         try:
             for entry in manifest.readlines():
@@ -83,7 +119,7 @@ def message(msg, **styles):
         click.secho(msg, **styles)
 
 
-def to_ptl_device(device: str) -> Tuple[str, Optional[List[int]]]:
+def to_ptl_device(device: str) -> tuple[str, Optional[list[int]]]:
     if device.strip() == 'auto':
         return 'auto', 'auto'
     devices = device.split(',')

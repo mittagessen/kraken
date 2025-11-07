@@ -28,8 +28,6 @@ from kraken.ketos.util import (_expand_gt, _validate_manifests, message,
                                to_ptl_device, _validate_merging)
 
 from kraken.registry import OPTIMIZERS, SCHEDULERS, STOPPERS
-from kraken.lib.default_specs import (SEGMENTATION_HYPER_PARAMS,
-                                      SEGMENTATION_SPEC)
 
 logging.captureWarnings(True)
 logger = logging.getLogger('kraken')
@@ -40,139 +38,75 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
 
 @click.command('segtrain')
 @click.pass_context
-@click.option('-o', '--output', show_default=True, type=click.Path(), default='model', help='Output model file')
-@click.option('-s', '--spec', show_default=True,
-              default=SEGMENTATION_SPEC,
-              help='VGSL spec of the baseline labeling network')
-@click.option('--line-width',
-              show_default=True,
-              default=SEGMENTATION_HYPER_PARAMS['line_width'],
-              help='The height of each baseline in the target after scaling')
-@click.option('--pad', show_default=True, type=(int, int), default=(0, 0),
-              help='Padding (left/right, top/bottom) around the page image')
-@click.option('-i', '--load', show_default=True, type=click.Path(exists=True,
-              readable=True), help='Load existing file to continue training')
-@click.option('-F', '--freq', show_default=True, default=SEGMENTATION_HYPER_PARAMS['freq'], type=click.FLOAT,
+@click.option('-o', '--output', 'checkpoint_path', type=click.Path(), default='model', help='Output model file')
+@click.option('--weights-format', default='safetensors', help='Output weights format.')
+@click.option('-s', '--spec', help='VGSL spec of the baseline labeling network')
+@click.option('--line-width', type=int, help='The height of each baseline in the target after scaling')
+@click.option('--pad', 'padding', type=(int, int), help='Padding (left/right, top/bottom) around the page image')
+@click.option('-i', '--load', type=click.Path(exists=True, readable=True), help='Load existing file to continue training')
+@click.option('-F', '--freq', type=click.FLOAT,
               help='Model saving and report generation frequency in epochs '
                    'during training. If frequency is >1 it must be an integer, '
                    'i.e. running validation every n-th epoch.')
 @click.option('-q',
               '--quit',
-              show_default=True,
-              default=SEGMENTATION_HYPER_PARAMS['quit'],
               type=click.Choice(STOPPERS),
               help='Stop condition for training. Set to `early` for early stopping or `fixed` for fixed number of epochs')
 @click.option('-N',
               '--epochs',
-              show_default=True,
-              default=SEGMENTATION_HYPER_PARAMS['epochs'],
+              type=int,
               help='Number of epochs to train for')
 @click.option('--min-epochs',
-              show_default=True,
-              default=SEGMENTATION_HYPER_PARAMS['min_epochs'],
+              type=int,
               help='Minimal number of epochs to train for when using early stopping.')
 @click.option('--lag',
-              show_default=True,
-              default=SEGMENTATION_HYPER_PARAMS['lag'],
+              type=int,
               help='Number of evaluations (--report frequency) to wait before stopping training without improvement')
 @click.option('--min-delta',
-              show_default=True,
-              default=SEGMENTATION_HYPER_PARAMS['min_delta'],
-              type=click.FLOAT,
+              type=float,
               help='Minimum improvement between epochs to reset early stopping. By default it scales the delta by the best loss')
-@click.option('-d', '--device', show_default=True, default='cpu', help='Select device to use (cpu, cuda:0, cuda:1, ...)')
 @click.option('--optimizer',
-              show_default=True,
-              default=SEGMENTATION_HYPER_PARAMS['optimizer'],
               type=click.Choice(OPTIMIZERS),
               help='Select optimizer')
-@click.option('-r', '--lrate', show_default=True, default=SEGMENTATION_HYPER_PARAMS['lrate'], help='Learning rate')
-@click.option('-m', '--momentum', show_default=True, default=SEGMENTATION_HYPER_PARAMS['momentum'], help='Momentum')
-@click.option('-w', '--weight-decay', show_default=True,
-              default=SEGMENTATION_HYPER_PARAMS['weight_decay'], help='Weight decay')
-@click.option('--warmup', show_default=True, type=float,
-              default=SEGMENTATION_HYPER_PARAMS['warmup'], help='Number of steps to ramp up to `lrate` initial learning rate.')
+@click.option('-r', '--lrate', type=float, help='Learning rate')
+@click.option('-m', '--momentum', type=float, help='Momentum')
+@click.option('-w', '--weight-decay', type=float, help='Weight decay')
+@click.option('--warmup', type=int, help='Number of steps to ramp up to `lrate` initial learning rate.')
 @click.option('--schedule',
-              show_default=True,
               type=click.Choice(SCHEDULERS),
-              default=SEGMENTATION_HYPER_PARAMS['schedule'],
               help='Set learning rate scheduler. For 1cycle, cycle length is determined by the `--step-size` option.')
 @click.option('-g',
               '--gamma',
-              show_default=True,
-              default=SEGMENTATION_HYPER_PARAMS['gamma'],
+              type=float,
               help='Decay factor for exponential, step, and reduceonplateau learning rate schedules')
 @click.option('-ss',
               '--step-size',
-              show_default=True,
-              default=SEGMENTATION_HYPER_PARAMS['step_size'],
+              type=float,
               help='Number of validation runs between learning rate decay for exponential and step LR schedules')
 @click.option('--sched-patience',
-              show_default=True,
-              default=SEGMENTATION_HYPER_PARAMS['rop_patience'],
+              type=int,
               help='Minimal number of validation runs between LR reduction for reduceonplateau LR schedule.')
 @click.option('--cos-max',
-              show_default=True,
-              default=SEGMENTATION_HYPER_PARAMS['cos_t_max'],
+              type=int,
               help='Epoch of minimal learning rate for cosine LR scheduler.')
 @click.option('--cos-min-lr',
-              show_default=True,
-              default=SEGMENTATION_HYPER_PARAMS['cos_min_lr'],
+              type=float,
               help='Minimal final learning rate for cosine LR scheduler.')
-@click.option('-p', '--partition', show_default=True, default=0.9,
-              help='Ground truth data partition ratio between train/validation set')
-@click.option('-t', '--training-files', show_default=True, default=None, multiple=True,
+@click.option('-p', '--partition', type=float, help='Ground truth data partition ratio between train/validation set')
+@click.option('-t', '--training-files', 'training_data', default=None, multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with additional paths to training data')
-@click.option('-e', '--evaluation-files', show_default=True, default=None, multiple=True,
+@click.option('-e', '--evaluation-files', 'evaluation_data', default=None, multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
-@click.option('--workers', show_default=True, default=1, type=click.IntRange(0), help='Number of data loading worker processes.')
-@click.option('--load-hyper-parameters/--no-load-hyper-parameters', show_default=True, default=False,
-              help='When loading an existing model, retrieve hyper-parameters from the model')
-@click.option('--force-binarization/--no-binarization', show_default=True,
-              default=False, help='Forces input images to be binary, otherwise '
-              'the appropriate color format will be auto-determined through the '
-              'network specification. Will be ignored in `path` mode.')
-@click.option('-f', '--format-type', type=click.Choice(['path', 'xml', 'alto', 'page']), default='xml',
+@click.option('-f', '--format-type', type=click.Choice(['xml', 'alto', 'page']),
               help='Sets the training data format. In ALTO and PageXML mode all '
               'data is extracted from xml files containing both baselines and a '
               'link to source images. In `path` mode arguments are image files '
               'sharing a prefix up to the last extension with JSON `.path` files '
               'containing the baseline information.')
-@click.option('--suppress-regions/--no-suppress-regions', show_default=True,
-              default=False, help='Disables region segmentation training.')
-@click.option('--suppress-baselines/--no-suppress-baselines', show_default=True,
-              default=False, help='Disables baseline segmentation training.')
-@click.option('-vr', '--valid-regions', show_default=True, default=None, multiple=True,
-              help='Valid region types in training data. May be used multiple times.')
-@click.option('-vb', '--valid-baselines', show_default=True, default=None, multiple=True,
-              help='Valid baseline types in training data. May be used multiple times.')
-@click.option('-mr',
-              '--merge-regions',
-              show_default=True,
-              default=None,
-              help='Region merge mapping. One or more mappings of the form `$target:$src` where $src is merged into $target.',
-              multiple=True,
-              callback=_validate_merging)
-@click.option('-mb',
-              '--merge-baselines',
-              show_default=True,
-              default=None,
-              help='Baseline type merge mapping. Same syntax as `--merge-regions`',
-              multiple=True,
-              callback=_validate_merging)
-@click.option('--merge-all-baselines', show_default=True, default=None,
-              help='Merges all baseline types into the argument identifier')
-@click.option('--merge-all-regions', show_default=True, default=None,
-              help='Merges all region types into the argument identifiers')
-@click.option('-br', '--bounding-regions', show_default=True, default=None, multiple=True,
-              help='Regions treated as boundaries for polygonization purposes. May be used multiple times.')
-@click.option('--augment/--no-augment',
-              show_default=True,
-              default=SEGMENTATION_HYPER_PARAMS['augment'],
-              help='Enable image augmentation')
-@click.option('--resize', show_default=True, default='fail',
+@click.option('--augment/--no-augment', help='Enable image augmentation')
+@click.option('--resize', default='fail',
               type=click.Choice([
                   'add', 'union',  # Deprecation: `add` is deprecated, `union` is the new value
                   'both', 'new',  # Deprecation: `both` is deprecated, `new` is the new value
@@ -182,28 +116,18 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
                    'added, `both` will set the layer to match exactly '
                    'the training data classes, `fail` will abort if training data and model '
                    'classes do not match.')
-@click.option('-tl', '--topline', 'topline', show_default=True, flag_value='topline',
+@click.option('-tl', '--topline', 'topline', flag_value='topline',
               help='Switch for the baseline location in the scripts. '
                    'Set to topline if the data is annotated with a hanging baseline, as is '
                    'common with Hebrew, Bengali, Devanagari, etc. Set to '
                    ' centerline for scripts annotated with a central line.')
 @click.option('-cl', '--centerline', 'topline', flag_value='centerline')
-@click.option('-bl', '--baseline', 'topline', flag_value='baseline', default='baseline')
-@click.option('--logger', 'pl_logger', show_default=True, type=click.Choice(['tensorboard']), default=None,
-              help='Logger used by PyTorch Lightning to track metrics such as loss and accuracy.')
-@click.option('--log-dir', show_default=True, type=click.Path(exists=True, dir_okay=True, writable=True),
+@click.option('-bl', '--baseline', 'topline', flag_value='baseline')
+@click.option('--logger', 'pl_logger', type=click.Choice(['tensorboard']), help='Logger used by PyTorch Lightning to track metrics such as loss and accuracy.')
+@click.option('--log-dir', type=click.Path(exists=True, dir_okay=True, writable=True),
               help='Path to directory where the logger will store the logs. If not set, a directory will be created in the current working directory.')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
-def segtrain(ctx, output, spec, line_width, pad, load, freq, quit, epochs,
-             min_epochs, lag, min_delta, device, optimizer, lrate,
-             momentum, weight_decay, warmup, schedule, gamma, step_size,
-             sched_patience, cos_max, cos_min_lr, partition, training_files,
-             evaluation_files, workers, load_hyper_parameters,
-             force_binarization, format_type, suppress_regions,
-             suppress_baselines, valid_regions, valid_baselines, merge_regions,
-             merge_baselines, merge_all_baselines, merge_all_regions,
-             bounding_regions, augment, resize, topline, pl_logger, log_dir,
-             ground_truth):
+def segtrain(ctx, **kwargs):
     """
     Trains a baseline labeling model for layout analysis
     """
@@ -288,28 +212,7 @@ def segtrain(ctx, output, spec, line_width, pad, load, freq, quit, epochs,
     else:
         val_check_interval = {'val_check_interval': hyper_params['freq']}
 
-    model = SegmentationModel(hyper_params,
-                              output=output,
-                              spec=spec,
-                              model=load,
-                              training_data=ground_truth,
-                              evaluation_data=evaluation_files,
-                              partition=partition,
-                              num_workers=workers,
-                              load_hyper_parameters=load_hyper_parameters,
-                              force_binarization=force_binarization,
-                              format_type=format_type,
-                              suppress_regions=suppress_regions,
-                              suppress_baselines=suppress_baselines,
-                              valid_regions=valid_regions,
-                              valid_baselines=valid_baselines,
-                              merge_regions=merge_regions,
-                              merge_baselines=merge_baselines,
-                              merge_all_baselines=merge_all_baselines,
-                              merge_all_regions=merge_all_regions,
-                              bounding_regions=bounding_regions,
-                              resize=resize,
-                              topline=topline)
+    model = SegmentationModel()
 
     message('Training line types:')
     for k, v in model.train_set.dataset.class_mapping['baselines'].items():
@@ -351,57 +254,17 @@ def segtrain(ctx, output, spec, line_width, pad, load, freq, quit, epochs,
 
 @click.command('segtest')
 @click.pass_context
-@click.option('-m', '--model', show_default=True, type=click.Path(exists=True, readable=True),
+@click.option('-m', '--model', type=click.Path(exists=True, readable=True),
               multiple=False, help='Model(s) to evaluate')
-@click.option('-e', '--evaluation-files', show_default=True, default=None, multiple=True,
+@click.option('-e', '--test-data', default=None, multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with paths to evaluation data.')
-@click.option('--force-binarization/--no-binarization', show_default=True,
-              default=False, help='Forces input images to be binary, otherwise '
-              'the appropriate color format will be auto-determined through the '
-              'network specification. Will be ignored in `path` mode.')
-@click.option('-f', '--format-type', type=click.Choice(['path', 'xml', 'alto', 'page']), default='xml',
+@click.option('-f', '--format-type', type=click.Choice(['xml', 'alto', 'page']), default='xml',
               help='Sets the training data format. In ALTO and PageXML mode all '
               'data is extracted from xml files containing both baselines and a '
-              'link to source images. In `path` mode arguments are image files '
-              'sharing a prefix up to the last extension with JSON `.path` files '
-              'containing the baseline information.')
-@click.option('-vr', '--valid-regions', show_default=True, default=None, multiple=True,
-              help='Valid region types in training data. May be used multiple times.')
-@click.option('-vb', '--valid-baselines', show_default=True, default=None, multiple=True,
-              help='Valid baseline types in training data. May be used multiple times.')
-@click.option('-mr',
-              '--merge-regions',
-              show_default=True,
-              default=None,
-              help='Region merge mapping. One or more mappings of the form `$target:$src` where $src is merged into $target.',
-              multiple=True,
-              callback=_validate_merging)
-@click.option('-mb',
-              '--merge-baselines',
-              show_default=True,
-              default=None,
-              help='Baseline type merge mapping. Same syntax as `--merge-regions`',
-              multiple=True,
-              callback=_validate_merging)
-@click.option('--suppress-regions/--no-suppress-regions', show_default=True,
-              default=False, help='Disables region segmentation training.')
-@click.option('--suppress-baselines/--no-suppress-baselines', show_default=True,
-              default=False, help='Disables baseline segmentation training.')
-@click.option('--merge-all-baselines', show_default=True, default=None,
-              help='Merges all baseline types into the argument identifier')
-@click.option('--merge-all-regions', show_default=True, default=None,
-              help='Merges all region types into the argument identifiers')
-@click.option('-br', '--bounding-regions', show_default=True, default=None, multiple=True,
-              help='Regions treated as boundaries for polygonization purposes. May be used multiple times.')
-@click.option("--threshold", type=click.FloatRange(.01, .99), default=.3, show_default=True,
-              help="Threshold for heatmap binarization. Training threshold is .3, prediction is .5")
+              'link to source images.')
 @click.argument('test_set', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
-def segtest(ctx, model, evaluation_files, threshold, force_binarization,
-            format_type, test_set, valid_regions, valid_baselines,
-            merge_regions, merge_baselines, suppress_regions,
-            suppress_baselines, merge_all_baselines, merge_all_regions,
-            bounding_regions):
+def segtest(ctx, **kwargs):
     """
     Evaluate on a test set.
     """
@@ -544,21 +407,6 @@ def segtest(ctx, model, evaluation_files, threshold, force_binarization,
                 progress.update(pred_task, advance=1)
 
     # Accuracy / pixel
-    corrects = torch.stack([x['corrects'] for x in pages], -1).sum(dim=-1)
-    all_n = torch.stack([x['all_n'] for x in pages]).sum()  # Number of pixel for all pages
-
-    class_pixel_accuracy = corrects / all_n
-    mean_accuracy = torch.mean(class_pixel_accuracy)
-
-    intersections = torch.stack([x['intersections'] for x in pages], -1).sum(dim=-1)
-    unions = torch.stack([x['unions'] for x in pages], -1).sum(dim=-1)
-    smooth = torch.finfo(torch.float).eps
-    class_iu = (intersections + smooth) / (unions + smooth)
-    mean_iu = torch.mean(class_iu)
-
-    cls_cnt = torch.stack([x['cls_cnt'] for x in pages]).sum()
-    freq_iu = torch.sum(cls_cnt / cls_cnt.sum() * class_iu.sum())
-
     message(f"Mean Accuracy: {mean_accuracy.item():.3f}")
     message(f"Mean IOU: {mean_iu.item():.3f}")
     message(f"Frequency-weighted IOU: {freq_iu.item():.3f}")

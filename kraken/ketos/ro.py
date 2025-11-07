@@ -28,7 +28,6 @@ from kraken.ketos.util import (_expand_gt, _validate_manifests, message,
                                to_ptl_device, _validate_merging)
 
 from kraken.registry import OPTIMIZERS, SCHEDULERS, STOPPERS
-from kraken.lib.default_specs import READING_ORDER_HYPER_PARAMS
 
 logging.captureWarnings(True)
 logger = logging.getLogger('kraken')
@@ -39,122 +38,77 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
 
 @click.command('rotrain')
 @click.pass_context
-@click.option('-B', '--batch-size', show_default=True, type=click.INT,
-              default=READING_ORDER_HYPER_PARAMS['batch_size'], help='batch sample size')
-@click.option('-o', '--output', show_default=True, type=click.Path(), default='model', help='Output model file')
-@click.option('-i', '--load', show_default=True, type=click.Path(exists=True,
-              readable=True), help='Load existing file to continue training')
-@click.option('-F', '--freq', show_default=True, default=READING_ORDER_HYPER_PARAMS['freq'], type=click.FLOAT,
+@click.option('-B', '--batch-size', type=int, help='batch sample size')
+@click.option('-o', '--output', 'checkpoint_path', type=click.Path(), help='Output model file')
+@click.option('-i', '--load', type=click.Path(exists=True, readable=True), help='Load existing file to continue training')
+@click.option('-F', '--freq', type=float,
               help='Model saving and report generation frequency in epochs '
                    'during training. If frequency is >1 it must be an integer, '
                    'i.e. running validation every n-th epoch.')
 @click.option('-q',
               '--quit',
-              show_default=True,
-              default=READING_ORDER_HYPER_PARAMS['quit'],
               type=click.Choice(STOPPERS),
               help='Stop condition for training. Set to `early` for early stopping or `fixed` for fixed number of epochs')
 @click.option('-N',
               '--epochs',
-              show_default=True,
-              default=READING_ORDER_HYPER_PARAMS['epochs'],
+              type=int,
               help='Number of epochs to train for')
 @click.option('--min-epochs',
-              show_default=True,
-              default=READING_ORDER_HYPER_PARAMS['min_epochs'],
+              type=int,
               help='Minimal number of epochs to train for when using early stopping.')
 @click.option('--lag',
-              show_default=True,
-              default=READING_ORDER_HYPER_PARAMS['lag'],
+              type=int,
               help='Number of evaluations (--report frequency) to wait before stopping training without improvement')
 @click.option('--min-delta',
-              show_default=True,
-              default=READING_ORDER_HYPER_PARAMS['min_delta'],
-              type=click.FLOAT,
+              type=float,
               help='Minimum improvement between epochs to reset early stopping. By default it scales the delta by the best loss')
 @click.option('--optimizer',
-              show_default=True,
-              default=READING_ORDER_HYPER_PARAMS['optimizer'],
               type=click.Choice(OPTIMIZERS),
               help='Select optimizer')
-@click.option('-r', '--lrate', show_default=True, default=READING_ORDER_HYPER_PARAMS['lrate'], help='Learning rate')
-@click.option('-m', '--momentum', show_default=True, default=READING_ORDER_HYPER_PARAMS['momentum'], help='Momentum')
-@click.option('-w', '--weight-decay', show_default=True,
-              default=READING_ORDER_HYPER_PARAMS['weight_decay'], help='Weight decay')
-@click.option('--warmup', show_default=True, type=float,
-              default=READING_ORDER_HYPER_PARAMS['warmup'], help='Number of samples to ramp up to `lrate` initial learning rate.')
+@click.option('-r', '--lrate', type=float, help='Learning rate')
+@click.option('-m', '--momentum', type=float, help='Momentum')
+@click.option('-w', '--weight-decay', type=float, help='Weight decay')
+@click.option('--warmup', type=int, help='Number of samples to ramp up to `lrate` initial learning rate.')
 @click.option('--schedule',
-              show_default=True,
               type=click.Choice(SCHEDULERS),
-              default=READING_ORDER_HYPER_PARAMS['schedule'],
               help='Set learning rate scheduler. For 1cycle, cycle length is determined by the `--step-size` option.')
 @click.option('-g',
               '--gamma',
-              show_default=True,
-              default=READING_ORDER_HYPER_PARAMS['gamma'],
+              type=float,
               help='Decay factor for exponential, step, and reduceonplateau learning rate schedules')
 @click.option('-ss',
               '--step-size',
-              show_default=True,
-              default=READING_ORDER_HYPER_PARAMS['step_size'],
+              type=int,
               help='Number of validation runs between learning rate decay for exponential and step LR schedules')
 @click.option('--sched-patience',
-              show_default=True,
-              default=READING_ORDER_HYPER_PARAMS['rop_patience'],
+              type=int,
               help='Minimal number of validation runs between LR reduction for reduceonplateau LR schedule.')
 @click.option('--cos-max',
-              show_default=True,
-              default=READING_ORDER_HYPER_PARAMS['cos_t_max'],
+              type=int,
               help='Epoch of minimal learning rate for cosine LR scheduler.')
 @click.option('--cos-min-lr',
-              show_default=True,
-              default=READING_ORDER_HYPER_PARAMS['cos_min_lr'],
+              type=float,
               help='Minimal final learning rate for cosine LR scheduler.')
-@click.option('-p', '--partition', show_default=True, default=0.9,
-              help='Ground truth data partition ratio between train/validation set')
-@click.option('-t', '--training-files', show_default=True, default=None, multiple=True,
+@click.option('-p', '--partition', type=float, help='Ground truth data partition ratio between train/validation set')
+@click.option('-t', '--training-data', default=None, multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with additional paths to training data')
-@click.option('-e', '--evaluation-files', show_default=True, default=None, multiple=True,
+@click.option('-e', '--evaluation-data', default=None, multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
-@click.option('--workers', show_default=True, default=1, type=click.IntRange(0), help='Number of worker proesses.')
-@click.option('--threads', show_default=True, default=1, type=click.IntRange(1), help='Maximum size of OpenMP/BLAS thread pool.')
-@click.option('--load-hyper-parameters/--no-load-hyper-parameters', show_default=True, default=False,
-              help='When loading an existing model, retrieve hyper-parameters from the model')
-@click.option('-f', '--format-type', type=click.Choice(['xml', 'alto', 'page']), default='xml',
+@click.option('-f', '--format-type', type=click.Choice(['xml', 'alto', 'page']),
               help='Sets the training data format. In ALTO and PageXML mode all '
               'data is extracted from xml files containing both baselines and a '
               'link to source images.')
-@click.option('-ve', '--valid-entities', show_default=True, default=None, multiple=True,
-              help='Valid entities types in training data. May be used multiple times.')
-@click.option('-me',
-              '--merge-entities',
-              show_default=True,
-              default=None,
-              help='Baseline/region merge mapping. One or more mappings of the form `$target:$src` where $src is merged into $target.',
-              multiple=True,
-              callback=_validate_merging)
-@click.option('--merge-all-entities/--no-merge-all-entities',
-              show_default=True,
-              default=False,
-              help='Merges all baselines/regions into a single class after filtering with `--valid-entities`')
-@click.option('--logger', 'pl_logger', show_default=True, type=click.Choice(['tensorboard']), default=None,
+@click.option('--logger', 'pl_logger', type=click.Choice(['tensorboard']),
               help='Logger used by PyTorch Lightning to track metrics such as loss and accuracy.')
-@click.option('--log-dir', show_default=True, type=click.Path(exists=True, dir_okay=True, writable=True),
+@click.option('--log-dir', type=click.Path(exists=True, dir_okay=True, writable=True),
               help='Path to directory where the logger will store the logs. If not set, a directory will be created in the current working directory.')
-@click.option('--level', show_default=True, type=click.Choice(['baselines', 'regions']), default='baselines',
+@click.option('--level', type=click.Choice(['baselines', 'regions']),
               help='Selects level to train reading order model on.')
-@click.option('--reading-order', show_default=True, default=None,
-              help='Select reading order to train. Defaults to `line_implicit`/`region_implicit`')
+@click.option('--reading-order', help='Select reading order to train. Defaults to `line_implicit`/`region_implicit`')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
-def rotrain(ctx, batch_size, output, load, freq, quit, epochs, min_epochs, lag,
-            min_delta, optimizer, lrate, momentum, weight_decay, warmup,
-            schedule, gamma, step_size, sched_patience, cos_max, cos_min_lr,
-            partition, training_files, evaluation_files, workers, threads,
-            load_hyper_parameters, format_type, valid_entities, merge_entities,
-            merge_all_entities, pl_logger, log_dir, level, reading_order,
-            ground_truth):
+def rotrain(ctx, **kwargsh):
     """
     Trains a baseline labeling model for layout analysis
     """
@@ -288,9 +242,9 @@ def rotrain(ctx, batch_size, output, load, freq, quit, epochs, min_epochs, lag,
 
 @click.command('roadd')
 @click.pass_context
-@click.option('-o', '--output', show_default=True, type=click.Path(), default='combined_seg.mlmodel', help='Combined output model file')
-@click.option('-r', '--ro-model', show_default=True, type=click.Path(exists=True, readable=True), help='Reading order model to load into segmentation model')
-@click.option('-i', '--seg-model', show_default=True, type=click.Path(exists=True, readable=True), help='Segmentation model to load')
+@click.option('-o', '--output', type=click.Path(), default='combined_seg.mlmodel', help='Combined output model file')
+@click.option('-r', '--ro-model', type=click.Path(exists=True, readable=True), help='Reading order model to load into segmentation model')
+@click.option('-i', '--seg-model', type=click.Path(exists=True, readable=True), help='Segmentation model to load')
 def roadd(ctx, output, ro_model, seg_model):
     """
     Combines a reading order model with a segmentation model.

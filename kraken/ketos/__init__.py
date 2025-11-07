@@ -29,6 +29,7 @@ from kraken.lib import log
 from kraken.registry import PRECISIONS
 
 from .dataset import compile
+from .util import _load_config
 from .pretrain import pretrain
 from .recognition import test, train
 from .repo import publish
@@ -45,41 +46,61 @@ install(suppress=[click])
 # raise default max image size to 20k * 20k pixels
 Image.MAX_IMAGE_PIXELS = 20000 ** 2
 
+from kraken.configs import (Config,
+                            TrainingDataConfig,
+                            VGSLRecognitionTrainingConfig,
+                            VGSLRecognitionTrainingDataConfig,
+                            BLLASegmentationTrainingConfig,
+                            BLLASegmentationTrainingDataConfig)
 
-@click.group()
+@click.group(context_settings=dict(show_default=True,
+                                   default_map={**Config().__dict__,
+                                                **TrainingDataConfig().__dict__,
+                                                'train': {**VGSLRecognitionTrainingConfig().__dict__, **VGSLRecognitionTrainingDataConfig().__dict__},
+                                                'test': VGSLRecognitionTrainingDataConfig().__dict__,
+                                                'segtrain': {**BLLASegmentationTrainingConfig().__dict__, **BLLASegmentationTrainingDataConfig().__dict__},
+                                                'segtest': {**BLLASegmentationTrainingConfig().__dict__, **BLLASegmentationTrainingDataConfig().__dict__}}))
+
 @click.version_option()
 @click.pass_context
 @click.option('-v', '--verbose', default=0, count=True)
-@click.option('-d', '--device', default='cpu', show_default=True,
+@click.option('-d', '--device', show_default=True,
               help='Select device to use (cpu, cuda:0, cuda:1, ...)')
 @click.option('--precision',
-              show_default=True,
-              default='32-true',
               type=click.Choice(PRECISIONS),
               help='Numerical precision to use for training. Default is 32-bit single-point precision.')
-@click.option('--workers', show_default=True, default=1, type=click.IntRange(0), help='Number of data loading worker processes.')
-@click.option('--threads', show_default=True, default=1, type=click.IntRange(1), help='Maximum size of OpenMP/BLAS thread pool.')
+@click.option('--workers', 'num_workers', type=click.IntRange(0), help='Number of data loading worker processes.')
+@click.option('--threads', 'num_threads', type=click.IntRange(1), help='Maximum size of OpenMP/BLAS thread pool.')
 @click.option('-s', '--seed', default=None, type=click.INT,
               help='Seed for numpy\'s and torch\'s RNG. Set to a fixed value to '
                    'ensure reproducible random splits of data')
-@click.option('-r', '--deterministic/--no-deterministic', default=False,
+@click.option('-r', '--deterministic/--no-deterministic',
               help="Enables deterministic training. If no seed is given and enabled the seed will be set to 42.")
-def cli(ctx, verbose, device, precision, workers, threads, seed, deterministic):
-    ctx.meta['deterministic'] = False if not deterministic else 'warn'
-    if seed:
+@click.option('--config',
+              type=click.File(mode='r', lazy=True),
+              help="Path to configuration file.",
+              callback=_load_config,
+              is_eager=True,
+              expose_value=False,
+              required=False)
+def cli(ctx, **kwargs):
+    params = ctx.params
+
+    ctx.meta['deterministic'] = False if not params['deterministic'] else 'warn'
+    if params['seed']:
         from lightning.pytorch import seed_everything
         seed_everything(seed, workers=True)
-    elif deterministic:
+    elif params['deterministic']:
         from lightning.pytorch import seed_everything
         seed_everything(42, workers=True)
 
-    ctx.meta['verbose'] = verbose
-    ctx.meta['device'] = device
-    ctx.meta['precision'] = precision
-    ctx.meta['workers'] = workers
-    ctx.meta['threads'] = threads
+    ctx.meta['verbose'] = params.get('verbose')
+    ctx.meta['device'] = params.get('device')
+    ctx.meta['precision'] = params.get('precision')
+    ctx.meta['num_workers'] = params.get('num_workers')
+    ctx.meta['num_threads'] = params.get('num_threads')
 
-    log.set_logger(logger, level=30 - min(10 * verbose, 20))
+    log.set_logger(logger, level=30 - min(10 * params['verbose'], 20))
 
 
 cli.add_command(compile)
