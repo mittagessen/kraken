@@ -9,10 +9,12 @@ from torch import nn
 
 from PIL import Image
 from dataclasses import dataclass
-from collections.abc import Generator, Counter
+from collections import Counter
+from collections.abc import Generator
 from typing import TYPE_CHECKING, Union
 from kraken.registry import register
-from kraken.models import load_models, RecognitionInferenceConfig
+from kraken.models import load_models
+from kraken.configs import RecognitionInferenceConfig
 
 if TYPE_CHECKING:
     from os import PathLike
