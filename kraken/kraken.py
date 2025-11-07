@@ -126,11 +126,8 @@ def binarizer(threshold, zoom, escale, border, perc, range, low, high, input, ou
     message('\u2713', fg='green')
 
 
-def segmenter(legacy, models, text_direction, scale, maxcolseps, black_colseps,
-              remove_hlines, padding, config, input, output) -> None:
+def segmenter(legacy, model, config, input, output) -> None:
     import json
-
-    from kraken import SegmentationTaskModel, pageseg
 
     ctx = click.get_current_context()
 
@@ -146,24 +143,21 @@ def segmenter(legacy, models, text_direction, scale, maxcolseps, black_colseps,
         im = Image.open(input)
     except IOError as e:
         raise click.BadParameter(str(e))
-    if mask:
-        try:
-            mask = Image.open(mask)
-        except IOError as e:
-            raise click.BadParameter(str(e))
     message(f'Segmenting {ctx.meta["orig_file"]}\t', nl=False)
     try:
         if legacy:
+            from kraken import pageseg
             res = pageseg.segment(im,
-                                  text_direction,
-                                  scale,
-                                  maxcolseps,
-                                  black_colseps,
-                                  no_hlines=remove_hlines,
-                                  pad=padding,
-                                  mask=mask)
+                                  config.text_direction,
+                                  config.legacy_scale,
+                                  config.legacy_maxcolseps,
+                                  config.legacy_black_colseps,
+                                  no_hlines=config.legacy_remove_hlines,
+                                  pad=config.bbox_line_padding)
         else:
-            task = SegmentationTaskModel(models)
+            from kraken.lib import vgsl
+            from kraken.tasks import SegmentationTaskModel
+            task = SegmentationTaskModel.load_model(model)
             res = task.predict(im=im, config=config)
     except Exception:
         if ctx.meta['raise_failed']:
@@ -471,80 +465,66 @@ def binarize(ctx, threshold, zoom, escale, border, perc, range, low, high):
 
 @cli.command('segment')
 @click.pass_context
-@click.option('-i', '--model', multiple=True, help='Baseline/region detection model(s) to use')
+@click.option('-i', '--model', type=str, help='Baseline/region detection model(s) to use')
 @click.option('-x/-bl', '--boxes/--baseline', default=True,
               help='Switch between legacy box segmenter and neural baseline segmenter')
 @click.option('-d', '--text-direction',
               type=click.Choice(['horizontal-lr', 'horizontal-rl', 'vertical-lr', 'vertical-rl']),
               help='Sets principal text direction')
-@click.option('--scale', type=click.FLOAT)
-@click.option('-m', '--maxcolseps', type=click.INT)
-@click.option('-b/-w', '--black-colseps/--white_colseps')
-@click.option('-r/-l', '--remove_hlines/--hlines')
-@click.option('-p', '--padding', type=(int, int),
-              help='Left and right padding around lines')
+@click.option('--scale', 'legacy_scale', type=float)
+@click.option('-m', '--maxcolseps', 'legacy_maxcolseps', type=int)
+@click.option('-b/-w', '--black-colseps/--white_colseps', 'legacy_black_colseps')
+@click.option('-r/-l', '--remove_hlines/--hlines', 'legacy_no_hlines')
+@click.option('-p', '--pad', 'bbox_line_padding', type=int, help='Left and right padding around lines. Only for BBox segmenter.')
+@click.option('--input-pad', 'input_padding', type=int, help='Padding to add around input image.')
 def segment(ctx, **kwargs):
     """
     Segments page images into text lines.
     """
     from kraken.containers import ProcessingStep
+    params = ctx.params
+    config = SegmentationInferenceConfig(**params, **ctx.meta)
 
-    if model and boxes:
+    if params['model'] and params['boxes']:
         logger.warning(f'Baseline model ({model}) given but legacy segmenter selected. Forcing to -bl.')
-        boxes = False
+        params['boxes'] = False
 
-    model = [Path(m) for m in model]
-    if boxes is False:
-        if not model:
-            model = [SEGMENTATION_DEFAULT_MODEL]
+    if params['boxes'] is False:
+        if not params['model']:
+            params['model'] = SEGMENTATION_DEFAULT_MODEL
+        model = Path(params['model'])
         ctx.meta['steps'].append(ProcessingStep(id=f'_{uuid.uuid4()}',
                                                 category='processing',
                                                 description='Baseline and region segmentation',
-                                                settings={'model': [m.name for m in model],
-                                                          'text_direction': text_direction}))
+                                                settings={'model': model.name,
+                                                          'text_direction': config.text_direction}))
 
         # first try to find the segmentation models by their given names, then
         # look in the kraken config folder
         locations = []
-        for m in model:
-            location = None
-            search = chain([m],
-                           Path(user_data_dir('htrmopo')).rglob(str(m)),
-                           Path(click.get_app_dir('kraken')).rglob(str(m)))
-            for loc in search:
-                if loc.is_file():
-                    location = loc
-                    locations.append(loc)
-                    break
-            if not location:
-                raise click.BadParameter(f'No model for {str(m)} found')
-
-        from kraken.lib.vgsl import TorchVGSLModel
-        model = []
-        for loc in locations:
-            message(f'Loading ANN {loc}\t', nl=False)
-            try:
-                model.append(TorchVGSLModel.load_model(loc))
-                model[-1].to(ctx.meta['device'])
-            except Exception:
-                if ctx.meta['raise_failed']:
-                    raise
-                message('\u2717', fg='red')
-                ctx.exit(1)
-            message('\u2713', fg='green')
+        location = None
+        search = chain([model],
+                       Path(user_data_dir('htrmopo')).rglob(str(model)),
+                       Path(click.get_app_dir('kraken')).rglob(str(model)))
+        for loc in search:
+            if loc.is_file():
+                location = loc
+                locations.append(loc)
+                break
+        if not location:
+            raise click.BadParameter(f'No model for {model} found')
     else:
         ctx.meta['steps'].append(ProcessingStep(id=f'_{uuid.uuid4()}',
                                                 category='processing',
                                                 description='bounding box segmentation',
-                                                settings={'text_direction': text_direction,
-                                                          'scale': scale,
-                                                          'maxcolseps': maxcolseps,
-                                                          'black_colseps': black_colseps,
-                                                          'remove_hlines': remove_hlines,
-                                                          'pad': pad}))
+                                                settings={'text_direction': config.text_direction,
+                                                          'scale': config.legacy_scale,
+                                                          'maxcolseps': config.legacy_maxcolseps,
+                                                          'black_colseps': config.legacy_black_colseps,
+                                                          'remove_hlines': config.legacy_remove_hlines,
+                                                          'pad': config.bbox_line_padding}))
 
-    return partial(segmenter, boxes, model, text_direction, scale, maxcolseps,
-                   black_colseps, remove_hlines, pad, mask, ctx.meta['device'])
+    return partial(segmenter, params['boxes'], model, config)
 
 @cli.command('ocr')
 @click.pass_context
@@ -598,7 +578,7 @@ def ocr(ctx, **kwargs):
     from kraken.containers import ProcessingStep
 
     params = ctx.params
-    config = RecognitionInferenceConfig(**params)
+    config = RecognitionInferenceConfig(**params, **ctx.meta)
 
     if ctx.meta['input_format_type'] != 'image' and params['no_segmentation']:
         raise click.BadParameter('no_segmentation mode is incompatible with page/alto inputs')
