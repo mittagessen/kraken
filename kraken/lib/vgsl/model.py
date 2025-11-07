@@ -28,10 +28,11 @@ from torch import nn
 from lightning.fabric import Fabric
 
 from kraken.lib.vgsl import layers
+from kraken.models import BaseModel
+from kraken.registry import register
 from kraken.lib.vgsl.rpred import VGSLRecognitionInference
 from kraken.lib.vgsl.spred import VGSLSegmentationInference
-from kraken.registry import register
-from kraken.models import BaseModel, Config, RecognitionInferenceConfig, SegmentationInferenceConfig
+from kraken.configs import Config, RecognitionInferenceConfig, SegmentationInferenceConfig
 from kraken.lib.codec import PytorchCodec
 from kraken.lib.exceptions import KrakenInvalidModelException
 
@@ -95,7 +96,7 @@ class TorchVGSLModel(nn.Module,
 
     Attributes:
         input: Expected input tensor as a 4-tuple.
-        nn: Stack of layers parsed from the spec.
+        net: Stack of layers parsed from the spec.
         criterion: Fully parametrized loss function.
         user_metadata: dict with user defined metadata. Is flushed into
                              model file during saving/overwritten by loading

@@ -66,7 +66,6 @@ class BaselineSet(Dataset):
         """
         super().__init__()
         self.imgs = []
-        self.im_mode = '1'
         self.pad = padding
         self.targets = []
         self.class_mapping = class_mapping

@@ -38,9 +38,15 @@ class Config:
             parameters set an empty dictionary.
 
         > Error handling parameters
+
         raise_on_error (bool, defaults to False):
             Causes an exception to be raised instead of internal handling when
             functional blocks that can fail for misshapen input crash.
+
+        > Parallelism parameters
+
+        num_threads (int, defaults to 1):
+            Number of threads to use for intra-op parallelisation.
     """
     def __init__(self, **kwargs):
         super().__init__()
@@ -50,7 +56,7 @@ class Config:
         self.batch_size = kwargs.pop('batch_size', 1)
         self.compile_config = kwargs.pop('compile', None)
         self.raise_on_error = kwargs.pop('raise_on_error', False)
-
+        self.num_threads = kwargs.pop('num_threads', 1)
 
 class TrainingDataConfig:
     """
@@ -283,6 +289,10 @@ class TrainingConfig(Config):
             Momentum parameter. Ignored if optimizer doesn't use it.
         weight_decay (float, defaults to 0.0):
             Weight decay. Ignored if optimizer doesn't support it.
+        gradient_clip_val (float, defaults to 1.0):
+            Threshold for gradient clipping.
+        accumulate_grad_batches (int, defaults to 1):
+            Number of batches to aggregate before backpropagation.
 
         > Learning rate scheduling parameters
 
@@ -325,6 +335,8 @@ class TrainingConfig(Config):
         self.lrate = kwargs.pop('lrate', 1e-5)
         self.momentum = kwargs.pop('momentum', 0.9)
         self.weight_decay = kwargs.pop('weight_decay', 0.0)
+        self.gradient_clip_val = kwargs.pop('gradient_clip_val', 1.0)
+        self.accumulate_grad_batches = kwargs.pop('accumulate_grad_batches', 1)
         self.schedule = kwargs.pop('schedule', 'constant')
         self.warmup = kwargs.pop('warmup', 0)
         self.step_size = kwargs.pop('step_size', 10)
@@ -336,5 +348,5 @@ class TrainingConfig(Config):
         self.quit = kwargs.pop('quit', 'fixed')
         self.min_epochs = kwargs.pop('min_epochs', 0)
         self.lag = kwargs.pop('lag', 10)
-        self.min_delta = kwargs.pop('min_delta', None)
+        self.min_delta = kwargs.pop('min_delta', 0.0)
         super().__init__(**kwargs)

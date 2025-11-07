@@ -109,7 +109,6 @@ class KrakenTrainer(L.Trainer):
                  log_dir: Optional['PathLike'] = None,
                  *args,
                  **kwargs):
-        kwargs['enable_checkpointing'] = False
         kwargs['enable_progress_bar'] = enable_progress_bar
         kwargs['min_epochs'] = min_epochs
         kwargs['max_epochs'] = max_epochs
@@ -202,30 +201,12 @@ class KrakenSetOneChannelMode(Callback):
     """
     def on_train_epoch_end(self, trainer: "L.Trainer", pl_module: "L.LightningModule") -> None:
         # fill one_channel_mode after 1 iteration over training data set
-        if not trainer.sanity_checking and trainer.current_epoch == 0 and trainer.model.nn.model_type == 'recognition':
-            ds = getattr(pl_module, 'train_set', None)
-            if not ds and trainer.datamodule:
-                ds = trainer.datamodule.train_set
-            im_mode = ds.dataset.im_mode
+        if not trainer.sanity_checking and trainer.current_epoch == 0 and trainer.model.net.model_type == 'recognition':
+            ds = trainer.datamodule.train_set
+            im_mode = getattr(ds.dataset.transforms, 'im_mode', ds.dataset.im_mode)
             if im_mode in ['1', 'L']:
                 logger.info(f'Setting model one_channel_mode to {im_mode}.')
-                trainer.model.nn.one_channel_mode = im_mode
-
-
-class KrakenSaveModel(Callback):
-    """
-    Kraken's own serialization callback instead of pytorch's.
-    """
-    def on_validation_end(self, trainer: "L.Trainer", pl_module: "L.LightningModule") -> None:
-        if not trainer.sanity_checking:
-            trainer.model.nn.hyper_params['completed_epochs'] += 1
-            metric = float(trainer.logged_metrics['val_metric']) if 'val_metric' in trainer.logged_metrics else -1.0
-            trainer.model.nn.user_metadata['accuracy'].append((trainer.global_step, metric))
-            trainer.model.nn.user_metadata['metrics'].append((trainer.global_step, {k: float(v) for k, v in trainer.logged_metrics.items()}))
-
-            logger.info('Saving to {}_{}.mlmodel'.format(trainer.model.output, trainer.current_epoch))
-            trainer.model.nn.save_model(f'{trainer.model.output}_{trainer.current_epoch}.mlmodel')
-            trainer.model.best_model = f'{trainer.model.output}_{trainer.model.best_epoch}.mlmodel'
+                trainer.model.net.one_channel_mode = im_mode
 
 
 def configure_optimizer_and_lr_scheduler(hparams, params, len_train_set=None, loss_tracking_mode='max'):
