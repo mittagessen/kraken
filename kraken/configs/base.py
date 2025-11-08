@@ -98,10 +98,6 @@ class SegmentationTrainingDataConfig(TrainingDataConfig):
 
         format_type (Literal['alto', 'page', 'xml'] defaults to 'xml'):
             Format of the training data.
-        suppress_regions (bool, defaults to False):
-            Suppresses all regions in the dataset.
-        suppress_baselines (bool, defaults to False)
-            Suppresses all baselines in the dataset.
         line_class_mapping (dict[str, int], defaults to defaultdict):
             Mapping between line class identifiers and integer labels.
         region_class_mapping (dict[str, int], defaults to None):

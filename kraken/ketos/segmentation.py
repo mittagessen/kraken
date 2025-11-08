@@ -38,7 +38,7 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
 
 @click.command('segtrain')
 @click.pass_context
-@click.option('-o', '--output', 'checkpoint_path', type=click.Path(), default='model', help='Output model file')
+@click.option('-o', '--output', 'checkpoint_path', type=click.Path(), default='model', help='Output checkpoint path')
 @click.option('--weights-format', default='safetensors', help='Output weights format.')
 @click.option('-s', '--spec', help='VGSL spec of the baseline labeling network')
 @click.option('--line-width', type=int, help='The height of each baseline in the target after scaling')
@@ -256,10 +256,16 @@ def segtrain(ctx, **kwargs):
 @click.pass_context
 @click.option('-m', '--model', type=click.Path(exists=True, readable=True),
               multiple=False, help='Model(s) to evaluate')
-@click.option('-e', '--test-data', default=None, multiple=True,
-              callback=_validate_manifests, type=click.File(mode='r', lazy=True),
+@click.option('-e',
+              '--test-files',
+              'test_data',
+              multiple=True,
+              callback=_validate_manifests,
+              type=click.File(mode='r', lazy=True),
               help='File(s) with paths to evaluation data.')
-@click.option('-f', '--format-type', type=click.Choice(['xml', 'alto', 'page']), default='xml',
+@click.option('-f',
+              '--format-type',
+              type=click.Choice(['xml', 'alto', 'page']),
               help='Sets the training data format. In ALTO and PageXML mode all '
               'data is extracted from xml files containing both baselines and a '
               'link to source images.')

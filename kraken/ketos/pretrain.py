@@ -36,11 +36,24 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
 
 @click.command('pretrain')
 @click.pass_context
-@click.option('-B', '--batch-size', type=int, help='batch sample size')
-@click.option('--pad', 'padding', type=int, help='Left and right padding around lines')
-@click.option('-o', '--output', 'checkpoint_path', type=click.Path(), help='Output checkpoint path')
-@click.option('-s', '--spec', help='VGSL spec of the network to train.')
-@click.option('-i', '--load', type=click.Path(exists=True, readable=True),
+@click.option('-B',
+              '--batch-size',
+              type=int,
+              help='batch sample size')
+@click.option('--pad',
+              'padding',
+              type=int,
+              help='Left and right padding around lines')
+@click.option('-o',
+              '--output',
+              'checkpoint_path',
+              type=click.Path(), help='Output checkpoint path')
+@click.option('-s',
+              '--spec',
+              help='VGSL spec of the network to train.')
+@click.option('-i',
+              '--load',
+              type=click.Path(exists=True, readable=True),
               help='Load existing file to continue training')
 @click.option('-F',
               '--freq',
@@ -98,7 +111,7 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
               type=int,
               help='Minimal number of validation runs between LR reduction for reduceonplateau LR schedule.')
 @click.option('--cos-max',
-              'cos_max_t',
+              'cos_t_max',
               type=int,
               help='Epoch of minimal learning rate for cosine LR scheduler.')
 @click.option('--cos-min-lr',
@@ -108,16 +121,12 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
               '--partition',
               type=float,
               help='Ground truth data partition ratio between train/validation set')
-@click.option('--fixed-splits/--ignore-fixed-splits', default=False,
-              help='Whether to honor fixed splits in binary datasets.')
-@click.option('-t', '--training-files', default=None, multiple=True,
+@click.option('-t', '--training-files', 'training_data', multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with additional paths to training data')
-@click.option('-e', '--evaluation-files', default=None, multiple=True,
+@click.option('-e', '--evaluation-files', 'evaluation_data', multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
-@click.option('--load-hyper-parameters/--no-load-hyper-parameters', default=False,
-              help='When loading an existing model, retrieve hyperparameters from the model')
 @click.option('-f', '--format-type', type=click.Choice(['path', 'xml', 'alto', 'page', 'binary']),
               help='Sets the training data format. In ALTO and PageXML mode all '
               'data is extracted from xml files containing both line definitions and a '

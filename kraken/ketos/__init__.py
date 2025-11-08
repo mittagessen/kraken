@@ -48,6 +48,7 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
 
 from kraken.configs import (Config,
                             TrainingDataConfig,
+                            VGSLPreTrainingConfig,
                             VGSLRecognitionTrainingConfig,
                             VGSLRecognitionTrainingDataConfig,
                             BLLASegmentationTrainingConfig,
@@ -59,7 +60,8 @@ from kraken.configs import (Config,
                                                 'train': {**VGSLRecognitionTrainingConfig().__dict__, **VGSLRecognitionTrainingDataConfig().__dict__},
                                                 'test': VGSLRecognitionTrainingDataConfig().__dict__,
                                                 'segtrain': {**BLLASegmentationTrainingConfig().__dict__, **BLLASegmentationTrainingDataConfig().__dict__},
-                                                'segtest': {**BLLASegmentationTrainingConfig().__dict__, **BLLASegmentationTrainingDataConfig().__dict__}}))
+                                                'segtest': {**BLLASegmentationTrainingConfig().__dict__, **BLLASegmentationTrainingDataConfig().__dict__},
+                                                'pretrain': {**VGSLRecognitionTrainingDataConfig().__dict__, **VGSLPreTrainingConfig().__dict__}}))
 
 @click.version_option()
 @click.pass_context
