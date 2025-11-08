@@ -160,7 +160,8 @@ def pretrain(ctx, **kwargs):
     """
     Trains a model from image-text pairs.
     """
-    params = ctx.params
+    params = ctx.params.copy()
+    params.update(ctx.meta)
     resume = params.pop('resume', None)
     load = params.pop('load', None)
     training_data = params.pop('training_data', [])
@@ -188,7 +189,7 @@ def pretrain(ctx, **kwargs):
                                      RecognitionPretrainModel)
     from kraken.train import KrakenTrainer
 
-    from kraken.configs import VGSLPreTrainingConfig, VGSLRecognitionTrainingDataConfig
+    from kraken.configs import VGSLPreTrainingConfig, VGSLPreTrainingDataConfig
 
     # disable automatic partition when given evaluation set explicitly
     if params['evaluation_data']:
@@ -217,7 +218,7 @@ def pretrain(ctx, **kwargs):
                                           filename='checkpoint_{epoch:02d}-{val_metric:.4f}')
     cbs.append(checkpoint_callback)
 
-    dm_config = VGSLRecognitionTrainingDataConfig(**params, **ctx.meta)
+    dm_config = VGSLPreTrainingDataConfig(**params)
     m_config = VGSLPreTrainingConfig(**params)
 
     if resume:

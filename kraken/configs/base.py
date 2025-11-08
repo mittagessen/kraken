@@ -78,6 +78,8 @@ class TrainingDataConfig:
             Number of dataloader workers.
         augment (bool, defaults to False):
             Switch to enable augmentation.
+        batch_size (int, defaults to 1):
+            Number of items to pack into a single sample.
     """
     def __init__(self, **kwargs):
         super().__init__()
@@ -87,6 +89,7 @@ class TrainingDataConfig:
         self.partition = kwargs.pop('partition', 0.9)
         self.num_workers = kwargs.pop('num_workers', 1)
         self.augment = kwargs.pop('augment', False)
+        self.batch_size = kwargs.pop('batch_size', 1)
 
 
 class SegmentationTrainingDataConfig(TrainingDataConfig):

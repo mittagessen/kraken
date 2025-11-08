@@ -20,12 +20,27 @@ Configurations for semi-supervised model pretraining.
 """
 from kraken.configs.vgsl import VGSLRecognitionTrainingConfig
 
-__all__ = ['VGSLPreTrainingConfig']
+__all__ = ['VGSLPreTrainingConfig', 'VGSLPreTrainingDataConfig']
+
+
+class VGSLPreTrainingDataConfig(VGSLRecognitionTrainingConfig):
+    """
+    Base configuration for pretraining a reading order model.
+
+    Arg:
+        mask_width (int, defaults to 4):
+        mask_prob (float, defaults to 0.5):
+        num_negatives (int, defaults to 100):
+        logit_temp (float, defaults to 0.1):
+    """
+    def __init__(self, **kwargs):
+        kwargs.setdefault('batch_size', 64)
+        super().__init__(**kwargs)
 
 
 class VGSLPreTrainingConfig(VGSLRecognitionTrainingConfig):
     """
-    Base configuration for training a reading order model.
+    Base configuration for pretraining a reading order model.
 
     Arg:
         mask_width (int, defaults to 4):
@@ -38,7 +53,6 @@ class VGSLPreTrainingConfig(VGSLRecognitionTrainingConfig):
         self.mask_prob = kwargs.pop('mask_prob', 0.5)
         self.num_negatives = kwargs.pop('num_negatives', 100)
         self.logit_temp = kwargs.pop('logit_temp', 0.1)
-        kwargs.setdefault('batch_size', 64)
         kwargs.setdefault('min_epochs', 100)
         kwargs.setdefault('lrate', 1e-6)
         kwargs.setdefault('weight_decay', 0.01)

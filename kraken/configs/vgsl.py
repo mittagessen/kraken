@@ -43,12 +43,15 @@ class VGSLRecognitionTrainingDataConfig(RecognitionTrainingDataConfig):
             algorithm. Set to L|R to override default text direction.
         legacy_polygons (bool, defaults to False):
             Whether to use the slow legacy polygon extractor for training.
+        paddding (int, defaults to 16):
+            Padding around start/end of line image.
     """
     def __init__(self, **kwargs):
         self.normalization = kwargs.pop('normalization', None)
         self.normalize_whitespace = kwargs.pop('normalize_whitespace', True)
         self.bidi_reordering = kwargs.pop('bidi_reordering', True)
         self.legacy_polygons = kwargs.pop('legacy_polygons', False)
+        self.padding = kwargs.pop('padding', 16)
         super().__init__(**kwargs)
 
 
@@ -70,8 +73,6 @@ class VGSLRecognitionTrainingConfig(TrainingConfig):
     Base configuration for training a VGSL recognition model with CTC loss.
 
     Arg:
-        paddding (int, defaults to 16):
-            Padding around start/end of line image.
         freeze_backbone (int, defaults to 0):
             Freezes the backbone (everything before the recurrent layers) of
             the network for `n` iterations.
@@ -79,7 +80,6 @@ class VGSLRecognitionTrainingConfig(TrainingConfig):
     """
     def __init__(self, **kwargs):
         self.spec = kwargs.pop('spec', '[1,120,0,1 Cr3,13,32 Do0.1,2 Mp2,2 Cr3,13,32 Do0.1,2 Mp2,2 Cr3,9,64 Do0.1,2 Mp2,2 Cr3,9,64 Do0.1,2 S1(1x0)1,3 Lbx200 Do0.1,2 Lbx200 Do0.1,2 Lbx200 Do]')
-        self.padding = kwargs.pop('padding', 16)
         self.freeze_backbone = kwargs.pop('freeze_backbone', 0)
         self.resize = kwargs.pop('resize', 'fail')
         kwargs.setdefault('quit', 'early')

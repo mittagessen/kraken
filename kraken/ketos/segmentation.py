@@ -150,7 +150,8 @@ def segtrain(ctx, **kwargs):
     """
     Trains a baseline labeling model for layout analysis
     """
-    params = ctx.params
+    params = ctx.params.copy()
+    params.update(ctx.meta)
     resume = params.pop('resume', None)
     load = params.pop('load', None)
     training_data = params.pop('training_data', [])
@@ -212,7 +213,7 @@ def segtrain(ctx, **kwargs):
                                           filename='checkpoint_{epoch:02d}-{val_metric:.4f}')
     cbs.append(checkpoint_callback)
 
-    dm_config = BLLASegmentationTrainingDataConfig(**params, **ctx.meta)
+    dm_config = BLLASegmentationTrainingDataConfig(**params)
     m_config = BLLASegmentationTrainingConfig(**params)
 
     if resume:
@@ -285,8 +286,8 @@ def segtest(ctx, **kwargs):
     """
     Evaluate on a test set.
     """
-
-    params = ctx.params
+    params = ctx.meta.copy()
+    params.update(ctx.params)
     model = params.pop('model')
     if not model:
         raise click.UsageError('No model to evaluate given.')
@@ -313,7 +314,7 @@ def segtest(ctx, **kwargs):
                             num_sanity_val_steps=0)
 
     m_config = BLLASegmentationTrainingConfig(**params)
-    dm_config = BLLASegmentationTrainingDataConfig(**params, **ctx.meta)
+    dm_config = BLLASegmentationTrainingDataConfig(**params)
     data_module = BLLASegmentationDataModule(dm_config)
 
     with trainer.init_module(empty_init=False):

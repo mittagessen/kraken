@@ -145,7 +145,7 @@ class CRNNRecognitionDataModule(L.LightningDataModule):
                                           self.trainer.lightning_module.height,
                                           self.trainer.lightning_module.width,
                                           self.trainer.lightning_module.channels,
-                                          (self.trainer.lightning_module.hparams.config.padding, 0),
+                                          (self.hparams.data_config.padding, 0),
                                           valid_norm=False)
 
         if stage in ['fit', None]:

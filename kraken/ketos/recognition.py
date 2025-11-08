@@ -108,7 +108,7 @@ logger = logging.getLogger('kraken')
                    'codec do not match.')
 @click.option('--reorder/--no-reorder', 'bidi_reordering', help='Reordering of code points to display order')
 @click.option('--base-dir',
-              type=click.Choice(['L', 'R', 'auto']), help='Set base text '
+              type=click.Choice(['L', 'R', 'auto']), default='auto', help='Set base text '
               'direction.  This should be set to the direction used during the '
               'creation of the training data. If set to `auto` it will be '
               'overridden by any explicit value given in the input files.')
@@ -137,7 +137,9 @@ def train(ctx, **kwargs):
     """
     Trains a model from image-text pairs.
     """
-    params = ctx.params
+    params = ctx.meta.copy()
+    params.update(ctx.params)
+
     resume = params.pop('resume', None)
     load = params.pop('load', None)
     training_data = params.pop('training_data', [])
@@ -201,7 +203,7 @@ def train(ctx, **kwargs):
                                           filename='checkpoint_{epoch:02d}-{val_metric:.4f}')
     cbs.append(checkpoint_callback)
 
-    dm_config = VGSLRecognitionTrainingDataConfig(**params, **ctx.meta)
+    dm_config = VGSLRecognitionTrainingDataConfig(**params)
     m_config = VGSLRecognitionTrainingConfig(**params)
 
     if resume:
@@ -242,8 +244,6 @@ def train(ctx, **kwargs):
             if resume:
                 trainer.fit(model, data_module, ckpt_path=resume)
             else:
-                if params.get('validate_before_train'):
-                    trainer.validate(model, data_module)
                 trainer.fit(model, data_module)
     except ValueError as e:
         if e.args[0].startswith('Training data and model codec alphabets mismatch') and params['resize'] == 'fail':
@@ -262,9 +262,16 @@ def train(ctx, **kwargs):
 @click.option('-e', '--test-files', 'test_data', multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with paths to evaluation data.')
+@click.option('-f', '--format-type', type=click.Choice(['path', 'xml', 'alto', 'page', 'binary']), default='path',
+              help='Sets the training data format. In ALTO and PageXML mode all '
+              'data is extracted from xml files containing both line definitions and a '
+              'link to source images. In `path` mode arguments are image files '
+              'sharing a prefix up to the last extension with `.gt.txt` text files '
+              'containing the transcription. In binary mode files are datasets '
+              'files containing pre-extracted text lines.')
 @click.option('--pad', 'padding', type=int, help='Left and right padding around lines')
 @click.option('--reorder/--no-reorder', 'bidi_reordering', help='Reordering of code points to display order')
-@click.option('--base-dir', type=click.Choice(['L', 'R', 'auto']), help='Set base text '
+@click.option('--base-dir', type=click.Choice(['L', 'R', 'auto']), default='auto', help='Set base text '
               'direction.  This should be set to the direction used during the '
               'creation of the training data. If set to `auto` it will be '
               'overridden by any explicit value given in the input files.')
@@ -278,9 +285,10 @@ def test(ctx, **kwargs):
     """
     Evaluate on a test set.
     """
-    params = ctx.params
+    params = ctx.meta.copy()
+    params.update(ctx.params)
 
-    model = kwargs.pop('model')
+    model = params.pop('model')
     if not model:
         raise click.UsageError('No model to evaluate given.')
 
@@ -296,6 +304,7 @@ def test(ctx, **kwargs):
     if params['bidi_reordering'] and params['base_dir'] != 'auto':
         params['bidi_reordering'] = params['base_dir']
 
+    from kraken.lib import vgsl  # NOQA
     from kraken.train import (KrakenTrainer, CRNNRecognitionModel,
                               CRNNRecognitionDataModule)
     from kraken.configs import VGSLRecognitionTrainingDataConfig, VGSLRecognitionTrainingConfig
@@ -310,9 +319,10 @@ def test(ctx, **kwargs):
                             num_sanity_val_steps=0)
 
     m_config = VGSLRecognitionTrainingConfig(**params)
-    dm_config = VGSLRecognitionTrainingDataConfig(**params, **ctx.meta)
+    dm_config = VGSLRecognitionTrainingDataConfig(**params)
     data_module = CRNNRecognitionDataModule(dm_config)
 
+    print(dm_config.batch_size)
     with trainer.init_module(empty_init=False):
         message(f'Loading from {model}.')
         if model.endswith('ckpt'):
@@ -320,7 +330,8 @@ def test(ctx, **kwargs):
         else:
             model = CRNNRecognitionModel.load_from_weights(model, m_config)
 
-    test_metrics = trainer.test(model, data_module)
+    with threadpool_limits(limits=ctx.meta['num_threads']):
+        test_metrics = trainer.test(model, data_module)
 
     rep = render_report(model=model,
                         chars=sum(test_metrics.character_counts),
