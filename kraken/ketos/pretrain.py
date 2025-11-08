@@ -144,6 +144,7 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
                    'in an effective mask width of 12.')
 @click.option('-mp',
               '--mask-probability',
+              'mask_prob',
               type=float,
               help='Probability of a particular position being the start position of a mask.')
 @click.option('-nn',
