@@ -25,7 +25,7 @@ from PIL import Image
 
 from kraken.registry import OPTIMIZERS, SCHEDULERS, STOPPERS
 
-from .util import _expand_gt, _validate_manifests, message, to_ptl_device
+from .util import _expand_gt, _validate_manifests, message
 
 logging.captureWarnings(True)
 logger = logging.getLogger('kraken')
@@ -181,11 +181,6 @@ def pretrain(ctx, **kwargs):
         except ImportError:
             raise click.BadOptionUsage('logger', 'tensorboard logger needs the `tensorboard` package installed.')
 
-    try:
-        accelerator, device = to_ptl_device(ctx.meta['device'])
-    except Exception as e:
-        raise click.BadOptionUsage('device', str(e))
-
     from threadpoolctl import threadpool_limits
     from lightning.pytorch.callbacks import ModelCheckpoint
 
@@ -234,8 +229,8 @@ def pretrain(ctx, **kwargs):
 
     data_module = PretrainDataModule()
 
-    trainer = KrakenTrainer(accelerator=accelerator,
-                            devices=device,
+    trainer = KrakenTrainer(accelerator=ctx.meta['accelerator'],
+                            devices=ctx.meta['device'],
                             precision=ctx.meta['precision'],
                             max_epochs=params['epochs'] if params['quit'] == 'fixed' else -1,
                             min_epochs=params['min_epochs'],
@@ -255,7 +250,7 @@ def pretrain(ctx, **kwargs):
             if load.endswith('ckpt'):
                 model = RecognitionPretrainModel.load_from_checkpoint(load, m_config)
             else:
-                model = RecognitionPretrainModel.load_from_weights(m_config, load)
+                model = RecognitionPretrainModel.load_from_weights(load, m_config)
         elif resume:
             message(f'Resuming from checkpoint {resume}.')
             model = RecognitionPretrainModel.load_from_checkpoint(resume)

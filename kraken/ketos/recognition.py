@@ -18,19 +18,14 @@ kraken.ketos.train
 
 Command line driver for recognition training and evaluation.
 """
-import logging
-import pathlib
-from typing import List
-from functools import partial
-import warnings
-
 import click
+import logging
+
 from threadpoolctl import threadpool_limits
 
 from kraken.registry import OPTIMIZERS, SCHEDULERS, STOPPERS
-from kraken.lib.exceptions import KrakenInputException
 
-from .util import _expand_gt, _validate_manifests, message, to_ptl_device
+from .util import _expand_gt, _validate_manifests, message
 
 logging.captureWarnings(True)
 logger = logging.getLogger('kraken')
@@ -163,22 +158,17 @@ def train(ctx, **kwargs):
         except ImportError:
             raise click.BadOptionUsage('logger', 'tensorboard logger needs the `tensorboard` package installed.')
 
-    try:
-        accelerator, device = to_ptl_device(ctx.meta['device'])
-    except Exception as e:
-        raise click.BadOptionUsage('device', str(e))
-
     import json
 
     from lightning.pytorch.callbacks import ModelCheckpoint
 
-    from kraken.lib import vgsl
+    from kraken.lib import vgsl  # NOQA
     from kraken.train import (KrakenTrainer, CRNNRecognitionModel,
                               CRNNRecognitionDataModule)
     from kraken.configs import VGSLRecognitionTrainingConfig, VGSLRecognitionTrainingDataConfig
 
     if (codec := params.get('codec')) is not None and not isinstance(codec, dict):
-        with open(codec, rb) as fp:
+        with open(codec, 'rb') as fp:
             params['codec'] = json.load(fp)
 
     # disable automatic partition when given evaluation set explicitly
@@ -195,7 +185,7 @@ def train(ctx, **kwargs):
         raise click.UsageError('No training data was provided to the train command. Use `-t` or the `ground_truth` argument.')
 
     if params['bidi_reordering'] and params['base_dir'] != 'auto':
-        params.setdefault('bidi_reordering', params['base_dir'])
+        params['bidi_reordering'] = params['base_dir']
 
     if params['freq'] > 1:
         val_check_interval = {'check_val_every_n_epoch': int(params['freq'])}
@@ -218,9 +208,9 @@ def train(ctx, **kwargs):
         data_module = CRNNRecognitionDataModule.load_from_checkpoint(resume)
     else:
         data_module = CRNNRecognitionDataModule(dm_config)
-    
-    trainer = KrakenTrainer(accelerator=accelerator,
-                            devices=device,
+
+    trainer = KrakenTrainer(accelerator=ctx.meta['accelerator'],
+                            devices=ctx.meta['device'],
                             precision=ctx.meta['precision'],
                             max_epochs=params['epochs'] if params['quit'] == 'fixed' else -1,
                             min_epochs=params['min_epochs'],
@@ -231,7 +221,6 @@ def train(ctx, **kwargs):
                             callbacks=cbs,
                             gradient_clip_val=params['gradient_clip_val'],
                             num_sanity_val_steps=0,
-                            use_distributed_sampler=False,
                             **val_check_interval)
 
     with trainer.init_module(empty_init=False if (load or resume) else True):
@@ -240,7 +229,7 @@ def train(ctx, **kwargs):
             if load.endswith('ckpt'):
                 model = CRNNRecognitionModel.load_from_checkpoint(load, m_config)
             else:
-                model = CRNNRecognitionModel.load_from_weights(m_config, load)
+                model = CRNNRecognitionModel.load_from_weights(load, m_config)
         elif resume:
             message(f'Resuming from checkpoint {resume}.')
             model = CRNNRecognitionModel.load_from_checkpoint(resume)
@@ -257,7 +246,7 @@ def train(ctx, **kwargs):
                     trainer.validate(model, data_module)
                 trainer.fit(model, data_module)
     except ValueError as e:
-        if e.args[0].startswith('Training data and model codec alphabets mismatch') and resize == 'fail':
+        if e.args[0].startswith('Training data and model codec alphabets mismatch') and params['resize'] == 'fail':
             raise click.BadOptionUsage('resize', 'Mismatched training data for loaded model. Set option `--resize` to `new` or `add`')
         else:
             raise e
@@ -270,11 +259,11 @@ def train(ctx, **kwargs):
 @click.pass_context
 @click.option('-B', '--batch-size', type=int, help='Batch sample size')
 @click.option('-m', '--model', type=click.Path(exists=True, readable=True), help='Model to evaluate')
-@click.option('-e', '--test-data', multiple=True,
+@click.option('-e', '--test-files', 'test_data', multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with paths to evaluation data.')
-@click.option('--padding', type=int, help='Left and right padding around lines')
-@click.option('--reorder/--no-reorder', help='Reordering of code points to display order')
+@click.option('--pad', 'padding', type=int, help='Left and right padding around lines')
+@click.option('--reorder/--no-reorder', 'bidi_reordering', help='Reordering of code points to display order')
 @click.option('--base-dir', type=click.Choice(['L', 'R', 'auto']), help='Set base text '
               'direction.  This should be set to the direction used during the '
               'creation of the training data. If set to `auto` it will be '
@@ -289,20 +278,61 @@ def test(ctx, **kwargs):
     """
     Evaluate on a test set.
     """
+    params = ctx.params
+
     model = kwargs.pop('model')
     if not model:
         raise click.UsageError('No model to evaluate given.')
 
-    rep = render_report(p,
-                        chars,
-                        error,
-                        cer_list[-1],
-                        cer_case_insensitive_list[-1],
-                        wer_list[-1],
-                        confusions,
-                        scripts,
-                        ins,
-                        dels,
-                        subs)
+    test_data = params.pop('test_data', [])
+    test_set = list(params.pop('test_set', []))
+
+    # merge training_files into ground_truth list
+    if test_data:
+        test_set.extend(test_data)
+
+    params['test_data'] = test_set
+
+    if params['bidi_reordering'] and params['base_dir'] != 'auto':
+        params['bidi_reordering'] = params['base_dir']
+
+    from kraken.train import (KrakenTrainer, CRNNRecognitionModel,
+                              CRNNRecognitionDataModule)
+    from kraken.configs import VGSLRecognitionTrainingDataConfig, VGSLRecognitionTrainingConfig
+    from kraken.serialization import render_report
+
+    trainer = KrakenTrainer(accelerator=ctx.meta['accelerator'],
+                            devices=ctx.meta['device'],
+                            precision=ctx.meta['precision'],
+                            enable_progress_bar=True if not ctx.meta['verbose'] else False,
+                            deterministic=ctx.meta['deterministic'],
+                            enable_model_summary=False,
+                            num_sanity_val_steps=0)
+
+    m_config = VGSLRecognitionTrainingConfig(**params)
+    dm_config = VGSLRecognitionTrainingDataConfig(**params, **ctx.meta)
+    data_module = CRNNRecognitionDataModule(dm_config)
+
+    with trainer.init_module(empty_init=False):
+        message(f'Loading from {model}.')
+        if model.endswith('ckpt'):
+            model = CRNNRecognitionModel.load_from_checkpoint(model, m_config)
+        else:
+            model = CRNNRecognitionModel.load_from_weights(model, m_config)
+
+    test_metrics = trainer.test(model, data_module)
+
+    rep = render_report(model=model,
+                        chars=sum(test_metrics.character_counts),
+                        errors=test_metrics.num_errors,
+                        char_accuracy=test_metrics.cer,
+                        char_CI_accucary=test_metrics.case_insensitive_cer,  # Case insensitive
+                        word_accuracy=test_metrics.wer,
+                        char_confusions=test_metrics.confusions,
+                        scripts=test_metrics.scripts,
+                        insertions=test_metrics.insertions,
+                        deletions=test_metrics.deletes,
+                        substitutions=test_metrics.substitutions)
+
     logger.info(rep)
     message(rep)

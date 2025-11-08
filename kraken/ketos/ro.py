@@ -19,13 +19,11 @@ kraken.ketos.ro
 Command line driver for reading order training, evaluation, and handling.
 """
 import logging
-import pathlib
 
 import click
 from PIL import Image
 
-from kraken.ketos.util import (_expand_gt, _validate_manifests, message,
-                               to_ptl_device, _validate_merging)
+from kraken.ketos.util import _expand_gt, _validate_manifests, message
 
 from kraken.registry import OPTIMIZERS, SCHEDULERS, STOPPERS
 
@@ -39,9 +37,13 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
 @click.command('rotrain')
 @click.pass_context
 @click.option('-B', '--batch-size', type=int, help='batch sample size')
+@click.option('--weights-format', default='safetensors', help='Output weights format.')
 @click.option('-o', '--output', 'checkpoint_path', type=click.Path(), help='Output model file')
-@click.option('-i', '--load', type=click.Path(exists=True, readable=True), help='Load existing file to continue training')
-@click.option('-F', '--freq', type=float,
+@click.option('-i', '--load', type=click.Path(exists=True, readable=True), help='Load existing checkpoint or weights file to train from.')
+@click.option('--resume', type=click.Path(exists=True, readable=True), help='Load a checkpoint to continue training')
+@click.option('-F',
+              '--freq',
+              type=float,
               help='Model saving and report generation frequency in epochs '
                    'during training. If frequency is >1 it must be an integer, '
                    'i.e. running validation every n-th epoch.')
@@ -112,132 +114,98 @@ def rotrain(ctx, **kwargsh):
     """
     Trains a baseline labeling model for layout analysis
     """
-    import shutil
+    params = ctx.params
+    resume = params.pop('resume', None)
+    load = params.pop('load', None)
+    training_data = params.pop('training_data', [])
+    ground_truth = list(params.pop('ground_truth', []))
 
-    from threadpoolctl import threadpool_limits
+    if sum(map(bool, [resume, load])) > 1:
+        raise click.BadOptionsUsage('load', 'load/resume options are mutually exclusive.')
 
-    from kraken.lib.ro import ROModel, RODataModule
-    from kraken.lib.train import KrakenTrainer
-
-    if not (0 <= freq <= 1) and freq % 1.0 != 0:
-        raise click.BadOptionUsage('freq', 'freq needs to be either in the interval [0,1.0] or a positive integer.')
-
-    if pl_logger == 'tensorboard':
+    if params.get('pl_logger') == 'tensorboard':
         try:
             import tensorboard  # NOQA
         except ImportError:
             raise click.BadOptionUsage('logger', 'tensorboard logger needs the `tensorboard` package installed.')
 
-    if log_dir is None:
-        log_dir = pathlib.Path.cwd()
+    from threadpoolctl import threadpool_limits
 
-    logger.info('Building ground truth set from {} document images'.format(len(ground_truth) + len(training_files)))
+    from lightning.pytorch.callbacks import ModelCheckpoint
 
-    # populate hyperparameters from command line args
-    hyper_params = READING_ORDER_HYPER_PARAMS.copy()
-    hyper_params.update({'batch_size': batch_size,
-                         'freq': freq,
-                         'quit': quit,
-                         'epochs': epochs,
-                         'min_epochs': min_epochs,
-                         'lag': lag,
-                         'min_delta': min_delta,
-                         'optimizer': optimizer,
-                         'lrate': lrate,
-                         'momentum': momentum,
-                         'weight_decay': weight_decay,
-                         'warmup': warmup,
-                         'schedule': schedule,
-                         'gamma': gamma,
-                         'step_size': step_size,
-                         'rop_patience': sched_patience,
-                         'cos_t_max': cos_max,
-                         'cos_min_lr': cos_min_lr,
-                         'pl_logger': pl_logger,
-                         }
-                        )
+    from kraken.lib import vgsl  # NOQA
+    from kraken.lib.ro import ROModel, RODataModule
+    from kraken.train import KrakenTrainer
+    from kraken.configs import VGSLRecognitionTrainingConfig, VGSLRecognitionTrainingDataConfig
 
     # disable automatic partition when given evaluation set explicitly
-    if evaluation_files:
-        partition = 1
-    ground_truth = list(ground_truth)
+    if params['evaluation_data']:
+        params['partition'] = 1
 
     # merge training_files into ground_truth list
-    if training_files:
-        ground_truth.extend(training_files)
+    if training_data:
+        ground_truth.extend(training_data)
+
+    params['training_data'] = ground_truth
 
     if len(ground_truth) == 0:
         raise click.UsageError('No training data was provided to the train command. Use `-t` or the `ground_truth` argument.')
 
-    try:
-        accelerator, device = to_ptl_device(ctx.meta['device'])
-    except Exception as e:
-        raise click.BadOptionUsage('device', str(e))
-
-    if hyper_params['freq'] > 1:
-        val_check_interval = {'check_val_every_n_epoch': int(hyper_params['freq'])}
+    if params['freq'] > 1:
+        val_check_interval = {'check_val_every_n_epoch': int(params['freq'])}
     else:
-        val_check_interval = {'val_check_interval': hyper_params['freq']}
+        val_check_interval = {'val_check_interval': params['freq']}
 
-    class_mapping = None
+    cbs = []
+    checkpoint_callback = ModelCheckpoint(dirpath=params.pop('checkpoint_path'),
+                                          save_top_k=10,
+                                          monitor='val_metric',
+                                          mode='max',
+                                          auto_insert_metric_name=False,
+                                          filename='checkpoint_{epoch:02d}-{val_metric:.4f}')
+    cbs.append(checkpoint_callback)
 
-    if load:
-        model = ROModel.load_from_checkpoint(load)
-        class_mapping = model.hparams.class_mapping
+    dm_config = VGSLRecognitionTrainingDataConfig(**params, **ctx.meta)
+    m_config = VGSLRecognitionTrainingConfig(**params)
 
-    dm = RODataModule(batch_size=hyper_params.pop('batch_size'),
-                      training_data=ground_truth,
-                      evaluation_data=evaluation_files,
-                      partition=partition,
-                      num_workers=workers,
-                      format_type=format_type,
-                      class_mapping=class_mapping,
-                      valid_entities=valid_entities,
-                      merge_entities=merge_entities,
-                      merge_all_entities=merge_all_entities,
-                      reading_order=reading_order)
+    if resume:
+        data_module = RODataModule.load_from_checkpoint(resume)
+    else:
+        data_module = RODataModule(dm_config)
 
-    dm.setup('fit')
-
-    if not load:
-        model = ROModel(feature_dim=dm.get_feature_dim(),
-                        class_mapping=dm.get_class_mapping(),
-                        hyper_params=hyper_params,
-                        output=output)
-
-    message(f'Training RO on following {level} types:')
-    for k, v in dm.get_class_mapping().items():
-        message(f'  {k}\t{v}')
-
-    if len(dm.train_set) == 0:
-        raise click.UsageError('No valid training data was provided to the train command. Use `-t` or the `ground_truth` argument.')
-
-    trainer = KrakenTrainer(accelerator=accelerator,
-                            devices=device,
-                            max_epochs=hyper_params['epochs'] if hyper_params['quit'] == 'fixed' else -1,
-                            min_epochs=hyper_params['min_epochs'],
+    trainer = KrakenTrainer(accelerator=ctx.meta['accelerator'],
+                            devices=ctx.meta['device'],
+                            precision=ctx.meta['precision'],
+                            max_epochs=params['epochs'] if params['quit'] == 'fixed' else -1,
+                            min_epochs=params['min_epochs'],
                             enable_progress_bar=True if not ctx.meta['verbose'] else False,
                             deterministic=ctx.meta['deterministic'],
-                            precision=ctx.meta['precision'],
-                            pl_logger=pl_logger,
-                            log_dir=log_dir,
+                            enable_model_summary=False,
+                            accumulate_grad_batches=params['accumulate_grad_batches'],
+                            callbacks=cbs,
+                            gradient_clip_val=params['gradient_clip_val'],
+                            num_sanity_val_steps=0,
                             **val_check_interval)
 
-    with threadpool_limits(limits=threads):
-        trainer.fit(model, dm)
+    with trainer.init_module(empty_init=False if (load or resume) else True):
+        if load:
+            message(f'Loading from checkpoint {load}.')
+            if load.endswith('ckpt'):
+                model = ROModel.load_from_checkpoint(load, m_config)
+            else:
+                model = ROModel.load_from_weights(load, m_config)
+        elif resume:
+            message(f'Resuming from checkpoint {resume}.')
+            model = ROModel.load_from_checkpoint(resume)
+        else:
+            message('Initializing new model.')
+            model = ROModel(m_config)
 
-    if model.best_epoch == -1:
-        logger.warning('Model did not improve during training.')
-        ctx.exit(1)
-
-    if not model.current_epoch:
-        logger.warning('Training aborted before end of first epoch.')
-        ctx.exit(1)
-
-    if quit == 'early':
-        message(f'Moving best model {model.best_model} ({model.best_metric}) to {output}_best.mlmodel')
-        logger.info(f'Moving best model {model.best_model} ({model.best_metric}) to {output}_best.mlmodel')
-        shutil.copy(f'{model.best_model}', f'{output}_best.mlmodel')
+    with threadpool_limits(limits=ctx.meta['num_threads']):
+        if resume:
+            trainer.fit(model, data_module, ckpt_path=resume)
+        else:
+            trainer.fit(model, data_module)
 
 
 @click.command('roadd')

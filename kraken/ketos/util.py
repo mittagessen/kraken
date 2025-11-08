@@ -23,9 +23,12 @@ import glob
 import yaml
 import shlex
 import logging
-from typing import Optional, Any
+from typing import Optional, Any, TYPE_CHECKING
 
 import click
+
+if TYPE_CHECKING:
+    from os import PathLike
 
 logging.captureWarnings(True)
 logger = logging.getLogger('kraken')
@@ -88,7 +91,7 @@ def _validate_merging(ctx, param, value):
 def _validate_manifests(ctx, param, value):
     images = []
     if value is None:
-        return None 
+        return None
     for manifest in value:
         try:
             for entry in manifest.readlines():

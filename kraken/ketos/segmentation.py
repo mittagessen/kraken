@@ -18,14 +18,12 @@ kraken.ketos.segmentation
 
 Command line driver for segmentation training and evaluation.
 """
-import logging
-import pathlib
-
 import click
+import logging
+
 from PIL import Image
 
-from kraken.ketos.util import (_expand_gt, _validate_manifests, message,
-                               to_ptl_device, _validate_merging)
+from kraken.ketos.util import _expand_gt, _validate_manifests, message
 
 from kraken.registry import OPTIMIZERS, SCHEDULERS, STOPPERS
 
@@ -44,6 +42,7 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
 @click.option('--line-width', type=int, help='The height of each baseline in the target after scaling')
 @click.option('--pad', 'padding', type=(int, int), help='Padding (left/right, top/bottom) around the page image')
 @click.option('-i', '--load', type=click.Path(exists=True, readable=True), help='Load existing file to continue training')
+@click.option('--resume', type=click.Path(exists=True, readable=True), help='Load a checkpoint to continue training')
 @click.option('-F', '--freq', type=click.FLOAT,
               help='Model saving and report generation frequency in epochs '
                    'during training. If frequency is >1 it must be an integer, '
@@ -68,10 +67,21 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
 @click.option('--optimizer',
               type=click.Choice(OPTIMIZERS),
               help='Select optimizer')
-@click.option('-r', '--lrate', type=float, help='Learning rate')
-@click.option('-m', '--momentum', type=float, help='Momentum')
-@click.option('-w', '--weight-decay', type=float, help='Weight decay')
-@click.option('--warmup', type=int, help='Number of steps to ramp up to `lrate` initial learning rate.')
+@click.option('-r',
+              '--lrate',
+              type=float,
+              help='Learning rate')
+@click.option('-m',
+              '--momentum',
+              type=float,
+              help='Momentum')
+@click.option('-w',
+              '--weight-decay',
+              type=float,
+              help='Weight decay')
+@click.option('--warmup',
+              type=int,
+              help='Number of steps to ramp up to `lrate` initial learning rate.')
 @click.option('--schedule',
               type=click.Choice(SCHEDULERS),
               help='Set learning rate scheduler. For 1cycle, cycle length is determined by the `--step-size` option.')
@@ -92,21 +102,26 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
 @click.option('--cos-min-lr',
               type=float,
               help='Minimal final learning rate for cosine LR scheduler.')
-@click.option('-p', '--partition', type=float, help='Ground truth data partition ratio between train/validation set')
+@click.option('-p',
+              '--partition',
+              type=float,
+              help='Ground truth data partition ratio between train/validation set')
 @click.option('-t', '--training-files', 'training_data', default=None, multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with additional paths to training data')
 @click.option('-e', '--evaluation-files', 'evaluation_data', default=None, multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
-@click.option('-f', '--format-type', type=click.Choice(['xml', 'alto', 'page']),
+@click.option('-f',
+              '--format-type',
+              type=click.Choice(['xml', 'alto', 'page']),
               help='Sets the training data format. In ALTO and PageXML mode all '
               'data is extracted from xml files containing both baselines and a '
               'link to source images. In `path` mode arguments are image files '
               'sharing a prefix up to the last extension with JSON `.path` files '
               'containing the baseline information.')
 @click.option('--augment/--no-augment', help='Enable image augmentation')
-@click.option('--resize', default='fail',
+@click.option('--resize',
               type=click.Choice([
                   'add', 'union',  # Deprecation: `add` is deprecated, `union` is the new value
                   'both', 'new',  # Deprecation: `both` is deprecated, `new` is the new value
@@ -123,133 +138,129 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
                    ' centerline for scripts annotated with a central line.')
 @click.option('-cl', '--centerline', 'topline', flag_value='centerline')
 @click.option('-bl', '--baseline', 'topline', flag_value='baseline')
-@click.option('--logger', 'pl_logger', type=click.Choice(['tensorboard']), help='Logger used by PyTorch Lightning to track metrics such as loss and accuracy.')
-@click.option('--log-dir', type=click.Path(exists=True, dir_okay=True, writable=True),
+@click.option('--logger',
+              'pl_logger',
+              type=click.Choice(['tensorboard']),
+              help='Logger used by PyTorch Lightning to track metrics such as loss and accuracy.')
+@click.option('--log-dir',
+              type=click.Path(exists=True, dir_okay=True, writable=True),
               help='Path to directory where the logger will store the logs. If not set, a directory will be created in the current working directory.')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def segtrain(ctx, **kwargs):
     """
     Trains a baseline labeling model for layout analysis
     """
-    import shutil
+    params = ctx.params
+    resume = params.pop('resume', None)
+    load = params.pop('load', None)
+    training_data = params.pop('training_data', [])
+    ground_truth = list(params.pop('ground_truth', []))
 
-    from threadpoolctl import threadpool_limits
+    if sum(map(bool, [resume, load])) > 1:
+        raise click.BadOptionsUsage('load', 'load/resume options are mutually exclusive.')
 
-    from kraken.lib.train import KrakenTrainer, SegmentationModel
-
-    if resize != 'fail' and not load:
-        raise click.BadOptionUsage('resize', 'resize option requires loading an existing model')
-
-    if not (0 <= freq <= 1) and freq % 1.0 != 0:
-        raise click.BadOptionUsage('freq', 'freq needs to be either in the interval [0,1.0] or a positive integer.')
-
-    if augment:
+    if params.get('augment'):
         try:
             import albumentations  # NOQA
         except ImportError:
             raise click.BadOptionUsage('augment', 'augmentation needs the `albumentations` package installed.')
 
-    if pl_logger == 'tensorboard':
+    if params.get('pl_logger') == 'tensorboard':
         try:
             import tensorboard  # NOQA
         except ImportError:
             raise click.BadOptionUsage('logger', 'tensorboard logger needs the `tensorboard` package installed.')
 
-    if log_dir is None:
-        log_dir = pathlib.Path.cwd()
+    from threadpoolctl import threadpool_limits
+    from lightning.pytorch.callbacks import ModelCheckpoint
 
-    logger.info('Building ground truth set from {} document images'.format(len(ground_truth) + len(training_files)))
-
-    # populate hyperparameters from command line args
-    hyper_params = SEGMENTATION_HYPER_PARAMS.copy()
-    hyper_params.update({'line_width': line_width,
-                         'padding': pad,
-                         'freq': freq,
-                         'quit': quit,
-                         'epochs': epochs,
-                         'min_epochs': min_epochs,
-                         'lag': lag,
-                         'min_delta': min_delta,
-                         'optimizer': optimizer,
-                         'lrate': lrate,
-                         'momentum': momentum,
-                         'weight_decay': weight_decay,
-                         'warmup': warmup,
-                         'schedule': schedule,
-                         'augment': augment,
-                         'gamma': gamma,
-                         'step_size': step_size,
-                         'rop_patience': sched_patience,
-                         'cos_t_max': cos_max,
-                         'cos_min_lr': cos_min_lr,
-                         })
+    from kraken.lib import vgsl  # NOQA
+    from kraken.train import (KrakenTrainer, BLLASegmentationDataModule,
+                              BLLASegmentationModel)
+    from kraken.configs import BLLASegmentationTrainingConfig, BLLASegmentationTrainingDataConfig
 
     # disable automatic partition when given evaluation set explicitly
-    if evaluation_files:
-        partition = 1
-    ground_truth = list(ground_truth)
+    if params['evaluation_data']:
+        params['partition'] = 1
 
     # merge training_files into ground_truth list
-    if training_files:
-        ground_truth.extend(training_files)
+    if training_data:
+        ground_truth.extend(training_data)
+
+    params['training_data'] = ground_truth
 
     if len(ground_truth) == 0:
         raise click.UsageError('No training data was provided to the train command. Use `-t` or the `ground_truth` argument.')
+
+    if params['freq'] > 1:
+        val_check_interval = {'check_val_every_n_epoch': int(params['freq'])}
+    else:
+        val_check_interval = {'val_check_interval': params['freq']}
 
     loc = {'topline': True,
            'baseline': False,
            'centerline': None}
 
-    topline = loc[topline]
+    params['topline'] = loc[params['topline']]
 
-    try:
-        accelerator, device = to_ptl_device(device)
-    except Exception as e:
-        raise click.BadOptionUsage('device', str(e))
+    cbs = []
+    checkpoint_callback = ModelCheckpoint(dirpath=params.pop('checkpoint_path'),
+                                          save_top_k=10,
+                                          monitor='val_metric',
+                                          mode='max',
+                                          auto_insert_metric_name=False,
+                                          filename='checkpoint_{epoch:02d}-{val_metric:.4f}')
+    cbs.append(checkpoint_callback)
 
-    if hyper_params['freq'] > 1:
-        val_check_interval = {'check_val_every_n_epoch': int(hyper_params['freq'])}
+    dm_config = BLLASegmentationTrainingDataConfig(**params, **ctx.meta)
+    m_config = BLLASegmentationTrainingConfig(**params)
+
+    if resume:
+        data_module = BLLASegmentationDataModule.load_from_checkpoint(resume)
     else:
-        val_check_interval = {'val_check_interval': hyper_params['freq']}
-
-    model = SegmentationModel()
+        data_module = BLLASegmentationDataModule(dm_config)
 
     message('Training line types:')
-    for k, v in model.train_set.dataset.class_mapping['baselines'].items():
-        message(f'  {k}\t{v}\t{model.train_set.dataset.class_stats["baselines"][k]}')
+    for k, v in data_module.train_set.dataset.class_mapping['baselines'].items():
+        message(f'  {k}\t{v}\t{data_module.train_set.dataset.class_stats["baselines"][k]}')
     message('Training region types:')
-    for k, v in model.train_set.dataset.class_mapping['regions'].items():
-        message(f'  {k}\t{v}\t{model.train_set.dataset.class_stats["regions"][k]}')
+    for k, v in data_module.train_set.dataset.class_mapping['regions'].items():
+        message(f'  {k}\t{v}\t{data_module.train_set.dataset.class_stats["regions"][k]}')
 
-    if len(model.train_set) == 0:
-        raise click.UsageError('No valid training data was provided to the train command. Use `-t` or the `ground_truth` argument.')
-
-    trainer = KrakenTrainer(accelerator=accelerator,
-                            devices=device,
+    trainer = KrakenTrainer(accelerator=ctx.meta['accelerator'],
+                            devices=ctx.meta['device'],
                             precision=ctx.meta['precision'],
-                            max_epochs=hyper_params['epochs'] if hyper_params['quit'] == 'fixed' else -1,
-                            min_epochs=hyper_params['min_epochs'],
+                            max_epochs=params['epochs'] if params['quit'] == 'fixed' else -1,
+                            min_epochs=params['min_epochs'],
                             enable_progress_bar=True if not ctx.meta['verbose'] else False,
                             deterministic=ctx.meta['deterministic'],
-                            pl_logger=pl_logger,
-                            log_dir=log_dir,
+                            enable_model_summary=False,
+                            accumulate_grad_batches=params['accumulate_grad_batches'],
+                            callbacks=cbs,
+                            gradient_clip_val=params['gradient_clip_val'],
+                            num_sanity_val_steps=0,
+                            use_distributed_sampler=False,
                             **val_check_interval)
 
-    with threadpool_limits(limits=ctx.meta['threads']):
-        trainer.fit(model)
+    with trainer.init_module(empty_init=False if (load or resume) else True):
+        if load:
+            message(f'Loading from checkpoint {load}.')
+            if load.endswith('ckpt'):
+                model = BLLASegmentationModel.load_from_checkpoint(load, m_config)
+            else:
+                model = BLLASegmentationModel.load_from_weights(load, m_config)
+        elif resume:
+            message(f'Resuming from checkpoint {resume}.')
+            model = BLLASegmentationModel.load_from_checkpoint(resume)
+        else:
+            message('Initializing new model.')
+            model = BLLASegmentationModel(m_config)
 
-    if model.best_epoch == -1:
-        logger.warning('Model did not improve during training.')
-        ctx.exit(1)
-
-    if not model.current_epoch:
-        logger.warning('Training aborted before end of first epoch.')
-        ctx.exit(1)
-
-    if quit == 'early':
-        message(f'Moving best model {model.best_model} ({model.best_metric}) to {output}_best.mlmodel')
-        logger.info(f'Moving best model {model.best_model} ({model.best_metric}) to {output}_best.mlmodel')
-        shutil.copy(f'{model.best_model}', f'{output}_best.mlmodel')
+    with threadpool_limits(limits=ctx.meta['num_threads']):
+        if resume:
+            trainer.fit(model, data_module, ckpt_path=resume)
+        else:
+            trainer.fit(model, data_module)
 
 
 @click.command('segtest')
@@ -274,164 +285,45 @@ def segtest(ctx, **kwargs):
     """
     Evaluate on a test set.
     """
+
+    params = ctx.params
+    model = params.pop('model')
     if not model:
         raise click.UsageError('No model to evaluate given.')
 
-    import torch
-    import torch.nn.functional as F
-    from threadpoolctl import threadpool_limits
-    from torch.utils.data import DataLoader
-    from lightning.fabric import Fabric
+    test_data = params.pop('test_data', [])
+    test_set = list(params.pop('test_set', []))
 
-    from kraken.lib.xml import XMLPage
-    from kraken.lib.vgsl import TorchVGSLModel
-    from kraken.lib.progress import KrakenProgressBar
-    from kraken.lib.train import BaselineSet, ImageInputTransforms
+    # merge training_files into ground_truth list
+    if test_data:
+        test_set.extend(test_data)
 
-    logger.info('Building test set from {} documents'.format(len(test_set) + len(evaluation_files)))
+    params['test_data'] = test_set
 
-    message('Loading model {}\t'.format(model), nl=False)
+    from kraken.train import (KrakenTrainer, BLLASegmentationModel,
+                              BLLASegmentationDataModule)
+    from kraken.configs import BLLASegmentationTrainingConfig, BLLASegmentationTrainingDataConfig
 
-    try:
-        accelerator, device = to_ptl_device(ctx.meta['device'])
-    except Exception as e:
-        raise click.BadOptionUsage('device', str(e))
+    trainer = KrakenTrainer(accelerator=ctx.meta['accelerator'],
+                            devices=ctx.meta['device'],
+                            precision=ctx.meta['precision'],
+                            enable_progress_bar=True if not ctx.meta['verbose'] else False,
+                            deterministic=ctx.meta['deterministic'],
+                            enable_model_summary=False,
+                            num_sanity_val_steps=0)
 
-    fabric = Fabric(accelerator=accelerator,
-                    devices=device,
-                    precision=ctx.meta['precision'])
+    m_config = BLLASegmentationTrainingConfig(**params)
+    dm_config = BLLASegmentationTrainingDataConfig(**params, **ctx.meta)
+    data_module = BLLASegmentationDataModule(dm_config)
 
-    with fabric.init_tensor(), fabric.init_module():
-        nn = TorchVGSLModel.load_model(model)
-        nn.eval()
+    with trainer.init_module(empty_init=False):
+        message(f'Loading from {model}.')
+        if model.endswith('ckpt'):
+            model = BLLASegmentationModel.load_from_checkpoint(model, m_config)
+        else:
+            model = BLLASegmentationModel.load_from_weights(model, m_config)
 
-    message('\u2713', fg='green')
-
-    test_set = list(test_set)
-    if evaluation_files:
-        test_set.extend(evaluation_files)
-
-    if len(test_set) == 0:
-        raise click.UsageError('No evaluation data was provided to the test command. Use `-e` or the `test_set` argument.')
-
-    _batch, _channels, _height, _width = nn.input
-    transforms = ImageInputTransforms(
-        _batch,
-        _height, _width, _channels, 0,
-        valid_norm=False, force_binarization=force_binarization
-    )
-    if 'file_system' in torch.multiprocessing.get_all_sharing_strategies():
-        logger.debug('Setting multiprocessing tensor sharing strategy to file_system')
-        torch.multiprocessing.set_sharing_strategy('file_system')
-
-    if not valid_regions:
-        valid_regions = None
-    if not valid_baselines:
-        valid_baselines = None
-
-    if suppress_regions:
-        valid_regions = []
-        merge_regions = None
-    if suppress_baselines:
-        valid_baselines = []
-        merge_baselines = None
-
-    dataset = BaselineSet(line_width=nn.user_metadata["hyper_params"]["line_width"],
-                          im_transforms=transforms,
-                          augmentation=False,
-                          valid_baselines=valid_baselines,
-                          merge_baselines=merge_baselines,
-                          valid_regions=valid_regions,
-                          merge_regions=merge_regions,
-                          merge_all_baselines=merge_all_baselines,
-                          merge_all_regions=merge_all_regions,
-                          class_mapping=nn.user_metadata["class_mapping"])
-
-    for file in test_set:
-        try:
-            dataset.add(XMLPage(file).to_container())
-        except Exception as e:
-            logger.warning(str(e))
-
-    baselines_diff = set(dataset.class_stats["baselines"].keys()).difference(dataset.class_mapping["baselines"].keys())
-    regions_diff = set(dataset.class_stats["regions"].keys()).difference(dataset.class_mapping["regions"].keys())
-
-    if baselines_diff:
-        message(f'Model baseline types missing in test set: {", ".join(sorted(list(baselines_diff)))}')
-
-    if regions_diff:
-        message(f'Model region types missing in the test set: {", ".join(sorted(list(regions_diff)))}')
-
-    if len(dataset) == 0:
-        raise click.UsageError('No evaluation data was provided to the test command. Use `-e` or the `test_set` argument.')
-
-    ds_loader = DataLoader(dataset, batch_size=1, num_workers=ctx.meta['workers'], pin_memory=True)
-
-    pages = []
-
-    lines_idx = list(dataset.class_mapping["baselines"].values())
-    regions_idx = list(dataset.class_mapping["regions"].values())
-
-    with KrakenProgressBar() as progress:
-        batches = len(ds_loader)
-        pred_task = progress.add_task('Evaluating', total=batches, visible=True if not ctx.meta['verbose'] else False)
-        with torch.inference_mode(), threadpool_limits(limits=ctx.meta['threads']), fabric.init_tensor():
-            for batch in ds_loader:
-                x, y = batch['image'], batch['target']
-                try:
-                    pred, _ = nn.nn(x)
-                    # scale target to output size
-                    y = F.interpolate(y, size=(pred.size(2), pred.size(3))).squeeze(0).bool()
-                    pred = pred.squeeze() > threshold
-                    pred = pred.view(pred.size(0), -1)
-                    y = y.view(y.size(0), -1)
-                    pages.append({
-                        'intersections': (y & pred).sum(dim=1, dtype=torch.double),
-                        'unions': (y | pred).sum(dim=1, dtype=torch.double),
-                        'corrects': torch.eq(y, pred).sum(dim=1, dtype=torch.double),
-                        'cls_cnt': y.sum(dim=1, dtype=torch.double),
-                        'all_n': torch.tensor(y.size(1), dtype=torch.double)
-                    })
-                    if lines_idx:
-                        y_baselines = y[lines_idx].sum(dim=0, dtype=torch.bool)
-                        pred_baselines = pred[lines_idx].sum(dim=0, dtype=torch.bool)
-                        pages[-1]["baselines"] = {
-                            'intersections': (y_baselines & pred_baselines).sum(dim=0, dtype=torch.double),
-                            'unions': (y_baselines | pred_baselines).sum(dim=0, dtype=torch.double),
-                        }
-                    if regions_idx:
-                        y_regions_idx = y[regions_idx].sum(dim=0, dtype=torch.bool)
-                        pred_regions_idx = pred[regions_idx].sum(dim=0, dtype=torch.bool)
-                        pages[-1]["regions"] = {
-                            'intersections': (y_regions_idx & pred_regions_idx).sum(dim=0, dtype=torch.double),
-                            'unions': (y_regions_idx | pred_regions_idx).sum(dim=0, dtype=torch.double),
-                        }
-                except Exception as e:
-                    batches -= 1
-                    progress.update(pred_task, total=batches)
-                    logger.warning(str(e))
-                progress.update(pred_task, advance=1)
-
-    # Accuracy / pixel
-    message(f"Mean Accuracy: {mean_accuracy.item():.3f}")
-    message(f"Mean IOU: {mean_iu.item():.3f}")
-    message(f"Frequency-weighted IOU: {freq_iu.item():.3f}")
-
-    # Region accuracies
-    if lines_idx:
-        line_intersections = torch.stack([x["baselines"]['intersections'] for x in pages]).sum()
-        line_unions = torch.stack([x["baselines"]['unions'] for x in pages]).sum()
-        smooth = torch.finfo(torch.float).eps
-        line_iu = (line_intersections + smooth) / (line_unions + smooth)
-        message(f"Class-independent Baseline IOU: {line_iu.item():.3f}")
-
-    # Region accuracies
-    if regions_idx:
-        region_intersections = torch.stack([x["regions"]['intersections'] for x in pages]).sum()
-        region_unions = torch.stack([x["regions"]['unions'] for x in pages]).sum()
-        smooth = torch.finfo(torch.float).eps
-        region_iu = (region_intersections + smooth) / (region_unions + smooth)
-        message(f"Class-independent Region IOU: {region_iu.item():.3f}")
+    test_metrics = trainer.test(model, data_module)
 
     from rich.console import Console
     from rich.table import Table
@@ -441,11 +333,11 @@ def segtest(ctx, **kwargs):
     class_iu = class_iu.tolist()
     class_pixel_accuracy = class_pixel_accuracy.tolist()
     for (cat, class_name), iu, pix_acc in zip(
-        [(cat, key) for (cat, subcategory) in dataset.class_mapping.items() for key in subcategory],
+        [(cat, key) for (cat, subcategory) in data_module.test_set.dataset.class_mapping.items() for key in subcategory],
         class_iu,
         class_pixel_accuracy
     ):
-        table.add_row(cat, class_name, f'{pix_acc:.3f}', f'{iu:.3f}', f'{dataset.class_stats[cat][class_name]}' if cat != "aux" else 'N/A')
+        table.add_row(cat, class_name, f'{pix_acc:.3f}', f'{iu:.3f}', f'{data_module.test_set.dataset.class_stats[cat][class_name]}' if cat != "aux" else 'N/A')
 
     console = Console()
     console.print(table)

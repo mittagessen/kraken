@@ -29,12 +29,20 @@ from kraken.lib import log
 from kraken.registry import PRECISIONS
 
 from .dataset import compile
-from .util import _load_config
+from .util import _load_config, to_ptl_device
 from .pretrain import pretrain
 from .recognition import test, train
 from .repo import publish
 from .ro import roadd, rotrain
 from .segmentation import segtest, segtrain
+
+from kraken.configs import (Config,
+                            TrainingDataConfig,
+                            VGSLPreTrainingConfig,
+                            VGSLRecognitionTrainingConfig,
+                            VGSLRecognitionTrainingDataConfig,
+                            BLLASegmentationTrainingConfig,
+                            BLLASegmentationTrainingDataConfig)
 
 logging.captureWarnings(True)
 logger = logging.getLogger('kraken')
@@ -46,13 +54,6 @@ install(suppress=[click])
 # raise default max image size to 20k * 20k pixels
 Image.MAX_IMAGE_PIXELS = 20000 ** 2
 
-from kraken.configs import (Config,
-                            TrainingDataConfig,
-                            VGSLPreTrainingConfig,
-                            VGSLRecognitionTrainingConfig,
-                            VGSLRecognitionTrainingDataConfig,
-                            BLLASegmentationTrainingConfig,
-                            BLLASegmentationTrainingDataConfig)
 
 @click.group(context_settings=dict(show_default=True,
                                    default_map={**Config().__dict__,
@@ -62,7 +63,6 @@ from kraken.configs import (Config,
                                                 'segtrain': {**BLLASegmentationTrainingConfig().__dict__, **BLLASegmentationTrainingDataConfig().__dict__},
                                                 'segtest': {**BLLASegmentationTrainingConfig().__dict__, **BLLASegmentationTrainingDataConfig().__dict__},
                                                 'pretrain': {**VGSLRecognitionTrainingDataConfig().__dict__, **VGSLPreTrainingConfig().__dict__}}))
-
 @click.version_option()
 @click.pass_context
 @click.option('-v', '--verbose', default=0, count=True)
@@ -91,13 +91,17 @@ def cli(ctx, **kwargs):
     ctx.meta['deterministic'] = False if not params['deterministic'] else 'warn'
     if params['seed']:
         from lightning.pytorch import seed_everything
-        seed_everything(seed, workers=True)
+        seed_everything(params['seed'], workers=True)
     elif params['deterministic']:
         from lightning.pytorch import seed_everything
         seed_everything(42, workers=True)
 
+    try:
+        ctx.meta['accelerator'], ctx.meta['device'] = to_ptl_device(params['device'])
+    except Exception as e:
+        raise click.BadOptionUsage('device', str(e))
+
     ctx.meta['verbose'] = params.get('verbose')
-    ctx.meta['device'] = params.get('device')
     ctx.meta['precision'] = params.get('precision')
     ctx.meta['num_workers'] = params.get('num_workers')
     ctx.meta['num_threads'] = params.get('num_threads')
