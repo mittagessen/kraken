@@ -145,96 +145,116 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
               '--logit-temp',
               type=float,
               help='Multiplicative factor for the logits used in contrastive loss.')
-@click.option('--legacy-polygons', default=False, is_flag=True, help='Use the legacy polygon extractor.')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def pretrain(ctx, **kwargs):
     """
     Trains a model from image-text pairs.
     """
-    if not (0 <= freq <= 1) and freq % 1.0 != 0:
-        raise click.BadOptionUsage('freq', 'freq needs to be either in the interval [0,1.0] or a positive integer.')
+    params = ctx.params
+    resume = params.pop('resume', None)
+    load = params.pop('load', None)
+    training_data = params.pop('training_data', [])
+    ground_truth = list(params.pop('ground_truth', []))
 
-    if augment:
+    if sum(map(bool, [resume, load])) > 1:
+        raise click.BadOptionsUsage('load', 'load/resume options are mutually exclusive.')
+
+    if params.get('augment'):
         try:
             import albumentations  # NOQA
         except ImportError:
             raise click.BadOptionUsage('augment', 'augmentation needs the `albumentations` package installed.')
 
-    import shutil
-
-    from threadpoolctl import threadpool_limits
-
-    from kraken.lib.pretrain import (PretrainDataModule,
-                                     RecognitionPretrainModel)
-    from kraken.lib.train import KrakenTrainer
-
-    # disable automatic partition when given evaluation set explicitly
-    if evaluation_files:
-        partition = 1
-    ground_truth = list(ground_truth)
-
-    # merge training_files into ground_truth list
-    if training_files:
-        ground_truth.extend(training_files)
-
-    if len(ground_truth) == 0:
-        raise click.UsageError('No training data was provided to the train command. Use `-t` or the `ground_truth` argument.')
+    if params.get('pl_logger') == 'tensorboard':
+        try:
+            import tensorboard  # NOQA
+        except ImportError:
+            raise click.BadOptionUsage('logger', 'tensorboard logger needs the `tensorboard` package installed.')
 
     try:
         accelerator, device = to_ptl_device(ctx.meta['device'])
     except Exception as e:
         raise click.BadOptionUsage('device', str(e))
 
-    if hyper_params['freq'] > 1:
-        val_check_interval = {'check_val_every_n_epoch': int(hyper_params['freq'])}
+    from threadpoolctl import threadpool_limits
+    from lightning.pytorch.callbacks import ModelCheckpoint
+
+    from kraken.lib.pretrain import (PretrainDataModule,
+                                     RecognitionPretrainModel)
+    from kraken.train import KrakenTrainer
+
+    from kraken.configs import VGSLPreTrainingConfig, VGSLRecognitionTrainingDataConfig
+
+    # disable automatic partition when given evaluation set explicitly
+    if params['evaluation_data']:
+        params['partition'] = 1
+
+    # merge training_files into ground_truth list
+    if training_data:
+        ground_truth.extend(training_data)
+
+    params['training_data'] = ground_truth
+
+    if len(ground_truth) == 0:
+        raise click.UsageError('No training data was provided to the train command. Use `-t` or the `ground_truth` argument.')
+
+    if params['freq'] > 1:
+        val_check_interval = {'check_val_every_n_epoch': int(params['freq'])}
     else:
-        val_check_interval = {'val_check_interval': hyper_params['freq']}
+        val_check_interval = {'val_check_interval': params['freq']}
 
-    model = RecognitionPretrainModel(hyper_params=hyper_params,
-                                     output=output,
-                                     spec=spec,
-                                     model=load,
-                                     load_hyper_parameters=load_hyper_parameters,
-                                     legacy_polygons=legacy_polygons)
+    cbs = []
+    checkpoint_callback = ModelCheckpoint(dirpath=params.pop('checkpoint_path'),
+                                          save_top_k=10,
+                                          monitor='CE',
+                                          mode='min',
+                                          auto_insert_metric_name=False,
+                                          filename='checkpoint_{epoch:02d}-{val_metric:.4f}')
+    cbs.append(checkpoint_callback)
 
-    data_module = PretrainDataModule(batch_size=hyper_params.pop('batch_size'),
-                                     pad=hyper_params.pop('pad'),
-                                     augment=hyper_params.pop('augment'),
-                                     training_data=ground_truth,
-                                     evaluation_data=evaluation_files,
-                                     partition=partition,
-                                     binary_dataset_split=fixed_splits,
-                                     num_workers=ctx.meta['num_workers'],
-                                     height=model.height,
-                                     width=model.width,
-                                     channels=model.channels,
-                                     force_binarization=force_binarization,
-                                     format_type=format_type,
-                                     legacy_polygons=legacy_polygons,)
+    dm_config = VGSLRecognitionTrainingDataConfig(**params, **ctx.meta)
+    m_config = VGSLPreTrainingConfig(**params)
 
-    model.len_train_set = len(data_module.train_dataloader())
+    if resume:
+        data_module = PretrainDataModule.load_from_checkpoint(resume)
+    else:
+        data_module = PretrainDataModule(dm_config)
+
+    model = RecognitionPretrainModel()
+
+    data_module = PretrainDataModule()
 
     trainer = KrakenTrainer(accelerator=accelerator,
                             devices=device,
                             precision=ctx.meta['precision'],
-                            max_epochs=hyper_params['epochs'] if hyper_params['quit'] == 'fixed' else -1,
-                            min_epochs=hyper_params['min_epochs'],
+                            max_epochs=params['epochs'] if params['quit'] == 'fixed' else -1,
+                            min_epochs=params['min_epochs'],
                             enable_progress_bar=True if not ctx.meta['verbose'] else False,
                             deterministic=ctx.meta['deterministic'],
+                            enable_model_summary=False,
+                            accumulate_grad_batches=params['accumulate_grad_batches'],
+                            callbacks=cbs,
+                            gradient_clip_val=params['gradient_clip_val'],
+                            num_sanity_val_steps=0,
+                            use_distributed_sampler=False,
                             **val_check_interval)
 
-    with threadpool_limits(limits=ctx.meta['threads']):
-        trainer.fit(model, datamodule=data_module)
+    with trainer.init_module(empty_init=False if (load or resume) else True):
+        if load:
+            message(f'Loading from checkpoint {load}.')
+            if load.endswith('ckpt'):
+                model = RecognitionPretrainModel.load_from_checkpoint(load, m_config)
+            else:
+                model = RecognitionPretrainModel.load_from_weights(m_config, load)
+        elif resume:
+            message(f'Resuming from checkpoint {resume}.')
+            model = RecognitionPretrainModel.load_from_checkpoint(resume)
+        else:
+            message('Initializing new model.')
+            model = RecognitionPretrainModel(m_config)
 
-    if model.best_epoch == -1:
-        logger.warning('Model did not improve during training.')
-        ctx.exit(1)
-
-    if not model.current_epoch:
-        logger.warning('Training aborted before end of first epoch.')
-        ctx.exit(1)
-
-    if quit == 'early':
-        message(f'Moving best model {model.best_model} ({model.best_metric}) to {output}_best.mlmodel')
-        logger.info(f'Moving best model {model.best_model} ({model.best_metric}) to {output}_best.mlmodel')
-        shutil.copy(f'{model.best_model}', f'{output}_best.mlmodel')
+    with threadpool_limits(limits=ctx.meta['num_threads']):
+        if resume:
+            trainer.fit(model, data_module, ckpt_path=resume)
+        else:
+            trainer.fit(model, data_module)

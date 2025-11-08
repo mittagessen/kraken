@@ -1,4 +1,5 @@
-from kraken.lib.vgsl import VGSLRecognitionTrainingConfig
+from kraken.models.vgsl import VGSLRecognitionTrainingConfig, VGSLRecognitionTrainingDataConfig
+
 
 
 class VGSLPreTrainingConfig(VGSLRecognitionTrainingConfig):

@@ -1,10 +1,10 @@
 """
 Layers for VGSL models
 """
-from typing import TYPE_CHECKING, Optional, Tuple
-
 import torch
-from torch.nn import Embedding, Linear
+
+from torch import nn
+from typing import TYPE_CHECKING, Optional, Tuple
 
 from kraken.registry import register
 from kraken.models import BaseModel
@@ -59,8 +59,8 @@ class Wav2Vec2Mask(nn.Module, BaseModel):
         self.num_negatives = num_negatives
 
         # mask embedding replacing the masked out areas
-        self.mask_emb = Embedding(1, context_encoder_input_dim)
-        self.project_q = Linear(context_encoder_input_dim, final_dim)
+        self.mask_emb = nn.Embedding(1, context_encoder_input_dim)
+        self.project_q = nn.Linear(context_encoder_input_dim, final_dim)
 
     def forward(self, inputs: torch.Tensor, seq_len: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         N, C, H, W = inputs.shape

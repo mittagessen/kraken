@@ -17,4 +17,3 @@ Tools for unsupervised pretraining of recognition models.
 """
 
 from .model import PretrainDataModule, RecognitionPretrainModel  # NOQA
-from .config import VGSLPreTrainingConfig  # NOQA
