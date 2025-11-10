@@ -22,6 +22,7 @@ import click
 import logging
 
 from PIL import Image
+from pathlib import Path
 
 from kraken.ketos.util import _expand_gt, _validate_manifests, message
 
@@ -265,6 +266,9 @@ def segtrain(ctx, **kwargs):
         else:
             trainer.fit(model, data_module)
 
+    score = checkpoint_callback.best_model_score.item()
+    weight_path = Path(checkpoint_callback.best_model_path).with_name(f'best_{score}.{kwargs.pop("weights_format")}')
+    message(f'Converting best model {checkpoint_callback.best_model_path} (score: {score}) to weights {weight_path}')
 
 @click.command('segtest')
 @click.pass_context

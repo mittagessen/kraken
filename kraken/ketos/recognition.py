@@ -251,9 +251,9 @@ def train(ctx, **kwargs):
         else:
             raise e
 
-    if best_ckpt := checkpoint_callback.best_model_path:
-        message(f'Converting best checkpoint {best_ckpt} ({checkpoint_callback.best_model_score}) to mlmodel.')
-
+    score = checkpoint_callback.best_model_score.item()
+    weight_path = Path(checkpoint_callback.best_model_path).with_name(f'best_{score}.{kwargs.pop("weights_format")}')
+    message(f'Converting best model {checkpoint_callback.best_model_path} (score: {score}) to weights {weight_path}')
 
 @click.command('test')
 @click.pass_context

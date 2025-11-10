@@ -470,7 +470,7 @@ class BLLASegmentationModel(L.LightningModule):
         from kraken.lib import vgsl  # NOQA
         from kraken.models import create_model
         if not isinstance(checkpoint['hyper_parameters']['config'], BLLASegmentationTrainingConfig):
-            raise ValueError('Checkpoint is not a recognition model.')
+            raise ValueError('Checkpoint is not a segmentation model.')
 
         self.net = create_model('TorchVGSLModel',
                                 vgsl=checkpoint['hyper_parameters']['config'].spec)

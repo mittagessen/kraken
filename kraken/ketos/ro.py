@@ -215,6 +215,9 @@ def rotrain(ctx, **kwargsh):
         else:
             trainer.fit(model, data_module)
 
+    score = checkpoint_callback.best_model_score.item()
+    weight_path = Path(checkpoint_callback.best_model_path).with_name(f'best_{score}.{kwargs.pop("weights_format")}')
+    message(f'Converting best model {checkpoint_callback.best_model_path} (score: {score}) to weights {weight_path}')
 
 @click.command('roadd')
 @click.pass_context
