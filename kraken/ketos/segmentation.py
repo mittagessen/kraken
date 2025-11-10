@@ -94,9 +94,11 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
               type=float,
               help='Number of validation runs between learning rate decay for exponential and step LR schedules')
 @click.option('--sched-patience',
+              'rop_patience',
               type=int,
               help='Minimal number of validation runs between LR reduction for reduceonplateau LR schedule.')
 @click.option('--cos-max',
+              'cos_t_max',
               type=int,
               help='Epoch of minimal learning rate for cosine LR scheduler.')
 @click.option('--cos-min-lr',

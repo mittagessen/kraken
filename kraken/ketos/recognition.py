@@ -322,7 +322,6 @@ def test(ctx, **kwargs):
     dm_config = VGSLRecognitionTrainingDataConfig(**params)
     data_module = CRNNRecognitionDataModule(dm_config)
 
-    print(dm_config.batch_size)
     with trainer.init_module(empty_init=False):
         message(f'Loading from {model}.')
         if model.endswith('ckpt'):
@@ -334,7 +333,7 @@ def test(ctx, **kwargs):
         test_metrics = trainer.test(model, data_module)
 
     rep = render_report(model=model,
-                        chars=sum(test_metrics.character_counts),
+                        chars=sum(test_metrics.character_counts.values()),
                         errors=test_metrics.num_errors,
                         char_accuracy=test_metrics.cer,
                         char_CI_accucary=test_metrics.case_insensitive_cer,  # Case insensitive

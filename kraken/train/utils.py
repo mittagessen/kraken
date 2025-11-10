@@ -151,7 +151,7 @@ class KrakenTrainer(L.Trainer):
 
     def test(self, *args, **kwargs) -> TestMetrics:
         super().test(*args, **kwargs)
-        return self.test_metrics
+        return self.model.test_metrics
 
     def fit(self, *args, **kwargs):
         with warnings.catch_warnings():

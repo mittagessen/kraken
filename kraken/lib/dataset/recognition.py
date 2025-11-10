@@ -290,6 +290,8 @@ class ArrowIPCRecognitionDataset(Dataset):
         pass
 
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor]:
+        if len(self.failed_samples) == len(self):
+            raise ValueError(f'All {len(self)} samples in dataset invalid.')
         try:
             sample = self.arrow_table.column('lines')[index].as_py()
             logger.debug(f'Loading sample {index}')
@@ -467,6 +469,8 @@ class PolygonGTDataset(Dataset):
             self.training_set.append((im, gt))
 
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor]:
+        if len(self.failed_samples) == len(self):
+            raise ValueError(f'All {len(self)} samples in dataset invalid.')
         item = self.training_set[index]
         try:
             logger.debug(f'Attempting to load {item[0]}')
@@ -501,6 +505,7 @@ class PolygonGTDataset(Dataset):
 
             return {'image': im, 'target': item[1]}
         except Exception:
+            raise
             self.failed_samples.add(index)
             idx = np.random.randint(0, len(self.training_set))
             logger.debug(traceback.format_exc())
@@ -660,6 +665,8 @@ class GroundTruthDataset(Dataset):
             self.training_set.append((im, gt))
 
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor]:
+        if len(self.failed_samples) == len(self):
+            raise ValueError(f'All {len(self)} samples in dataset invalid.')
         item = self.training_set[index]
         try:
             logger.debug(f'Attempting to load {item[0]}')
@@ -684,7 +691,6 @@ class GroundTruthDataset(Dataset):
                 im = self.aug(image=im, index=index)
             return {'image': im, 'target': item[1]}
         except Exception:
-            raise
             self.failed_samples.add(index)
             idx = np.random.randint(0, len(self.training_set))
             logger.debug(traceback.format_exc())
