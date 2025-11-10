@@ -42,7 +42,9 @@ from kraken.configs import (Config,
                             VGSLRecognitionTrainingConfig,
                             VGSLRecognitionTrainingDataConfig,
                             BLLASegmentationTrainingConfig,
-                            BLLASegmentationTrainingDataConfig)
+                            BLLASegmentationTrainingDataConfig,
+                            ROTrainingDataConfig,
+                            ROTrainingConfig)
 
 logging.captureWarnings(True)
 logger = logging.getLogger('kraken')
@@ -62,7 +64,8 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
                                                 'test': VGSLRecognitionTrainingDataConfig().__dict__,
                                                 'segtrain': {**BLLASegmentationTrainingConfig().__dict__, **BLLASegmentationTrainingDataConfig().__dict__},
                                                 'segtest': {**BLLASegmentationTrainingConfig().__dict__, **BLLASegmentationTrainingDataConfig().__dict__},
-                                                'pretrain': {**VGSLRecognitionTrainingDataConfig().__dict__, **VGSLPreTrainingConfig().__dict__}}))
+                                                'pretrain': {**VGSLRecognitionTrainingDataConfig().__dict__, **VGSLPreTrainingConfig().__dict__},
+                                                'rotrain': {**ROTrainingConfig().__dict__, **ROTrainingDataConfig().__dict__}}))
 @click.version_option()
 @click.pass_context
 @click.option('-v', '--verbose', default=0, count=True)

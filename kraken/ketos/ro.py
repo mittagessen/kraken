@@ -70,6 +70,12 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
 @click.option('-r', '--lrate', type=float, help='Learning rate')
 @click.option('-m', '--momentum', type=float, help='Momentum')
 @click.option('-w', '--weight-decay', type=float, help='Weight decay')
+@click.option('--gradient-clip-val',
+              type=float,
+              help='Gradient clip value')
+@click.option('--accumulate-grad-batches',
+              type=int,
+              help='Number of batches to accumulate gradient across.')
 @click.option('--warmup', type=int, help='Number of samples to ramp up to `lrate` initial learning rate.')
 @click.option('--schedule',
               type=click.Choice(SCHEDULERS),
@@ -83,19 +89,21 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
               type=int,
               help='Number of validation runs between learning rate decay for exponential and step LR schedules')
 @click.option('--sched-patience',
+              'rop_patience',
               type=int,
               help='Minimal number of validation runs between LR reduction for reduceonplateau LR schedule.')
 @click.option('--cos-max',
+              'cos_t_max',
               type=int,
               help='Epoch of minimal learning rate for cosine LR scheduler.')
 @click.option('--cos-min-lr',
               type=float,
               help='Minimal final learning rate for cosine LR scheduler.')
 @click.option('-p', '--partition', type=float, help='Ground truth data partition ratio between train/validation set')
-@click.option('-t', '--training-data', default=None, multiple=True,
+@click.option('-t', '--training-files', 'training_data', multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with additional paths to training data')
-@click.option('-e', '--evaluation-data', default=None, multiple=True,
+@click.option('-e', '--evaluation-data', 'evaluation_files', multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
 @click.option('-f', '--format-type', type=click.Choice(['xml', 'alto', 'page']),

@@ -79,6 +79,12 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
               '--weight-decay',
               type=float,
               help='Weight decay')
+@click.option('--gradient-clip-val',
+              type=float,
+              help='Gradient clip value')
+@click.option('--accumulate-grad-batches',
+              type=int,
+              help='Number of batches to accumulate gradient across.')
 @click.option('--warmup',
               type=int,
               help='Number of steps to ramp up to `lrate` initial learning rate.')
