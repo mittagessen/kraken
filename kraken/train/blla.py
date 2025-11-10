@@ -148,6 +148,9 @@ class BLLASegmentationDataModule(L.LightningDataModule):
                 raise ValueError('No valid validation data provided. Please add some.')
             self.train_set.dataset.transforms = transforms
             self.val_set.dataset.transforms = transforms
+            # make sure class mapping is serializable dict
+            self.hparams.data_config.line_class_mapping = dict(self.train_set.dataset.class_mapping['baselines'])
+            self.hparams.data_config.region_class_mapping = dict(self.train_set.dataset.class_mapping['regions'])
         elif stage == 'test':
             if len(self.test_data) == 0:
                 raise ValueError('No valid test data provided. Please add some.')
