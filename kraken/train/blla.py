@@ -258,11 +258,6 @@ class BLLASegmentationModel(L.LightningModule):
             mean_iu = self.val_mean_iu.compute()
             freq_iu = self.val_freq_iu.compute()
 
-            if mean_iu > self.best_metric:
-                logger.debug(f'Updating best metric from {self.best_metric} ({self.best_epoch}) to {mean_iu} ({self.current_epoch})')
-                self.best_epoch = self.current_epoch
-                self.best_metric = mean_iu
-
             logger.info(f'validation run: accuracy {pixel_accuracy} mean_acc {mean_accuracy} mean_iu {mean_iu} freq_iu {freq_iu}')
 
             self.log('val_accuracy', pixel_accuracy, on_step=False, on_epoch=True, prog_bar=True, logger=True)

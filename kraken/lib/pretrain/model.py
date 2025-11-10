@@ -203,11 +203,6 @@ class RecognitionPretrainModel(L.LightningModule):
     def on_validation_epoch_end(self):
         if not self.trainer.sanity_checking:
             ce = self.val_ce.compute()
-
-            if ce < self.best_metric:
-                logger.debug(f'Updating best metric from {self.best_metric} ({self.best_epoch}) to {ce} ({self.current_epoch})')
-                self.best_epoch = self.current_epoch
-                self.best_metric = ce
             logger.info(f'validation run: cross_enctropy: {ce}')
             self.log('val_ce', ce, on_step=False, on_epoch=True, prog_bar=True, logger=True)
         self.val_ce.reset()

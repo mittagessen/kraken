@@ -180,9 +180,6 @@ class ROModel(L.LightningModule):
         self.output = output
         self.criterion = torch.nn.BCEWithLogitsLoss()
 
-        self.best_epoch = -1
-        self.best_metric = torch.inf
-
         logger.info('Creating new RO model')
         self.ro_net = ROMLP(feature_dim, feature_dim * 2)
 
@@ -223,10 +220,6 @@ class ROModel(L.LightningModule):
             val_metric = self.val_spearman.compute()
             val_loss = self.val_losses.compute()
 
-            if val_metric < self.best_metric:
-                logger.debug(f'Updating best metric from {self.best_metric} ({self.best_epoch}) to {val_metric} ({self.current_epoch})')
-                self.best_epoch = self.current_epoch
-                self.best_metric = val_metric
             logger.info(f'validation run: val_spearman {val_metric} val_loss {val_loss}')
             self.log('val_spearman', val_metric, on_step=False, on_epoch=True, prog_bar=True, logger=True)
             self.log('val_metric', val_metric, on_step=False, on_epoch=True, prog_bar=False, logger=True)
