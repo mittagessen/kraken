@@ -229,9 +229,9 @@ def train(ctx, **kwargs):
         if load:
             message(f'Loading from checkpoint {load}.')
             if load.endswith('ckpt'):
-                model = CRNNRecognitionModel.load_from_checkpoint(load, m_config)
+                model = CRNNRecognitionModel.load_from_checkpoint(load, config=m_config)
             else:
-                model = CRNNRecognitionModel.load_from_weights(load, m_config)
+                model = CRNNRecognitionModel.load_from_weights(load, config=m_config)
         elif resume:
             message(f'Resuming from checkpoint {resume}.')
             model = CRNNRecognitionModel.load_from_checkpoint(resume)
@@ -325,7 +325,7 @@ def test(ctx, **kwargs):
     with trainer.init_module(empty_init=False):
         message(f'Loading from {model}.')
         if model.endswith('ckpt'):
-            model = CRNNRecognitionModel.load_from_checkpoint(model, m_config)
+            model = CRNNRecognitionModel.load_from_checkpoint(model, config=m_config)
         else:
             model = CRNNRecognitionModel.load_from_weights(model, m_config)
 

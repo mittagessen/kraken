@@ -199,7 +199,7 @@ def rotrain(ctx, **kwargsh):
         if load:
             message(f'Loading from checkpoint {load}.')
             if load.endswith('ckpt'):
-                model = ROModel.load_from_checkpoint(load, m_config)
+                model = ROModel.load_from_checkpoint(load, config=m_config)
             else:
                 model = ROModel.load_from_weights(load, m_config)
         elif resume:
