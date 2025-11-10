@@ -139,13 +139,13 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
                    'added, `both` will set the layer to match exactly '
                    'the training data classes, `fail` will abort if training data and model '
                    'classes do not match.')
-@click.option('-tl', '--topline', 'topline', flag_value='topline',
+@click.option('-tl', '--topline', 'topline', flag_value=True,
               help='Switch for the baseline location in the scripts. '
                    'Set to topline if the data is annotated with a hanging baseline, as is '
                    'common with Hebrew, Bengali, Devanagari, etc. Set to '
                    ' centerline for scripts annotated with a central line.')
-@click.option('-cl', '--centerline', 'topline', flag_value='centerline')
-@click.option('-bl', '--baseline', 'topline', flag_value='baseline')
+@click.option('-cl', '--centerline', 'topline', flag_value=None)
+@click.option('-bl', '--baseline', 'topline', flag_value=False)
 @click.option('--logger',
               'pl_logger',
               type=click.Choice(['tensorboard']),
@@ -205,12 +205,6 @@ def segtrain(ctx, **kwargs):
         val_check_interval = {'check_val_every_n_epoch': int(params['freq'])}
     else:
         val_check_interval = {'val_check_interval': params['freq']}
-
-    loc = {'topline': True,
-           'baseline': False,
-           'centerline': None}
-
-    params['topline'] = loc[params['topline']]
 
     cbs = []
     checkpoint_callback = ModelCheckpoint(dirpath=params.pop('checkpoint_path'),
