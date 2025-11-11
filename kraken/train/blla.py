@@ -378,7 +378,7 @@ class BLLASegmentationModel(L.LightningModule):
                         for c in new_regions:
                             cls_idx += 1
                             net_class_mapping['regions'][c] = cls_idx
-                    elif self.resize == 'new':
+                    elif self.hparams.config.resize == 'new':
                         logger.info('Fitting network exactly to training set.')
                         new_bls = set_class_mapping['baselines'].keys() - net_class_mapping['baselines'].keys()
                         new_regions = set_class_mapping['regions'].keys() - net_class_mapping['regions'].keys()
