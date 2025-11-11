@@ -943,20 +943,17 @@ class ActConv2D(Module):
             del_indices = []
         old_shape = self.co.weight.size(0)
         self.out_channels = output_size
-        idx = torch.tensor([x for x in range(old_shape) if x not in del_indices])
+        idx = torch.tensor([x for x in range(old_shape) if x not in del_indices], device=self.co.weight.device)
         weight = self.co.weight.index_select(0, idx)
-        rweight = torch.zeros((output_size - weight.size(0), weight.size(1), weight.size(2), weight.size(3)))
+        rweight = torch.zeros((output_size - weight.size(0), weight.size(1), weight.size(2), weight.size(3)),
+                              dtype=self.co.weight.dtype,
+                              device=self.co.weight.device)
         if rweight.shape[0] > 0:
             torch.nn.init.xavier_uniform_(rweight)
         weight = torch.cat([weight, rweight], dim=0)
         bias = self.co.bias.index_select(0, idx)
-        bias = torch.cat([bias, torch.zeros(output_size - bias.size(0))])
-        if self.transposed:
-            self.co = torch.nn.ConvTranspose2d(self.in_channels, self.out_channels, self.kernel_size,
-                                               stride=self.stride, padding=self.padding)
-        else:
-            self.co = torch.nn.Conv2d(self.in_channels, self.out_channels, self.kernel_size,
-                                      stride=self.stride, padding=self.padding)
+        bias = torch.cat([bias, torch.zeros(output_size - bias.size(0), device=bias.device, dtype=bias.dtype)])
+        self.co.out_channels = self.out_channels
         self.co.weight = torch.nn.Parameter(weight)
         self.co.bias = torch.nn.Parameter(bias)
 
