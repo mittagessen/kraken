@@ -106,6 +106,7 @@ class TorchVGSLModel(nn.Module,
                                 models trained on binarized images, 'L' for
                                 grayscale, and None otherwise.
     """
+    user_metadata = {}
     _kraken_min_version = '5.0.0'
 
     def __init__(self, **kwargs) -> None:
