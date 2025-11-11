@@ -475,6 +475,7 @@ class BLLASegmentationModel(L.LightningModule):
         data_config = checkpoint['datamodule_hyper_parameters']['data_config']
         self.net = create_model('TorchVGSLModel',
                                 vgsl=checkpoint['_module_config'].spec,
+                                model_type='segmentation',
                                 topline=data_config.topline,
                                 class_mapping={'aux': {'_start_separator': 0, '_end_separator': 1},
                                                'baselines': data_config.line_class_mapping,

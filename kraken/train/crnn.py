@@ -435,7 +435,7 @@ class CRNNRecognitionModel(L.LightningModule):
                         logger.info(f'Resizing codec to include {len(alpha_diff)} new code points.')
                         codec = codec.add_labels(alpha_diff)
                         self.net.add_codec(codec)
-                        logger.info(f'Resizing last layer in network to {train_codec.max_label+1} outputs')
+                        logger.info(f'Resizing last layer in network to {codec.max_label+1} outputs')
                         self.net.resize_output(codec.max_label + 1)
                         train_set.encode(codec)
                     elif self.hparams.config.resize == 'new':
@@ -517,6 +517,10 @@ class CRNNRecognitionModel(L.LightningModule):
             raise ValueError('Checkpoint is not a recognition model.')
         data_config = checkpoint['datamodule_hyper_parameters']['data_config']
         self.net = create_model('TorchVGSLModel',
+                                model_type='recognition',
+                                use_legacy_polygons=data_config.use_legacy_polygons,
+                                seg_type=checkpoint['_seg_type'],
+                                one_channel_mode=checkpoint['_one_channel_mode'],
                                 vgsl=checkpoint['_module_config'].spec,
                                 codec=data_config['codec'])
 
@@ -528,6 +532,8 @@ class CRNNRecognitionModel(L.LightningModule):
         shouldn't be overwritten in on_load_checkpoint.
         """
         checkpoint['_module_config'] = self.hparams.config
+        checkpoint['_one_channel_mode'] = self.trainer.datamodule.train_set.im_mode
+        checkpoint['_seg_type'] = self.trainer.datamodule.train_set.seg_type
 
     @classmethod
     def load_from_weights(cls,
