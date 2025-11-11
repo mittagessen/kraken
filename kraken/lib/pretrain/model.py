@@ -226,11 +226,25 @@ class RecognitionPretrainModel(L.LightningModule):
         """
         from kraken.lib import vgsl  # NOQA
         from kraken.models import create_model
-        if not isinstance(checkpoint['hyper_parameters']['config'], VGSLPreTrainingConfig):
-            raise ValueError('Checkpoint is not a recognition model.')
+        if not isinstance(checkpoint['_module_config'], BLLASegmentationTrainingConfig):
+            raise ValueError('Checkpoint is not a segmentation model.')
+
+        data_config = checkpoint['datamodule_hyper_parameters']['data_config']
         self.net = create_model('TorchVGSLModel',
-                                vgsl=checkpoint['hyper_parameters']['config'].spec)
+                                vgsl=checkpoint['_module_config'].spec,
+                                topline=data_config.topline,
+                                class_mapping={'aux': {'_start_separator': 0, '_end_separator': 1},
+                                               'baselines': data_config.line_class_mapping,
+                                               'regions': data_config.region_class_mapping})
+
         self.batch, self.channels, self.height, self.width = self.net.input
+
+    def on_save_checkpoint(self, checkpoint):
+        """
+        Save hyperparameters a second time so we can set parameters that
+        shouldn't be overwritten in on_load_checkpoint.
+        """
+        checkpoint['_module_config'] = self.hparams.config
 
     @classmethod
     def load_from_weights(cls,

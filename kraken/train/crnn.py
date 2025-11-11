@@ -515,10 +515,19 @@ class CRNNRecognitionModel(L.LightningModule):
         from kraken.models import create_model
         if not isinstance(checkpoint['hyper_parameters']['config'], VGSLRecognitionTrainingConfig):
             raise ValueError('Checkpoint is not a recognition model.')
+        data_config = checkpoint['datamodule_hyper_parameters']['data_config']
         self.net = create_model('TorchVGSLModel',
-                                vgsl=checkpoint['hyper_parameters']['config'].spec)
-        self.net.add_codec(checkpoint['datamodule_hyper_parameters']['data_config'].codec)
+                                vgsl=checkpoint['_module_config'].spec,
+                                codec=data_config['codec'])
+
         self.batch, self.channels, self.height, self.width = self.net.input
+
+    def on_save_checkpoint(self, checkpoint):
+        """
+        Save hyperparameters a second time so we can set parameters that
+        shouldn't be overwritten in on_load_checkpoint.
+        """
+        checkpoint['_module_config'] = self.hparams.config
 
     @classmethod
     def load_from_weights(cls,
