@@ -41,6 +41,9 @@ def write_models(objs: list[BaseModel], path: Union[str, PathLike]) -> PathLike:
 
 @register(type='writer')
 def write_safetensors(objs: list[BaseModel], path: Union[str, PathLike]) -> PathLike:
+    """
+    Writes a set of models as a safetensors.
+    """
     from safetensors.torch import save_file
     # assign unique prefixes to each model in model list
     prefixes = {str(uuid.uuid4()): model for model in objs}
@@ -61,6 +64,9 @@ def write_safetensors(objs: list[BaseModel], path: Union[str, PathLike]) -> Path
 
 @register(type='writer')
 def write_coreml(obj: list['TorchVGSLModel'], path: Union[str, PathLike]) -> PathLike:
+    """
+    Writes a single model as a CoreML file.
+    """
     from kraken.lib.vgsl import TorchVGSLModel
 
     if len(obj) != 1:
