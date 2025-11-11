@@ -199,7 +199,7 @@ def segtrain(ctx, **kwargs):
 
     params['training_data'] = ground_truth
 
-    if len(ground_truth) == 0:
+    if len(ground_truth) == 0 and not resume:
         raise click.UsageError('No training data was provided to the train command. Use `-t` or the `ground_truth` argument.')
 
     if params['freq'] > 1:
