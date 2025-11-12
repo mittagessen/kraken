@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_T_tasks = NewType('_T_tasks', list[Literal['segmentation', 'recognition', 'reading_order']])
+_T_tasks = NewType('_T_tasks', list[Literal['segmentation', 'recognition', 'reading_order', 'pretrain']])
 
 
 class BaseModel(ABC):
@@ -37,15 +37,6 @@ class BaseModel(ABC):
         """
         A dictionary containing all hyperparameters, statistics, etc. of the
         model.
-        """
-        pass
-
-    @property
-    @abstractmethod
-    def hyper_params(self):
-        """
-        A filtered version of the `user_metadata` field containing only values
-        needed to instantiate the model.
         """
         pass
 

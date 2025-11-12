@@ -26,6 +26,7 @@ class Wav2Vec2Mask(nn.Module, BaseModel):
     recurrent/contextual layers.
     """
     user_metadata = {}
+    model_type = 'pretrain'
     _kraken_min_version = '5.0.0'
 
     def __init__(self,
@@ -51,7 +52,6 @@ class Wav2Vec2Mask(nn.Module, BaseModel):
             - Outputs output :math:`(N, C, H, W)`
         """
         super().__init__()
-
         self.context_encoder_input_dim = context_encoder_input_dim
         self.final_dim = final_dim
         self.mask_width = mask_width
@@ -116,6 +116,9 @@ class Wav2Vec2Mask(nn.Module, BaseModel):
         bias = torch.Tensor(lin.bias.floatValue)
         self.project_q.weight = torch.nn.Parameter(weights)
         self.project_q.bias = torch.nn.Parameter(bias)
+
+    def prepare_for_inference(self, *args, **kwargs):
+        pass
 
     def serialize(self, name: str, input: str, builder):
         """
