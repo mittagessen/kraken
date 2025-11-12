@@ -518,7 +518,7 @@ class CRNNRecognitionModel(L.LightningModule):
         data_config = checkpoint['datamodule_hyper_parameters']['data_config']
         self.net = create_model('TorchVGSLModel',
                                 model_type='recognition',
-                                use_legacy_polygons=data_config.use_legacy_polygons,
+                                use_legacy_polygons=data_config.legacy_polygons,
                                 seg_type=checkpoint['_seg_type'],
                                 one_channel_mode=checkpoint['_one_channel_mode'],
                                 vgsl=checkpoint['_module_config'].spec,
