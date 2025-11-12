@@ -147,7 +147,7 @@ class RecognitionPretrainModel(L.LightningModule):
         if not isinstance(self.net.nn[-1], layers.LinSoftmax):
             self.net.append(len(self.net.nn), "[O1c2]")
 
-        self.encoder = self.net.nn[idx:]
+        self.encoder = self.net.nn[idx:-1]
 
         self.val_ce = MeanMetric()
 
@@ -251,8 +251,8 @@ class RecognitionPretrainModel(L.LightningModule):
         shouldn't be overwritten in on_load_checkpoint.
         """
         checkpoint['_module_config'] = self.hparams.config
-        checkpoint['_one_channel_mode'] = self.trainer.datamodule.train_set.im_mode
-        checkpoint['_seg_type'] = self.trainer.datamodule.train_set.seg_type
+        checkpoint['_one_channel_mode'] = self.trainer.datamodule.train_set.dataset.im_mode
+        checkpoint['_seg_type'] = self.trainer.datamodule.train_set.dataset.seg_type
 
     @classmethod
     def load_from_weights(cls,
