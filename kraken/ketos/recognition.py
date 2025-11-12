@@ -95,7 +95,7 @@ logger = logging.getLogger('kraken')
 @click.option('-p', '--partition', type=float, help='Ground truth data partition ratio between train/validation set')
 @click.option('-u', '--normalization', type=click.Choice(['NFD', 'NFKD', 'NFC', 'NFKC']), help='Ground truth normalization')
 @click.option('-n', '--normalize-whitespace/--no-normalize-whitespace', help='Normalizes unicode whitespace')
-@click.option('-c', '--codec', type=click.Path(exists=True, readable=True),
+@click.option('-c', '--codec', type=click.UNPROCESSED,
               help='Load a codec JSON definition (invalid if loading existing model)')
 @click.option('--resize',
               type=click.Choice([
