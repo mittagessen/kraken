@@ -532,8 +532,8 @@ class CRNNRecognitionModel(L.LightningModule):
         shouldn't be overwritten in on_load_checkpoint.
         """
         checkpoint['_module_config'] = self.hparams.config
-        checkpoint['_one_channel_mode'] = self.trainer.datamodule.train_set.im_mode
-        checkpoint['_seg_type'] = self.trainer.datamodule.train_set.seg_type
+        checkpoint['_one_channel_mode'] = self.trainer.datamodule.train_set.dataset.im_mode
+        checkpoint['_seg_type'] = self.trainer.datamodule.train_set.dataset.seg_type
 
     @classmethod
     def load_from_weights(cls,
