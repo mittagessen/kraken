@@ -266,3 +266,6 @@ def pretrain(ctx, **kwargs):
             trainer.fit(model, data_module, ckpt_path=resume)
         else:
             trainer.fit(model, data_module)
+
+    score = checkpoint_callback.best_model_score.item()
+    message(f'Best model checkpoint: {checkpoint_callback.best_model_path}')
