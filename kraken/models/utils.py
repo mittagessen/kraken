@@ -1,5 +1,6 @@
+import importlib
+
 from kraken.models.base import BaseModel
-from kraken.registry import MODEL_REGISTRY
 
 __all__ = ['create_model']
 
@@ -11,10 +12,10 @@ def create_model(name, *args, **kwargs) -> BaseModel:
     if not type(name) in (type, str):
         raise ValueError(f'`{name}` is neither type nor string.')
 
-    if name not in MODEL_REGISTRY:
+    try:
+        (entry_point,) = importlib.metadata.entry_points(group='kraken.models', name=name)
+    except ValueError:
         raise ValueError(f'`{name}` is not in model registry.')
 
-    cfg = MODEL_REGISTRY[name]
-    cls = getattr(cfg['_module'], name)
-
+    cls = entry_point.load()
     return cls(*args, **kwargs)

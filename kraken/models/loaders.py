@@ -15,7 +15,6 @@ from collections import defaultdict
 from collections.abc import Sequence
 from packaging.version import Version
 
-from kraken.registry import register, LOADER_REGISTRY
 from kraken.models.base import BaseModel
 from kraken.models.utils import create_model
 logger = logging.getLogger(__name__)
@@ -33,15 +32,14 @@ def load_models(path: Union[str, 'PathLike'], tasks: Optional[Sequence[_T_tasks]
     path = Path(path)
     if not path.is_file():
         raise ValueError(f'{path} is not a regular file.')
-    for name, cfg in LOADER_REGISTRY.items():
+    for loader in importlib.metadata.entry_points(group='kraken.loaders'):
         try:
-            return getattr(cfg['_module'], name)(path, tasks=tasks)
+            return loader.load()(path, tasks=tasks)
         except ValueError:
             continue
     raise ValueError(f'No loader found for {path}')
 
 
-@register(type='loader')
 def load_safetensors(path: Union[str, PathLike], tasks: Optional[Sequence[_T_tasks]] = None) -> list[BaseModel]:
     """
     Loads one or more models in safetensors format and returns them.
@@ -80,7 +78,6 @@ def load_safetensors(path: Union[str, PathLike], tasks: Optional[Sequence[_T_tas
     return list(models.values())
 
 
-@register(type='loader')
 def load_coreml(path: Union[str, PathLike], tasks: Optional[Sequence[_T_tasks]] = None) -> list[BaseModel]:
     """
     Loads a model in coreml format.

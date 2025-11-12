@@ -21,7 +21,6 @@ Command line drivers for recognition functionality.
 import os
 import uuid
 import click
-import shlex
 import logging
 import warnings
 import dataclasses
@@ -32,7 +31,7 @@ from itertools import chain
 from functools import partial
 from importlib import resources
 from platformdirs import user_data_dir
-from typing import IO, Any, Callable, Dict, List, Union, cast
+from typing import IO, Any, Callable, cast
 
 from rich import print
 from rich.tree import Tree
@@ -67,7 +66,7 @@ def message(msg: str, **styles) -> None:
         click.secho(msg, **styles)
 
 
-def get_input_parser(type_str: str) -> Callable[[str], Dict[str, Any]]:
+def get_input_parser(type_str: str) -> Callable[[str], dict[str, Any]]:
     if type_str in ['alto', 'page', 'xml']:
         from kraken.lib.xml import XMLPage
         return XMLPage
@@ -155,7 +154,6 @@ def segmenter(legacy, model, config, input, output) -> None:
                                   no_hlines=config.legacy_remove_hlines,
                                   pad=config.bbox_line_padding)
         else:
-            from kraken.lib import vgsl
             from kraken.tasks import SegmentationTaskModel
             task = SegmentationTaskModel.load_model(model)
             res = task.predict(im=im, config=config)
@@ -486,7 +484,7 @@ def segment(ctx, **kwargs):
     config = SegmentationInferenceConfig(**params, **ctx.meta)
 
     if params['model'] and params['boxes']:
-        logger.warning(f'Baseline model ({model}) given but legacy segmenter selected. Forcing to -bl.')
+        logger.warning(f'Baseline model ({params["model"]}) given but legacy segmenter selected. Forcing to -bl.')
         params['boxes'] = False
 
     if params['boxes'] is False:
@@ -525,6 +523,7 @@ def segment(ctx, **kwargs):
                                                           'pad': config.bbox_line_padding}))
 
     return partial(segmenter, params['boxes'], model, config)
+
 
 @cli.command('ocr')
 @click.pass_context

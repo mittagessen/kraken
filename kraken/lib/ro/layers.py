@@ -7,7 +7,6 @@ import torch
 from torch import nn
 
 from kraken.models import BaseModel
-from kraken.registry import register
 
 import logging
 
@@ -19,7 +18,6 @@ if TYPE_CHECKING:
 __all__ = ['ROMLP']
 
 
-@register(type='model')
 class ROMLP(nn.Module, BaseModel):
     """
     A simple 2 layer MLP for reading order determination.

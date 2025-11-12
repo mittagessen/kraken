@@ -11,7 +11,6 @@ from bidi.algorithm import get_display
 
 from typing import TYPE_CHECKING, Union
 
-from kraken.registry import register
 from kraken.lib.vgsl import TorchVGSLModel
 from kraken.containers import Segmentation, BaselineOCRRecord
 from kraken.models import load_models, RecognitionInferenceConfig
@@ -27,7 +26,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-@register(type='task')
 class ForcedAlignmentTaskModel(nn.Module):
     """
     A wrapper for forced alignment of CTC output.

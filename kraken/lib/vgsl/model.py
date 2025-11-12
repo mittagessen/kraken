@@ -29,7 +29,6 @@ from lightning.fabric import Fabric
 
 from kraken.lib.vgsl import layers
 from kraken.models import BaseModel
-from kraken.registry import register
 from kraken.lib.vgsl.rpred import VGSLRecognitionInference
 from kraken.lib.vgsl.spred import VGSLSegmentationInference
 from kraken.configs import Config, RecognitionInferenceConfig, SegmentationInferenceConfig
@@ -76,7 +75,6 @@ class VGSLBlock:
         return self._layer
 
 
-@register(type='model')
 class TorchVGSLModel(nn.Module,
                      BaseModel,
                      VGSLRecognitionInference,

@@ -20,6 +20,7 @@ Command line driver for recognition training and evaluation.
 """
 import click
 import logging
+import importlib
 
 from pathlib import Path
 from threadpoolctl import threadpool_limits
@@ -240,10 +241,11 @@ def train(ctx, **kwargs):
             message('Initializing new model.')
             model = CRNNRecognitionModel(m_config)
 
-    from kraken import models, registry  # NOQA
-    if (cfg := registry.WRITER_REGISTRY.get(f'write_{params.get("weights_format")}', None)) is None:
+    try:
+        (entry_point,) = importlib.metadata.entry_points(group='kraken.writers', name='safetensors')
+        writer = entry_point.load()
+    except ValueError:
         raise click.UsageError('weights_format', 'Unknown format `{params.get("weights_format")}` for weights.')
-    writer = getattr(cfg['_module'], f'write_{params.get("weights_format")}')
 
     try:
         with threadpool_limits(limits=ctx.meta['num_threads']):

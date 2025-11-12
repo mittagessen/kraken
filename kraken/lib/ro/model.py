@@ -31,7 +31,7 @@ from torch.optim import lr_scheduler
 from torch.utils.data import DataLoader, Subset
 from torchmetrics.aggregation import MeanMetric
 
-from kraken.lib import default_specs
+from kraken.configs import ROTrainingConfig, ROTrainingDataConfig
 from kraken.lib.dataset import PageWiseROSet, PairWiseROSet
 from kraken.lib.ro.layers import ROMLP
 from kraken.lib.segmentation import _greedy_order_decoder
@@ -67,18 +67,7 @@ def spearman_footrule_distance(s, t):
 
 class RODataModule(L.LightningDataModule):
     def __init__(self,
-                 batch_size: int = 16000,
-                 training_data: Union[Sequence[Union['PathLike', str]], Sequence[Dict[str, Any]]] = None,
-                 evaluation_data: Optional[Union[Sequence[Union['PathLike', str]], Sequence[Dict[str, Any]]]] = None,
-                 partition: Optional[float] = 0.9,
-                 num_workers: int = 1,
-                 format_type: Literal['alto', 'page', 'xml'] = 'xml',
-                 level: Literal['baselines', 'regions'] = 'baselines',
-                 class_mapping: Optional[Dict[str, int]] = None,
-                 valid_entities: Optional[Sequence[str]] = None,
-                 merge_entities: Optional[Dict[str, str]] = None,
-                 merge_all_entities: bool = False,
-                 reading_order: Optional[str] = None):
+                 data_config: ROTrainingDataConfig):
         super().__init__()
 
         self.save_hyperparameters()
@@ -153,10 +142,8 @@ class RODataModule(L.LightningDataModule):
 
 class ROModel(L.LightningModule):
     def __init__(self,
-                 feature_dim: int,
-                 class_mapping: Dict[str, int],
-                 hyper_params: Dict[str, Any] = None,
-                 output: 'PathLike' = 'model') -> None:
+                 config: ROTrainingConfig,
+                 model: Optional[BaseModel] = None) -> None:
         """
         A LightningModule encapsulating the unsupervised pretraining setup for
         a text recognition model.
@@ -173,19 +160,17 @@ class ROModel(L.LightningModule):
             **kwargs: Setup parameters, i.e. CLI parameters of the train() command.
         """
         super().__init__()
-        self.hyper_params = default_specs.READING_ORDER_HYPER_PARAMS
-        if hyper_params:
-            self.hyper_params.update(hyper_params)
 
+        if model:
+            self.net = model
+
+            self.batch, self.channels, self.height, self.width = self.net.input
+        else:
+            logger.info('Creating new RO model')
+            self.net = ROMLP(feature_dim, feature_dim * 2)
+           
         self.output = output
         self.criterion = torch.nn.BCEWithLogitsLoss()
-
-        logger.info('Creating new RO model')
-        self.ro_net = ROMLP(feature_dim, feature_dim * 2)
-
-        if 'file_system' in torch.multiprocessing.get_all_sharing_strategies():
-            logger.debug('Setting multiprocessing tensor sharing strategy to file_system')
-            torch.multiprocessing.set_sharing_strategy('file_system')
 
         self.nn = DummyVGSLModel(ptl_module=self)
 
@@ -195,11 +180,11 @@ class ROModel(L.LightningModule):
         self.save_hyperparameters()
 
     def forward(self, x):
-        return F.sigmoid(self.ro_net(x))
+        return F.sigmoid(self.net(x))
 
     def validation_step(self, batch, batch_idx):
         xs, ys, num_lines = batch['sample'], batch['target'], batch['num_lines']
-        logits = self.ro_net(xs).squeeze()
+        logits = self.net(xs).squeeze()
         yhat = F.sigmoid(logits)
         order = torch.zeros((num_lines, num_lines))
         idx = 0
@@ -230,7 +215,7 @@ class ROModel(L.LightningModule):
 
     def training_step(self, batch, batch_idx):
         x, y = batch['sample'], batch['target']
-        logits = self.ro_net(x)
+        logits = self.net(x)
         loss = self.criterion(logits.squeeze(), y)
         self.log('loss',
                  loss,
@@ -259,7 +244,7 @@ class ROModel(L.LightningModule):
     # scheduler are then only performed at the end of the epoch.
     def configure_optimizers(self):
         return _configure_optimizer_and_lr_scheduler(self.hparams.hyper_params,
-                                                     self.ro_net.parameters(),
+                                                     self.net.parameters(),
                                                      loss_tracking_mode='min')
 
     def optimizer_step(self, epoch, batch_idx, optimizer, optimizer_closure):

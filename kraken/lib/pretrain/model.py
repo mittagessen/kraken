@@ -108,7 +108,6 @@ class PretrainDataModule(CRNNRecognitionDataModule):
             self.hparams.data_config.codec = PytorchCodec(' ')
 
 
-
 class RecognitionPretrainModel(L.LightningModule):
     def __init__(self,
                  config: VGSLPreTrainingConfig,
@@ -229,7 +228,6 @@ class RecognitionPretrainModel(L.LightningModule):
         Reconstruct the model from the spec here and not in setup() as
         otherwise the weight loading will fail.
         """
-        from kraken.lib import vgsl  # NOQA
         from kraken.models import create_model
         if not isinstance(checkpoint['hyper_parameters']['config'], VGSLPreTrainingConfig):
             raise ValueError('Checkpoint is not a recognition model.')

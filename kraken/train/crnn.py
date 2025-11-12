@@ -511,7 +511,6 @@ class CRNNRecognitionModel(L.LightningModule):
         Reconstruct the model from the spec here and not in setup() as
         otherwise the weight loading will fail.
         """
-        from kraken.lib import vgsl  # NOQA
         from kraken.models import create_model
         if not isinstance(checkpoint['hyper_parameters']['config'], VGSLRecognitionTrainingConfig):
             raise ValueError('Checkpoint is not a recognition model.')

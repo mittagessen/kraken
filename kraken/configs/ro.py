@@ -17,7 +17,7 @@
 kraken.configs.vgsl
 ~~~~~~~~~~~~~~~~~~~
 
-Configurations for VGSL (segmentation and recognition) model training.
+Configurations for RO model training.
 """
 from kraken.configs.base import (TrainingConfig,
                                  SegmentationTrainingDataConfig)

@@ -12,7 +12,6 @@ from dataclasses import dataclass
 from collections import Counter
 from collections.abc import Generator
 from typing import TYPE_CHECKING, Union
-from kraken.registry import register
 from kraken.models import load_models
 from kraken.configs import RecognitionInferenceConfig
 
@@ -27,7 +26,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-@register(type='task')
 class RecognitionTaskModel(nn.Module):
     """
     A wrapper for model performing a recognition task.

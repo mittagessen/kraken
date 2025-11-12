@@ -6,7 +6,6 @@ import torch
 from torch import nn
 from typing import TYPE_CHECKING, Optional, Tuple
 
-from kraken.registry import register
 from kraken.models import BaseModel
 from kraken.lib.pretrain.util import compute_mask_indices, sample_negatives
 
@@ -19,7 +18,6 @@ if TYPE_CHECKING:
 __all__ = ['Wav2Vec2Mask']
 
 
-@register(type='model')
 class Wav2Vec2Mask(nn.Module, BaseModel):
     """
     A layer for Wav2Vec2-style masking. Needs to be placed just before

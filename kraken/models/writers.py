@@ -12,7 +12,6 @@ from os import PathLike
 from pathlib import Path
 from typing import Union, TYPE_CHECKING
 
-from kraken.registry import register, WRITER_REGISTRY
 from kraken.models.base import BaseModel
 
 if TYPE_CHECKING:
@@ -31,15 +30,15 @@ def write_models(objs: list[BaseModel], path: Union[str, PathLike]) -> PathLike:
     """
     if (path := Path(path)).exists():
         raise ValueError(f'{path} already exists.')
-    for name, cfg in WRITER_REGISTRY.items():
+
+    for writer in importlib.metadata.entry_points(group='kraken.writers'):
         try:
-            return getattr(cfg['_module'], name)(objs, path)
+            return writer.load()(objs, path)
         except ValueError:
             continue
     raise ValueError(f'No writer found for {path}')
 
 
-@register(type='writer')
 def write_safetensors(objs: list[BaseModel], path: Union[str, PathLike]) -> PathLike:
     """
     Writes a set of models as a safetensors.
@@ -62,7 +61,6 @@ def write_safetensors(objs: list[BaseModel], path: Union[str, PathLike]) -> Path
     return Path(path)
 
 
-@register(type='writer')
 def write_coreml(obj: list['TorchVGSLModel'], path: Union[str, PathLike]) -> PathLike:
     """
     Writes a single model as a CoreML file.

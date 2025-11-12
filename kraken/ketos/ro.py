@@ -18,9 +18,10 @@ kraken.ketos.ro
 
 Command line driver for reading order training, evaluation, and handling.
 """
-import logging
-
 import click
+import logging
+import importlib
+
 from PIL import Image
 
 from pathlib import Path
@@ -182,10 +183,11 @@ def rotrain(ctx, **kwargs):
     else:
         data_module = RODataModule(dm_config)
 
-    from kraken import models, registry  # NOQA
-    if (cfg := registry.WRITER_REGISTRY.get(f'write_{params.get("weights_format")}', None)) is None:
+    try:
+        (entry_point,) = importlib.metadata.entry_points(group='kraken.writers', name='safetensors')
+        writer = entry_point.load()
+    except ValueError:
         raise click.UsageError('weights_format', 'Unknown format `{params.get("weights_format")}` for weights.')
-    writer = getattr(cfg['_module'], f'write_{params.get("weights_format")}')
 
     trainer = KrakenTrainer(accelerator=ctx.meta['accelerator'],
                             devices=ctx.meta['device'],
