@@ -44,7 +44,8 @@ from lightning.pytorch.utilities.memory import (garbage_collection_cuda,
 from torch.optim import lr_scheduler
 
 from kraken.configs import VGSLPreTrainingConfig
-from kraken.lib import layers, vgsl
+from kraken.lib import vgsl
+from kraken.lib.vgsl import layers
 from kraken.models import BaseModel
 from kraken.lib.codec import PytorchCodec
 from kraken.lib.pretrain.layers import Wav2Vec2Mask
@@ -226,7 +227,7 @@ class RecognitionPretrainModel(L.LightningModule):
         """
         from kraken.lib import vgsl  # NOQA
         from kraken.models import create_model
-        if not isinstance(checkpoint['hyper_parameters']['config'], VGSLRecognitionTrainingConfig):
+        if not isinstance(checkpoint['hyper_parameters']['config'], VGSLPreTrainingConfig):
             raise ValueError('Checkpoint is not a recognition model.')
 
         data_config = checkpoint['datamodule_hyper_parameters']['data_config']
