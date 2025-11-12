@@ -226,16 +226,17 @@ class RecognitionPretrainModel(L.LightningModule):
         """
         from kraken.lib import vgsl  # NOQA
         from kraken.models import create_model
-        if not isinstance(checkpoint['_module_config'], BLLASegmentationTrainingConfig):
-            raise ValueError('Checkpoint is not a segmentation model.')
+        if not isinstance(checkpoint['hyper_parameters']['config'], VGSLRecognitionTrainingConfig):
+            raise ValueError('Checkpoint is not a recognition model.')
 
         data_config = checkpoint['datamodule_hyper_parameters']['data_config']
         self.net = create_model('TorchVGSLModel',
+                                model_type='recognition',
+                                use_legacy_polygons=data_config.use_legacy_polygons,
+                                seg_type=checkpoint['_seg_type'],
+                                one_channel_mode=checkpoint['_one_channel_mode'],
                                 vgsl=checkpoint['_module_config'].spec,
-                                topline=data_config.topline,
-                                class_mapping={'aux': {'_start_separator': 0, '_end_separator': 1},
-                                               'baselines': data_config.line_class_mapping,
-                                               'regions': data_config.region_class_mapping})
+                                codec=data_config['codec'])
 
         self.batch, self.channels, self.height, self.width = self.net.input
 
@@ -245,6 +246,8 @@ class RecognitionPretrainModel(L.LightningModule):
         shouldn't be overwritten in on_load_checkpoint.
         """
         checkpoint['_module_config'] = self.hparams.config
+        checkpoint['_one_channel_mode'] = self.trainer.datamodule.train_set.im_mode
+        checkpoint['_seg_type'] = self.trainer.datamodule.train_set.seg_type
 
     @classmethod
     def load_from_weights(cls,

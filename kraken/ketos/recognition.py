@@ -21,6 +21,7 @@ Command line driver for recognition training and evaluation.
 import click
 import logging
 
+from pathlib import Path
 from threadpoolctl import threadpool_limits
 
 from kraken.registry import OPTIMIZERS, SCHEDULERS, STOPPERS
@@ -239,6 +240,11 @@ def train(ctx, **kwargs):
             message('Initializing new model.')
             model = CRNNRecognitionModel(m_config)
 
+    from kraken import models, registry  # NOQA
+    if (cfg := registry.WRITER_REGISTRY.get(f'write_{params.get("weights_format")}', None)) is None:
+        raise click.UsageError('weights_format', 'Unknown format `{params.get("weights_format")}` for weights.')
+    writer = getattr(cfg['_module'], f'write_{params.get("weights_format")}')
+
     try:
         with threadpool_limits(limits=ctx.meta['num_threads']):
             if resume:
@@ -252,8 +258,11 @@ def train(ctx, **kwargs):
             raise e
 
     score = checkpoint_callback.best_model_score.item()
-    weight_path = Path(checkpoint_callback.best_model_path).with_name(f'best_{score}.{kwargs.pop("weights_format")}')
-    message(f'Converting best model {checkpoint_callback.best_model_path} (score: {score}) to weights {weight_path}')
+    weight_path = Path(checkpoint_callback.best_model_path).with_name(f'best_{score:.4f}.{params.get("weights_format")}')
+    message(f'Converting best model {checkpoint_callback.best_model_path} (score: {score:.4f}) to weights {weight_path}')
+    model = CRNNRecognitionModel.load_from_checkpoint(checkpoint_callback.best_model_path, config=m_config)
+    writer([model.net], weight_path)
+
 
 @click.command('test')
 @click.pass_context
