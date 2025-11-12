@@ -522,7 +522,7 @@ class CRNNRecognitionModel(L.LightningModule):
                                 seg_type=checkpoint['_seg_type'],
                                 one_channel_mode=checkpoint['_one_channel_mode'],
                                 vgsl=checkpoint['_module_config'].spec,
-                                codec=data_config['codec'])
+                                codec=data_config.codec)
 
         self.batch, self.channels, self.height, self.width = self.net.input
 
