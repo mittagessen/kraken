@@ -396,7 +396,7 @@ class CRNNRecognitionModel(L.LightningModule):
             if (codec := self.trainer.datamodule.hparams.data_config.codec):
                 if not isinstance(codec, PytorchCodec):
                     logger.info('Instantiating codec')
-                    self.trainer.datamodule.hparams.config.codec = PytorchCodec(codec)
+                    self.trainer.datamodule.hparams.data_config.codec = PytorchCodec(codec)
                 for k, v in self.trainer.datamodule.hparams.data_config.codec.c2l.items():
                     char = make_printable(k)
                     if char == k:
