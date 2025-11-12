@@ -77,7 +77,6 @@ class PretrainDataModule(CRNNRecognitionDataModule):
                 dataset.add(**sample)
             except Exception as e:
                 logger.warning(str(e))
-
         if self.hparams.data_config.format_type == 'binary' and (self.hparams.data_config.normalization or
                                                                  self.hparams.data_config.normalize_whitespace or
                                                                  self.hparams.data_config.bidi_reordering):
@@ -105,6 +104,9 @@ class PretrainDataModule(CRNNRecognitionDataModule):
 
             self.train_set.dataset.no_encode()
             self.val_set.dataset.no_encode()
+
+            self.hparams.data_config.codec = PytorchCodec(' ')
+
 
 
 class RecognitionPretrainModel(L.LightningModule):
@@ -143,8 +145,6 @@ class RecognitionPretrainModel(L.LightningModule):
 
         # add dummy codec and output layer
         if not isinstance(self.net.nn[-1], layers.LinSoftmax):
-            logger.info('Adding dummy codec and output layer to model')
-            self.trainer.datamodule.hparams.data_config.codec = PytorchCodec(' ')
             self.net.append(len(self.net.nn), "[O1c2]")
 
         self.encoder = self.net.nn[idx:]
