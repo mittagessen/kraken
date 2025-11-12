@@ -23,6 +23,7 @@ import logging
 import click
 from PIL import Image
 
+from pathlib import Path
 from kraken.ketos.util import _expand_gt, _validate_manifests, message
 
 from kraken.registry import OPTIMIZERS, SCHEDULERS, STOPPERS
@@ -118,7 +119,7 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
               help='Selects level to train reading order model on.')
 @click.option('--reading-order', help='Select reading order to train. Defaults to `line_implicit`/`region_implicit`')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
-def rotrain(ctx, **kwargsh):
+def rotrain(ctx, **kwargs):
     """
     Trains a baseline labeling model for layout analysis
     """
@@ -181,6 +182,11 @@ def rotrain(ctx, **kwargsh):
     else:
         data_module = RODataModule(dm_config)
 
+    from kraken import models, registry  # NOQA
+    if (cfg := registry.WRITER_REGISTRY.get(f'write_{params.get("weights_format")}', None)) is None:
+        raise click.UsageError('weights_format', 'Unknown format `{params.get("weights_format")}` for weights.')
+    writer = getattr(cfg['_module'], f'write_{params.get("weights_format")}')
+
     trainer = KrakenTrainer(accelerator=ctx.meta['accelerator'],
                             devices=ctx.meta['device'],
                             precision=ctx.meta['precision'],
@@ -216,8 +222,11 @@ def rotrain(ctx, **kwargsh):
             trainer.fit(model, data_module)
 
     score = checkpoint_callback.best_model_score.item()
-    weight_path = Path(checkpoint_callback.best_model_path).with_name(f'best_{score}.{kwargs.pop("weights_format")}')
-    message(f'Converting best model {checkpoint_callback.best_model_path} (score: {score}) to weights {weight_path}')
+    weight_path = Path(checkpoint_callback.best_model_path).with_name(f'best_{score:.4f}.{params.get("weights_format")}')
+    message(f'Converting best model {checkpoint_callback.best_model_path} (score: {score:.4f}) to weights {weight_path}')
+    model = ROModel.load_from_checkpoint(checkpoint_callback.best_model_path, config=m_config)
+    writer([model.net], weight_path)
+
 
 @click.command('roadd')
 @click.pass_context

@@ -23,7 +23,7 @@ import glob
 import yaml
 import shlex
 import logging
-from collections import defaultdict 
+from collections import defaultdict
 from typing import Optional, Any, TYPE_CHECKING
 
 import click
