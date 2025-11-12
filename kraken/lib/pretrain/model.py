@@ -268,7 +268,7 @@ class RecognitionPretrainModel(L.LightningModule):
         return cls(config=config, model=models[0])
 
     def configure_optimizers(self):
-        return configure_optimizer_and_lr_scheduler(self.hparams,
+        return configure_optimizer_and_lr_scheduler(self.hparams.config,
                                                     chain(self.features.parameters(),
                                                           self.wav2vec2mask.parameters(),
                                                           self.encoder.parameters()),
