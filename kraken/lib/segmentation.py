@@ -1183,6 +1183,12 @@ def extract_polygons(im: Image.Image,
 
     Yields:
         The extracted subimage, and the corresponding bounding box or baseline
+
+    Raises:
+        ValueError in the following cases:
+
+        * No bounding polygon defined for a baseline.
+        * Baseline, bounding polygon, or bounding box extending beyond image extents
     """
     if bounds.type == 'baselines':
         # select proper interpolation scheme depending on shape
@@ -1194,9 +1200,9 @@ def extract_polygons(im: Image.Image,
 
         for line in bounds.lines:
             if line.boundary is None:
-                raise KrakenInputException('No boundary given for line')
+                raise ValueError('No boundary given for line')
             if len(line.baseline) < 2 or geom.LineString(line.baseline).length < 5:
-                raise KrakenInputException('Baseline length below minimum 5px')
+                raise ValueError('Baseline length below minimum 5px')
             pl = np.array(line.boundary)
             baseline = np.array(line.baseline)
             c_min, c_max = int(pl[:, 0].min()), int(pl[:, 0].max())
@@ -1205,9 +1211,9 @@ def extract_polygons(im: Image.Image,
             imshape = np.array([im.height, im.width])
 
             if (pl < 0).any() or (pl.max(axis=0)[::-1] >= imshape).any():
-                raise KrakenInputException('Line polygon outside of image bounds')
+                raise ValueError('Line polygon outside of image bounds')
             if (baseline < 0).any() or (baseline.max(axis=0)[::-1] >= imshape).any():
-                raise KrakenInputException('Baseline outside of image bounds')
+                raise ValueError('Baseline outside of image bounds')
 
             if legacy:
                 im = np.asarray(im)
@@ -1381,5 +1387,5 @@ def extract_polygons(im: Image.Image,
             if (box < [0, 0, 0, 0] or box[::2] >= [im.size[0], im.size[0]] or
                     box[1::2] >= [im.size[1], im.size[1]]):
                 logger.error('bbox {} is outside of image bounds {}'.format(box, im.size))
-                raise KrakenInputException('Line outside of image bounds')
+                raise ValueError('Line outside of image bounds')
             yield im.crop(box).rotate(angle, expand=True), line
