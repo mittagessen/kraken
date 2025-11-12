@@ -130,24 +130,24 @@ class RecognitionPretrainModel(L.LightningModule):
 
         self.batch, self.channels, self.height, self.width = self.net.input
 
-        for idx, layer in enumerate(self.net.children()):
+        for idx, layer in enumerate(self.net.nn.children()):
             if isinstance(layer, layers.TransposedSummarizingRNN):
                 break
 
-        self.features = self.net[:idx]
-        self.wav2vec2mask = Wav2Vec2Mask(self.net[idx-1].output_shape[1],
-                                         self.net[-1].output_shape[1],
+        self.features = self.net.nn[:idx]
+        self.wav2vec2mask = Wav2Vec2Mask(self.net.nn[idx-1].output_shape[1],
+                                         self.net.nn[-1].output_shape[1],
                                          self.hparams.config.mask_width,
                                          self.hparams.config.mask_prob,
                                          self.hparams.config.num_negatives)
 
         # add dummy codec and output layer
-        if not isinstance(self.net[-1], layers.LinSoftmax):
+        if not isinstance(self.net.nn[-1], layers.LinSoftmax):
             logger.info('Adding dummy codec and output layer to model')
             self.trainer.datamodule.hparams.data_config.codec = PytorchCodec(' ')
-            self.net.append(len(self.net), "[O1c2]")
+            self.net.append(len(self.net.nn), "[O1c2]")
 
-        self.encoder = self.net[idx:]
+        self.encoder = self.net.nn[idx:]
 
         self.val_ce = MeanMetric()
 
