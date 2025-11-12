@@ -24,7 +24,7 @@ import logging
 from PIL import Image
 from pathlib import Path
 
-from kraken.ketos.util import _expand_gt, _validate_manifests, message
+from kraken.ketos.util import _expand_gt, _validate_manifests, message, _create_class_map
 
 from kraken.registry import OPTIMIZERS, SCHEDULERS, STOPPERS
 
@@ -154,6 +154,8 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
 @click.option('--log-dir',
               type=click.Path(exists=True, dir_okay=True, writable=True),
               help='Path to directory where the logger will store the logs. If not set, a directory will be created in the current working directory.')
+@click.option('--line-class-mapping', type=click.UNPROCESSED, hidden=True)
+@click.option('--region-class-mapping', type=click.UNPROCESSED, hidden=True)
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def segtrain(ctx, **kwargs):
     """
@@ -180,6 +182,12 @@ def segtrain(ctx, **kwargs):
             import tensorboard  # NOQA
         except ImportError:
             raise click.BadOptionUsage('logger', 'tensorboard logger needs the `tensorboard` package installed.')
+
+    # parse line_class_mapping
+    if isinstance(line_cls_map := params.get('line_class_mapping'), list):
+        params['line_class_mapping'] = _create_class_map(line_cls_map)
+    if isinstance(region_cls_map := params.get('region_class_mapping'), list):
+        params['region_class_mapping'] = _create_class_map(region_cls_map)
 
     from threadpoolctl import threadpool_limits
     from lightning.pytorch.callbacks import ModelCheckpoint

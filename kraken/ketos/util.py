@@ -23,6 +23,7 @@ import glob
 import yaml
 import shlex
 import logging
+from collections import defaultdict 
 from typing import Optional, Any, TYPE_CHECKING
 
 import click
@@ -32,6 +33,20 @@ if TYPE_CHECKING:
 
 logging.captureWarnings(True)
 logger = logging.getLogger('kraken')
+
+
+def _create_class_map(cls_map):
+    """
+    Converts the list as a parameter
+    """
+    default = None
+    for idx, (cls, label) in enumerate(cls_map):
+        if '*' in cls:
+            def default():
+                return label
+            cls_map.pop(idx)
+            break
+    return defaultdict(default, cls_map)
 
 
 def _recursive_update(a: dict[str, Any],
