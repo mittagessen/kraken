@@ -18,12 +18,12 @@ kraken.configs.pretrain
 
 Configurations for semi-supervised model pretraining.
 """
-from kraken.configs.vgsl import VGSLRecognitionTrainingConfig
+from kraken.configs.vgsl import VGSLRecognitionTrainingConfig, VGSLRecognitionTrainingDataConfig
 
 __all__ = ['VGSLPreTrainingConfig', 'VGSLPreTrainingDataConfig']
 
 
-class VGSLPreTrainingDataConfig(VGSLRecognitionTrainingConfig):
+class VGSLPreTrainingDataConfig(VGSLRecognitionTrainingDataConfig):
     """
     Base configuration for pretraining a reading order model.
 
