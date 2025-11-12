@@ -120,8 +120,12 @@ class RecognitionPretrainModel(L.LightningModule):
 
         if model:
             self.net = model
+
+            self.batch, self.channels, self.height, self.width = self.net.input
         else:
-            self.net = vgsl.TorchVGSLModel(config.spec)
+            from kraken.models import create_model
+            self.net = create_model('TorchVGSLModel',
+                                    vgsl=self.hparams.config.spec)
             self.net.init_weights()
 
         self.batch, self.channels, self.height, self.width = self.net.input
@@ -138,7 +142,7 @@ class RecognitionPretrainModel(L.LightningModule):
                                          self.hparams.config.num_negatives)
 
         # add dummy codec and output layer
-        if isinstance(self.net[-1], layers.LinSoftmax):
+        if not isinstance(self.net[-1], layers.LinSoftmax):
             logger.info('Adding dummy codec and output layer to model')
             self.trainer.datamodule.hparams.data_config.codec = PytorchCodec(' ')
             self.net.append(len(self.net), "[O1c2]")
