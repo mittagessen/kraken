@@ -477,6 +477,7 @@ class BLLASegmentationModel(L.LightningModule):
                                 vgsl=checkpoint['_module_config'].spec,
                                 model_type='segmentation',
                                 topline=data_config.topline,
+                                one_channel_mode=checkpoint['_one_channel_mode'],
                                 class_mapping={'aux': {'_start_separator': 0, '_end_separator': 1},
                                                'baselines': data_config.line_class_mapping,
                                                'regions': data_config.region_class_mapping})
@@ -489,6 +490,7 @@ class BLLASegmentationModel(L.LightningModule):
         shouldn't be overwritten in on_load_checkpoint.
         """
         checkpoint['_module_config'] = self.hparams.config
+        checkpoint['_one_channel_mode'] = self.trainer.datamodule.train_set.im_mode
 
     @classmethod
     def load_from_weights(cls,
