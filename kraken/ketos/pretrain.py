@@ -232,10 +232,6 @@ def pretrain(ctx, **kwargs):
     else:
         data_module = PretrainDataModule(dm_config)
 
-    model = RecognitionPretrainModel()
-
-    data_module = PretrainDataModule()
-
     trainer = KrakenTrainer(accelerator=ctx.meta['accelerator'],
                             devices=ctx.meta['device'],
                             precision=ctx.meta['precision'],
