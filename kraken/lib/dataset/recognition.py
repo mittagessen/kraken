@@ -505,7 +505,6 @@ class PolygonGTDataset(Dataset):
 
             return {'image': im, 'target': item[1]}
         except Exception:
-            raise
             self.failed_samples.add(index)
             idx = np.random.randint(0, len(self.training_set))
             logger.debug(traceback.format_exc())
