@@ -795,7 +795,7 @@ def get(ctx, model_id):
 
 
 for subcommand in sorted(importlib.metadata.entry_points(group='kraken.cli')):
-    cli.add_command(subcommand.load())
+    cli.add_command(subcommand.load(), name=subcommand.name)
 
 
 if __name__ == '__main__':

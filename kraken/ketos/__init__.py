@@ -114,7 +114,7 @@ def cli(ctx, **kwargs):
 
 
 for entry_point in sorted(importlib.metadata.entry_points(group='ketos.cli')):
-    cli.add_command(entry_point.load())
+    cli.add_command(entry_point.load(), name=entry_point.name)
 
 
 if __name__ == '__main__':
