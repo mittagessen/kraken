@@ -23,6 +23,7 @@ import uuid
 import click
 import logging
 import warnings
+import importlib
 import dataclasses
 
 from PIL import Image
@@ -429,7 +430,7 @@ def process_pipeline(subcommands, input, batch_input, suffix, verbose, format_ty
                 os.unlink(fc[0])
 
 
-@cli.command('binarize')
+@click.command('binarize')
 @click.pass_context
 @click.option('--threshold', default=0.5, type=click.FLOAT)
 @click.option('--zoom', default=0.5, type=click.FLOAT)
@@ -461,7 +462,7 @@ def binarize(ctx, threshold, zoom, escale, border, perc, range, low, high):
                    low, high)
 
 
-@cli.command('segment')
+@click.command('segment')
 @click.pass_context
 @click.option('-i', '--model', type=str, help='Baseline/region detection model(s) to use')
 @click.option('-x/-bl', '--boxes/--baseline', default=True,
@@ -525,7 +526,7 @@ def segment(ctx, **kwargs):
     return partial(segmenter, params['boxes'], model, config)
 
 
-@cli.command('ocr')
+@click.command('ocr')
 @click.pass_context
 @click.option('-m',
               '--model',
@@ -614,7 +615,7 @@ def ocr(ctx, **kwargs):
                    config=config)
 
 
-@cli.command('show')
+@click.command('show')
 @click.pass_context
 @click.option('-V', '--metadata-version',
               default='highest',
@@ -702,7 +703,7 @@ def show(ctx, metadata_version, model_id):
     print(table)
 
 
-@cli.command('list')
+@click.command('list')
 @click.option('--all', 'model_type', flag_value='all', default=True, help='List both segmentation and recognition models.')
 @click.option('--recognition', 'model_type', flag_value='recognition', help='Only list recognition models.')
 @click.option('--segmentation', 'model_type', flag_value='segmentation', help='Only list segmentation models.')
@@ -766,7 +767,7 @@ def list_models(ctx, model_type, language, script, keyword):
     print(table)
 
 
-@cli.command('get')
+@click.command('get')
 @click.pass_context
 @click.argument('model_id')
 def get(ctx, model_id):
@@ -791,6 +792,10 @@ def get(ctx, model_id):
                               callback=lambda total, advance: progress.update(download_task, total=total, advance=advance))
     model_candidates = list(filter(lambda x: x.suffix == '.mlmodel', model_dir.iterdir()))
     message(f'Model dir: {model_dir} (model files: {", ".join(x.name for x in model_candidates)})')
+
+
+for subcommand in sorted(importlib.metadata.entry_points(group='kraken.cli')):
+    cli.add_command(subcommand.load())
 
 
 if __name__ == '__main__':

@@ -18,10 +18,10 @@ kraken.ketos
 
 Command line drivers for training functionality.
 """
-
+import click
+import importlib
 import logging
 
-import click
 from PIL import Image
 from rich.traceback import install
 
@@ -113,16 +113,9 @@ def cli(ctx, **kwargs):
     log.set_logger(logger, level=30 - min(10 * params['verbose'], 20))
 
 
-cli.add_command(compile)
-cli.add_command(convert)
-cli.add_command(pretrain)
-cli.add_command(train)
-cli.add_command(test)
-cli.add_command(segtrain)
-cli.add_command(segtest)
-cli.add_command(publish)
-cli.add_command(rotrain)
-cli.add_command(roadd)
+for entry_point in sorted(importlib.metadata.entry_points(group='ketos.cli')):
+    cli.add_command(entry_point.load())
+
 
 if __name__ == '__main__':
     cli()
