@@ -47,7 +47,6 @@ def convert(ctx, output, weights_format, checkpoints):
     """
     Converts and combines one or more checkpoints/weights.
     """
-    from pathlib import Path
     from kraken.models import convert_models
 
     if not checkpoints:

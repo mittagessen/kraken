@@ -1,5 +1,6 @@
 import importlib
 
+from pathlib import Path
 from collections.abc import Iterable
 from typing import Union, TYPE_CHECKING
 from kraken.models.base import BaseModel
