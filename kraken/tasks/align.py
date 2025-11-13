@@ -6,14 +6,15 @@ Forced alignment of CTC output.
 """
 import torch
 from torch import nn
-from dataclasses import replace, dataclass
 from bidi.algorithm import get_display
+from dataclasses import replace, dataclass
 
 from typing import TYPE_CHECKING, Union
 
+from kraken.models import load_models
 from kraken.lib.vgsl import TorchVGSLModel
 from kraken.containers import Segmentation, BaselineOCRRecord
-from kraken.models import load_models, RecognitionInferenceConfig
+from kraken.configs import RecognitionInferenceConfig
 
 if TYPE_CHECKING:
     from os import PathLike
@@ -66,7 +67,7 @@ class ForcedAlignmentTaskModel(nn.Module):
         When the character sets of transcription and recognition model differ,
         the affected code points in the furnished transcription will silently
         be ignored. In case inference fails on a line, a record without
-        cuts/confidences is returned. 
+        cuts/confidences is returned.
 
         Args:
             im: The input image
@@ -75,7 +76,7 @@ class ForcedAlignmentTaskModel(nn.Module):
                     automatically set some required configuration flags on it.
 
         Returns:
-            A single segmentation that contains the aligned `ocr_record` objects. 
+            A single segmentation that contains the aligned `ocr_record` objects.
         """
         if not config.return_logits:
             logger.info('Forced alignment requires logits in output records. Enabling.')

@@ -8,8 +8,6 @@ import torch
 from torch import nn
 
 from PIL import Image
-from dataclasses import dataclass
-from collections import Counter
 from collections.abc import Generator
 from typing import TYPE_CHECKING, Union
 from kraken.models import load_models
