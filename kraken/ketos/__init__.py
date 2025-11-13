@@ -35,6 +35,7 @@ from .recognition import test, train
 from .repo import publish
 from .ro import roadd, rotrain
 from .segmentation import segtest, segtrain
+from .weights import convert
 
 from kraken.configs import (Config,
                             TrainingDataConfig,
@@ -113,6 +114,7 @@ def cli(ctx, **kwargs):
 
 
 cli.add_command(compile)
+cli.add_command(convert)
 cli.add_command(pretrain)
 cli.add_command(train)
 cli.add_command(test)

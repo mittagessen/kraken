@@ -242,7 +242,7 @@ def train(ctx, **kwargs):
             model = CRNNRecognitionModel(m_config)
 
     try:
-        (entry_point,) = importlib.metadata.entry_points(group='kraken.writers', name='safetensors')
+        (entry_point,) = importlib.metadata.entry_points(group='kraken.writers', name=params['weights_format'])
         writer = entry_point.load()
     except ValueError:
         raise click.UsageError('weights_format', 'Unknown format `{params.get("weights_format")}` for weights.')
