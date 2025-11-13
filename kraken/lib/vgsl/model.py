@@ -483,7 +483,6 @@ class TorchVGSLModel(nn.Module,
         self.nn = self._fabric.to_device(self.nn)
 
         self._m_dtype = next(self.parameters()).dtype
-        self._m_device = next(self.parameters()).device
 
     @torch.inference_mode()
     def predict(self, *args, **kwargs):
