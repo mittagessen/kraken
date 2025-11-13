@@ -37,8 +37,6 @@ class ForcedAlignmentTaskModel(nn.Module):
     Raises:
         ValueError: Is raised when the model type is not a sequence recognizer.
     """
-    net: nn.Module
-
     def __init__(self, models: list[nn.Module]):
         super().__init__()
         # only use recognition models.

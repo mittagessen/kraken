@@ -479,6 +479,9 @@ class TorchVGSLModel(nn.Module,
                               devices=self._inf_config.device,
                               precision=self._inf_config.precision)
 
+        self.nn = self._fabric._precision.convert_module(self.nn)
+        self.nn = self._fabric.to_device(self.nn)
+
         self._m_dtype = next(self.parameters()).dtype
         self._m_device = next(self.parameters()).device
 
