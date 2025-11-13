@@ -47,40 +47,10 @@ def convert(ctx, output, weights_format, checkpoints):
     """
     Converts and combines one or more checkpoints/weights.
     """
-    import importlib
-
-    from kraken.models import load_models
-    from kraken.lib.progress import KrakenProgressBar
-
-    from .util import message
-
-    try:
-        (entry_point,) = importlib.metadata.entry_points(group='kraken.writers', name=weights_format)
-        writer = entry_point.load()
-    except ValueError:
-        raise click.UsageError('weights_format', 'Unknown format `{weights_format}` for weights.')
+    from kraken.models import convert_models
 
     if not checkpoints:
         raise click.UsageError('No checkpoints to convert were provided.')
 
-    def _find_module(path):
-        for entry_point in importlib.metadata.entry_points(group='kraken.lightning_modules'):
-            module = entry_point.load()
-            try:
-                return module.load_from_checkpoint(path)
-            except ValueError:
-                continue
-        raise ValueError(f'No lightning module found for checkpoint {path}')
-
-    models = []
-    with KrakenProgressBar() as progress:
-        load_task = progress.add_task('Loading checkpoints', total=len(checkpoints), start=True, visible=True if not ctx.meta['verbose'] else False)
-        for ckpt in checkpoints:
-            if ckpt.endswith('ckpt'):
-                models.append(_find_module(ckpt).net)
-            else:
-                models.extend(load_models(ckpt))
-        load_task.advance(load_task)
-
-    opath = writer(models, output)
+    opath = convert_models(checkpoints, output, weights_format)
     message(f'Output file written to {opath}')
