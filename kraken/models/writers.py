@@ -9,6 +9,7 @@ import uuid
 import logging
 import importlib
 
+from torch import nn
 from os import PathLike
 from pathlib import Path
 from typing import Union, TYPE_CHECKING
@@ -44,21 +45,17 @@ def write_safetensors(objs: list[BaseModel], path: Union[str, PathLike]) -> Path
     """
     Writes a set of models as a safetensors.
     """
-    from safetensors.torch import save_file
+    from safetensors.torch import save_model
     # assign unique prefixes to each model in model list
-    prefixes = {str(uuid.uuid4()): model for model in objs}
-    metadatas = {k: {'_kraken_min_version': v._kraken_min_version,
-                     '_tasks': v.model_type,
-                     '_model': v.__class__.__name__,
-                     **v.user_metadata} for k, v in prefixes.items()}
+    prefixes = nn.ModuleDict({str(uuid.uuid4()): model for model in objs})
+    metadata = {k: {'_kraken_min_version': v._kraken_min_version,
+                    '_tasks': v.model_type,
+                    '_model': v.__class__.__name__,
+                    **v.user_metadata} for k, v in prefixes.items()}
 
-    weights = {}
-    for prefix, model in prefixes.items():
-        for name in (state_dict := model.state_dict()):
-            weights[f'{prefix}.{name}'] = state_dict[name]
-    save_file(weights,
-              filename=path,
-              metadata={'kraken_meta': json.dumps(metadatas)})
+    save_model(prefixes,
+               filename=path,
+               metadata={'kraken_meta': json.dumps(metadata)})
     return Path(path)
 
 
