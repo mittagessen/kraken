@@ -227,12 +227,12 @@ class ROModel(L.LightningModule):
 
     def configure_callbacks(self):
         callbacks = []
-        if self.hparams.hyper_params['quit'] == 'early':
+        if self.hparams.config.quit == 'early':
             callbacks.append(EarlyStopping(monitor='val_metric',
                                            mode='min',
-                                           patience=self.hparams.hyper_params['lag'],
+                                           patience=self.hparams.config.lag,
                                            stopping_threshold=0.0))
-        if self.hparams.hyper_params['pl_logger']:
+        if self.hparams.config.pl_logger:
             callbacks.append(LearningRateMonitor(logging_interval='step'))
         return callbacks
 
@@ -253,13 +253,13 @@ class ROModel(L.LightningModule):
 
         # linear warmup between 0 and the initial learning rate `lrate` in `warmup`
         # steps.
-        if self.hparams.hyper_params['warmup'] and self.trainer.global_step < self.hparams.hyper_params['warmup']:
-            lr_scale = min(1.0, float(self.trainer.global_step + 1) / self.hparams.hyper_params['warmup'])
+        if self.hparams.config.warmup and self.trainer.global_step < self.hparams.config.warmup'
+            lr_scale = min(1.0, float(self.trainer.global_step + 1) / self.hparams.config.warmup)
             for pg in optimizer.param_groups:
-                pg["lr"] = lr_scale * self.hparams.hyper_params['lrate']
+                pg["lr"] = lr_scale * self.hparams.config.lrate
 
     def lr_scheduler_step(self, scheduler, metric):
-        if not self.hparams.hyper_params['warmup'] or self.trainer.global_step >= self.hparams.hyper_params['warmup']:
+        if not self.hparams.config.warmup or self.trainer.global_step >= self.hparams.config.warmup:
             # step OneCycleLR each batch if not in warmup phase
             if isinstance(scheduler, lr_scheduler.OneCycleLR):
                 scheduler.step()
