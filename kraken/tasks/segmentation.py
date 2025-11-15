@@ -99,6 +99,8 @@ class SegmentationTaskModel:
     @staticmethod
     def _merge_segmentations(segmentations: list[Segmentation],
                              config: SegmentationInferenceConfig) -> Segmentation:
+        if len(segmentations) == 1:
+            return segmentations[0]
         lines = []
         regions = {}
         script_detection = False
