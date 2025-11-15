@@ -42,7 +42,7 @@ def _create_class_map(cls_map):
     default = None
     for idx, (cls, label) in enumerate(cls_map):
         if '*' in cls:
-            def default():
+            def default():  # NOQA
                 return label
             cls_map.pop(idx)
             break

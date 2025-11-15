@@ -44,7 +44,6 @@ from lightning.pytorch.utilities.memory import (garbage_collection_cuda,
 from torch.optim import lr_scheduler
 
 from kraken.configs import VGSLPreTrainingConfig
-from kraken.lib import vgsl
 from kraken.lib.vgsl import layers
 from kraken.models import BaseModel
 from kraken.lib.codec import PytorchCodec

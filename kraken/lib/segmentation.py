@@ -40,7 +40,6 @@ from skimage.measure import (approximate_polygon, label, regionprops,
 from skimage.morphology import skeletonize
 from skimage.transform import (AffineTransform, PiecewiseAffineTransform, warp)
 
-from kraken.lib.exceptions import KrakenInputException
 
 if TYPE_CHECKING:
     from kraken.containers import Segmentation, BBoxLine, BaselineLine

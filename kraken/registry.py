@@ -13,15 +13,8 @@
 # or implied. See the License for the specific language governing
 # permissions and limitations under the License.
 """
-Model constructor, task, and hyperparameter registries.
+Hyperparameter registries.
 """
-import inspect
-import importlib
-from functools import partial
-from collections import OrderedDict
-
-from typing import Literal
-
 
 OPTIMIZERS = ['Adam', 'AdamW', 'SGD', 'RMSprop']
 SCHEDULERS = ['cosine', 'constant', 'exponential', 'step', '1cycle', 'reduceonplateau']

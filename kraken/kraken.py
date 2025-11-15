@@ -201,9 +201,9 @@ def recognizer(model, no_segmentation, config, input, output) -> None:
         if ctx.meta['input_format_type'] != 'image':
             doc = get_input_parser(ctx.meta['input_format_type'])(input)
             ctx.meta['base_image'] = doc.imagename
-            if doc.base_dir and bidi_reordering is True:
+            if doc.base_dir and config.bidi_reordering is True:
                 message(f'Setting base text direction for BiDi reordering to {doc.base_dir} (from XML input file)')
-                bidi_reordering = doc.base_dir
+                config.bidi_reordering = doc.base_dir
             bounds = doc.to_container()
     try:
         im = Image.open(ctx.meta['base_image'])
@@ -597,7 +597,7 @@ def ocr(ctx, **kwargs):
             location = loc
             break
     if not location:
-        raise click.BadParameter(f'No model path for {model} found')
+        raise click.BadParameter(f'No model path for {params["model"]} found')
 
     ctx.meta['steps'].append(ProcessingStep(id=f'_{uuid.uuid4()}',
                                             category='processing',

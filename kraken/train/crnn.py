@@ -318,7 +318,10 @@ class CRNNRecognitionModel(L.LightningModule):
             self.val_cer.update(pred_str, target)
             self.val_wer.update(pred_str, target)
 
-        if self.logger and self.trainer.state.stage != 'sanity_check' and self.hparams.config.batch_size * batch_idx < 16 and getattr(self.logger.experiment, 'add_image', None) is not None:
+        if self.logger and \
+           self.trainer.state.stage != 'sanity_check' and \
+           self.hparams.config.batch_size * batch_idx < 16 and \
+           getattr(self.logger.experiment, 'add_image', None) is not None:
             for i in range(self.hparams.config.batch_size):
                 count = self.hparams.config.batch_sizd * batch_idx + i
                 if count < 16:

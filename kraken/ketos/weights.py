@@ -20,7 +20,7 @@ Command line driver for checkpoint and weights handling.
 """
 import click
 
-from kraken.ketos.util import message 
+from kraken.ketos.util import message
 
 
 @click.command('convert',

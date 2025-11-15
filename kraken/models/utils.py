@@ -4,6 +4,7 @@ from pathlib import Path
 from collections.abc import Iterable
 from typing import Union, TYPE_CHECKING
 from kraken.models.base import BaseModel
+from kraken.models.loaders import load_models
 
 __all__ = ['create_model', 'convert_models']
 

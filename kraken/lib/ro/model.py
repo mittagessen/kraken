@@ -19,8 +19,7 @@ Adapted from:
 """
 import logging
 from dataclasses import dataclass, field
-from typing import (TYPE_CHECKING, Any, Dict, List, Literal, Optional,
-                    Sequence, Union)
+from typing import TYPE_CHECKING, Literal, Optional
 
 import numpy as np
 import lightning as L
@@ -38,24 +37,23 @@ from kraken.lib.segmentation import _greedy_order_decoder
 from kraken.lib.train import _configure_optimizer_and_lr_scheduler
 
 if TYPE_CHECKING:
-    from os import PathLike
-
     from torch.nn import Module
+    from kraken.models import BaseModel
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
 class DummyVGSLModel:
-    hyper_params: Dict[str, int] = field(default_factory=dict)
-    user_metadata: Dict[str, List] = field(default_factory=dict)
+    hyper_params: dict[str, int] = field(default_factory=dict)
+    user_metadata: dict[str, list] = field(default_factory=dict)
     one_channel_mode: Literal['1', 'L'] = '1'
     ptl_module: 'Module' = None
     model_type: str = 'unknown'
 
     def __post_init__(self):
-        self.hyper_params: Dict[str, int] = {'completed_epochs': 0}
-        self.user_metadata: Dict[str, List] = {'accuracy': [], 'metrics': []}
+        self.hyper_params: dict[str, int] = {'completed_epochs': 0}
+        self.user_metadata: dict[str, list] = {'accuracy': [], 'metrics': []}
 
     def save_model(self, filename):
         self.ptl_module.save_checkpoint(filename)
@@ -143,7 +141,7 @@ class RODataModule(L.LightningDataModule):
 class ROModel(L.LightningModule):
     def __init__(self,
                  config: ROTrainingConfig,
-                 model: Optional[BaseModel] = None) -> None:
+                 model: Optional['BaseModel'] = None) -> None:
         """
         A LightningModule encapsulating the unsupervised pretraining setup for
         a text recognition model.
@@ -164,12 +162,6 @@ class ROModel(L.LightningModule):
         if model:
             self.net = model
 
-            self.batch, self.channels, self.height, self.width = self.net.input
-        else:
-            logger.info('Creating new RO model')
-            self.net = ROMLP(feature_dim, feature_dim * 2)
-           
-        self.output = output
         self.criterion = torch.nn.BCEWithLogitsLoss()
 
         self.nn = DummyVGSLModel(ptl_module=self)
@@ -225,6 +217,13 @@ class ROModel(L.LightningModule):
                  logger=True)
         return loss
 
+    def setup(self, stage: Optional[str] = None):
+        if stage in [None, 'fit']:
+            if not self.net:
+                logger.info('Creating new RO model')
+                feature_dim = self.trainer.datamodule.get_feature_dim()
+                self.net = ROMLP(feature_dim, feature_dim * 2)
+
     def configure_callbacks(self):
         callbacks = []
         if self.hparams.config.quit == 'early':
@@ -253,7 +252,7 @@ class ROModel(L.LightningModule):
 
         # linear warmup between 0 and the initial learning rate `lrate` in `warmup`
         # steps.
-        if self.hparams.config.warmup and self.trainer.global_step < self.hparams.config.warmup'
+        if self.hparams.config.warmup and self.trainer.global_step < self.hparams.config.warmup:
             lr_scale = min(1.0, float(self.trainer.global_step + 1) / self.hparams.config.warmup)
             for pg in optimizer.param_groups:
                 pg["lr"] = lr_scale * self.hparams.config.lrate

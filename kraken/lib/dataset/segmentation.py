@@ -18,7 +18,7 @@ Utility functions for data loading and training of VGSL networks.
 import traceback
 from collections import defaultdict
 from itertools import groupby
-from typing import TYPE_CHECKING, Any, Callable, Dict, Sequence, Tuple, Optional
+from typing import TYPE_CHECKING, Any, Callable
 
 import numpy as np
 import shapely.geometry as geom
@@ -51,7 +51,7 @@ class BaselineSet(Dataset):
     def __init__(self,
                  class_mapping: dict[str, dict[str, int]],
                  line_width: int = 4,
-                 padding: Tuple[int, int, int, int] = (0, 0, 0, 0),
+                 padding: tuple[int, int, int, int] = (0, 0, 0, 0),
                  im_transforms: Callable[[Any], torch.Tensor] = transforms.Compose([]),
                  augmentation: bool = False) -> None:
         """

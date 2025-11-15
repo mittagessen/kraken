@@ -58,6 +58,7 @@ class Config:
         self.raise_on_error = kwargs.pop('raise_on_error', False)
         self.num_threads = kwargs.pop('num_threads', 1)
 
+
 class TrainingDataConfig:
     """
     Generic configuration for datasets for all tasks.

@@ -331,7 +331,6 @@ class ArrowIPCRecognitionDataset(Dataset):
                 b'R': 'RGB'}[self._im_mode.value]
 
 
-
 class PolygonGTDataset(Dataset):
     """
     Dataset for training a line recognition model from polygonal/baseline data.
