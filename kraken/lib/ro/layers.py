@@ -42,11 +42,6 @@ class ROMLP(nn.Module, BaseModel):
         self.feature_size = feature_size
         self.hidden_size = hidden_size
 
-    @property
-    def hyper_params(self):
-        return {'feature_size': self.feature_size,
-                'hidden_size': self.hidden_size}
-
     def forward(self, x):
         x = self.fc1(x)
         x = self.relu(x)
