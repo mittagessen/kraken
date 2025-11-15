@@ -218,7 +218,7 @@ class RecognitionInferenceConfig(Config):
 
 class SegmentationInferenceConfig(Config):
     """
-    Configuration for recognition inference.
+    Configuration for segmentation inference.
 
     Arg:
         > Universal parameters
