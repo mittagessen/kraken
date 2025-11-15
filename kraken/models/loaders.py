@@ -11,7 +11,6 @@ import importlib
 from os import PathLike
 from typing import Union, NewType, Literal, Optional
 from pathlib import Path
-from collections import defaultdict
 from collections.abc import Sequence
 from packaging.version import Version
 
@@ -44,9 +43,10 @@ def load_safetensors(path: Union[str, PathLike], tasks: Optional[Sequence[_T_tas
     """
     Loads one or more models in safetensors format and returns them.
     """
+    from torch import nn
     from safetensors import safe_open, SafetensorError
-    weights = defaultdict(dict)
-    models = {}
+    from safetensors.torch import load_model
+    models = nn.ModuleDict()
     try:
         with safe_open(path, framework="pt") as f:
             if (metadata := f.metadata()) is not None:
@@ -64,17 +64,10 @@ def load_safetensors(path: Union[str, PathLike], tasks: Optional[Sequence[_T_tas
                     models[prefix] = create_model(model_map[prefix].get('_model'), **model_map[prefix])
             else:
                 raise ValueError(f'No model metadata found in {path}.')
-            for k in f.offset_keys():
-                try:
-                    prefix = prefixes[list(map(k.startswith, prefixes)).index(True)]
-                    weights[prefix][k.removeprefix(f'{prefix}.')] = f.get_tensor(k)
-                except ValueError:
-                    continue
     except SafetensorError as e:
         raise ValueError(f'Invalid model file {path}') from e
     # load weights into models
-    for prefix, weight in weights.items():
-        models[prefix].load_state_dict(weight)
+    load_model(models, path)
     return list(models.values())
 
 
