@@ -533,7 +533,7 @@ class BLLASegmentationModel(L.LightningModule):
         # linear warmup between 0 and the initial learning rate `lrate` in `warmup`
         # steps.
         if self.hparams.config.warmup and self.trainer.global_step < self.hparams.config.warmup:
-            lr_scale = min(1.0, float(self.trainer.global_step + 1) / self.hparams)
+            lr_scale = min(1.0, float(self.trainer.global_step + 1) / self.hparams.config.warmup)
             for pg in optimizer.param_groups:
                 pg["lr"] = lr_scale * self.hparams.config.lrate
 
