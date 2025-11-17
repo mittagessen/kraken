@@ -56,7 +56,7 @@ def convert_models(paths: Iterable[Union[str, 'PathLike']],
             module = entry_point.load()
             try:
                 return module.load_from_checkpoint(path)
-            except ValueError:
+            except Exception:
                 continue
         raise ValueError(f'No lightning module found for checkpoint {path}')
 
