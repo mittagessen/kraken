@@ -199,6 +199,9 @@ class BLLASegmentationModel(L.LightningModule):
         super().__init__()
         self.save_hyperparameters(ignore=['model'])
 
+        if not isinstance(config, BLLASegmentationTrainingConfig):
+            raise ValueError(f'config attribute is {type(config)} not BLLASegmentationTrainingConfig.')
+
         if model:
             self.net = model
 
@@ -468,6 +471,7 @@ class BLLASegmentationModel(L.LightningModule):
         otherwise the weight loading will fail.
         """
         from kraken.models import create_model
+        print(checkpoint['_module_config'])
         if not isinstance(checkpoint['_module_config'], BLLASegmentationTrainingConfig):
             raise ValueError('Checkpoint is not a segmentation model.')
 

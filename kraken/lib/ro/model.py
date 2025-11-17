@@ -34,7 +34,7 @@ from kraken.configs import ROTrainingConfig, ROTrainingDataConfig
 from kraken.lib.dataset import PageWiseROSet, PairWiseROSet
 from kraken.lib.ro.layers import ROMLP
 from kraken.lib.segmentation import _greedy_order_decoder
-from kraken.lib.train import _configure_optimizer_and_lr_scheduler
+from kraken.train.utils import configure_optimizer_and_lr_scheduler
 
 if TYPE_CHECKING:
     from torch.nn import Module
@@ -158,6 +158,9 @@ class ROModel(L.LightningModule):
             **kwargs: Setup parameters, i.e. CLI parameters of the train() command.
         """
         super().__init__()
+
+        if not isinstance(config, ROTrainingConfig):
+            raise ValueError(f'config attribute is {type(config)} not ROTrainingConfig.')
 
         if model:
             self.net = model

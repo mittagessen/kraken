@@ -118,6 +118,9 @@ class RecognitionPretrainModel(L.LightningModule):
         super().__init__()
         self.save_hyperparameters()
 
+        if not isinstance(config, VGSLPreTrainingConfig):
+            raise ValueError(f'config attribute is {type(config)} not VGSLPreTrainingConfig.')
+
         if model:
             self.net = model
 

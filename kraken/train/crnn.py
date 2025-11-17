@@ -243,6 +243,9 @@ class CRNNRecognitionModel(L.LightningModule):
         super().__init__()
         self.save_hyperparameters(ignore=['model'])
 
+        if not isinstance(config, VGSLRecognitionTrainingConfig):
+            raise ValueError(f'config attribute is {type(config)} not VGSLRecognitionTrainingConfig.')
+
         if model:
             self.net = model
 
