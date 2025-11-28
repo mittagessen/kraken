@@ -164,7 +164,7 @@ def train(ctx, **kwargs):
 
     import json
 
-    from lightning.pytorch.callbacks import ModelCheckpoint
+    from lightning.pytorch.callbacks import ModelCheckpoint, OnExceptionCheckpoint
 
     from kraken.lib import vgsl  # NOQA
     from kraken.train import (KrakenTrainer, CRNNRecognitionModel,
@@ -196,7 +196,8 @@ def train(ctx, **kwargs):
     else:
         val_check_interval = {'val_check_interval': params['freq']}
 
-    cbs = []
+    cbs = [OnExceptionCheckpoint(dirpath=params.get('checkpoint_path'),
+                                 filename='checkpoint_abort')]
     checkpoint_callback = ModelCheckpoint(dirpath=params.pop('checkpoint_path'),
                                           save_top_k=10,
                                           monitor='val_metric',
