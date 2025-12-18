@@ -299,7 +299,7 @@ def segment(im: PIL.Image.Image,
     """
     if model is None:
         logger.info('No segmentation model given. Loading default model.')
-        model = vgsl.TorchVGSLModel.load_model(resources.files(__name__).joinpath('blla.mlmodel'))
+        model = vgsl.TorchVGSLModel.load_model(resources.files('kraken').joinpath('blla.mlmodel'))
 
     if isinstance(model, vgsl.TorchVGSLModel):
         model = [model]
