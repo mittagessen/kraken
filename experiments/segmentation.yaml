@@ -1,0 +1,33 @@
+precision: 32-true
+device: auto
+workers: 32
+threads: 1
+segtrain:
+  # training data manifests
+  training_data: 
+    - train.lst
+  evaluation_data: 
+    - val.lst
+  # directory to save checkpoints in
+  output: checkpoints
+  # change to `coreml` to save best model with kraken < 7 compatibility
+  weights_format: safetensors
+  # dataset metadata and transformations
+  topline: false
+  augment: true
+  # class mappings
+  line_class_mapping:  # Set to null to generate a mapping automatically
+    - ['*', 3]  # '*' is a special value that matches all strings. It can be
+                # used to match all classes into one value
+    - ['DefaultLine', 3]  # if you use '*' you can make sure you also need to
+                          # define a merged class identifier. Otherwise a random one will be picked.
+    - ['Marginal_Note', 4]
+  region_class_mapping: 
+    - ['*', 5]  # same semantics as line_class_mapping.
+    - ['Text_Region', 5]
+    - ['Foot_Notes', 6]
+  # base configuration of training epochs and LR schedule
+  epochs: 24
+  lrate: 1e-3
+  schedule: constant 
+  warmup: 200 
