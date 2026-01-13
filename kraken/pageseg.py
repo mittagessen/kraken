@@ -17,7 +17,8 @@
 kraken.pageseg
 ~~~~~~~~~~~~~~
 
-Layout analysis methods.
+The legacy bounding box segmentation method using conventional image processing
+techniques.
 """
 import logging
 import uuid

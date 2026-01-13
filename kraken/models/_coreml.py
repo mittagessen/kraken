@@ -1,8 +1,8 @@
 """
-kraken.models.loaders
+kraken.models._coreml
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Implementation for model metadata and weight loading from various formats.
+Implementation for weight loading from a CoreML NeuralNetwork object.
 """
 import torch
 

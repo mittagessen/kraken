@@ -2,7 +2,7 @@
 kraken.lib.tasks.segmentation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Wrappers around models for specific tasks.
+A wrapper around models for layout analysis and reading order determination.
 """
 import torch
 import shapely.geometry as geom
@@ -28,7 +28,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class SegmentationTaskModel:
+class SegmentationTaskModel(nn.Module):
     """
     A wrapper class collecting one or more models that perform segmentation.
 

@@ -16,7 +16,8 @@
 kraken.rpred
 ~~~~~~~~~~~~
 
-Generators for recognition on lines images.
+Legacy line text recognition API. New code should use the RecognitionTaskModel
+from kraken.tasks which is more versatile and offers higher performance.
 """
 import logging
 import warnings

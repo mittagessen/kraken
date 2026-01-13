@@ -42,6 +42,17 @@ def load_models(path: Union[str, 'PathLike'], tasks: Optional[Sequence[_T_tasks]
 def load_safetensors(path: Union[str, PathLike], tasks: Optional[Sequence[_T_tasks]] = None) -> list[BaseModel]:
     """
     Loads one or more models in safetensors format and returns them.
+
+    Args:
+        path: Path to the safetensors file.
+        tasks: Filter for model types to load from file.
+
+    Returns:
+        A list of models.
+
+    Raises:
+        ValueError: When model metadata is incomplete or the safetensors file
+        is invalid.
     """
     from torch import nn
     from safetensors import safe_open, SafetensorError
@@ -74,7 +85,18 @@ def load_safetensors(path: Union[str, PathLike], tasks: Optional[Sequence[_T_tas
 
 def load_coreml(path: Union[str, PathLike], tasks: Optional[Sequence[_T_tasks]] = None) -> list[BaseModel]:
     """
-    Loads a model in coreml format.
+    Loads a model in CoreML format.
+
+    Args:
+        path: Path to the coreml file.
+        tasks: Filter for model types to load from file.
+
+    Returns:
+        A list of models.
+
+    Raises:
+        ValueError: When model metadata is incomplete or the coreml file
+        is invalid.
     """
     root_logger = logging.getLogger()
     level = root_logger.getEffectiveLevel()
@@ -82,6 +104,8 @@ def load_coreml(path: Union[str, PathLike], tasks: Optional[Sequence[_T_tasks]] 
     from coremltools.models import MLModel
     root_logger.setLevel(level)
     from google.protobuf.message import DecodeError
+
+    models = []
 
     if isinstance(path, PathLike):
         path = path.as_posix()
@@ -111,12 +135,14 @@ def load_coreml(path: Union[str, PathLike], tasks: Optional[Sequence[_T_tasks]] 
         weights.update(cml_parser(spec))
 
     model.load_state_dict(weights)
+    models.append(model)
 
     # construct additional models if auxiliary layers are defined.
 
-    # if 'aux_layers' in mlmodel.user_defined_metadata:
-    #     logger.info('Deserializing auxiliary layers.')
+    if 'aux_layers' in mlmodel.user_defined_metadata:
+        logger.info('Deserializing auxiliary layers.')
 
-    #     nn.aux_layers = {k: cls(v).nn.get_submodule(k) for k, v in json.loads(mlmodel.user_defined_metadata['aux_layers']).items()}
+        nn.aux_layers = {k: cls(v).nn.get_submodule(k) for k, v in json.loads(mlmodel.user_defined_metadata['aux_layers']).items()}
 
-    return [model]
+    return models
+

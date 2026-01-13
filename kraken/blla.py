@@ -16,8 +16,8 @@
 kraken.blla
 ~~~~~~~~~~~
 
-Trainable layout analysis tools for kraken for line and region detection. The
-line recognizer uses the baseline paradigm.
+Legacy API for inference using the trainable baseline and region detection
+segmenter. New code should use the SegmentationTaskModel from kraken.tasks.
 """
 import PIL
 import uuid

@@ -18,8 +18,8 @@
 align
 ~~~~~
 
-A character alignment module using a network output lattice and ground truth to
-accuractely determine grapheme locations in input data.
+Legacy API for forced alignment using the network output lattice. New
+applications should use the ForcedAlignmentTaskModel from kraken.tasks.
 """
 import logging
 import warnings
