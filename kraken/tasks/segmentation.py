@@ -32,6 +32,10 @@ class SegmentationTaskModel(nn.Module):
     """
     A wrapper class collecting one or more models that perform segmentation.
 
+    A segmentation task is the process of identifying the regions and lines of
+    text in an image. This class provides a high-level interface for running
+    segmentation models on an image.
+
     It deals with the following tasks:
         * region segmentation
         * line detection
@@ -65,11 +69,23 @@ class SegmentationTaskModel(nn.Module):
 
         Args:
             im: Input image with an arbitrary color mode and size
-            config: A configuration object for the segmentation task.
+            config: A configuration object for the segmentation task, such as
+                    the batch size and the precision.
 
         Returns:
             A single Segmentation object that contains the merged output of all
             associated segmentation models.
+
+        Example:
+            >>> from PIL import Image
+            >>> from kraken.tasks import SegmentationTaskModel
+            >>> from kraken.configs import SegmentationInferenceConfig
+
+            >>> model = SegmentationTaskModel.load_model()
+            >>> im = Image.open('image.png')
+            >>> config = SegmentationInferenceConfig()
+
+            >>> segmentation = model.predict(im, config)
         """
         segs = []
         for net in self.seg_models:
@@ -86,9 +102,11 @@ class SegmentationTaskModel(nn.Module):
         """
         Loads a collection from layout analysis models from the given file path.
 
+        If no path is provided, the default BLLA segmentation model will be
+        loaded.
+
         Args:
-            path: Path to model weights file. If `None`, the default BLLA
-                  segmentation model will be loaded.
+            path: Path to model weights file.
         """
         if not path:
             path = resources.files('kraken').joinpath('blla.mlmodel')

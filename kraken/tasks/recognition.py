@@ -26,7 +26,11 @@ logger = logging.getLogger(__name__)
 
 class RecognitionTaskModel(nn.Module):
     """
-    A wrapper for model performing a recognition task.
+    A wrapper for a model performing a recognition task.
+
+    A recognition task is the process of transcribing a line of text from an
+    image. This class provides a high-level interface for running a recognition
+    model on an image, given a segmentation.
 
     Raises:
         ValueError: Is raised when the model type is not a sequence recognizer.
@@ -56,10 +60,25 @@ class RecognitionTaskModel(nn.Module):
         Args:
             im: Input image
             segmentation: The segmentation corresponding to the input image.
-            config: A configuration object containing inference parameters.
+            config: A configuration object containing inference parameters, such
+                    as the batch size and the precision.
 
         Yields:
             One ocr_record for each line.
+
+        Example:
+            >>> from PIL import Image
+            >>> from kraken.tasks import RecognitionTaskModel
+            >>> from kraken.containers import Segmentation
+            >>> from kraken.configs import RecognitionInferenceConfig
+
+            >>> model = RecognitionTaskModel.load_model('model.mlmodel')
+            >>> im = Image.open('image.png')
+            >>> segmentation = Segmentation(...)
+            >>> config = RecognitionInferenceConfig()
+
+            >>> for record in model.predict(im, segmentation, config):
+            ...     print(record.prediction)
         """
         if config.precision in ['bf16-true', '16-true']:
             logger.warning(f'Selected float precision {config.precision} is '

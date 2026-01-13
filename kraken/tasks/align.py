@@ -75,6 +75,25 @@ class ForcedAlignmentTaskModel(nn.Module):
 
         Returns:
             A single segmentation that contains the aligned `ocr_record` objects.
+
+        Example:
+            >>> from PIL import Image
+            >>> from kraken.tasks import ForcedAlignmentTaskModel
+            >>> from kraken.containers import Segmentation, BaselineLine
+            >>> from kraken.configs import RecognitionInferenceConfig
+
+            >>> # Assume `model.mlmodel` is a recognition model
+            >>> model = ForcedAlignmentTaskModel.load_model('model.mlmodel')
+            >>> im = Image.open('image.png')
+            >>> # Create a dummy segmentation with a line and a transcription
+            >>> line = BaselineLine(baseline=[(0,0), (100,0)], boundary=[(0,-10), (100,-10), (100,10), (0,10)], text='Hello World')
+            >>> segmentation = Segmentation(lines=[line])
+            >>> config = RecognitionInferenceConfig()
+
+            >>> aligned_segmentation = model.predict(im, segmentation, config)
+            >>> record = aligned_segmentation.lines[0]:
+            >>> print(record.prediction)
+            >>> print(record.cuts)
         """
         if not config.return_logits:
             logger.info('Forced alignment requires logits in output records. Enabling.')
