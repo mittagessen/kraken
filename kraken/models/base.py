@@ -7,9 +7,12 @@ Base metaclass for models
 import logging
 
 from abc import ABC, abstractmethod
+from collections.abc import Generator
 from typing import Union, Literal, NewType, TYPE_CHECKING
 
-__all__ = ['BaseModel']
+__all__ = ['BaseModel',
+           'RecognitionBaseModel',
+           'SegmentationBaseModel']
 
 if TYPE_CHECKING:
     from kraken.configs import Config
@@ -86,4 +89,25 @@ class BaseModel(ABC):
         """
         Prepares the model for inference.
         """
+        pass
+
+
+class SegmentationBaseModel(BaseModel):
+    """
+    Base model metaclass for layout analysis models.
+    """
+    @abstractmethod
+    def predict(self, im: 'Image.Image') -> 'Segmentation':
+        """
+        Computes a segmentation on an input image.
+        """
+        pass
+
+
+class RecognitionBaseModel(BaseModel):
+    """
+    Base model metaclass for text recognition models.
+    """
+    @abstractmethod
+    def predict(self, im: 'Image.Image', segmentation: 'Segmentation') -> Generator['ocr_record', None, None]:
         pass
