@@ -30,7 +30,7 @@ This documentation is structured to guide you through kraken's capabilities:
 
 * The :doc:`introduction_to_atr` is a basic primer on the core concepts intended for readers without prior ATR or machine learning experience.
 * The :doc:`getting_started` guide provides a concise introduction to installation and basic usage.
-* The :doc:`user_guide/index` offers detailed information on utilizing the CLI tools for various tasks.
+* The :doc:`user_guide/index` offers detailed information on utilizing the CLI tools for various tasks and an introduction to the python API.
 * The :doc:`api/index` serves as a comprehensive reference for integrating kraken into your python projects.
 
 Features
@@ -40,7 +40,7 @@ kraken's main features are:
 
   - Fully trainable layout analysis, reading order, and character recognition.
   - `Right-to-Left <https://en.wikipedia.org/wiki/Right-to-left>`_, `BiDi
-    <https://en.wikipedia.com/wiki/Bi-directional_text>`_, and Top-to-Bottom
+    <https://en.wikipedia.org/wiki/Bi-directional_text>`_, and Top-to-Bottom
     script support
   - `ALTO <https://www.loc.gov/standards/alto/>`_, PageXML, abbyyXML, and hOCR
     output
