@@ -57,8 +57,6 @@ class Config:
         self.compile_config = kwargs.pop('compile', None)
         self.raise_on_error = kwargs.pop('raise_on_error', False)
         self.num_threads = kwargs.pop('num_threads', 1)
-        if kwargs:
-            logger.warning(f'Unknown parameters remaining in config: {kwargs}')
 
 
 class TrainingDataConfig:
@@ -93,8 +91,6 @@ class TrainingDataConfig:
         self.num_workers = kwargs.pop('num_workers', 1)
         self.augment = kwargs.pop('augment', False)
         self.batch_size = kwargs.pop('batch_size', 1)
-        if kwargs:
-            logger.warning(f'Unknown parameters remaining in config: {kwargs}')
 
 
 class SegmentationTrainingDataConfig(TrainingDataConfig):
