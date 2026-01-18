@@ -23,6 +23,7 @@ import glob
 import yaml
 import shlex
 import logging
+import difflib
 from collections import defaultdict
 from typing import Optional, Any, TYPE_CHECKING
 
@@ -53,14 +54,20 @@ def _recursive_update(a: dict[str, Any],
                       b: dict[str, Any]) -> dict[str, Any]:
     """Like standard ``dict.update()``, but recursive so sub-dict gets updated.
 
-    Ignore elements present in ``b`` but not in ``a``. Unless ``strict`` is set to
-    `True`, in which case a `ValueError` exception will be raised.
+    Warns on keys present in ``b`` but not in ``a`` and suggests alternatives.
     """
     for k, v in b.items():
+        if k not in a:
+            matches = difflib.get_close_matches(k, a.keys())
+            msg = f'Ignoring unknown configuration key "{k}" in experiment file.'
+            if matches:
+                msg += f' Did you mean "{matches[0]}"?'
+            logger.warning(msg)
+            continue
         if isinstance(v, dict) and isinstance(a.get(k), dict):
             a[k] = _recursive_update(a[k], v)
         else:
-            a[k] = b[k]
+            a[k] = v
     return a
 
 
