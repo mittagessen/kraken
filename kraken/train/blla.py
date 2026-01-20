@@ -128,8 +128,10 @@ class BLLASegmentationDataModule(L.LightningDataModule):
         dataset = BaselineSet(line_width=self.hparams.data_config.line_width,
                               **kwargs)
 
-        for page in data:
-            dataset.add(page)
+        try:
+            dataset.add(**sample)
+        except Exception as e:
+            logger.warning(str(e))
 
         return dataset
 
