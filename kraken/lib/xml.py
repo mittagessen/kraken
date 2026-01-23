@@ -426,14 +426,15 @@ class XMLPage(object):
                         text += el.text
                 # retrieve line tags if custom string is set and contains
                 tags = {}
-                custom_str = line.get('custom')
-                if custom_str:
+                if (custom_str := line.get('custom')) is not None:
                     cs = self._parse_page_custom(custom_str)
                     if (structure := cs.get('structure')) is not None and (ltype := structure[0].get('type')):
                         tags['type'] = [{'type': ltype}]
                     if (line_ro := cs.get('readingOrder')) is not None and (line_ro_idx := line_ro[0].get('index')) is not None:
                         # look up region index from parent
-                        reg_cus = self._parse_page_custom(line.getparent().get('custom'))
+                        reg_cus = {}
+                        if (parent_str := line.getparent().get('custom')) is not None:
+                            reg_cus = self._parse_page_custom(parent_str)
                         if 'readingOrder' not in reg_cus or 'index' not in reg_cus['readingOrder']:
                             logger.info('Incomplete `custom` attribute reading order found.')
                         else:
