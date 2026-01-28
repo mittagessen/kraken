@@ -63,7 +63,6 @@ def _recursive_update(a: dict[str, Any],
             if matches:
                 msg += f' Did you mean "{matches[0]}"?'
             logger.warning(msg)
-            continue
         if isinstance(v, dict) and isinstance(a.get(k), dict):
             a[k] = _recursive_update(a[k], v)
         else:
