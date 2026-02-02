@@ -51,20 +51,34 @@ def _create_class_map(cls_map):
 
 
 def _recursive_update(a: dict[str, Any],
-                      b: dict[str, Any]) -> dict[str, Any]:
+                      b: dict[str, Any],
+                      cmd: Optional[click.BaseCommand] = None) -> dict[str, Any]:
     """Like standard ``dict.update()``, but recursive so sub-dict gets updated.
 
-    Warns on keys present in ``b`` but not in ``a`` and suggests alternatives.
+    Warns on keys present in ``b`` but not in ``a`` and not valid option names
+    for the command ``cmd`` and suggests alternatives.
     """
+    valid_keys = set(a.keys())
+    if cmd is not None:
+        for param in cmd.params:
+            if param.name:
+                valid_keys.add(param.name)
+        if isinstance(cmd, click.MultiCommand):
+            valid_keys.update(cmd.list_commands(None))
     for k, v in b.items():
-        if k not in a:
-            matches = difflib.get_close_matches(k, a.keys())
+        if k not in valid_keys:
+            matches = difflib.get_close_matches(k, valid_keys)
             msg = f'Ignoring unknown configuration key "{k}" in experiment file.'
             if matches:
                 msg += f' Did you mean "{matches[0]}"?'
             logger.warning(msg)
+        subcmd = None
+        if cmd is not None and isinstance(cmd, click.MultiCommand):
+            subcmd = cmd.get_command(None, k)
         if isinstance(v, dict) and isinstance(a.get(k), dict):
-            a[k] = _recursive_update(a[k], v)
+            a[k] = _recursive_update(a[k], v, subcmd)
+        elif isinstance(v, dict) and subcmd is not None:
+            a[k] = _recursive_update({}, v, subcmd)
         else:
             a[k] = v
     return a
@@ -83,7 +97,7 @@ def _load_config(ctx: click.Context,
             # Update the default_map.
             if ctx.default_map is None:
                 ctx.default_map = {}
-            ctx.default_map = _recursive_update(ctx.default_map, conf)
+            ctx.default_map = _recursive_update(ctx.default_map, conf, ctx.command)
         except FileNotFoundError:
             logger.critical(f"No configuration file {path} found.")
 
