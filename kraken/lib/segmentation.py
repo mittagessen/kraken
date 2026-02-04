@@ -29,7 +29,6 @@ from PIL.Image import Resampling, Transform
 from scipy.ndimage import (binary_erosion, distance_transform_cdt,
                            gaussian_filter, maximum_filter, affine_transform)
 from scipy.signal import convolve2d
-from scipy.spatial.distance import pdist, squareform
 from shapely.ops import nearest_points, unary_union
 from shapely.validation import explain_validity
 from skimage import draw, filters
@@ -1005,6 +1004,62 @@ def _test_intersect(bp, uv, bs):
     return np.array(points)
 
 
+def _point_in_polygon(point, polygon):
+    """
+    Tests if a point is strictly inside a polygon using the ray casting
+    algorithm. Points on the boundary are considered outside (matching
+    shapely's Polygon.contains behavior).
+    """
+    x, y = float(point[0]), float(point[1])
+    n = len(polygon)
+    inside = False
+    on_boundary = False
+    j = n - 1
+    for i in range(n):
+        xi, yi = float(polygon[i][0]), float(polygon[i][1])
+        xj, yj = float(polygon[j][0]), float(polygon[j][1])
+        # check if point is on this edge
+        if (min(yi, yj) <= y <= max(yi, yj)) and (min(xi, xj) <= x <= max(xi, xj)):
+            # check collinearity via cross product
+            if abs((xj - xi) * (y - yi) - (yj - yi) * (x - xi)) < 1e-10:
+                on_boundary = True
+                break
+        if ((yi > y) != (yj > y)) and (x < (xj - xi) * (y - yi) / (yj - yi) + xi):
+            inside = not inside
+        j = i
+    if on_boundary:
+        return False
+    return inside
+
+
+def _ray_boundary_intersection(origin, direction, polygon):
+    """
+    Finds the closest intersection point of a ray from `origin` in
+    `direction` with the edges of `polygon`.
+
+    Returns the intersection point as a numpy array, or None if no
+    intersection is found.
+    """
+    poly = np.asarray(polygon)
+    n = len(poly)
+    best_t = np.inf
+    best_point = None
+    for i in range(n):
+        p1 = poly[i]
+        p2 = poly[(i + 1) % n]
+        edge = p2 - p1
+        denom = direction[0] * edge[1] - direction[1] * edge[0]
+        if abs(denom) < np.finfo(float).eps:
+            continue
+        diff = p1 - origin
+        t = (diff[0] * edge[1] - diff[1] * edge[0]) / denom
+        u = (diff[0] * direction[1] - diff[1] * direction[0]) / denom
+        if t >= 0 and 0 <= u <= 1 and t < best_t:
+            best_t = t
+            best_point = origin + t * direction
+    return best_point
+
+
 def compute_polygon_section(baseline: Sequence[tuple[int, int]],
                             boundary: Sequence[tuple[int, int]],
                             dist1: int,
@@ -1033,29 +1088,32 @@ def compute_polygon_section(baseline: Sequence[tuple[int, int]],
         dist1 = np.finfo(float).eps
     if dist2 == 0:
         dist2 = np.finfo(float).eps
-    boundary_pol = geom.Polygon(boundary)
     bl = np.array(baseline)
     # extend first/last segment of baseline if not on polygon boundary
-    if boundary_pol.contains(geom.Point(bl[0])):
+    if _point_in_polygon(bl[0], boundary):
         logger.debug(f'Extending leftmost end of baseline {bl} to polygon boundary')
-        l_point = boundary_pol.boundary.intersection(geom.LineString(
-            [(bl[0][0]-10*(bl[1][0]-bl[0][0]), bl[0][1]-10*(bl[1][1]-bl[0][1])), bl[0]]))
-        # intersection is incidental with boundary so take closest point instead
-        if l_point.geom_type != 'Point':
+        direction = bl[0].astype(float) - bl[1].astype(float)
+        l_point = _ray_boundary_intersection(bl[0].astype(float), direction, boundary)
+        if l_point is not None:
+            bl[0] = np.array(l_point, 'int')
+        else:
+            # fallback: use nearest point on boundary
+            boundary_pol = geom.Polygon(boundary)
             bl[0] = np.array(nearest_points(geom.Point(bl[0]), boundary_pol)[1].coords[0], 'int')
-        else:
-            bl[0] = np.array(l_point.coords[0], 'int')
-    if boundary_pol.contains(geom.Point(bl[-1])):
+    if _point_in_polygon(bl[-1], boundary):
         logger.debug(f'Extending rightmost end of baseline {bl} to polygon boundary')
-        r_point = boundary_pol.boundary.intersection(geom.LineString(
-            [(bl[-1][0]-10*(bl[-2][0]-bl[-1][0]), bl[-1][1]-10*(bl[-2][1]-bl[-1][1])), bl[-1]]))
-        if r_point.geom_type != 'Point':
-            bl[-1] = np.array(nearest_points(geom.Point(bl[-1]), boundary_pol)[1].coords[0], 'int')
+        direction = bl[-1].astype(float) - bl[-2].astype(float)
+        r_point = _ray_boundary_intersection(bl[-1].astype(float), direction, boundary)
+        if r_point is not None:
+            bl[-1] = np.array(r_point, 'int')
         else:
-            bl[-1] = np.array(r_point.coords[0], 'int')
-    dist1 = min(geom.LineString(bl).length - np.finfo(float).eps, dist1)
-    dist2 = min(geom.LineString(bl).length - np.finfo(float).eps, dist2)
-    dists = np.cumsum(np.diag(np.roll(squareform(pdist(bl)), 1)))
+            # fallback: use nearest point on boundary
+            boundary_pol = geom.Polygon(boundary)
+            bl[-1] = np.array(nearest_points(geom.Point(bl[-1]), boundary_pol)[1].coords[0], 'int')
+    dists = np.cumsum(np.insert(np.linalg.norm(np.diff(bl, axis=0), axis=1), 0, 0))
+    bl_length = dists[-1]
+    dist1 = min(bl_length - np.finfo(float).eps, dist1)
+    dist2 = min(bl_length - np.finfo(float).eps, dist2)
     segs_idx = np.searchsorted(dists, [dist1, dist2])
     segs = np.dstack((bl[segs_idx-1], bl[segs_idx]))
     # compute unit vector of segments (NOT orthogonal)
