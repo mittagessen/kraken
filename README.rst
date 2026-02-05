@@ -35,15 +35,15 @@ yourself you can use `pipx`.
    $ pipx install kraken
 
 kraken works both on Linux and Mac OS X and with any python interpreter between
-3.9 and 3.11. It is possible the installation fails because `pipx` defaults to
+3.10 and 3.13. It is possible the installation fails because `pipx` defaults to
 an unsupported interpreter version. In that case you need to install a
 compatible interpreter version such as 3.11 and then specify this version
 explicitly:
 
 .. code-block:: console
 
-   $ sudo apt install python3.11-full
-   $ pipx install --python python3.11 kraken
+   $ sudo apt install python3.13-full
+   $ pipx install --python python3.13 kraken
 
 
 Installation using pip
