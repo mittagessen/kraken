@@ -154,8 +154,9 @@ class SegmentationTaskModel(nn.Module):
         else:
             ro_fn = config.bbox_ro_fn
 
+        all_regions = [reg for rgs in regions.values() for reg in rgs]
         basic_lo = ro_fn(lines=_lines,
-                         regions=_shp_regs.values(),
+                         regions=all_regions,
                          text_direction=segmentations[0].text_direction[-2:])
 
         _lines = [_lines[idx] for idx in basic_lo]

@@ -6,15 +6,15 @@ import numpy as np
 import pytest
 import shapely.geometry as geom
 
+from kraken.containers import BBoxLine
 from kraken.lib.segmentation import is_in_region, reading_order, topsort
 
 
-def polygon_slices(polygon: Sequence[Tuple[int, int]]) -> Tuple[slice, slice]:
-    """Convert polygons to slices for reading_order"""
+def bbox_from_polygon(polygon: Sequence[Tuple[int, int]]) -> BBoxLine:
+    """Convert polygon coordinates to a BBoxLine."""
     linestr = geom.LineString(polygon)
-    slices = (slice(linestr.bounds[1], linestr.bounds[3]),
-             slice(linestr.bounds[0], linestr.bounds[2]))
-    return slices
+    b = linestr.bounds  # (minx, miny, maxx, maxy)
+    return BBoxLine(id='_test', bbox=(int(b[0]), int(b[1]), int(b[2]), int(b[3])))
 
 
 class TestReadingOrder(unittest.TestCase):
@@ -60,12 +60,11 @@ class TestReadingOrder(unittest.TestCase):
         """
         polygon0 = [[10, 10], [10, 20], [100, 20], [100, 10], [10, 10]]
         polygon1 = [[10, 30], [10, 40], [100, 40], [100, 30], [10, 30]]
-        order_lr = reading_order([polygon_slices(line) for line in [polygon0, polygon1]])
-        order_rl = reading_order([polygon_slices(line) for line in [polygon0, polygon1]], 'rl')
-        # line0 should come before line1, lines do not come before themselves
-        expected = np.array([[0, 1], [0, 0]])
-        self.assertTrue(np.array_equal(order_lr, expected), "Reading order is not as expected: {}".format(order_lr))
-        self.assertTrue(np.array_equal(order_rl, expected), "Reading order is not as expected: {}".format(order_rl))
+        order_lr = reading_order([bbox_from_polygon(line) for line in [polygon0, polygon1]])
+        order_rl = reading_order([bbox_from_polygon(line) for line in [polygon0, polygon1]], 'rl')
+        # line0 should come before line1
+        self.assertEqual(order_lr, [0, 1], "Reading order is not as expected: {}".format(order_lr))
+        self.assertEqual(order_rl, [0, 1], "Reading order is not as expected: {}".format(order_rl))
 
     def test_order_simple_over_under_touching(self):
         """
@@ -80,12 +79,11 @@ class TestReadingOrder(unittest.TestCase):
         """
         polygon0 = [[10, 10], [10, 30], [100, 30], [100, 10], [10, 10]]
         polygon1 = [[10, 30], [10, 40], [100, 40], [100, 30], [10, 30]]
-        order_lr = reading_order([polygon_slices(line) for line in [polygon0, polygon1]])
-        order_rl = reading_order([polygon_slices(line) for line in [polygon0, polygon1]], 'rl')
-        # line0 should come before line1, lines do not come before themselves
-        expected = np.array([[0, 1], [0, 0]])
-        self.assertTrue(np.array_equal(order_lr, expected), "Reading order is not as expected: {}".format(order_lr))
-        self.assertTrue(np.array_equal(order_rl, expected), "Reading order is not as expected: {}".format(order_rl))
+        order_lr = reading_order([bbox_from_polygon(line) for line in [polygon0, polygon1]])
+        order_rl = reading_order([bbox_from_polygon(line) for line in [polygon0, polygon1]], 'rl')
+        # line0 should come before line1
+        self.assertEqual(order_lr, [0, 1], "Reading order is not as expected: {}".format(order_lr))
+        self.assertEqual(order_rl, [0, 1], "Reading order is not as expected: {}".format(order_rl))
 
     def test_order_simple_left_right(self):
         """
@@ -98,10 +96,9 @@ class TestReadingOrder(unittest.TestCase):
         """
         polygon0 = [[10, 10], [10, 20], [100, 20], [100, 10], [10, 10]]
         polygon1 = [[150, 10], [150, 20], [250, 20], [250, 10], [150, 10]]
-        order = reading_order([polygon_slices(line) for line in [polygon0, polygon1]])
-        # line0 should come before line1, lines do not come before themselves
-        expected = np.array([[0, 1], [0, 0]])
-        self.assertTrue(np.array_equal(order, expected), "Reading order is not as expected: {}".format(order))
+        order = reading_order([bbox_from_polygon(line) for line in [polygon0, polygon1]])
+        # line0 should come before line1
+        self.assertEqual(order, [0, 1], "Reading order is not as expected: {}".format(order))
 
     @pytest.mark.xfail
     def test_order_simple_left_right_touching(self):
@@ -115,10 +112,9 @@ class TestReadingOrder(unittest.TestCase):
         """
         polygon0 = [[10, 10], [10, 20], [100, 20], [100, 10], [10, 10]]
         polygon1 = [[100, 10], [100, 20], [250, 20], [250, 10], [100, 10]]
-        order = reading_order([polygon_slices(line) for line in [polygon0, polygon1]])
-        # line0 should come before line1, lines do not come before themselves
-        expected = np.array([[0, 1], [0, 0]])
-        self.assertTrue(np.array_equal(order, expected), "Reading order is not as expected: {}".format(order))
+        order = reading_order([bbox_from_polygon(line) for line in [polygon0, polygon1]])
+        # line0 should come before line1
+        self.assertEqual(order, [0, 1], "Reading order is not as expected: {}".format(order))
 
     def test_order_simple_right_left(self):
         """
@@ -131,10 +127,9 @@ class TestReadingOrder(unittest.TestCase):
         """
         polygon0 = [[10, 10], [10, 20], [100, 20], [100, 10], [10, 10]]
         polygon1 = [[150, 10], [150, 20], [250, 20], [250, 10], [150, 10]]
-        order = reading_order([polygon_slices(line) for line in [polygon0, polygon1]], 'rl')
-        # line1 should come before line0, lines do not come before themselves
-        expected = np.array([[0, 0], [1, 0]])
-        self.assertTrue(np.array_equal(order, expected), "Reading order is not as expected: {}".format(order))
+        order = reading_order([bbox_from_polygon(line) for line in [polygon0, polygon1]], 'rl')
+        # line1 should come before line0
+        self.assertEqual(order, [1, 0], "Reading order is not as expected: {}".format(order))
 
     @pytest.mark.xfail
     def test_order_simple_right_left_touching(self):
@@ -148,10 +143,9 @@ class TestReadingOrder(unittest.TestCase):
         """
         polygon0 = [[10, 10], [10, 20], [100, 20], [100, 10], [10, 10]]
         polygon1 = [[100, 10], [100, 20], [250, 20], [250, 10], [100, 10]]
-        order = reading_order([polygon_slices(line) for line in [polygon0, polygon1]])
-        # line1 should come before line0, lines do not come before themselves
-        expected = np.array([[0, 0], [1, 0]])
-        self.assertTrue(np.array_equal(order, expected), "Reading order is not as expected: {}".format(order))
+        order = reading_order([bbox_from_polygon(line) for line in [polygon0, polygon1]])
+        # line1 should come before line0
+        self.assertEqual(order, [1, 0], "Reading order is not as expected: {}".format(order))
 
     def test_order_real_reverse(self):
         """
@@ -160,12 +154,11 @@ class TestReadingOrder(unittest.TestCase):
         """
         polygon0 = [[474, 2712], [466, 2669], [1741, 2655], [1749, 2696], [1746, 2709], [474, 2725]]
         polygon1 = [[493, 2409], [488, 2374], [1733, 2361], [1741, 2395], [1738, 2409], [493, 2422]]
-        order_lr = reading_order([polygon_slices(line) for line in [polygon0, polygon1]])
-        order_rl = reading_order([polygon_slices(line) for line in [polygon0, polygon1]], 'rl')
-        # line1 should come before line0, lines do not come before themselves
-        expected = np.array([[0, 0], [1, 0]])
-        self.assertTrue(np.array_equal(order_lr, expected), "Reading order is not as expected: {}".format(order_lr))
-        self.assertTrue(np.array_equal(order_rl, expected), "Reading order is not as expected: {}".format(order_rl))
+        order_lr = reading_order([bbox_from_polygon(line) for line in [polygon0, polygon1]])
+        order_rl = reading_order([bbox_from_polygon(line) for line in [polygon0, polygon1]], 'rl')
+        # line1 should come before line0
+        self.assertEqual(order_lr, [1, 0], "Reading order is not as expected: {}".format(order_lr))
+        self.assertEqual(order_rl, [1, 0], "Reading order is not as expected: {}".format(order_rl))
 
     def test_order_real_in_order(self):
         """
@@ -174,12 +167,11 @@ class TestReadingOrder(unittest.TestCase):
         """
         polygon0 = [[493, 2409], [488, 2374], [1733, 2361], [1741, 2395], [1738, 2409], [493, 2422]]
         polygon1 = [[474, 2712], [466, 2669], [1741, 2655], [1749, 2696], [1746, 2709], [474, 2725]]
-        order_lr = reading_order([polygon_slices(line) for line in [polygon0, polygon1]])
-        order_rl = reading_order([polygon_slices(line) for line in [polygon0, polygon1]], 'rl')
-        # line0 should come before line1, lines do not come before themselves
-        expected = np.array([[0, 1], [0, 0]])
-        self.assertTrue(np.array_equal(order_lr, expected), "Reading order is not as expected: {}".format(order_lr))
-        self.assertTrue(np.array_equal(order_rl, expected), "Reading order is not as expected: {}".format(order_rl))
+        order_lr = reading_order([bbox_from_polygon(line) for line in [polygon0, polygon1]])
+        order_rl = reading_order([bbox_from_polygon(line) for line in [polygon0, polygon1]], 'rl')
+        # line0 should come before line1
+        self.assertEqual(order_lr, [0, 1], "Reading order is not as expected: {}".format(order_lr))
+        self.assertEqual(order_rl, [0, 1], "Reading order is not as expected: {}".format(order_rl))
 
     def test_topsort_ordered(self):
         """

@@ -31,7 +31,7 @@ from scipy.ndimage import gaussian_filter, maximum_filter, uniform_filter
 from kraken.containers import BBoxLine, Segmentation
 from kraken.lib import morph, sl
 from kraken.lib.exceptions import KrakenInputException
-from kraken.lib.segmentation import reading_order, topsort
+from kraken.lib.segmentation import reading_order
 from kraken.lib.util import get_im_str, is_bitonal, pil2array
 
 __all__ = ['segment']
@@ -416,10 +416,14 @@ def segment(im: PIL.Image.Image,
     segmentation = llabels*binary
 
     lines = compute_lines(segmentation, scale)
-    order = reading_order_fn([line.bounds for line in lines], text_direction[-2:])
-    lsort = topsort(order)
-    lines = [lines[i].bounds for i in lsort]
-    lines = [(s2.start, s1.start, s2.stop, s1.stop) for s1, s2 in lines]
+    bbox_lines = [BBoxLine(id=f'_{uuid.uuid4()}',
+                           bbox=(line.bounds[1].start,
+                                 line.bounds[0].start,
+                                 line.bounds[1].stop,
+                                 line.bounds[0].stop)) for line in lines]
+    lsort = reading_order_fn(bbox_lines, text_direction[-2:])
+    lines = [bbox_lines[i] for i in lsort]
+    lines = [(line.bbox[0], line.bbox[1], line.bbox[2], line.bbox[3]) for line in lines]
 
     if isinstance(pad, int):
         pad = (pad, pad)

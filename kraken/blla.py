@@ -29,6 +29,7 @@ import torch
 import torch.nn.functional as F
 import torchvision.transforms as tf
 
+from dataclasses import replace
 from torchvision.transforms import v2
 from importlib import resources
 from scipy.ndimage import gaussian_filter
@@ -357,10 +358,16 @@ def segment(im: PIL.Image.Image,
                            topline=net.user_metadata['topline'] if 'topline' in net.user_metadata else False,
                            raise_on_error=raise_on_error)
 
+        # convert dicts to BaselineLine objects
+        _lines = [BaselineLine(id=f'_{uuid.uuid4()}',
+                               baseline=line['baseline'],
+                               boundary=line['boundary'],
+                               tags=line['tags']) for line in _lines]
+
         if 'ro_model' in net.aux_layers:
             logger.info(f'Using reading order model found in segmentation model {net}.')
             _order = neural_reading_order(lines=_lines,
-                                          regions=_regions,
+                                          regions=[reg for rgs in _regions.values() for reg in rgs],
                                           text_direction=text_direction[-2:],
                                           model=net.aux_layers['ro_model'],
                                           im_size=im.size,
@@ -384,8 +391,6 @@ def segment(im: PIL.Image.Image,
     else:
         script_detection = False
 
-    # create objects and assign IDs
-    blls = []
     _shp_regs = {}
     for reg_type, rgs in regions.items():
         for reg in rgs:
@@ -393,16 +398,19 @@ def segment(im: PIL.Image.Image,
 
     # reorder lines
     logger.debug(f'Reordering baselines with main RO function {reading_order_fn}.')
-    basic_lo = reading_order_fn(lines=lines, regions=_shp_regs.values(), text_direction=text_direction[-2:])
+    all_regions = [reg for rgs in regions.values() for reg in rgs]
+    basic_lo = reading_order_fn(lines=lines, regions=all_regions, text_direction=text_direction[-2:])
     lines = [lines[idx] for idx in basic_lo]
 
+    # assign region IDs
+    blls = []
     for line in lines:
         line_regs = []
         for reg_id, reg in _shp_regs.items():
-            line_ls = geom.LineString(line['baseline'])
+            line_ls = geom.LineString(line.baseline)
             if is_in_region(line_ls, reg):
                 line_regs.append(reg_id)
-        blls.append(BaselineLine(id=f'_{uuid.uuid4()}', baseline=line['baseline'], boundary=line['boundary'], tags=line['tags'], regions=line_regs))
+        blls.append(replace(line, regions=line_regs))
 
     return Segmentation(text_direction=text_direction,
                         imagename=getattr(im, 'filename', None),

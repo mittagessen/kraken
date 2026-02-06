@@ -41,7 +41,7 @@ from skimage.transform import (AffineTransform, PiecewiseAffineTransform, warp)
 
 
 if TYPE_CHECKING:
-    from kraken.containers import Segmentation, BBoxLine, BaselineLine
+    from kraken.containers import Segmentation, BBoxLine, BaselineLine, Region
     from kraken.lib.vgsl import TorchVGSLModel
 
 
@@ -81,7 +81,7 @@ class FastPiecewiseAffineTransform(PiecewiseAffineTransform):
         return result
 
 
-def reading_order(lines: Sequence[tuple[slice, slice]], text_direction: Literal['lr', 'rl'] = 'lr') -> np.ndarray:
+def _reading_order(lines: Sequence[tuple[slice, slice]], text_direction: Literal['lr', 'rl'] = 'lr') -> np.ndarray:
     """Given the list of lines (a list of 2D slices), computes
     the partial reading order.  The output is a binary 2D array
     such that order[i,j] is true if line i comes before line j
@@ -127,6 +127,27 @@ def reading_order(lines: Sequence[tuple[slice, slice]], text_direction: Literal[
                     if horizontal_order(u, v):
                         order[i, j] = 1
     return order
+
+
+def reading_order(lines: Sequence['BBoxLine'],
+                  text_direction: Literal['lr', 'rl'] = 'lr',
+                  regions: Optional[Sequence['Region']] = None) -> Sequence[int]:
+    """Given a list of BBoxLine objects, computes the reading order.
+
+    Args:
+        lines: list of BBoxLine objects.
+        text_direction: Set principal text direction for column ordering. Can
+                        be 'lr' or 'rl'.
+        regions: Accepted for signature compatibility but unused (bbox
+                 pipeline has no region-aware ordering).
+
+    Returns:
+        A list of indices defining the reading order.
+    """
+    slices = [(slice(line.bbox[1], line.bbox[3]),
+               slice(line.bbox[0], line.bbox[2])) for line in lines]
+    order = _reading_order(slices, text_direction)
+    return topsort(order)
 
 
 def topsort(order: np.ndarray) -> list[int]:
@@ -781,32 +802,33 @@ def calculate_polygonal_environment(im: Image.Image = None,
 
 def polygonal_reading_order(lines: list['BaselineLine'],
                             text_direction: Literal['lr', 'rl'] = 'lr',
-                            regions: Optional[Sequence[geom.Polygon]] = None) -> Sequence[int]:
+                            regions: Optional[Sequence['Region']] = None) -> Sequence[int]:
     """
     Given a list of baselines and regions, calculates the correct reading order
     and applies it to the input.
 
     Args:
-        lines: list of tuples containing the baseline and its polygonization.
-        regions: list of region polygons.
+        lines: list of BaselineLine objects.
+        regions: list of Region objects.
         text_direction: Set principal text direction for column ordering. Can
                         be 'lr' or 'rl'
 
     Returns:
         The indices of the ordered input.
     """
-    lines = [line.baseline for line in lines]
+    baselines = [line.baseline for line in lines]
 
     bounds = []
     if regions is None:
         regions = []
+    reg_polygons = [geom.Polygon(reg.boundary) for reg in regions]
     region_lines = [[] for _ in range(len(regions))]
     indizes = {}
-    for line_idx, line in enumerate(lines):
+    for line_idx, line in enumerate(baselines):
         s_line = geom.LineString(line)
         in_region = False
-        for idx, reg in enumerate(regions):
-            if is_in_region(s_line, reg):
+        for idx, reg_polygon in enumerate(reg_polygons):
+            if is_in_region(s_line, reg_polygon):
                 region_lines[idx].append((line_idx, (slice(s_line.bounds[1], s_line.bounds[3]),
                                                      slice(s_line.bounds[0], s_line.bounds[2]))))
                 in_region = True
@@ -817,16 +839,16 @@ def polygonal_reading_order(lines: list['BaselineLine'],
             indizes[line_idx] = ('line', line)
     # order everything in regions
     intra_region_order = [[] for _ in range(len(regions))]
-    for idx, reg in enumerate(regions):
+    for idx, reg_polygon in enumerate(reg_polygons):
         if len(region_lines[idx]) > 0:
-            order = reading_order([x[1] for x in region_lines[idx]], text_direction)
+            order = _reading_order([x[1] for x in region_lines[idx]], text_direction)
             lsort = topsort(order)
             intra_region_order[idx] = [region_lines[idx][i][0] for i in lsort]
-            reg = reg.bounds
-            bounds.append((slice(reg[1], reg[3]), slice(reg[0], reg[2])))
+            reg_bounds = reg_polygon.bounds
+            bounds.append((slice(reg_bounds[1], reg_bounds[3]), slice(reg_bounds[0], reg_bounds[2])))
             indizes[line_idx+idx+1] = ('region', idx)
     # order unassigned lines and regions
-    order = reading_order(bounds, text_direction)
+    order = _reading_order(bounds, text_direction)
     lsort = topsort(order)
     sidz = sorted(indizes.keys())
     lsort = [sidz[i] for i in lsort]
@@ -855,9 +877,9 @@ def is_in_region(line: geom.LineString, region: geom.Polygon) -> bool:
     return region.contains(l_obj)
 
 
-def neural_reading_order(lines: Sequence[Dict],
+def neural_reading_order(lines: Sequence['BaselineLine'],
                          text_direction: str = 'lr',
-                         regions: Optional[Sequence[geom.Polygon]] = None,
+                         regions: Optional[Sequence['Region']] = None,
                          im_size: tuple[int, int] = None,
                          model: 'TorchVGSLModel' = None,
                          class_mapping: Dict[str, int] = None) -> Sequence[int]:
@@ -866,18 +888,23 @@ def neural_reading_order(lines: Sequence[Dict],
     and applies it to the input.
 
     Args:
-        lines: list of tuples containing the baseline and its polygonization.
-        model: torch Module for
+        lines: list of BaselineLine objects.
+        regions: list of Region objects (unused).
+        model: torch Module for reading order prediction.
+        im_size: tuple (height, width) of the input image.
+        class_mapping: dict mapping line types to indices.
 
     Returns:
         The indices of the ordered input.
     """
+    from kraken.lib.dataset.utils import _get_type
+
     if len(lines) == 0:
         return None
     elif len(lines) == 1:
         return torch.tensor([0])
 
-    lines = [(line['tags']['type'], line['baseline'], line['boundary']) for line in lines]
+    lines = [(_get_type(line.tags), line.baseline, line.boundary) for line in lines]
     # construct all possible pairs
     h, w = im_size
     features = []
