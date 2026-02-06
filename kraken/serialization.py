@@ -93,8 +93,6 @@ def serialize(results: 'Segmentation',
     with jinja2 templates that can either be shipped with kraken
     (`template_source` == 'native') or custom (`template_source` == 'custom').
 
-    Note: Empty records are ignored for serialization purposes.
-
     Args:
         segmentation: Segmentation container object
         image_size: Dimensions of the source image
