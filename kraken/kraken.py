@@ -152,7 +152,7 @@ def segmenter(legacy, model, config, input, output) -> None:
                                   config.legacy_scale,
                                   config.legacy_maxcolseps,
                                   config.legacy_black_colseps,
-                                  no_hlines=config.legacy_remove_hlines,
+                                  no_hlines=config.legacy_no_hlines,
                                   pad=config.bbox_line_padding)
         else:
             from kraken.tasks import SegmentationTaskModel
@@ -473,7 +473,7 @@ def binarize(ctx, threshold, zoom, escale, border, perc, range, low, high):
 @click.option('--scale', 'legacy_scale', type=float)
 @click.option('-m', '--maxcolseps', 'legacy_maxcolseps', type=int)
 @click.option('-b/-w', '--black-colseps/--white_colseps', 'legacy_black_colseps')
-@click.option('-r/-l', '--remove_hlines/--hlines', 'legacy_no_hlines')
+@click.option('-r/-l', '--remove-hlines/--hlines', 'legacy_no_hlines')
 @click.option('-p', '--pad', 'bbox_line_padding', type=int, help='Left and right padding around lines. Only for BBox segmenter.')
 @click.option('--input-pad', 'input_padding', type=int, help='Padding to add around input image.')
 def segment(ctx, **kwargs):
@@ -513,6 +513,7 @@ def segment(ctx, **kwargs):
         if not location:
             raise click.BadParameter(f'No model for {model} found')
     else:
+        model = None
         ctx.meta['steps'].append(ProcessingStep(id=f'_{uuid.uuid4()}',
                                                 category='processing',
                                                 description='bounding box segmentation',
@@ -520,7 +521,7 @@ def segment(ctx, **kwargs):
                                                           'scale': config.legacy_scale,
                                                           'maxcolseps': config.legacy_maxcolseps,
                                                           'black_colseps': config.legacy_black_colseps,
-                                                          'remove_hlines': config.legacy_remove_hlines,
+                                                          'no_hlines': config.legacy_no_hlines,
                                                           'pad': config.bbox_line_padding}))
 
     return partial(segmenter, params['boxes'], model, config)
