@@ -1024,7 +1024,7 @@ def _test_intersect(bp, uv, bs):
     for dir in ((1, -1), (-1, 1)):
         w = (uv * dir * (1, -1))[::-1]
         z = np.dot(v, w)
-        t1 = np.cross(v, u) / (z + np.finfo(float).eps)
+        t1 = (v[:, 0] * u[:, 1] - v[:, 1] * u[:, 0]) / (z + np.finfo(float).eps)
         t2 = np.dot(u, w) / (z + np.finfo(float).eps)
         t1 = t1[np.logical_and(t2 >= 0.0, t2 <= 1.0)]
         points.extend(bp + (t1[np.where(t1 >= 0)[0].min()] * (uv * dir)))

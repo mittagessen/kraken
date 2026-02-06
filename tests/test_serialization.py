@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
-import json
+import copy
+import pickle
 import tempfile
 import unittest
 import uuid
@@ -73,13 +74,14 @@ class TestSerializations(unittest.TestCase):
     Tests for output serialization
     """
     def setUp(self):
-        with open(resources /'records.json', 'r') as fp:
-            self.box_records = [containers.BBoxOCRRecord(**x) for x in json.load(fp)]
+        with open(resources / 'box_rec.pkl', 'rb') as fp:
+            box_seg = pickle.load(fp)
+        self.box_records = box_seg.lines
 
-        with open(resources / 'bl_records.json', 'r') as fp:
-            recs = json.load(fp)
-            self.bl_records = [containers.BaselineOCRRecord(**bl) for bl in recs['lines']]
-            self.bl_regions = recs['regions']
+        with open(resources / 'bl_rec.pkl', 'rb') as fp:
+            bl_seg = pickle.load(fp)
+        self.bl_records = bl_seg.lines
+        self.bl_regions = bl_seg.regions
 
         self.box_segmentation = containers.Segmentation(type='bbox',
                                                         imagename='foo.png',
@@ -88,10 +90,14 @@ class TestSerializations(unittest.TestCase):
                                                         script_detection=True,
                                                         regions={})
 
+        bl_records_no_regions = copy.deepcopy(self.bl_records)
+        for line in bl_records_no_regions:
+            line.regions = []
+
         self.bl_segmentation = containers.Segmentation(type='baselines',
                                                        imagename='foo.png',
                                                        text_direction='horizontal-lr',
-                                                       lines=self.bl_records,
+                                                       lines=bl_records_no_regions,
                                                        script_detection=True,
                                                        regions={})
 

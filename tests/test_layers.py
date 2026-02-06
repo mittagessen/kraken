@@ -3,13 +3,11 @@ import unittest
 
 import torch
 
-from kraken.lib import layers
-
+from kraken.lib.vgsl import layers
 
 class TestLayers(unittest.TestCase):
-
     """
-    Testing custom layer implementations.
+    Testing VGSL custom layer implementations.
     """
     def setUp(self):
         torch.set_grad_enabled(False)

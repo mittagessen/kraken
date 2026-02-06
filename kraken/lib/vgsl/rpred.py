@@ -103,17 +103,23 @@ class VGSLRecognitionInference:
             for im, line_idx in self._line_extraction_pool.imap_unordered(_exl, range(self._len)):
                 if im is None or 0 in im.size:
                     rec_results[line_idx] = _empty_record_cls('', [], [], segmentation.lines[line_idx])
-                ts_im = transforms(im)
-                if ts_im.max() == ts_im.min():
-                    rec_results[line_idx] = _empty_record_cls('', [], [], segmentation.lines[line_idx])
-                input_queue.append((ts_im, im, line_idx))
-                # feed the input queue through the network
-                if len(input_queue) == self._inf_config.batch_size or len(input_queue) == rec_results.count(None):
-                    for rec, idx in self._line_iter(input_queue, segmentation):
-                        logger.debug(f'Inserting batch result at index {idx}: {rec}')
-                        rec_results[idx] = rec
-                    input_queue.clear()
-                if rec_results[next_idx_to_emit] is not None:
+                else:
+                    try:
+                        ts_im = transforms(im)
+                    except Exception:
+                        rec_results[line_idx] = _empty_record_cls('', [], [], segmentation.lines[line_idx])
+                    else:
+                        if ts_im.max() == ts_im.min():
+                            rec_results[line_idx] = _empty_record_cls('', [], [], segmentation.lines[line_idx])
+                        else:
+                            input_queue.append((ts_im, im, line_idx))
+                            # feed the input queue through the network
+                            if len(input_queue) == self._inf_config.batch_size or len(input_queue) == rec_results.count(None):
+                                for rec, idx in self._line_iter(input_queue, segmentation):
+                                    logger.debug(f'Inserting batch result at index {idx}: {rec}')
+                                    rec_results[idx] = rec
+                                input_queue.clear()
+                while next_idx_to_emit < self._len and rec_results[next_idx_to_emit] is not None:
                     yield rec_results[next_idx_to_emit]
                     next_idx_to_emit += 1
 

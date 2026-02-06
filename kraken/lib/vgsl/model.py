@@ -408,10 +408,9 @@ class TorchVGSLModel(nn.Module,
 
             mlmodel = MLModel(net_builder.spec)
             mlmodel.short_description = 'kraken model'
-            if self.codec:
+            if getattr(self, 'codec', None):
                 mlmodel.user_defined_metadata['codec'] = json.dumps(self.codec.c2l)
-            if self.user_metadata:
-                mlmodel.user_defined_metadata['kraken_meta'] = json.dumps(self.user_metadata)
+            mlmodel.user_defined_metadata['kraken_meta'] = json.dumps(self.user_metadata)
             if self.aux_layers:
                 mlmodel.user_defined_metadata['aux_layers'] = json.dumps({k: v.get_spec(k) for k, v in self.aux_layers.items()})
             mlmodel.save(path)

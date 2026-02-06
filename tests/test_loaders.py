@@ -1,19 +1,128 @@
 # -*- coding: utf-8 -*-
 """
-Tests for safetensors loader dtype handling.
-
-Verifies that models saved with non-float32 dtypes (uniform float16 and
-mixed-precision) can be loaded without errors through `load_models`.
+Tests for model loaders/writers/creators.
 """
-import unittest
-from pathlib import Path
-
+import os
 import torch
+import pytest
+import tempfile
+import unittest
 
-from kraken.models import load_models
+from pathlib import Path
+from pytest import raises
+
+from kraken.models.utils import create_model
+from kraken.models import load_models, write_models
 
 thisfile = Path(__file__).resolve().parent
 resources = thisfile / 'resources'
+
+
+class TestCreateModel(unittest.TestCase):
+    """
+    Tests for the `create_model` factory function that uses the model
+    registry to instantiate model objects.
+    """
+
+    def test_create_model_invalid_name(self):
+        """
+        Tests that create_model raises ValueError for unknown model names.
+        """
+        with raises(ValueError, match='not in model registry'):
+            create_model('NonExistentModel')
+
+    def test_create_model_torch_vgsl(self):
+        """
+        Tests that create_model can instantiate a TorchVGSLModel from the
+        registry.
+        """
+        from kraken.lib.vgsl import TorchVGSLModel
+        model = create_model('TorchVGSLModel',
+                             vgsl='[1,48,0,1 Cr3,3,32 Mp2,2 Cr3,3,64 Mp2,2 S1(1x0)1,3 Lbx200 Do O1c10]')
+        self.assertIsInstance(model, TorchVGSLModel)
+
+
+class TestLoadModels(unittest.TestCase):
+    """
+    Tests for the `load_models` factory function that uses registered loaders
+    to deserialize model files.
+    """
+
+    def test_load_models_coreml(self):
+        """
+        Tests loading a CoreML model file through the loader registry.
+        """
+        models = load_models(resources / 'overfit.mlmodel')
+        self.assertIsInstance(models, list)
+        self.assertGreater(len(models), 0)
+        self.assertIn('recognition', models[0].model_type)
+
+    def test_load_models_invalid_file(self):
+        """
+        Tests that load_models raises ValueError for invalid model files.
+        """
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.bin') as fp:
+            fp.write(b'invalid data')
+            fp.flush()
+            try:
+                with raises(ValueError):
+                    load_models(fp.name)
+            finally:
+                os.unlink(fp.name)
+
+    def test_load_models_nonexistent_file(self):
+        """
+        Tests that load_models raises ValueError for non-existent files.
+        """
+        with raises(ValueError, match='not a regular file'):
+            load_models('/nonexistent/path/model.mlmodel')
+
+    def test_load_models_task_filter(self):
+        """
+        Tests that the task filter parameter works correctly.
+        """
+        models = load_models(resources / 'overfit.mlmodel', tasks=['recognition'])
+        self.assertGreater(len(models), 0)
+
+    def test_load_models_task_filter_mismatch(self):
+        """
+        Tests that task filtering returns empty list for mismatched tasks.
+        """
+        models = load_models(resources / 'overfit.mlmodel', tasks=['segmentation'])
+        self.assertEqual(len(models), 0)
+
+
+class TestWriteModels(unittest.TestCase):
+    """
+    Tests for the `write_models` factory function that uses registered writers
+    to serialize model objects.
+    """
+
+    def test_write_models_existing_path_raises(self):
+        """
+        Tests that write_models raises ValueError if the target path already
+        exists.
+        """
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.safetensors') as fp:
+            try:
+                models = load_models(resources / 'overfit.mlmodel')
+                with raises(ValueError, match='already exists'):
+                    write_models(models, fp.name)
+            finally:
+                os.unlink(fp.name)
+
+    def test_write_read_roundtrip_safetensors(self):
+        """
+        Tests that models can be written and read back in safetensors format.
+        """
+        models = load_models(resources / 'overfit.mlmodel')
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / 'test_model.safetensors'
+            write_models(models, path)
+            self.assertTrue(path.exists())
+            loaded = load_models(path)
+            self.assertEqual(len(loaded), len(models))
+            self.assertEqual(loaded[0].model_type, models[0].model_type)
 
 
 class TestSafetensorsLoaderDtype(unittest.TestCase):
