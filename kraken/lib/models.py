@@ -132,14 +132,7 @@ class TorchSeqRecognizer(object):
             List of decoded sequences.
         """
         o, olens = self.forward(line, lens)
-        dec_seqs = []
-        if olens is not None:
-            for seq, seq_len in zip(o, olens):
-                locs = self.decoder(seq[:, :seq_len])
-                dec_seqs.append(self.codec.decode(locs))
-        else:
-            locs = self.decoder(o[0])
-            dec_seqs.append(self.codec.decode(locs))
+        dec_seqs = [self.codec.decode(locs) for locs in self.decoder(o, olens)]
         return dec_seqs
 
     def predict_string(self, line: torch.Tensor, lens: Optional[torch.Tensor] = None) -> List[str]:
@@ -152,14 +145,7 @@ class TorchSeqRecognizer(object):
             lens: Optional tensor containing the sequence lengths of the input batch.
         """
         o, olens = self.forward(line, lens)
-        dec_strs = []
-        if olens is not None:
-            for seq, seq_len in zip(o, olens):
-                locs = self.decoder(seq[:, :seq_len])
-                dec_strs.append(''.join(x[0] for x in self.codec.decode(locs)))
-        else:
-            locs = self.decoder(o[0])
-            dec_strs.append(''.join(x[0] for x in self.codec.decode(locs)))
+        dec_strs = [''.join(x[0] for x in self.codec.decode(locs)) for locs in self.decoder(o, olens)]
         return dec_strs
 
     def predict_labels(self, line: torch.tensor, lens: torch.Tensor = None) -> List[List[tuple[int, int, int, float]]]:
@@ -169,13 +155,7 @@ class TorchSeqRecognizer(object):
         maximum value of the softmax layer in the region.
         """
         o, olens = self.forward(line, lens)
-        oseqs = []
-        if olens is not None:
-            for seq, seq_len in zip(o, olens):
-                oseqs.append(self.decoder(seq[:, :seq_len]))
-        else:
-            oseqs.append(self.decoder(o[0]))
-        return oseqs
+        return self.decoder(o, olens)
 
 
 def load_any(fname: Union['PathLike', str],

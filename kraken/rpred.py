@@ -199,7 +199,7 @@ class mm_rpred(object):
         seg = dataclasses.replace(self.bounds, lines=[line])
         try:
             box, line = next(extract_polygons(self.im, seg, legacy=use_legacy_polygons))
-        except KrakenInputException as e:
+        except ValueError as e:
             logger.warning(f'Extracting line failed: {e}')
             return BBoxOCRRecord('', [], [], line)
 
@@ -274,7 +274,7 @@ class mm_rpred(object):
 
         try:
             box, coords = next(extract_polygons(self.im, seg, legacy=use_legacy_polygons))
-        except KrakenInputException as e:
+        except ValueError as e:
             logger.warning(f'Extracting line failed: {e}')
             return BaselineOCRRecord('', [], [], line)
 
