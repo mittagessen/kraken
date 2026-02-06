@@ -78,8 +78,15 @@ def load_safetensors(path: Union[str, PathLike], tasks: Optional[Sequence[_T_tas
                 raise ValueError(f'No model metadata found in {path}.')
     except SafetensorError as e:
         raise ValueError(f'Invalid model file {path}') from e
-    # load weights into models
-    load_model(models, path)
+    # load weights into models with strict=False to allow dtype mismatches
+    # between saved weights and model parameters (e.g. bfloat16 weights
+    # into a float32 model). PyTorch's load_state_dict handles the
+    # conversion internally via copy_().
+    missing, unexpected = load_model(models, path, strict=False)
+    if missing or unexpected:
+        raise RuntimeError(f'Error(s) in loading state_dict for {models.__class__.__name__}:\n'
+                           f'    Missing key(s): {missing}\n'
+                           f'    Unexpected key(s): {unexpected}')
     return list(models.values())
 
 
