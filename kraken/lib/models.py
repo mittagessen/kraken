@@ -6,7 +6,7 @@ Wrapper around TorchVGSLModel including a variety of forward pass helpers for
 sequence classification.
 """
 from os.path import abspath, expanduser, expandvars
-from typing import TYPE_CHECKING, List, Optional, Union
+from typing import TYPE_CHECKING, Optional, Union
 
 import torch
 import numpy as np
@@ -118,7 +118,7 @@ class TorchSeqRecognizer(object):
             olens = olens.cpu().numpy()
         return self.outputs, olens
 
-    def predict(self, line: torch.Tensor, lens: Optional[torch.Tensor] = None) -> List[List[tuple[str, int, int, float]]]:
+    def predict(self, line: torch.Tensor, lens: Optional[torch.Tensor] = None) -> list[list[tuple[str, int, int, float]]]:
         """
         Performs a forward pass on a torch tensor of a line with shape (N, C, H, W)
         and returns the decoding as a list of tuples (string, start, end,
@@ -129,13 +129,13 @@ class TorchSeqRecognizer(object):
             lens: Optional tensor containing sequence lengths if N > 1
 
         Returns:
-            List of decoded sequences.
+            list of decoded sequences.
         """
         o, olens = self.forward(line, lens)
         dec_seqs = [self.codec.decode(locs) for locs in self.decoder(o, olens)]
         return dec_seqs
 
-    def predict_string(self, line: torch.Tensor, lens: Optional[torch.Tensor] = None) -> List[str]:
+    def predict_string(self, line: torch.Tensor, lens: Optional[torch.Tensor] = None) -> list[str]:
         """
         Performs a forward pass on a torch tensor of a line with shape (N, C, H, W)
         and returns a string of the results.
@@ -148,7 +148,7 @@ class TorchSeqRecognizer(object):
         dec_strs = [''.join(x[0] for x in self.codec.decode(locs)) for locs in self.decoder(o, olens)]
         return dec_strs
 
-    def predict_labels(self, line: torch.tensor, lens: torch.Tensor = None) -> List[List[tuple[int, int, int, float]]]:
+    def predict_labels(self, line: torch.tensor, lens: torch.Tensor = None) -> list[list[tuple[int, int, int, float]]]:
         """
         Performs a forward pass on a torch tensor of a line with shape (N, C, H, W)
         and returns a list of tuples (class, start, end, max). Max is the

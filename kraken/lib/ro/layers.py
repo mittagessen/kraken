@@ -1,7 +1,7 @@
 """
 Layers for VGSL models
 """
-from typing import TYPE_CHECKING, Tuple
+from typing import TYPE_CHECKING
 
 import torch
 from torch import nn
@@ -47,7 +47,7 @@ class ROMLP(nn.Module, BaseModel):
         x = self.relu(x)
         return self.fc2(x)
 
-    def get_shape(self, input: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
+    def get_shape(self, input: tuple[int, int, int, int]) -> tuple[int, int, int, int]:
         """
         Calculates the output shape from input 4D tuple NCHW.
         """

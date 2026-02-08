@@ -4,7 +4,8 @@
 # LICENSE file in the root directory of this source tree.
 
 import random
-from typing import Sequence, Tuple, Union
+from typing import Union
+from collections.abc import Callable
 
 import numpy as np
 import torch
@@ -93,7 +94,7 @@ def sample_negatives(y, num_samples, num_neg_samples: int):
     return negs
 
 
-def compute_mask_indices(shape: Tuple[int, int], mask_prob: float, mask_length: int = 4, mask_min_space: int = 2) -> np.ndarray:
+def compute_mask_indices(shape: tuple[int, int], mask_prob: float, mask_length: int = 4, mask_min_space: int = 2) -> np.ndarray:
     """
     Computes random mask spans for a given shape
 

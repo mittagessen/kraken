@@ -4,7 +4,7 @@ Layers for VGSL models
 import torch
 
 from torch import nn
-from typing import TYPE_CHECKING, Optional, Tuple
+from typing import TYPE_CHECKING, Optional
 
 from kraken.models import BaseModel
 from kraken.lib.pretrain.util import compute_mask_indices, sample_negatives
@@ -60,7 +60,7 @@ class Wav2Vec2Mask(nn.Module, BaseModel):
         self.mask_emb = nn.Embedding(1, context_encoder_input_dim)
         self.project_q = nn.Linear(context_encoder_input_dim, final_dim)
 
-    def forward(self, inputs: torch.Tensor, seq_len: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+    def forward(self, inputs: torch.Tensor, seq_len: Optional[torch.Tensor] = None) -> tuple[torch.Tensor, Optional[torch.Tensor]]:
         N, C, H, W = inputs.shape
         if H != 1:
             raise Exception(f'Height has to be 1, not {H} for Wav2Vec2 masking layer.')
@@ -88,7 +88,7 @@ class Wav2Vec2Mask(nn.Module, BaseModel):
                 'seq_len': seq_len,
                 'mask': mask_indices}
 
-    def get_shape(self, input: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
+    def get_shape(self, input: tuple[int, int, int, int]) -> tuple[int, int, int, int]:
         """
         Calculates the output shape from input 4D tuple NCHW.
         """

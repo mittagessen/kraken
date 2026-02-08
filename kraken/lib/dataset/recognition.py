@@ -28,9 +28,9 @@ import os
 from torchvision.utils import save_image
 
 from collections import Counter
+from collections.abc import Callable
 from functools import partial
-from typing import (TYPE_CHECKING, Any, Callable, List, Literal, Optional,
-                    Tuple, Union)
+from typing import TYPE_CHECKING, Any, Literal, Optional, Union
 
 from PIL import Image
 from ctypes import c_char
@@ -147,7 +147,7 @@ class ArrowIPCRecognitionDataset(Dataset):
                           file will be considered.
         """
         self.alphabet: Counter = Counter()
-        self.text_transforms: List[Callable[[str], str]] = []
+        self.text_transforms: list[Callable[[str], str]] = []
         self.failed_samples = set()
         self.transforms = im_transforms
         self.aug = None
@@ -289,7 +289,7 @@ class ArrowIPCRecognitionDataset(Dataset):
         """
         pass
 
-    def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor]:
+    def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
         if len(self.failed_samples) == len(self):
             raise ValueError(f'All {len(self)} samples in dataset invalid.')
         try:
@@ -357,10 +357,10 @@ class PolygonGTDataset(Dataset):
                            suitable for forward passes.
             augmentation: Enables augmentation.
         """
-        self._images: Union[List[Image.Image], List[torch.Tensor]] = []
-        self._gt: List[str] = []
+        self._images: Union[list[Image.Image], list[torch.Tensor]] = []
+        self._gt: list[str] = []
         self.alphabet: Counter = Counter()
-        self.text_transforms: List[Callable[[str], str]] = []
+        self.text_transforms: list[Callable[[str], str]] = []
         self.transforms = im_transforms
         self.aug = None
         self.skip_empty_lines = skip_empty_lines
@@ -455,7 +455,7 @@ class PolygonGTDataset(Dataset):
             self.codec = codec
         else:
             self.codec = PytorchCodec(''.join(self.alphabet.keys()))
-        self.training_set: List[Tuple[Union[Image.Image, torch.Tensor], torch.Tensor]] = []
+        self.training_set: list[tuple[Union[Image.Image, torch.Tensor], torch.Tensor]] = []
         for im, gt in zip(self._images, self._gt):
             self.training_set.append((im, self.codec.encode(gt)))
 
@@ -463,11 +463,11 @@ class PolygonGTDataset(Dataset):
         """
         Creates an unencoded dataset.
         """
-        self.training_set: List[Tuple[Union[Image.Image, torch.Tensor], str]] = []
+        self.training_set: list[tuple[Union[Image.Image, torch.Tensor], str]] = []
         for im, gt in zip(self._images, self._gt):
             self.training_set.append((im, gt))
 
-    def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor]:
+    def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
         if len(self.failed_samples) == len(self):
             raise ValueError(f'All {len(self)} samples in dataset invalid.')
         item = self.training_set[index]
@@ -555,10 +555,10 @@ class GroundTruthDataset(Dataset):
                            tensor suitable for forward passes.
             augmentation: Enables augmentation.
         """
-        self._images = []  # type:  Union[List[Image], List[torch.Tensor]]
-        self._gt = []  # type:  List[str]
+        self._images = []  # type:  Union[list[Image], list[torch.Tensor]]
+        self._gt = []  # type:  list[str]
         self.alphabet = Counter()  # type: Counter
-        self.text_transforms = []  # type: List[Callable[[str], str]]
+        self.text_transforms = []  # type: list[Callable[[str], str]]
         self.transforms = im_transforms
         self.skip_empty_lines = skip_empty_lines
         self.aug = None
@@ -650,7 +650,7 @@ class GroundTruthDataset(Dataset):
             self.codec = codec
         else:
             self.codec = PytorchCodec(''.join(self.alphabet.keys()))
-        self.training_set: List[Tuple[Union[Image.Image, torch.Tensor], torch.Tensor]] = []
+        self.training_set: list[tuple[Union[Image.Image, torch.Tensor], torch.Tensor]] = []
         for im, gt in zip(self._images, self._gt):
             self.training_set.append((im, self.codec.encode(gt)))
 
@@ -658,11 +658,11 @@ class GroundTruthDataset(Dataset):
         """
         Creates an unencoded dataset.
         """
-        self.training_set: List[Tuple[Union[Image.Image, torch.Tensor], str]] = []
+        self.training_set: list[tuple[Union[Image.Image, torch.Tensor], str]] = []
         for im, gt in zip(self._images, self._gt):
             self.training_set.append((im, gt))
 
-    def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor]:
+    def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
         if len(self.failed_samples) == len(self):
             raise ValueError(f'All {len(self)} samples in dataset invalid.')
         item = self.training_set[index]

@@ -21,7 +21,7 @@ kraken-specific filtering for repository querying operations.
 """
 from collections import defaultdict
 from collections.abc import Callable
-from typing import Any, Dict, Optional, TypeVar, Literal
+from typing import Any, Optional, TypeVar, Literal
 
 
 from htrmopo import get_description as mopo_get_description
@@ -53,7 +53,7 @@ def get_description(model_id: str,
 
 def get_listing(callback: Callable[[int, int], Any] = lambda total, advance: None,
                 from_date: Optional[str] = None,
-                filter_fn: Optional[Callable[[_v0_or_v1_Record], bool]] = lambda x: True) -> Dict[str, Dict[str, _v0_or_v1_Record]]:
+                filter_fn: Optional[Callable[[_v0_or_v1_Record], bool]] = lambda x: True) -> dict[str, dict[str, _v0_or_v1_Record]]:
     """
     Returns a filtered representation of the model repository grouped by
     concept DOI.

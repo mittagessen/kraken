@@ -25,7 +25,7 @@ import importlib.metadata
 import logging
 from typing import TYPE_CHECKING, Any, Literal, Optional
 
-from collections import Sequence, Iterable
+from collections.abc import Sequence, Iterable
 from jinja2 import Environment, FunctionLoader, PackageLoader
 
 from kraken.lib.util import make_printable

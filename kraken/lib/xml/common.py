@@ -18,8 +18,10 @@ Shared constants and utilities for ALTO/PageXML parsing.
 import logging
 import re
 from collections import defaultdict
+from collections.abc import Sequence
 from itertools import groupby
-from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
+
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +49,7 @@ alto_regions = {'TextBlock': 'text',
                 'ComposedBlock': 'composed'}
 
 
-def parse_alto_pointstype(coords: str) -> Sequence[Tuple[float, float]]:
+def parse_alto_pointstype(coords: str) -> Sequence[tuple[float, float]]:
     """
     ALTO's PointsType is underspecified so a variety of serializations are valid:
 
@@ -93,11 +95,11 @@ def parse_page_custom(s):
     return dict(o)
 
 
-def flatten_order_to_lines(raw_order: List[str],
+def flatten_order_to_lines(raw_order: list[str],
                            lines_dict: dict,
-                           region_ids: Set[str],
-                           line_implicit_order: List[str],
-                           string_to_line_map: Optional[Dict[str, str]] = None) -> List[str]:
+                           region_ids: set[str],
+                           line_implicit_order: list[str],
+                           string_to_line_map: Optional[dict[str, str]] = None) -> list[str]:
     """
     Flatten a raw reading order (list of IDs) to line-level.
 
@@ -126,10 +128,10 @@ def flatten_order_to_lines(raw_order: List[str],
     return result
 
 
-def flatten_order_to_regions(raw_order: List[str],
+def flatten_order_to_regions(raw_order: list[str],
                              lines_dict: dict,
-                             region_ids: Set[str],
-                             string_to_line_map: Optional[Dict[str, str]] = None) -> List[str]:
+                             region_ids: set[str],
+                             string_to_line_map: Optional[dict[str, str]] = None) -> list[str]:
     """
     Flatten a raw reading order (list of IDs) to region-level.
 
@@ -159,8 +161,8 @@ def flatten_order_to_regions(raw_order: List[str],
     return result
 
 
-def validate_and_clean_order(flat_order: List[str],
-                             valid_ids: Set[str]) -> Tuple[List[str], bool]:
+def validate_and_clean_order(flat_order: list[str],
+                             valid_ids: set[str]) -> tuple[list[str], bool]:
     """
     Validate a flattened order.
 

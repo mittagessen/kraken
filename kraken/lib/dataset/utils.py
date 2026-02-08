@@ -18,8 +18,9 @@ Utility functions for data loading and training of VGSL networks.
 import json
 import numbers
 from collections import Counter
+from collections.abc import Sequence
 from functools import partial
-from typing import Any, Dict, List, Sequence, Tuple, Union
+from typing import Any, Union
 
 import torch
 import torch.nn.functional as F
@@ -40,7 +41,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def _get_type(tags: Dict, default='default') -> str:
+def _get_type(tags: dict, default='default') -> str:
     if tags is None:
         return default
     ot = tags.get('type', [{'type': default}])[0]
@@ -56,7 +57,7 @@ class ImageInputTransforms(transforms.Compose):
                  height: int,
                  width: int,
                  channels: int,
-                 pad: Union[int, Tuple[int, int], Tuple[int, int, int, int]],
+                 pad: Union[int, tuple[int, int], tuple[int, int, int, int]],
                  valid_norm: bool = True,
                  force_binarization: bool = False,
                  dtype: torch.dtype = torch.float32) -> None:
@@ -79,7 +80,7 @@ class ImageInputTransforms(transforms.Compose):
         """
         super().__init__(None)
 
-        self._scale: Tuple[int, int] = (height, width)
+        self._scale: tuple[int, int] = (height, width)
         self._valid_norm = valid_norm
         self._force_binarization = force_binarization
         self._batch = batch
@@ -206,7 +207,7 @@ class ImageInputTransforms(transforms.Compose):
         return self._mode if not self.force_binarization else '1'
 
     @property
-    def scale(self) -> Tuple[int, int]:
+    def scale(self) -> tuple[int, int]:
         """
         Desired output shape (height, width) of the image. If any value is set
         to 0, image will be rescaled proportionally with height, width, if 1
@@ -219,7 +220,7 @@ class ImageInputTransforms(transforms.Compose):
             return self._scale
 
     @scale.setter
-    def scale(self, scale: Tuple[int, int]) -> None:
+    def scale(self, scale: tuple[int, int]) -> None:
         self._scale = scale
         self._create_transforms()
 
@@ -231,7 +232,7 @@ class ImageInputTransforms(transforms.Compose):
         return self._pad
 
     @pad.setter
-    def pad(self, pad: Union[int, Tuple[int, int], Tuple[int, int, int, int]]) -> None:
+    def pad(self, pad: Union[int, tuple[int, int], tuple[int, int, int, int]]) -> None:
         if not isinstance(pad, (numbers.Number, tuple, list)):
             raise TypeError('Got inappropriate padding arg')
         self._pad = pad
@@ -271,7 +272,7 @@ class ImageInputTransforms(transforms.Compose):
         self._create_transforms()
 
 
-def global_align(seq1: Sequence[Any], seq2: Sequence[Any]) -> Tuple[int, List[str], List[str]]:
+def global_align(seq1: Sequence[Any], seq2: Sequence[Any]) -> tuple[int, list[str], list[str]]:
     """
     Computes a global alignment of two strings.
 
@@ -301,8 +302,8 @@ def global_align(seq1: Sequence[Any], seq2: Sequence[Any]) -> Tuple[int, List[st
             direction[i][j] = best[0]
     d = cost[-1][-1]
     # backtrace
-    algn1: List[Any] = []
-    algn2: List[Any] = []
+    algn1: list[Any] = []
+    algn2: list[Any] = []
     i = len(direction) - 1
     j = len(direction[0]) - 1
     while direction[i][j] != (-1, 0):
@@ -334,7 +335,7 @@ def compute_confusions(algn1: Sequence[str], algn2: Sequence[str]):
         insertions, `del` an integer of the number of deletions, `subs` per
         script substitutions.
     """
-    counts: Dict[Tuple[str, str], int] = Counter()
+    counts: dict[tuple[str, str], int] = Counter()
     ref = resources.files('kraken.lib.dataset').joinpath('scripts.json')
     with ref.open('rb') as fp:
         script_map = json.load(fp)
@@ -345,10 +346,10 @@ def compute_confusions(algn1: Sequence[str], algn2: Sequence[str]):
                 return n
         return 'Unknown'
 
-    scripts: Dict[Tuple[str, str], int] = Counter()
-    ins: Dict[Tuple[str, str], int] = Counter()
+    scripts: dict[tuple[str, str], int] = Counter()
+    ins: dict[tuple[str, str], int] = Counter()
     dels: int = 0
-    subs: Dict[Tuple[str, str], int] = Counter()
+    subs: dict[tuple[str, str], int] = Counter()
     for u, v in zip(algn1, algn2):
         counts[(u, v)] += 1
     for k, v in counts.items():
