@@ -49,6 +49,13 @@ class XMLPage(object):
         filename: Path to the XML file
         filetype: Selector for explicit subparser choice.
         linetype: Parse line data as baselines or bounding box type.
+
+    Attributes:
+        type: Either 'baselines' or 'bbox'.
+        imagename: Path to the image to the XML file.
+        image_size: Size of the image as a (height, width) tuple
+        has_tags: Indicates if the source document contains tag information
+        has_splits: Indicates if the source document contains explicit training splits
     """
     type: Literal['baselines', 'bbox'] = 'baselines'
     base_dir: Optional[Literal['L', 'R']] = None

@@ -88,7 +88,7 @@ def parse_page(doc, filename, linetype):
     page_default_lang = parse_page_langs(image)
 
     imagename = base_directory.joinpath(image.get('imageFilename'))
-    image_size = int(image.get('imageWidth')), int(image.get('imageHeight'))
+    image_size = int(image.get('imageHeight')), int(image.get('imageWidth'))
 
     # parse region type and coords
     region_data = defaultdict(list)
