@@ -272,3 +272,145 @@ class TestXMLParser(unittest.TestCase):
         reg_langs = [x.language for x in seg.regions['Machine\\u0020Printed\\u0020text']]
         self.assertEqual(reg_langs, [['hbo'], ['heb', 'deu', 'eng'], ['pol', 'deu']])
 
+    def test_alto_ro_string_refs_flattened(self):
+        """
+        Test that ALTO reading orders with String-level refs are properly
+        flattened to line-level IDs instead of being discarded.
+        """
+        doc = xml.XMLPage(self.alto_doc, filetype='alto')
+        # og_0 was previously discarded because it contained String refs
+        self.assertIn('og_0', doc.reading_orders)
+        ro = doc.reading_orders['og_0']
+        self.assertEqual(ro['level'], 'line')
+        # All IDs in the flattened order should be valid line IDs
+        for lid in ro['order']:
+            self.assertIn(lid, doc.lines)
+        # og_0 should have 30 lines (all lines in the document)
+        self.assertEqual(len(ro['order']), 30)
+
+    def test_alto_ro_region_level_flattened(self):
+        """
+        Test that region-level flattened orders are created for ALTO explicit ROs.
+        """
+        doc = xml.XMLPage(self.alto_doc, filetype='alto')
+        self.assertIn('og_0:regions', doc.reading_orders)
+        ro = doc.reading_orders['og_0:regions']
+        self.assertEqual(ro['level'], 'region')
+        # All IDs should be valid region IDs
+        region_ids = {reg.id for regs in doc.regions.values() for reg in regs}
+        for rid in ro['order']:
+            self.assertIn(rid, region_ids)
+
+    def test_alto_order_levels(self):
+        """
+        Test that reading orders have correct level annotations.
+        """
+        doc = xml.XMLPage(self.alto_doc, filetype='alto')
+        self.assertEqual(doc.reading_orders['line_implicit']['level'], 'line')
+        self.assertEqual(doc.reading_orders['region_implicit']['level'], 'region')
+
+    def test_page_explicit_ro_parsing(self):
+        """
+        Test parsing of PageXML files with explicit ReadingOrder element.
+        """
+        doc = xml.XMLPage(self.page_doc_root / 'explicit_ro.xml', filetype='page')
+        self.assertEqual(len(doc.lines), 5)
+        self.assertEqual(len([item for x in doc.regions.values() for item in x]), 3)
+        # The explicit RO should exist as a flattened line-level order
+        self.assertIn('ro_1', doc.reading_orders)
+        ro = doc.reading_orders['ro_1']
+        self.assertEqual(ro['level'], 'line')
+        # The order is r2, r1, r3 -> expanded to lines
+        line_ids = ro['order']
+        # r2 has l3, l4; r1 has l1, l2; r3 has l5
+        self.assertEqual(line_ids, ['l3', 'l4', 'l1', 'l2', 'l5'])
+
+    def test_page_explicit_ro_region_level(self):
+        """
+        Test that region-level flattened order is created for PageXML explicit RO.
+        """
+        doc = xml.XMLPage(self.page_doc_root / 'explicit_ro.xml', filetype='page')
+        self.assertIn('ro_1:regions', doc.reading_orders)
+        ro = doc.reading_orders['ro_1:regions']
+        self.assertEqual(ro['level'], 'region')
+        self.assertEqual(ro['order'], ['r2', 'r1', 'r3'])
+
+    def test_page_explicit_ro_unordered_group(self):
+        """
+        Test PageXML with top-level UnorderedGroup producing multiple partial orders.
+        """
+        doc = xml.XMLPage(self.page_doc_root / 'explicit_ro_unordered.xml', filetype='page')
+        self.assertIn('ro_main', doc.reading_orders)
+        self.assertIn('ro_margin', doc.reading_orders)
+        # Both are children of UnorderedGroup => partial
+        self.assertFalse(doc.reading_orders['ro_main']['is_total'])
+        self.assertFalse(doc.reading_orders['ro_margin']['is_total'])
+        # Main: r1, r2 -> l1, l2
+        self.assertEqual(doc.reading_orders['ro_main']['order'], ['l1', 'l2'])
+        # Margin: r3 -> l3
+        self.assertEqual(doc.reading_orders['ro_margin']['order'], ['l3'])
+
+    def test_page_order_levels(self):
+        """
+        Test that PageXML reading orders have correct level annotations.
+        """
+        doc = xml.XMLPage(self.page_doc, filetype='page')
+        self.assertEqual(doc.reading_orders['line_implicit']['level'], 'line')
+        self.assertEqual(doc.reading_orders['region_implicit']['level'], 'region')
+        self.assertEqual(doc.reading_orders['region_transkribus']['level'], 'region')
+
+    def test_to_container_line_orders(self):
+        """
+        Test that to_container() produces correct list[list[int]] for line_orders.
+        """
+        doc = xml.XMLPage(self.page_doc_root / 'explicit_ro.xml', filetype='page')
+        seg = doc.to_container()
+        # line_orders should be a list of lists of integers
+        self.assertIsInstance(seg.line_orders, list)
+        for order in seg.line_orders:
+            self.assertIsInstance(order, list)
+            for idx in order:
+                self.assertIsInstance(idx, int)
+                self.assertGreaterEqual(idx, 0)
+                self.assertLess(idx, len(seg.lines))
+
+    def test_to_container_explicit_ro_indices(self):
+        """
+        Test that explicit reading order indices match expected line positions.
+        """
+        doc = xml.XMLPage(self.page_doc_root / 'explicit_ro.xml', filetype='page')
+        seg = doc.to_container()
+        # Find the explicit ro_1 order in line_orders
+        # The implicit order (line_implicit) gives: l1, l2, l3, l4, l5 (indices 0-4)
+        # The explicit ro_1 order is: l3, l4, l1, l2, l5 (indices 2, 3, 0, 1, 4)
+        line_id_to_idx = {line.id: idx for idx, line in enumerate(seg.lines)}
+        expected_ro1_indices = [line_id_to_idx['l3'], line_id_to_idx['l4'],
+                                line_id_to_idx['l1'], line_id_to_idx['l2'],
+                                line_id_to_idx['l5']]
+        # The explicit order should be in line_orders
+        self.assertIn(expected_ro1_indices, seg.line_orders)
+
+    def test_get_sorted_lines_by_region(self):
+        """
+        Test that get_sorted_lines_by_region returns line objects (not tuples).
+        """
+        doc = xml.XMLPage(self.page_doc_root / 'explicit_ro.xml', filetype='page')
+        region_lines = doc.get_sorted_lines_by_region('r1')
+        self.assertEqual(len(region_lines), 2)
+        for line in region_lines:
+            self.assertIsInstance(line, BaselineLine)
+        self.assertEqual(region_lines[0].id, 'l1')
+        self.assertEqual(region_lines[1].id, 'l2')
+
+    def test_get_sorted_regions(self):
+        """
+        Test that get_sorted_regions returns Region objects in correct order.
+        """
+        doc = xml.XMLPage(self.page_doc_root / 'explicit_ro.xml', filetype='page')
+        from kraken.containers import Region
+        regions = doc.get_sorted_regions('ro_1:regions')
+        self.assertEqual(len(regions), 3)
+        self.assertEqual([r.id for r in regions], ['r2', 'r1', 'r3'])
+        for r in regions:
+            self.assertIsInstance(r, Region)
+
