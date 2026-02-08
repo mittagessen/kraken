@@ -36,6 +36,49 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def _num_classes_from_mapping(class_mapping: dict[str, int]) -> int:
+    """Returns the number of classes needed for a potentially sparse mapping."""
+    if not class_mapping:
+        return 1
+    return max(0, *class_mapping.values()) + 1
+
+
+def _extract_features(element, image_size, class_mapping, num_classes):
+    """Extract spatial features from a BaselineLine or Region object.
+
+    Args:
+        element: A BaselineLine or Region object.
+        image_size: Tuple (height, width) of the source image.
+        class_mapping: Dict mapping type tags to class indices.
+        num_classes: Total number of classes (including the default class).
+
+    Returns:
+        A tuple (tag, features_tensor).
+    """
+    h, w = image_size
+    tag = _get_type(element.tags)
+    cl = torch.zeros(num_classes, dtype=torch.float)
+    cl[class_mapping.get(tag, 0)] = 1
+
+    if hasattr(element, 'baseline') and element.baseline is not None:
+        # BaselineLine: use baseline coords
+        coords = np.array(element.baseline) / (w, h)
+        center = np.mean(coords, axis=0)
+        start = coords[0, :]
+        end = coords[-1, :]
+    else:
+        # Region: use boundary bounding box
+        boundary = np.array(element.boundary)
+        center = np.mean(boundary, axis=0) / (w, h)
+        start = np.array([boundary[:, 0].min(), boundary[:, 1].min()]) / (w, h)
+        end = np.array([boundary[:, 0].max(), boundary[:, 1].max()]) / (w, h)
+
+    return tag, torch.cat((cl,
+                           torch.tensor(center, dtype=torch.float),
+                           torch.tensor(start, dtype=torch.float),
+                           torch.tensor(end, dtype=torch.float)))
+
+
 class PairWiseROSet(Dataset):
     """
     Dataset for training a reading order determination model.
@@ -65,7 +108,7 @@ class PairWiseROSet(Dataset):
         self._num_pairs = 0
         self.failed_samples = []
         self.class_mapping = class_mapping
-        self.num_classes = len(class_mapping) + 1
+        self.num_classes = _num_classes_from_mapping(class_mapping)
 
         self.data = []
 
@@ -88,10 +131,9 @@ class PairWiseROSet(Dataset):
                     for el in order:
                         tag = _get_type(el.tags)
                         try:
-                            idx = self.class_mapping[tag]
-                            _order.append((tag, el))
-                            self.class_stats['baselines'][idx] += 1
-                            self.num_classes = len(self.class_mapping) + 1
+                            self.class_mapping[tag]
+                            _order.append(el)
+                            self.num_classes = _num_classes_from_mapping(self.class_mapping)
                         except KeyError:
                             continue
                     docs.append((doc.image_size, _order))
@@ -99,23 +141,12 @@ class PairWiseROSet(Dataset):
                     logger.warning(e)
                     continue
 
-            for (w, h), order in docs:
+            for image_size, order in docs:
                 # traverse RO and substitute features.
                 sorted_lines = []
-                for tag, line in order:
-                    line_coords = np.array(line.baseline) / (w, h)
-                    line_center = np.mean(line_coords, axis=0)
-                    cl = torch.zeros(self.num_classes, dtype=torch.float)
-                    # if class is not in class mapping default to None class (idx 0)
-                    cl[self.class_mapping.get(tag, 0)] = 1
-                    line_data = {'type': tag,
-                                 'features': torch.cat((cl,  # one hot encoded line type
-                                                        torch.tensor(line_center, dtype=torch.float),  # line center
-                                                        torch.tensor(line_coords[0, :], dtype=torch.float),  # start_point coord
-                                                        torch.tensor(line_coords[-1, :], dtype=torch.float),  # end point coord)
-                                                        )
-                                                       )
-                                 }
+                for element in order:
+                    tag, features = _extract_features(element, image_size, self.class_mapping, self.num_classes)
+                    line_data = {'type': tag, 'features': features}
                     sorted_lines.append(line_data)
                 if len(sorted_lines) > 1:
                     self.data.append(sorted_lines)
@@ -164,18 +195,13 @@ class PageWiseROSet(Dataset):
             level: Computes reading order tuples on line or region level.
             ro_id: ID of the reading order to sample from. Defaults to
                    `line_implicit`/`region_implicit`.
-            valid_entities: Sequence of valid baseline/regions identifiers. If `None`
-                             all are valid.
-            merge_entities: Sequence of baseline/region identifiers to merge.  Note
-                             that merging occurs after entities not in valid_*
-                             have been discarded.
             class_mapping: Explicit class mapping to use. No sanity checks are performed.
         """
         super().__init__()
 
         self.failed_samples = []
         self.class_mapping = class_mapping
-        self.num_classes = len(class_mapping) + 1
+        self.num_classes = _num_classes_from_mapping(class_mapping)
 
         self.data = []
 
@@ -199,8 +225,8 @@ class PageWiseROSet(Dataset):
                         tag = _get_type(el.tags)
                         try:
                             self.class_mapping[tag]
-                            _order.append((tag, el))
-                            self.num_classes = len(self.class_mapping) + 1
+                            _order.append(el)
+                            self.num_classes = _num_classes_from_mapping(self.class_mapping)
                         except KeyError:
                             continue
                     docs.append((doc.image_size, _order))
@@ -208,23 +234,12 @@ class PageWiseROSet(Dataset):
                     logger.warning(e)
                     continue
 
-            for (w, h), order in docs:
+            for image_size, order in docs:
                 # traverse RO and substitute features.
                 sorted_lines = []
-                for tag, line in order:
-                    line_coords = np.array(line.baseline) / (w, h)
-                    line_center = np.mean(line_coords, axis=0)
-                    cl = torch.zeros(self.num_classes, dtype=torch.float)
-                    # if class is not in class mapping default to None class (idx 0)
-                    cl[self.class_mapping.get(tag, 0)] = 1
-                    line_data = {'type': tag,
-                                 'features': torch.cat((cl,  # one hot encoded line type
-                                                        torch.tensor(line_center, dtype=torch.float),  # line center
-                                                        torch.tensor(line_coords[0, :], dtype=torch.float),  # start_point coord
-                                                        torch.tensor(line_coords[-1, :], dtype=torch.float),  # end point coord)
-                                                        )
-                                                       )
-                                 }
+                for element in order:
+                    tag, features = _extract_features(element, image_size, self.class_mapping, self.num_classes)
+                    line_data = {'type': tag, 'features': features}
                     sorted_lines.append(line_data)
                 if len(sorted_lines) > 1:
                     self.data.append(sorted_lines)

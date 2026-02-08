@@ -25,7 +25,7 @@ import importlib
 from PIL import Image
 
 from pathlib import Path
-from kraken.ketos.util import _expand_gt, _validate_manifests, message
+from kraken.ketos.util import _expand_gt, _validate_manifests, message, _create_class_map
 
 from kraken.registry import OPTIMIZERS, SCHEDULERS, STOPPERS
 
@@ -102,10 +102,10 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
               type=float,
               help='Minimal final learning rate for cosine LR scheduler.')
 @click.option('-p', '--partition', type=float, help='Ground truth data partition ratio between train/validation set')
-@click.option('-t', '--training-files', 'training_data', multiple=True,
+@click.option('-t', '--training-data', 'training_data', multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with additional paths to training data')
-@click.option('-e', '--evaluation-data', 'evaluation_files', multiple=True,
+@click.option('-e', '--evaluation-data', 'evaluation_data', multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
 @click.option('-f', '--format-type', type=click.Choice(['xml', 'alto', 'page']),
@@ -119,6 +119,11 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
 @click.option('--level', type=click.Choice(['baselines', 'regions']),
               help='Selects level to train reading order model on.')
 @click.option('--reading-order', help='Select reading order to train. Defaults to `line_implicit`/`region_implicit`')
+@click.option('--class-mapping', type=click.UNPROCESSED, hidden=True)
+@click.option('--class-mapping-from-ckpt',
+              type=click.Path(exists=True, readable=True),
+              help='Extract class mapping from a segmentation checkpoint (.ckpt). '
+                   'Uses --level to select baseline or region mapping.')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def rotrain(ctx, **kwargs):
     """
@@ -129,6 +134,33 @@ def rotrain(ctx, **kwargs):
     load = params.pop('load', None)
     training_data = params.pop('training_data', [])
     ground_truth = list(params.pop('ground_truth', []))
+
+    class_mapping_from_ckpt = params.pop('class_mapping_from_ckpt', None)
+
+    # parse class_mapping from YAML list-of-tuples
+    if isinstance(params.get('class_mapping'), list):
+        params['class_mapping'] = _create_class_map(params['class_mapping'])
+    elif params.get('class_mapping') is None:
+        params.pop('class_mapping', None)
+
+    if class_mapping_from_ckpt:
+        if 'class_mapping' in params:
+            raise click.UsageError('--class-mapping and --class-mapping-from-ckpt are mutually exclusive.')
+        import torch
+        try:
+            ckpt = torch.load(class_mapping_from_ckpt, map_location='cpu', weights_only=False)
+            data_config = ckpt['hyper_parameters']['data_config']
+            if params.get('level', 'baselines') == 'baselines':
+                cm = data_config.line_class_mapping
+            else:
+                cm = data_config.region_class_mapping
+            params['class_mapping'] = dict(cm)
+        except Exception as e:
+            raise click.UsageError(
+                f'Failed to extract class mapping from {class_mapping_from_ckpt}: {e}. '
+                'This usually happens when the checkpoint\'s serialized config references '
+                'training data paths that have moved or been deleted.'
+            )
 
     if sum(map(bool, [resume, load])) > 1:
         raise click.BadOptionsUsage('load', 'load/resume options are mutually exclusive.')
@@ -146,13 +178,13 @@ def rotrain(ctx, **kwargs):
     from kraken.lib import vgsl  # NOQA
     from kraken.lib.ro import ROModel, RODataModule
     from kraken.train import KrakenTrainer
-    from kraken.configs import VGSLRecognitionTrainingConfig, VGSLRecognitionTrainingDataConfig
+    from kraken.configs import ROTrainingConfig, ROTrainingDataConfig
 
     # disable automatic partition when given evaluation set explicitly
     if params['evaluation_data']:
         params['partition'] = 1
 
-    # merge training_files into ground_truth list
+    # merge training_data into ground_truth list
     if training_data:
         ground_truth.extend(training_data)
 
@@ -176,8 +208,8 @@ def rotrain(ctx, **kwargs):
                                           filename='checkpoint_{epoch:02d}-{val_metric:.4f}')
     cbs.append(checkpoint_callback)
 
-    dm_config = VGSLRecognitionTrainingDataConfig(**params, **ctx.meta)
-    m_config = VGSLRecognitionTrainingConfig(**params)
+    dm_config = ROTrainingDataConfig(**params, **ctx.meta)
+    m_config = ROTrainingConfig(**params)
 
     if resume:
         data_module = RODataModule.load_from_checkpoint(resume)
@@ -242,24 +274,45 @@ def roadd(ctx, output, ro_model, seg_model):
     """
     from kraken.lib import vgsl
     from kraken.lib.ro import ROModel
+    from kraken.models import load_models
 
     message(f'Adding {ro_model} reading order model to {seg_model}.')
-    ro_net = ROModel.load_from_checkpoint(ro_model)
-    message('Line classes known to RO model:')
-    for k, v in ro_net.hparams.class_mapping.items():
+
+    # Load ROMLP — try as weights file first, fall back to checkpoint
+    try:
+        models = load_models(ro_model, tasks=['reading_order'])
+        if len(models) != 1:
+            raise ValueError(f'Found {len(models)} reading order models in {ro_model}.')
+        ro_mlp = models[0]
+    except ValueError:
+        ro_module = ROModel.load_from_checkpoint(ro_model)
+        ro_mlp = ro_module.net
+
+    ro_class_mapping = ro_mlp.user_metadata.get('class_mapping', {})
+    level = ro_mlp.user_metadata.get('level', 'baselines')
+
+    message(f'RO model level: {level}')
+    message('Classes known to RO model:')
+    for k, v in ro_class_mapping.items():
         message(f'  {k}\t{v}')
+
     seg_net = vgsl.TorchVGSLModel.load_model(seg_model)
     if seg_net.model_type != 'segmentation':
         raise click.UsageError(f'Model {seg_model} is invalid {seg_net.model_type} model (expected `segmentation`).')
-    message('Line classes known to segmentation model:')
-    for k, v in seg_net.user_metadata['class_mapping']['baselines'].items():
+
+    seg_section = 'baselines' if level == 'baselines' else 'regions'
+    aux_key = 'ro_model' if level == 'baselines' else 'ro_model_regions'
+
+    message(f'{seg_section.capitalize()} classes known to segmentation model:')
+    for k, v in seg_net.user_metadata['class_mapping'][seg_section].items():
         message(f'  {k}\t{v}')
-    diff = set(ro_net.hparams.class_mapping.keys()).symmetric_difference(set(seg_net.user_metadata['class_mapping']['baselines'].keys()))
+    diff = set(ro_class_mapping.keys()).symmetric_difference(set(seg_net.user_metadata['class_mapping'][seg_section].keys()))
     diff.discard('default')
     if len(diff):
         raise click.UsageError(f'Model {seg_model} and {ro_model} class mappings mismatch.')
 
-    seg_net.aux_layers = {'ro_model': ro_net.ro_net}
-    seg_net.user_metadata['ro_class_mapping'] = ro_net.hparams.class_mapping
+    if not hasattr(seg_net, 'aux_layers') or seg_net.aux_layers is None:
+        seg_net.aux_layers = {}
+    seg_net.aux_layers[aux_key] = ro_mlp
     message(f'Saving combined model to {output}')
     seg_net.save_model(output)

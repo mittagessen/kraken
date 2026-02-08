@@ -99,7 +99,8 @@ def flatten_order_to_lines(raw_order: list[str],
                            lines_dict: dict,
                            region_ids: set[str],
                            line_implicit_order: list[str],
-                           string_to_line_map: Optional[dict[str, str]] = None) -> list[str]:
+                           string_to_line_map: Optional[dict[str, str]] = None,
+                           missing_region_ids: Optional[set[str]] = None) -> list[str]:
     """
     Flatten a raw reading order (list of IDs) to line-level.
 
@@ -118,6 +119,8 @@ def flatten_order_to_lines(raw_order: list[str],
             for lid in line_implicit_order:
                 if lines_dict[lid].regions and lines_dict[lid].regions[0] == ref_id:
                     result.append(lid)
+        elif missing_region_ids is not None and ref_id in missing_region_ids:
+            logger.warning(f'Reading order references region {ref_id} without coordinates, skipping.')
         elif string_to_line_map is not None and ref_id in string_to_line_map:
             parent_line = string_to_line_map[ref_id]
             # deduplicate consecutive same-line refs
@@ -131,7 +134,8 @@ def flatten_order_to_lines(raw_order: list[str],
 def flatten_order_to_regions(raw_order: list[str],
                              lines_dict: dict,
                              region_ids: set[str],
-                             string_to_line_map: Optional[dict[str, str]] = None) -> list[str]:
+                             string_to_line_map: Optional[dict[str, str]] = None,
+                             missing_region_ids: Optional[set[str]] = None) -> list[str]:
     """
     Flatten a raw reading order (list of IDs) to region-level.
 
@@ -146,6 +150,8 @@ def flatten_order_to_regions(raw_order: list[str],
         if ref_id in region_ids:
             if not result or result[-1] != ref_id:
                 result.append(ref_id)
+        elif missing_region_ids is not None and ref_id in missing_region_ids:
+            logger.warning(f'Reading order references region {ref_id} without coordinates, skipping.')
         elif ref_id in lines_dict:
             parent_region = lines_dict[ref_id].regions[0] if lines_dict[ref_id].regions else None
             if parent_region and (not result or result[-1] != parent_region):

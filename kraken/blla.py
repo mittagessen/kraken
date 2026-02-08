@@ -325,8 +325,7 @@ def segment(im: PIL.Image.Image,
     order = None
     regions = {}
     multi_lines = False
-    # flag to indicate that multiple models produced line output -> disable
-    # neural reading order
+
     for net in model:
         if 'topline' in net.user_metadata:
             loc = {None: 'center',
@@ -364,14 +363,86 @@ def segment(im: PIL.Image.Image,
                                boundary=line['boundary'],
                                tags=line['tags']) for line in _lines]
 
-        if 'ro_model' in net.aux_layers:
-            logger.info(f'Using reading order model found in segmentation model {net}.')
-            _order = neural_reading_order(lines=_lines,
-                                          regions=[reg for rgs in _regions.values() for reg in rgs],
-                                          text_direction=text_direction[-2:],
-                                          model=net.aux_layers['ro_model'],
-                                          im_size=im.size,
-                                          class_mapping=net.user_metadata['ro_class_mapping'])
+        if 'ro_model' in net.aux_layers or 'ro_model_regions' in net.aux_layers:
+            logger.info(f'Using reading order model(s) found in segmentation model {net}.')
+            flat_regs = [reg for rgs in _regions.values() for reg in rgs]
+            line_ro = net.aux_layers.get('ro_model')
+            region_ro = net.aux_layers.get('ro_model_regions')
+
+            # Region ordering
+            if region_ro and flat_regs:
+                reg_order = neural_reading_order(lines=flat_regs,
+                                                 model=region_ro,
+                                                 im_size=im.size,
+                                                 class_mapping=net.user_metadata['class_mapping']['regions'])
+                if reg_order is not None:
+                    ordered_regs = [flat_regs[i] for i in reg_order]
+                else:
+                    ordered_regs = flat_regs
+            else:
+                ordered_regs = flat_regs
+
+            # Line ordering (per-region if region model present, else global)
+            if line_ro:
+                line_class_mapping = net.user_metadata['class_mapping']['baselines']
+                if region_ro and ordered_regs:
+                    from collections import defaultdict
+                    region_line_map = defaultdict(list)
+                    region_ids = {reg.id for reg in ordered_regs}
+                    for line in _lines:
+                        if line.regions and line.regions[0] in region_ids:
+                            region_line_map[line.regions[0]].append(line)
+                        else:
+                            region_line_map[None].append(line)
+                    ordered_lines = []
+                    for reg in ordered_regs:
+                        rlines = region_line_map.get(reg.id, [])
+                        if len(rlines) > 1:
+                            lo = neural_reading_order(lines=rlines,
+                                                      model=line_ro,
+                                                      im_size=im.size,
+                                                      class_mapping=line_class_mapping)
+                            if lo is not None:
+                                ordered_lines.extend([rlines[i] for i in lo])
+                            else:
+                                ordered_lines.extend(rlines)
+                        else:
+                            ordered_lines.extend(rlines)
+                    orphans = region_line_map.get(None, [])
+                    if len(orphans) > 1:
+                        lo = neural_reading_order(lines=orphans,
+                                                  model=line_ro,
+                                                  im_size=im.size,
+                                                  class_mapping=line_class_mapping)
+                        if lo is not None:
+                            ordered_lines.extend([orphans[i] for i in lo])
+                        else:
+                            ordered_lines.extend(orphans)
+                    else:
+                        ordered_lines.extend(orphans)
+                    _order = [_lines.index(l) for l in ordered_lines]
+                else:
+                    _order = neural_reading_order(lines=_lines,
+                                                  regions=flat_regs,
+                                                  text_direction=text_direction[-2:],
+                                                  model=line_ro,
+                                                  im_size=im.size,
+                                                  class_mapping=line_class_mapping)
+            elif region_ro:
+                # Only region model — group lines by region order
+                ordered_lines = []
+                used = set()
+                for reg in ordered_regs:
+                    for line in _lines:
+                        if line.regions and line.regions[0] == reg.id and id(line) not in used:
+                            ordered_lines.append(line)
+                            used.add(id(line))
+                for line in _lines:
+                    if id(line) not in used:
+                        ordered_lines.append(line)
+                _order = [_lines.index(l) for l in ordered_lines]
+            else:
+                _order = None
         else:
             _order = None
 

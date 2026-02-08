@@ -25,7 +25,7 @@ from iso639 import Lang
 from iso639.exceptions import InvalidLanguageValue
 
 from kraken.containers import BBoxLine, BaselineLine, Region
-from kraken.lib.xml._common import page_regions, parse_page_coords, parse_page_custom
+from kraken.lib.xml.common import page_regions, parse_page_coords, parse_page_custom
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +93,7 @@ def parse_page(doc, filename, linetype):
     # parse region type and coords
     region_data = defaultdict(list)
     tr_region_order = []
+    missing_region_ids: set[str] = set()
 
     tag_set = set(('default',))
     tmp_transkribus_line_order = defaultdict(list)
@@ -111,6 +112,7 @@ def parse_page(doc, filename, linetype):
         except Exception:
             logger.info(f'Region {region_id} without coordinates')
             coords = None
+        region_has_coords = coords is not None
         tags = {}
         rtype = region.get('type')
         # parse transkribus-style custom field if possible
@@ -121,7 +123,10 @@ def parse_page(doc, filename, linetype):
                 rtype = cs['structure'][0]['type']
             # transkribus-style reading order
             if (reg_ro := cs.get('readingOrder')) is not None and (reg_ro_idx := reg_ro[0].get('index')) is not None:
-                tr_region_order.append((region_id, int(reg_ro_idx)))
+                if region_has_coords:
+                    tr_region_order.append((region_id, int(reg_ro_idx)))
+                else:
+                    logger.warning(f'Region {region_id} in custom reading order lacks coordinates; skipping.')
             tags.update(cs)
 
         if region_default_lang is None:
@@ -132,7 +137,10 @@ def parse_page(doc, filename, linetype):
             rtype = page_regions[region.tag.split('}')[-1]]
 
         tags['type'] = [{'type': rtype}]
-        region_data[rtype].append(Region(id=region_id, boundary=coords, tags=tags, language=region_default_lang))
+        if region_has_coords:
+            region_data[rtype].append(Region(id=region_id, boundary=coords, tags=tags, language=region_default_lang))
+        else:
+            missing_region_ids.add(region_id)
 
         region_default_direction = {'left-to-right': 'L',
                                     'right-to-left': 'R',
@@ -140,7 +148,8 @@ def parse_page(doc, filename, linetype):
                                     'bottom-to-top': 'R'}.get(region.get('readingDirection'))
 
         # register implicit reading order
-        region_implicit_order.append(region_id)
+        if region_has_coords:
+            region_implicit_order.append(region_id)
 
         # parse line information
         for line in region.iterfind('./{*}TextLine'):
@@ -183,10 +192,12 @@ def parse_page(doc, filename, linetype):
                     reg_cus = {}
                     if (parent_str := line.getparent().get('custom')) is not None:
                         reg_cus = parse_page_custom(parent_str)
-                    if 'readingOrder' not in reg_cus or 'index' not in reg_cus['readingOrder']:
-                        logger.info('Incomplete `custom` attribute reading order found.')
-                    else:
-                        tmp_transkribus_line_order[int(reg_cus['readingOrder'][0]['index'])].append((int(line_ro_idx), line_id))
+                        if 'readingOrder' not in reg_cus or 'index' not in reg_cus['readingOrder']:
+                            logger.info('Incomplete `custom` attribute reading order found.')
+                        elif not region_has_coords:
+                            logger.warning(f'Region {region_id} in custom reading order lacks coordinates; skipping.')
+                        else:
+                            tmp_transkribus_line_order[int(reg_cus['readingOrder'][0]['index'])].append((int(line_ro_idx), line_id))
                 line_tags.update(cs)
 
             # get base text direction
@@ -214,7 +225,7 @@ def parse_page(doc, filename, linetype):
                                         language=line_langs,
                                         split=line_split,
                                         base_dir=line_dir,
-                                        regions=[region_id])
+                                        regions=[region_id] if region_has_coords else [])
             elif linetype == 'bbox':
                 flat_box = [point for pol in boundary for point in pol]
                 xmin, xmax = min(flat_box[::2]), max(flat_box[::2])
@@ -226,7 +237,7 @@ def parse_page(doc, filename, linetype):
                                     language=line_langs,
                                     split=line_split,
                                     base_dir=line_dir,
-                                    regions=[region_id])
+                                    regions=[region_id] if region_has_coords else [])
 
             lines[line_id] = line_obj
             # register implicit reading order
@@ -307,4 +318,5 @@ def parse_page(doc, filename, linetype):
         'tag_set': tag_set,
         'raw_orders': raw_orders,
         'transkribus_orders': transkribus_orders,
+        'missing_region_ids': missing_region_ids,
     }

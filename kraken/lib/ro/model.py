@@ -19,7 +19,7 @@ Adapted from:
 """
 import logging
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Literal, Optional
+from typing import TYPE_CHECKING, Literal, Optional, Union
 
 import numpy as np
 import lightning as L
@@ -37,6 +37,7 @@ from kraken.lib.segmentation import _greedy_order_decoder
 from kraken.train.utils import configure_optimizer_and_lr_scheduler
 
 if TYPE_CHECKING:
+    from os import PathLike
     from torch.nn import Module
     from kraken.models import BaseModel
 
@@ -78,13 +79,6 @@ class RODataModule(L.LightningDataModule):
         evaluation_data = self.hparams.evaluation_data
         partition = self.hparams.partition
 
-        valid_entities = self.hparams.valid_entities
-        merge_entities = self.hparams.merge_entities
-        merge_all_entities = self.hparams.merge_all_entities
-
-        if not valid_entities:
-            valid_entities = None
-
         if not evaluation_data:
             np.random.shuffle(training_data)
             training_data = training_data[:int(partition*len(training_data))]
@@ -93,20 +87,15 @@ class RODataModule(L.LightningDataModule):
                                   mode=self.hparams.format_type,
                                   level=self.hparams.level,
                                   ro_id=self.hparams.reading_order,
-                                  class_mapping=self.hparams.class_mapping,
-                                  valid_entities=valid_entities,
-                                  merge_entities=merge_entities,
-                                  merge_all_entities=merge_all_entities)
+                                  class_mapping=self.hparams.class_mapping)
         self.train_set = Subset(train_set, range(len(train_set)))
         self.class_mapping = train_set.class_mapping
+        self.hparams['class_mapping'] = dict(self.class_mapping)
         val_set = PageWiseROSet(evaluation_data,
                                 mode=self.hparams.format_type,
                                 class_mapping=self.class_mapping,
                                 level=self.hparams.level,
-                                ro_id=self.hparams.reading_order,
-                                valid_entities=valid_entities,
-                                merge_entities=merge_entities,
-                                merge_all_entities=merge_all_entities)
+                                ro_id=self.hparams.reading_order)
 
         self.val_set = Subset(val_set, range(len(val_set)))
 
@@ -174,6 +163,19 @@ class ROModel(L.LightningModule):
 
         self.save_hyperparameters()
 
+    @classmethod
+    def load_from_weights(cls,
+                          path: Union[str, 'PathLike'],
+                          config: ROTrainingConfig) -> 'ROModel':
+        """
+        Initializes the module from a model weights file.
+        """
+        from kraken.models import load_models
+        models = load_models(path, tasks=['reading_order'])
+        if len(models) != 1:
+            raise ValueError(f'Found {len(models)} reading order models in model file.')
+        return cls(config=config, model=models[0])
+
     def forward(self, x):
         return F.sigmoid(self.net(x))
 
@@ -222,10 +224,15 @@ class ROModel(L.LightningModule):
 
     def setup(self, stage: Optional[str] = None):
         if stage in [None, 'fit']:
-            if not self.net:
+            if not getattr(self, 'net', None):
                 logger.info('Creating new RO model')
-                feature_dim = self.trainer.datamodule.get_feature_dim()
-                self.net = ROMLP(feature_dim, feature_dim * 2)
+                class_mapping = dict(self.trainer.datamodule.get_class_mapping())
+                num_classes = max(0, *class_mapping.values()) + 1 if class_mapping else 1
+                feature_dim = 2 * num_classes + 12
+                self.net = ROMLP(feature_size=feature_dim,
+                                 hidden_size=feature_dim * 2,
+                                 class_mapping=class_mapping,
+                                 level=self.trainer.datamodule.hparams.level)
 
     def configure_callbacks(self):
         callbacks = []
@@ -245,9 +252,9 @@ class ROModel(L.LightningModule):
     # batch-wise learning rate warmup. In lr_scheduler_step() calls to the
     # scheduler are then only performed at the end of the epoch.
     def configure_optimizers(self):
-        return _configure_optimizer_and_lr_scheduler(self.hparams.hyper_params,
-                                                     self.net.parameters(),
-                                                     loss_tracking_mode='min')
+        return configure_optimizer_and_lr_scheduler(self.hparams.config,
+                                                    self.net.parameters(),
+                                                    loss_tracking_mode='min')
 
     def optimizer_step(self, epoch, batch_idx, optimizer, optimizer_closure):
         # update params

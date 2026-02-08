@@ -17,8 +17,8 @@ Processing for baseline segmenter output
 """
 import logging
 from collections import defaultdict
-from typing import (TYPE_CHECKING, Dict, Literal, Optional, Sequence, Union,
-                    TypeVar, Any, Generator)
+from collections.abc import Sequence, Generator
+from typing import TYPE_CHECKING, Literal, Optional, Union, TypeVar, Any
 
 import numpy as np
 import shapely.geometry as geom
@@ -877,58 +877,84 @@ def is_in_region(line: geom.LineString, region: geom.Polygon) -> bool:
     return region.contains(l_obj)
 
 
-def neural_reading_order(lines: Sequence['BaselineLine'],
+def _extract_element_features(element, image_size, class_mapping, num_classes):
+    """Extract spatial features from a BaselineLine or Region object for neural RO.
+
+    Args:
+        element: A BaselineLine or Region object.
+        image_size: Tuple (height, width) of the source image.
+        class_mapping: dict mapping type tags to class indices.
+        num_classes: Total number of classes (including the default class).
+
+    Returns:
+        A tuple (tag, features_tensor).
+    """
+    from kraken.lib.dataset.utils import _get_type
+
+    h, w = image_size
+    tag = _get_type(element.tags)
+    cl = torch.zeros(num_classes, dtype=torch.float)
+    cl[class_mapping.get(tag, 0)] = 1
+
+    if hasattr(element, 'baseline') and element.baseline is not None:
+        coords = np.array(element.baseline) / (w, h)
+        center = np.mean(coords, axis=0)
+        start = coords[0, :]
+        end = coords[-1, :]
+    elif hasattr(element, 'boundary') and element.boundary is not None:
+        boundary = np.array(element.boundary)
+        center = np.mean(boundary, axis=0) / (w, h)
+        start = np.array([boundary[:, 0].min(), boundary[:, 1].min()]) / (w, h)
+        end = np.array([boundary[:, 0].max(), boundary[:, 1].max()]) / (w, h)
+    else:
+        raise ValueError('Neural reading order only supports baselines or regions with polygons.')
+
+    return tag, torch.cat((cl,
+                           torch.tensor(center, dtype=torch.float),
+                           torch.tensor(start, dtype=torch.float),
+                           torch.tensor(end, dtype=torch.float)))
+
+
+def neural_reading_order(lines: Sequence[Union['BaselineLine', 'Region']],
                          text_direction: str = 'lr',
                          regions: Optional[Sequence['Region']] = None,
                          im_size: tuple[int, int] = None,
                          model: 'TorchVGSLModel' = None,
-                         class_mapping: Dict[str, int] = None) -> Sequence[int]:
+                         class_mapping: dict[str, int] = None) -> Sequence[int]:
     """
-    Given a list of baselines and regions, calculates the correct reading order
-    and applies it to the input.
+    Given a list of baselines/regions, calculates the correct reading order
+    using a neural model and applies it to the input.
 
     Args:
-        lines: list of BaselineLine objects.
+        lines: list of BaselineLine or Region objects.
         regions: list of Region objects (unused).
         model: torch Module for reading order prediction.
         im_size: tuple (height, width) of the input image.
-        class_mapping: dict mapping line types to indices.
+        class_mapping: dict mapping element types to indices.
 
     Returns:
         The indices of the ordered input.
     """
-    from kraken.lib.dataset.utils import _get_type
-
     if len(lines) == 0:
         return None
     elif len(lines) == 1:
         return torch.tensor([0])
 
-    lines = [(_get_type(line.tags), line.baseline, line.boundary) for line in lines]
+    if class_mapping is None:
+        class_mapping = {}
+    num_classes = max(0, *class_mapping.values()) + 1 if class_mapping else 1
+    element_features = []
+    for el in lines:
+        _, feats = _extract_element_features(el, im_size, class_mapping, num_classes)
+        element_features.append(feats)
+
     # construct all possible pairs
-    h, w = im_size
     features = []
-    for i in lines:
-        for j in lines:
-            if i == j and len(lines) != 1:
+    for i in range(len(element_features)):
+        for j in range(len(element_features)):
+            if i == j and len(element_features) != 1:
                 continue
-            num_classes = len(class_mapping) + 1
-            cl_i = torch.zeros(num_classes, dtype=torch.float)
-            cl_j = torch.zeros(num_classes, dtype=torch.float)
-            cl_i[class_mapping.get(i[0], 0)] = 1
-            cl_j[class_mapping.get(j[0], 0)] = 1
-            line_coords_i = np.array(i[1]) / (w, h)
-            line_center_i = np.mean(line_coords_i, axis=0)
-            line_coords_j = np.array(j[1]) / (w, h)
-            line_center_j = np.mean(line_coords_j, axis=0)
-            features.append(torch.cat((cl_i,
-                                       torch.tensor(line_center_i, dtype=torch.float),  # lin
-                                       torch.tensor(line_coords_i[0, :], dtype=torch.float),
-                                       torch.tensor(line_coords_i[-1, :], dtype=torch.float),
-                                       cl_j,
-                                       torch.tensor(line_center_j, dtype=torch.float),  # lin
-                                       torch.tensor(line_coords_j[0, :], dtype=torch.float),
-                                       torch.tensor(line_coords_j[-1, :], dtype=torch.float))))
+            features.append(torch.cat((element_features[i], element_features[j])))
     features = torch.stack(features)
     output = F.sigmoid(model(features))
 

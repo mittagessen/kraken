@@ -144,6 +144,7 @@ class XMLPage(object):
         for regs in self._regions.values():
             for reg in regs:
                 region_ids.add(reg.id)
+        missing_region_ids = set(result.get('missing_region_ids', set()))
 
         # Get string_to_line_map for ALTO
         string_to_line_map = result.get('string_to_line_map')
@@ -164,7 +165,8 @@ class XMLPage(object):
                                                 self._lines,
                                                 region_ids,
                                                 result['line_implicit_order'],
-                                                string_to_line_map)
+                                                string_to_line_map,
+                                                missing_region_ids)
             flat_lines, _ = validate_and_clean_order(flat_lines, set(self._lines.keys()))
             self._orders[ro_id] = {'order': flat_lines,
                                    'is_total': is_total,
@@ -175,7 +177,8 @@ class XMLPage(object):
             flat_regions = flatten_order_to_regions(raw_order,
                                                    self._lines,
                                                    region_ids,
-                                                   string_to_line_map)
+                                                   string_to_line_map,
+                                                   missing_region_ids)
             flat_regions, _ = validate_and_clean_order(flat_regions, region_ids)
             self._orders[f'{ro_id}:regions'] = {'order': flat_regions,
                                                 'is_total': is_total,

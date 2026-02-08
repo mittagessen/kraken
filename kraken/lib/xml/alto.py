@@ -25,7 +25,7 @@ from iso639 import Lang
 from iso639.exceptions import InvalidLanguageValue
 
 from kraken.containers import BBoxLine, BaselineLine, Region
-from kraken.lib.xml._common import alto_regions, parse_alto_pointstype
+from kraken.lib.xml.common import alto_regions, parse_alto_pointstype
 
 logger = logging.getLogger(__name__)
 
@@ -137,6 +137,7 @@ def parse_alto(doc, filename, linetype):
     region_data = defaultdict(list)
     line_implicit_order = []
     region_implicit_order = []
+    missing_region_ids: set[str] = set()
     # Map string IDs to their parent TextLine IDs
     string_to_line_map = {}
 
@@ -163,6 +164,7 @@ def parse_alto(doc, filename, linetype):
                             (x_min + width, y_min)]
             except (ValueError, TypeError):
                 pass
+        region_has_coords = boundary is not None
         # parse region tags
         reg_tags = parse_alto_tagrefs(cls_map, region.get('TAGREFS'), tag_set)
         tag_type = reg_tags.pop('region') if 'region' in reg_tags else reg_tags.pop('type', None)
@@ -179,12 +181,15 @@ def parse_alto(doc, filename, linetype):
                                                tag_set,
                                                [page_default_lang] if page_default_lang is not None else None)
 
-        region_data[rtype[0]['type']].append(Region(id=region_id,
-                                                    boundary=boundary,
-                                                    tags=reg_tags,
-                                                    language=region_default_lang))
-        # register implicit reading order
-        region_implicit_order.append(region_id)
+        if region_has_coords:
+            region_data[rtype[0]['type']].append(Region(id=region_id,
+                                                        boundary=boundary,
+                                                        tags=reg_tags,
+                                                        language=region_default_lang))
+            # register implicit reading order
+            region_implicit_order.append(region_id)
+        else:
+            missing_region_ids.add(region_id)
 
         # parse lines in region
         for line in region.iterfind('./{*}TextLine'):
@@ -247,7 +252,7 @@ def parse_alto(doc, filename, linetype):
                                         language=line_langs,
                                         split=line_split,
                                         base_dir=line_dir,
-                                        regions=[region_id])
+                                        regions=[region_id] if region_has_coords else [])
             elif linetype == 'bbox':
                 line_obj = BBoxLine(id=line_id,
                                     bbox=bbox,
@@ -256,7 +261,7 @@ def parse_alto(doc, filename, linetype):
                                     language=line_langs,
                                     split=line_split,
                                     base_dir=line_dir,
-                                    regions=[region_id])
+                                    regions=[region_id] if region_has_coords else [])
 
             lines[line_id] = line_obj
             # register implicit reading order
@@ -319,4 +324,5 @@ def parse_alto(doc, filename, linetype):
         'tag_set': tag_set,
         'raw_orders': raw_orders,
         'string_to_line_map': string_to_line_map,
+        'missing_region_ids': missing_region_ids,
     }

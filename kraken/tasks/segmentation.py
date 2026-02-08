@@ -7,13 +7,14 @@ A wrapper around models for layout analysis and reading order determination.
 import torch
 import shapely.geometry as geom
 
+from collections import defaultdict
 from torch import nn
 from importlib import resources
 from dataclasses import replace
 from typing import TYPE_CHECKING, Union, Optional
 
 from kraken.containers import Segmentation, BaselineLine
-from kraken.lib.segmentation import is_in_region
+from kraken.lib.segmentation import is_in_region, neural_reading_order
 from kraken.models import load_models
 from kraken.configs import SegmentationInferenceConfig
 
@@ -59,6 +60,23 @@ class SegmentationTaskModel(nn.Module):
         if not len(self.seg_models):
             raise ValueError('No segmentation models in model list {models}.')
 
+        # validate RO models: no duplicates at the same level, class
+        # mappings match the segmentation model's.
+        seg_class_mapping = self.seg_models[0].user_metadata.get('class_mapping', {})
+        ro_levels = set()
+        for m in self.ro_models:
+            level = m.user_metadata.get('level', 'baselines')
+            if level in ro_levels:
+                raise ValueError(f'Multiple reading order models at level `{level}`.')
+            ro_levels.add(level)
+            ro_cm = m.user_metadata.get('class_mapping', {})
+            seg_cm = seg_class_mapping.get(level, {})
+            diff = set(ro_cm.keys()).symmetric_difference(set(seg_cm.keys()))
+            diff.discard('default')
+            if diff:
+                raise ValueError(f'Reading order model class mapping at level '
+                                 f'`{level}` does not match segmentation model: {diff}')
+
     @torch.inference_mode()
     def predict(self,
                 im: 'Image.Image',
@@ -95,7 +113,8 @@ class SegmentationTaskModel(nn.Module):
         logger.info(f'Merging {len(segs)} segmentations.')
         segmentation = self._merge_segmentations(segs, config)
         logger.info('Computing reading order(s)')
-        return self._compute_additional_line_orders(segmentation, config)
+        im_size = (im.height, im.width)
+        return self._compute_additional_line_orders(segmentation, config, im_size=im_size)
 
     @classmethod
     def load_model(cls, path: Optional[Union[str, 'PathLike']] = None) -> 'SegmentationTaskModel':
@@ -170,10 +189,123 @@ class SegmentationTaskModel(nn.Module):
 
     def _compute_additional_line_orders(self,
                                         segmentation: Segmentation,
-                                        config: SegmentationInferenceConfig) -> Segmentation:
+                                        config: SegmentationInferenceConfig,
+                                        im_size: Optional[tuple[int, int]] = None) -> Segmentation:
         """
         Computes additional reading orders with neural models.
 
-        Not implemented yet.
+        Neural reading order models are separated by level (baselines/regions).
+        If a region-level model is present, regions are ordered first. If a
+        line-level model is present, lines within each region are ordered. The
+        result is appended as an additional entry in `line_orders`.
         """
-        return segmentation
+        if not self.ro_models:
+            return segmentation
+
+        line_ro = None
+        region_ro = None
+        for model in self.ro_models:
+            level = model.user_metadata.get('level', 'baselines')
+            if level == 'regions':
+                region_ro = model
+            else:
+                line_ro = model
+
+        seg_class_mapping = self.seg_models[0].user_metadata.get('class_mapping', {})
+        if not segmentation.lines or not isinstance(segmentation.lines[0], BaselineLine):
+            logger.warning('Neural reading order only supports baselines. Skipping.')
+            return segmentation
+
+        if im_size is None:
+            logger.warning('No image size available. Cannot compute neural reading order.')
+            return segmentation
+
+        all_regions = [reg for rgs in segmentation.regions.values() for reg in rgs]
+
+        # Order regions if region model present
+        if region_ro and all_regions:
+            region_order = neural_reading_order(
+                lines=all_regions,
+                model=region_ro,
+                im_size=im_size,
+                class_mapping=seg_class_mapping.get('regions', {}))
+            if region_order is not None:
+                ordered_regions = [all_regions[i] for i in region_order]
+            else:
+                ordered_regions = all_regions
+        else:
+            ordered_regions = all_regions
+
+        # Order lines within each region if line model present
+        if line_ro:
+            line_class_mapping = seg_class_mapping.get('baselines', {})
+            ordered_lines = []
+            region_line_map = defaultdict(list)
+            region_ids = {reg.id for reg in ordered_regions}
+            for line in segmentation.lines:
+                if line.regions and line.regions[0] in region_ids:
+                    region_line_map[line.regions[0]].append(line)
+                else:
+                    region_line_map[None].append(line)
+
+            if region_ro and ordered_regions:
+                for region in ordered_regions:
+                    rlines = region_line_map.get(region.id, [])
+                    if len(rlines) > 1:
+                        lo = neural_reading_order(
+                            lines=rlines,
+                            model=line_ro,
+                            im_size=im_size,
+                            class_mapping=line_class_mapping)
+                        if lo is not None:
+                            ordered_lines.extend([rlines[i] for i in lo])
+                        else:
+                            ordered_lines.extend(rlines)
+                    else:
+                        ordered_lines.extend(rlines)
+                # Orphan lines (no region)
+                orphans = region_line_map.get(None, [])
+                if len(orphans) > 1:
+                    lo = neural_reading_order(
+                        lines=orphans,
+                        model=line_ro,
+                        im_size=im_size,
+                        class_mapping=line_class_mapping)
+                    if lo is not None:
+                        ordered_lines.extend([orphans[i] for i in lo])
+                    else:
+                        ordered_lines.extend(orphans)
+                else:
+                    ordered_lines.extend(orphans)
+            else:
+                lo = neural_reading_order(
+                    lines=segmentation.lines,
+                    model=line_ro,
+                    im_size=im_size,
+                    class_mapping=line_class_mapping)
+                if lo is not None:
+                    ordered_lines = [segmentation.lines[i] for i in lo]
+                else:
+                    ordered_lines = list(segmentation.lines)
+        elif region_ro:
+            # Only region model — group lines by region order, keep intra-region order
+            ordered_lines = []
+            used = set()
+            for region in ordered_regions:
+                for line in segmentation.lines:
+                    if line.regions and line.regions[0] == region.id and id(line) not in used:
+                        ordered_lines.append(line)
+                        used.add(id(line))
+            for line in segmentation.lines:
+                if id(line) not in used:
+                    ordered_lines.append(line)
+        else:
+            return segmentation
+
+        # Build index mapping for line_orders
+        old_to_new = {id(line): idx for idx, line in enumerate(segmentation.lines)}
+        neural_order = [old_to_new[id(line)] for line in ordered_lines]
+
+        line_orders = list(segmentation.line_orders) if segmentation.line_orders else []
+        line_orders.append(neural_order)
+        return replace(segmentation, line_orders=line_orders)
