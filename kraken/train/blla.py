@@ -437,6 +437,9 @@ class BLLASegmentationModel(L.LightningModule):
                 self.trainer.datamodule.val_set.dataset.class_mapping = net_class_mapping
                 self.trainer.datamodule.val_set.dataset.num_classes = num_classes
 
+            # store canonical (one-to-one) class mapping in model metadata for inference
+            self.net.user_metadata['class_mapping'] = self.trainer.datamodule.train_set.dataset.canonical_class_mapping
+
             # change topline/baseline switch
             loc = {None: 'centerline',
                    True: 'topline',

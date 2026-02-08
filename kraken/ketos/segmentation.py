@@ -234,12 +234,30 @@ def segtrain(ctx, **kwargs):
     else:
         data_module = BLLASegmentationDataModule(dm_config)
 
-    message('Training line types:')
-    for k, v in data_module.train_set.dataset.class_mapping['baselines'].items():
-        message(f'  {k}\t{v}\t{data_module.train_set.dataset.class_stats["baselines"][k]}')
-    message('Training region types:')
-    for k, v in data_module.train_set.dataset.class_mapping['regions'].items():
-        message(f'  {k}\t{v}\t{data_module.train_set.dataset.class_stats["regions"][k]}')
+    from rich.console import Console
+    from rich.table import Table
+
+    ds = data_module.train_set.dataset
+    canonical = ds.canonical_class_mapping
+    merged = ds.merged_classes
+
+    table = Table(title='Training Class Summary')
+    table.add_column('Category')
+    table.add_column('Class')
+    table.add_column('Label Index', justify='right')
+    table.add_column('Merged With')
+    table.add_column('Count', justify='right')
+
+    for section in ('baselines', 'regions'):
+        for cls_name, idx in canonical[section].items():
+            aliases = merged[section].get(cls_name, [])
+            merged_str = ', '.join(aliases) if aliases else ''
+            count = ds.class_stats[section].get(cls_name, 0)
+            for alias in aliases:
+                count += ds.class_stats[section].get(alias, 0)
+            table.add_row(section, cls_name, str(idx), merged_str, str(count))
+
+    Console(stderr=True).print(table)
 
     trainer = KrakenTrainer(accelerator=ctx.meta['accelerator'],
                             devices=ctx.meta['device'],

@@ -114,6 +114,42 @@ class BaselineSet(Dataset):
         self.transforms = im_transforms
         self.seg_type = None
 
+    @property
+    def canonical_class_mapping(self) -> dict[str, dict[str, int]]:
+        """Returns a one-to-one class mapping (one string per label index).
+
+        For merged classes (multiple strings -> same index), the first string
+        by insertion order is kept as the canonical name.
+        """
+        result = {}
+        for section, sub_dict in self.class_mapping.items():
+            seen_indices = set()
+            canonical = {}
+            for key, idx in sub_dict.items():
+                if idx not in seen_indices:
+                    seen_indices.add(idx)
+                    canonical[key] = idx
+            result[section] = canonical
+        return result
+
+    @property
+    def merged_classes(self) -> dict[str, dict[str, list[str]]]:
+        """Returns merged class info: {section: {canonical_name: [aliases]}}.
+
+        Only includes entries where multiple strings map to the same index.
+        """
+        result = {}
+        for section, sub_dict in self.class_mapping.items():
+            idx_to_names: dict[int, list[str]] = defaultdict(list)
+            for key, idx in sub_dict.items():
+                idx_to_names[idx].append(key)
+            merged = {}
+            for idx, names in idx_to_names.items():
+                if len(names) > 1:
+                    merged[names[0]] = names[1:]
+            result[section] = merged
+        return result
+
     def add(self, doc: 'Segmentation'):
         """
         Adds a page to the dataset.

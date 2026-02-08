@@ -168,6 +168,68 @@ class TestBaselineSet(unittest.TestCase):
         self.assertEqual(sample['image'].shape, (1, 200, 100))
         self.assertEqual(sample['target'].shape, (ds.num_classes, 200, 100))
 
+    def test_baselineset_canonical_class_mapping_no_merging(self):
+        """
+        When no classes are merged, canonical_class_mapping equals class_mapping.
+        """
+        class_mapping = {
+            'aux': {'_start_separator': 0, '_end_separator': 1},
+            'baselines': {'$pag': 2, '$pac': 3, '$tip': 4, '$par': 5},
+            'regions': {'$pag': 6, '$pac': 7, '$tip': 8, '$par': 9},
+        }
+        ds = BaselineSet(class_mapping=class_mapping, im_transforms=self.transforms)
+        self.assertEqual(ds.canonical_class_mapping, class_mapping)
+
+    def test_baselineset_canonical_class_mapping_with_merging(self):
+        """
+        When classes are merged, canonical mapping keeps only the first by insertion order.
+        """
+        class_mapping = {
+            'aux': {'_start_separator': 0, '_end_separator': 1},
+            'baselines': {'$pag': 2, '$pac': 3, '$par': 4, '$tip': 4},
+            'regions': {'$pag': 5, '$pac': 6, '$tip': 7, '$par': 7},
+        }
+        ds = BaselineSet(class_mapping=class_mapping, im_transforms=self.transforms)
+        canonical = ds.canonical_class_mapping
+        # $par is first at index 4, $tip should be dropped
+        self.assertEqual(canonical['baselines'], {'$pag': 2, '$pac': 3, '$par': 4})
+        # $tip is first at index 7, $par should be dropped
+        self.assertEqual(canonical['regions'], {'$pag': 5, '$pac': 6, '$tip': 7})
+        # aux unchanged
+        self.assertEqual(canonical['aux'], {'_start_separator': 0, '_end_separator': 1})
+
+    def test_baselineset_merged_classes_empty(self):
+        """
+        When no merging, merged_classes sections are all empty dicts.
+        """
+        class_mapping = {
+            'aux': {'_start_separator': 0, '_end_separator': 1},
+            'baselines': {'$pag': 2, '$pac': 3, '$tip': 4, '$par': 5},
+            'regions': {'$pag': 6, '$pac': 7, '$tip': 8, '$par': 9},
+        }
+        ds = BaselineSet(class_mapping=class_mapping, im_transforms=self.transforms)
+        merged = ds.merged_classes
+        self.assertEqual(merged['aux'], {})
+        self.assertEqual(merged['baselines'], {})
+        self.assertEqual(merged['regions'], {})
+
+    def test_baselineset_merged_classes_with_merging(self):
+        """
+        Reports correct aliases when classes are merged.
+        """
+        class_mapping = {
+            'aux': {'_start_separator': 0, '_end_separator': 1},
+            'baselines': {'$pag': 2, '$pac': 3, '$par': 4, '$tip': 4},
+            'regions': {'$pag': 5, '$pac': 6, '$tip': 7, '$par': 7},
+        }
+        ds = BaselineSet(class_mapping=class_mapping, im_transforms=self.transforms)
+        merged = ds.merged_classes
+        # $par is canonical for index 4, $tip is the alias
+        self.assertEqual(merged['baselines'], {'$par': ['$tip']})
+        # $tip is canonical for index 7, $par is the alias
+        self.assertEqual(merged['regions'], {'$tip': ['$par']})
+        self.assertEqual(merged['aux'], {})
+
     def test_baselineset_empty_baselines_and_regions(self):
         """
         Test aux-only class_mapping with empty baselines and regions.
