@@ -65,11 +65,22 @@ class BaselineSet(Dataset):
             class_mapping: class map.
         """
         super().__init__()
+        # validate class_mapping structure
+        required_keys = {'aux', 'baselines', 'regions'}
+        if set(class_mapping.keys()) != required_keys:
+            raise ValueError(f'class_mapping must have exactly keys {required_keys}, got {set(class_mapping.keys())}')
+        for req in ('_start_separator', '_end_separator'):
+            if req not in class_mapping['aux']:
+                raise ValueError(f"class_mapping['aux'] must contain '{req}'")
+        for section, sub_dict in class_mapping.items():
+            for key, val in sub_dict.items():
+                if not isinstance(val, int) or isinstance(val, bool) or val < 0:
+                    raise ValueError(f'class_mapping[{section!r}][{key!r}] must be a non-negative integer, got {val!r}')
         self.imgs = []
         self.pad = padding
         self.targets = []
         self.class_mapping = class_mapping
-        self.num_classes = sum(len(v) for v in self.class_mapping.values())
+        self.num_classes = max(v for d in self.class_mapping.values() for v in d.values()) + 1
 
         # keep track of samples that failed to load
         self.failed_samples = set()
@@ -119,7 +130,7 @@ class BaselineSet(Dataset):
             try:
                 idx = self.class_mapping['baselines'][tag]
                 baselines_[idx].append(line.baseline)
-                self.class_stats['baselines'][idx] += 1
+                self.class_stats['baselines'][tag] += 1
             except KeyError:
                 continue
 
@@ -129,12 +140,11 @@ class BaselineSet(Dataset):
                 idx = self.class_mapping['regions'][k]
                 v = [x for x in v if x.boundary]
                 regions_[idx].extend(v)
-                self.class_stats['regions'][idx] += len(v)
+                self.class_stats['regions'][k] += len(v)
             except KeyError:
                 continue
         self.targets.append({'baselines': baselines_, 'regions': regions_})
         self.imgs.append(doc.imagename)
-        self.num_classes = sum(len(v) for v in self.class_mapping.values())
 
     def __getitem__(self, idx):
         if len(self.failed_samples) == len(self):

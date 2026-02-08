@@ -48,7 +48,7 @@ from kraken.lib.vgsl import layers
 from kraken.models import BaseModel
 from kraken.lib.codec import PytorchCodec
 from kraken.lib.pretrain.layers import Wav2Vec2Mask
-from kraken.train import CRNNRecognitionDataModule
+from kraken.train import VGSLRecognitionDataModule
 from kraken.train.utils import configure_optimizer_and_lr_scheduler
 from kraken.lib.dataset import ImageInputTransforms
 
@@ -58,7 +58,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class PretrainDataModule(CRNNRecognitionDataModule):
+class PretrainDataModule(VGSLRecognitionDataModule):
 
     def _build_dataset(self,
                        DatasetClass,

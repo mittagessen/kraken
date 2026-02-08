@@ -1,3 +1,3 @@
 from .utils import KrakenTrainer  # NOQA
-from .crnn import *  # NOQA
+from .vgsl import *  # NOQA
 from .blla import *  # NOQA

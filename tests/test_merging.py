@@ -4,7 +4,7 @@ from unittest import TestCase
 
 import lightning as L
 
-from kraken.train import CRNNRecognitionModel, CRNNRecognitionDataModule
+from kraken.train import VGSLRecognitionModel, VGSLRecognitionDataModule
 from kraken.configs import VGSLRecognitionTrainingConfig, VGSLRecognitionTrainingDataConfig
 
 _here = Path(__file__).parent
@@ -36,8 +36,8 @@ class TestMerging(TestCase):
             quit='fixed',
             epochs=1,
         )
-        model = CRNNRecognitionModel.load_from_weights(base_model, config)
-        data_module = CRNNRecognitionDataModule(data_config)
+        model = VGSLRecognitionModel.load_from_weights(base_model, config)
+        data_module = VGSLRecognitionDataModule(data_config)
         return model, data_module
 
     def _run_setup(self, model, data_module):

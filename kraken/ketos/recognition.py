@@ -167,8 +167,8 @@ def train(ctx, **kwargs):
     from lightning.pytorch.callbacks import ModelCheckpoint, OnExceptionCheckpoint
 
     from kraken.lib import vgsl  # NOQA
-    from kraken.train import (KrakenTrainer, CRNNRecognitionModel,
-                              CRNNRecognitionDataModule)
+    from kraken.train import (KrakenTrainer, VGSLRecognitionModel,
+                              VGSLRecognitionDataModule)
     from kraken.configs import VGSLRecognitionTrainingConfig, VGSLRecognitionTrainingDataConfig
 
     if (codec := params.get('codec')) is not None and not isinstance(codec, dict):
@@ -210,9 +210,9 @@ def train(ctx, **kwargs):
     m_config = VGSLRecognitionTrainingConfig(**params)
 
     if resume:
-        data_module = CRNNRecognitionDataModule.load_from_checkpoint(resume)
+        data_module = VGSLRecognitionDataModule.load_from_checkpoint(resume)
     else:
-        data_module = CRNNRecognitionDataModule(dm_config)
+        data_module = VGSLRecognitionDataModule(dm_config)
 
     trainer = KrakenTrainer(accelerator=ctx.meta['accelerator'],
                             devices=ctx.meta['device'],
@@ -232,15 +232,15 @@ def train(ctx, **kwargs):
         if load:
             message(f'Loading from checkpoint {load}.')
             if load.endswith('ckpt'):
-                model = CRNNRecognitionModel.load_from_checkpoint(load, config=m_config)
+                model = VGSLRecognitionModel.load_from_checkpoint(load, config=m_config)
             else:
-                model = CRNNRecognitionModel.load_from_weights(load, config=m_config)
+                model = VGSLRecognitionModel.load_from_weights(load, config=m_config)
         elif resume:
             message(f'Resuming from checkpoint {resume}.')
-            model = CRNNRecognitionModel.load_from_checkpoint(resume)
+            model = VGSLRecognitionModel.load_from_checkpoint(resume)
         else:
             message('Initializing new model.')
-            model = CRNNRecognitionModel(m_config)
+            model = VGSLRecognitionModel(m_config)
 
     try:
         (entry_point,) = importlib.metadata.entry_points(group='kraken.writers', name=params['weights_format'])
@@ -262,7 +262,7 @@ def train(ctx, **kwargs):
 
     score = checkpoint_callback.best_model_score.item()
     weight_path = Path(checkpoint_callback.best_model_path).with_name(f'best_{score:.4f}.{params.get("weights_format")}')
-    model = CRNNRecognitionModel.load_from_checkpoint(checkpoint_callback.best_model_path, config=m_config)
+    model = VGSLRecognitionModel.load_from_checkpoint(checkpoint_callback.best_model_path, config=m_config)
     opath = writer([model.net], weight_path)
     message(f'Converting best model {checkpoint_callback.best_model_path} (score: {score:.4f}) to weights file {opath}')
 
@@ -317,8 +317,8 @@ def test(ctx, **kwargs):
         params['bidi_reordering'] = params['base_dir']
 
     from kraken.lib import vgsl  # NOQA
-    from kraken.train import (KrakenTrainer, CRNNRecognitionModel,
-                              CRNNRecognitionDataModule)
+    from kraken.train import (KrakenTrainer, VGSLRecognitionModel,
+                              VGSLRecognitionDataModule)
     from kraken.configs import VGSLRecognitionTrainingDataConfig, VGSLRecognitionTrainingConfig
     from kraken.serialization import render_report
 
@@ -332,14 +332,14 @@ def test(ctx, **kwargs):
 
     m_config = VGSLRecognitionTrainingConfig(**params)
     dm_config = VGSLRecognitionTrainingDataConfig(**params)
-    data_module = CRNNRecognitionDataModule(dm_config)
+    data_module = VGSLRecognitionDataModule(dm_config)
 
     with trainer.init_module(empty_init=False):
         message(f'Loading from {model}.')
         if model.endswith('ckpt'):
-            model = CRNNRecognitionModel.load_from_checkpoint(model, config=m_config)
+            model = VGSLRecognitionModel.load_from_checkpoint(model, config=m_config)
         else:
-            model = CRNNRecognitionModel.load_from_weights(model, m_config)
+            model = VGSLRecognitionModel.load_from_weights(model, m_config)
 
     with threadpool_limits(limits=ctx.meta['num_threads']):
         test_metrics = trainer.test(model, data_module)

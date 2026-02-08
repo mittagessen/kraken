@@ -37,9 +37,14 @@ class TestBaselineSet(unittest.TestCase):
 
     def test_baselineset_simple_xml(self):
         """
-        Tests simple BaselineSet instantiation
+        Tests simple BaselineSet instantiation with all baseline and region types.
         """
-        ds = BaselineSet(im_transforms=self.transforms)
+        class_mapping = {
+            'aux': {'_start_separator': 0, '_end_separator': 1},
+            'baselines': {'$pag': 2, '$pac': 3, '$tip': 4, '$par': 5},
+            'regions': {'$pag': 6, '$pac': 7, '$tip': 8, '$par': 9},
+        }
+        ds = BaselineSet(class_mapping=class_mapping, im_transforms=self.transforms)
         ds.add(self.doc)
         ds.add(self.doc)
 
@@ -49,102 +54,217 @@ class TestBaselineSet(unittest.TestCase):
         self.assertEqual(sample['image'].shape, (1, 200, 100))
         self.assertEqual(sample['target'].shape, (ds.num_classes, 200, 100))
 
-    def test_baselineset_simple_valid_baselines(self):
+    def test_baselineset_filter_baselines(self):
         """
-        Test baseline whitelisting in BaselineSet
+        Test that only baselines present in class_mapping are included.
         """
-        # filter out $pac and $pag baseline classes
-        ds = BaselineSet(im_transforms=self.transforms,
-                         valid_baselines=['$par', '$tip'])
+        class_mapping = {
+            'aux': {'_start_separator': 0, '_end_separator': 1},
+            'baselines': {'$tip': 2, '$par': 3},
+            'regions': {'$pag': 4, '$pac': 5, '$tip': 6, '$par': 7},
+        }
+        ds = BaselineSet(class_mapping=class_mapping, im_transforms=self.transforms)
         ds.add(self.doc)
         ds.add(self.doc)
 
         sample = ds[0]
         self.assertEqual(len(ds), 2)
         self.assertEqual(ds.num_classes, 8)
-        self.assertEqual(set(ds.class_mapping['baselines'].keys()), set(('$tip', '$par')))
+        self.assertEqual(set(ds.class_mapping['baselines'].keys()), {'$tip', '$par'})
         self.assertNotIn('$pac', ds.class_mapping['baselines'])
         self.assertNotIn('$pag', ds.class_mapping['baselines'])
         self.assertEqual(sample['image'].shape, (1, 200, 100))
         self.assertEqual(sample['target'].shape, (ds.num_classes, 200, 100))
 
-    def test_baselineset_simple_valid_regions(self):
+    def test_baselineset_filter_regions(self):
         """
-        Test region whitelisting in BaselineSet
+        Test that only regions present in class_mapping are included.
         """
-        # filter out $tip and $par regions
-        ds = BaselineSet(im_transforms=self.transforms,
-                         valid_regions=['$pag', '$pac'])
+        class_mapping = {
+            'aux': {'_start_separator': 0, '_end_separator': 1},
+            'baselines': {'$pag': 2, '$pac': 3, '$tip': 4, '$par': 5},
+            'regions': {'$pag': 6, '$pac': 7},
+        }
+        ds = BaselineSet(class_mapping=class_mapping, im_transforms=self.transforms)
         ds.add(self.doc)
         ds.add(self.doc)
 
         sample = ds[0]
         self.assertEqual(len(ds), 2)
         self.assertEqual(ds.num_classes, 8)
-        self.assertEqual(set(ds.class_mapping['regions'].keys()), set(('$pag', '$pac')))
+        self.assertEqual(set(ds.class_mapping['regions'].keys()), {'$pag', '$pac'})
         self.assertNotIn('$par', ds.class_mapping['regions'])
         self.assertNotIn('$tip', ds.class_mapping['regions'])
         self.assertEqual(sample['image'].shape, (1, 200, 100))
         self.assertEqual(sample['target'].shape, (ds.num_classes, 200, 100))
 
-    def test_baselineset_simple_merge_baselines(self):
+    def test_baselineset_merge_baselines(self):
         """
-        Test baseline merging in BaselineSet
+        Test baseline merging via duplicate index values in class_mapping.
         """
-        # merge $par into $tip
-        ds = BaselineSet(im_transforms=self.transforms,
-                         merge_baselines={'$par': '$tip'})
+        # $par and $tip share index 4 (merged), $pag=2, $pac=3
+        class_mapping = {
+            'aux': {'_start_separator': 0, '_end_separator': 1},
+            'baselines': {'$pag': 2, '$pac': 3, '$par': 4, '$tip': 4},
+            'regions': {'$pag': 5, '$pac': 6, '$tip': 7, '$par': 8},
+        }
+        ds = BaselineSet(class_mapping=class_mapping, im_transforms=self.transforms)
         ds.add(self.doc)
         ds.add(self.doc)
 
         sample = ds[0]
         self.assertEqual(len(ds), 2)
         self.assertEqual(ds.num_classes, 9)
-        self.assertEqual(set(ds.class_mapping['baselines'].keys()), set(('$tip', '$pag', '$pac')))
-        self.assertEqual(len(ds.targets[0]['baselines']['$tip']), 18)
-        self.assertNotIn('$par', ds.class_mapping['baselines'])
+        # merged baselines should have 17 ($par) + 1 ($tip) = 18 lines at index 4
+        self.assertEqual(len(ds.targets[0]['baselines'][4]), 18)
         self.assertEqual(sample['image'].shape, (1, 200, 100))
         self.assertEqual(sample['target'].shape, (ds.num_classes, 200, 100))
 
-    def test_baselineset_merge_after_valid_baselines(self):
+    def test_baselineset_merge_and_filter_baselines(self):
         """
-        Test that filtering with valid_baselines occurs before merging.
+        Test merging and filtering baselines simultaneously.
         """
-        # merge $par and $pac into $tip but discard $par before
-        ds = BaselineSet(im_transforms=self.transforms,
-                         valid_baselines=('$tip', '$pac'),
-                         merge_baselines={'$par': '$tip', '$pac': '$tip'})
+        # only $tip and $pac in mapping, both merged to index 2
+        class_mapping = {
+            'aux': {'_start_separator': 0, '_end_separator': 1},
+            'baselines': {'$tip': 2, '$pac': 2},
+            'regions': {'$pag': 3, '$pac': 4, '$tip': 5, '$par': 6},
+        }
+        ds = BaselineSet(class_mapping=class_mapping, im_transforms=self.transforms)
         ds.add(self.doc)
         ds.add(self.doc)
 
         sample = ds[0]
         self.assertEqual(len(ds), 2)
         self.assertEqual(ds.num_classes, 7)
-        self.assertEqual(set(ds.class_mapping['baselines'].keys()), set(('$tip',)))
-        self.assertEqual(len(ds.targets[0]['baselines']['$tip']), 26)
+        # merged baselines: $tip (1) + $pac (25) = 26 lines at index 2
+        self.assertEqual(len(ds.targets[0]['baselines'][2]), 26)
         self.assertNotIn('$par', ds.class_mapping['baselines'])
+        self.assertNotIn('$pag', ds.class_mapping['baselines'])
         self.assertEqual(sample['image'].shape, (1, 200, 100))
         self.assertEqual(sample['target'].shape, (ds.num_classes, 200, 100))
 
-    def test_baselineset_merge_after_valid_regions(self):
+    def test_baselineset_merge_and_filter_regions(self):
         """
-        Test that filtering with valid_regions occurs before merging.
+        Test merging and filtering regions simultaneously.
         """
-        # merge $par and $pac into $tip but discard $par before
-        ds = BaselineSet(im_transforms=self.transforms,
-                         valid_regions=('$tip', '$pac'),
-                         merge_regions={'$par': '$tip', '$pac': '$tip'})
+        # only $tip and $pac in region mapping, both merged to index 6
+        class_mapping = {
+            'aux': {'_start_separator': 0, '_end_separator': 1},
+            'baselines': {'$pag': 2, '$pac': 3, '$tip': 4, '$par': 5},
+            'regions': {'$tip': 6, '$pac': 6},
+        }
+        ds = BaselineSet(class_mapping=class_mapping, im_transforms=self.transforms)
         ds.add(self.doc)
         ds.add(self.doc)
 
         sample = ds[0]
         self.assertEqual(len(ds), 2)
         self.assertEqual(ds.num_classes, 7)
-        self.assertEqual(set(ds.class_mapping['regions'].keys()), set(('$tip',)))
-        self.assertEqual(len(ds.targets[0]['regions']['$tip']), 2)
+        # merged regions: $tip (1) + $pac (1) = 2 regions at index 6
+        self.assertEqual(len(ds.targets[0]['regions'][6]), 2)
         self.assertNotIn('$par', ds.class_mapping['regions'])
+        self.assertNotIn('$pag', ds.class_mapping['regions'])
         self.assertEqual(sample['image'].shape, (1, 200, 100))
         self.assertEqual(sample['target'].shape, (ds.num_classes, 200, 100))
+
+    def test_baselineset_empty_baselines_and_regions(self):
+        """
+        Test aux-only class_mapping with empty baselines and regions.
+        """
+        class_mapping = {
+            'aux': {'_start_separator': 0, '_end_separator': 1},
+            'baselines': {},
+            'regions': {},
+        }
+        ds = BaselineSet(class_mapping=class_mapping, im_transforms=self.transforms)
+        ds.add(self.doc)
+
+        self.assertEqual(len(ds), 1)
+        self.assertEqual(ds.num_classes, 2)
+        self.assertEqual(ds.targets[0]['baselines'], {})
+        self.assertEqual(ds.targets[0]['regions'], {})
+
+    def test_baselineset_invalid_missing_aux(self):
+        """
+        Test that missing 'aux' key raises ValueError.
+        """
+        class_mapping = {
+            'baselines': {'$par': 2},
+            'regions': {'$par': 3},
+        }
+        with raises(ValueError):
+            BaselineSet(class_mapping=class_mapping, im_transforms=self.transforms)
+
+    def test_baselineset_invalid_missing_baselines(self):
+        """
+        Test that missing 'baselines' key raises ValueError.
+        """
+        class_mapping = {
+            'aux': {'_start_separator': 0, '_end_separator': 1},
+            'regions': {'$par': 2},
+        }
+        with raises(ValueError):
+            BaselineSet(class_mapping=class_mapping, im_transforms=self.transforms)
+
+    def test_baselineset_invalid_missing_regions(self):
+        """
+        Test that missing 'regions' key raises ValueError.
+        """
+        class_mapping = {
+            'aux': {'_start_separator': 0, '_end_separator': 1},
+            'baselines': {'$par': 2},
+        }
+        with raises(ValueError):
+            BaselineSet(class_mapping=class_mapping, im_transforms=self.transforms)
+
+    def test_baselineset_invalid_missing_start_separator(self):
+        """
+        Test that missing '_start_separator' in aux raises ValueError.
+        """
+        class_mapping = {
+            'aux': {'_end_separator': 1},
+            'baselines': {'$par': 2},
+            'regions': {'$par': 3},
+        }
+        with raises(ValueError):
+            BaselineSet(class_mapping=class_mapping, im_transforms=self.transforms)
+
+    def test_baselineset_invalid_missing_end_separator(self):
+        """
+        Test that missing '_end_separator' in aux raises ValueError.
+        """
+        class_mapping = {
+            'aux': {'_start_separator': 0},
+            'baselines': {'$par': 2},
+            'regions': {'$par': 3},
+        }
+        with raises(ValueError):
+            BaselineSet(class_mapping=class_mapping, im_transforms=self.transforms)
+
+    def test_baselineset_invalid_negative_value(self):
+        """
+        Test that negative index values raise ValueError.
+        """
+        class_mapping = {
+            'aux': {'_start_separator': 0, '_end_separator': 1},
+            'baselines': {'$par': -1},
+            'regions': {'$par': 2},
+        }
+        with raises(ValueError):
+            BaselineSet(class_mapping=class_mapping, im_transforms=self.transforms)
+
+    def test_baselineset_invalid_non_integer_value(self):
+        """
+        Test that non-integer index values raise ValueError.
+        """
+        class_mapping = {
+            'aux': {'_start_separator': 0, '_end_separator': 1},
+            'baselines': {'$par': 2.5},
+            'regions': {'$par': 3},
+        }
+        with raises(ValueError):
+            BaselineSet(class_mapping=class_mapping, im_transforms=self.transforms)
 
 
 class TestInputTransforms(unittest.TestCase):
