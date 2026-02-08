@@ -127,10 +127,10 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
               '--partition',
               type=float,
               help='Ground truth data partition ratio between train/validation set')
-@click.option('-t', '--training-files', 'training_data', multiple=True,
+@click.option('-t', '--training-data', 'training_data', multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with additional paths to training data')
-@click.option('-e', '--evaluation-files', 'evaluation_data', multiple=True,
+@click.option('-e', '--evaluation-data', 'evaluation_data', multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
 @click.option('-f', '--format-type', type=click.Choice(['path', 'xml', 'alto', 'page', 'binary']),
@@ -201,7 +201,7 @@ def pretrain(ctx, **kwargs):
     if params['evaluation_data']:
         params['partition'] = 1
 
-    # merge training_files into ground_truth list
+    # merge training_data into ground_truth list
     if training_data:
         ground_truth.extend(training_data)
 

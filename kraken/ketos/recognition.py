@@ -114,10 +114,10 @@ logger = logging.getLogger('kraken')
               'direction.  This should be set to the direction used during the '
               'creation of the training data. If set to `auto` it will be '
               'overridden by any explicit value given in the input files.')
-@click.option('-t', '--training-files', 'training_data', multiple=True,
+@click.option('-t', '--training-data', 'training_data', multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with additional paths to training data')
-@click.option('-e', '--evaluation-files', 'evaluation_data',
+@click.option('-e', '--evaluation-data', 'evaluation_data',
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
 @click.option('-f', '--format-type', type=click.Choice(['path', 'xml', 'alto', 'page', 'binary']), default='path',
@@ -179,7 +179,7 @@ def train(ctx, **kwargs):
     if params['evaluation_data']:
         params['partition'] = 1
 
-    # merge training_files into ground_truth list
+    # merge training_data into ground_truth list
     if training_data:
         ground_truth.extend(training_data)
 
@@ -271,7 +271,7 @@ def train(ctx, **kwargs):
 @click.pass_context
 @click.option('-B', '--batch-size', type=int, help='Batch sample size')
 @click.option('-m', '--model', type=click.Path(exists=True, readable=True), help='Model to evaluate')
-@click.option('-e', '--test-files', 'test_data', multiple=True,
+@click.option('-e', '--test-data', 'test_data', multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with paths to evaluation data.')
 @click.option('-f', '--format-type', type=click.Choice(['path', 'xml', 'alto', 'page', 'binary']), default='path',
@@ -307,7 +307,7 @@ def test(ctx, **kwargs):
     test_data = params.pop('test_data', [])
     test_set = list(params.pop('test_set', []))
 
-    # merge training_files into ground_truth list
+    # merge test_data into test_set list
     if test_data:
         test_set.extend(test_data)
 
