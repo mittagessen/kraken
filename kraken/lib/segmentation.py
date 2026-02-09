@@ -882,8 +882,8 @@ def _extract_element_features(element, image_size, class_mapping, num_classes):
 
     Args:
         element: A BaselineLine or Region object.
-        image_size: Tuple (height, width) of the source image.
-        class_mapping: dict mapping type tags to class indices.
+        image_size: Tuple (width, height) of the source image.
+        class_mapping: Dict mapping type tags to class indices.
         num_classes: Total number of classes (including the default class).
 
     Returns:
@@ -891,7 +891,7 @@ def _extract_element_features(element, image_size, class_mapping, num_classes):
     """
     from kraken.lib.dataset.utils import _get_type
 
-    h, w = image_size
+    w, h = image_size
     tag = _get_type(element.tags)
     cl = torch.zeros(num_classes, dtype=torch.float)
     cl[class_mapping.get(tag, 0)] = 1
@@ -929,7 +929,7 @@ def neural_reading_order(lines: Sequence[Union['BaselineLine', 'Region']],
         lines: list of BaselineLine or Region objects.
         regions: list of Region objects (unused).
         model: torch Module for reading order prediction.
-        im_size: tuple (height, width) of the input image.
+        im_size: tuple (width, height) of the input image.
         class_mapping: dict mapping element types to indices.
 
     Returns:

@@ -113,7 +113,7 @@ class SegmentationTaskModel(nn.Module):
         logger.info(f'Merging {len(segs)} segmentations.')
         segmentation = self._merge_segmentations(segs, config)
         logger.info('Computing reading order(s)')
-        im_size = (im.height, im.width)
+        im_size = im.size
         return self._compute_additional_line_orders(segmentation, config, im_size=im_size)
 
     @classmethod
@@ -194,6 +194,11 @@ class SegmentationTaskModel(nn.Module):
         """
         Computes additional reading orders with neural models.
 
+        Args:
+            segmentation: Segmentation container to augment with reading orders.
+            config: Inference configuration.
+            im_size: Dimensions of the source image as a (width, height) tuple.
+
         Neural reading order models are separated by level (baselines/regions).
         If a region-level model is present, regions are ordered first. If a
         line-level model is present, lines within each region are ordered. The
@@ -224,11 +229,10 @@ class SegmentationTaskModel(nn.Module):
 
         # Order regions if region model present
         if region_ro and all_regions:
-            region_order = neural_reading_order(
-                lines=all_regions,
-                model=region_ro,
-                im_size=im_size,
-                class_mapping=seg_class_mapping.get('regions', {}))
+            region_order = neural_reading_order(lines=all_regions,
+                                                model=region_ro,
+                                                im_size=im_size,
+                                                class_mapping=seg_class_mapping.get('regions', {}))
             if region_order is not None:
                 ordered_regions = [all_regions[i] for i in region_order]
             else:
@@ -252,11 +256,10 @@ class SegmentationTaskModel(nn.Module):
                 for region in ordered_regions:
                     rlines = region_line_map.get(region.id, [])
                     if len(rlines) > 1:
-                        lo = neural_reading_order(
-                            lines=rlines,
-                            model=line_ro,
-                            im_size=im_size,
-                            class_mapping=line_class_mapping)
+                        lo = neural_reading_order(lines=rlines,
+                                                  model=line_ro,
+                                                  im_size=im_size,
+                                                  class_mapping=line_class_mapping)
                         if lo is not None:
                             ordered_lines.extend([rlines[i] for i in lo])
                         else:
@@ -266,11 +269,10 @@ class SegmentationTaskModel(nn.Module):
                 # Orphan lines (no region)
                 orphans = region_line_map.get(None, [])
                 if len(orphans) > 1:
-                    lo = neural_reading_order(
-                        lines=orphans,
-                        model=line_ro,
-                        im_size=im_size,
-                        class_mapping=line_class_mapping)
+                    lo = neural_reading_order(lines=orphans,
+                                              model=line_ro,
+                                              im_size=im_size,
+                                              class_mapping=line_class_mapping)
                     if lo is not None:
                         ordered_lines.extend([orphans[i] for i in lo])
                     else:
@@ -278,11 +280,10 @@ class SegmentationTaskModel(nn.Module):
                 else:
                     ordered_lines.extend(orphans)
             else:
-                lo = neural_reading_order(
-                    lines=segmentation.lines,
-                    model=line_ro,
-                    im_size=im_size,
-                    class_mapping=line_class_mapping)
+                lo = neural_reading_order(lines=segmentation.lines,
+                                          model=line_ro,
+                                          im_size=im_size,
+                                          class_mapping=line_class_mapping)
                 if lo is not None:
                     ordered_lines = [segmentation.lines[i] for i in lo]
                 else:
