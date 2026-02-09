@@ -70,7 +70,7 @@ class BLLASegmentationDataModule(L.LightningDataModule):
                 data = []
                 for pos, file in enumerate(dataset):
                     try:
-                        data.append(XMLPage(file, filetype=data_config.format_type).to_container())
+                        data.append({'doc': XMLPage(file, filetype=data_config.format_type).to_container()})
                     except Exception as e:
                         logger.warning(f'Failed to parse {file}: {e}')
                 return data
@@ -128,10 +128,11 @@ class BLLASegmentationDataModule(L.LightningDataModule):
         dataset = BaselineSet(line_width=self.hparams.data_config.line_width,
                               **kwargs)
 
-        try:
-            dataset.add(**sample)
-        except Exception as e:
-            logger.warning(str(e))
+        for sample in data:
+            try:
+                dataset.add(**sample)
+            except Exception as e:
+                logger.warning(str(e))
 
         return dataset
 
