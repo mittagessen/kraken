@@ -95,7 +95,7 @@ def serialize(results: 'Segmentation',
 
     Args:
         segmentation: Segmentation container object
-        image_size: Dimensions of the source image
+        image_size: Dimensions of the source image as a (width, height) tuple.
         writing_mode: Sets the principal layout of lines and the
                       direction in which blocks progress. Valid values are
                       horizontal-tb, vertical-rl, and vertical-lr.

@@ -111,7 +111,7 @@ def parse_alto(doc, filename, linetype):
         raise ValueError(f'No "Page" element found in ALTO file {filename}')
 
     try:
-        image_size = int(page.get('HEIGHT')), int(page.get('WIDTH'))
+        image_size = int(page.get('WIDTH')), int(page.get('HEIGHT'))
     except (ValueError, TypeError) as e:
         raise ValueError(f'Invalid image dimensions in {filename}: {e}')
 

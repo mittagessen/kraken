@@ -53,7 +53,7 @@ class XMLPage(object):
     Attributes:
         type: Either 'baselines' or 'bbox'.
         imagename: Path to the image to the XML file.
-        image_size: Size of the image as a (height, width) tuple
+        image_size: Size of the image as a (width, height) tuple
         has_tags: Indicates if the source document contains tag information
         has_splits: Indicates if the source document contains explicit training splits
     """
