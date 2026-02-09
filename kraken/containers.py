@@ -84,7 +84,7 @@ class ocr_line(ABC):
     text: Optional[str] = None
     base_dir: Optional[Literal['L', 'R']] = None
     imagename: Optional[Union[str, 'PathLike']] = None
-    tags: Optional[dict[str, str]] = None
+    tags: Optional[dict[str, list[dict[str, str]]]] = None
     split: Optional[Literal['train', 'validation', 'test']] = None
     regions: Optional[list[str]] = None
     language: Optional[list[str]] = None
@@ -142,7 +142,7 @@ class Region:
     id: str
     boundary: list[tuple[int, int]]
     imagename: Optional[Union[str, 'PathLike']] = None
-    tags: Optional[dict[str, str]] = None
+    tags: Optional[dict[str, list[dict[str, str]]]] = None
     language: Optional[list[str]] = None
 
 
