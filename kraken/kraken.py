@@ -546,8 +546,8 @@ def segment(ctx, **kwargs):
               type=float,
               help='Softmax temperature')
 @click.option('--num-line-workers',
-              type=click.IntRange(1),
-              help='Number of line extraction worker processes.')
+              type=click.IntRange(0),
+              help='Number of line extraction worker processes. 0 for in-process extraction.')
 @click.option('-n',
               '--reorder/--no-reorder',
               'bidi_reordering',

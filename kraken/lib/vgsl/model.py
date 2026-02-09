@@ -174,8 +174,7 @@ class TorchVGSLModel(nn.Module,
                                               'metrics': [],
                                               'seg_type': None,
                                               'one_channel_mode': None,
-                                              'model_type': None,
-                                              'legacy_polygons': False}  # enable new polygons by default on new models
+                                              'model_type': None}
 
         self.user_metadata.update(**kwargs)
 
@@ -468,9 +467,13 @@ class TorchVGSLModel(nn.Module,
         self.eval()
         self._inf_config = config
         # create line extraction worker pool
-        from torch.multiprocessing import Pool
         if self.model_type == 'recognition' and getattr(self, '_line_extraction_pool', None) is None:
-            self._line_extraction_pool = Pool(self._inf_config.num_line_workers)
+            if self._inf_config.num_line_workers == 0:
+                from multiprocessing.pool import ThreadPool
+                self._line_extraction_pool = ThreadPool(1)
+            else:
+                from torch.multiprocessing import Pool
+                self._line_extraction_pool = Pool(self._inf_config.num_line_workers)
             import atexit
             atexit.register(self._line_extraction_pool.terminate)
 
