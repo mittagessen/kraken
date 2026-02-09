@@ -23,6 +23,7 @@ from collections.abc import Sequence
 from typing import Union
 
 import numpy as np
+import torch.serialization
 from torch import IntTensor
 
 from kraken.lib.exceptions import KrakenCodecException, KrakenEncodeException
@@ -264,3 +265,6 @@ class PytorchCodec(object):
 
     def __repr__(self):
         return f'PytorchCodec({self.c2l})'
+
+
+torch.serialization.add_safe_globals([PytorchCodec])
