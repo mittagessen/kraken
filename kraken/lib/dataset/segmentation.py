@@ -16,7 +16,9 @@
 Utility functions for data loading and training of VGSL networks.
 """
 import traceback
+import multiprocessing as mp
 from collections import defaultdict
+from ctypes import c_char
 from itertools import groupby
 from typing import TYPE_CHECKING, Any, Callable
 
@@ -32,6 +34,7 @@ from torchvision import transforms
 
 from kraken.lib.dataset.utils import _get_type
 from kraken.lib.segmentation import scale_regions
+from kraken.lib.util import is_bitonal
 
 if TYPE_CHECKING:
     from kraken.containers import Segmentation
@@ -80,7 +83,6 @@ class BaselineSet(Dataset):
         self.pad = padding
         self.targets = []
         self.class_mapping = class_mapping
-        self.num_classes = max(v for d in self.class_mapping.values() for v in d.values()) + 1
 
         # keep track of samples that failed to load
         self.failed_samples = set()
@@ -113,6 +115,11 @@ class BaselineSet(Dataset):
         self.line_width = line_width
         self.transforms = im_transforms
         self.seg_type = None
+        self._im_mode = mp.Value(c_char, b'1')
+
+    @property
+    def num_classes(self):
+        return max(v for d in self.class_mapping.values() for v in d.values()) + 1
 
     @property
     def canonical_class_mapping(self) -> dict[str, dict[str, int]]:
@@ -182,6 +189,18 @@ class BaselineSet(Dataset):
         self.targets.append({'baselines': baselines_, 'regions': regions_})
         self.imgs.append(doc.imagename)
 
+    def _update_im_mode(self, im):
+        if im.shape[0] == 3:
+            im_mode = b'R'
+        elif im.shape[0] == 1:
+            im_mode = b'L'
+        if is_bitonal(im):
+            im_mode = b'1'
+        with self._im_mode.get_lock():
+            if im_mode > self._im_mode.value:
+                logger.info(f'Upgrading "im_mode" from {self._im_mode.value} to {im_mode}')
+                self._im_mode.value = im_mode
+
     def __getitem__(self, idx):
         if len(self.failed_samples) == len(self):
             raise ValueError(f'All {len(self)} samples in dataset invalid.')
@@ -192,6 +211,7 @@ class BaselineSet(Dataset):
                 logger.debug(f'Attempting to load {im}')
                 im = Image.open(im)
                 im, target = self.transform(im, target)
+                self._update_im_mode(im)
                 return {'image': im, 'target': target}
             except Exception:
                 raise
@@ -201,6 +221,7 @@ class BaselineSet(Dataset):
                 logger.info(f'Failed. Replacing with sample {idx}')
                 return self[idx]
         im, target = self.transform(im, target)
+        self._update_im_mode(im)
         return {'image': im, 'target': target}
 
     @staticmethod
@@ -264,3 +285,9 @@ class BaselineSet(Dataset):
 
     def __len__(self):
         return len(self.imgs)
+
+    @property
+    def im_mode(self):
+        return {b'1': '1',
+                b'L': 'L',
+                b'R': 'RGB'}[self._im_mode.value]

@@ -15,6 +15,7 @@
 """
 Utility functions for data loading and training of VGSL networks.
 """
+from collections import defaultdict
 from math import factorial
 from typing import TYPE_CHECKING, Literal, Optional, Sequence, Union
 
@@ -48,14 +49,14 @@ def _extract_features(element, image_size, class_mapping, num_classes):
 
     Args:
         element: A BaselineLine or Region object.
-        image_size: Tuple (height, width) of the source image.
+        image_size: Tuple (width, height) of the source image.
         class_mapping: Dict mapping type tags to class indices.
         num_classes: Total number of classes (including the default class).
 
     Returns:
         A tuple (tag, features_tensor).
     """
-    h, w = image_size
+    w, h = image_size
     tag = _get_type(element.tags)
     cl = torch.zeros(num_classes, dtype=torch.float)
     cl[class_mapping.get(tag, 0)] = 1
@@ -106,9 +107,10 @@ class PairWiseROSet(Dataset):
         super().__init__()
 
         self._num_pairs = 0
+        self._num_classes = None
         self.failed_samples = []
         self.class_mapping = class_mapping
-        self.num_classes = _num_classes_from_mapping(class_mapping)
+        self.class_stats = defaultdict(int)
 
         self.data = []
 
@@ -133,7 +135,7 @@ class PairWiseROSet(Dataset):
                         try:
                             self.class_mapping[tag]
                             _order.append(el)
-                            self.num_classes = _num_classes_from_mapping(self.class_mapping)
+                            self.class_stats[tag] += 1
                         except KeyError:
                             continue
                     docs.append((doc.image_size, _order))
@@ -141,11 +143,12 @@ class PairWiseROSet(Dataset):
                     logger.warning(e)
                     continue
 
+            num_classes = _num_classes_from_mapping(self.class_mapping)
             for image_size, order in docs:
                 # traverse RO and substitute features.
                 sorted_lines = []
                 for element in order:
-                    tag, features = _extract_features(element, image_size, self.class_mapping, self.num_classes)
+                    tag, features = _extract_features(element, image_size, self.class_mapping, num_classes)
                     line_data = {'type': tag, 'features': features}
                     sorted_lines.append(line_data)
                 if len(sorted_lines) > 1:
@@ -155,6 +158,40 @@ class PairWiseROSet(Dataset):
                     logger.info(f'Page {doc} has less than 2 lines. Skipping')
         else:
             raise Exception('invalid dataset mode')
+
+    @property
+    def num_classes(self):
+        return _num_classes_from_mapping(self.class_mapping)
+
+    @property
+    def canonical_class_mapping(self) -> dict[str, int]:
+        """Returns a one-to-one class mapping (one string per label index).
+
+        For merged classes (multiple strings -> same index), the first string
+        by insertion order is kept as the canonical name.
+        """
+        seen_indices = set()
+        canonical = {}
+        for key, idx in self.class_mapping.items():
+            if idx not in seen_indices:
+                seen_indices.add(idx)
+                canonical[key] = idx
+        return canonical
+
+    @property
+    def merged_classes(self) -> dict[str, list[str]]:
+        """Returns merged class info: {canonical_name: [aliases]}.
+
+        Only includes entries where multiple strings map to the same index.
+        """
+        idx_to_names: dict[int, list[str]] = defaultdict(list)
+        for key, idx in self.class_mapping.items():
+            idx_to_names[idx].append(key)
+        merged = {}
+        for idx, names in idx_to_names.items():
+            if len(names) > 1:
+                merged[names[0]] = names[1:]
+        return merged
 
     def __getitem__(self, idx):
         lines = []
@@ -199,9 +236,10 @@ class PageWiseROSet(Dataset):
         """
         super().__init__()
 
+        self._num_classes = None
         self.failed_samples = []
         self.class_mapping = class_mapping
-        self.num_classes = _num_classes_from_mapping(class_mapping)
+        self.class_stats = defaultdict(int)
 
         self.data = []
 
@@ -226,7 +264,7 @@ class PageWiseROSet(Dataset):
                         try:
                             self.class_mapping[tag]
                             _order.append(el)
-                            self.num_classes = _num_classes_from_mapping(self.class_mapping)
+                            self.class_stats[tag] += 1
                         except KeyError:
                             continue
                     docs.append((doc.image_size, _order))
@@ -234,11 +272,12 @@ class PageWiseROSet(Dataset):
                     logger.warning(e)
                     continue
 
+            num_classes = _num_classes_from_mapping(self.class_mapping)
             for image_size, order in docs:
                 # traverse RO and substitute features.
                 sorted_lines = []
                 for element in order:
-                    tag, features = _extract_features(element, image_size, self.class_mapping, self.num_classes)
+                    tag, features = _extract_features(element, image_size, self.class_mapping, num_classes)
                     line_data = {'type': tag, 'features': features}
                     sorted_lines.append(line_data)
                 if len(sorted_lines) > 1:
@@ -247,6 +286,40 @@ class PageWiseROSet(Dataset):
                     logger.info(f'Page {doc} has less than 2 lines. Skipping')
         else:
             raise Exception('invalid dataset mode')
+
+    @property
+    def num_classes(self):
+        return _num_classes_from_mapping(self.class_mapping)
+
+    @property
+    def canonical_class_mapping(self) -> dict[str, int]:
+        """Returns a one-to-one class mapping (one string per label index).
+
+        For merged classes (multiple strings -> same index), the first string
+        by insertion order is kept as the canonical name.
+        """
+        seen_indices = set()
+        canonical = {}
+        for key, idx in self.class_mapping.items():
+            if idx not in seen_indices:
+                seen_indices.add(idx)
+                canonical[key] = idx
+        return canonical
+
+    @property
+    def merged_classes(self) -> dict[str, list[str]]:
+        """Returns merged class info: {canonical_name: [aliases]}.
+
+        Only includes entries where multiple strings map to the same index.
+        """
+        idx_to_names: dict[int, list[str]] = defaultdict(list)
+        for key, idx in self.class_mapping.items():
+            idx_to_names[idx].append(key)
+        merged = {}
+        for idx, names in idx_to_names.items():
+            if len(names) > 1:
+                merged[names[0]] = names[1:]
+        return merged
 
     def __getitem__(self, idx):
         xs = []
