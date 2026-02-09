@@ -117,7 +117,7 @@ logger = logging.getLogger('kraken')
 @click.option('-t', '--training-data', 'training_data', multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with additional paths to training data')
-@click.option('-e', '--evaluation-data', 'evaluation_data',
+@click.option('-e', '--evaluation-data', 'evaluation_data', multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
 @click.option('-f', '--format-type', type=click.Choice(['path', 'xml', 'alto', 'page', 'binary']), default='path',
