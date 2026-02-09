@@ -22,7 +22,8 @@ Configurations for RO model training.
 from collections import defaultdict
 
 from kraken.configs.base import (TrainingConfig,
-                                 SegmentationTrainingDataConfig)
+                                 SegmentationTrainingDataConfig,
+                                 _Counter)
 
 __all__ = ['ROTrainingDataConfig',
            'ROTrainingConfig']
@@ -40,16 +41,9 @@ class ROTrainingDataConfig(SegmentationTrainingDataConfig):
             implicit order is used.
     """
     def __init__(self, **kwargs):
-        counter = {'i': 1}
-
-        def idx_factory():
-            val = counter['i']
-            counter['i'] += 1
-            return val
-
         self.level = kwargs.pop('level', 'baselines')
         self.reading_order = kwargs.pop('reading_order', None)
-        self.class_mapping = kwargs.pop('class_mapping', defaultdict(idx_factory))
+        self.class_mapping = kwargs.pop('class_mapping', defaultdict(_Counter(1)))
         kwargs.setdefault('batch_size', 15000)
         super().__init__(**kwargs)
 

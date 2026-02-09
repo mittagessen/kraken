@@ -8,6 +8,17 @@ import logging
 
 from collections import defaultdict
 
+
+class _Counter:
+    """Picklable auto-incrementing counter for use as a defaultdict factory."""
+    def __init__(self, start=0):
+        self.n = start
+
+    def __call__(self):
+        val = self.n
+        self.n += 1
+        return val
+
 __all__ = ['Config',
            'RecognitionInferenceConfig',
            'SegmentationInferenceConfig',
@@ -133,16 +144,10 @@ class SegmentationTrainingDataConfig(TrainingDataConfig):
         assigns a unique label to each line/region class in the training data.
     """
     def __init__(self, **kwargs):
-        counter = {'i': 2}
-
-        def idx_factory():
-            val = counter['i']
-            counter['i'] += 1
-            return val
-
+        counter = _Counter(2)
         self.format_type = kwargs.pop('format_type', 'xml')
-        self.line_class_mapping = kwargs.pop('line_class_mapping', defaultdict(idx_factory))
-        self.region_class_mapping = kwargs.pop('region_class_mapping', defaultdict(idx_factory))
+        self.line_class_mapping = kwargs.pop('line_class_mapping', defaultdict(counter))
+        self.region_class_mapping = kwargs.pop('region_class_mapping', defaultdict(counter))
         self.topline = kwargs.pop('topline', False)
         super().__init__(**kwargs)
 
