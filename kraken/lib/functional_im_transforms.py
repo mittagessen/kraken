@@ -18,7 +18,7 @@ facilitate pickling.
 """
 import unicodedata
 from pathlib import Path
-from collection.abs import Callablej
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, Literal, Optional, Union
 
 import bidi.algorithm as bd
