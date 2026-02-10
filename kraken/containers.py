@@ -26,7 +26,7 @@ from typing import (TYPE_CHECKING, Any, Literal, Optional, Union)
 import bidi.algorithm as bd
 import numpy as np
 
-from kraken.lib.segmentation import compute_polygon_section
+from kraken.lib.segmentation import compute_polygon_section, precompute_polygon_sections
 
 if TYPE_CHECKING:
     import torch
@@ -329,6 +329,12 @@ class BaselineOCRRecord(ocr_record, BaselineLine):
         self._line_base_dir = self.base_dir
         self.base_dir = base_dir
         ocr_record.__init__(self, prediction, cuts, confidences, display_order, logits, image)
+        if self.baseline and self.boundary and self._cuts:
+            self._polygon_cuts, self._intersection_cache, self._bl_length = precompute_polygon_sections(
+                self.baseline, self.boundary, self._cuts)
+        else:
+            self._polygon_cuts, self._intersection_cache, self._bl_length = [], {}, 0.0
+
 
     def __repr__(self) -> str:
         return f'pred: {self.prediction} baseline: {self.baseline} boundary: {self.boundary} confidences: {self.confidences}'
@@ -337,10 +343,7 @@ class BaselineOCRRecord(ocr_record, BaselineLine):
         if self.idx + 1 < len(self):
             self.idx += 1
             return (self.prediction[self.idx],
-                    compute_polygon_section(self.baseline,
-                                            self.boundary,
-                                            self.cuts[self.idx][0],
-                                            self.cuts[self.idx][1]),
+                    self._polygon_cuts[self.idx],
                     self.confidences[self.idx])
         else:
             raise StopIteration
@@ -356,26 +359,39 @@ class BaselineOCRRecord(ocr_record, BaselineLine):
 
     def __getitem__(self, key: Union[int, slice]):
         if isinstance(key, slice):
-            recs = [self._get_raw_item(i) for i in range(*key.indices(len(self)))]
+            indices = range(*key.indices(len(self)))
+            recs = [self._get_raw_item(i) for i in indices]
             prediction = ''.join([x[0] for x in recs])
             flat_offsets = sum((tuple(x[1]) for x in recs), ())
-            cut = compute_polygon_section(self.baseline,
-                                          self.boundary,
-                                          min(flat_offsets),
-                                          max(flat_offsets))
+            min_d = min(flat_offsets)
+            max_d = max(flat_offsets)
+            eps = np.finfo(float).eps
+            cd_min = min(self._bl_length - eps, eps if min_d == 0 else min_d)
+            cd_max = min(self._bl_length - eps, eps if max_d == 0 else max_d)
+            p1 = self._intersection_cache.get(cd_min)
+            p2 = self._intersection_cache.get(cd_max)
+            if p1 is not None and p2 is not None:
+                o = np.int_(p1).reshape(-1, 2).tolist()
+                o.extend(np.int_(np.roll(p2, 2)).reshape(-1, 2).tolist())
+                cut = tuple(o)
+            else:
+                cut = compute_polygon_section(self.baseline, self.boundary, min_d, max_d)
             confidence = np.mean([x[2] for x in recs])
             return (prediction, cut, confidence)
         elif isinstance(key, int):
-            pred, cut, confidence = self._get_raw_item(key)
-            return (pred,
-                    compute_polygon_section(self.baseline, self.boundary, cut[0], cut[1]),
-                    confidence)
+            if key < 0:
+                key += len(self)
+            if key >= len(self):
+                raise IndexError('Index (%d) is out of range' % key)
+            return (self.prediction[key],
+                    self._polygon_cuts[key],
+                    self.confidences[key])
         else:
             raise TypeError('Invalid argument type')
 
     @property
-    def cuts(self) -> list[tuple[int, int]]:
-        return tuple([compute_polygon_section(self.baseline, self.boundary, cut[0], cut[1]) for cut in self._cuts])
+    def cuts(self) -> tuple:
+        return tuple(self._polygon_cuts)
 
     def logical_order(self, base_dir: Optional[Literal['L', 'R']] = None) -> 'BaselineOCRRecord':
         """

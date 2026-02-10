@@ -57,6 +57,7 @@ __all__ = ['reading_order',
            'scale_polygonal_lines',
            'scale_regions',
            'compute_polygon_section',
+           'precompute_polygon_sections',
            'extract_polygons']
 
 
@@ -1186,6 +1187,104 @@ def compute_polygon_section(baseline: Sequence[tuple[int, int]],
     o = np.int_(points[0]).reshape(-1, 2).tolist()
     o.extend(np.int_(np.roll(points[1], 2)).reshape(-1, 2).tolist())
     return tuple(o)
+
+
+def precompute_polygon_sections(baseline: Sequence[tuple[int, int]],
+                                boundary: Sequence[tuple[int, int]],
+                                cut_pairs: list[tuple[int, int]]) -> tuple[list[tuple], dict, float]:
+    """
+    Batch-precompute polygon sections for all characters, amortizing the
+    expensive baseline extension and cumulative distance computation.
+
+    Args:
+        baseline: A polyline ((x1, y1), ..., (xn, yn))
+        boundary: A bounding polygon around the baseline.
+        cut_pairs: List of (dist1, dist2) tuples for each character.
+
+    Returns:
+        A tuple of (char_polygons, intersection_cache, bl_length) where:
+        - char_polygons is a list of polygon tuples, one per character
+        - intersection_cache maps clamped distance values to raw
+          _test_intersect result arrays (or None on failure)
+        - bl_length is the total baseline length after extension
+    """
+    if not cut_pairs:
+        return [], {}, 0.0
+
+    eps = np.finfo(float).eps
+
+    # Extend baseline endpoints to boundary (done once)
+    bl = np.array(baseline)
+    if _point_in_polygon(bl[0], boundary):
+        logger.debug(f'Extending leftmost end of baseline {bl} to polygon boundary')
+        direction = bl[0].astype(float) - bl[1].astype(float)
+        l_point = _ray_boundary_intersection(bl[0].astype(float), direction, boundary)
+        if l_point is not None:
+            bl[0] = np.array(l_point, 'int')
+        else:
+            boundary_pol = geom.Polygon(boundary)
+            bl[0] = np.array(nearest_points(geom.Point(bl[0]), boundary_pol)[1].coords[0], 'int')
+    if _point_in_polygon(bl[-1], boundary):
+        logger.debug(f'Extending rightmost end of baseline {bl} to polygon boundary')
+        direction = bl[-1].astype(float) - bl[-2].astype(float)
+        r_point = _ray_boundary_intersection(bl[-1].astype(float), direction, boundary)
+        if r_point is not None:
+            bl[-1] = np.array(r_point, 'int')
+        else:
+            boundary_pol = geom.Polygon(boundary)
+            bl[-1] = np.array(nearest_points(geom.Point(bl[-1]), boundary_pol)[1].coords[0], 'int')
+
+    # Compute cumulative distances once
+    dists = np.cumsum(np.insert(np.linalg.norm(np.diff(bl, axis=0), axis=1), 0, 0))
+    bl_length = float(dists[-1])
+    bounds = np.array(boundary)
+
+    def _clamp(d):
+        if d == 0:
+            d = eps
+        return min(bl_length - eps, d)
+
+    # Collect all unique clamped distances
+    unique_dists = set()
+    for d1, d2 in cut_pairs:
+        unique_dists.add(_clamp(d1))
+        unique_dists.add(_clamp(d2))
+
+    # Compute intersection points for each unique distance
+    intersection_cache = {}
+    for d in unique_dists:
+        seg_idx = int(np.searchsorted(dists, d))
+        seg_start = bl[seg_idx - 1].astype(float)
+        seg_end = bl[seg_idx].astype(float)
+        direction = seg_end - seg_start
+        length = np.linalg.norm(direction)
+        if length < eps:
+            unit_vec = direction
+        else:
+            unit_vec = direction / length
+        seg_point = seg_start + (d - dists[seg_idx - 1]) * unit_vec
+        try:
+            points = _test_intersect(seg_point, unit_vec[::-1], bounds).round()
+            intersection_cache[d] = points
+        except ValueError:
+            intersection_cache[d] = None
+
+    # Assemble per-character polygons
+    char_polygons = []
+    for d1, d2 in cut_pairs:
+        cd1 = _clamp(d1)
+        cd2 = _clamp(d2)
+        p1 = intersection_cache[cd1]
+        p2 = intersection_cache[cd2]
+        if p1 is not None and p2 is not None:
+            o = np.int_(p1).reshape(-1, 2).tolist()
+            o.extend(np.int_(np.roll(p2, 2)).reshape(-1, 2).tolist())
+            char_polygons.append(tuple(o))
+        else:
+            # Fallback for malformed polygons
+            char_polygons.append(compute_polygon_section(baseline, boundary, d1, d2))
+
+    return char_polygons, intersection_cache, bl_length
 
 
 def _bevelled_warping_envelope(baseline: np.ndarray,
