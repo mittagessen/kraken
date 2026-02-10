@@ -19,6 +19,8 @@ kraken.ketos.pretrain
 Command line driver for unsupervised recognition pretraining
 """
 import logging
+import importlib
+from pathlib import Path
 
 import click
 from PIL import Image
@@ -108,6 +110,7 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
               '--gamma',
               type=float,
               help='Decay factor for exponential, step, and reduceonplateau learning rate schedules')
+@click.option('--legacy-polygons', is_flag=True, help='Use the legacy polygon extractor.')
 @click.option('-ss',
               '--step-size',
               type=int,
@@ -217,7 +220,7 @@ def pretrain(ctx, **kwargs):
 
     cbs = [OnExceptionCheckpoint(dirpath=params.get('checkpoint_path'),
                                  filename='checkpoint_abort')]
-    checkpoint_callback = ModelCheckpoint(dirpath=params.pop('checkpoint_path'),
+    checkpoint_callback = ModelCheckpoint(dirpath=Path(params.pop('checkpoint_path')),
                                           save_top_k=10,
                                           monitor='CE',
                                           mode='min',
@@ -252,12 +255,12 @@ def pretrain(ctx, **kwargs):
         if load:
             message(f'Loading from checkpoint {load}.')
             if load.endswith('ckpt'):
-                model = RecognitionPretrainModel.load_from_checkpoint(load, config=m_config)
+                model = RecognitionPretrainModel.load_from_checkpoint(load, config=m_config, weights_only=True)
             else:
                 model = RecognitionPretrainModel.load_from_weights(load, m_config)
         elif resume:
             message(f'Resuming from checkpoint {resume}.')
-            model = RecognitionPretrainModel.load_from_checkpoint(resume)
+            model = RecognitionPretrainModel.load_from_checkpoint(resume, weights_only=True)
         else:
             message('Initializing new model.')
             model = RecognitionPretrainModel(m_config)
@@ -270,3 +273,16 @@ def pretrain(ctx, **kwargs):
 
     score = checkpoint_callback.best_model_score.item()
     message(f'Best model checkpoint: {checkpoint_callback.best_model_path}')
+
+    try:
+        (entry_point,) = importlib.metadata.entry_points(group='kraken.writers', name='coreml')
+        writer = entry_point.load()
+    except ValueError:
+        raise click.UsageError('weights_format', 'Unknown format `coreml` for weights.')
+
+    weight_path = Path(checkpoint_callback.best_model_path).with_name(f'best_{score:.4f}.coreml')
+    model = RecognitionPretrainModel.load_from_checkpoint(checkpoint_callback.best_model_path,
+                                                          config=m_config,
+                                                          weights_only=True)
+    opath = writer([model.net], weight_path)
+    message(f'Converting best model {checkpoint_callback.best_model_path} (score: {score:.4f}) to weights file {opath}')

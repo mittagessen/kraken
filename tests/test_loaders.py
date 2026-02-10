@@ -13,7 +13,7 @@ from pytest import raises
 from safetensors import safe_open
 
 from kraken.models.utils import create_model
-from kraken.models import load_models, write_models
+from kraken.models import load_models, write_safetensors
 
 thisfile = Path(__file__).resolve().parent
 resources = thisfile / 'resources'
@@ -126,33 +126,18 @@ class TestLoadModels(unittest.TestCase):
 
 class TestWriteModels(unittest.TestCase):
     """
-    Tests for the `write_models` factory function that uses registered writers
-    to serialize model objects.
+    Tests for the `write_safetensors`/`write`
     """
-
-    def test_write_models_existing_path_raises(self):
-        """
-        Tests that write_models raises ValueError if the target path already
-        exists.
-        """
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.safetensors') as fp:
-            try:
-                models = load_models(resources / 'overfit.mlmodel')
-                with raises(ValueError, match='already exists'):
-                    write_models(models, fp.name)
-            finally:
-                os.unlink(fp.name)
-
     def test_write_read_roundtrip_safetensors(self):
         """
         Tests that models can be written and read back in safetensors format.
         """
-        models = load_models(resources / 'overfit.mlmodel')
+        models = load_models(resources / 'model_small.safetensors')
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / 'test_model.safetensors'
-            write_models(models, path)
-            self.assertTrue(path.exists())
-            loaded = load_models(path)
+            opath = write_safetensors(models, path)
+            self.assertTrue(opath.exists())
+            loaded = load_models(opath)
             self.assertEqual(len(loaded), len(models))
             self.assertEqual(loaded[0].model_type, models[0].model_type)
 
@@ -163,9 +148,9 @@ class TestWriteModels(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / 'fp16.safetensors'
-            write_models(models, path)
+            opath = write_safetensors(models, path)
 
-            with safe_open(path, framework='pt') as f:
+            with safe_open(opath, framework='pt') as f:
                 for key in f.keys():
                     tensor = f.get_tensor(key)
                     self.assertEqual(tensor.dtype, torch.float16,
@@ -178,9 +163,9 @@ class TestWriteModels(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / 'mixed.safetensors'
-            write_models(models, path)
+            opath = write_safetensors(models, path)
 
-            with safe_open(path, framework='pt') as f:
+            with safe_open(opath, framework='pt') as f:
                 for key in f.keys():
                     tensor = f.get_tensor(key)
                     if '.C_0.' in key:

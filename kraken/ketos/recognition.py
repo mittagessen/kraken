@@ -198,7 +198,7 @@ def train(ctx, **kwargs):
 
     cbs = [OnExceptionCheckpoint(dirpath=params.get('checkpoint_path'),
                                  filename='checkpoint_abort')]
-    checkpoint_callback = ModelCheckpoint(dirpath=params.pop('checkpoint_path'),
+    checkpoint_callback = ModelCheckpoint(dirpath=Path(params.pop('checkpoint_path')),
                                           save_top_k=10,
                                           monitor='val_metric',
                                           mode='max',
@@ -301,6 +301,7 @@ def test(ctx, **kwargs):
     params.update(ctx.params)
 
     model = params.pop('model')
+    no_legacy_polygons = params.pop('no_legacy_polygons')
     if not model:
         raise click.UsageError('No model to evaluate given.')
 
@@ -331,15 +332,20 @@ def test(ctx, **kwargs):
                             num_sanity_val_steps=0)
 
     m_config = VGSLRecognitionTrainingConfig(**params)
-    dm_config = VGSLRecognitionTrainingDataConfig(**params)
-    data_module = VGSLRecognitionDataModule(dm_config)
-
     with trainer.init_module(empty_init=False):
         message(f'Loading from {model}.')
         if model.endswith('ckpt'):
             model = VGSLRecognitionModel.load_from_checkpoint(model, config=m_config)
         else:
             model = VGSLRecognitionModel.load_from_weights(model, m_config)
+
+    if not no_legacy_polygons and model.net.use_legacy_polygons:
+        params['legacy_polygons'] = True
+    else:
+        params['legacy_polygons'] = False
+
+    dm_config = VGSLRecognitionTrainingDataConfig(**params)
+    data_module = VGSLRecognitionDataModule(dm_config)
 
     with threadpool_limits(limits=ctx.meta['num_threads']):
         test_metrics = trainer.test(model, data_module)

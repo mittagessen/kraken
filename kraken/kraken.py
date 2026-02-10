@@ -491,7 +491,7 @@ def segment(ctx, **kwargs):
     if params['boxes'] is False:
         if not params['model']:
             params['model'] = SEGMENTATION_DEFAULT_MODEL
-        model = Path(params['model'])
+        model = Path(params['model']).expanduser()
         ctx.meta['steps'].append(ProcessingStep(id=f'_{uuid.uuid4()}',
                                                 category='processing',
                                                 description='Baseline and region segmentation',
@@ -503,8 +503,8 @@ def segment(ctx, **kwargs):
         locations = []
         location = None
         search = chain([model],
-                       Path(user_data_dir('htrmopo')).rglob(str(model)),
-                       Path(click.get_app_dir('kraken')).rglob(str(model)))
+                       Path(user_data_dir('htrmopo')).rglob(str(model)) if not model.is_absolute() else (),
+                       Path(click.get_app_dir('kraken')).rglob(str(model)) if not model.is_absolute() else ())
         for loc in search:
             if loc.is_file():
                 location = loc
@@ -588,9 +588,10 @@ def ocr(ctx, **kwargs):
         config.bidi_reordering = params['base_dir']
 
     # first we try to find the model in the absolute path, then ~/.kraken
-    search = chain([Path(params['model'])],
-                   Path(user_data_dir('htrmopo')).rglob(params['model']),
-                   Path(click.get_app_dir('kraken')).rglob(params['model']))
+    model = Path(params['model']).expanduser()
+    search = chain([model],
+                   Path(user_data_dir('htrmopo')).rglob(str(model)) if not model.is_absolute() else (),
+                   Path(click.get_app_dir('kraken')).rglob(str(model)) if not model.is_absolute() else ())
 
     location = None
     for loc in search:

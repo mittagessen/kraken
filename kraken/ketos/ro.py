@@ -147,8 +147,10 @@ def rotrain(ctx, **kwargs):
         if 'class_mapping' in params:
             raise click.UsageError('--class-mapping and --class-mapping-from-ckpt are mutually exclusive.')
         import torch
+        import kraken.configs  # registers safe globals for checkpoint configs
+        import kraken.lib.codec  # registers PytorchCodec if present in ckpt
         try:
-            ckpt = torch.load(class_mapping_from_ckpt, map_location='cpu', weights_only=False)
+            ckpt = torch.load(class_mapping_from_ckpt, map_location='cpu', weights_only=True)
             data_config = ckpt['hyper_parameters']['data_config']
             if params.get('level', 'baselines') == 'baselines':
                 cm = data_config.line_class_mapping
