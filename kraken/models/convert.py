@@ -55,7 +55,7 @@ def convert_models(paths: Iterable[Union[str, 'PathLike']],
         for entry_point in importlib.metadata.entry_points(group='kraken.lightning_modules'):
             module = entry_point.load()
             try:
-                return module.load_from_checkpoint(path, weights_only=False)
+                return module.load_from_checkpoint(path, weights_only=True)
             except Exception:
                 continue
         raise ValueError(f'No lightning module found for checkpoint {path}')
@@ -64,6 +64,13 @@ def convert_models(paths: Iterable[Union[str, 'PathLike']],
     for ckpt in paths:
         ckpt = Path(ckpt)
         if ckpt.suffix == '.ckpt':
+            import torch.serialization
+            from collections import defaultdict
+
+            safe_globals = [defaultdict]
+            for ep in importlib.metadata.entry_points(group='kraken.configs'):
+                safe_globals.append(ep.load())
+            torch.serialization.add_safe_globals(safe_globals)
             models.append(_find_module(ckpt).net)
         else:
             models.extend(load_models(ckpt))
