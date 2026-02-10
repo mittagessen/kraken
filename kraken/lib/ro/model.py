@@ -75,27 +75,27 @@ class RODataModule(L.LightningDataModule):
         """
         Builds the datasets.
         """
-        training_data = self.hparams.training_data
-        evaluation_data = self.hparams.evaluation_data
-        partition = self.hparams.partition
+        training_data = self.hparams.data_config.training_data
+        evaluation_data = self.hparams.data_config.evaluation_data
+        partition = self.hparams.data_config.partition
 
         if not evaluation_data:
             np.random.shuffle(training_data)
             training_data = training_data[:int(partition*len(training_data))]
             evaluation_data = training_data[int(partition*len(training_data)):]
         train_set = PairWiseROSet(training_data,
-                                  mode=self.hparams.format_type,
-                                  level=self.hparams.level,
-                                  ro_id=self.hparams.reading_order,
-                                  class_mapping=self.hparams.class_mapping)
+                                  mode=self.hparams.data_config.format_type,
+                                  level=self.hparams.data_config.level,
+                                  ro_id=self.hparams.data_config.reading_order,
+                                  class_mapping=self.hparams.data_config.class_mapping)
         self.train_set = Subset(train_set, range(len(train_set)))
         self.class_mapping = train_set.class_mapping
-        self.hparams['class_mapping'] = dict(self.class_mapping)
+        self.hparams.data_config.class_mapping = dict(self.class_mapping)
         val_set = PageWiseROSet(evaluation_data,
-                                mode=self.hparams.format_type,
+                                mode=self.hparams.data_config.format_type,
                                 class_mapping=self.class_mapping,
-                                level=self.hparams.level,
-                                ro_id=self.hparams.reading_order)
+                                level=self.hparams.data_config.level,
+                                ro_id=self.hparams.data_config.reading_order)
 
         self.val_set = Subset(val_set, range(len(val_set)))
 
@@ -108,8 +108,8 @@ class RODataModule(L.LightningDataModule):
 
     def train_dataloader(self):
         return DataLoader(self.train_set,
-                          batch_size=self.hparams.batch_size,
-                          num_workers=self.hparams.num_workers,
+                          batch_size=self.hparams.data_config.batch_size,
+                          num_workers=self.hparams.data_config.num_workers,
                           pin_memory=True,
                           shuffle=False)
 
@@ -117,7 +117,7 @@ class RODataModule(L.LightningDataModule):
         return DataLoader(self.val_set,
                           shuffle=False,
                           batch_size=1,
-                          num_workers=self.hparams.num_workers,
+                          num_workers=self.hparams.data_config.num_workers,
                           pin_memory=True)
 
     def get_feature_dim(self):
@@ -147,6 +147,7 @@ class ROModel(L.LightningModule):
             **kwargs: Setup parameters, i.e. CLI parameters of the train() command.
         """
         super().__init__()
+        self.save_hyperparameters(ignore=['model'])
 
         if not isinstance(config, ROTrainingConfig):
             raise ValueError(f'config attribute is {type(config)} not ROTrainingConfig.')
@@ -160,8 +161,6 @@ class ROModel(L.LightningModule):
 
         self.val_losses = MeanMetric()
         self.val_spearman = MeanMetric()
-
-        self.save_hyperparameters()
 
     @classmethod
     def load_from_weights(cls,
@@ -222,17 +221,52 @@ class ROModel(L.LightningModule):
                  logger=True)
         return loss
 
+    def on_load_checkpoint(self, checkpoint):
+        """
+        Reconstruct the model here and not in setup() as otherwise the weight
+        loading will fail.
+        """
+        from kraken.models import create_model
+        if not isinstance(checkpoint['hyper_parameters']['config'], ROTrainingConfig):
+            raise ValueError('Checkpoint is not a reading order model.')
+        data_config = checkpoint['datamodule_hyper_parameters']['data_config']
+        self.net = create_model('ROMLP',
+                                class_mapping=data_config.class_mapping,
+                                level=data_config.level)
+
+    def on_save_checkpoint(self, checkpoint):
+        """
+        Save hyperparameters a second time so we can set parameters that
+        shouldn't be overwritten in on_load_checkpoint.
+        """
+        checkpoint['_module_config'] = self.hparams.config
+
     def setup(self, stage: Optional[str] = None):
         if stage in [None, 'fit']:
+            set_class_mapping = dict(self.trainer.datamodule.get_class_mapping())
             if not getattr(self, 'net', None):
                 logger.info('Creating new RO model')
-                class_mapping = dict(self.trainer.datamodule.get_class_mapping())
-                num_classes = max(0, *class_mapping.values()) + 1 if class_mapping else 1
-                feature_dim = 2 * num_classes + 12
-                self.net = ROMLP(feature_size=feature_dim,
-                                 hidden_size=feature_dim * 2,
-                                 class_mapping=class_mapping,
-                                 level=self.trainer.datamodule.hparams.level)
+                self.net = ROMLP(class_mapping=set_class_mapping,
+                                 level=self.trainer.datamodule.hparams.data_config.level)
+            else:
+                net_class_mapping = self.net.user_metadata['class_mapping']
+                if set_class_mapping.keys() != net_class_mapping.keys():
+                    diff = set(set_class_mapping.keys()).symmetric_difference(set(net_class_mapping.keys()))
+                    raise ValueError(f'Training data and model class mapping differ: {diff}')
+                # backfill train_set/val_set mapping if key-equal as the actual
+                # numbering in the train_set might be different
+                num_classes = max(0, *net_class_mapping.values()) + 1
+                self.trainer.datamodule.train_set.dataset.class_mapping = net_class_mapping
+                self.trainer.datamodule.train_set.dataset.num_classes = num_classes
+                self.trainer.datamodule.val_set.dataset.class_mapping = net_class_mapping
+                self.trainer.datamodule.val_set.dataset.num_classes = num_classes
+
+            # store canonical (one-to-one) class mapping in model metadata for inference
+            self.net.user_metadata['class_mapping'] = self.trainer.datamodule.train_set.dataset.canonical_class_mapping
+
+            logger.info('Training types:')
+            for k, v in set_class_mapping.items():
+                logger.info(f'  {k}\t{v}\t{self.trainer.datamodule.train_set.dataset.class_stats[k]}')
 
     def configure_callbacks(self):
         callbacks = []
@@ -241,8 +275,6 @@ class ROModel(L.LightningModule):
                                            mode='min',
                                            patience=self.hparams.config.lag,
                                            stopping_threshold=0.0))
-        if self.hparams.config.pl_logger:
-            callbacks.append(LearningRateMonitor(logging_interval='step'))
         return callbacks
 
     # configuration of optimizers and learning rate schedulers

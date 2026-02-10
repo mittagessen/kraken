@@ -28,24 +28,29 @@ class ROMLP(nn.Module, BaseModel):
 
     def __init__(self, **kwargs):
         super().__init__()
-        if (feature_size := kwargs.get('feature_size', None)) is None:
-            raise ValueError('`feature_size` is missing in model arguments.')
-        if (hidden_size := kwargs.get('hidden_size', None)) is None:
-            raise ValueError('`hidden_size` is missing in model arguments.')
-        if kwargs.get('class_mapping', None) is None:
-            logger.warning('Class mapping missing in reading order model arguments.')
+        self.class_mapping = kwargs.get('class_mapping', None)
+        if self.class_mapping is None:
+            raise ValueError('`class_mapping` missing in reading order model arguments.')
+        self.level = kwargs.get('level', None)
+        if self.level is None:
+            raise ValueError('`level` missing in reading order model arguments.')
+
+        num_classes = max(0, *self.class_mapping.values()) + 1
+        self.feature_size = 2 * num_classes + 12
+        self.hidden_size = self.feature_size * 2
 
         self.user_metadata = kwargs
-        self.fc1 = nn.Linear(feature_size, hidden_size)
+        self.fc1 = nn.Linear(self.feature_size, self.hidden_size)
         self.relu = nn.ReLU()
-        self.fc2 = nn.Linear(hidden_size, 1)
-        self.feature_size = feature_size
-        self.hidden_size = hidden_size
+        self.fc2 = nn.Linear(self.hidden_size, 1)
 
     def forward(self, x):
         x = self.fc1(x)
         x = self.relu(x)
         return self.fc2(x)
+
+    def prepare_for_inference(self, config):
+        pass
 
     def get_shape(self, input: tuple[int, int, int, int]) -> tuple[int, int, int, int]:
         """

@@ -23,6 +23,7 @@ import pyarrow as pa
 import traceback
 import dataclasses
 import multiprocessing as mp
+import threading
 
 import os
 from torchvision.utils import save_image
@@ -55,6 +56,30 @@ __all__ = ['DefaultAugmenter',
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+class _LocalValue:
+    """
+    Minimal stand-in for multiprocessing.Value when shared memory is unavailable.
+    """
+    def __init__(self, value):
+        self.value = value
+        self._lock = threading.Lock()
+
+    def get_lock(self):
+        return self._lock
+
+
+def _safe_mp_value(typecode_or_type, value):
+    """
+    Creates a multiprocessing.Value with a local fallback if shared memory
+    isn't available (e.g. restricted /dev/shm).
+    """
+    try:
+        return mp.Value(typecode_or_type, value)
+    except (PermissionError, OSError):
+        logger.warning('Shared memory unavailable; falling back to in-process value.')
+        return _LocalValue(value)
 
 
 class DefaultAugmenter():
@@ -172,7 +197,7 @@ class ArrowIPCRecognitionDataset(Dataset):
         if augmentation:
             self.aug = DefaultAugmenter()
 
-        self._im_mode = mp.Value(c_char, b'1')
+        self._im_mode = _safe_mp_value(c_char, b'1')
 
     def add(self, file: Union[str, 'PathLike']) -> None:
         """
@@ -381,7 +406,7 @@ class PolygonGTDataset(Dataset):
         if augmentation:
             self.aug = DefaultAugmenter()
 
-        self._im_mode = mp.Value(c_char, b'1')
+        self._im_mode = _safe_mp_value(c_char, b'1')
 
     def add(self,
             line: Optional[BaselineLine] = None,
@@ -578,7 +603,7 @@ class GroundTruthDataset(Dataset):
         if augmentation:
             self.aug = DefaultAugmenter()
 
-        self._im_mode = mp.Value(c_char, b'1')
+        self._im_mode = _safe_mp_value(c_char, b'1')
 
     def add(self,
             line: Optional[BBoxLine] = None,

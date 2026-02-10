@@ -116,7 +116,7 @@ class RecognitionPretrainModel(L.LightningModule):
         a text recognition model.
         """
         super().__init__()
-        self.save_hyperparameters()
+        self.save_hyperparameters(ignore=['model'])
 
         if not isinstance(config, VGSLPreTrainingConfig):
             raise ValueError(f'config attribute is {type(config)} not VGSLPreTrainingConfig.')
@@ -131,31 +131,7 @@ class RecognitionPretrainModel(L.LightningModule):
                                     vgsl=self.hparams.config.spec)
             self.net.init_weights()
 
-        self.batch, self.channels, self.height, self.width = self.net.input
-
-        for idx, layer in enumerate(self.net.nn.children()):
-            if isinstance(layer, layers.TransposedSummarizingRNN):
-                break
-
-        self.features = self.net.nn[:idx]
-        self.wav2vec2mask = Wav2Vec2Mask(self.net.nn[idx-1].output_shape[1],
-                                         self.net.nn[-1].output_shape[1],
-                                         self.hparams.config.mask_width,
-                                         self.hparams.config.mask_prob,
-                                         self.hparams.config.num_negatives)
-
-        # add dummy codec and output layer
-        if not isinstance(self.net.nn[-1], layers.LinSoftmax):
-            self.net.append(len(self.net.nn), "[O1c2]")
-
-        self.encoder = self.net.nn[idx:-1]
-
-        self.val_ce = MeanMetric()
-
-        self.example_input_array = torch.Tensor(self.batch,
-                                                self.channels,
-                                                self.height if self.height else 32,
-                                                self.width if self.width else 400)
+        self._set_input_shape()
 
     def forward(self, x, seq_lens=None):
         return self.net(x, seq_lens)
@@ -235,15 +211,68 @@ class RecognitionPretrainModel(L.LightningModule):
             raise ValueError('Checkpoint is not a recognition model.')
 
         data_config = checkpoint['datamodule_hyper_parameters']['data_config']
+        # Handle both config objects and serialized dicts.
+        if isinstance(data_config, dict):
+            legacy_polygons = data_config.get('legacy_polygons', False)
+            codec = data_config.get('codec')
+        else:
+            legacy_polygons = getattr(data_config, 'legacy_polygons', False)
+            codec = getattr(data_config, 'codec', None)
+        if codec is not None and hasattr(codec, 'c2l'):
+            codec = codec.c2l
         self.net = create_model('TorchVGSLModel',
                                 model_type='recognition',
-                                use_legacy_polygons=data_config.use_legacy_polygons,
+                                legacy_polygons=legacy_polygons,
                                 seg_type=checkpoint['_seg_type'],
                                 one_channel_mode=checkpoint['_one_channel_mode'],
                                 vgsl=checkpoint['_module_config'].spec,
-                                codec=data_config['codec'])
+                                codec=codec)
+        self._init_pretrain_components()
 
+    def _configure_net_components(self) -> None:
+        idx = self._init_pretrain_components()
+
+        self.features = self.net.nn[:idx]
+
+        self.encoder = self.net.nn[idx:-1]
+
+        self.val_ce = MeanMetric()
+
+    def _init_pretrain_components(self) -> int:
+        self._set_input_shape()
+
+        for idx, layer in enumerate(self.net.nn.children()):
+            if isinstance(layer, layers.TransposedSummarizingRNN):
+                break
+
+        final_dim_layer = self.net.nn[-1]
+        if isinstance(final_dim_layer, layers.LinSoftmax):
+            final_dim_layer = self.net.nn[-2]
+
+        # add dummy codec and output layer
+        if not isinstance(self.net.nn[-1], layers.LinSoftmax):
+            self.net.append(len(self.net.nn), "[O1c2]")
+
+        if not hasattr(self, 'wav2vec2mask'):
+            self.wav2vec2mask = Wav2Vec2Mask(self.net.nn[idx-1].output_shape[1],
+                                             final_dim_layer.output_shape[1],
+                                             self.hparams.config.mask_width,
+                                             self.hparams.config.mask_prob,
+                                             self.hparams.config.num_negatives)
+
+        return idx
+
+    def _set_input_shape(self) -> None:
         self.batch, self.channels, self.height, self.width = self.net.input
+
+        self.example_input_array = torch.Tensor(self.batch,
+                                                self.channels,
+                                                self.height if self.height else 32,
+                                                self.width if self.width else 400)
+
+    def setup(self, stage: Optional[str] = None):
+        if stage in [None, 'fit', 'validate', 'test', 'predict']:
+            self._configure_net_components()
 
     def on_save_checkpoint(self, checkpoint):
         """
@@ -265,6 +294,8 @@ class RecognitionPretrainModel(L.LightningModule):
         models = load_models(path, tasks=['recognition'])
         if len(models) != 1:
             raise ValueError(f'Found {len(models)} recognition models in model file.')
+        if hasattr(models[0], 'spec'):
+            config.spec = models[0].spec
         return cls(config=config, model=models[0])
 
     def configure_optimizers(self):
