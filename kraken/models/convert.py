@@ -55,7 +55,7 @@ def convert_models(paths: Iterable[Union[str, 'PathLike']],
         for entry_point in importlib.metadata.entry_points(group='kraken.lightning_modules'):
             module = entry_point.load()
             try:
-                return module.load_from_checkpoint(path)
+                return module.load_from_checkpoint(path, weights_only=False)
             except Exception:
                 continue
         raise ValueError(f'No lightning module found for checkpoint {path}')

@@ -67,8 +67,9 @@ def write_coreml(obj: list['TorchVGSLModel'], path: Union[str, PathLike]) -> Pat
 
     if len(obj) != 1:
         raise ValueError('CoreML writer only support writing one model at a time.')
-    if not isinstance(obj, TorchVGSLModel):
-        raise ValueError(f'CoreML writer only serializes TorchVGSLModel objects, not {obj}.')
+    model = obj[0]
+    if not isinstance(model, TorchVGSLModel):
+        raise ValueError(f'CoreML writer only serializes TorchVGSLModel objects, not {model}.')
 
     path = Path(path)
     # coreml refuses to serialize into a path that doesn't have a '.mlmodel'
@@ -78,5 +79,5 @@ def write_coreml(obj: list['TorchVGSLModel'], path: Union[str, PathLike]) -> Pat
     if path.exists():
         raise ValueError(f'{path} already exists.')
 
-    obj.save_model(path.as_posix())
+    model.save_model(path.as_posix())
     return path

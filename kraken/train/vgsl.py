@@ -170,7 +170,10 @@ class VGSLRecognitionDataModule(L.LightningDataModule):
                 if legacy_train_status == "mixed":
                     logger.warning('Mixed legacy polygon status in training dataset. Consider recompilation.')
                     legacy_train_status = False
-                logger.info(f'Setting dataset legacy polygon status to {legacy_train_status} based on training set.')
+                if legacy_train_status != self.hparams.data_config.legacy_polygons:
+                    logger.warning(f'Setting dataset legacy polygon status to {legacy_train_status} based on training set.')
+                else:
+                    logger.info(f'Setting dataset legacy polygon status to {legacy_train_status} based on training set.')
                 self.use_legacy_polygons = legacy_train_status
 
             train_set.transforms = transforms
@@ -245,6 +248,8 @@ class VGSLRecognitionModel(L.LightningModule):
 
         if not isinstance(config, VGSLRecognitionTrainingConfig):
             raise ValueError(f'config attribute is {type(config)} not VGSLRecognitionTrainingConfig.')
+
+        self._loaded_model = model is not None
 
         if model:
             self.net = model
@@ -496,15 +501,30 @@ class VGSLRecognitionModel(L.LightningModule):
                 logger.info(f'Setting seg_type to {train_set.seg_type}.')
                 self.net.seg_type = train_set.seg_type
 
-            if self.trainer.datamodule.hparams.data_config.format_type != 'binary' and self.trainer.datamodule.hparams.data_config.legacy_polygons:
-                logger.warning('The model will be flagged to use legacy polygon extractor.')
-                self.net.use_legacy_polygons = True
-            elif self.trainer.datamodule.use_legacy_polygons:
-                logger.warning('Dataset was compiled with legacy polygon extractor. Consider recompiling your dataset.')
-                self.net.use_legacy_polygons = True
-            elif not (self.trainer.datamodule.use_legacy_polygons and self.trainer.datamodule.hparams.data_config.legacy_polygons):
-                logger.info('Setting model polygonizer flag to new polygonizer.')
-                self.net.use_legacy_polygons = False
+            data_cfg = self.trainer.datamodule.hparams.data_config
+            use_legacy = self.trainer.datamodule.use_legacy_polygons
+            force_legacy = data_cfg.legacy_polygons
+
+            if data_cfg.format_type != 'binary' and force_legacy:
+                desired_legacy = True
+            elif use_legacy:
+                desired_legacy = True
+            else:
+                desired_legacy = False
+
+            if not self._loaded_model:
+                if data_cfg.format_type != 'binary' and force_legacy:
+                    logger.warning('the new model will be flagged to use legacy')
+                elif data_cfg.format_type == 'binary':
+                    if force_legacy and not use_legacy:
+                        logger.warning('the new model will be flagged to use new')
+                    elif (not force_legacy) and use_legacy:
+                        logger.warning('the new model will be flagged to use legacy')
+
+            if self._loaded_model and (not force_legacy) and self.net.use_legacy_polygons and not desired_legacy:
+                logger.warning('model will be flagged to use new')
+
+            self.net.use_legacy_polygons = desired_legacy
 
             self.trainer.datamodule.hparams.data_config.codec = self.net.codec
         elif stage == 'test':
@@ -523,7 +543,7 @@ class VGSLRecognitionModel(L.LightningModule):
         data_config = checkpoint['datamodule_hyper_parameters']['data_config']
         self.net = create_model('TorchVGSLModel',
                                 model_type='recognition',
-                                use_legacy_polygons=data_config.legacy_polygons,
+                                legacy_polygons=data_config.legacy_polygons,
                                 seg_type=checkpoint['_seg_type'],
                                 one_channel_mode=checkpoint['_one_channel_mode'],
                                 vgsl=checkpoint['_module_config'].spec,

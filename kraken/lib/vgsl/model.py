@@ -262,6 +262,8 @@ class TorchVGSLModel(nn.Module,
         for module in nn.named_children():
             self.nn.add_module(*module)
         self.spec = '[' + ' '.join(self.named_spec) + ']'
+        if getattr(self, 'user_metadata', None) is not None:
+            self.user_metadata['vgsl'] = self.spec
         self.init_weights(slice(idx, -1))
 
     @classmethod
@@ -469,8 +471,17 @@ class TorchVGSLModel(nn.Module,
         # create line extraction worker pool
         if self.model_type == 'recognition' and getattr(self, '_line_extraction_pool', None) is None:
             if self._inf_config.num_line_workers == 0:
-                from multiprocessing.pool import ThreadPool
-                self._line_extraction_pool = ThreadPool(1)
+                # Use a lightweight in-process runner to avoid OS-level
+                # semaphores that may be restricted in some environments.
+                class _InProcessPool:
+                    def imap_unordered(self, func, iterable):
+                        for item in iterable:
+                            yield func(item)
+
+                    def terminate(self):
+                        return None
+
+                self._line_extraction_pool = _InProcessPool()
             else:
                 from torch.multiprocessing import Pool
                 self._line_extraction_pool = Pool(self._inf_config.num_line_workers)
@@ -526,6 +537,8 @@ class TorchVGSLModel(nn.Module,
         aug = m.group('aug') if m.group('aug') else ''
         self.named_spec[-1] = 'O{}{}{}{}{}'.format(m.group('name'), m.group('dim'), m.group('type'), aug, output_size)
         self.spec = '[' + ' '.join(self.named_spec) + ']'
+        if getattr(self, 'user_metadata', None) is not None:
+            self.user_metadata['vgsl'] = self.spec
 
     def build_rnn(self,
                   input: tuple[int, int, int, int],

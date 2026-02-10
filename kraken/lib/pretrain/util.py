@@ -5,7 +5,7 @@
 
 import random
 from typing import Union
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 
 import numpy as np
 import torch

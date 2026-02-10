@@ -124,13 +124,19 @@ def load_coreml(path: Union[str, PathLike], tasks: Optional[Sequence[_T_tasks]] 
         raise ValueError(f'Failure parsing model protobuf: {e}') from e
 
     metadata = json.loads(mlmodel.user_defined_metadata.get('kraken_meta', '{}'))
+    vgsl_spec = mlmodel.user_defined_metadata.get('vgsl') or metadata.get('vgsl')
+    # avoid passing codec/vgsl twice (once in metadata, once as explicit argument)
+    metadata.pop('codec', None)
+    metadata.pop('vgsl', None)
+    if not vgsl_spec:
+        raise ValueError(f'No VGSL spec in model metadata for {path}')
 
     if tasks and metadata['model_type'] not in tasks:
         logger.info(f'Model file {path} not in demanded tasks {tasks}')
         return []
 
     model = create_model('TorchVGSLModel',
-                         vgsl=mlmodel.user_defined_metadata['vgsl'],
+                         vgsl=vgsl_spec,
                          codec=json.loads(mlmodel.user_defined_metadata.get('codec', 'null')),
                          **metadata)
 
@@ -152,4 +158,3 @@ def load_coreml(path: Union[str, PathLike], tasks: Optional[Sequence[_T_tasks]] 
         nn.aux_layers = {k: cls(v).nn.get_submodule(k) for k, v in json.loads(mlmodel.user_defined_metadata['aux_layers']).items()}
 
     return models
-
