@@ -19,7 +19,6 @@ kraken.ketos.pretrain
 Command line driver for unsupervised recognition pretraining
 """
 import logging
-import importlib
 from pathlib import Path
 
 import click
@@ -50,6 +49,7 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
               '--output',
               'checkpoint_path',
               type=click.Path(), help='Output checkpoint path')
+@click.option('--weights-format', default='safetensors', help='Output weights format.')
 @click.option('-s',
               '--spec',
               help='VGSL spec of the network to train.')
@@ -199,6 +199,7 @@ def pretrain(ctx, **kwargs):
     from kraken.train import KrakenTrainer
 
     from kraken.configs import VGSLPreTrainingConfig, VGSLPreTrainingDataConfig
+    from kraken.models.convert import convert_models
 
     # disable automatic partition when given evaluation set explicitly
     if params['evaluation_data']:
@@ -274,14 +275,6 @@ def pretrain(ctx, **kwargs):
     score = checkpoint_callback.best_model_score.item()
     message(f'Best model checkpoint: {checkpoint_callback.best_model_path}')
 
-    try:
-        (entry_point,) = importlib.metadata.entry_points(group='kraken.writers', name='coreml')
-        writer = entry_point.load()
-    except ValueError:
-        raise click.UsageError('weights_format', 'Unknown format `coreml` for weights.')
-
-    weight_path = Path(checkpoint_callback.best_model_path).with_name(f'best_{score:.4f}.coreml')
-    model = RecognitionPretrainModel.load_from_checkpoint(checkpoint_callback.best_model_path,
-                                                          config=m_config)
-    opath = writer([model.net], weight_path)
+    weight_path = Path(checkpoint_callback.best_model_path).with_name(f'best_{score:.4f}.{params.get("weights_format")}')
+    opath = convert_models([checkpoint_callback.best_model_path], weight_path, weights_format=params['weights_format'])
     message(f'Converting best model {checkpoint_callback.best_model_path} (score: {score:.4f}) to weights file {opath}')

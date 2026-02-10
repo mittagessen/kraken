@@ -20,7 +20,6 @@ Command line driver for recognition training and evaluation.
 """
 import click
 import logging
-import importlib
 
 from pathlib import Path
 from threadpoolctl import threadpool_limits
@@ -166,7 +165,7 @@ def train(ctx, **kwargs):
 
     from lightning.pytorch.callbacks import ModelCheckpoint, OnExceptionCheckpoint
 
-    from kraken.lib import vgsl  # NOQA
+    from kraken.models.convert import convert_models
     from kraken.train import (KrakenTrainer, VGSLRecognitionModel,
                               VGSLRecognitionDataModule)
     from kraken.configs import VGSLRecognitionTrainingConfig, VGSLRecognitionTrainingDataConfig
@@ -243,12 +242,6 @@ def train(ctx, **kwargs):
             model = VGSLRecognitionModel(m_config)
 
     try:
-        (entry_point,) = importlib.metadata.entry_points(group='kraken.writers', name=params['weights_format'])
-        writer = entry_point.load()
-    except ValueError:
-        raise click.UsageError('weights_format', 'Unknown format `{params.get("weights_format")}` for weights.')
-
-    try:
         with threadpool_limits(limits=ctx.meta['num_threads']):
             if resume:
                 trainer.fit(model, data_module, ckpt_path=resume)
@@ -262,8 +255,7 @@ def train(ctx, **kwargs):
 
     score = checkpoint_callback.best_model_score.item()
     weight_path = Path(checkpoint_callback.best_model_path).with_name(f'best_{score:.4f}.{params.get("weights_format")}')
-    model = VGSLRecognitionModel.load_from_checkpoint(checkpoint_callback.best_model_path, config=m_config)
-    opath = writer([model.net], weight_path)
+    opath = convert_models([checkpoint_callback.best_model_path], weight_path, weights_format=params['weights_format'])
     message(f'Converting best model {checkpoint_callback.best_model_path} (score: {score:.4f}) to weights file {opath}')
 
 

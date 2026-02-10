@@ -20,7 +20,6 @@ Command line driver for reading order training, evaluation, and handling.
 """
 import click
 import logging
-import importlib
 
 from PIL import Image
 
@@ -179,6 +178,7 @@ def rotrain(ctx, **kwargs):
     from kraken.lib.ro import ROModel, RODataModule
     from kraken.train import KrakenTrainer
     from kraken.configs import ROTrainingConfig, ROTrainingDataConfig
+    from kraken.models.convert import convert_models
 
     # disable automatic partition when given evaluation set explicitly
     if params['evaluation_data']:
@@ -216,12 +216,6 @@ def rotrain(ctx, **kwargs):
     else:
         data_module = RODataModule(dm_config)
 
-    try:
-        (entry_point,) = importlib.metadata.entry_points(group='kraken.writers', name=params['weights_format'])
-        writer = entry_point.load()
-    except ValueError:
-        raise click.UsageError('weights_format', 'Unknown format `{params.get("weights_format")}` for weights.')
-
     trainer = KrakenTrainer(accelerator=ctx.meta['accelerator'],
                             devices=ctx.meta['device'],
                             precision=ctx.meta['precision'],
@@ -258,8 +252,7 @@ def rotrain(ctx, **kwargs):
 
     score = checkpoint_callback.best_model_score.item()
     weight_path = Path(checkpoint_callback.best_model_path).with_name(f'best_{score:.4f}.{params.get("weights_format")}')
-    model = ROModel.load_from_checkpoint(checkpoint_callback.best_model_path, config=m_config)
-    opath = writer([model.net], weight_path)
+    opath = convert_models([checkpoint_callback.best_model_path], weight_path, weights_format=params['weights_format'])
     message(f'Converting best model {checkpoint_callback.best_model_path} (score: {score:.4f}) to weights {opath}')
 
 
