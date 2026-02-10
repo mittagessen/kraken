@@ -8,7 +8,25 @@ from kraken.models.loaders import load_models
 if TYPE_CHECKING:
     from os import PathLike
 
-__all__ = ['convert_models']
+__all__ = ['convert_models', 'load_from_checkpoint']
+
+
+def load_from_checkpoint(path):
+    import torch.serialization
+    from collections import defaultdict
+
+    safe_globals = [defaultdict]
+    for ep in importlib.metadata.entry_points(group='kraken.configs'):
+        safe_globals.append(ep.load())
+    torch.serialization.add_safe_globals(safe_globals)
+
+    for entry_point in importlib.metadata.entry_points(group='kraken.lightning_modules'):
+        module = entry_point.load()
+        try:
+            return module.load_from_checkpoint(path, weights_only=True)
+        except Exception:
+            continue
+    raise ValueError(f'No lightning module found for checkpoint {path}')
 
 
 def convert_models(paths: Iterable[Union[str, 'PathLike']],
@@ -51,27 +69,11 @@ def convert_models(paths: Iterable[Union[str, 'PathLike']],
     except ValueError:
         raise ValueError('No writer for format {weights_format} found.')
 
-    def _find_module(path):
-        for entry_point in importlib.metadata.entry_points(group='kraken.lightning_modules'):
-            module = entry_point.load()
-            try:
-                return module.load_from_checkpoint(path, weights_only=True)
-            except Exception:
-                continue
-        raise ValueError(f'No lightning module found for checkpoint {path}')
-
     models = []
     for ckpt in paths:
         ckpt = Path(ckpt)
         if ckpt.suffix == '.ckpt':
-            import torch.serialization
-            from collections import defaultdict
-
-            safe_globals = [defaultdict]
-            for ep in importlib.metadata.entry_points(group='kraken.configs'):
-                safe_globals.append(ep.load())
-            torch.serialization.add_safe_globals(safe_globals)
-            models.append(_find_module(ckpt).net)
+            models.append(load_from_checkpoint(ckpt).net)
         else:
             models.extend(load_models(ckpt))
 

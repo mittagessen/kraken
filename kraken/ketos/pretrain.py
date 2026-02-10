@@ -255,12 +255,12 @@ def pretrain(ctx, **kwargs):
         if load:
             message(f'Loading from checkpoint {load}.')
             if load.endswith('ckpt'):
-                model = RecognitionPretrainModel.load_from_checkpoint(load, config=m_config, weights_only=True)
+                model = RecognitionPretrainModel.load_from_checkpoint(load, config=m_config)
             else:
                 model = RecognitionPretrainModel.load_from_weights(load, m_config)
         elif resume:
             message(f'Resuming from checkpoint {resume}.')
-            model = RecognitionPretrainModel.load_from_checkpoint(resume, weights_only=True)
+            model = RecognitionPretrainModel.load_from_checkpoint(resume)
         else:
             message('Initializing new model.')
             model = RecognitionPretrainModel(m_config)
@@ -282,7 +282,6 @@ def pretrain(ctx, **kwargs):
 
     weight_path = Path(checkpoint_callback.best_model_path).with_name(f'best_{score:.4f}.coreml')
     model = RecognitionPretrainModel.load_from_checkpoint(checkpoint_callback.best_model_path,
-                                                          config=m_config,
-                                                          weights_only=True)
+                                                          config=m_config)
     opath = writer([model.net], weight_path)
     message(f'Converting best model {checkpoint_callback.best_model_path} (score: {score:.4f}) to weights file {opath}')
