@@ -35,13 +35,18 @@ class BaseModel(ABC):
         pass
 
     @property
-    @abstractmethod
     def user_metadata(self) -> dict:
         """
         A dictionary containing all hyperparameters, statistics, etc. of the
         model.
         """
-        pass
+        if not hasattr(self, '_user_metadata'):
+            self._user_metadata = {}
+        return self._user_metadata
+
+    @user_metadata.setter
+    def user_metadata(self, val: dict) -> None:
+        self._user_metadata = val
 
     @property
     def one_channel_mode(self) -> Union[None, Literal['1', 'L']]:
