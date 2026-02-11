@@ -87,7 +87,7 @@ class TestEntryPointRegistration(unittest.TestCase):
         the expected lightning modules.
         """
         eps = {ep.name for ep in importlib.metadata.entry_points(group='kraken.lightning_modules')}
-        for mod in ('blla', 'crnn', 'pretrain', 'ro'):
+        for mod in ('blla', 'vgsl', 'pretrain', 'ro'):
             self.assertIn(mod, eps)
 
 
