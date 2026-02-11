@@ -439,9 +439,12 @@ class TestInputTransforms(unittest.TestCase):
             else:
                 self.assertEqual(getattr(tf, k), v)
         self.assertFalse(tf.centerline_norm)
-        self.channel_height_inst['height'] = self.channel_height_inst['channels']
-        self.channel_height_inst['channels'] = 1
-        check_output(self, self.channel_height_inst, self.im, tf(self.im))
+        out = tf(self.im)
+        # In channel-height mode the target height is moved into the channel
+        # dimension, resulting in a Cx1xW tensor.
+        self.assertEqual(self.channel_height_inst['channels'], out.shape[0])
+        self.assertEqual(self.channel_height_inst['height'], out.shape[1])
+        check_output(self, self.channel_height_inst, self.im, out)
 
     def test_imageinputtransforms_invalid_channels(self):
         """
@@ -449,4 +452,3 @@ class TestInputTransforms(unittest.TestCase):
         """
         with raises(KrakenInputException):
             tf = ImageInputTransforms(**self.invalid_channels)
-
