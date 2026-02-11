@@ -231,7 +231,7 @@ def segtrain(ctx, **kwargs):
     m_config = BLLASegmentationTrainingConfig(**params)
 
     if resume:
-        data_module = BLLASegmentationDataModule.load_from_checkpoint(resume)
+        data_module = BLLASegmentationDataModule.load_from_checkpoint(resume, weights_only=False)
     else:
         data_module = BLLASegmentationDataModule(dm_config)
 
@@ -279,12 +279,12 @@ def segtrain(ctx, **kwargs):
         if load:
             message(f'Loading from checkpoint {load}.')
             if load.endswith('ckpt'):
-                model = BLLASegmentationModel.load_from_checkpoint(load, config=m_config)
+                model = BLLASegmentationModel.load_from_checkpoint(load, config=m_config, weights_only=False)
             else:
                 model = BLLASegmentationModel.load_from_weights(load, config=m_config)
         elif resume:
             message(f'Resuming from checkpoint {resume}.')
-            model = BLLASegmentationModel.load_from_checkpoint(resume)
+            model = BLLASegmentationModel.load_from_checkpoint(resume, weights_only=False)
         else:
             message('Initializing new model.')
             model = BLLASegmentationModel(m_config)

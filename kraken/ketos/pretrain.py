@@ -233,7 +233,7 @@ def pretrain(ctx, **kwargs):
     m_config = VGSLPreTrainingConfig(**params)
 
     if resume:
-        data_module = PretrainDataModule.load_from_checkpoint(resume)
+        data_module = PretrainDataModule.load_from_checkpoint(resume, weights_only=False)
     else:
         data_module = PretrainDataModule(dm_config)
 
@@ -256,12 +256,12 @@ def pretrain(ctx, **kwargs):
         if load:
             message(f'Loading from checkpoint {load}.')
             if load.endswith('ckpt'):
-                model = RecognitionPretrainModel.load_from_checkpoint(load, config=m_config)
+                model = RecognitionPretrainModel.load_from_checkpoint(load, config=m_config, weights_only=False)
             else:
                 model = RecognitionPretrainModel.load_from_weights(load, m_config)
         elif resume:
             message(f'Resuming from checkpoint {resume}.')
-            model = RecognitionPretrainModel.load_from_checkpoint(resume)
+            model = RecognitionPretrainModel.load_from_checkpoint(resume, weights_only=False)
         else:
             message('Initializing new model.')
             model = RecognitionPretrainModel(m_config)

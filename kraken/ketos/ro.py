@@ -212,7 +212,7 @@ def rotrain(ctx, **kwargs):
     m_config = ROTrainingConfig(**params)
 
     if resume:
-        data_module = RODataModule.load_from_checkpoint(resume)
+        data_module = RODataModule.load_from_checkpoint(resume, weights_only=False)
     else:
         data_module = RODataModule(dm_config)
 
@@ -234,12 +234,12 @@ def rotrain(ctx, **kwargs):
         if load:
             message(f'Loading from checkpoint {load}.')
             if load.endswith('ckpt'):
-                model = ROModel.load_from_checkpoint(load, config=m_config)
+                model = ROModel.load_from_checkpoint(load, config=m_config, weights_only=False)
             else:
                 model = ROModel.load_from_weights(load, m_config)
         elif resume:
             message(f'Resuming from checkpoint {resume}.')
-            model = ROModel.load_from_checkpoint(resume)
+            model = ROModel.load_from_checkpoint(resume, weights_only=False)
         else:
             message('Initializing new model.')
             model = ROModel(m_config)

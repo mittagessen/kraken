@@ -209,7 +209,7 @@ def train(ctx, **kwargs):
     m_config = VGSLRecognitionTrainingConfig(**params)
 
     if resume:
-        data_module = VGSLRecognitionDataModule.load_from_checkpoint(resume)
+        data_module = VGSLRecognitionDataModule.load_from_checkpoint(resume, weights_only=False)
     else:
         data_module = VGSLRecognitionDataModule(dm_config)
 
@@ -231,12 +231,12 @@ def train(ctx, **kwargs):
         if load:
             message(f'Loading from checkpoint {load}.')
             if load.endswith('ckpt'):
-                model = VGSLRecognitionModel.load_from_checkpoint(load, config=m_config)
+                model = VGSLRecognitionModel.load_from_checkpoint(load, config=m_config, weights_only=False)
             else:
                 model = VGSLRecognitionModel.load_from_weights(load, config=m_config)
         elif resume:
             message(f'Resuming from checkpoint {resume}.')
-            model = VGSLRecognitionModel.load_from_checkpoint(resume)
+            model = VGSLRecognitionModel.load_from_checkpoint(resume, weights_only=False)
         else:
             message('Initializing new model.')
             model = VGSLRecognitionModel(m_config)
