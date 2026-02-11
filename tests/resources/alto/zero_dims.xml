@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<alto xmlns="http://www.loc.gov/standards/alto/ns-v4#">
+  <Description>
+    <MeasurementUnit>pixel</MeasurementUnit>
+    <sourceImageInformation>
+      <fileName>zero_dims.png</fileName>
+    </sourceImageInformation>
+  </Description>
+  <Layout>
+    <Page WIDTH="0" HEIGHT="0" ID="p1">
+      <PrintSpace HPOS="0" VPOS="0" WIDTH="123" HEIGHT="45"/>
+    </Page>
+  </Layout>
+</alto>

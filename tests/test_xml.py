@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import json
-import tempfile
 import unittest
 from pathlib import Path
 
@@ -21,7 +20,9 @@ class TestXMLParser(unittest.TestCase):
         self.alto_doc_root = resources / 'alto'
         self.page_doc_root = resources / 'page'
         self.alto_doc = self.alto_doc_root / 'bsb00084914_00007.xml'
+        self.alto_zero_dims_doc = self.alto_doc_root / 'zero_dims.xml'
         self.page_doc = self.page_doc_root / 'cPAS-2000.xml'
+        self.page_zero_dims_doc = self.page_doc_root / 'zero_dims.xml'
         self.reg_alto_doc = self.alto_doc_root / 'reg_test.xml'
 
         self.invalid_alto_docs = self.alto_doc_root / 'invalid'
@@ -84,6 +85,20 @@ class TestXMLParser(unittest.TestCase):
         """
         with raises(ValueError):
             xml.XMLPage(self.invalid_alto_docs / 'dims.xml')
+
+    def test_alto_zero_dims_fallback_to_image_size(self):
+        """
+        Test that zero ALTO page dimensions are resolved from the image file.
+        """
+        doc = xml.XMLPage(self.alto_zero_dims_doc, filetype='alto')
+        self.assertEqual(doc.image_size, (123, 45))
+
+    def test_failure_alto_zero_dims_missing_image(self):
+        """
+        Test that parsing aborts if ALTO dimensions are zero and image is missing.
+        """
+        with raises(ValueError):
+            xml.XMLPage(self.invalid_alto_docs / 'zero_dims_missing_image.xml', filetype='alto')
 
     def test_alto_basedirection(self):
         """
@@ -191,6 +206,20 @@ class TestXMLParser(unittest.TestCase):
         """
         with raises(ValueError):
             xml.XMLPage(self.invalid_page_docs / 'dims.xml')
+
+    def test_page_zero_dims_fallback_to_image_size(self):
+        """
+        Test that zero PageXML dimensions are resolved from the image file.
+        """
+        doc = xml.XMLPage(self.page_zero_dims_doc, filetype='page')
+        self.assertEqual(doc.image_size, (123, 45))
+
+    def test_failure_page_zero_dims_missing_image(self):
+        """
+        Test that parsing aborts if PageXML dimensions are zero and image is missing.
+        """
+        with raises(ValueError):
+            xml.XMLPage(self.invalid_page_docs / 'zero_dims_missing_image.xml', filetype='page')
 
     def test_page_basedirection(self):
         """
@@ -573,4 +602,3 @@ class TestXMLParser(unittest.TestCase):
         tr_ro = doc.reading_orders['region_transkribus']
         self.assertNotIn('r_nocoords', tr_ro['order'])
         self.assertEqual(tr_ro['order'], ['r1', 'r2'])
-

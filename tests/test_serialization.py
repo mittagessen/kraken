@@ -130,15 +130,13 @@ class TestSerializations(unittest.TestCase):
                                                                    'models': 'bar.mlmodel',
                                                                    'pad': 16,
                                                                    'bidi_reordering': True})]
-
-
     def test_box_vertical_hocr_serialization(self):
         """
         Test vertical line hOCR serialization
         """
         fp = StringIO()
 
-        fp.write(serialization.serialize(self.box_segmentation, writing_mode='vertical-lr', template='hocr'))
+        fp.write(serialization.serialize(self.box_segmentation, image_size=(2000, 2000), writing_mode='vertical-lr', template='hocr'))
         validate_hocr(self, fp)
 
     def test_box_hocr_serialization(self):
@@ -147,7 +145,7 @@ class TestSerializations(unittest.TestCase):
         """
         fp = StringIO()
 
-        fp.write(serialization.serialize(self.box_segmentation, template='hocr'))
+        fp.write(serialization.serialize(self.box_segmentation, image_size=(2000, 2000), template='hocr'))
         validate_hocr(self, fp)
 
     def test_box_alto_serialization_validation(self):
@@ -156,7 +154,7 @@ class TestSerializations(unittest.TestCase):
         """
         fp = StringIO()
 
-        fp.write(serialization.serialize(self.box_segmentation, template='alto'))
+        fp.write(serialization.serialize(self.box_segmentation, image_size=(2000, 2000), template='alto'))
         validate_alto(self, fp)
 
     def test_box_abbyyxml_serialization_validation(self):
@@ -165,7 +163,7 @@ class TestSerializations(unittest.TestCase):
         """
         fp = StringIO()
 
-        fp.write(serialization.serialize(self.box_segmentation, template='abbyyxml'))
+        fp.write(serialization.serialize(self.box_segmentation, image_size=(2000, 2000), template='abbyyxml'))
         doc = etree.fromstring(fp.getvalue().encode('utf-8'))
         with open(resources / 'FineReader10-schema-v1.xml') as schema_fp:
             abbyy_schema = etree.XMLSchema(etree.parse(schema_fp))
@@ -177,7 +175,7 @@ class TestSerializations(unittest.TestCase):
         """
         fp = StringIO()
 
-        fp.write(serialization.serialize(self.box_segmentation, template='pagexml'))
+        fp.write(serialization.serialize(self.box_segmentation, image_size=(2000, 2000), template='pagexml'))
         validate_page(self, fp)
 
     def test_bl_alto_serialization_validation(self):
@@ -186,7 +184,7 @@ class TestSerializations(unittest.TestCase):
         """
         fp = StringIO()
 
-        fp.write(serialization.serialize(self.bl_segmentation, template='alto'))
+        fp.write(serialization.serialize(self.bl_segmentation, image_size=(2000, 2000), template='alto'))
         validate_alto(self, fp)
         roundtrip(self, self.bl_records, fp)
 
@@ -196,7 +194,7 @@ class TestSerializations(unittest.TestCase):
         """
         fp = StringIO()
 
-        fp.write(serialization.serialize(self.bl_segmentation, template='abbyyxml'))
+        fp.write(serialization.serialize(self.bl_segmentation, image_size=(2000, 2000), template='abbyyxml'))
         doc = etree.fromstring(fp.getvalue().encode('utf-8'))
         with open(resources / 'FineReader10-schema-v1.xml') as schema_fp:
             abbyy_schema = etree.XMLSchema(etree.parse(schema_fp))
@@ -208,7 +206,7 @@ class TestSerializations(unittest.TestCase):
         """
         fp = StringIO()
 
-        fp.write(serialization.serialize(self.bl_segmentation, template='pagexml'))
+        fp.write(serialization.serialize(self.bl_segmentation, image_size=(2000, 2000), template='pagexml'))
         validate_page(self, fp)
         roundtrip(self, self.bl_records, fp)
 
@@ -218,7 +216,7 @@ class TestSerializations(unittest.TestCase):
         """
         fp = StringIO()
 
-        fp.write(serialization.serialize(self.bl_segmentation_regs, template='alto'))
+        fp.write(serialization.serialize(self.bl_segmentation_regs, image_size=(2000, 2000), template='alto'))
         validate_alto(self, fp)
         roundtrip(self, self.bl_records, fp)
 
@@ -228,7 +226,7 @@ class TestSerializations(unittest.TestCase):
         """
         fp = StringIO()
 
-        fp.write(serialization.serialize(self.bl_segmentation_regs, template='abbyyxml'))
+        fp.write(serialization.serialize(self.bl_segmentation_regs, image_size=(2000, 2000), template='abbyyxml'))
         doc = etree.fromstring(fp.getvalue().encode('utf-8'))
         with open(resources / 'FineReader10-schema-v1.xml') as schema_fp:
             abbyy_schema = etree.XMLSchema(etree.parse(schema_fp))
@@ -240,7 +238,7 @@ class TestSerializations(unittest.TestCase):
         """
         fp = StringIO()
 
-        fp.write(serialization.serialize(self.bl_segmentation_regs, template='pagexml'))
+        fp.write(serialization.serialize(self.bl_segmentation_regs, image_size=(2000, 2000), template='pagexml'))
         validate_page(self, fp)
         roundtrip(self, self.bl_records, fp)
 
@@ -250,7 +248,7 @@ class TestSerializations(unittest.TestCase):
         """
         fp = StringIO()
 
-        fp.write(serialization.serialize(self.bl_seg_nolines_regs, template='alto'))
+        fp.write(serialization.serialize(self.bl_seg_nolines_regs, image_size=(2000, 2000), template='alto'))
         validate_alto(self, fp)
 
     def test_region_only_abbyyxml_serialization_validation(self):
@@ -259,7 +257,7 @@ class TestSerializations(unittest.TestCase):
         """
         fp = StringIO()
 
-        fp.write(serialization.serialize(self.bl_seg_nolines_regs, template='abbyyxml'))
+        fp.write(serialization.serialize(self.bl_seg_nolines_regs, image_size=(2000, 2000), template='abbyyxml'))
         doc = etree.fromstring(fp.getvalue().encode('utf-8'))
         with open(resources / 'FineReader10-schema-v1.xml') as schema_fp:
             abbyy_schema = etree.XMLSchema(etree.parse(schema_fp))
@@ -271,7 +269,7 @@ class TestSerializations(unittest.TestCase):
         """
         fp = StringIO()
 
-        fp.write(serialization.serialize(self.bl_seg_nolines_regs, template='pagexml'))
+        fp.write(serialization.serialize(self.bl_seg_nolines_regs, image_size=(2000, 2000), template='pagexml'))
         validate_page(self, fp)
 
     def test_bl_region_alto_serialization_validation_steps(self):
@@ -280,7 +278,7 @@ class TestSerializations(unittest.TestCase):
         """
         fp = StringIO()
 
-        fp.write(serialization.serialize(self.bl_segmentation, template='alto', processing_steps=self.metadata_steps))
+        fp.write(serialization.serialize(self.bl_segmentation, image_size=(2000, 2000), template='alto', processing_steps=self.metadata_steps))
 
         validate_alto(self, fp)
         roundtrip(self, self.bl_records, fp)
@@ -291,7 +289,7 @@ class TestSerializations(unittest.TestCase):
         """
         fp = StringIO()
 
-        fp.write(serialization.serialize(self.bl_segmentation, template='abbyyxml', processing_steps=self.metadata_steps))
+        fp.write(serialization.serialize(self.bl_segmentation, image_size=(2000, 2000), template='abbyyxml', processing_steps=self.metadata_steps))
 
         doc = etree.fromstring(fp.getvalue().encode('utf-8'))
         with open(resources / 'FineReader10-schema-v1.xml') as schema_fp:
@@ -303,7 +301,6 @@ class TestSerializations(unittest.TestCase):
         Validates output with processing steps against PageXML schema
         """
         fp = StringIO()
-        fp.write(serialization.serialize(self.bl_segmentation, template='pagexml', processing_steps=self.metadata_steps))
+        fp.write(serialization.serialize(self.bl_segmentation, image_size=(2000, 2000), template='pagexml', processing_steps=self.metadata_steps))
         validate_page(self, fp)
         roundtrip(self, self.bl_records, fp)
-

@@ -115,6 +115,15 @@ def parse_alto(doc, filename, linetype):
     except (ValueError, TypeError) as e:
         raise ValueError(f'Invalid image dimensions in {filename}: {e}')
 
+    if not image_size[0] or not image_size[1]:
+        logger.warning(f'Invalid image dimensions {image_size} in {filename}. Attempting to read from image file.')
+        try:
+            from PIL import Image
+            with Image.open(imagename) as im:
+                image_size = im.size
+        except Exception as e:
+            raise ValueError(f'Invalid image dimensions {image_size} in {filename} and unable to read image file {imagename}: {e}')
+
     page_default_lang = page.get('LANG')
 
     # find all image regions in order
