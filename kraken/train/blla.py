@@ -18,6 +18,7 @@ BLLA segmentation model trainer.
 import re
 import torch
 import logging
+import numpy as np
 import lightning as L
 import torch.nn.functional as F
 
@@ -25,11 +26,15 @@ from lightning.pytorch.callbacks import EarlyStopping
 
 from torch import nn
 from torch.optim import lr_scheduler
-from torch.utils.data import DataLoader, Subset, random_split
+from torch.utils.data import DataLoader, Subset, default_collate, random_split
 from torchmetrics.classification import MultilabelAccuracy, MultilabelJaccardIndex
 
 from kraken.lib.xml import XMLPage
 from kraken.lib.dataset import BaselineSet, ImageInputTransforms
+from kraken.lib.segmentation import vectorize_lines
+from kraken.lib.segmentation_metrics import (interpolate_polyline,
+                                              compute_detection_metrics,
+                                              aggregate_detection_metrics)
 from kraken.configs import BLLASegmentationTrainingConfig, BLLASegmentationTrainingDataConfig
 from kraken.train.utils import configure_optimizer_and_lr_scheduler, SegmentationTestMetrics
 
@@ -44,6 +49,14 @@ logger = logging.getLogger(__name__)
 
 
 __all__ = ['BLLASegmentationDataModule', 'BLLASegmentationModel']
+
+
+def _seg_collate_fn(batch):
+    """Custom collate that preserves baselines as a plain list."""
+    baselines = [sample.pop('baselines') for sample in batch]
+    collated = default_collate(batch)
+    collated['baselines'] = baselines
+    return collated
 
 
 class BLLASegmentationDataModule(L.LightningDataModule):
@@ -169,21 +182,24 @@ class BLLASegmentationDataModule(L.LightningDataModule):
                           batch_size=1,
                           num_workers=self.hparams.data_config.num_workers,
                           shuffle=True,
-                          pin_memory=True)
+                          pin_memory=True,
+                          collate_fn=_seg_collate_fn)
 
     def val_dataloader(self):
         return DataLoader(self.val_set,
                           shuffle=False,
                           batch_size=1,
                           num_workers=self.hparams.data_config.num_workers,
-                          pin_memory=True)
+                          pin_memory=True,
+                          collate_fn=_seg_collate_fn)
 
     def test_dataloader(self):
         return DataLoader(self.test_set,
                           shuffle=False,
                           batch_size=1,
                           num_workers=self.hparams.data_config.num_workers,
-                          pin_memory=True)
+                          pin_memory=True,
+                          collate_fn=_seg_collate_fn)
 
 
 class BLLASegmentationModel(L.LightningModule):
@@ -252,13 +268,48 @@ class BLLASegmentationModel(L.LightningModule):
     def validation_step(self, batch, batch_idx):
         x, y = batch['image'], batch['target']
         pred, _ = self.net(x)
+        # capture target size before interpolation for baseline scaling
+        target_h, target_w = y.shape[2], y.shape[3]
         # scale target to output size
         y = F.interpolate(y, size=(pred.size(2), pred.size(3))).int()
 
-        self.val_px_accuracy.update(pred, y)
-        self.val_mean_accuracy.update(pred, y)
-        self.val_mean_iu.update(pred, y)
-        self.val_freq_iu.update(pred, y)
+        # pixel metrics on region+aux channels only
+        pred_px = pred[:, self.val_pixel_idxs, :, :]
+        y_px = y[:, self.val_pixel_idxs, :, :]
+        self.val_px_accuracy.update(pred_px, y_px)
+        self.val_mean_accuracy.update(pred_px, y_px)
+        self.val_mean_iu.update(pred_px, y_px)
+        self.val_freq_iu.update(pred_px, y_px)
+
+        # baseline detection metrics
+        if self.bl_cls_idxs:
+            gt_baselines = batch['baselines'][0]  # batch_size=1
+            pred_np = torch.sigmoid(pred).squeeze(0).cpu().numpy()
+            pred_h, pred_w = pred.shape[2], pred.shape[3]
+            scale_x = pred_w / target_w
+            scale_y = pred_h / target_h
+
+            all_pred_polylines = []
+            all_gt_polylines = []
+            for cls_idx in self.bl_cls_idxs:
+                three_ch = np.stack([pred_np[self.start_sep_idx],
+                                     pred_np[self.end_sep_idx],
+                                     pred_np[cls_idx]])
+                pred_lines = vectorize_lines(three_ch)
+                for pl in pred_lines:
+                    pts = torch.tensor(pl, dtype=torch.float32)
+                    all_pred_polylines.append(interpolate_polyline(pts))
+                if cls_idx in gt_baselines:
+                    for bl in gt_baselines[cls_idx]:
+                        pts = torch.tensor(bl, dtype=torch.float32)
+                        pts[:, 0] *= scale_x
+                        pts[:, 1] *= scale_y
+                        all_gt_polylines.append(interpolate_polyline(pts))
+
+            metrics = compute_detection_metrics(all_pred_polylines,
+                                                all_gt_polylines,
+                                                self.hparams.config.bl_tol)
+            self.val_bl_metrics.append(metrics)
 
     def on_validation_epoch_end(self):
         if not self.trainer.sanity_checking:
@@ -275,11 +326,19 @@ class BLLASegmentationModel(L.LightningModule):
             self.log('val_freq_iu', freq_iu, on_step=False, on_epoch=True, prog_bar=True, logger=True)
             self.log('val_metric', mean_iu, on_step=False, on_epoch=True, prog_bar=False, logger=True)
 
+            if self.val_bl_metrics:
+                bl_agg = aggregate_detection_metrics(self.val_bl_metrics)
+                self.log('val_bl_precision', bl_agg['precision'], on_step=False, on_epoch=True, prog_bar=False, logger=True)
+                self.log('val_bl_recall', bl_agg['recall'], on_step=False, on_epoch=True, prog_bar=False, logger=True)
+                self.log('val_bl_f1', bl_agg['f1'], on_step=False, on_epoch=True, prog_bar=True, logger=True)
+                logger.info(f'validation bl detection: P {bl_agg["precision"]:.4f} R {bl_agg["recall"]:.4f} F1 {bl_agg["f1"]:.4f}')
+
         # reset metrics even if sanity checking
         self.val_px_accuracy.reset()
         self.val_mean_accuracy.reset()
         self.val_mean_iu.reset()
         self.val_freq_iu.reset()
+        self.val_bl_metrics = []
 
     def on_test_epoch_start(self):
         self.pages = []
@@ -287,16 +346,18 @@ class BLLASegmentationModel(L.LightningModule):
     def test_step(self, batch, batch_idx, test_dataloader=0):
         x, y = batch['image'], batch['target']
         pred, _ = self.net(x)
+        # capture target size before interpolation for baseline scaling
+        target_h, target_w = y.shape[2], y.shape[3]
         # scale target to output size
         y = F.interpolate(y, size=(pred.size(2), pred.size(3))).squeeze(0).bool()
+        pred_raw = pred
         pred = pred.squeeze() > 0.5
         pred = pred.view(pred.size(0), -1)
         y = y.view(y.size(0), -1)
-        if self.line_cls_idxs:
-            y_baselines = y[self.line_cls_idxs].sum(dim=0, dtype=torch.bool)
-            pred_baselines = pred[self.line_cls_idxs].sum(dim=0, dtype=torch.bool)
-            baseline_metrics = {'intersections': (y_baselines & pred_baselines).sum(dim=0),
-                                'unions': (y_baselines | pred_baselines).sum(dim=0)}
+
+        # pixel metrics for region+aux channels only
+        pred_px = pred[self.test_pixel_idxs]
+        y_px = y[self.test_pixel_idxs]
 
         if self.region_cls_idxs:
             y_region_cls_idxs = y[self.region_cls_idxs].sum(dim=0, dtype=torch.bool)
@@ -304,13 +365,53 @@ class BLLASegmentationModel(L.LightningModule):
             region_metrics = {'intersections': (y_region_cls_idxs & pred_region_cls_idxs).sum(dim=0),
                               'unions': (y_region_cls_idxs | pred_region_cls_idxs).sum(dim=0)}
 
-        self.pages.append({'intersections': (y & pred).sum(dim=1),
-                           'unions': (y | pred).sum(dim=1),
-                           'corrects': torch.eq(y, pred).sum(dim=1),
-                           'cls_cnt': y.sum(dim=1),
-                           'all_n': torch.tensor(y.size(1)),
-                           'baselines': baseline_metrics,
-                           'regions': region_metrics})
+        # baseline detection metrics
+        gt_baselines = batch['baselines'][0]  # batch_size=1
+        pred_np = torch.sigmoid(pred_raw).squeeze(0).cpu().numpy()
+        pred_h, pred_w = pred_raw.shape[2], pred_raw.shape[3]
+        scale_x = pred_w / target_w
+        scale_y = pred_h / target_h
+
+        all_pred_polylines = []
+        all_gt_polylines = []
+        per_class_metrics = {}
+
+        for cls_idx in self.bl_cls_idxs:
+            three_ch = np.stack([pred_np[self.start_sep_idx],
+                                 pred_np[self.end_sep_idx],
+                                 pred_np[cls_idx]])
+            pred_lines = vectorize_lines(three_ch)
+            cls_pred_polylines = []
+            for pl in pred_lines:
+                pts = torch.tensor(pl, dtype=torch.float32)
+                cls_pred_polylines.append(interpolate_polyline(pts))
+
+            cls_gt_polylines = []
+            if cls_idx in gt_baselines:
+                for bl in gt_baselines[cls_idx]:
+                    pts = torch.tensor(bl, dtype=torch.float32)
+                    pts[:, 0] *= scale_x
+                    pts[:, 1] *= scale_y
+                    cls_gt_polylines.append(interpolate_polyline(pts))
+
+            per_class_metrics[cls_idx] = compute_detection_metrics(
+                cls_pred_polylines, cls_gt_polylines, self.hparams.config.bl_tol)
+            all_pred_polylines.extend(cls_pred_polylines)
+            all_gt_polylines.extend(cls_gt_polylines)
+
+        overall_bl_metrics = compute_detection_metrics(
+            all_pred_polylines, all_gt_polylines, self.hparams.config.bl_tol)
+
+        page_data = {'intersections': (y_px & pred_px).sum(dim=1),
+                     'unions': (y_px | pred_px).sum(dim=1),
+                     'corrects': torch.eq(y_px, pred_px).sum(dim=1),
+                     'cls_cnt': y_px.sum(dim=1),
+                     'all_n': torch.tensor(y_px.size(1)),
+                     'bl_detection': overall_bl_metrics,
+                     'bl_detection_per_class': per_class_metrics}
+        if self.region_cls_idxs:
+            page_data['regions'] = region_metrics
+        self.pages.append(page_data)
 
     def on_test_epoch_end(self):
         corrects = torch.stack([x['corrects'] for x in self.pages], -1).sum(dim=-1)
@@ -328,18 +429,25 @@ class BLLASegmentationModel(L.LightningModule):
         cls_cnt = torch.stack([x['cls_cnt'] for x in self.pages]).sum()
         freq_iu = torch.sum(cls_cnt / cls_cnt.sum() * class_iu.sum())
 
+        # baseline detection metrics
+        bl_page_metrics = [x['bl_detection'] for x in self.pages]
+        bl_agg = aggregate_detection_metrics(bl_page_metrics)
+
+        bl_per_class = {}
+        for cls_idx in self.bl_cls_idxs:
+            cls_page_metrics = [x['bl_detection_per_class'][cls_idx] for x in self.pages]
+            cls_name = self.bl_cls_names[cls_idx]
+            bl_per_class[cls_name] = aggregate_detection_metrics(cls_page_metrics)
+
         self.test_metrics = SegmentationTestMetrics(class_pixel_accuracy=class_pixel_accuracy,
                                                     mean_accuracy=mean_accuracy,
                                                     class_iu=class_iu,
                                                     mean_iu=mean_iu,
-                                                    freq_iu=freq_iu)
-
-        if self.line_cls_idxs:
-            line_intersections = torch.stack([x["baselines"]['intersections'] for x in self.pages]).sum()
-            line_unions = torch.stack([x["baselines"]['unions'] for x in self.pages]).sum()
-            smooth = torch.finfo(torch.float).eps
-            line_iu = (line_intersections + smooth) / (line_unions + smooth)
-            self.test_metrics.line_iu = line_iu
+                                                    freq_iu=freq_iu,
+                                                    bl_precision=bl_agg['precision'],
+                                                    bl_recall=bl_agg['recall'],
+                                                    bl_f1=bl_agg['f1'],
+                                                    bl_detection_per_class=bl_per_class)
 
         if self.region_cls_idxs:
             region_intersections = torch.stack([x["regions"]['intersections'] for x in self.pages]).sum()
@@ -462,15 +570,32 @@ class BLLASegmentationModel(L.LightningModule):
             # set model type metadata field and dump class_mapping
             self.net.model_type = ['segmentation']
 
-            # set up validation metrics after output classes have been determined
-            num_classes = self.trainer.datamodule.train_set.dataset.num_classes
-            self.val_px_accuracy = MultilabelAccuracy(average='micro', num_labels=num_classes)
-            self.val_mean_accuracy = MultilabelAccuracy(average='macro', num_labels=num_classes)
-            self.val_mean_iu = MultilabelJaccardIndex(average='macro', num_labels=num_classes)
-            self.val_freq_iu = MultilabelJaccardIndex(average='weighted', num_labels=num_classes)
+            # set up validation metrics for region+aux channels only
+            final_mapping = self.trainer.datamodule.train_set.dataset.class_mapping
+            region_idx = list(final_mapping['regions'].values())
+            aux_idx = list(final_mapping['aux'].values())
+            self.val_pixel_idxs = sorted(aux_idx + region_idx)
+            num_pixel_labels = len(self.val_pixel_idxs)
+
+            self.val_px_accuracy = MultilabelAccuracy(average='micro', num_labels=num_pixel_labels)
+            self.val_mean_accuracy = MultilabelAccuracy(average='macro', num_labels=num_pixel_labels)
+            self.val_mean_iu = MultilabelJaccardIndex(average='macro', num_labels=num_pixel_labels)
+            self.val_freq_iu = MultilabelJaccardIndex(average='weighted', num_labels=num_pixel_labels)
+
+            # baseline detection setup
+            self.bl_cls_idxs = list(final_mapping['baselines'].values())
+            self.start_sep_idx = final_mapping['aux']['_start_separator']
+            self.end_sep_idx = final_mapping['aux']['_end_separator']
+            self.val_bl_metrics = []
         elif stage == 'test':
-            self.line_cls_idxs = list(self.trainer.datamodule.test_set.dataset.class_mapping['baselines'].values())
-            self.region_cls_idxs = list(self.trainer.datamodule.test_set.dataset.class_mapping['regions'].values())
+            test_class_mapping = self.trainer.datamodule.test_set.dataset.class_mapping
+            self.region_cls_idxs = list(test_class_mapping['regions'].values())
+            self.bl_cls_idxs = list(test_class_mapping['baselines'].values())
+            self.start_sep_idx = test_class_mapping['aux']['_start_separator']
+            self.end_sep_idx = test_class_mapping['aux']['_end_separator']
+            aux_idx = list(test_class_mapping['aux'].values())
+            self.test_pixel_idxs = sorted(aux_idx + self.region_cls_idxs)
+            self.bl_cls_names = {v: k for k, v in test_class_mapping['baselines'].items()}
 
     def on_load_checkpoint(self, checkpoint):
         """

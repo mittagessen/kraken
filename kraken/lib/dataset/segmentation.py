@@ -210,9 +210,9 @@ class BaselineSet(Dataset):
             try:
                 logger.debug(f'Attempting to load {im}')
                 im = Image.open(im)
-                im, target = self.transform(im, target)
+                im, target, baselines = self.transform(im, target)
                 self._update_im_mode(im)
-                return {'image': im, 'target': target}
+                return {'image': im, 'target': target, 'baselines': baselines}
             except Exception:
                 raise
                 self.failed_samples.add(idx)
@@ -220,9 +220,9 @@ class BaselineSet(Dataset):
                 logger.debug(traceback.format_exc())
                 logger.info(f'Failed. Replacing with sample {idx}')
                 return self[idx]
-        im, target = self.transform(im, target)
+        im, target, baselines = self.transform(im, target)
         self._update_im_mode(im)
-        return {'image': im, 'target': target}
+        return {'image': im, 'target': target, 'baselines': baselines}
 
     @staticmethod
     def _get_ortho_line(lineseg, point, line_width, offset):
@@ -245,11 +245,13 @@ class BaselineSet(Dataset):
         start_sep_cls = self.class_mapping['aux']['_start_separator']
         end_sep_cls = self.class_mapping['aux']['_end_separator']
 
+        scaled_baselines = defaultdict(list)
         for cls_idx, lines in target['baselines'].items():
             for line in lines:
                 # buffer out line to desired width
                 line = [k for k, g in groupby(line)]
                 line = np.array(line)*scale
+                scaled_baselines[cls_idx].append(line.tolist())
                 shp_line = geom.LineString(line)
                 split_offset = min(5, shp_line.length/2)
                 line_pol = np.array(shp_line.buffer(self.line_width/2, cap_style=2).boundary.coords, dtype=int)
@@ -281,7 +283,7 @@ class BaselineSet(Dataset):
             o = self.aug(image=image, mask=target)
             image = torch.tensor(o['image']).permute(2, 0, 1)
             target = torch.tensor(o['mask']).permute(2, 0, 1)
-        return image, target
+        return image, target, dict(scaled_baselines)
 
     def __len__(self):
         return len(self.imgs)
