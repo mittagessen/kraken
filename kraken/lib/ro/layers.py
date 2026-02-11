@@ -22,12 +22,12 @@ class ROMLP(nn.Module, BaseModel):
     """
     A simple 2 layer MLP for reading order determination.
     """
-    user_metadata = {}
     _kraken_min_version = '5.0.0'
     model_type = ['reading_order']
 
     def __init__(self, **kwargs):
         super().__init__()
+        self.user_metadata = {}
         self.class_mapping = kwargs.get('class_mapping', None)
         if self.class_mapping is None:
             raise ValueError('`class_mapping` missing in reading order model arguments.')

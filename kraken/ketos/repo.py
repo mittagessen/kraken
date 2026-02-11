@@ -162,7 +162,7 @@ def publish(ctx, metadata, access_token, doi, private, model):
     software_hints = ['kind=vgsl']
 
     # take last metrics field, falling back to accuracy field in model metadata
-    if nn.model_type == 'recognition':
+    if 'recognition' in nn.model_type:
         metrics = {}
         if len(nn.user_metadata.get('metrics', '')):
             if (val_accuracy := nn.user_metadata['metrics'][-1][1].get('val_accuracy', None)) is not None:
@@ -179,7 +179,7 @@ def publish(ctx, metadata, access_token, doi, private, model):
     frontmatter['software_hints'] = software_hints
 
     frontmatter['software_name'] = 'kraken'
-    frontmatter['model_type'] = [nn.model_type]
+    frontmatter['model_type'] = nn.model_type
 
     # build temporary directory
     with tempfile.TemporaryDirectory() as tmpdir, KrakenDownloadProgressBar() as progress:
@@ -188,7 +188,7 @@ def publish(ctx, metadata, access_token, doi, private, model):
         model = Path(model).resolve()
         tmpdir = Path(tmpdir)
         (tmpdir / model.name).resolve().symlink_to(model)
-        if nn.model_type == 'recognition':
+        if 'recognition' in nn.model_type:
             # v0 metadata only supports recognition models
             v0_metadata = {
                 'summary': frontmatter['summary'],

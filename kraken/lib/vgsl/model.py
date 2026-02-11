@@ -104,7 +104,6 @@ class TorchVGSLModel(nn.Module,
                                 models trained on binarized images, 'L' for
                                 grayscale, and None otherwise.
     """
-    user_metadata = {}
     _kraken_min_version = '5.0.0'
 
     def __init__(self, **kwargs) -> None:
@@ -155,6 +154,8 @@ class TorchVGSLModel(nn.Module,
                     dimension.
         """
         super().__init__()
+        self.user_metadata = {}
+
         if (vgsl := kwargs.pop('vgsl', None)) is None:
             raise ValueError('vgsl specification argument is missing in args.')
         self.spec = vgsl
@@ -174,7 +175,7 @@ class TorchVGSLModel(nn.Module,
                                               'metrics': [],
                                               'seg_type': None,
                                               'one_channel_mode': None,
-                                              'model_type': None}
+                                              'model_type': []}
 
         self.user_metadata.update(**kwargs)
 
@@ -331,12 +332,15 @@ class TorchVGSLModel(nn.Module,
 
     @property
     def model_type(self):
-        return self.user_metadata.get('model_type', None)
+        return self.user_metadata.get('model_type', [])
 
     @model_type.setter
-    def model_type(self, val: str):
-        if val not in ['recognition', 'segmentation']:
-            raise ValueError('model_type {} is not one of [recognition, segmentation]'.format(val))
+    def model_type(self, val: Union[str, list[str]]):
+        if isinstance(val, str):
+            val = [val]
+        for v in val:
+            if v not in ['recognition', 'segmentation']:
+                raise ValueError('model_type {} is not one of [recognition, segmentation]'.format(v))
         self.user_metadata['model_type'] = val
 
     @property
@@ -411,7 +415,10 @@ class TorchVGSLModel(nn.Module,
             mlmodel.short_description = 'kraken model'
             if getattr(self, 'codec', None):
                 mlmodel.user_defined_metadata['codec'] = json.dumps(self.codec.c2l)
-            mlmodel.user_defined_metadata['kraken_meta'] = json.dumps(self.user_metadata)
+            coreml_metadata = dict(self.user_metadata)
+            # convert kraken 7-style list model_type to string compatible with older versions.
+            coreml_metadata['model_type'] = coreml_metadata['model_type'][0] if coreml_metadata['model_type'] else 'unknown'
+            mlmodel.user_defined_metadata['kraken_meta'] = json.dumps(coreml_metadata)
             if self.aux_layers:
                 mlmodel.user_defined_metadata['aux_layers'] = json.dumps({k: v.get_spec(k) for k, v in self.aux_layers.items()})
             mlmodel.save(path)
@@ -463,13 +470,13 @@ class TorchVGSLModel(nn.Module,
         """
         Configures the model for inference.
         """
-        if (isinstance(config, RecognitionInferenceConfig) and self.model_type != 'recognition') or (isinstance(config, SegmentationInferenceConfig) and self.model_type != 'segmentation'):
+        if (isinstance(config, RecognitionInferenceConfig) and 'recognition' not in self.model_type) or (isinstance(config, SegmentationInferenceConfig) and 'segmentation' not in self.model_type):
             raise ValueError(f'{self} is a {self.model_type} model. Got incompatible {config.__class__.__name}.')
 
         self.eval()
         self._inf_config = config
         # create line extraction worker pool
-        if self.model_type == 'recognition' and getattr(self, '_line_extraction_pool', None) is None:
+        if 'recognition' in self.model_type and getattr(self, '_line_extraction_pool', None) is None:
             if self._inf_config.num_line_workers == 0:
                 # Use a lightweight in-process runner to avoid OS-level
                 # semaphores that may be restricted in some environments.
@@ -513,9 +520,9 @@ class TorchVGSLModel(nn.Module,
 
             im (PIL.Image.Image): Input image.
         """
-        if self.model_type == 'recognition':
+        if 'recognition' in self.model_type:
             return self._recognition_pred(*args, **kwargs)
-        elif self.model_type == 'segmentation':
+        elif 'segmentation' in self.model_type:
             return self._segmentation_pred(*args, **kwargs)
 
     def resize_output(self, output_size: int, del_indices: Optional[Iterable] = None) -> None:

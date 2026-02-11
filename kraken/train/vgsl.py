@@ -254,7 +254,7 @@ class VGSLRecognitionModel(L.LightningModule):
         if model:
             self.net = model
 
-            if self.net.model_type not in [None, 'recognition']:
+            if self.net.model_type and 'recognition' not in self.net.model_type:
                 raise ValueError(f'Model {model} is of type {self.net.model_type} while `recognition` is expected.')
 
             self.batch, self.channels, self.height, self.width = self.net.input
@@ -478,6 +478,7 @@ class VGSLRecognitionModel(L.LightningModule):
                 self.hparams.config.spec = f'[{vgsl[1:-1]} O1c{train_set.codec.max_label+1}]'
                 from kraken.models import create_model
                 self.net = create_model('TorchVGSLModel',
+                                        model_type=['recognition'],
                                         vgsl=self.hparams.config.spec)
                 # initialize weights
                 self.net.init_weights()
@@ -495,7 +496,7 @@ class VGSLRecognitionModel(L.LightningModule):
                 logger.warning(f'Neural network has been trained on mode {self.net.one_channel_mode} images, '
                                f'training set contains mode {train_set.im_mode} data. Consider binarizing your data.')
 
-            self.net.model_type = 'recognition'
+            self.net.model_type = ['recognition']
 
             if not self.net.seg_type:
                 logger.info(f'Setting seg_type to {train_set.seg_type}.')
@@ -542,7 +543,7 @@ class VGSLRecognitionModel(L.LightningModule):
             raise ValueError('Checkpoint is not a recognition model.')
         data_config = checkpoint['datamodule_hyper_parameters']['data_config']
         self.net = create_model('TorchVGSLModel',
-                                model_type='recognition',
+                                model_type=['recognition'],
                                 legacy_polygons=data_config.legacy_polygons,
                                 seg_type=checkpoint['_seg_type'],
                                 one_channel_mode=checkpoint['_one_channel_mode'],

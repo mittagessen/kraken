@@ -69,7 +69,7 @@ def load_safetensors(path: Union[str, PathLike], tasks: Optional[Sequence[_T_tas
                         logger.warning(f'Model {prefix} in model file {path} requires minimum kraken version {min_ver} (installed {inst_ver})')
                         # XXX: Don't skip check on release.
 #                        continue
-                    if tasks and not set(tasks).intersection(set(model_map[prefix].get('model_type', []))):
+                    if tasks and not set(tasks).intersection(set(model_map[prefix].get('_tasks', []))):
                         logger.info(f'Model {prefix} in model file {path} not in demanded tasks {tasks}')
                         continue
                     model_map[prefix].pop('_tasks')
@@ -124,6 +124,8 @@ def load_coreml(path: Union[str, PathLike], tasks: Optional[Sequence[_T_tasks]] 
         raise ValueError(f'Failure parsing model protobuf: {e}') from e
 
     metadata = json.loads(mlmodel.user_defined_metadata.get('kraken_meta', '{}'))
+    # convert kraken < 7 string syle model_type to list
+    metadata['model_type'] = [metadata['model_type']] if metadata['model_type'] else []
     vgsl_spec = mlmodel.user_defined_metadata.get('vgsl') or metadata.get('vgsl')
     # avoid passing codec/vgsl twice (once in metadata, once as explicit argument)
     metadata.pop('codec', None)
@@ -131,7 +133,7 @@ def load_coreml(path: Union[str, PathLike], tasks: Optional[Sequence[_T_tasks]] 
     if not vgsl_spec:
         raise ValueError(f'No VGSL spec in model metadata for {path}')
 
-    if tasks and metadata['model_type'] not in tasks:
+    if tasks and not set(metadata.get('model_type', [])).intersection(set(tasks)):
         logger.info(f'Model file {path} not in demanded tasks {tasks}')
         return []
 

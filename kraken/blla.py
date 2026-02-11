@@ -313,7 +313,7 @@ def segment(im: PIL.Image.Image,
         model = [model]
 
     for nn in model:
-        if nn.model_type != 'segmentation':
+        if 'segmentation' not in nn.model_type:
             raise KrakenInvalidModelException(f'Invalid model type {nn.model_type} for {nn}')
         if 'class_mapping' not in nn.user_metadata:
             raise KrakenInvalidModelException(f'Segmentation model {nn} does not contain valid class mapping')

@@ -50,7 +50,7 @@ class DummyVGSLModel:
     user_metadata: dict[str, list] = field(default_factory=dict)
     one_channel_mode: Literal['1', 'L'] = '1'
     ptl_module: 'Module' = None
-    model_type: str = 'unknown'
+    model_type: list[str] = ['unknown']
 
     def __post_init__(self):
         self.hyper_params: dict[str, int] = {'completed_epochs': 0}

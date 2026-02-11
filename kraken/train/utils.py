@@ -201,7 +201,7 @@ class KrakenSetOneChannelMode(Callback):
     """
     def on_train_epoch_end(self, trainer: "L.Trainer", pl_module: "L.LightningModule") -> None:
         # fill one_channel_mode after 1 iteration over training data set
-        if not trainer.sanity_checking and trainer.current_epoch == 0 and trainer.model.net.model_type == 'recognition':
+        if not trainer.sanity_checking and trainer.current_epoch == 0 and 'recognition' in trainer.model.net.model_type:
             ds = trainer.datamodule.train_set
             im_mode = getattr(ds.dataset.transforms, 'im_mode', ds.dataset.im_mode)
             if im_mode in ['1', 'L']:

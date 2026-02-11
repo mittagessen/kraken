@@ -208,7 +208,7 @@ class BLLASegmentationModel(L.LightningModule):
         if model:
             self.net = model
 
-            if self.net.model_type not in [None, 'segmentation']:
+            if self.net.model_type and 'segmentation' not in self.net.model_type:
                 raise ValueError(f'Model {model} is of type {self.net.model_type} while `segmentation` is expected.')
 
             self.batch, self.channels, self.height, self.width = self.net.input
@@ -358,6 +358,7 @@ class BLLASegmentationModel(L.LightningModule):
                 logger.info(f'Creating model {vgsl} with {self.trainer.datamodule.train_set.dataset.num_classes} outputs')
                 from kraken.models import create_model
                 self.net = create_model('TorchVGSLModel',
+                                        model_type=['segmentation'],
                                         vgsl=self.hparams.config.spec,
                                         topline=self.trainer.datamodule.hparams.data_config.topline,
                                         class_mapping=set_class_mapping)
@@ -459,7 +460,7 @@ class BLLASegmentationModel(L.LightningModule):
                 logger.info(f'  {k}\t{v}\t{self.trainer.datamodule.train_set.dataset.class_stats["regions"][k]}')
 
             # set model type metadata field and dump class_mapping
-            self.net.model_type = 'segmentation'
+            self.net.model_type = ['segmentation']
 
             # set up validation metrics after output classes have been determined
             num_classes = self.trainer.datamodule.train_set.dataset.num_classes
@@ -484,7 +485,7 @@ class BLLASegmentationModel(L.LightningModule):
         data_config = checkpoint['datamodule_hyper_parameters']['data_config']
         self.net = create_model('TorchVGSLModel',
                                 vgsl=checkpoint['_module_config'].spec,
-                                model_type='segmentation',
+                                model_type=['segmentation'],
                                 topline=data_config.topline,
                                 one_channel_mode=checkpoint['_one_channel_mode'],
                                 class_mapping={'aux': {'_start_separator': 0, '_end_separator': 1},

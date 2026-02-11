@@ -76,7 +76,7 @@ class TorchSeqRecognizer(object):
         self.temperature = temperature
         self.train = train
         self.device = device
-        if nn.model_type not in [None, 'recognition']:
+        if nn.model_type and 'recognition' not in nn.model_type:
             raise ValueError(f'Models of type {nn.model_type} are not supported by TorchSeqRecognizer')
         self.one_channel_mode = nn.one_channel_mode
         self.seg_type = nn.seg_type

@@ -290,7 +290,7 @@ def roadd(ctx, output, ro_model, seg_model):
         message(f'  {k}\t{v}')
 
     seg_net = vgsl.TorchVGSLModel.load_model(seg_model)
-    if seg_net.model_type != 'segmentation':
+    if 'segmentation' not in seg_net.model_type:
         raise click.UsageError(f'Model {seg_model} is invalid {seg_net.model_type} model (expected `segmentation`).')
 
     seg_section = 'baselines' if level == 'baselines' else 'regions'

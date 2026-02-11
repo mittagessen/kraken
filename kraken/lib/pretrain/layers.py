@@ -23,8 +23,7 @@ class Wav2Vec2Mask(nn.Module, BaseModel):
     A layer for Wav2Vec2-style masking. Needs to be placed just before
     recurrent/contextual layers.
     """
-    user_metadata = {}
-    model_type = 'pretrain'
+    model_type = ['pretrain']
     _kraken_min_version = '5.0.0'
 
     def __init__(self,
@@ -50,6 +49,7 @@ class Wav2Vec2Mask(nn.Module, BaseModel):
             - Outputs output :math:`(N, C, H, W)`
         """
         super().__init__()
+        self.user_metadata = {}
         self.context_encoder_input_dim = context_encoder_input_dim
         self.final_dim = final_dim
         self.mask_width = mask_width

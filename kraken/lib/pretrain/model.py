@@ -221,7 +221,7 @@ class RecognitionPretrainModel(L.LightningModule):
         if codec is not None and hasattr(codec, 'c2l'):
             codec = codec.c2l
         self.net = create_model('TorchVGSLModel',
-                                model_type='recognition',
+                                model_type=['recognition'],
                                 legacy_polygons=legacy_polygons,
                                 seg_type=checkpoint['_seg_type'],
                                 one_channel_mode=checkpoint['_one_channel_mode'],
