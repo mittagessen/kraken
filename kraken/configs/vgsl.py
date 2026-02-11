@@ -94,12 +94,15 @@ class BLLASegmentationTrainingConfig(TrainingConfig):
     Arg:
         padding (tuple[int, int], defaults to (0, 0)):
         resize (Literal['fail', 'new', 'union'], defaults to 'fail'):
+        bl_tol (float, defaults to 10.0):
+            Tolerance in pixels for baseline detection metrics.
 
     """
     def __init__(self, **kwargs):
         self.spec = kwargs.pop('spec', '[1,1800,0,3 Cr7,7,64,2,2 Gn32 Cr3,3,128,2,2 Gn32 Cr3,3,128 Gn32 Cr3,3,256 Gn32 Cr3,3,256 Gn32 Lbx32 Lby32 Cr1,1,32 Gn32 Lby32 Lbx32]')
         self.padding = kwargs.pop('padding', (0, 0))
         self.resize = kwargs.pop('resize', 'fail')
+        self.bl_tol = kwargs.pop('bl_tol', 10.0)
 
         kwargs.setdefault('quit', 'fixed')
         kwargs.setdefault('epochs', 50)

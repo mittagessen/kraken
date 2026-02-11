@@ -57,8 +57,11 @@ class SegmentationTestMetrics(TestMetrics):
     class_iu: torch.FloatTensor
     mean_iu: torch.FloatTensor
     freq_iu: torch.FloatTensor
-    line_iu: torch.FloatTensor
-    region_iu: torch.FloatTensor
+    region_iu: torch.FloatTensor = None
+    bl_precision: float = None
+    bl_recall: float = None
+    bl_f1: float = None
+    bl_detection_per_class: dict = None
 
 
 @dataclass

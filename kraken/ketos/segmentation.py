@@ -41,6 +41,7 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
 @click.option('--weights-format', default='safetensors', help='Output weights format.')
 @click.option('-s', '--spec', help='VGSL spec of the baseline labeling network')
 @click.option('--line-width', type=int, help='The height of each baseline in the target after scaling')
+@click.option('--bl-tol', type=float, help='Tolerance in pixels for baseline detection metrics')
 @click.option('--pad', 'padding', type=(int, int), help='Padding (left/right, top/bottom) around the page image')
 @click.option('-i', '--load', type=click.Path(exists=True, readable=True), help='Load existing file to continue training')
 @click.option('--resume', type=click.Path(exists=True, readable=True), help='Load a checkpoint to continue training')
@@ -317,6 +318,7 @@ def segtrain(ctx, **kwargs):
               help='Sets the training data format. In ALTO and PageXML mode all '
               'data is extracted from xml files containing both baselines and a '
               'link to source images.')
+@click.option('--bl-tol', type=float, help='Tolerance in pixels for baseline detection metrics')
 @click.argument('test_set', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def segtest(ctx, **kwargs):
     """
@@ -365,16 +367,36 @@ def segtest(ctx, **kwargs):
     from rich.console import Console
     from rich.table import Table
 
-    table = Table('Category', 'Class Name', 'Pixel Accuracy', 'IOU', 'Object Count')
-
-    class_iu = class_iu.tolist()
-    class_pixel_accuracy = class_pixel_accuracy.tolist()
-    for (cat, class_name), iu, pix_acc in zip(
-        [(cat, key) for (cat, subcategory) in data_module.test_set.dataset.class_mapping.items() for key in subcategory],
-        class_iu,
-        class_pixel_accuracy
-    ):
-        table.add_row(cat, class_name, f'{pix_acc:.3f}', f'{iu:.3f}', f'{data_module.test_set.dataset.class_stats[cat][class_name]}' if cat != "aux" else 'N/A')
-
     console = Console()
+
+    # pixel metrics table (aux + regions only)
+    class_mapping = data_module.test_set.dataset.class_mapping
+    idx_to_name = {}
+    for cat in ('aux', 'regions'):
+        for name, idx in class_mapping[cat].items():
+            idx_to_name[idx] = (cat, name)
+    pixel_idxs = sorted(idx_to_name.keys())
+
+    table = Table('Category', 'Class Name', 'Pixel Accuracy', 'IOU', 'Object Count')
+    class_iu = test_metrics.class_iu.tolist()
+    class_pixel_accuracy = test_metrics.class_pixel_accuracy.tolist()
+    for i, idx in enumerate(pixel_idxs):
+        cat, class_name = idx_to_name[idx]
+        count = f'{data_module.test_set.dataset.class_stats[cat][class_name]}' if cat != 'aux' else 'N/A'
+        table.add_row(cat, class_name, f'{class_pixel_accuracy[i]:.3f}', f'{class_iu[i]:.3f}', count)
     console.print(table)
+
+    # baseline detection metrics table
+    if test_metrics.bl_f1 is not None:
+        bl_table = Table('Class', 'Precision', 'Recall', 'F1')
+        bl_table.add_row('Overall',
+                         f'{test_metrics.bl_precision:.3f}',
+                         f'{test_metrics.bl_recall:.3f}',
+                         f'{test_metrics.bl_f1:.3f}')
+        if test_metrics.bl_detection_per_class:
+            for cls_name, m in test_metrics.bl_detection_per_class.items():
+                bl_table.add_row(cls_name,
+                                 f'{m["precision"]:.3f}',
+                                 f'{m["recall"]:.3f}',
+                                 f'{m["f1"]:.3f}')
+        console.print(bl_table)
