@@ -90,6 +90,15 @@ def parse_page(doc, filename, linetype):
     imagename = base_directory.joinpath(image.get('imageFilename'))
     image_size = int(image.get('imageWidth')), int(image.get('imageHeight'))
 
+    if not image_size[0] or not image_size[1]:
+        logger.warning(f'Invalid image dimensions {image_size} in {filename}. Attempting to read from image file.')
+        try:
+            from PIL import Image
+            with Image.open(imagename) as im:
+                image_size = im.size
+        except Exception as e:
+            raise ValueError(f'Invalid image dimensions {image_size} in {filename} and unable to read image file {imagename}: {e}')
+
     # parse region type and coords
     region_data = defaultdict(list)
     tr_region_order = []
