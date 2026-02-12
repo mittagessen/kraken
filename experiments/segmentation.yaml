@@ -1,7 +1,7 @@
 precision: 32-true
 device: auto
-workers: 32
-threads: 1
+num_workers: 32
+num_threads: 1
 segtrain:
   # training data manifests
   training_data: 
@@ -9,7 +9,7 @@ segtrain:
   evaluation_data: 
     - val.lst
   # directory to save checkpoints in
-  output: checkpoints
+  checkpoint_path: checkpoints
   # change to `coreml` to save best model with kraken < 7 compatibility
   weights_format: safetensors
   # dataset metadata and transformations
