@@ -314,6 +314,16 @@ def segtrain(ctx, **kwargs):
               'data is extracted from xml files containing both baselines and a '
               'link to source images.')
 @click.option('--bl-tol', type=float, help='Tolerance in pixels for baseline detection metrics')
+@click.option('--test-class-mapping-mode',
+              type=click.Choice(['full', 'canonical', 'custom']),
+              default='full',
+              show_default=True,
+              help='Class mapping mode for test dataset. `full` uses the '
+                   'many-to-one mapping from the training checkpoint (falls '
+                   'back to `canonical` for weights files), `canonical` uses '
+                   'the one-to-one mapping, `custom` uses user-provided mappings.')
+@click.option('--line-class-mapping', type=click.UNPROCESSED, hidden=True)
+@click.option('--region-class-mapping', type=click.UNPROCESSED, hidden=True)
 @click.argument('test_set', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def segtest(ctx, **kwargs):
     """
@@ -334,9 +344,15 @@ def segtest(ctx, **kwargs):
 
     params['test_data'] = test_set
 
+    # parse custom class mappings
+    if isinstance(line_cls_map := params.get('line_class_mapping'), list):
+        params['line_class_mapping'] = _create_class_map(line_cls_map)
+    if isinstance(region_cls_map := params.get('region_class_mapping'), list):
+        params['region_class_mapping'] = _create_class_map(region_cls_map)
+
     from kraken.train import (KrakenTrainer, BLLASegmentationModel,
                               BLLASegmentationDataModule)
-    from kraken.configs import BLLASegmentationTrainingConfig, BLLASegmentationTrainingDataConfig
+    from kraken.configs import BLLASegmentationTrainingConfig, BLLASegmentationTestDataConfig
 
     trainer = KrakenTrainer(accelerator=ctx.meta['accelerator'],
                             devices=ctx.meta['device'],
@@ -347,7 +363,7 @@ def segtest(ctx, **kwargs):
                             num_sanity_val_steps=0)
 
     m_config = BLLASegmentationTrainingConfig(**params)
-    dm_config = BLLASegmentationTrainingDataConfig(**params)
+    dm_config = BLLASegmentationTestDataConfig(**params)
     data_module = BLLASegmentationDataModule(dm_config)
 
     with trainer.init_module(empty_init=False):

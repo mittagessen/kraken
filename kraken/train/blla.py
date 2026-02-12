@@ -170,9 +170,28 @@ class BLLASegmentationDataModule(L.LightningDataModule):
         elif stage == 'test':
             if len(self.test_data) == 0:
                 raise ValueError('No valid test data provided. Please add some.')
+
+            mode = getattr(self.hparams.data_config, 'test_class_mapping_mode', 'full')
+            if mode == 'custom':
+                class_mapping = {'aux': {'_start_separator': 0, '_end_separator': 1},
+                                 'baselines': self.hparams.data_config.line_class_mapping,
+                                 'regions': self.hparams.data_config.region_class_mapping}
+            elif mode == 'full':
+                full = getattr(self.trainer.lightning_module, '_full_class_mapping', None)
+                if full is not None:
+                    class_mapping = full
+                else:
+                    logger.warning('Full class mapping not available (model loaded '
+                                   'from weights file). Falling back to canonical mapping.')
+                    class_mapping = self.trainer.lightning_module.net.user_metadata['class_mapping']
+            elif mode == 'canonical':
+                class_mapping = self.trainer.lightning_module.net.user_metadata['class_mapping']
+            else:
+                raise ValueError(f'Invalid test_class_mapping_mode: {mode}')
+
             test_set = self._build_dataset(self.test_data,
                                            im_transforms=transforms,
-                                           class_mapping=self.trainer.lightning_module._full_class_mapping)
+                                           class_mapping=class_mapping)
             self.test_set = Subset(test_set, range(len(test_set)))
             if len(self.test_set) == 0:
                 raise ValueError('No valid test data provided. Please add some.')
