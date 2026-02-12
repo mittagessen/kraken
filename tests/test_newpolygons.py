@@ -77,13 +77,22 @@ class TestNewPolygons(unittest.TestCase):
         for cl in extractor_mock.mock_calls:
             self.assertEqual(cl[2]["legacy"], expect_legacy)
 
-    @patch("kraken.rpred.extract_polygons", new_callable=mock_extract_polygons)
+    @patch("kraken.lib.vgsl.rpred.extract_polygons", new_callable=mock_extract_polygons)
     def _test_krakencli(self, extractor_mock: Mock, *, args, force_no_legacy: bool=False, expect_legacy: bool,):
         """
         Base recipe for testing kraken_cli with a given polygon extraction method
         """
-        if force_no_legacy:
-            args = ["--no-legacy-polygons"] + args
+        # Insert options after the 'ocr' subcommand: --num-line-workers 0
+        # for in-process line extraction so mocks are effective, and
+        # --no-legacy-polygons if requested.
+        try:
+            ocr_idx = args.index('ocr')
+            extra = ['--num-line-workers', '0']
+            if force_no_legacy:
+                extra += ['--no-legacy-polygons']
+            args = args[:ocr_idx + 1] + extra + args[ocr_idx + 1:]
+        except ValueError:
+            pass
 
         result = self.runner.invoke(kraken_cli, args)
         print("kraken", *args)
@@ -116,6 +125,12 @@ class TestNewPolygons(unittest.TestCase):
             extractor_mock.assert_called()
             for cl in extractor_mock.mock_calls:
                 self.assertEqual(cl[2]["legacy"], expect_legacy)
+
+    def _find_best_model(self, model_dir):
+        """Find the best model weights file in the checkpoint directory."""
+        models = list(Path(model_dir).glob('best_*.*'))
+        self.assertEqual(len(models), 1, f"Expected exactly one best model in {model_dir}, found {models}")
+        return str(models[0])
 
     ## TESTS
 
@@ -214,7 +229,7 @@ class TestNewPolygons(unittest.TestCase):
             )
 
             self._test_krakencli(
-                args=['-f', 'xml', '-i', self.segmented_img, fp, 'ocr', '-m', mfp + "_0.mlmodel"],
+                args=['-f', 'xml', '-i', self.segmented_img, fp, 'ocr', '-m', self._find_best_model(mfp)],
                 expect_legacy=False,
             )
 
@@ -233,7 +248,7 @@ class TestNewPolygons(unittest.TestCase):
             )
 
             self._test_krakencli(
-                args=['-f', 'xml', '-i', self.segmented_img, fp, 'ocr', '-m', mfp + "_0.mlmodel"],
+                args=['-f', 'xml', '-i', self.segmented_img, fp, 'ocr', '-m', self._find_best_model(mfp)],
                 expect_legacy=True,
             )
 
@@ -251,7 +266,7 @@ class TestNewPolygons(unittest.TestCase):
                 check_exit_code=[0, 1], # Model may not improve during training
             )
             self._test_krakencli(
-                args=['-f', 'xml', '-i', self.segmented_img, fp, 'ocr', '-m', mfp + "_0.mlmodel"],
+                args=['-f', 'xml', '-i', self.segmented_img, fp, 'ocr', '-m', self._find_best_model(mfp)],
                 expect_legacy=False,
             )
 
@@ -269,7 +284,7 @@ class TestNewPolygons(unittest.TestCase):
                 check_exit_code=[0, 1], # Model may not improve during training
             )
             self._test_krakencli(
-                args=['-f', 'xml', '-i', self.segmented_img, fp, 'ocr', '-m', mfp + "_0.mlmodel"],
+                args=['-f', 'xml', '-i', self.segmented_img, fp, 'ocr', '-m', self._find_best_model(mfp)],
                 expect_legacy=True,
             )
 
@@ -287,7 +302,7 @@ class TestNewPolygons(unittest.TestCase):
                 check_exit_code=[0, 1], # Model may not improve during training
             )
             self._test_krakencli(
-                args=['-f', 'xml', '-i', self.segmented_img, fp, 'ocr', '-m', mfp + "_0.mlmodel"],
+                args=['-f', 'xml', '-i', self.segmented_img, fp, 'ocr', '-m', self._find_best_model(mfp)],
                 expect_legacy=False,
             )
 
@@ -306,7 +321,7 @@ class TestNewPolygons(unittest.TestCase):
             )
 
             self._test_krakencli(
-                args=['-f', 'xml', '-i', self.segmented_img, fp, 'ocr', '-m', str(mfp) + "_0.mlmodel"],
+                args=['-f', 'xml', '-i', self.segmented_img, fp, 'ocr', '-m', self._find_best_model(mfp)],
                 expect_legacy=True,
             )
 
@@ -325,7 +340,7 @@ class TestNewPolygons(unittest.TestCase):
             )
 
             self._test_krakencli(
-                args=['-f', 'xml', '-i', self.segmented_img, fp, 'ocr', '-m', mfp + "_0.mlmodel"],
+                args=['-f', 'xml', '-i', self.segmented_img, fp, 'ocr', '-m', self._find_best_model(mfp)],
                 expect_legacy=False,
             )
 

@@ -28,6 +28,7 @@ Vogler, Nikolai, et al. "Lacuna Reconstruction: Self-supervised Pre-training
 for Low-Resource Historical Document Transcription." arXiv preprint
 arXiv:2112.08692 (2021).
 """
+import re
 import logging
 from itertools import chain
 from typing import TYPE_CHECKING, Optional, Union
@@ -47,7 +48,6 @@ from kraken.configs import VGSLPreTrainingConfig
 from kraken.lib.vgsl import layers
 from kraken.models import BaseModel
 from kraken.lib.codec import PytorchCodec
-from kraken.lib.pretrain.layers import Wav2Vec2Mask
 from kraken.train import VGSLRecognitionDataModule
 from kraken.train.utils import configure_optimizer_and_lr_scheduler
 from kraken.lib.dataset import ImageInputTransforms
@@ -123,15 +123,22 @@ class RecognitionPretrainModel(L.LightningModule):
 
         if model:
             self.net = model
-
             self.batch, self.channels, self.height, self.width = self.net.input
         else:
-            from kraken.models import create_model
-            self.net = create_model('TorchVGSLModel',
-                                    vgsl=self.hparams.config.spec)
-            self.net.init_weights()
+            self.net = None
+            vgsl = config.spec.strip()
+            if vgsl[0] != '[' or vgsl[-1] != ']':
+                raise ValueError(f'VGSL spec "{vgsl}" not bracketed')
+            blocks = vgsl[1:-1].split(' ')
+            m = re.match(r'(\d+),(\d+),(\d+),(\d+)', blocks[0])
+            if not m:
+                raise ValueError(f'Invalid input spec {blocks[0]}')
+            self.batch, self.height, self.width, self.channels = [int(x) for x in m.groups()]
 
-        self._set_input_shape()
+        self.example_input_array = torch.Tensor(self.batch,
+                                                self.channels,
+                                                self.height if self.height else 32,
+                                                self.width if self.width else 400)
 
     def forward(self, x, seq_lens=None):
         return self.net(x, seq_lens)
@@ -227,7 +234,7 @@ class RecognitionPretrainModel(L.LightningModule):
                                 one_channel_mode=checkpoint['_one_channel_mode'],
                                 vgsl=checkpoint['_module_config'].spec,
                                 codec=codec)
-        self._init_pretrain_components()
+        self._configure_net_components()
 
     def _configure_net_components(self) -> None:
         idx = self._init_pretrain_components()
@@ -239,7 +246,9 @@ class RecognitionPretrainModel(L.LightningModule):
         self.val_ce = MeanMetric()
 
     def _init_pretrain_components(self) -> int:
-        self._set_input_shape()
+        from kraken.models import create_model
+
+        self.batch, self.channels, self.height, self.width = self.net.input
 
         for idx, layer in enumerate(self.net.nn.children()):
             if isinstance(layer, layers.TransposedSummarizingRNN):
@@ -254,24 +263,22 @@ class RecognitionPretrainModel(L.LightningModule):
             self.net.append(len(self.net.nn), "[O1c2]")
 
         if not hasattr(self, 'wav2vec2mask'):
-            self.wav2vec2mask = Wav2Vec2Mask(self.net.nn[idx-1].output_shape[1],
-                                             final_dim_layer.output_shape[1],
-                                             self.hparams.config.mask_width,
-                                             self.hparams.config.mask_prob,
-                                             self.hparams.config.num_negatives)
+            self.wav2vec2mask = create_model('Wav2Vec2Mask',
+                                             context_encoder_input_dim=self.net.nn[idx-1].output_shape[1],
+                                             final_dim=final_dim_layer.output_shape[1],
+                                             mask_width=self.hparams.config.mask_width,
+                                             mask_prob=self.hparams.config.mask_prob,
+                                             num_negatives=self.hparams.config.num_negatives)
 
         return idx
 
-    def _set_input_shape(self) -> None:
-        self.batch, self.channels, self.height, self.width = self.net.input
-
-        self.example_input_array = torch.Tensor(self.batch,
-                                                self.channels,
-                                                self.height if self.height else 32,
-                                                self.width if self.width else 400)
-
     def setup(self, stage: Optional[str] = None):
         if stage in [None, 'fit', 'validate', 'test', 'predict']:
+            if self.net is None:
+                from kraken.models import create_model
+                self.net = create_model('TorchVGSLModel',
+                                        vgsl=self.hparams.config.spec)
+                self.net.init_weights()
             self._configure_net_components()
 
     def on_save_checkpoint(self, checkpoint):
