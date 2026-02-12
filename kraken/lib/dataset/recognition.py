@@ -23,10 +23,6 @@ import pyarrow as pa
 import traceback
 import dataclasses
 import multiprocessing as mp
-import threading
-
-import os
-from torchvision.utils import save_image
 
 from collections import Counter
 from collections.abc import Callable
@@ -35,7 +31,8 @@ from typing import TYPE_CHECKING, Any, Literal, Optional, Union
 
 from PIL import Image
 from ctypes import c_char
-from torchvision import transforms
+from torchvision.transforms import InterpolationMode
+from torchvision.transforms import v2
 from torch.utils.data import Dataset
 
 from kraken.containers import BaselineLine, BBoxLine, Segmentation
@@ -58,85 +55,35 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class _LocalValue:
-    """
-    Minimal stand-in for multiprocessing.Value when shared memory is unavailable.
-    """
-    def __init__(self, value):
-        self.value = value
-        self._lock = threading.Lock()
-
-    def get_lock(self):
-        return self._lock
-
-
-def _safe_mp_value(typecode_or_type, value):
-    """
-    Creates a multiprocessing.Value with a local fallback if shared memory
-    isn't available (e.g. restricted /dev/shm).
-    """
-    try:
-        return mp.Value(typecode_or_type, value)
-    except (PermissionError, OSError):
-        logger.warning('Shared memory unavailable; falling back to in-process value.')
-        return _LocalValue(value)
-
-
 class DefaultAugmenter():
     def __init__(self):
-        import cv2
-        cv2.setNumThreads(0)
-        from albumentations import (Blur, Compose, ElasticTransform,
-                                    MedianBlur, MotionBlur, OneOf, SafeRotate,
-                                    OpticalDistortion, PixelDropout,
-                                    ToFloat)
+        self._blur = v2.RandomChoice([
+            v2.GaussianBlur(kernel_size=3, sigma=(0.1, 1.0)),
+            v2.GaussianBlur(kernel_size=5, sigma=(0.1, 2.0)),
+        ])
+        self._deform = v2.RandomChoice([
+            v2.RandomPerspective(distortion_scale=0.2, p=1.0, fill=0.0),
+            v2.RandomRotation(degrees=3,
+                              interpolation=InterpolationMode.BILINEAR,
+                              fill=0.0),
+            v2.RandomAffine(degrees=0,
+                            translate=(0.04, 0.04),
+                            scale=(0.9, 1.1),
+                            shear=(-3.0, 3.0),
+                            interpolation=InterpolationMode.BILINEAR,
+                            fill=0.0),
+        ])
+        self._dropout = v2.RandomErasing(p=1.0,
+                                         scale=(0.2, 0.2),
+                                         value=0.0)
+        self._augment = v2.RandomApply([v2.Compose([
+            v2.RandomApply([self._dropout], p=0.2),
+            v2.RandomApply([self._blur], p=0.2),
+            v2.RandomApply([self._deform], p=0.2),
+        ])], p=0.5)
 
-        self._transforms = Compose([
-                                    ToFloat(),
-                                    PixelDropout(p=0.2),
-                                    OneOf([
-                                        MotionBlur(p=0.2),
-                                        MedianBlur(blur_limit=3, p=0.1),
-                                        Blur(blur_limit=3, p=0.1),
-                                    ], p=0.2),
-                                    OneOf([
-                                        OpticalDistortion(p=0.3),
-                                        ElasticTransform(alpha=7, sigma=25, p=0.1),
-                                        SafeRotate(limit=(-3, 3), border_mode=cv2.BORDER_CONSTANT, p=0.2)
-                                    ], p=0.2),
-                                   ], p=0.5)
-
-    def __call__(self, image, index):
-        im = image.permute((1, 2, 0)).numpy()
-        o = self._transforms(image=im)
-        im = torch.tensor(o['image'].transpose(2, 0, 1))
-
-        """
-        Saves augmented images to disk for debugging or inspection if `isSave` is set to True.
-
-        **Need improve** - User option to debug, option to set the save folder and exceptions
-
-        Parameters:
-        - isSave (bool): Flag to enable or disable saving images.
-        - index (int): Image index, used for naming the saved file.
-
-        The function creates an 'augmented_images' directory (if not already existing),
-        saves the image as 'image_{index}.png', and logs the save path.
-        """
-        isSave = False
-        if isSave:
-            # Save augmented image using torchvision's save_image
-            output_dir = "augmented_images"
-            os.makedirs(output_dir, exist_ok=True)
-
-            save_path = os.path.join(
-                output_dir,
-                f"image_{index}.png"
-            )
-            save_image(im, save_path)
-            logger.info(f"Saved augmented image to {save_path}")
-
-        return im
+    def __call__(self, image: torch.Tensor, index: int) -> torch.Tensor:
+        return self._augment(image).clamp(0.0, 1.0)
 
 
 class ArrowIPCRecognitionDataset(Dataset):
@@ -149,7 +96,7 @@ class ArrowIPCRecognitionDataset(Dataset):
                  whitespace_normalization: bool = True,
                  skip_empty_lines: bool = True,
                  reorder: Union[bool, Literal['L', 'R']] = True,
-                 im_transforms: Callable[[Any], torch.Tensor] = transforms.Compose([]),
+                 im_transforms: Callable[[Any], torch.Tensor] = v2.Identity(),
                  augmentation: bool = False,
                  split_filter: Optional[str] = None) -> None:
         """
@@ -197,7 +144,7 @@ class ArrowIPCRecognitionDataset(Dataset):
         if augmentation:
             self.aug = DefaultAugmenter()
 
-        self._im_mode = _safe_mp_value(c_char, b'1')
+        self._im_mode = mp.Value(c_char, b'1')
 
     def add(self, file: Union[str, 'PathLike']) -> None:
         """
@@ -365,7 +312,7 @@ class PolygonGTDataset(Dataset):
                  whitespace_normalization: bool = True,
                  skip_empty_lines: bool = True,
                  reorder: Union[bool, Literal['L', 'R']] = True,
-                 im_transforms: Callable[[Any], torch.Tensor] = transforms.Compose([]),
+                 im_transforms: Callable[[Any], torch.Tensor] = v2.Identity(),
                  augmentation: bool = False,
                  legacy_polygons: bool = False) -> None:
         """
@@ -406,7 +353,7 @@ class PolygonGTDataset(Dataset):
         if augmentation:
             self.aug = DefaultAugmenter()
 
-        self._im_mode = _safe_mp_value(c_char, b'1')
+        self._im_mode = mp.Value(c_char, b'1')
 
     def add(self,
             line: Optional[BaselineLine] = None,
@@ -556,7 +503,7 @@ class GroundTruthDataset(Dataset):
                  whitespace_normalization: bool = True,
                  skip_empty_lines: bool = True,
                  reorder: Union[bool, str] = True,
-                 im_transforms: Callable[[Any], torch.Tensor] = transforms.Compose([]),
+                 im_transforms: Callable[[Any], torch.Tensor] = v2.Identity(),
                  augmentation: bool = False) -> None:
         """
         Reads a list of image-text pairs and creates a ground truth set.
@@ -603,7 +550,7 @@ class GroundTruthDataset(Dataset):
         if augmentation:
             self.aug = DefaultAugmenter()
 
-        self._im_mode = _safe_mp_value(c_char, b'1')
+        self._im_mode = mp.Value(c_char, b'1')
 
     def add(self,
             line: Optional[BBoxLine] = None,

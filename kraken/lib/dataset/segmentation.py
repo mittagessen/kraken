@@ -30,7 +30,9 @@ from PIL import Image
 from shapely.ops import split
 from skimage.draw import polygon
 from torch.utils.data import Dataset
-from torchvision import transforms
+from torchvision import tv_tensors
+from torchvision.transforms import InterpolationMode
+from torchvision.transforms import v2
 
 from kraken.lib.dataset.utils import _get_type
 from kraken.lib.segmentation import scale_regions
@@ -47,6 +49,39 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+class SegmentationAugmenter():
+    def __init__(self) -> None:
+        self._blur = v2.RandomChoice([
+            v2.GaussianBlur(kernel_size=3, sigma=(0.1, 1.0)),
+            v2.GaussianBlur(kernel_size=5, sigma=(0.1, 2.0)),
+        ])
+        self._affine = v2.RandomAffine(degrees=45,
+                                       translate=(0.0625, 0.0625),
+                                       scale=(0.8, 1.2),
+                                       shear=(-5.0, 5.0),
+                                       interpolation=InterpolationMode.BILINEAR,
+                                       fill=0.0)
+        self._perspective = v2.RandomPerspective(distortion_scale=0.2,
+                                                 p=1.0,
+                                                 interpolation=InterpolationMode.BILINEAR,
+                                                 fill=0.0)
+        self._color = v2.ColorJitter(brightness=0.1,
+                                     contrast=0.1,
+                                     saturation=0.1,
+                                     hue=0.05)
+        self._augment = v2.RandomApply([v2.Compose([
+            v2.RandomApply([self._blur], p=0.2),
+            v2.RandomApply([self._affine], p=0.2),
+            v2.RandomApply([self._perspective], p=0.2),
+            v2.RandomApply([self._color], p=0.3),
+        ])], p=0.5)
+
+    def __call__(self, image: torch.Tensor, target: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        mask = tv_tensors.Mask(target)
+        image, mask = self._augment(image, mask)
+        return image.clamp(0.0, 1.0), mask.as_subclass(torch.Tensor)
+
+
 class BaselineSet(Dataset):
     """
     Dataset for training a baseline/region segmentation model.
@@ -55,7 +90,7 @@ class BaselineSet(Dataset):
                  class_mapping: dict[str, dict[str, int]],
                  line_width: int = 4,
                  padding: tuple[int, int, int, int] = (0, 0, 0, 0),
-                 im_transforms: Callable[[Any], torch.Tensor] = transforms.Compose([]),
+                 im_transforms: Callable[[Any], torch.Tensor] = v2.Identity(),
                  augmentation: bool = False) -> None:
         """
         Creates a dataset for a text-line and region segmentation model.
@@ -90,27 +125,7 @@ class BaselineSet(Dataset):
         self.aug = None
 
         if augmentation:
-            import cv2
-            cv2.setNumThreads(0)
-            from albumentations import (Blur, Compose, ElasticTransform,
-                                        HueSaturationValue, MedianBlur,
-                                        MotionBlur, OneOf, OpticalDistortion,
-                                        ShiftScaleRotate, ToFloat)
-
-            self.aug = Compose([
-                                ToFloat(),
-                                OneOf([
-                                    MotionBlur(p=0.2),
-                                    MedianBlur(blur_limit=3, p=0.1),
-                                    Blur(blur_limit=3, p=0.1),
-                                ], p=0.2),
-                                ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.2, rotate_limit=45, p=0.2),
-                                OneOf([
-                                    OpticalDistortion(p=0.3),
-                                    ElasticTransform(p=0.1),
-                                ], p=0.2),
-                                HueSaturationValue(hue_shift_limit=20, sat_shift_limit=0.1, val_shift_limit=0.1, p=0.3),
-                               ], p=0.5)
+            self.aug = SegmentationAugmenter()
 
         self.line_width = line_width
         self.transforms = im_transforms
@@ -278,11 +293,7 @@ class BaselineSet(Dataset):
                 t[cls_idx, rr, cc] = 1
         target = F.pad(t, self.pad)
         if self.aug:
-            image = image.permute(1, 2, 0).numpy()
-            target = target.permute(1, 2, 0).numpy()
-            o = self.aug(image=image, mask=target)
-            image = torch.tensor(o['image']).permute(2, 0, 1)
-            target = torch.tensor(o['mask']).permute(2, 0, 1)
+            image, target = self.aug(image, target)
         return image, target, dict(scaled_baselines)
 
     def __len__(self):

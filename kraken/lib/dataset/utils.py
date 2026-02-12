@@ -123,24 +123,42 @@ class ImageInputTransforms(transforms.Compose):
                                        'combination with forced binarization.')
 
         self.transforms = []
-        self.transforms.append(transforms.Lambda(partial(F_t.pil_to_mode, mode=self._mode)))
+
+        def mode_transform():
+            if self._mode == 'L':
+                return v2.Grayscale(num_output_channels=1)
+            return partial(F_t.pil_to_mode, mode=self._mode)
+
+        def resize_transform(im):
+            oh, ow = self._scale
+            h, w = im.height, im.width
+            if oh == 0:
+                oh = int(h * ow / w)
+            elif ow == 0:
+                ow = int(w * oh / h)
+            return v2.functional.resize(im, [oh, ow], interpolation=v2.InterpolationMode.LANCZOS, antialias=True)
+
+        self.transforms.append(mode_transform())
 
         if self._force_binarization:
-            self.transforms.append(transforms.Lambda(F_t.pil_to_bin))
+            self.transforms.append(F_t.pil_to_bin)
         if self._scale != (0, 0):
             if self._center_norm:
                 lnorm = CenterNormalizer(self._scale[0])
-                self.transforms.append(transforms.Lambda(partial(F_t.pil_dewarp, lnorm=lnorm)))
-                self.transforms.append(transforms.Lambda(partial(F_t.pil_to_mode, mode=self._mode)))
+                self.transforms.append(partial(F_t.pil_dewarp, lnorm=lnorm))
+                self.transforms.append(mode_transform())
             else:
-                self.transforms.append(transforms.Lambda(partial(F_t.pil_fixed_resize, scale=self._scale)))
+                if self._scale[0] > 0 and self._scale[1] > 0:
+                    self.transforms.append(v2.Resize(self._scale, interpolation=v2.InterpolationMode.LANCZOS, antialias=True))
+                else:
+                    self.transforms.append(resize_transform)
         if self._pad:
-            self.transforms.append(transforms.Pad(self._pad, fill=255))
+            self.transforms.append(v2.Pad(self._pad, fill=255))
         self.transforms.append(v2.PILToTensor())
         self.transforms.append(v2.ToDtype(self._dtype, scale=True))
         # invert
-        self.transforms.append(transforms.Lambda(F_t.tensor_invert))
-        self.transforms.append(transforms.Lambda(partial(F_t.tensor_permute, perm=perm)))
+        self.transforms.append(v2.RandomInvert(p=1.0))
+        self.transforms.append(partial(F_t.tensor_permute, perm=perm))
 
     @property
     def batch(self) -> int:

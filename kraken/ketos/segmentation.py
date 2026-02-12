@@ -172,12 +172,6 @@ def segtrain(ctx, **kwargs):
     if sum(map(bool, [resume, load])) > 1:
         raise click.BadOptionsUsage('load', 'load/resume options are mutually exclusive.')
 
-    if params.get('augment'):
-        try:
-            import albumentations  # NOQA
-        except ImportError:
-            raise click.BadOptionUsage('augment', 'augmentation needs the `albumentations` package installed.')
-
     if params.get('pl_logger') == 'tensorboard':
         try:
             import tensorboard  # NOQA
