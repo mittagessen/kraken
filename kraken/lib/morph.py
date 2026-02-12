@@ -2,7 +2,8 @@
 Various add-ons to the SciPy morphology package
 """
 import numpy as np
-from scipy.ndimage import distance_transform_edt, filters
+from scipy.ndimage import (distance_transform_edt, maximum_filter,
+                           minimum_filter, uniform_filter)
 from scipy.ndimage import find_objects as _find_objects
 from scipy.ndimage import label as _label
 
@@ -49,27 +50,27 @@ def find_objects(image: np.ndarray, **kw) -> np.ndarray:
 
 def r_dilation(image, size, origin=0):
     """Dilation with rectangular structuring element using maximum_filter"""
-    return filters.maximum_filter(image, size, origin=origin)
+    return maximum_filter(image, size, origin=origin)
 
 
 def r_erosion(image, size, origin=0):
     """Erosion with rectangular structuring element using maximum_filter"""
-    return filters.minimum_filter(image, size, origin=origin)
+    return minimum_filter(image, size, origin=origin)
 
 
 def rb_dilation(image, size, origin=0):
     """Binary dilation using linear filters."""
     output = np.zeros(image.shape, 'f')
-    filters.uniform_filter(image, size, output=output, origin=origin,
-                           mode='constant', cval=0)
+    uniform_filter(image, size, output=output, origin=origin,
+                   mode='constant', cval=0)
     return np.array(output > 0, 'i')
 
 
 def rb_erosion(image, size, origin=0):
     """Binary erosion using linear filters."""
     output = np.zeros(image.shape, 'f')
-    filters.uniform_filter(image, size, output=output, origin=origin,
-                           mode='constant', cval=1)
+    uniform_filter(image, size, output=output, origin=origin,
+                   mode='constant', cval=1)
     return np.array(output == 1, 'i')
 
 
