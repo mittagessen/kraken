@@ -172,7 +172,7 @@ class BLLASegmentationDataModule(L.LightningDataModule):
                 raise ValueError('No valid test data provided. Please add some.')
             test_set = self._build_dataset(self.test_data,
                                            im_transforms=transforms,
-                                           class_mapping=self.trainer.lightning_module.net.user_metadata['class_mapping'])
+                                           class_mapping=self.trainer.lightning_module._full_class_mapping)
             self.test_set = Subset(test_set, range(len(test_set)))
             if len(self.test_set) == 0:
                 raise ValueError('No valid test data provided. Please add some.')
@@ -587,15 +587,20 @@ class BLLASegmentationModel(L.LightningModule):
             self.start_sep_idx = final_mapping['aux']['_start_separator']
             self.end_sep_idx = final_mapping['aux']['_end_separator']
             self.val_bl_metrics = []
+
+            # store full (potentially many-to-one) mapping for test dataset construction
+            self._full_class_mapping = self.trainer.datamodule.train_set.dataset.class_mapping
         elif stage == 'test':
             test_class_mapping = self.trainer.datamodule.test_set.dataset.class_mapping
-            self.region_cls_idxs = list(test_class_mapping['regions'].values())
-            self.bl_cls_idxs = list(test_class_mapping['baselines'].values())
+            self.region_cls_idxs = sorted(set(test_class_mapping['regions'].values()))
+            self.bl_cls_idxs = sorted(set(test_class_mapping['baselines'].values()))
             self.start_sep_idx = test_class_mapping['aux']['_start_separator']
             self.end_sep_idx = test_class_mapping['aux']['_end_separator']
             aux_idx = list(test_class_mapping['aux'].values())
-            self.test_pixel_idxs = sorted(aux_idx + self.region_cls_idxs)
-            self.bl_cls_names = {v: k for k, v in test_class_mapping['baselines'].items()}
+            self.test_pixel_idxs = sorted(set(aux_idx + self.region_cls_idxs))
+            # use canonical mapping for index-to-name (one name per index)
+            canonical = self.net.user_metadata['class_mapping']
+            self.bl_cls_names = {v: k for k, v in canonical['baselines'].items()}
 
     def on_load_checkpoint(self, checkpoint):
         """
@@ -603,21 +608,27 @@ class BLLASegmentationModel(L.LightningModule):
         otherwise the weight loading will fail.
         """
         from kraken.models import create_model
-        print(checkpoint['_module_config'])
         if not isinstance(checkpoint['_module_config'], BLLASegmentationTrainingConfig):
             raise ValueError('Checkpoint is not a segmentation model.')
 
         data_config = checkpoint['datamodule_hyper_parameters']['data_config']
+        full_class_mapping = {'aux': {'_start_separator': 0, '_end_separator': 1},
+                              'baselines': data_config.line_class_mapping,
+                              'regions': data_config.region_class_mapping}
         self.net = create_model('TorchVGSLModel',
                                 vgsl=checkpoint['_module_config'].spec,
                                 model_type=['segmentation'],
                                 topline=data_config.topline,
                                 one_channel_mode=checkpoint['_one_channel_mode'],
-                                class_mapping={'aux': {'_start_separator': 0, '_end_separator': 1},
-                                               'baselines': data_config.line_class_mapping,
-                                               'regions': data_config.region_class_mapping})
+                                class_mapping=full_class_mapping)
 
         self.batch, self.channels, self.height, self.width = self.net.input
+
+        # store full (potentially many-to-one) mapping for test dataset construction
+        self._full_class_mapping = full_class_mapping
+        # restore canonical (one-to-one) mapping in user_metadata for inference/export
+        if '_canonical_class_mapping' in checkpoint:
+            self.net.user_metadata['class_mapping'] = checkpoint['_canonical_class_mapping']
 
     def on_save_checkpoint(self, checkpoint):
         """
@@ -626,6 +637,7 @@ class BLLASegmentationModel(L.LightningModule):
         """
         checkpoint['_module_config'] = self.hparams.config
         checkpoint['_one_channel_mode'] = self.trainer.datamodule.train_set.dataset.im_mode
+        checkpoint['_canonical_class_mapping'] = self.net.user_metadata['class_mapping']
 
     @classmethod
     def load_from_weights(cls,
