@@ -34,8 +34,8 @@ yourself you can use `pipx`.
    $ sudo apt install pipx
    $ pipx install kraken
 
-kraken works both on Linux and Mac OS X and with any python interpreter between
-3.9 and 3.11. It is possible the installation fails because `pipx` defaults to
+kraken works both on Linux and macOS and with any Python interpreter between
+3.9 and 3.12. It is possible the installation fails because `pipx` defaults to
 an unsupported interpreter version. In that case you need to install a
 compatible interpreter version such as 3.11 and then specify this version
 explicitly:
