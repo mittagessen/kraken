@@ -185,11 +185,12 @@ def segtrain(ctx, **kwargs):
         params['region_class_mapping'] = _create_class_map(region_cls_map)
 
     from threadpoolctl import threadpool_limits
-    from lightning.pytorch.callbacks import ModelCheckpoint, OnExceptionCheckpoint
+    from lightning.pytorch.callbacks import ModelCheckpoint
 
     from kraken.lib import vgsl  # NOQA
     from kraken.train import (KrakenTrainer, BLLASegmentationDataModule,
                               BLLASegmentationModel)
+    from kraken.train.utils import KrakenOnExceptionCheckpoint
     from kraken.configs import BLLASegmentationTrainingConfig, BLLASegmentationTrainingDataConfig
     from kraken.models.convert import convert_models
 
@@ -211,8 +212,8 @@ def segtrain(ctx, **kwargs):
     else:
         val_check_interval = {'val_check_interval': params['freq']}
 
-    cbs = [OnExceptionCheckpoint(dirpath=params.get('checkpoint_path'),
-                                 filename='checkpoint_abort')]
+    cbs = [KrakenOnExceptionCheckpoint(dirpath=params.get('checkpoint_path'),
+                                       filename='checkpoint_abort')]
     checkpoint_callback = ModelCheckpoint(dirpath=params.pop('checkpoint_path'),
                                           save_top_k=10,
                                           monitor='val_metric',

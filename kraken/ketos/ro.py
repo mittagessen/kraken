@@ -172,11 +172,12 @@ def rotrain(ctx, **kwargs):
 
     from threadpoolctl import threadpool_limits
 
-    from lightning.pytorch.callbacks import ModelCheckpoint, OnExceptionCheckpoint
+    from lightning.pytorch.callbacks import ModelCheckpoint
 
     from kraken.lib import vgsl  # NOQA
     from kraken.lib.ro import ROModel, RODataModule
     from kraken.train import KrakenTrainer
+    from kraken.train.utils import KrakenOnExceptionCheckpoint
     from kraken.configs import ROTrainingConfig, ROTrainingDataConfig
     from kraken.models.convert import convert_models
 
@@ -198,8 +199,8 @@ def rotrain(ctx, **kwargs):
     else:
         val_check_interval = {'val_check_interval': params['freq']}
 
-    cbs = [OnExceptionCheckpoint(dirpath=params.get('checkpoint_path'),
-                                 filename='checkpoint_abort')]
+    cbs = [KrakenOnExceptionCheckpoint(dirpath=params.get('checkpoint_path'),
+                                       filename='checkpoint_abort')]
     checkpoint_callback = ModelCheckpoint(dirpath=params.pop('checkpoint_path'),
                                           save_top_k=10,
                                           monitor='val_metric',

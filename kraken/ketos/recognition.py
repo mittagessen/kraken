@@ -157,11 +157,12 @@ def train(ctx, **kwargs):
 
     import json
 
-    from lightning.pytorch.callbacks import ModelCheckpoint, OnExceptionCheckpoint
+    from lightning.pytorch.callbacks import ModelCheckpoint
 
     from kraken.models.convert import convert_models
     from kraken.train import (KrakenTrainer, VGSLRecognitionModel,
                               VGSLRecognitionDataModule)
+    from kraken.train.utils import KrakenOnExceptionCheckpoint
     from kraken.configs import VGSLRecognitionTrainingConfig, VGSLRecognitionTrainingDataConfig
 
     if (codec := params.get('codec')) is not None and not isinstance(codec, dict):
@@ -189,8 +190,8 @@ def train(ctx, **kwargs):
     else:
         val_check_interval = {'val_check_interval': params['freq']}
 
-    cbs = [OnExceptionCheckpoint(dirpath=params.get('checkpoint_path'),
-                                 filename='checkpoint_abort')]
+    cbs = [KrakenOnExceptionCheckpoint(dirpath=params.get('checkpoint_path'),
+                                       filename='checkpoint_abort')]
     checkpoint_callback = ModelCheckpoint(dirpath=Path(params.pop('checkpoint_path')),
                                           save_top_k=10,
                                           monitor='val_metric',

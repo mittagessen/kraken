@@ -19,6 +19,7 @@ import torch
 import logging
 import warnings
 import lightning as L
+from os import path
 
 from collections import Counter
 from dataclasses import dataclass
@@ -38,6 +39,7 @@ logger = logging.getLogger(__name__)
 __all__ = ['SegmentationTestMetrics',
            'RecognitionTestMetrics',
            'KrakenTrainer',
+           'KrakenOnExceptionCheckpoint',
            'configure_optimizer_and_lr_scheduler',
            'validation_worker_init_fn']
 
@@ -161,6 +163,30 @@ class KrakenTrainer(L.Trainer):
             warnings.filterwarnings(action='ignore', category=UserWarning,
                                     message='The dataloader,')
             super().fit(*args, **kwargs)
+
+
+class KrakenOnExceptionCheckpoint(Callback):
+    """
+    Callback saving a checkpoint when training exits via exception.
+
+    This intentionally does not inherit from Lightning's
+    `OnExceptionCheckpoint` to avoid fit-time auto-resume selection of "last"
+    checkpoints when no explicit resume path was provided.
+    """
+    FILE_EXTENSION = '.ckpt'
+
+    def __init__(self, dirpath: 'PathLike', filename: str = 'checkpoint_abort'):
+        if not filename:
+            raise ValueError('The filename cannot be empty')
+        self.dirpath = str(dirpath)
+        self.filename = filename
+
+    @property
+    def ckpt_path(self) -> str:
+        return path.join(self.dirpath, self.filename + self.FILE_EXTENSION)
+
+    def on_exception(self, trainer: "L.Trainer", *_args, **_kwargs) -> None:
+        trainer.save_checkpoint(self.ckpt_path)
 
 
 class KrakenFreezeBackbone(BaseFinetuning):

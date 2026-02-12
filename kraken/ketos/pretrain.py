@@ -186,11 +186,12 @@ def pretrain(ctx, **kwargs):
             raise click.BadOptionUsage('logger', 'tensorboard logger needs the `tensorboard` package installed.')
 
     from threadpoolctl import threadpool_limits
-    from lightning.pytorch.callbacks import ModelCheckpoint, OnExceptionCheckpoint
+    from lightning.pytorch.callbacks import ModelCheckpoint
 
     from kraken.lib.pretrain import (PretrainDataModule,
                                      RecognitionPretrainModel)
     from kraken.train import KrakenTrainer
+    from kraken.train.utils import KrakenOnExceptionCheckpoint
 
     from kraken.configs import VGSLPreTrainingConfig, VGSLPreTrainingDataConfig
     from kraken.models.convert import convert_models
@@ -213,8 +214,8 @@ def pretrain(ctx, **kwargs):
     else:
         val_check_interval = {'val_check_interval': params['freq']}
 
-    cbs = [OnExceptionCheckpoint(dirpath=params.get('checkpoint_path'),
-                                 filename='checkpoint_abort')]
+    cbs = [KrakenOnExceptionCheckpoint(dirpath=params.get('checkpoint_path'),
+                                       filename='checkpoint_abort')]
     checkpoint_callback = ModelCheckpoint(dirpath=Path(params.pop('checkpoint_path')),
                                           save_top_k=10,
                                           monitor='CE',
