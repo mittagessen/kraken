@@ -153,10 +153,19 @@ def load_coreml(path: Union[str, PathLike], tasks: Optional[Sequence[_T_tasks]] 
     models.append(model)
 
     # construct additional models if auxiliary layers are defined.
-
     if 'aux_layers' in mlmodel.user_defined_metadata:
         logger.info('Deserializing auxiliary layers.')
-
-        nn.aux_layers = {k: cls(v).nn.get_submodule(k) for k, v in json.loads(mlmodel.user_defined_metadata['aux_layers']).items()}
+        for name in json.loads(mlmodel.user_defined_metadata['aux_layers']).keys():
+            if name == 'ro_model':
+                level = 'baselines'
+            elif name == 'ro_model_regions':
+                level = 'regions'
+            else:
+                logger.warning(f'Unknown auxiliary layer key {name}, skipping.')
+                continue
+            class_mapping = model.user_metadata.get('class_mapping', {}).get(level, {})
+            romlp = create_model('ROMLP', class_mapping=class_mapping, level=level)
+            romlp.deserialize(name, mlmodel.get_spec())
+            models.append(romlp)
 
     return models
