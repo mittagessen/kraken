@@ -23,6 +23,7 @@ import logging
 
 from PIL import Image
 from pathlib import Path
+from collections import Counter
 
 from kraken.ketos.util import _expand_gt, _validate_manifests, message, _create_class_map
 
@@ -33,6 +34,69 @@ logger = logging.getLogger('kraken')
 
 # raise default max image size to 20k * 20k pixels
 Image.MAX_IMAGE_PIXELS = 20000 ** 2
+
+
+def _collect_observed_test_classes(test_data):
+    """
+    Collects raw class names seen in test data before class-map filtering.
+    """
+    from kraken.lib.dataset.utils import _get_type
+
+    observed = {'baselines': Counter(), 'regions': Counter()}
+    for sample in test_data or []:
+        doc = sample.get('doc') if isinstance(sample, dict) else sample
+        if doc is None:
+            continue
+        for line in getattr(doc, 'lines', []):
+            observed['baselines'][_get_type(line.tags)] += 1
+        for reg_type, regs in getattr(doc, 'regions', {}).items():
+            observed['regions'][reg_type] += len(regs)
+    return observed
+
+
+def _build_segtest_class_diagnostics(model_mapping, dataset_mapping, dataset_stats, observed):
+    """
+    Builds rows for a unified class diagnostic table.
+    """
+    rows = []
+    mismatches = []
+    for section in ('baselines', 'regions'):
+        model_cls = model_mapping.get(section, {})
+        dataset_cls = dataset_mapping.get(section, {})
+        section_stats = dataset_stats.get(section, {})
+        observed_stats = observed.get(section, {})
+        names = sorted(set(model_cls.keys()) | set(dataset_cls.keys()) | set(observed_stats.keys()))
+        for name in names:
+            model_idx = model_cls.get(name)
+            dataset_idx = dataset_cls.get(name)
+            observed_count = int(observed_stats.get(name, 0))
+            effective_count = int(section_stats.get(name, 0))
+
+            if model_idx is not None and dataset_idx is not None:
+                status = 'ok' if model_idx == dataset_idx else 'index mismatch'
+            elif dataset_idx is not None:
+                status = 'missing in model mapping'
+            elif model_idx is not None:
+                status = 'missing in dataset mapping'
+            elif observed_count > 0:
+                status = 'unknown in test data'
+            else:
+                status = 'unknown'
+
+            if observed_count > 0 and dataset_idx is None and model_idx is not None:
+                status = 'ignored by dataset mapping'
+
+            row = {'category': section,
+                   'class_name': name,
+                   'model_idx': '-' if model_idx is None else str(model_idx),
+                   'dataset_idx': '-' if dataset_idx is None else str(dataset_idx),
+                   'observed': str(observed_count),
+                   'effective': str(effective_count),
+                   'status': status}
+            rows.append(row)
+            if status != 'ok':
+                mismatches.append(row)
+    return rows, mismatches
 
 
 @click.command('segtrain')
@@ -178,7 +242,7 @@ def segtrain(ctx, **kwargs):
         except ImportError:
             raise click.BadOptionUsage('logger', 'tensorboard logger needs the `tensorboard` package installed.')
 
-    # parse line_class_mapping
+    # parse line_class_mapping from list into dictionary
     if isinstance(line_cls_map := params.get('line_class_mapping'), list):
         params['line_class_mapping'] = _create_class_map(line_cls_map)
     if isinstance(region_cls_map := params.get('region_class_mapping'), list):
@@ -369,19 +433,82 @@ def segtest(ctx, **kwargs):
     with trainer.init_module(empty_init=False):
         message(f'Loading from {model}.')
         if model.endswith('ckpt'):
-            model = BLLASegmentationModel.load_from_checkpoint(model, config=m_config)
+            model = BLLASegmentationModel.load_from_checkpoint(model, config=m_config, weights_only=False)
         else:
             model = BLLASegmentationModel.load_from_weights(model, m_config)
-
-    test_metrics = trainer.test(model, data_module)
 
     from rich.console import Console
     from rich.table import Table
 
     console = Console()
 
+    # initialize test data/model explicitly so diagnostics are based on effective
+    # test mapping before running evaluation
+    class _DMProxy:
+        pass
+    class _ModelProxy:
+        pass
+
+    dm_proxy = _DMProxy()
+    dm_proxy.lightning_module = model
+    data_module.trainer = dm_proxy
+    data_module.setup('test')
+
+    model_proxy = _ModelProxy()
+    model_proxy.datamodule = data_module
+    model.trainer = model_proxy
+    model.setup('test')
+
+    # class mapping diagnostics
+    effective_mapping = data_module.test_set.dataset.class_mapping
+    effective_stats = data_module.test_set.dataset.class_stats
+    observed = _collect_observed_test_classes(data_module.test_data)
+    mode = params.get('test_class_mapping_mode', 'full')
+    if mode == 'full' and hasattr(model, '_full_class_mapping'):
+        model_mapping = model._full_class_mapping
+        model_mapping_src = 'full'
+    else:
+        model_mapping = model.net.user_metadata['class_mapping']
+        model_mapping_src = 'canonical'
+
+    diag_rows, mismatch_rows = _build_segtest_class_diagnostics(model_mapping,
+                                                                effective_mapping,
+                                                                effective_stats,
+                                                                observed)
+    diag = Table(title=f'Class Mapping Diagnostics (model={model_mapping_src}, dataset=effective)')
+    diag.add_column('Category')
+    diag.add_column('Class Name')
+    diag.add_column('Model Idx')
+    diag.add_column('Dataset Idx')
+    diag.add_column('Observed')
+    diag.add_column('Effective')
+    diag.add_column('Status')
+    for row in diag_rows:
+        diag.add_row(row['category'],
+                     row['class_name'],
+                     row['model_idx'],
+                     row['dataset_idx'],
+                     row['observed'],
+                     row['effective'],
+                     row['status'])
+    console.print(diag)
+
+    if mismatch_rows:
+        mismatch = Table('Category', 'Class Name', 'Model Idx', 'Dataset Idx', 'Observed', 'Effective', 'Mismatch')
+        for row in mismatch_rows:
+            mismatch.add_row(row['category'],
+                             row['class_name'],
+                             row['model_idx'],
+                             row['dataset_idx'],
+                             row['observed'],
+                             row['effective'],
+                             row['status'])
+        console.print(mismatch)
+
+    test_metrics = trainer.test(model, data_module)
+
     # pixel metrics table (aux + regions only)
-    class_mapping = data_module.test_set.dataset.class_mapping
+    class_mapping = effective_mapping
     idx_to_name = {}
     for cat in ('aux', 'regions'):
         for name, idx in class_mapping[cat].items():
