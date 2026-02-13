@@ -231,7 +231,6 @@ def rotrain(ctx, **kwargs):
                             num_sanity_val_steps=0,
                             **val_check_interval)
 
-
     with trainer.init_module(empty_init=False if (load or resume) else True):
         if load:
             message(f'Loading from checkpoint {load}.')

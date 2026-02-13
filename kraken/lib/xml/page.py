@@ -17,9 +17,6 @@ PageXML parsing.
 """
 import logging
 from collections import defaultdict
-from typing import Any, Optional
-
-from lxml import etree
 
 from iso639 import Lang
 from iso639.exceptions import InvalidLanguageValue

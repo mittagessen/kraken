@@ -168,7 +168,7 @@ class TorchVGSLModel(nn.Module,
                     self.build_dropout, self.build_maxpool, self.build_conv,
                     self.build_output, self.build_reshape, self.build_wav2vec2,
                     self.build_groupnorm, self.build_series,
-                    self.build_parallel, self.build_ro]
+                    self.build_parallel]
 
         self.nn = layers.MultiParamSequential()
         self.user_metadata: dict[str, Any] = {'accuracy': [],
@@ -316,7 +316,21 @@ class TorchVGSLModel(nn.Module,
 
         if 'aux_layers' in mlmodel.user_defined_metadata:
             logger.info('Deserializing auxiliary layers.')
-            nn.aux_layers = {k: cls(v).nn.get_submodule(k) for k, v in json.loads(mlmodel.user_defined_metadata['aux_layers']).items()}
+            from kraken.lib.ro.layers import ROMLP
+            aux = {}
+            for name, spec_str in json.loads(mlmodel.user_defined_metadata['aux_layers']).items():
+                if name == 'ro_model':
+                    level = 'baselines'
+                elif name == 'ro_model_regions':
+                    level = 'regions'
+                else:
+                    logger.warning(f'Unknown auxiliary layer key {name}, skipping.')
+                    continue
+                class_mapping = nn.user_metadata.get('class_mapping', {}).get(level, {})
+                romlp = ROMLP(class_mapping=class_mapping, level=level)
+                romlp.deserialize(name, mlmodel.get_spec())
+                aux[name] = romlp
+            nn.aux_layers = aux
 
         return nn
 
@@ -667,27 +681,6 @@ class TorchVGSLModel(nn.Module,
         self.idx += 1
         logger.debug(f'{self.idx}\t\twav2vec2\tmask width {mask_width}, prob '
                      f'{mask_prob}, negative samples {num_negatives}')
-        return fn.get_shape(input), [VGSLBlock(blocks[idx], m.group('type'), m.group('name'), self.idx)], fn
-
-    def build_ro(self,
-                 input: tuple[int, int, int, int],
-                 blocks: list[str],
-                 idx: int,
-                 target_output_shape: Optional[tuple[int, int, int, int]] = None) -> Union[tuple[None, None, None],
-                                                                                           tuple[tuple[int, int, int, int], str, Callable]]:
-        """
-        Builds a RO determination layer.
-        """
-        pattern = re.compile(r'(?P<type>RO)(?P<name>{\w+})(?P<feature_size>\d+),(?P<hidden_size>\d+)')
-        m = pattern.match(blocks[idx])
-        if not m:
-            return None, None, None
-        feature_size = int(m.group('feature_size'))
-        hidden_size = int(m.group('hidden_size'))
-        from kraken.lib import ro
-        fn = ro.layers.MLP(feature_size, hidden_size)
-        self.idx += 1
-        logger.debug(f'{self.idx}\t\tro\tfeatures {feature_size}, hidden_size {hidden_size}')
         return fn.get_shape(input), [VGSLBlock(blocks[idx], m.group('type'), m.group('name'), self.idx)], fn
 
     def build_conv(self,

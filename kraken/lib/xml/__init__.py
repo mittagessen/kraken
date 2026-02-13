@@ -175,10 +175,10 @@ class XMLPage(object):
 
             # Flatten to region-level
             flat_regions = flatten_order_to_regions(raw_order,
-                                                   self._lines,
-                                                   region_ids,
-                                                   string_to_line_map,
-                                                   missing_region_ids)
+                                                    self._lines,
+                                                    region_ids,
+                                                    string_to_line_map,
+                                                    missing_region_ids)
             flat_regions, _ = validate_and_clean_order(flat_regions, region_ids)
             self._orders[f'{ro_id}:regions'] = {'order': flat_regions,
                                                 'is_total': is_total,

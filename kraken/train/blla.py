@@ -33,8 +33,8 @@ from kraken.lib.xml import XMLPage
 from kraken.lib.dataset import BaselineSet, ImageInputTransforms
 from kraken.lib.segmentation import vectorize_lines
 from kraken.lib.segmentation_metrics import (interpolate_polyline,
-                                              compute_detection_metrics,
-                                              aggregate_detection_metrics)
+                                             compute_detection_metrics,
+                                             aggregate_detection_metrics)
 from kraken.configs import BLLASegmentationTrainingConfig, BLLASegmentationTrainingDataConfig
 from kraken.train.utils import configure_optimizer_and_lr_scheduler, SegmentationTestMetrics
 

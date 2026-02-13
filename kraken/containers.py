@@ -335,7 +335,6 @@ class BaselineOCRRecord(ocr_record, BaselineLine):
         else:
             self._polygon_cuts, self._intersection_cache, self._bl_length = [], {}, 0.0
 
-
     def __repr__(self) -> str:
         return f'pred: {self.prediction} baseline: {self.baseline} boundary: {self.boundary} confidences: {self.confidences}'
 

@@ -222,7 +222,6 @@ def _build_segtest_class_diagnostics(model_mapping, dataset_mapping, dataset_sta
 @click.option('--line-class-mapping', type=click.UNPROCESSED, hidden=True)
 @click.option('--region-class-mapping', type=click.UNPROCESSED, hidden=True)
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
-
 def segtrain(ctx, **kwargs):
     """
     Trains a baseline labeling model for layout analysis
@@ -447,6 +446,7 @@ def segtest(ctx, **kwargs):
     # test mapping before running evaluation
     class _DMProxy:
         pass
+
     class _ModelProxy:
         pass
 

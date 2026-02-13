@@ -19,6 +19,7 @@ class _Counter:
         self.n += 1
         return val
 
+
 __all__ = ['Config',
            'RecognitionInferenceConfig',
            'SegmentationInferenceConfig',

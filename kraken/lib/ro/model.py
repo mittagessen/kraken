@@ -25,7 +25,7 @@ import numpy as np
 import lightning as L
 import torch
 import torch.nn.functional as F
-from lightning.pytorch.callbacks import EarlyStopping, LearningRateMonitor
+from lightning.pytorch.callbacks import EarlyStopping
 from torch.optim import lr_scheduler
 from torch.utils.data import DataLoader, Subset
 from torchmetrics.aggregation import MeanMetric

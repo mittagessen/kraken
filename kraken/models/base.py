@@ -16,6 +16,8 @@ __all__ = ['BaseModel',
 
 if TYPE_CHECKING:
     from kraken.configs import Config
+    from PIL.Image import Image
+    from kraken.containers import Segmentation, ocr_record
 
 logger = logging.getLogger(__name__)
 
