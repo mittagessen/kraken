@@ -247,6 +247,8 @@ class BLLASegmentationModel(L.LightningModule):
                 raise ValueError(f'Model {model} is of type {self.net.model_type} while `segmentation` is expected.')
 
             self.batch, self.channels, self.height, self.width = self.net.input
+            if full := self.net.user_metadata.get('_full_class_mapping'):
+                self._full_class_mapping = full
         else:
             self.net = None
 
@@ -287,13 +289,14 @@ class BLLASegmentationModel(L.LightningModule):
     def validation_step(self, batch, batch_idx):
         x, y = batch['image'], batch['target']
         pred, _ = self.net(x)
+        pred_probs = torch.sigmoid(pred)
         # capture target size before interpolation for baseline scaling
         target_h, target_w = y.shape[2], y.shape[3]
         # scale target to output size
         y = F.interpolate(y, size=(pred.size(2), pred.size(3))).int()
 
         # pixel metrics on region+aux channels only
-        pred_px = pred[:, self.val_pixel_idxs, :, :]
+        pred_px = pred_probs[:, self.val_pixel_idxs, :, :]
         y_px = y[:, self.val_pixel_idxs, :, :]
         self.val_px_accuracy.update(pred_px, y_px)
         self.val_mean_accuracy.update(pred_px, y_px)
@@ -303,7 +306,7 @@ class BLLASegmentationModel(L.LightningModule):
         # baseline detection metrics
         if self.bl_cls_idxs:
             gt_baselines = batch['baselines'][0]  # batch_size=1
-            pred_np = torch.sigmoid(pred).squeeze(0).cpu().numpy()
+            pred_np = pred_probs.detach().squeeze(0).cpu().numpy()
             pred_h, pred_w = pred.shape[2], pred.shape[3]
             scale_x = pred_w / target_w
             scale_y = pred_h / target_h
@@ -365,12 +368,13 @@ class BLLASegmentationModel(L.LightningModule):
     def test_step(self, batch, batch_idx, test_dataloader=0):
         x, y = batch['image'], batch['target']
         pred, _ = self.net(x)
+        pred_probs = torch.sigmoid(pred)
         # capture target size before interpolation for baseline scaling
         target_h, target_w = y.shape[2], y.shape[3]
         # scale target to output size
         y = F.interpolate(y, size=(pred.size(2), pred.size(3))).squeeze(0).bool()
-        pred_raw = pred
-        pred = pred.squeeze() > 0.5
+        pred_raw = pred_probs
+        pred = pred_raw.squeeze() > 0.5
         pred = pred.view(pred.size(0), -1)
         y = y.view(y.size(0), -1)
 
@@ -386,7 +390,7 @@ class BLLASegmentationModel(L.LightningModule):
 
         # baseline detection metrics
         gt_baselines = batch['baselines'][0]  # batch_size=1
-        pred_np = torch.sigmoid(pred_raw).squeeze(0).cpu().numpy()
+        pred_np = pred_raw.detach().squeeze(0).cpu().numpy()
         pred_h, pred_w = pred_raw.shape[2], pred_raw.shape[3]
         scale_x = pred_w / target_w
         scale_y = pred_h / target_h
@@ -609,6 +613,7 @@ class BLLASegmentationModel(L.LightningModule):
 
             # store full (potentially many-to-one) mapping for test dataset construction
             self._full_class_mapping = self.trainer.datamodule.train_set.dataset.class_mapping
+            self.net.user_metadata['_full_class_mapping'] = self._full_class_mapping
         elif stage == 'test':
             test_class_mapping = self.trainer.datamodule.test_set.dataset.class_mapping
             self.region_cls_idxs = sorted(set(test_class_mapping['regions'].values()))
@@ -645,6 +650,7 @@ class BLLASegmentationModel(L.LightningModule):
 
         # store full (potentially many-to-one) mapping for test dataset construction
         self._full_class_mapping = full_class_mapping
+        self.net.user_metadata['_full_class_mapping'] = full_class_mapping
         # restore canonical (one-to-one) mapping in user_metadata for inference/export
         if '_canonical_class_mapping' in checkpoint:
             self.net.user_metadata['class_mapping'] = checkpoint['_canonical_class_mapping']

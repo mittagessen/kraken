@@ -109,11 +109,11 @@ class TorchSeqRecognizer(object):
         """
         if self.device:
             line = line.to(self.device)
-        o, olens = self.nn.nn(line, lens)
-        if o.size(2) != 1:
-            raise KrakenInputException('Expected dimension 3 to be 1, actual {}'.format(o.size()))
-        o = (o/self.temperature).softmax(1)
-        self.outputs = o.detach().squeeze(2).float().cpu().numpy()
+        logits, olens = self.nn.nn(line, lens)
+        if logits.size(2) != 1:
+            raise KrakenInputException('Expected dimension 3 to be 1, actual {}'.format(logits.size()))
+        probs = (logits/self.temperature).softmax(1)
+        self.outputs = probs.detach().squeeze(2).float().cpu().numpy()
         if olens is not None:
             olens = olens.cpu().numpy()
         return self.outputs, olens

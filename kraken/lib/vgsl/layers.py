@@ -848,8 +848,8 @@ class ActConv2D(Module):
             o = self.co(inputs, output_size=output_shape)
         else:
             o = self.co(inputs)
-        # return logits for sigmoid activation during training
-        if not (self.nl_name == 'SIGMOID' and self.training):
+        # keep sigmoid projection outputs as logits in both train and eval.
+        if self.nl_name != 'SIGMOID':
             o = self.nl(o)
 
         if seq_len is not None:
@@ -905,6 +905,7 @@ class ActConv2D(Module):
         """
         conv_name = '{}_conv'.format(name)
         act_name = '{}_act'.format(name)
+        conv_out = name if self.nl_name == 'SIGMOID' else conv_name
         W = self.co.weight.permute(2, 3, 0, 1).data.numpy() if self.transposed else self.co.weight.permute(2, 3, 1, 0).data.numpy()
         builder.add_convolution(name=conv_name,
                                 kernel_channels=self.in_channels,
@@ -921,11 +922,11 @@ class ActConv2D(Module):
                                 has_bias=True,
                                 is_deconv=self.transposed,
                                 input_name=input,
-                                output_name=conv_name)
-        if self.nl_name != 'SOFTMAX':
-            builder.add_activation(act_name, self.nl_name, conv_name, name, params=None if self.nl_name != 'LEAKYRELU' else [self.nl.negative_slope])
-        else:
+                                output_name=conv_out)
+        if self.nl_name == 'SOFTMAX':
             builder.add_softmax(act_name, conv_name, name)
+        else:
+            builder.add_activation(act_name, self.nl_name, conv_name, name, params=None if self.nl_name != 'LEAKYRELU' else [self.nl.negative_slope])
         return name
 
     def resize(self, output_size: int, del_indices: Optional[Iterable[int]] = None) -> None:

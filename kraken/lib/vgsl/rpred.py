@@ -222,9 +222,9 @@ class VGSLRecognitionInference:
         Returns:
             List of decoded sequences.
         """
-        o, olens = self.nn(line, lens)
-        o = (o/self._inf_config.temperature).softmax(1)
-        self.outputs = o.detach().squeeze(2)
+        logits, olens = self.nn(line, lens)
+        probs = (logits/self._inf_config.temperature).softmax(1)
+        self.outputs = probs.detach().squeeze(2)
         dec_seqs = [self.codec.decode(locs) for locs in self._inf_config.decoder(self.outputs, olens)]
         return dec_seqs, olens
 

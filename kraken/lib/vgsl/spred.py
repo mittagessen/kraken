@@ -269,6 +269,7 @@ class VGSLSegmentationInference:
 
         logger.debug('Upsampling network output')
         o = F.interpolate(o, size=scal_im.shape)
+        o = torch.sigmoid(o)
         # remove padding
         padding = [pad if pad else None for pad in padding]
         padding[1] = -padding[1] if padding[1] else None
