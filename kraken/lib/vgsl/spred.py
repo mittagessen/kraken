@@ -174,7 +174,6 @@ class VGSLSegmentationInference:
             logger.debug(f'Baseline location: {loc}')
 
         lines = []
-        order = None
         regions = {}
 
         with self._fabric.init_tensor():
@@ -220,13 +219,20 @@ class VGSLSegmentationInference:
                     line_regs.append(reg_id)
             blls.append(BaselineLine(id=f'_{uuid.uuid4()}', baseline=line['baseline'], boundary=line['boundary'], tags=line['tags'], regions=line_regs))
 
+        if blls:
+            all_regions = [reg for rgs in regions.values() for reg in rgs]
+            ro = self._inf_config.baseline_ro_fn(lines=blls,
+                                                 regions=all_regions,
+                                                 text_direction=self._inf_config.text_direction[-2:])
+            blls = [blls[idx] for idx in ro]
+
         return Segmentation(text_direction=self._inf_config.text_direction,
                             imagename=getattr(im, 'filename', None),
                             type='baselines',
                             lines=blls,
                             regions=regions,
                             script_detection=script_detection,
-                            line_orders=[order] if order is not None else [])
+                            line_orders=[])
 
     def _compute_segmentation_map(self, im: PIL.Image.Image) -> dict[str, Any]:
         """
