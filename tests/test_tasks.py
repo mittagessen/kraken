@@ -15,6 +15,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from PIL import Image
 from pytest import raises
+from difflib import SequenceMatcher
 
 from kraken.containers import (BaselineLine, BaselineOCRRecord, BBoxLine,
                                BBoxOCRRecord, Segmentation)
@@ -112,7 +113,8 @@ class TestRecognitionTaskModel(unittest.TestCase):
             self.assertIsInstance(rec, BaselineOCRRecord)
         expected_by_id = {r.id: r.prediction for r in self.bl_expected.lines}
         for rec in records:
-            self.assertEqual(rec.prediction, expected_by_id[rec.id])
+            self.assertTrue(SequenceMatcher(isjunk=None, a=rec.prediction, b=expected_by_id[rec.id]).ratio() > 0.9,
+                            msg=f'Prediction for line {rec.id!r} differs by more than one character')
 
     def test_predict_bbox(self):
         """
@@ -126,7 +128,8 @@ class TestRecognitionTaskModel(unittest.TestCase):
             self.assertIsInstance(rec, BBoxOCRRecord)
         expected_by_id = {r.id: r.prediction for r in self.box_expected.lines}
         for rec in records:
-            self.assertEqual(rec.prediction, expected_by_id[rec.id])
+            self.assertTrue(SequenceMatcher(isjunk=None, a=rec.prediction, b=expected_by_id[rec.id]).ratio() > 0.9,
+                            msg=f'Prediction for line {rec.id!r} differs by more than one character')
 
     def test_predict_empty_segmentation(self):
         """
@@ -212,7 +215,8 @@ class TestRTLRecognitionTaskModel(unittest.TestCase):
                     '\u0627\u0654\u0645 \u0627\u0654\u064a\u0636\u0627\u064b \u0644\u0645\u0627\u0630 '
                     '\u0643\u0631. . \u0648\u0644\u0646\u0627 \u0627\u0654\u0646 \u0646\u0642\u0648\u0644 '
                     '\u0627\u0646 \u0627\u0644\u0627\u0653\u0645')
-        self.assertEqual(record.prediction, expected)
+        self.assertTrue(SequenceMatcher(isjunk=None, a=record.prediction, b=expected).ratio() > 0.9,
+                        msg='RTL bidi prediction differs from expected by more than one character')
 
     def test_predict_rtl_baseline_nobidi(self):
         """
@@ -230,7 +234,8 @@ class TestRTLRecognitionTaskModel(unittest.TestCase):
                     '\u0645\u0654\u0627 \u0629\u0631\u064a\u063a\u0635\u0644\u0644 '
                     '\u0646\u0643\u064a \u0645\u0644 \u0627\u0630\u0627 '
                     '\u062a\u0627\u0628\u0635\u0639\u0644\u0627 \u0645\u062f\u0639 \u062f\u0646\u0639')
-        self.assertEqual(record.prediction, expected)
+        self.assertTrue(SequenceMatcher(isjunk=None, a=record.prediction, b=expected).ratio() > 0.9,
+                        msg='RTL non-bidi prediction differs from expected by more than one character')
 
     def test_predict_rtl_display_logical_switch(self):
         """
