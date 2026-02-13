@@ -21,9 +21,9 @@ Command line drivers for recognition functionality.
 import os
 import uuid
 import click
-import shlex
 import logging
 import warnings
+import importlib
 import dataclasses
 
 from PIL import Image
@@ -32,7 +32,7 @@ from itertools import chain
 from functools import partial
 from importlib import resources
 from platformdirs import user_data_dir
-from typing import IO, Any, Callable, Dict, List, Union, cast
+from typing import IO, Any, Callable, cast
 
 from rich import print
 from rich.tree import Tree
@@ -42,6 +42,9 @@ from rich.traceback import install
 from rich.markdown import Markdown
 
 from kraken.lib import log
+from kraken.registry import PRECISIONS
+from kraken.configs import Config, RecognitionInferenceConfig, SegmentationInferenceConfig
+from kraken.ketos.util import to_ptl_device
 
 warnings.simplefilter('ignore', UserWarning)
 
@@ -64,7 +67,7 @@ def message(msg: str, **styles) -> None:
         click.secho(msg, **styles)
 
 
-def get_input_parser(type_str: str) -> Callable[[str], Dict[str, Any]]:
+def get_input_parser(type_str: str) -> Callable[[str], dict[str, Any]]:
     if type_str in ['alto', 'page', 'xml']:
         from kraken.lib.xml import XMLPage
         return XMLPage
@@ -123,11 +126,8 @@ def binarizer(threshold, zoom, escale, border, perc, range, low, high, input, ou
     message('\u2713', fg='green')
 
 
-def segmenter(legacy, models, text_direction, scale, maxcolseps, black_colseps,
-              remove_hlines, pad, mask, device, input, output) -> None:
+def segmenter(legacy, model, config, input, output) -> None:
     import json
-
-    from kraken import blla, pageseg
 
     ctx = click.get_current_context()
 
@@ -143,25 +143,21 @@ def segmenter(legacy, models, text_direction, scale, maxcolseps, black_colseps,
         im = Image.open(input)
     except IOError as e:
         raise click.BadParameter(str(e))
-    if mask:
-        try:
-            mask = Image.open(mask)
-        except IOError as e:
-            raise click.BadParameter(str(e))
     message(f'Segmenting {ctx.meta["orig_file"]}\t', nl=False)
     try:
         if legacy:
+            from kraken import pageseg
             res = pageseg.segment(im,
-                                  text_direction,
-                                  scale,
-                                  maxcolseps,
-                                  black_colseps,
-                                  no_hlines=remove_hlines,
-                                  pad=pad,
-                                  mask=mask)
+                                  config.text_direction,
+                                  config.legacy_scale,
+                                  config.legacy_maxcolseps,
+                                  config.legacy_black_colseps,
+                                  no_hlines=config.legacy_no_hlines,
+                                  pad=config.bbox_line_padding)
         else:
-            res = blla.segment(im, text_direction, mask=mask, model=models, device=device,
-                               raise_on_error=ctx.meta['raise_failed'], autocast=ctx.meta["autocast"])
+            from kraken.tasks import SegmentationTaskModel
+            task = SegmentationTaskModel.load_model(model)
+            res = task.predict(im=im, config=config)
     except Exception:
         if ctx.meta['raise_failed']:
             raise
@@ -185,13 +181,13 @@ def segmenter(legacy, models, text_direction, scale, maxcolseps, black_colseps,
     message('\u2713', fg='green')
 
 
-def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore,
-               input, output) -> None:
+def recognizer(model, no_segmentation, config, input, output) -> None:
 
     import dataclasses
     import json
 
-    from kraken import rpred
+    from kraken.lib import vgsl  # NOQA
+    from kraken.tasks import RecognitionTaskModel
     from kraken.containers import BBoxLine, Segmentation
     from kraken.lib.progress import KrakenProgressBar
 
@@ -205,9 +201,9 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore,
         if ctx.meta['input_format_type'] != 'image':
             doc = get_input_parser(ctx.meta['input_format_type'])(input)
             ctx.meta['base_image'] = doc.imagename
-            if doc.base_dir and bidi_reordering is True:
+            if doc.base_dir and config.bidi_reordering is True:
                 message(f'Setting base text direction for BiDi reordering to {doc.base_dir} (from XML input file)')
-                bidi_reordering = doc.base_dir
+                config.bidi_reordering = doc.base_dir
             bounds = doc.to_container()
     try:
         im = Image.open(ctx.meta['base_image'])
@@ -224,7 +220,7 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore,
     elif not bounds:
         if no_segmentation:
             bounds = Segmentation(type='bbox',
-                                  text_direction='horizontal-lr',
+                                  text_direction=config.text_direction,
                                   imagename=ctx.meta['base_image'],
                                   script_detection=False,
                                   lines=[BBoxLine(id=f'_{uuid.uuid4()}',
@@ -234,25 +230,17 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore,
     elif no_segmentation:
         logger.warning('no_segmentation mode enabled but segmentation defined. Ignoring --no-segmentation option.')
 
-    # script detection
-    if bounds.script_detection:
-        it = rpred.mm_rpred(model, im, bounds, pad,
-                            bidi_reordering=bidi_reordering,
-                            tags_ignore=tags_ignore,
-                            no_legacy_polygons=ctx.meta['no_legacy_polygons'])
-    else:
-        it = rpred.rpred(model['default'], im, bounds, pad,
-                         bidi_reordering=bidi_reordering,
-                         no_legacy_polygons=ctx.meta['no_legacy_polygons'])
+    predictor = RecognitionTaskModel.load_model(model)
+    it = predictor.predict(im=im, segmentation=bounds, config=config)
 
     preds = []
 
     with KrakenProgressBar() as progress:
-        pred_task = progress.add_task('Processing', total=len(it), visible=True if not ctx.meta['verbose'] else False)
+        pred_task = progress.add_task('Processing', total=len(bounds.lines), visible=True if not ctx.meta['verbose'] else False)
         for pred in it:
             preds.append(pred)
             progress.update(pred_task, advance=1)
-    results = dataclasses.replace(it.bounds, lines=preds, imagename=ctx.meta['base_image'])
+    results = dataclasses.replace(bounds, lines=preds, imagename=ctx.meta['base_image'])
 
     ctx = click.get_current_context()
     with click.open_file(output, 'w', encoding='utf-8') as fp:
@@ -274,7 +262,11 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore,
         message('\u2713', fg='green')
 
 
-@click.group(chain=True)
+@click.group(context_settings=dict(show_default=True,
+                                   default_map={**Config().__dict__,
+                                                'segment': SegmentationInferenceConfig().__dict__,
+                                                'ocr': RecognitionInferenceConfig().__dict__}),
+             chain=True)
 @click.version_option()
 @click.option('-i', '--input',
               type=(click.Path(exists=True, dir_okay=False, path_type=Path),  # type: ignore
@@ -283,16 +275,14 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore,
               help='Input-output file pairs. Each input file (first argument) is mapped to one '
                    'output file (second argument), e.g. `-i input.png output.txt`')
 @click.option('-I', '--batch-input', multiple=True, help='Glob expression to add multiple files at once.')
-@click.option('-o', '--suffix', default='', show_default=True,
-              help='Suffix for output files from batch and PDF inputs.')
-@click.option('-v', '--verbose', default=0, count=True, show_default=True)
+@click.option('-o', '--suffix', default='', help='Suffix for output files from batch and PDF inputs.')
+@click.option('-v', '--verbose', default=0, count=True)
 @click.option('-f', '--format-type', type=click.Choice(['image', 'alto', 'page', 'pdf', 'xml']), default='image',
               help='Sets the default input type. In image mode inputs are image '
                    'files, alto/page expects XML files in the respective format, pdf '
                    'expects PDF files with numbered suffixes added to output file '
                    'names as needed.')
 @click.option('-p', '--pdf-format', default='{src}_{idx:06d}',
-              show_default=True,
               help='Format for output of PDF files. valid fields '
                    'are `src` (source file), `idx` (page number), and `uuid` (v4 uuid). '
                    '`-o` suffixes are appended to this format string.')
@@ -304,26 +294,19 @@ def recognizer(model, pad, no_segmentation, bidi_reordering, tags_ignore,
 @click.option('-a', '--alto', 'serializer', flag_value='alto')
 @click.option('-y', '--abbyy', 'serializer', flag_value='abbyyxml')
 @click.option('-x', '--pagexml', 'serializer', flag_value='pagexml')
-@click.option('-n', '--native', 'serializer', flag_value='native', default=True,
-              show_default=True)
-@click.option('-t', '--template', type=click.Path(exists=True, dir_okay=False),
-              help='Explicitly set jinja template for output serialization. Overrides -h/-a/-y/-x/-n.')
-@click.option('-d', '--device', default='cpu', show_default=True,
-              help='Select device to use (cpu, cuda:0, cuda:1, ...)')
-@click.option('-r', '--raise-on-error/--no-raise-on-error', default=False, show_default=True,
-              help='Raises the exception that caused processing to fail in the case of an error')
-@click.option('-2', '--autocast', default=False, show_default=True, flag_value=True,
-              help='On compatible devices, uses autocast for `segment` which lower the memory usage.')
-@click.option('--threads', default=1, show_default=True, type=click.IntRange(1),
-              help='Size of thread pools for intra-op parallelization')
-@click.option('--no-legacy-polygons', 'no_legacy_polygons', is_flag=True, default=False,
-              help="Force disable legacy polygon extraction")
+@click.option('-n', '--native', 'serializer', flag_value='native', default=True)
+@click.option('-t', '--template', type=click.Path(exists=True, dir_okay=False))
+@click.option('-d', '--device', help='Select device to use (cpu, cuda:0, cuda:1, ...)')
+@click.option('--precision',
+              type=click.Choice(PRECISIONS),
+              help='Numerical precision to use for inference. Default is 32-bit single-point precision.')
+@click.option('-r', '--raise-on-error/--no-raise-on-error', default=False, help='Raises the exception that caused processing to fail in the case of an error')
+@click.option('--threads', 'num_threads', type=click.IntRange(1), help='Maximum size of OpenMP/BLAS thread pool.')
 @click.option('--subline-segmentation/--no-subline-segmentation', 'subline_segmentation',
-              is_flag=True, default=True,
+              is_flag=True,
+              default=True,
               help="Enable/disable subline segmentation in the serialization format (Default: enabled)")
-def cli(input, batch_input, suffix, verbose, format_type, pdf_format,
-        serializer, template, device, raise_on_error, autocast, threads, no_legacy_polygons,
-        subline_segmentation):
+def cli(**kwargs):
     """
     Base command for recognition functionality.
 
@@ -332,32 +315,23 @@ def cli(input, batch_input, suffix, verbose, format_type, pdf_format,
     is set on all subcommands with the `-v` switch.
     """
     ctx = click.get_current_context()
-    if device != 'cpu':
-        import torch
-        try:
-            torch.ones(1, device=device)
-        except AssertionError as e:
-            if raise_on_error:
-                raise
-            logger.error(f'Device {device} not available: {e.args[0]}.')
-            ctx.exit(1)
-    ctx.meta['device'] = device
-    ctx.meta['input_format_type'] = format_type if format_type != 'pdf' else 'image'
-    ctx.meta['raise_failed'] = raise_on_error
-    if not template:
-        ctx.meta['output_mode'] = serializer
-        ctx.meta['output_template'] = serializer
+    params = ctx.params
+    ctx.meta['accelerator'], ctx.meta['device'] = to_ptl_device(params['device'])
+    ctx.meta['precision'] = params['precision']
+    ctx.meta['input_format_type'] = params['format_type'] if params['format_type'] != 'pdf' else 'image'
+    ctx.meta['raise_failed'] = params['raise_on_error']
+    if not params['template']:
+        ctx.meta['output_mode'] = params['serializer']
+        ctx.meta['output_template'] = params['serializer']
     else:
         ctx.meta['output_mode'] = 'template'
-        ctx.meta['output_template'] = template
-    ctx.meta['verbose'] = verbose
+        ctx.meta['output_template'] = params['template']
+    ctx.meta['verbose'] = params['verbose']
     ctx.meta['steps'] = []
-    ctx.meta["autocast"] = autocast
-    ctx.meta['threads'] = threads
-    ctx.meta['no_legacy_polygons'] = no_legacy_polygons
-    ctx.meta['subline_segmentation'] = subline_segmentation
+    ctx.meta['subline_segmentation'] = params['subline_segmentation']
+    ctx.meta['num_threads'] = params['num_threads']
 
-    log.set_logger(logger, level=30 - min(10 * verbose, 20))
+    log.set_logger(logger, level=30 - min(10 * params['verbose'], 20))
 
 
 @cli.result_callback()
@@ -441,7 +415,7 @@ def process_pipeline(subcommands, input, batch_input, suffix, verbose, format_ty
             for idx, (task, input, output) in enumerate(zip(subcommands, fc, fc[1:])):
                 if len(fc) - 2 == idx:
                     ctx.meta['last_process'] = True
-                with threadpool_limits(limits=ctx.meta['threads']):
+                with threadpool_limits(limits=ctx.meta['num_threads']):
                     task(input=input, output=output)
         except Exception as e:
             logger.error(f'Failed processing {io_pair[0]}: {str(e)}')
@@ -456,16 +430,16 @@ def process_pipeline(subcommands, input, batch_input, suffix, verbose, format_ty
                 os.unlink(fc[0])
 
 
-@cli.command('binarize')
+@click.command('binarize')
 @click.pass_context
-@click.option('--threshold', show_default=True, default=0.5, type=click.FLOAT)
-@click.option('--zoom', show_default=True, default=0.5, type=click.FLOAT)
-@click.option('--escale', show_default=True, default=1.0, type=click.FLOAT)
-@click.option('--border', show_default=True, default=0.1, type=click.FLOAT)
-@click.option('--perc', show_default=True, default=80, type=click.IntRange(1, 100))
-@click.option('--range', show_default=True, default=20, type=click.INT)
-@click.option('--low', show_default=True, default=5, type=click.IntRange(1, 100))
-@click.option('--high', show_default=True, default=90, type=click.IntRange(1, 100))
+@click.option('--threshold', default=0.5, type=click.FLOAT)
+@click.option('--zoom', default=0.5, type=click.FLOAT)
+@click.option('--escale', default=1.0, type=click.FLOAT)
+@click.option('--border', default=0.1, type=click.FLOAT)
+@click.option('--perc', default=80, type=click.IntRange(1, 100))
+@click.option('--range', default=20, type=click.INT)
+@click.option('--low', default=5, type=click.IntRange(1, 100))
+@click.option('--high', default=90, type=click.IntRange(1, 100))
 def binarize(ctx, threshold, zoom, escale, border, perc, range, low, high):
     """
     Binarizes page images.
@@ -488,214 +462,162 @@ def binarize(ctx, threshold, zoom, escale, border, perc, range, low, high):
                    low, high)
 
 
-@cli.command('segment')
+@click.command('segment')
 @click.pass_context
-@click.option('-i', '--model', default=None, show_default=True, multiple=True,
-              help='Baseline detection model to use')
-@click.option('-x/-bl', '--boxes/--baseline', default=True, show_default=True,
+@click.option('-i', '--model', type=str, help='Baseline/region detection model(s) to use')
+@click.option('-x/-bl', '--boxes/--baseline', default=True,
               help='Switch between legacy box segmenter and neural baseline segmenter')
-@click.option('-d', '--text-direction', default='horizontal-lr',
-              show_default=True,
-              type=click.Choice(['horizontal-lr', 'horizontal-rl',
-                                 'vertical-lr', 'vertical-rl']),
+@click.option('-d', '--text-direction',
+              type=click.Choice(['horizontal-lr', 'horizontal-rl', 'vertical-lr', 'vertical-rl']),
               help='Sets principal text direction')
-@click.option('--scale', show_default=True, default=None, type=click.FLOAT)
-@click.option('-m', '--maxcolseps', show_default=True, default=2, type=click.INT)
-@click.option('-b/-w', '--black-colseps/--white_colseps', show_default=True, default=False)
-@click.option('-r/-l', '--remove_hlines/--hlines', show_default=True, default=True)
-@click.option('-p', '--pad', show_default=True, type=(int, int), default=(0, 0),
-              help='Left and right padding around lines')
-@click.option('-m', '--mask', show_default=True, default=None,
-              type=click.File(mode='rb', lazy=True), help='Segmentation mask '
-              'suppressing page areas for line detection. 0-valued image '
-              'regions are ignored for segmentation purposes. Disables column '
-              'detection.')
-def segment(ctx, model, boxes, text_direction, scale, maxcolseps,
-            black_colseps, remove_hlines, pad, mask):
+@click.option('--scale', 'legacy_scale', type=float)
+@click.option('-m', '--maxcolseps', 'legacy_maxcolseps', type=int)
+@click.option('-b/-w', '--black-colseps/--white_colseps', 'legacy_black_colseps')
+@click.option('-r/-l', '--remove-hlines/--hlines', 'legacy_no_hlines')
+@click.option('-p', '--pad', 'bbox_line_padding', type=int, help='Left and right padding around lines. Only for BBox segmenter.')
+@click.option('--input-pad', 'input_padding', type=int, help='Padding to add around input image.')
+def segment(ctx, **kwargs):
     """
     Segments page images into text lines.
     """
     from kraken.containers import ProcessingStep
+    params = ctx.params
+    config = SegmentationInferenceConfig(**params, **ctx.meta)
 
-    if model and boxes:
-        logger.warning(f'Baseline model ({model}) given but legacy segmenter selected. Forcing to -bl.')
-        boxes = False
+    if params['model'] and params['boxes']:
+        logger.warning(f'Baseline model ({params["model"]}) given but legacy segmenter selected. Forcing to -bl.')
+        params['boxes'] = False
 
-    model = [Path(m) for m in model]
-    if boxes is False:
-        if not model:
-            model = [SEGMENTATION_DEFAULT_MODEL]
+    if params['boxes'] is False:
+        if not params['model']:
+            params['model'] = SEGMENTATION_DEFAULT_MODEL
+        model = Path(params['model']).expanduser()
         ctx.meta['steps'].append(ProcessingStep(id=f'_{uuid.uuid4()}',
                                                 category='processing',
                                                 description='Baseline and region segmentation',
-                                                settings={'model': [m.name for m in model],
-                                                          'text_direction': text_direction}))
+                                                settings={'model': model.name,
+                                                          'text_direction': config.text_direction}))
 
         # first try to find the segmentation models by their given names, then
         # look in the kraken config folder
         locations = []
-        for m in model:
-            location = None
-            search = chain([m],
-                           Path(user_data_dir('htrmopo')).rglob(str(m)),
-                           Path(click.get_app_dir('kraken')).rglob(str(m)))
-            for loc in search:
-                if loc.is_file():
-                    location = loc
-                    locations.append(loc)
-                    break
-            if not location:
-                raise click.BadParameter(f'No model for {str(m)} found')
-
-        from kraken.lib.vgsl import TorchVGSLModel
-        model = []
-        for loc in locations:
-            message(f'Loading ANN {loc}\t', nl=False)
-            try:
-                model.append(TorchVGSLModel.load_model(loc))
-                model[-1].to(ctx.meta['device'])
-            except Exception:
-                if ctx.meta['raise_failed']:
-                    raise
-                message('\u2717', fg='red')
-                ctx.exit(1)
-            message('\u2713', fg='green')
-    else:
-        ctx.meta['steps'].append(ProcessingStep(id=f'_{uuid.uuid4()}',
-                                                category='processing',
-                                                description='bounding box segmentation',
-                                                settings={'text_direction': text_direction,
-                                                          'scale': scale,
-                                                          'maxcolseps': maxcolseps,
-                                                          'black_colseps': black_colseps,
-                                                          'remove_hlines': remove_hlines,
-                                                          'pad': pad}))
-
-    return partial(segmenter, boxes, model, text_direction, scale, maxcolseps,
-                   black_colseps, remove_hlines, pad, mask, ctx.meta['device'])
-
-
-def _validate_mm(ctx, param, value):
-    """
-    Maps model mappings to a dictionary.
-    """
-    model_dict: Dict[str, Union[str, List[str]]] = {'ignore': []}
-    if len(value) == 1:
-        lexer = shlex.shlex(value[0], posix=True)
-        lexer.wordchars += r'\/.+-()=^&;,.'
-        if len(list(lexer)) == 1:
-            model_dict['default'] = value[0]
-            return model_dict
-    try:
-        for m in value:
-            lexer = shlex.shlex(m, posix=True)
-            lexer.wordchars += r'\/.+-()=^&;,.'
-            tokens = list(lexer)
-            if len(tokens) != 3:
-                raise ValueError
-            k, _, v = tokens
-            if v == 'ignore':
-                model_dict['ignore'].append(k)  # type: ignore
-            else:
-                model_dict[k] = Path(v)
-    except Exception:
-        raise click.BadParameter('Mappings must be in format tag:model')
-    return model_dict
-
-
-@cli.command('ocr')
-@click.pass_context
-@click.option('-m', '--model', default=DEFAULT_MODEL, multiple=True,
-              show_default=True, callback=_validate_mm,
-              help='Path to an recognition model or mapping of the form '
-              '$tag1=$model1. Add multiple mappings to run multi-model '
-              'recognition based on detected tags. Use the `default` keyword '
-              'for adding a catch-all model. Recognition on tags can be '
-              'ignored with the model value `ignore`. Refer to the '
-              'documentation for more information about tag handling.')
-@click.option('-p', '--pad', show_default=True, type=click.INT, default=16, help='Left and right '
-              'padding around lines')
-@click.option('-t', '--temperature', show_default=True, type=click.FLOAT, default=1.0, help='Softmax temperature')
-@click.option('-n', '--reorder/--no-reorder', show_default=True, default=True,
-              help='Reorder code points to logical order')
-@click.option('--base-dir', show_default=True, default='auto',
-              type=click.Choice(['L', 'R', 'auto']), help='Set base text '
-              'direction.  This should be set to the direction used during the '
-              'creation of the training data. If set to `auto` it will be '
-              'overridden by any explicit value given in the input files.')
-@click.option('-s', '--no-segmentation', default=False, show_default=True, is_flag=True,
-              help='Enables non-segmentation mode treating each input image as a whole line.')
-@click.option('-d', '--text-direction', default='horizontal-tb',
-              show_default=True,
-              type=click.Choice(['horizontal-tb', 'vertical-lr', 'vertical-rl']),
-              help='Sets principal text direction in serialization output')
-def ocr(ctx, model, pad, temperature, reorder, base_dir, no_segmentation,
-        text_direction):
-    """
-    Recognizes text in line images.
-    """
-    from kraken.lib import models
-
-    from kraken.containers import ProcessingStep
-
-    if ctx.meta['input_format_type'] != 'image' and no_segmentation:
-        raise click.BadParameter('no_segmentation mode is incompatible with page/alto inputs')
-
-    if reorder and base_dir != 'auto':
-        reorder = base_dir
-
-    # first we try to find the model in the absolute path, then ~/.kraken
-    nm: Dict[str, models.TorchSeqRecognizer] = {}
-    ign_tags = model.pop('ignore')
-    for k, v in model.items():
-        search = chain([Path(v)],
-                       Path(user_data_dir('htrmopo')).rglob(v),
-                       Path(click.get_app_dir('kraken')).rglob(v))
         location = None
+        search = chain([model],
+                       Path(user_data_dir('htrmopo')).rglob(str(model)) if not model.is_absolute() else (),
+                       Path(click.get_app_dir('kraken')).rglob(str(model)) if not model.is_absolute() else ())
         for loc in search:
             if loc.is_file():
                 location = loc
+                locations.append(loc)
                 break
         if not location:
-            raise click.BadParameter(f'No model for {v} found')
-        message(f'Loading ANN {v}\t', nl=False)
-        try:
-            rnn = models.load_any(location, device=ctx.meta['device'])
-            rnn.temperature = temperature
-            nm[k] = rnn
-        except Exception:
-            if ctx.meta['raise_failed']:
-                raise
-            message('\u2717', fg='red')
-            ctx.exit(1)
-        message('\u2713', fg='green')
+            raise click.BadParameter(f'No model for {model} found')
+    else:
+        model = None
+        ctx.meta['steps'].append(ProcessingStep(id=f'_{uuid.uuid4()}',
+                                                category='processing',
+                                                description='bounding box segmentation',
+                                                settings={'text_direction': config.text_direction,
+                                                          'scale': config.legacy_scale,
+                                                          'maxcolseps': config.legacy_maxcolseps,
+                                                          'black_colseps': config.legacy_black_colseps,
+                                                          'no_hlines': config.legacy_no_hlines,
+                                                          'pad': config.bbox_line_padding}))
 
-    if 'default' in nm:
-        from collections import defaultdict
+    return partial(segmenter, params['boxes'], model, config)
 
-        nn: Dict[str, models.TorchSeqRecognizer] = defaultdict(lambda: nm['default'])
-        nn.update(nm)
-        nm = nn
+
+@click.command('ocr')
+@click.pass_context
+@click.option('-m',
+              '--model',
+              help='Path to recognition model weights.')
+@click.option('-B',
+              '--batch-size',
+              type=int,
+              help='Number of lines per forward pass batch.')
+@click.option('-p',
+              '--pad',
+              'padding',
+              type=int,
+              help='Left and right padding around lines')
+@click.option('-t',
+              '--temperature',
+              type=float,
+              help='Softmax temperature')
+@click.option('--num-line-workers',
+              type=click.IntRange(0),
+              help='Number of line extraction worker processes. 0 for in-process extraction.')
+@click.option('-n',
+              '--reorder/--no-reorder',
+              'bidi_reordering',
+              help='Reorder code points to logical order in output.')
+@click.option('--base-dir',
+              type=click.Choice(['L', 'R', 'auto']),
+              help='Set base text direction. This should be set to the '
+              'direction used during the creation of the training data. If '
+              'set to `auto` it will be overridden by any explicit value '
+              'given in the input files.')
+@click.option('-s',
+              '--no-segmentation',
+              default=False,
+              is_flag=True,
+              help='Enables non-segmentation mode treating each input image as a whole line.')
+@click.option('-d',
+              '--text-direction',
+              type=click.Choice(['horizontal-tb', 'vertical-lr', 'vertical-rl']),
+              help='Sets principal text direction in serialization output')
+@click.option('--no-legacy-polygons',
+              'no_legacy_polygons',
+              is_flag=True,
+              default=False,
+              help="Force disable the legacy polygon extractor")
+def ocr(ctx, **kwargs):
+    """
+    Recognizes text in line images.
+    """
+    from kraken.containers import ProcessingStep
+
+    params = ctx.params
+    config = RecognitionInferenceConfig(**params, **ctx.meta)
+
+    if ctx.meta['input_format_type'] != 'image' and params['no_segmentation']:
+        raise click.BadParameter('no_segmentation mode is incompatible with page/alto inputs')
+
+    if config.bidi_reordering and params['base_dir'] != 'auto':
+        config.bidi_reordering = params['base_dir']
+
+    # first we try to find the model in the absolute path, then ~/.kraken
+    model = Path(params['model']).expanduser()
+    search = chain([model],
+                   Path(user_data_dir('htrmopo')).rglob(str(model)) if not model.is_absolute() else (),
+                   Path(click.get_app_dir('kraken')).rglob(str(model)) if not model.is_absolute() else ())
+
+    location = None
+    for loc in search:
+        if loc.is_file():
+            location = loc
+            break
+    if not location:
+        raise click.BadParameter(f'No model path for {params["model"]} found')
 
     ctx.meta['steps'].append(ProcessingStep(id=f'_{uuid.uuid4()}',
                                             category='processing',
                                             description='Text line recognition',
-                                            settings={'text_direction': text_direction,
-                                                      'models': ' '.join(Path(v).name for v in model.values()),
-                                                      'pad': pad,
-                                                      'bidi_reordering': reorder}))
+                                            settings={'text_direction': config.text_direction,
+                                                      'models': params['model'],
+                                                      'pad': config.padding,
+                                                      'bidi_reordering': config.bidi_reordering}))
 
     # set output mode
-    ctx.meta['text_direction'] = text_direction
+    ctx.meta['text_direction'] = params['text_direction']
     return partial(recognizer,
-                   model=nm,
-                   pad=pad,
-                   no_segmentation=no_segmentation,
-                   bidi_reordering=reorder,
-                   tags_ignore=ign_tags)
+                   model=location,
+                   no_segmentation=params['no_segmentation'],
+                   config=config)
 
 
-@cli.command('show')
+@click.command('show')
 @click.pass_context
 @click.option('-V', '--metadata-version',
               default='highest',
@@ -783,7 +705,7 @@ def show(ctx, metadata_version, model_id):
     print(table)
 
 
-@cli.command('list')
+@click.command('list')
 @click.option('--all', 'model_type', flag_value='all', default=True, help='List both segmentation and recognition models.')
 @click.option('--recognition', 'model_type', flag_value='recognition', help='Only list recognition models.')
 @click.option('--segmentation', 'model_type', flag_value='segmentation', help='Only list segmentation models.')
@@ -847,7 +769,7 @@ def list_models(ctx, model_type, language, script, keyword):
     print(table)
 
 
-@cli.command('get')
+@click.command('get')
 @click.pass_context
 @click.argument('model_id')
 def get(ctx, model_id):
@@ -872,6 +794,10 @@ def get(ctx, model_id):
                               callback=lambda total, advance: progress.update(download_task, total=total, advance=advance))
     model_candidates = list(filter(lambda x: x.suffix == '.mlmodel', model_dir.iterdir()))
     message(f'Model dir: {model_dir} (model files: {", ".join(x.name for x in model_candidates)})')
+
+
+for subcommand in sorted(importlib.metadata.entry_points(group='kraken.cli')):
+    cli.add_command(subcommand.load(), name=subcommand.name)
 
 
 if __name__ == '__main__':

@@ -18,20 +18,15 @@ kraken.ketos.train
 
 Command line driver for recognition training and evaluation.
 """
-import logging
-import pathlib
-from typing import List
-from functools import partial
-import warnings
-
 import click
+import logging
+
+from pathlib import Path
 from threadpoolctl import threadpool_limits
 
-from kraken.lib.register import OPTIMIZERS, SCHEDULERS, STOPPERS
-from kraken.lib.default_specs import RECOGNITION_HYPER_PARAMS, RECOGNITION_SPEC
-from kraken.lib.exceptions import KrakenInputException
+from kraken.registry import OPTIMIZERS, SCHEDULERS, STOPPERS
 
-from .util import _expand_gt, _validate_manifests, message, to_ptl_device
+from .util import _expand_gt, _validate_manifests, message
 
 logging.captureWarnings(True)
 logger = logging.getLogger('kraken')
@@ -39,96 +34,70 @@ logger = logging.getLogger('kraken')
 
 @click.command('train')
 @click.pass_context
-@click.option('-B', '--batch-size', show_default=True, type=click.INT,
-              default=RECOGNITION_HYPER_PARAMS['batch_size'], help='batch sample size')
-@click.option('--pad', show_default=True, type=click.INT, default=16, help='Left and right '
-              'padding around lines')
-@click.option('-o', '--output', show_default=True, type=click.Path(), default='model', help='Output model file')
-@click.option('-s', '--spec', show_default=True, default=RECOGNITION_SPEC,
-              help='VGSL spec of the network to train. CTC layer will be added automatically.')
-@click.option('-a', '--append', show_default=True, default=None, type=click.INT,
-              help='Removes layers before argument and then appends spec. Only works when loading an existing model')
-@click.option('-i', '--load', show_default=True, type=click.Path(exists=True,
-              readable=True), help='Load existing file to continue training')
-@click.option('-F', '--freq', show_default=True, default=RECOGNITION_HYPER_PARAMS['freq'], type=click.FLOAT,
+@click.option('-B', '--batch-size', type=int, help='batch sample size')
+@click.option('--pad', 'padding', type=int, help='Left and right padding around lines')
+@click.option('-o', '--output', 'checkpoint_path', default='model', help='Directory to save checkpoints into.')
+@click.option('--weights-format', default='safetensors', help='Output weights format.')
+@click.option('-s', '--spec', help='VGSL spec of the network to train. CTC layer will be added automatically.')
+@click.option('-i', '--load', type=click.Path(exists=True, readable=True), help='Load existing file to continue training')
+@click.option('--resume', type=click.Path(exists=True, readable=True), help='Load a checkpoint to continue training')
+@click.option('-F', '--freq',
+              type=click.FLOAT,
               help='Model saving and report generation frequency in epochs '
                    'during training. If frequency is >1 it must be an integer, '
                    'i.e. running validation every n-th epoch.')
 @click.option('-q',
               '--quit',
-              show_default=True,
-              default=RECOGNITION_HYPER_PARAMS['quit'],
               type=click.Choice(STOPPERS),
               help='Stop condition for training. Set to `early` for early stooping or `fixed` for fixed number of epochs')
 @click.option('-N',
               '--epochs',
-              show_default=True,
-              default=RECOGNITION_HYPER_PARAMS['epochs'],
+              type=int,
               help='Number of epochs to train for')
 @click.option('--min-epochs',
-              show_default=True,
-              default=RECOGNITION_HYPER_PARAMS['min_epochs'],
+              type=int,
               help='Minimal number of epochs to train for when using early stopping.')
 @click.option('--lag',
-              show_default=True,
-              default=RECOGNITION_HYPER_PARAMS['lag'],
+              type=int,
               help='Number of evaluations (--report frequency) to wait before stopping training without improvement')
 @click.option('--min-delta',
-              show_default=True,
-              default=RECOGNITION_HYPER_PARAMS['min_delta'],
-              type=click.FLOAT,
-              help='Minimum improvement between epochs to reset early stopping. Default is scales the delta by the best loss')
+              type=float,
+              help='Minimum improvement between epochs to reset early stopping.')
 @click.option('--optimizer',
-              show_default=True,
-              default=RECOGNITION_HYPER_PARAMS['optimizer'],
               type=click.Choice(OPTIMIZERS),
               help='Select optimizer')
-@click.option('-r', '--lrate', show_default=True, default=RECOGNITION_HYPER_PARAMS['lrate'], help='Learning rate')
-@click.option('-m', '--momentum', show_default=True, default=RECOGNITION_HYPER_PARAMS['momentum'], help='Momentum')
-@click.option('-w', '--weight-decay', show_default=True, type=float,
-              default=RECOGNITION_HYPER_PARAMS['weight_decay'], help='Weight decay')
-@click.option('--warmup', show_default=True, type=int,
-              default=RECOGNITION_HYPER_PARAMS['warmup'], help='Number of steps to ramp up to `lrate` initial learning rate.')
-@click.option('--freeze-backbone', show_default=True, type=int,
-              default=RECOGNITION_HYPER_PARAMS['freeze_backbone'], help='Number of samples to keep the backbone (everything but last layer) frozen.')
+@click.option('-r', '--lrate', type=float, help='Learning rate')
+@click.option('-m', '--momentum', type=float, help='Momentum')
+@click.option('-w', '--weight-decay', type=float, help='Weight decay')
+@click.option('--gradient-clip-val', type=float, help='Gradient clip value')
+@click.option('--accumulate-grad-batches', type=int, help='Number of batches to accumulate gradient across.')
+@click.option('--warmup', type=int, help='Number of steps to ramp up to `lrate` initial learning rate.')
+@click.option('--freeze-backbone', type=int, help='Number of samples to keep the backbone (everything but last layer) frozen.')
 @click.option('--schedule',
-              show_default=True,
               type=click.Choice(SCHEDULERS),
-              default=RECOGNITION_HYPER_PARAMS['schedule'],
               help='Set learning rate scheduler. For 1cycle, cycle length is determined by the `--epoch` option.')
 @click.option('-g',
               '--gamma',
-              show_default=True,
-              default=RECOGNITION_HYPER_PARAMS['gamma'],
+              type=float,
               help='Decay factor for exponential, step, and reduceonplateau learning rate schedules')
 @click.option('-ss',
               '--step-size',
-              show_default=True,
-              default=RECOGNITION_HYPER_PARAMS['step_size'],
+              type=int,
               help='Number of validation runs between learning rate decay for exponential and step LR schedules')
 @click.option('--sched-patience',
-              show_default=True,
-              default=RECOGNITION_HYPER_PARAMS['rop_patience'],
+              'rop_patience',
+              type=int,
               help='Minimal number of validation runs between LR reduction for reduceonplateau LR schedule.')
-@click.option('--cos-max',
-              show_default=True,
-              default=RECOGNITION_HYPER_PARAMS['cos_t_max'],
-              help='Epoch of minimal learning rate for cosine LR scheduler.')
+@click.option('--cos-max', 'cos_t_max', type=int, help='Epoch of minimal learning rate for cosine LR scheduler.')
 @click.option('--cos-min-lr',
-              show_default=True,
-              default=RECOGNITION_HYPER_PARAMS['cos_min_lr'],
+              type=float,
               help='Minimal final learning rate for cosine LR scheduler.')
-@click.option('-p', '--partition', show_default=True, default=0.9,
-              help='Ground truth data partition ratio between train/validation set')
-@click.option('--fixed-splits/--ignore-fixed-split', show_default=True, default=False,
-              help='Whether to honor fixed splits in binary datasets.')
-@click.option('-u', '--normalization', show_default=True, type=click.Choice(['NFD', 'NFKD', 'NFC', 'NFKC']),
-              default=RECOGNITION_HYPER_PARAMS['normalization'], help='Ground truth normalization')
-@click.option('-n', '--normalize-whitespace/--no-normalize-whitespace', show_default=True,
-              default=RECOGNITION_HYPER_PARAMS['normalize_whitespace'], help='Normalizes unicode whitespace')
-@click.option('-c', '--codec', show_default=True, default=None, type=click.File(mode='r', lazy=True),
+@click.option('-p', '--partition', type=float, help='Ground truth data partition ratio between train/validation set')
+@click.option('-u', '--normalization', type=click.Choice(['NFD', 'NFKD', 'NFC', 'NFKC']), help='Ground truth normalization')
+@click.option('-n', '--normalize-whitespace/--no-normalize-whitespace', help='Normalizes unicode whitespace')
+@click.option('-c', '--codec', type=click.UNPROCESSED,
               help='Load a codec JSON definition (invalid if loading existing model)')
-@click.option('--resize', show_default=True, default='fail',
+@click.option('--resize',
               type=click.Choice([
                   'add', 'union',  # Deprecation: `add` is deprecated, `union` is the new value
                   'both', 'new',  # Deprecation: `both` is deprecated, `new` is the new value
@@ -138,24 +107,18 @@ logger = logging.getLogger('kraken')
                    'points will be added, `new` will set the layer to match exactly '
                    'the training data, `fail` will abort if training data and model '
                    'codec do not match.')
-@click.option('--reorder/--no-reorder', show_default=True, default=True, help='Reordering of code points to display order')
-@click.option('--base-dir', show_default=True, default='auto',
-              type=click.Choice(['L', 'R', 'auto']), help='Set base text '
+@click.option('--reorder/--no-reorder', 'bidi_reordering', help='Reordering of code points to display order')
+@click.option('--base-dir',
+              type=click.Choice(['L', 'R', 'auto']), default='auto', help='Set base text '
               'direction.  This should be set to the direction used during the '
               'creation of the training data. If set to `auto` it will be '
               'overridden by any explicit value given in the input files.')
-@click.option('-t', '--training-files', show_default=True, default=None, multiple=True,
+@click.option('-t', '--training-data', 'training_data', multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with additional paths to training data')
-@click.option('-e', '--evaluation-files', show_default=True, default=None, multiple=True,
+@click.option('-e', '--evaluation-data', 'evaluation_data', multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
-@click.option('--load-hyper-parameters/--no-load-hyper-parameters', show_default=True, default=False,
-              help='When loading an existing model, retrieve hyperparameters from the model')
-@click.option('--force-binarization/--no-binarization', show_default=True,
-              default=False, help='Forces input images to be binary, otherwise '
-              'the appropriate color format will be auto-determined through the '
-              'network specification. Will be ignored in `path` mode.')
 @click.option('-f', '--format-type', type=click.Choice(['path', 'xml', 'alto', 'page', 'binary']), default='path',
               help='Sets the training data format. In ALTO and PageXML mode all '
               'data is extracted from xml files containing both line definitions and a '
@@ -164,405 +127,227 @@ logger = logging.getLogger('kraken')
               'containing the transcription. In binary mode files are datasets '
               'files containing pre-extracted text lines.')
 @click.option('--augment/--no-augment',
-              show_default=True,
-              default=RECOGNITION_HYPER_PARAMS['augment'],
               help='Enable image augmentation')
-@click.option('--logger', 'pl_logger', show_default=True, type=click.Choice(['tensorboard']), default=None,
+@click.option('--logger', 'pl_logger', type=click.Choice(['tensorboard']),
               help='Logger used by PyTorch Lightning to track metrics such as loss and accuracy.')
-@click.option('--log-dir', show_default=True, type=click.Path(exists=True, dir_okay=True, writable=True),
+@click.option('--log-dir', type=click.Path(exists=True, dir_okay=True, writable=True),
               help='Path to directory where the logger will store the logs. If not set, a directory will be created in the current working directory.')
+@click.option('--legacy-polygons', is_flag=True, help='Use the legacy polygon extractor.')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
-@click.option('--legacy-polygons', show_default=True, default=False, is_flag=True, help='Use the legacy polygon extractor.')
-def train(ctx, batch_size, pad, output, spec, append, load, freq, quit, epochs,
-          min_epochs, lag, min_delta, optimizer, lrate, momentum, weight_decay,
-          warmup, freeze_backbone, schedule, gamma, step_size, sched_patience,
-          cos_max, cos_min_lr, partition, fixed_splits, normalization,
-          normalize_whitespace, codec, resize, reorder, base_dir,
-          training_files, evaluation_files, load_hyper_parameters,
-          force_binarization, format_type, augment, pl_logger, log_dir,
-          ground_truth, legacy_polygons):
+def train(ctx, **kwargs):
     """
     Trains a model from image-text pairs.
     """
-    if not load and append:
-        raise click.BadOptionUsage('append', 'append option requires loading an existing model')
+    params = ctx.meta.copy()
+    params.update(ctx.params)
 
-    if resize != 'fail' and not load:
-        raise click.BadOptionUsage('resize', 'resize option requires loading an existing model')
+    resume = params.pop('resume', None)
+    load = params.pop('load', None)
+    training_data = params.pop('training_data', [])
+    ground_truth = list(params.pop('ground_truth', []))
 
-    if not (0 <= freq <= 1) and freq % 1.0 != 0:
-        raise click.BadOptionUsage('freq', 'freq needs to be either in the interval [0,1.0] or a positive integer.')
+    if sum(map(bool, [resume, load])) > 1:
+        raise click.BadOptionsUsage('load', 'load/resume options are mutually exclusive.')
 
-    if augment:
-        try:
-            import albumentations  # NOQA
-        except ImportError:
-            raise click.BadOptionUsage('augment', 'augmentation needs the `albumentations` package installed.')
-
-    if pl_logger == 'tensorboard':
+    if params.get('pl_logger') == 'tensorboard':
         try:
             import tensorboard  # NOQA
         except ImportError:
             raise click.BadOptionUsage('logger', 'tensorboard logger needs the `tensorboard` package installed.')
 
-    if log_dir is None:
-        log_dir = pathlib.Path.cwd()
-
     import json
-    import shutil
 
-    from kraken.lib.train import KrakenTrainer, RecognitionModel
+    from lightning.pytorch.callbacks import ModelCheckpoint
 
-    hyper_params = RECOGNITION_HYPER_PARAMS.copy()
-    hyper_params.update({'freq': freq,
-                         'pad': pad,
-                         'batch_size': batch_size,
-                         'quit': quit,
-                         'epochs': epochs,
-                         'min_epochs': min_epochs,
-                         'lag': lag,
-                         'min_delta': min_delta,
-                         'optimizer': optimizer,
-                         'lrate': lrate,
-                         'momentum': momentum,
-                         'weight_decay': weight_decay,
-                         'warmup': warmup,
-                         'freeze_backbone': freeze_backbone,
-                         'schedule': schedule,
-                         'gamma': gamma,
-                         'step_size': step_size,
-                         'rop_patience': sched_patience,
-                         'cos_t_max': cos_max,
-                         'cos_min_lr': cos_min_lr,
-                         'normalization': normalization,
-                         'normalize_whitespace': normalize_whitespace,
-                         'augment': augment,
-                         })
+    from kraken.models.convert import convert_models
+    from kraken.train import (KrakenTrainer, VGSLRecognitionModel,
+                              VGSLRecognitionDataModule)
+    from kraken.train.utils import KrakenOnExceptionCheckpoint
+    from kraken.configs import VGSLRecognitionTrainingConfig, VGSLRecognitionTrainingDataConfig
+
+    if (codec := params.get('codec')) is not None and not isinstance(codec, dict):
+        with open(codec, 'rb') as fp:
+            params['codec'] = json.load(fp)
 
     # disable automatic partition when given evaluation set explicitly
-    if evaluation_files:
-        partition = 1
-    ground_truth = list(ground_truth)
+    if params['evaluation_data']:
+        params['partition'] = 1
 
-    # merge training_files into ground_truth list
-    if training_files:
-        ground_truth.extend(training_files)
+    # merge training_data into ground_truth list
+    if training_data:
+        ground_truth.extend(training_data)
+
+    params['training_data'] = ground_truth
 
     if len(ground_truth) == 0:
         raise click.UsageError('No training data was provided to the train command. Use `-t` or the `ground_truth` argument.')
 
-    if reorder and base_dir != 'auto':
-        reorder = base_dir
+    if params['bidi_reordering'] and params['base_dir'] != 'auto':
+        params['bidi_reordering'] = params['base_dir']
 
-    if codec:
-        logger.debug(f'Loading codec file from {codec}')
-        codec = json.load(codec)
-
-    try:
-        accelerator, device = to_ptl_device(ctx.meta['device'])
-    except Exception as e:
-        raise click.BadOptionUsage('device', str(e))
-
-    if hyper_params['freq'] > 1:
-        val_check_interval = {'check_val_every_n_epoch': int(hyper_params['freq'])}
+    if params['freq'] > 1:
+        val_check_interval = {'check_val_every_n_epoch': int(params['freq'])}
     else:
-        val_check_interval = {'val_check_interval': hyper_params['freq']}
+        val_check_interval = {'val_check_interval': params['freq']}
 
-    model = RecognitionModel(hyper_params=hyper_params,
-                             output=output,
-                             spec=spec,
-                             append=append,
-                             model=load,
-                             reorder=reorder,
-                             training_data=ground_truth,
-                             evaluation_data=evaluation_files,
-                             partition=partition,
-                             binary_dataset_split=fixed_splits,
-                             num_workers=ctx.meta['workers'],
-                             load_hyper_parameters=load_hyper_parameters,
-                             force_binarization=force_binarization,
-                             format_type=format_type,
-                             codec=codec,
-                             resize=resize,
-                             legacy_polygons=legacy_polygons)
+    cbs = [KrakenOnExceptionCheckpoint(dirpath=params.get('checkpoint_path'),
+                                       filename='checkpoint_abort')]
+    checkpoint_callback = ModelCheckpoint(dirpath=Path(params.pop('checkpoint_path')),
+                                          save_top_k=10,
+                                          monitor='val_metric',
+                                          mode='max',
+                                          auto_insert_metric_name=False,
+                                          filename='checkpoint_{epoch:02d}-{val_metric:.4f}')
+    cbs.append(checkpoint_callback)
 
-    # Force upgrade to new polygon extractor if model was not trained with it
-    if model.nn and model.nn.use_legacy_polygons:
-        if not legacy_polygons and not model.legacy_polygons:
-            # upgrade to new polygon extractor
-            logger.warning('The model will be flagged to use new polygon extractor.')
-            model.nn.use_legacy_polygons = False
-    if not model.nn and legacy_polygons != model.legacy_polygons:
-        logger.warning(f'Dataset was compiled with legacy polygon extractor: {model.legacy_polygons}, '
-                       f'the new model will be flagged to use {"legacy" if model.legacy_polygons else "new"} method.')
-        legacy_polygons = model.legacy_polygons
+    dm_config = VGSLRecognitionTrainingDataConfig(**params)
+    m_config = VGSLRecognitionTrainingConfig(**params)
 
-    trainer = KrakenTrainer(accelerator=accelerator,
-                            devices=device,
+    if resume:
+        data_module = VGSLRecognitionDataModule.load_from_checkpoint(resume, weights_only=False)
+    else:
+        data_module = VGSLRecognitionDataModule(dm_config)
+
+    trainer = KrakenTrainer(accelerator=ctx.meta['accelerator'],
+                            devices=ctx.meta['device'],
                             precision=ctx.meta['precision'],
-                            max_epochs=hyper_params['epochs'] if hyper_params['quit'] == 'fixed' else -1,
-                            min_epochs=hyper_params['min_epochs'],
-                            freeze_backbone=hyper_params['freeze_backbone'],
+                            max_epochs=params['epochs'] if params['quit'] == 'fixed' else -1,
+                            min_epochs=params['min_epochs'],
                             enable_progress_bar=True if not ctx.meta['verbose'] else False,
                             deterministic=ctx.meta['deterministic'],
-                            pl_logger=pl_logger,
-                            log_dir=log_dir,
+                            enable_model_summary=False,
+                            accumulate_grad_batches=params['accumulate_grad_batches'],
+                            callbacks=cbs,
+                            gradient_clip_val=params['gradient_clip_val'],
+                            num_sanity_val_steps=0,
                             **val_check_interval)
+
+    with trainer.init_module(empty_init=False if (load or resume) else True):
+        if load:
+            message(f'Loading from checkpoint {load}.')
+            if load.endswith('ckpt'):
+                model = VGSLRecognitionModel.load_from_checkpoint(load, config=m_config, weights_only=False)
+            else:
+                model = VGSLRecognitionModel.load_from_weights(load, config=m_config)
+        elif resume:
+            message(f'Resuming from checkpoint {resume}.')
+            model = VGSLRecognitionModel.load_from_checkpoint(resume, weights_only=False)
+        else:
+            message('Initializing new model.')
+            model = VGSLRecognitionModel(m_config)
+
     try:
-        with threadpool_limits(limits=ctx.meta['threads']):
-            trainer.fit(model)
-    except KrakenInputException as e:
-        if e.args[0].startswith('Training data and model codec alphabets mismatch') and resize == 'fail':
+        with threadpool_limits(limits=ctx.meta['num_threads']):
+            if resume:
+                trainer.fit(model, data_module, ckpt_path=resume)
+            else:
+                trainer.fit(model, data_module)
+    except ValueError as e:
+        if e.args[0].startswith('Training data and model codec alphabets mismatch') and params['resize'] == 'fail':
             raise click.BadOptionUsage('resize', 'Mismatched training data for loaded model. Set option `--resize` to `new` or `add`')
         else:
             raise e
 
-    if model.best_epoch == -1:
-        logger.warning('Model did not improve during training.')
-        ctx.exit(1)
-
-    if not model.current_epoch:
-        logger.warning('Training aborted before end of first epoch.')
-        ctx.exit(1)
-
-    if quit == 'early':
-        message(f'Moving best model {model.best_model} ({model.best_metric}) to {output}_best.mlmodel')
-        logger.info(f'Moving best model {model.best_model} ({model.best_metric}) to {output}_best.mlmodel')
-        shutil.copy(f'{model.best_model}', f'{output}_best.mlmodel')
+    score = checkpoint_callback.best_model_score.item()
+    weight_path = Path(checkpoint_callback.best_model_path).with_name(f'best_{score:.4f}.{params.get("weights_format")}')
+    opath = convert_models([checkpoint_callback.best_model_path], weight_path, weights_format=params['weights_format'])
+    message(f'Converting best model {checkpoint_callback.best_model_path} (score: {score:.4f}) to weights file {opath}')
 
 
 @click.command('test')
 @click.pass_context
-@click.option('-B', '--batch-size', show_default=True, type=click.INT,
-              default=RECOGNITION_HYPER_PARAMS['batch_size'], help='Batch sample size')
-@click.option('-m', '--model', show_default=True, type=click.Path(exists=True, readable=True),
-              multiple=True, help='Model(s) to evaluate')
-@click.option('-e', '--evaluation-files', show_default=True, default=None, multiple=True,
+@click.option('-B', '--batch-size', type=int, help='Batch sample size')
+@click.option('-m', '--model', type=click.Path(exists=True, readable=True), help='Model to evaluate')
+@click.option('-e', '--test-data', 'test_data', multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with paths to evaluation data.')
-@click.option('--pad', show_default=True, type=click.INT, default=16, help='Left and right '
-              'padding around lines')
-@click.option('--reorder/--no-reorder', show_default=True, default=True, help='Reordering of code points to display order')
-@click.option('--base-dir', show_default=True, default='auto',
-              type=click.Choice(['L', 'R', 'auto']), help='Set base text '
+@click.option('-f', '--format-type', type=click.Choice(['path', 'xml', 'alto', 'page', 'binary']), default='path',
+              help='Sets the training data format. In ALTO and PageXML mode all '
+              'data is extracted from xml files containing both line definitions and a '
+              'link to source images. In `path` mode arguments are image files '
+              'sharing a prefix up to the last extension with `.gt.txt` text files '
+              'containing the transcription. In binary mode files are datasets '
+              'files containing pre-extracted text lines.')
+@click.option('--pad', 'padding', type=int, help='Left and right padding around lines')
+@click.option('--reorder/--no-reorder', 'bidi_reordering', help='Reordering of code points to display order')
+@click.option('--base-dir', type=click.Choice(['L', 'R', 'auto']), default='auto', help='Set base text '
               'direction.  This should be set to the direction used during the '
               'creation of the training data. If set to `auto` it will be '
               'overridden by any explicit value given in the input files.')
-@click.option('-u', '--normalization', show_default=True, type=click.Choice(['NFD', 'NFKD', 'NFC', 'NFKC']),
-              default=None, help='Ground truth normalization')
+@click.option('-u', '--normalization', type=click.Choice(['NFD', 'NFKD', 'NFC', 'NFKC']),
+              help='Ground truth normalization')
 @click.option('-n', '--normalize-whitespace/--no-normalize-whitespace',
-              show_default=True, default=True, help='Normalizes unicode whitespace')
-@click.option('--force-binarization/--no-binarization', show_default=True,
-              default=False, help='Forces input images to be binary, otherwise '
-              'the appropriate color format will be auto-determined through the '
-              'network specification. Will be ignored in `path` mode.')
-@click.option('-f', '--format-type', type=click.Choice(['path', 'xml', 'alto', 'page', 'binary']), default='path',
-              help='Sets the training data format. In ALTO and PageXML mode all '
-              'data is extracted from xml files containing both baselines and a '
-              'link to source images. In `path` mode arguments are image files '
-              'sharing a prefix up to the last extension with JSON `.path` files '
-              'containing the baseline information. In `binary` mode files are '
-              'collections of pre-extracted text line images.')
-@click.option('--fixed-splits/--ignore-fixed-split', show_default=True, default=False,
-              help='Whether to honor fixed splits in binary datasets.')
-@click.argument('test_set', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
+              help='Normalizes unicode whitespace')
 @click.option('--no-legacy-polygons', show_default=True, default=False, is_flag=True, help='Force disable the legacy polygon extractor.')
-def test(ctx, batch_size, model, evaluation_files, pad, reorder, base_dir,
-         normalization, normalize_whitespace, force_binarization, format_type,
-         fixed_splits, test_set, no_legacy_polygons):
+@click.argument('test_set', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
+def test(ctx, **kwargs):
     """
     Evaluate on a test set.
     """
+    params = ctx.meta.copy()
+    params.update(ctx.params)
+
+    model = params.pop('model')
+    no_legacy_polygons = params.pop('no_legacy_polygons')
     if not model:
         raise click.UsageError('No model to evaluate given.')
 
-    import torch
-    import numpy as np
-    from torch.utils.data import DataLoader
+    test_data = params.pop('test_data', [])
+    test_set = list(params.pop('test_set', []))
 
-    from torchmetrics.text import CharErrorRate, WordErrorRate
-    from lightning.fabric import Fabric
+    # merge test_data into test_set list
+    if test_data:
+        test_set.extend(test_data)
 
-    from kraken.lib import models, util
-    from kraken.lib.dataset import (ArrowIPCRecognitionDataset,
-                                    GroundTruthDataset, ImageInputTransforms,
-                                    PolygonGTDataset, collate_sequences,
-                                    compute_confusions, global_align)
-    from kraken.lib.progress import KrakenProgressBar
-    from kraken.lib.xml import XMLPage
+    params['test_data'] = test_set
+
+    if params['bidi_reordering'] and params['base_dir'] != 'auto':
+        params['bidi_reordering'] = params['base_dir']
+
+    from kraken.lib import vgsl  # NOQA
+    from kraken.train import (KrakenTrainer, VGSLRecognitionModel,
+                              VGSLRecognitionDataModule)
+    from kraken.configs import VGSLRecognitionTrainingDataConfig, VGSLRecognitionTrainingConfig
     from kraken.serialization import render_report
 
-    logger.info('Building test set from {} line images'.format(len(test_set) + len(evaluation_files)))
+    trainer = KrakenTrainer(accelerator=ctx.meta['accelerator'],
+                            devices=ctx.meta['device'],
+                            precision=ctx.meta['precision'],
+                            enable_progress_bar=True if not ctx.meta['verbose'] else False,
+                            deterministic=ctx.meta['deterministic'],
+                            enable_model_summary=False,
+                            num_sanity_val_steps=0)
 
-    legacy_polygons = None
-    incoherent_legacy_polygons = False
-
-    try:
-        accelerator, device = to_ptl_device(ctx.meta['device'])
-    except Exception as e:
-        raise click.BadOptionUsage('device', str(e))
-
-    fabric = Fabric(accelerator=accelerator,
-                    devices=device,
-                    precision=ctx.meta['precision'])
-
-    with fabric.init_tensor(), fabric.init_module():
-        nn = {}
-        for p in model:
-            message('Loading model {}\t'.format(p), nl=False)
-            nn[p] = models.load_any(p)
-            message('\u2713', fg='green')
-            model_legacy_polygons = nn[p].nn.use_legacy_polygons
-            if legacy_polygons is None:
-                legacy_polygons = model_legacy_polygons
-            elif legacy_polygons != model_legacy_polygons:
-                incoherent_legacy_polygons = True
-
-    if incoherent_legacy_polygons and not no_legacy_polygons:
-        logger.warning('Models use different polygon extractors. Legacy polygon extractor will be used ; use --no-legacy-polygons to force disable it.')
-        legacy_polygons = True
-    elif no_legacy_polygons:
-        legacy_polygons = False
-
-    if legacy_polygons:
-        warnings.warn('Using legacy polygon extractor, as the model was not '
-                      'trained with the new method. Please retrain your model to '
-                      'get performance improvements.')
-
-    pin_ds_mem = False
-    if device != 'cpu':
-        pin_ds_mem = True
-
-    test_set = list(test_set)
-
-    if evaluation_files:
-        test_set.extend(evaluation_files)
-
-    if len(test_set) == 0:
-        raise click.UsageError('No evaluation data was provided to the test command. Use `-e` or the `test_set` argument.')
-
-    dataset_kwargs = {}
-    if fixed_splits:
-        if format_type != "binary":
-            logger.warning("--fixed-splits can only be use with data using binary format")
+    m_config = VGSLRecognitionTrainingConfig(**params)
+    with trainer.init_module(empty_init=False):
+        message(f'Loading from {model}.')
+        if model.endswith('ckpt'):
+            model = VGSLRecognitionModel.load_from_checkpoint(model, config=m_config)
         else:
-            dataset_kwargs["split_filter"] = "test"
+            model = VGSLRecognitionModel.load_from_weights(model, m_config)
 
-    if format_type in ['xml', 'page', 'alto']:
-        test_set = [{'page': XMLPage(file, filetype=format_type).to_container()} for file in test_set]
-        valid_norm = False
-        DatasetClass = partial(PolygonGTDataset, legacy_polygons=legacy_polygons)
-    elif format_type == 'binary':
-        DatasetClass = ArrowIPCRecognitionDataset
-        test_set = [{'file': file} for file in test_set]
-        valid_norm = False
+    if not no_legacy_polygons and model.net.use_legacy_polygons:
+        params['legacy_polygons'] = True
     else:
-        DatasetClass = GroundTruthDataset
-        if force_binarization:
-            logger.warning('Forced binarization enabled in `path` mode. Will be ignored.')
-            force_binarization = False
-        test_set = [{'line': util.parse_gt_path(img)} for img in test_set]
-        valid_norm = True
+        params['legacy_polygons'] = False
 
-    if len(test_set) == 0:
-        raise click.UsageError('No evaluation data was provided to the test command. Use `-e` or the `test_set` argument.')
+    dm_config = VGSLRecognitionTrainingDataConfig(**params)
+    data_module = VGSLRecognitionDataModule(dm_config)
 
-    if reorder and base_dir != 'auto':
-        reorder = base_dir
+    with threadpool_limits(limits=ctx.meta['num_threads']):
+        test_metrics = trainer.test(model, data_module)
 
-    cer_list = []
-    wer_list = []
-    cer_case_insensitive_list = []
+    rep = render_report(model=model,
+                        chars=sum(test_metrics.character_counts.values()),
+                        errors=test_metrics.num_errors,
+                        char_accuracy=test_metrics.cer,
+                        char_CI_accucary=test_metrics.case_insensitive_cer,  # Case insensitive
+                        word_accuracy=test_metrics.wer,
+                        char_confusions=test_metrics.confusions,
+                        scripts=test_metrics.scripts,
+                        insertions=test_metrics.insertions,
+                        deletions=test_metrics.deletes,
+                        substitutions=test_metrics.substitutions)
 
-    with torch.inference_mode(), threadpool_limits(limits=ctx.meta['threads']), fabric.init_tensor(), fabric.init_module():
-        for p, net in nn.items():
-            algn_gt: List[str] = []
-            algn_pred: List[str] = []
-            chars = 0
-            error = 0
-            message('Evaluating {}'.format(p))
-            logger.info('Evaluating {}'.format(p))
-            batch, channels, height, width = net.nn.input
-            ts = ImageInputTransforms(batch, height, width, channels, (pad, 0), valid_norm, force_binarization)
-            ds = DatasetClass(normalization=normalization,
-                              whitespace_normalization=normalize_whitespace,
-                              reorder=reorder,
-                              im_transforms=ts,
-                              **dataset_kwargs)
-            for line in test_set:
-                try:
-                    ds.add(**line)
-                except ValueError as e:
-                    logger.info(e)
-
-            if hasattr(ds, 'legacy_polygon_status'):
-                if ds.legacy_polygons_status != legacy_polygons:
-                    warnings.warn(
-                        f'Binary dataset was compiled with legacy polygon extractor: {ds.legacy_polygon_status}, '
-                        f'while expecting data extracted with {"legacy" if legacy_polygons else "new"} method. Results may be inaccurate.')
-
-            # don't encode validation set as the alphabets may not match causing encoding failures
-            ds.no_encode()
-            ds_loader = DataLoader(ds,
-                                   batch_size=batch_size,
-                                   num_workers=ctx.meta['workers'],
-                                   pin_memory=pin_ds_mem,
-                                   collate_fn=collate_sequences)
-
-            test_cer = CharErrorRate()
-            test_cer_case_insensitive = CharErrorRate()
-            test_wer = WordErrorRate()
-
-            with KrakenProgressBar() as progress:
-                batches = len(ds_loader)
-                pred_task = progress.add_task('Evaluating', total=batches, visible=True if not ctx.meta['verbose'] else False)
-
-                for batch in ds_loader:
-                    im = batch['image']
-                    text = batch['target']
-                    lens = batch['seq_lens']
-                    try:
-                        pred = net.predict_string(im, lens)
-                        for x, y in zip(pred, text):
-                            chars += len(y)
-                            c, algn1, algn2 = global_align(y, x)
-                            algn_gt.extend(algn1)
-                            algn_pred.extend(algn2)
-                            error += c
-                            test_cer.update(x, y)
-                            # Update case-insensitive CER metric
-                            test_cer_case_insensitive.update(x.lower(), y.lower())
-                            test_wer.update(x, y)
-
-                    except FileNotFoundError as e:
-                        batches -= 1
-                        progress.update(pred_task, total=batches)
-                        logger.warning('{} {}. Skipping.'.format(e.strerror, e.filename))
-                    except KrakenInputException as e:
-                        batches -= 1
-                        progress.update(pred_task, total=batches)
-                        logger.warning(str(e))
-                    progress.update(pred_task, advance=1)
-
-            cer_list.append(1.0 - test_cer.compute())
-            cer_case_insensitive_list.append(1.0 - test_cer_case_insensitive.compute())
-            wer_list.append(1.0 - test_wer.compute())
-            confusions, scripts, ins, dels, subs = compute_confusions(algn_gt, algn_pred)
-            rep = render_report(p,
-                                chars,
-                                error,
-                                cer_list[-1],
-                                cer_case_insensitive_list[-1],
-                                wer_list[-1],
-                                confusions,
-                                scripts,
-                                ins,
-                                dels,
-                                subs)
-            logger.info(rep)
-            message(rep)
-
-    logger.info('Average character accuracy: {:0.2f}%, (stddev: {:0.2f})'.format(np.mean(cer_list) * 100, np.std(cer_list) * 100))
-    message('Average character accuracy: {:0.2f}%, (stddev: {:0.2f})'.format(np.mean(cer_list) * 100, np.std(cer_list) * 100))
-    logger.info('Average word accuracy: {:0.2f}%, (stddev: {:0.2f})'.format(np.mean(wer_list) * 100, np.std(wer_list) * 100))
-    message('Average word accuracy: {:0.2f}%, (stddev: {:0.2f})'.format(np.mean(wer_list) * 100, np.std(wer_list) * 100))
+    logger.info(rep)
+    message(rep)

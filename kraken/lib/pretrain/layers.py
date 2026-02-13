@@ -1,11 +1,12 @@
 """
 Layers for VGSL models
 """
-from typing import TYPE_CHECKING, Optional, Tuple
-
 import torch
-from torch.nn import Embedding, Linear, Module
 
+from torch import nn
+from typing import TYPE_CHECKING, Optional
+
+from kraken.models import BaseModel
 from kraken.lib.pretrain.util import compute_mask_indices, sample_negatives
 
 if TYPE_CHECKING:
@@ -17,11 +18,13 @@ if TYPE_CHECKING:
 __all__ = ['Wav2Vec2Mask']
 
 
-class Wav2Vec2Mask(Module):
+class Wav2Vec2Mask(nn.Module, BaseModel):
     """
     A layer for Wav2Vec2-style masking. Needs to be placed just before
     recurrent/contextual layers.
     """
+    model_type = ['pretrain']
+    _kraken_min_version = '5.0.0'
 
     def __init__(self,
                  context_encoder_input_dim: int,
@@ -46,7 +49,7 @@ class Wav2Vec2Mask(Module):
             - Outputs output :math:`(N, C, H, W)`
         """
         super().__init__()
-
+        self.user_metadata = {}
         self.context_encoder_input_dim = context_encoder_input_dim
         self.final_dim = final_dim
         self.mask_width = mask_width
@@ -54,10 +57,10 @@ class Wav2Vec2Mask(Module):
         self.num_negatives = num_negatives
 
         # mask embedding replacing the masked out areas
-        self.mask_emb = Embedding(1, context_encoder_input_dim)
-        self.project_q = Linear(context_encoder_input_dim, final_dim)
+        self.mask_emb = nn.Embedding(1, context_encoder_input_dim)
+        self.project_q = nn.Linear(context_encoder_input_dim, final_dim)
 
-    def forward(self, inputs: torch.Tensor, seq_len: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+    def forward(self, inputs: torch.Tensor, seq_len: Optional[torch.Tensor] = None) -> tuple[torch.Tensor, Optional[torch.Tensor]]:
         N, C, H, W = inputs.shape
         if H != 1:
             raise Exception(f'Height has to be 1, not {H} for Wav2Vec2 masking layer.')
@@ -85,7 +88,7 @@ class Wav2Vec2Mask(Module):
                 'seq_len': seq_len,
                 'mask': mask_indices}
 
-    def get_shape(self, input: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
+    def get_shape(self, input: tuple[int, int, int, int]) -> tuple[int, int, int, int]:
         """
         Calculates the output shape from input 4D tuple NCHW.
         """
@@ -111,6 +114,9 @@ class Wav2Vec2Mask(Module):
         bias = torch.Tensor(lin.bias.floatValue)
         self.project_q.weight = torch.nn.Parameter(weights)
         self.project_q.bias = torch.nn.Parameter(bias)
+
+    def prepare_for_inference(self, *args, **kwargs):
+        pass
 
     def serialize(self, name: str, input: str, builder):
         """

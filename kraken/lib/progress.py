@@ -109,7 +109,7 @@ class KrakenTrainProgressBar(RichProgressBar):
             self._reset_progress_bar_ids()
             reconfigure(**self._console_kwargs)
             self._console = get_console()
-            self._console.clear_live()
+
             self._metric_component = MetricsTextColumn(trainer,
                                                        self.theme.metrics,
                                                        self.theme.metrics_text_delimiter,
@@ -123,7 +123,8 @@ class KrakenTrainProgressBar(RichProgressBar):
 
             self.progress = CustomProgress(
                 *columns,
-                auto_refresh=False,
+                auto_refresh=True,
+                refresh_per_second=self.refresh_rate if self.is_enabled else 1,
                 disable=self.is_disabled,
                 console=self._console,
             )

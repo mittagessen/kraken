@@ -24,17 +24,15 @@ import traceback
 import dataclasses
 import multiprocessing as mp
 
-import os
-from torchvision.utils import save_image
-
 from collections import Counter
+from collections.abc import Callable
 from functools import partial
-from typing import (TYPE_CHECKING, Any, Callable, List, Literal, Optional,
-                    Tuple, Union)
+from typing import TYPE_CHECKING, Any, Literal, Optional, Union
 
 from PIL import Image
 from ctypes import c_char
-from torchvision import transforms
+from torchvision.transforms import InterpolationMode
+from torchvision.transforms import v2
 from torch.utils.data import Dataset
 
 from kraken.containers import BaselineLine, BBoxLine, Segmentation
@@ -59,59 +57,33 @@ logger = logging.getLogger(__name__)
 
 class DefaultAugmenter():
     def __init__(self):
-        import cv2
-        cv2.setNumThreads(0)
-        from albumentations import (Blur, Compose, ElasticTransform,
-                                    MedianBlur, MotionBlur, OneOf, SafeRotate,
-                                    OpticalDistortion, PixelDropout,
-                                    ToFloat)
+        self._blur = v2.RandomChoice([
+            v2.GaussianBlur(kernel_size=3, sigma=(0.1, 1.0)),
+            v2.GaussianBlur(kernel_size=5, sigma=(0.1, 2.0)),
+        ])
+        self._deform = v2.RandomChoice([
+            v2.RandomPerspective(distortion_scale=0.2, p=1.0, fill=0.0),
+            v2.RandomRotation(degrees=3,
+                              interpolation=InterpolationMode.BILINEAR,
+                              fill=0.0),
+            v2.RandomAffine(degrees=0,
+                            translate=(0.04, 0.04),
+                            scale=(0.9, 1.1),
+                            shear=(-3.0, 3.0),
+                            interpolation=InterpolationMode.BILINEAR,
+                            fill=0.0),
+        ])
+        self._dropout = v2.RandomErasing(p=1.0,
+                                         scale=(0.2, 0.2),
+                                         value=0.0)
+        self._augment = v2.RandomApply([v2.Compose([
+            v2.RandomApply([self._dropout], p=0.2),
+            v2.RandomApply([self._blur], p=0.2),
+            v2.RandomApply([self._deform], p=0.2),
+        ])], p=0.5)
 
-        self._transforms = Compose([
-                                    ToFloat(),
-                                    PixelDropout(p=0.2),
-                                    OneOf([
-                                        MotionBlur(p=0.2),
-                                        MedianBlur(blur_limit=3, p=0.1),
-                                        Blur(blur_limit=3, p=0.1),
-                                    ], p=0.2),
-                                    OneOf([
-                                        OpticalDistortion(p=0.3),
-                                        ElasticTransform(alpha=7, sigma=25, p=0.1),
-                                        SafeRotate(limit=(-3, 3), border_mode=cv2.BORDER_CONSTANT, p=0.2)
-                                    ], p=0.2),
-                                   ], p=0.5)
-
-    def __call__(self, image, index):
-        im = image.permute((1, 2, 0)).numpy()
-        o = self._transforms(image=im)
-        im = torch.tensor(o['image'].transpose(2, 0, 1))
-
-        """
-        Saves augmented images to disk for debugging or inspection if `isSave` is set to True.
-
-        **Need improve** - User option to debug, option to set the save folder and exceptions
-
-        Parameters:
-        - isSave (bool): Flag to enable or disable saving images.
-        - index (int): Image index, used for naming the saved file.
-
-        The function creates an 'augmented_images' directory (if not already existing),
-        saves the image as 'image_{index}.png', and logs the save path.
-        """
-        isSave = False
-        if isSave:
-            # Save augmented image using torchvision's save_image
-            output_dir = "augmented_images"
-            os.makedirs(output_dir, exist_ok=True)
-
-            save_path = os.path.join(
-                output_dir,
-                f"image_{index}.png"
-            )
-            save_image(im, save_path)
-            logger.info(f"Saved augmented image to {save_path}")
-
-        return im
+    def __call__(self, image: torch.Tensor, index: int) -> torch.Tensor:
+        return self._augment(image).clamp(0.0, 1.0)
 
 
 class ArrowIPCRecognitionDataset(Dataset):
@@ -124,7 +96,7 @@ class ArrowIPCRecognitionDataset(Dataset):
                  whitespace_normalization: bool = True,
                  skip_empty_lines: bool = True,
                  reorder: Union[bool, Literal['L', 'R']] = True,
-                 im_transforms: Callable[[Any], torch.Tensor] = transforms.Compose([]),
+                 im_transforms: Callable[[Any], torch.Tensor] = v2.Identity(),
                  augmentation: bool = False,
                  split_filter: Optional[str] = None) -> None:
         """
@@ -147,7 +119,7 @@ class ArrowIPCRecognitionDataset(Dataset):
                           file will be considered.
         """
         self.alphabet: Counter = Counter()
-        self.text_transforms: List[Callable[[str], str]] = []
+        self.text_transforms: list[Callable[[str], str]] = []
         self.failed_samples = set()
         self.transforms = im_transforms
         self.aug = None
@@ -172,7 +144,7 @@ class ArrowIPCRecognitionDataset(Dataset):
         if augmentation:
             self.aug = DefaultAugmenter()
 
-        self.im_mode = self.transforms.mode
+        self._im_mode = mp.Value(c_char, b'1')
 
     def add(self, file: Union[str, 'PathLike']) -> None:
         """
@@ -203,9 +175,6 @@ class ArrowIPCRecognitionDataset(Dataset):
         if self._split_filter and metadata['counts'][self._split_filter] == 0:
             logger.warning(f'No explicit split for "{self._split_filter}" in dataset {file} (with splits {metadata["counts"].items()}).')
             return
-        if metadata['im_mode'] > self.im_mode and self.transforms.mode >= metadata['im_mode']:
-            logger.info(f'Upgrading "im_mode" from {self.im_mode} to {metadata["im_mode"]}.')
-            self.im_mode = metadata['im_mode']
         # centerline normalize raw bbox dataset
         if self.seg_type == 'bbox' and metadata['image_type'] == 'raw':
             self.transforms.valid_norm = True
@@ -292,7 +261,9 @@ class ArrowIPCRecognitionDataset(Dataset):
         """
         pass
 
-    def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor]:
+    def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
+        if len(self.failed_samples) == len(self):
+            raise ValueError(f'All {len(self)} samples in dataset invalid.')
         try:
             sample = self.arrow_table.column('lines')[index].as_py()
             logger.debug(f'Loading sample {index}')
@@ -300,6 +271,18 @@ class ArrowIPCRecognitionDataset(Dataset):
             im = self.transforms(im)
             if self.aug:
                 im = self.aug(image=im, index=index)
+            if im.shape[0] == 3:
+                im_mode = b'R'
+            elif im.shape[0] == 1:
+                im_mode = b'L'
+            if is_bitonal(im):
+                im_mode = b'1'
+
+            with self._im_mode.get_lock():
+                if im_mode > self._im_mode.value:
+                    logger.info(f'Upgrading "im_mode" from {self._im_mode.value} to {im_mode}')
+                    self._im_mode.value = im_mode
+
             text = self._apply_text_transform(sample)
         except Exception:
             self.failed_samples.add(index)
@@ -313,6 +296,12 @@ class ArrowIPCRecognitionDataset(Dataset):
     def __len__(self) -> int:
         return self._num_lines
 
+    @property
+    def im_mode(self):
+        return {b'1': '1',
+                b'L': 'L',
+                b'R': 'RGB'}[self._im_mode.value]
+
 
 class PolygonGTDataset(Dataset):
     """
@@ -323,7 +312,7 @@ class PolygonGTDataset(Dataset):
                  whitespace_normalization: bool = True,
                  skip_empty_lines: bool = True,
                  reorder: Union[bool, Literal['L', 'R']] = True,
-                 im_transforms: Callable[[Any], torch.Tensor] = transforms.Compose([]),
+                 im_transforms: Callable[[Any], torch.Tensor] = v2.Identity(),
                  augmentation: bool = False,
                  legacy_polygons: bool = False) -> None:
         """
@@ -340,10 +329,10 @@ class PolygonGTDataset(Dataset):
                            suitable for forward passes.
             augmentation: Enables augmentation.
         """
-        self._images: Union[List[Image.Image], List[torch.Tensor]] = []
-        self._gt: List[str] = []
+        self._images: Union[list[Image.Image], list[torch.Tensor]] = []
+        self._gt: list[str] = []
         self.alphabet: Counter = Counter()
-        self.text_transforms: List[Callable[[str], str]] = []
+        self.text_transforms: list[Callable[[str], str]] = []
         self.transforms = im_transforms
         self.aug = None
         self.skip_empty_lines = skip_empty_lines
@@ -438,7 +427,7 @@ class PolygonGTDataset(Dataset):
             self.codec = codec
         else:
             self.codec = PytorchCodec(''.join(self.alphabet.keys()))
-        self.training_set: List[Tuple[Union[Image.Image, torch.Tensor], torch.Tensor]] = []
+        self.training_set: list[tuple[Union[Image.Image, torch.Tensor], torch.Tensor]] = []
         for im, gt in zip(self._images, self._gt):
             self.training_set.append((im, self.codec.encode(gt)))
 
@@ -446,11 +435,13 @@ class PolygonGTDataset(Dataset):
         """
         Creates an unencoded dataset.
         """
-        self.training_set: List[Tuple[Union[Image.Image, torch.Tensor], str]] = []
+        self.training_set: list[tuple[Union[Image.Image, torch.Tensor], str]] = []
         for im, gt in zip(self._images, self._gt):
             self.training_set.append((im, gt))
 
-    def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor]:
+    def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
+        if len(self.failed_samples) == len(self):
+            raise ValueError(f'All {len(self)} samples in dataset invalid.')
         item = self.training_set[index]
         try:
             logger.debug(f'Attempting to load {item[0]}')
@@ -512,7 +503,7 @@ class GroundTruthDataset(Dataset):
                  whitespace_normalization: bool = True,
                  skip_empty_lines: bool = True,
                  reorder: Union[bool, str] = True,
-                 im_transforms: Callable[[Any], torch.Tensor] = transforms.Compose([]),
+                 im_transforms: Callable[[Any], torch.Tensor] = v2.Identity(),
                  augmentation: bool = False) -> None:
         """
         Reads a list of image-text pairs and creates a ground truth set.
@@ -536,10 +527,10 @@ class GroundTruthDataset(Dataset):
                            tensor suitable for forward passes.
             augmentation: Enables augmentation.
         """
-        self._images = []  # type:  Union[List[Image], List[torch.Tensor]]
-        self._gt = []  # type:  List[str]
+        self._images = []  # type:  Union[list[Image], list[torch.Tensor]]
+        self._gt = []  # type:  list[str]
         self.alphabet = Counter()  # type: Counter
-        self.text_transforms = []  # type: List[Callable[[str], str]]
+        self.text_transforms = []  # type: list[Callable[[str], str]]
         self.transforms = im_transforms
         self.skip_empty_lines = skip_empty_lines
         self.aug = None
@@ -631,7 +622,7 @@ class GroundTruthDataset(Dataset):
             self.codec = codec
         else:
             self.codec = PytorchCodec(''.join(self.alphabet.keys()))
-        self.training_set: List[Tuple[Union[Image.Image, torch.Tensor], torch.Tensor]] = []
+        self.training_set: list[tuple[Union[Image.Image, torch.Tensor], torch.Tensor]] = []
         for im, gt in zip(self._images, self._gt):
             self.training_set.append((im, self.codec.encode(gt)))
 
@@ -639,11 +630,13 @@ class GroundTruthDataset(Dataset):
         """
         Creates an unencoded dataset.
         """
-        self.training_set: List[Tuple[Union[Image.Image, torch.Tensor], str]] = []
+        self.training_set: list[tuple[Union[Image.Image, torch.Tensor], str]] = []
         for im, gt in zip(self._images, self._gt):
             self.training_set.append((im, gt))
 
-    def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor]:
+    def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
+        if len(self.failed_samples) == len(self):
+            raise ValueError(f'All {len(self)} samples in dataset invalid.')
         item = self.training_set[index]
         try:
             logger.debug(f'Attempting to load {item[0]}')
@@ -668,7 +661,6 @@ class GroundTruthDataset(Dataset):
                 im = self.aug(image=im, index=index)
             return {'image': im, 'target': item[1]}
         except Exception:
-            raise
             self.failed_samples.add(index)
             idx = np.random.randint(0, len(self.training_set))
             logger.debug(traceback.format_exc())

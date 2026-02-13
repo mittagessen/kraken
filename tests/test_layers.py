@@ -3,13 +3,11 @@ import unittest
 
 import torch
 
-from kraken.lib import layers
-
+from kraken.lib.vgsl import layers
 
 class TestLayers(unittest.TestCase):
-
     """
-    Testing custom layer implementations.
+    Testing VGSL custom layer implementations.
     """
     def setUp(self):
         torch.set_grad_enabled(False)
@@ -126,25 +124,37 @@ class TestLayers(unittest.TestCase):
         o = conv(torch.randn(1, 5, 24, 12))
         self.assertEqual(o[0].shape, (1, 12, 24, 12))
 
-    def test_actconv2d_train_sigmoid(self):
+    def test_actconv2d_sigmoid_logits_train(self):
         """
-        Test convolutional layer with sigmoid activation.
+        Sigmoid output layers return logits in train mode.
         """
         conv = layers.ActConv2D(5, 12, (3, 3), (1, 1), 's')
-        o = conv(torch.randn(1, 5, 24, 12))
         conv.train()
+        o = conv(torch.randn(1, 5, 24, 12))
         self.assertFalse(0 <= o[0].min() <= 1)
         self.assertFalse(0 <= o[0].max() <= 1)
 
-    def test_actconv2d_eval_sigmoid(self):
+    def test_actconv2d_sigmoid_logits_eval(self):
         """
-        Test convolutional layer with sigmoid activation.
+        Sigmoid output layers return logits in eval mode.
         """
         conv = layers.ActConv2D(5, 12, (3, 3), (1, 1), 's')
         conv.eval()
         o = conv(torch.randn(1, 5, 24, 12))
-        self.assertTrue(0 <= o[0].min() <= 1)
-        self.assertTrue(0 <= o[0].max() <= 1)
+        self.assertFalse(0 <= o[0].min() <= 1)
+        self.assertFalse(0 <= o[0].max() <= 1)
+
+    def test_actconv2d_sigmoid_mode_invariant(self):
+        """
+        Sigmoid output layers are mode-invariant (no train/eval activation switch).
+        """
+        conv = layers.ActConv2D(5, 12, (3, 3), (1, 1), 's')
+        x = torch.randn(1, 5, 24, 12)
+        conv.train()
+        train_o = conv(x)[0]
+        conv.eval()
+        eval_o = conv(x)[0]
+        self.assertTrue(torch.allclose(train_o, eval_o))
 
     def test_actconv2d_tanh(self):
         """

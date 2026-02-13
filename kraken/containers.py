@@ -21,19 +21,20 @@ functional blocks.
 """
 from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass
-from typing import (TYPE_CHECKING, Any, Dict, List, Literal, Optional, Tuple,
-                    Union)
+from typing import (TYPE_CHECKING, Any, Literal, Optional, Union)
 
 import bidi.algorithm as bd
 import numpy as np
 
-from kraken.lib.segmentation import compute_polygon_section
+from kraken.lib.segmentation import compute_polygon_section, precompute_polygon_sections
 
 if TYPE_CHECKING:
+    import torch
     from os import PathLike
+    from PIL import Image
 
-
-__all__ = ['BaselineLine',
+__all__ = ['ocr_line',
+           'BaselineLine',
            'BBoxLine',
            'Segmentation',
            'Region',
@@ -52,27 +53,21 @@ class ProcessingStep:
         id: Unique identifier
         category: Category of processing step that has been performed.
         description: Natural-language description of the process.
-        settings: Dict describing the parameters of the processing step.
+        settings: dict describing the parameters of the processing step.
     """
     id: str
     category: Literal['preprocessing', 'processing', 'postprocessing']
     description: str
-    settings: Dict[str, Union[Dict, str, float, int, bool]]
+    settings: dict[str, Union[dict, str, float, int, bool]]
 
 
 @dataclass
-class BaselineLine:
+class ocr_line(ABC):
     """
-    Baseline-type line record.
-
-    A container class for a single line in baseline + bounding polygon format,
-    optionally containing a transcription, tags, or associated regions.
+    A line record.
 
     Attributes:
         id: Unique identifier
-        baseline: List of tuples `(x_n, y_n)` defining the baseline.
-        boundary: List of tuples `(x_n, y_n)` defining the bounding polygon of
-                  the line. The first and last points should be identical.
         text: Transcription of this line.
         base_dir: An optional string defining the base direction (also called
                   paragraph direction) for the BiDi algorithm. Valid values are
@@ -83,22 +78,38 @@ class BaselineLine:
         split: Defines whether this line is in the `train`, `validation`, or
                `test` set during training.
         regions: A list of identifiers of regions the line is associated with.
+        languages: A list of identifiers of regions the line is associated with.
     """
     id: str
-    baseline: List[Tuple[int, int]]
-    boundary: List[Tuple[int, int]]
     text: Optional[str] = None
     base_dir: Optional[Literal['L', 'R']] = None
-    type: str = 'baselines'
     imagename: Optional[Union[str, 'PathLike']] = None
-    tags: Optional[Dict[str, str]] = None
+    tags: Optional[dict[str, list[dict[str, str]]]] = None
     split: Optional[Literal['train', 'validation', 'test']] = None
-    regions: Optional[List[str]] = None
-    language: Optional[List[str]] = None
+    regions: Optional[list[str]] = None
+    language: Optional[list[str]] = None
 
 
 @dataclass
-class BBoxLine:
+class BaselineLine(ocr_line):
+    """
+    Baseline-type line record.
+
+    A container class for a single line in baseline + bounding polygon format,
+    optionally containing a transcription, tags, or associated regions.
+
+    Attributes:
+        baseline: list of tuples `(x_n, y_n)` defining the baseline.
+        boundary: list of tuples `(x_n, y_n)` defining the bounding polygon of
+                  the line. The first and last points should be identical.
+    """
+    type: str = 'baselines'
+    baseline: Optional[list[tuple[int, int]]] = None
+    boundary: Optional[list[tuple[int, int]]] = None
+
+
+@dataclass
+class BBoxLine(ocr_line):
     """
     Bounding box-type line record.
 
@@ -106,33 +117,14 @@ class BBoxLine:
     optionally containing a transcription, tags, or associated regions.
 
     Attributes:
-        id: Unique identifier
-        bbox: Tuple in form `(xmin, ymin, xmax, ymax)` defining
+        bbox: tuple in form `(xmin, ymin, xmax, ymax)` defining
               the bounding box.
-        text: Transcription of this line.
-        base_dir: An optional string defining the base direction (also called
-                  paragraph direction) for the BiDi algorithm. Valid values are
-                  'L' or 'R'. If None is given the default auto-resolution will
-                  be used.
-        imagename: Path to the image associated with the line..
-        tags: A dict mapping types to values.
-        split: Defines whether this line is in the `train`, `validation`, or
-               `test` set during training.
-        regions: A list of identifiers of regions the line is associated with.
         text_direction: Sets the principal orientation (of the line) and
                         reading direction (of the document).
     """
-    id: str
-    bbox: Tuple[int, int, int, int]
-    text: Optional[str] = None
-    base_dir: Optional[Literal['L', 'R']] = None
     type: str = 'bbox'
-    imagename: Optional[Union[str, 'PathLike']] = None
-    tags: Optional[Dict[str, str]] = None
-    split: Optional[Literal['train', 'validation', 'test']] = None
-    regions: Optional[List[str]] = None
+    bbox: Optional[tuple[int, int, int, int]] = None
     text_direction: Literal['horizontal-lr', 'horizontal-rl', 'vertical-lr', 'vertical-rl'] = 'horizontal-lr'
-    language: Optional[List[str]] = None
 
 
 @dataclass
@@ -142,16 +134,16 @@ class Region:
 
     Attributes:
         id: Unique identifier
-        boundary: List of tuples `(x_n, y_n)` defining the bounding polygon of
+        boundary: list of tuples `(x_n, y_n)` defining the bounding polygon of
                   the region. The first and last points should be identical.
         imagename: Path to the image associated with the region.
         tags: A dict mapping types to values.
     """
     id: str
-    boundary: List[Tuple[int, int]]
+    boundary: list[tuple[int, int]]
     imagename: Optional[Union[str, 'PathLike']] = None
-    tags: Optional[Dict[str, str]] = None
-    language: Optional[List[str]] = None
+    tags: Optional[dict[str, list[dict[str, str]]]] = None
+    language: Optional[list[str]] = None
 
 
 @dataclass
@@ -173,20 +165,20 @@ class Segmentation:
                         horizontal/vertical, and reading direction (of the
                         document), i.e. lr/rl.
         script_detection: Flag indicating if the line records have tags.
-        lines: List of line records. Records are expected to be in a valid
+        lines: list of line records. Records are expected to be in a valid
                reading order.
-        regions: Dict mapping types to lists of regions.
-        line_orders: List of alternative reading orders for the segmentation.
+        regions: dict mapping types to lists of regions.
+        line_orders: list of alternative reading orders for the segmentation.
                      Each reading order is a list of line indices.
     """
     type: Literal['baselines', 'bbox']
     imagename: Union[str, 'PathLike']
     text_direction: Literal['horizontal-lr', 'horizontal-rl', 'vertical-lr', 'vertical-rl']
     script_detection: bool
-    lines: Optional[List[Union[BaselineLine, BBoxLine]]] = None
-    regions: Optional[Dict[str, List[Region]]] = None
-    line_orders: Optional[List[List[int]]] = None
-    language: Optional[List[str]] = None
+    lines: Optional[list[Union[BaselineLine, BBoxLine]]] = None
+    regions: Optional[dict[str, list[Region]]] = None
+    line_orders: Optional[list[list[int]]] = None
+    language: Optional[list[str]] = None
 
     def __post_init__(self):
         if not self.regions:
@@ -218,16 +210,20 @@ class ocr_record(ABC):
 
     def __init__(self,
                  prediction: str,
-                 cuts: List[Union[Tuple[int, int], Tuple[Tuple[int, int],
-                                                         Tuple[int, int],
-                                                         Tuple[int, int],
-                                                         Tuple[int, int]]]],
-                 confidences: List[float],
-                 display_order: bool = True) -> None:
+                 cuts: list[Union[tuple[int, int], tuple[tuple[int, int],
+                                                         tuple[int, int],
+                                                         tuple[int, int],
+                                                         tuple[int, int]]]],
+                 confidences: list[float],
+                 display_order: bool = True,
+                 logits: Optional['torch.FloatTensor'] = None,
+                 image: Optional['Image.Image'] = None) -> None:
         self._prediction = prediction
         self._cuts = cuts
         self._confidences = confidences
         self._display_order = display_order
+        self.logits = logits
+        self.image = image
 
     @property
     @abstractmethod
@@ -245,11 +241,11 @@ class ocr_record(ABC):
         return self._prediction
 
     @property
-    def cuts(self) -> List:
+    def cuts(self) -> list:
         return self._cuts
 
     @property
-    def confidences(self) -> List[float]:
+    def confidences(self) -> list[float]:
         return self._confidences
 
     def __iter__(self):
@@ -257,12 +253,12 @@ class ocr_record(ABC):
         return self
 
     @abstractmethod
-    def __next__(self) -> Tuple[str,
-                                Union[List[Tuple[int, int]],
-                                      Tuple[Tuple[int, int],
-                                            Tuple[int, int],
-                                            Tuple[int, int],
-                                            Tuple[int, int]]],
+    def __next__(self) -> tuple[str,
+                                Union[list[tuple[int, int]],
+                                      tuple[tuple[int, int],
+                                            tuple[int, int],
+                                            tuple[int, int],
+                                            tuple[int, int]]],
                                 float]:
         pass
 
@@ -301,6 +297,8 @@ class BaselineOCRRecord(ocr_record, BaselineLine):
                        code point, in logical order (`False`) the n-th code
                        point corresponds to the n-th read code point. See [UAX
                        #9](https://unicode.org/reports/tr9) for more details.
+        logits: The logits for the prediction.
+        image: The line image used to produce the prediction.
 
     Notes:
         When slicing the record the behavior of the cuts is changed from
@@ -314,12 +312,15 @@ class BaselineOCRRecord(ocr_record, BaselineLine):
     """
     type = 'baselines'
 
-    def __init__(self, prediction: str,
-                 cuts: List[Tuple[int, int]],
-                 confidences: List[float],
-                 line: Union[BaselineLine, Dict[str, Any]],
+    def __init__(self,
+                 prediction: str,
+                 cuts: list[tuple[int, int]],
+                 confidences: list[float],
+                 line: Union[BaselineLine, dict[str, Any]],
                  base_dir: Optional[Literal['L', 'R']] = None,
-                 display_order: bool = True) -> None:
+                 display_order: bool = True,
+                 logits: Optional['torch.FloatTensor'] = None,
+                 image: Optional['Image.Image'] = None) -> None:
         if not isinstance(line, dict):
             line = asdict(line)
         if line['type'] != 'baselines':
@@ -327,19 +328,22 @@ class BaselineOCRRecord(ocr_record, BaselineLine):
         BaselineLine.__init__(self, **line)
         self._line_base_dir = self.base_dir
         self.base_dir = base_dir
-        ocr_record.__init__(self, prediction, cuts, confidences, display_order)
+        ocr_record.__init__(self, prediction, cuts, confidences, display_order, logits, image)
+        if self.baseline and self.boundary and self._cuts:
+            self._polygon_cuts, self._intersection_cache, self._bl_length = precompute_polygon_sections(
+                self.baseline, self.boundary, self._cuts)
+        else:
+            self._polygon_cuts, self._intersection_cache, self._bl_length = [], {}, 0.0
+
 
     def __repr__(self) -> str:
         return f'pred: {self.prediction} baseline: {self.baseline} boundary: {self.boundary} confidences: {self.confidences}'
 
-    def __next__(self) -> Tuple[str, int, float]:
+    def __next__(self) -> tuple[str, int, float]:
         if self.idx + 1 < len(self):
             self.idx += 1
             return (self.prediction[self.idx],
-                    compute_polygon_section(self.baseline,
-                                            self.boundary,
-                                            self.cuts[self.idx][0],
-                                            self.cuts[self.idx][1]),
+                    self._polygon_cuts[self.idx],
                     self.confidences[self.idx])
         else:
             raise StopIteration
@@ -355,26 +359,39 @@ class BaselineOCRRecord(ocr_record, BaselineLine):
 
     def __getitem__(self, key: Union[int, slice]):
         if isinstance(key, slice):
-            recs = [self._get_raw_item(i) for i in range(*key.indices(len(self)))]
+            indices = range(*key.indices(len(self)))
+            recs = [self._get_raw_item(i) for i in indices]
             prediction = ''.join([x[0] for x in recs])
             flat_offsets = sum((tuple(x[1]) for x in recs), ())
-            cut = compute_polygon_section(self.baseline,
-                                          self.boundary,
-                                          min(flat_offsets),
-                                          max(flat_offsets))
+            min_d = min(flat_offsets)
+            max_d = max(flat_offsets)
+            eps = np.finfo(float).eps
+            cd_min = min(self._bl_length - eps, eps if min_d == 0 else min_d)
+            cd_max = min(self._bl_length - eps, eps if max_d == 0 else max_d)
+            p1 = self._intersection_cache.get(cd_min)
+            p2 = self._intersection_cache.get(cd_max)
+            if p1 is not None and p2 is not None:
+                o = np.int_(p1).reshape(-1, 2).tolist()
+                o.extend(np.int_(np.roll(p2, 2)).reshape(-1, 2).tolist())
+                cut = tuple(o)
+            else:
+                cut = compute_polygon_section(self.baseline, self.boundary, min_d, max_d)
             confidence = np.mean([x[2] for x in recs])
             return (prediction, cut, confidence)
         elif isinstance(key, int):
-            pred, cut, confidence = self._get_raw_item(key)
-            return (pred,
-                    compute_polygon_section(self.baseline, self.boundary, cut[0], cut[1]),
-                    confidence)
+            if key < 0:
+                key += len(self)
+            if key >= len(self):
+                raise IndexError('Index (%d) is out of range' % key)
+            return (self.prediction[key],
+                    self._polygon_cuts[key],
+                    self.confidences[key])
         else:
             raise TypeError('Invalid argument type')
 
     @property
-    def cuts(self) -> List[Tuple[int, int]]:
-        return tuple([compute_polygon_section(self.baseline, self.boundary, cut[0], cut[1]) for cut in self._cuts])
+    def cuts(self) -> tuple:
+        return tuple(self._polygon_cuts)
 
     def logical_order(self, base_dir: Optional[Literal['L', 'R']] = None) -> 'BaselineOCRRecord':
         """
@@ -453,7 +470,9 @@ class BaselineOCRRecord(ocr_record, BaselineLine):
                                 confidences=confidences,
                                 line=line,
                                 base_dir=base_dir,
-                                display_order=not self._display_order)
+                                display_order=not self._display_order,
+                                logits=self.logits,
+                                image=self.image)
         return rec
 
 
@@ -479,6 +498,8 @@ class BBoxOCRRecord(ocr_record, BBoxLine):
                        code point, in logical order (`False`) the n-th code
                        point corresponds to the n-th read code point. See [UAX
                        #9](https://unicode.org/reports/tr9) for more details.
+        logits: The logits for the prediction.
+        image: The line image used to produce the prediction.
 
     Notes:
         When slicing the record the behavior of the cuts is changed from
@@ -494,14 +515,16 @@ class BBoxOCRRecord(ocr_record, BBoxLine):
 
     def __init__(self,
                  prediction: str,
-                 cuts: List[Tuple[Tuple[int, int],
-                                  Tuple[int, int],
-                                  Tuple[int, int],
-                                  Tuple[int, int]]],
-                 confidences: List[float],
-                 line: Union[BBoxLine, Dict[str, Any]],
+                 cuts: list[tuple[tuple[int, int],
+                                  tuple[int, int],
+                                  tuple[int, int],
+                                  tuple[int, int]]],
+                 confidences: list[float],
+                 line: Union[BBoxLine, dict[str, Any]],
                  base_dir: Optional[Literal['L', 'R']] = None,
-                 display_order: bool = True) -> None:
+                 display_order: bool = True,
+                 logits: Optional['torch.FloatTensor'] = None,
+                 image: Optional['Image.Image'] = None) -> None:
         if not isinstance(line, dict):
             line = asdict(line)
         if line['type'] != 'bbox':
@@ -509,12 +532,12 @@ class BBoxOCRRecord(ocr_record, BBoxLine):
         BBoxLine.__init__(self, **line)
         self._line_base_dir = self.base_dir
         self.base_dir = base_dir
-        ocr_record.__init__(self, prediction, cuts, confidences, display_order)
+        ocr_record.__init__(self, prediction, cuts, confidences, display_order, logits, image)
 
     def __repr__(self) -> str:
         return f'pred: {self.prediction} bbox: {self.bbox} confidences: {self.confidences}'
 
-    def __next__(self) -> Tuple[str, int, float]:
+    def __next__(self) -> tuple[str, int, float]:
         if self.idx + 1 < len(self):
             self.idx += 1
             return (self.prediction[self.idx],
@@ -623,5 +646,7 @@ class BBoxOCRRecord(ocr_record, BBoxLine):
                             confidences=confidences,
                             line=line,
                             base_dir=base_dir,
-                            display_order=not self._display_order)
+                            display_order=not self._display_order,
+                            logits=self.logits,
+                            image=self.image)
         return rec

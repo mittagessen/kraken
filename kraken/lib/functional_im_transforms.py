@@ -18,8 +18,8 @@ facilitate pickling.
 """
 import unicodedata
 from pathlib import Path
-from typing import (TYPE_CHECKING, Any, Callable, Literal, Optional, Tuple,
-                    Union)
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, Literal, Optional, Union
 
 import bidi.algorithm as bd
 import regex
@@ -51,7 +51,7 @@ def pil_dewarp(im: 'Image.Image', lnorm: CenterNormalizer) -> 'Image.Image':
     return dewarp(lnorm, im)
 
 
-def pil_fixed_resize(im: 'Image.Image', scale: Tuple[int, int]) -> 'Image.Image':
+def pil_fixed_resize(im: 'Image.Image', scale: tuple[int, int]) -> 'Image.Image':
     return _fixed_resize(im, scale, Resampling.LANCZOS)
 
 
@@ -59,18 +59,18 @@ def tensor_invert(im: torch.Tensor) -> torch.Tensor:
     return im.max() - im
 
 
-def tensor_permute(im: torch.Tensor, perm: Tuple[int, ...]) -> torch.Tensor:
+def tensor_permute(im: torch.Tensor, perm: tuple[int, ...]) -> torch.Tensor:
     return im.permute(*perm)
 
 
-def _fixed_resize(img: 'Image.Image', size: Tuple[int, int], interpolation: int = Resampling.LANCZOS):
+def _fixed_resize(img: 'Image.Image', size: tuple[int, int], interpolation: int = Resampling.LANCZOS):
     """
     Doesn't do the annoying runtime scale dimension switching the default
     pytorch transform does.
 
     Args:
         img: image to resize
-        size: Tuple (height, width)
+        size: tuple (height, width)
     """
     w, h = img.size
     oh, ow = size

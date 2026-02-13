@@ -18,17 +18,15 @@ kraken.ketos.ro
 
 Command line driver for reading order training, evaluation, and handling.
 """
-import logging
-import pathlib
-
 import click
+import logging
+
 from PIL import Image
 
-from kraken.ketos.util import (_expand_gt, _validate_manifests, message,
-                               to_ptl_device, _validate_merging)
+from pathlib import Path
+from kraken.ketos.util import _expand_gt, _validate_manifests, message, _create_class_map
 
-from kraken.lib.register import OPTIMIZERS, SCHEDULERS, STOPPERS
-from kraken.lib.default_specs import READING_ORDER_HYPER_PARAMS
+from kraken.registry import OPTIMIZERS, SCHEDULERS, STOPPERS
 
 logging.captureWarnings(True)
 logger = logging.getLogger('kraken')
@@ -39,279 +37,278 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
 
 @click.command('rotrain')
 @click.pass_context
-@click.option('-B', '--batch-size', show_default=True, type=click.INT,
-              default=READING_ORDER_HYPER_PARAMS['batch_size'], help='batch sample size')
-@click.option('-o', '--output', show_default=True, type=click.Path(), default='model', help='Output model file')
-@click.option('-i', '--load', show_default=True, type=click.Path(exists=True,
-              readable=True), help='Load existing file to continue training')
-@click.option('-F', '--freq', show_default=True, default=READING_ORDER_HYPER_PARAMS['freq'], type=click.FLOAT,
+@click.option('-B', '--batch-size', type=int, help='batch sample size')
+@click.option('--weights-format', default='safetensors', help='Output weights format.')
+@click.option('-o', '--output', 'checkpoint_path', type=click.Path(), help='Output model file')
+@click.option('-i', '--load', type=click.Path(exists=True, readable=True), help='Load existing checkpoint or weights file to train from.')
+@click.option('--resume', type=click.Path(exists=True, readable=True), help='Load a checkpoint to continue training')
+@click.option('-F',
+              '--freq',
+              type=float,
               help='Model saving and report generation frequency in epochs '
                    'during training. If frequency is >1 it must be an integer, '
                    'i.e. running validation every n-th epoch.')
 @click.option('-q',
               '--quit',
-              show_default=True,
-              default=READING_ORDER_HYPER_PARAMS['quit'],
               type=click.Choice(STOPPERS),
               help='Stop condition for training. Set to `early` for early stopping or `fixed` for fixed number of epochs')
 @click.option('-N',
               '--epochs',
-              show_default=True,
-              default=READING_ORDER_HYPER_PARAMS['epochs'],
+              type=int,
               help='Number of epochs to train for')
 @click.option('--min-epochs',
-              show_default=True,
-              default=READING_ORDER_HYPER_PARAMS['min_epochs'],
+              type=int,
               help='Minimal number of epochs to train for when using early stopping.')
 @click.option('--lag',
-              show_default=True,
-              default=READING_ORDER_HYPER_PARAMS['lag'],
+              type=int,
               help='Number of evaluations (--report frequency) to wait before stopping training without improvement')
 @click.option('--min-delta',
-              show_default=True,
-              default=READING_ORDER_HYPER_PARAMS['min_delta'],
-              type=click.FLOAT,
+              type=float,
               help='Minimum improvement between epochs to reset early stopping. By default it scales the delta by the best loss')
 @click.option('--optimizer',
-              show_default=True,
-              default=READING_ORDER_HYPER_PARAMS['optimizer'],
               type=click.Choice(OPTIMIZERS),
               help='Select optimizer')
-@click.option('-r', '--lrate', show_default=True, default=READING_ORDER_HYPER_PARAMS['lrate'], help='Learning rate')
-@click.option('-m', '--momentum', show_default=True, default=READING_ORDER_HYPER_PARAMS['momentum'], help='Momentum')
-@click.option('-w', '--weight-decay', show_default=True,
-              default=READING_ORDER_HYPER_PARAMS['weight_decay'], help='Weight decay')
-@click.option('--warmup', show_default=True, type=float,
-              default=READING_ORDER_HYPER_PARAMS['warmup'], help='Number of samples to ramp up to `lrate` initial learning rate.')
+@click.option('-r', '--lrate', type=float, help='Learning rate')
+@click.option('-m', '--momentum', type=float, help='Momentum')
+@click.option('-w', '--weight-decay', type=float, help='Weight decay')
+@click.option('--gradient-clip-val',
+              type=float,
+              help='Gradient clip value')
+@click.option('--accumulate-grad-batches',
+              type=int,
+              help='Number of batches to accumulate gradient across.')
+@click.option('--warmup', type=int, help='Number of samples to ramp up to `lrate` initial learning rate.')
 @click.option('--schedule',
-              show_default=True,
               type=click.Choice(SCHEDULERS),
-              default=READING_ORDER_HYPER_PARAMS['schedule'],
               help='Set learning rate scheduler. For 1cycle, cycle length is determined by the `--step-size` option.')
 @click.option('-g',
               '--gamma',
-              show_default=True,
-              default=READING_ORDER_HYPER_PARAMS['gamma'],
+              type=float,
               help='Decay factor for exponential, step, and reduceonplateau learning rate schedules')
 @click.option('-ss',
               '--step-size',
-              show_default=True,
-              default=READING_ORDER_HYPER_PARAMS['step_size'],
+              type=int,
               help='Number of validation runs between learning rate decay for exponential and step LR schedules')
 @click.option('--sched-patience',
-              show_default=True,
-              default=READING_ORDER_HYPER_PARAMS['rop_patience'],
+              'rop_patience',
+              type=int,
               help='Minimal number of validation runs between LR reduction for reduceonplateau LR schedule.')
 @click.option('--cos-max',
-              show_default=True,
-              default=READING_ORDER_HYPER_PARAMS['cos_t_max'],
+              'cos_t_max',
+              type=int,
               help='Epoch of minimal learning rate for cosine LR scheduler.')
 @click.option('--cos-min-lr',
-              show_default=True,
-              default=READING_ORDER_HYPER_PARAMS['cos_min_lr'],
+              type=float,
               help='Minimal final learning rate for cosine LR scheduler.')
-@click.option('-p', '--partition', show_default=True, default=0.9,
-              help='Ground truth data partition ratio between train/validation set')
-@click.option('-t', '--training-files', show_default=True, default=None, multiple=True,
+@click.option('-p', '--partition', type=float, help='Ground truth data partition ratio between train/validation set')
+@click.option('-t', '--training-data', 'training_data', multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with additional paths to training data')
-@click.option('-e', '--evaluation-files', show_default=True, default=None, multiple=True,
+@click.option('-e', '--evaluation-data', 'evaluation_data', multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
-@click.option('--load-hyper-parameters/--no-load-hyper-parameters', show_default=True, default=False,
-              help='When loading an existing model, retrieve hyper-parameters from the model')
-@click.option('-f', '--format-type', type=click.Choice(['xml', 'alto', 'page']), default='xml',
+@click.option('-f', '--format-type', type=click.Choice(['xml', 'alto', 'page']),
+>>>>>>> 59d8599 (proper typing in ketos CLI parameters)
               help='Sets the training data format. In ALTO and PageXML mode all '
               'data is extracted from xml files containing both baselines and a '
               'link to source images.')
-@click.option('-ve', '--valid-entities', show_default=True, default=None, multiple=True,
-              help='Valid entities types in training data. May be used multiple times.')
-@click.option('-me',
-              '--merge-entities',
-              show_default=True,
-              default=None,
-              help='Baseline/region merge mapping. One or more mappings of the form `$target:$src` where $src is merged into $target.',
-              multiple=True,
-              callback=_validate_merging)
-@click.option('--merge-all-entities/--no-merge-all-entities',
-              show_default=True,
-              default=False,
-              help='Merges all baselines/regions into a single class after filtering with `--valid-entities`')
-@click.option('--logger', 'pl_logger', show_default=True, type=click.Choice(['tensorboard']), default=None,
+@click.option('--logger', 'pl_logger', type=click.Choice(['tensorboard']),
               help='Logger used by PyTorch Lightning to track metrics such as loss and accuracy.')
-@click.option('--log-dir', show_default=True, type=click.Path(exists=True, dir_okay=True, writable=True),
+@click.option('--log-dir', type=click.Path(exists=True, dir_okay=True, writable=True),
               help='Path to directory where the logger will store the logs. If not set, a directory will be created in the current working directory.')
-@click.option('--level', show_default=True, type=click.Choice(['baselines', 'regions']), default='baselines',
+@click.option('--level', type=click.Choice(['baselines', 'regions']),
               help='Selects level to train reading order model on.')
-@click.option('--reading-order', show_default=True, default=None,
-              help='Select reading order to train. Defaults to `line_implicit`/`region_implicit`')
+@click.option('--reading-order', help='Select reading order to train. Defaults to `line_implicit`/`region_implicit`')
+@click.option('--class-mapping', type=click.UNPROCESSED, hidden=True)
+@click.option('--class-mapping-from-ckpt',
+              type=click.Path(exists=True, readable=True),
+              help='Extract class mapping from a segmentation checkpoint (.ckpt). '
+                   'Uses --level to select baseline or region mapping.')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
-def rotrain(ctx, batch_size, output, load, freq, quit, epochs, min_epochs, lag,
-            min_delta, optimizer, lrate, momentum, weight_decay, warmup,
-            schedule, gamma, step_size, sched_patience, cos_max, cos_min_lr,
-            partition, training_files, evaluation_files, load_hyper_parameters,
-            format_type, valid_entities, merge_entities, merge_all_entities,
-            pl_logger, log_dir, level, reading_order, ground_truth):
+def rotrain(ctx, **kwargs):
     """
     Trains a baseline labeling model for layout analysis
     """
-    import shutil
+    params = ctx.params
+    resume = params.pop('resume', None)
+    load = params.pop('load', None)
+    training_data = params.pop('training_data', [])
+    ground_truth = list(params.pop('ground_truth', []))
 
-    from threadpoolctl import threadpool_limits
+    class_mapping_from_ckpt = params.pop('class_mapping_from_ckpt', None)
 
-    from kraken.lib.ro import ROModel, RODataModule
-    from kraken.lib.train import KrakenTrainer
+    # parse class_mapping from YAML list-of-tuples
+    if isinstance(params.get('class_mapping'), list):
+        params['class_mapping'] = _create_class_map(params['class_mapping'])
+    elif params.get('class_mapping') is None:
+        params.pop('class_mapping', None)
 
-    if not (0 <= freq <= 1) and freq % 1.0 != 0:
-        raise click.BadOptionUsage('freq', 'freq needs to be either in the interval [0,1.0] or a positive integer.')
+    if class_mapping_from_ckpt:
+        if 'class_mapping' in params:
+            raise click.UsageError('--class-mapping and --class-mapping-from-ckpt are mutually exclusive.')
+        from kraken.models.convert import load_from_checkpoint
+        try:
+            module = load_from_checkpoint(class_mapping_from_ckpt)
+            data_config = module.hparams['data_config']
+            if params.get('level', 'baselines') == 'baselines':
+                cm = data_config.line_class_mapping
+            else:
+                cm = data_config.region_class_mapping
+            params['class_mapping'] = dict(cm)
+        except Exception as e:
+            raise click.UsageError(
+                f'Failed to extract class mapping from {class_mapping_from_ckpt}: {e}. '
+                'This usually happens when the checkpoint\'s serialized config references '
+                'training data paths that have moved or been deleted.'
+            )
 
-    if pl_logger == 'tensorboard':
+    if sum(map(bool, [resume, load])) > 1:
+        raise click.BadOptionsUsage('load', 'load/resume options are mutually exclusive.')
+
+    if params.get('pl_logger') == 'tensorboard':
         try:
             import tensorboard  # NOQA
         except ImportError:
             raise click.BadOptionUsage('logger', 'tensorboard logger needs the `tensorboard` package installed.')
 
-    if log_dir is None:
-        log_dir = pathlib.Path.cwd()
+    from threadpoolctl import threadpool_limits
 
-    logger.info('Building ground truth set from {} document images'.format(len(ground_truth) + len(training_files)))
+    from lightning.pytorch.callbacks import ModelCheckpoint
 
-    # populate hyperparameters from command line args
-    hyper_params = READING_ORDER_HYPER_PARAMS.copy()
-    hyper_params.update({'batch_size': batch_size,
-                         'freq': freq,
-                         'quit': quit,
-                         'epochs': epochs,
-                         'min_epochs': min_epochs,
-                         'lag': lag,
-                         'min_delta': min_delta,
-                         'optimizer': optimizer,
-                         'lrate': lrate,
-                         'momentum': momentum,
-                         'weight_decay': weight_decay,
-                         'warmup': warmup,
-                         'schedule': schedule,
-                         'gamma': gamma,
-                         'step_size': step_size,
-                         'rop_patience': sched_patience,
-                         'cos_t_max': cos_max,
-                         'cos_min_lr': cos_min_lr,
-                         'pl_logger': pl_logger,
-                         }
-                        )
+    from kraken.lib import vgsl  # NOQA
+    from kraken.lib.ro import ROModel, RODataModule
+    from kraken.train import KrakenTrainer
+    from kraken.train.utils import KrakenOnExceptionCheckpoint
+    from kraken.configs import ROTrainingConfig, ROTrainingDataConfig
+    from kraken.models.convert import convert_models
 
     # disable automatic partition when given evaluation set explicitly
-    if evaluation_files:
-        partition = 1
-    ground_truth = list(ground_truth)
+    if params['evaluation_data']:
+        params['partition'] = 1
 
-    # merge training_files into ground_truth list
-    if training_files:
-        ground_truth.extend(training_files)
+    # merge training_data into ground_truth list
+    if training_data:
+        ground_truth.extend(training_data)
+
+    params['training_data'] = ground_truth
 
     if len(ground_truth) == 0:
         raise click.UsageError('No training data was provided to the train command. Use `-t` or the `ground_truth` argument.')
 
-    try:
-        accelerator, device = to_ptl_device(ctx.meta['device'])
-    except Exception as e:
-        raise click.BadOptionUsage('device', str(e))
-
-    if hyper_params['freq'] > 1:
-        val_check_interval = {'check_val_every_n_epoch': int(hyper_params['freq'])}
+    if params['freq'] > 1:
+        val_check_interval = {'check_val_every_n_epoch': int(params['freq'])}
     else:
-        val_check_interval = {'val_check_interval': hyper_params['freq']}
+        val_check_interval = {'val_check_interval': params['freq']}
 
-    class_mapping = None
+    cbs = [KrakenOnExceptionCheckpoint(dirpath=params.get('checkpoint_path'),
+                                       filename='checkpoint_abort')]
+    checkpoint_callback = ModelCheckpoint(dirpath=params.pop('checkpoint_path'),
+                                          save_top_k=10,
+                                          monitor='val_metric',
+                                          mode='max',
+                                          auto_insert_metric_name=False,
+                                          filename='checkpoint_{epoch:02d}-{val_metric:.4f}')
+    cbs.append(checkpoint_callback)
 
-    if load:
-        model = ROModel.load_from_checkpoint(load)
-        class_mapping = model.hparams.class_mapping
+    dm_config = ROTrainingDataConfig(**params, **ctx.meta)
+    m_config = ROTrainingConfig(**params)
 
-    dm = RODataModule(batch_size=hyper_params.pop('batch_size'),
-                      training_data=ground_truth,
-                      evaluation_data=evaluation_files,
-                      partition=partition,
-                      num_workers=ctx.meta['workers'],
-                      format_type=format_type,
-                      class_mapping=class_mapping,
-                      valid_entities=valid_entities,
-                      merge_entities=merge_entities,
-                      merge_all_entities=merge_all_entities,
-                      reading_order=reading_order)
+    if resume:
+        data_module = RODataModule.load_from_checkpoint(resume, weights_only=False)
+    else:
+        data_module = RODataModule(dm_config)
 
-    dm.setup('fit')
-
-    if not load:
-        model = ROModel(feature_dim=dm.get_feature_dim(),
-                        class_mapping=dm.get_class_mapping(),
-                        hyper_params=hyper_params,
-                        output=output)
-
-    message(f'Training RO on following {level} types:')
-    for k, v in dm.get_class_mapping().items():
-        message(f'  {k}\t{v}')
-
-    if len(dm.train_set) == 0:
-        raise click.UsageError('No valid training data was provided to the train command. Use `-t` or the `ground_truth` argument.')
-
-    trainer = KrakenTrainer(accelerator=accelerator,
-                            devices=device,
-                            max_epochs=hyper_params['epochs'] if hyper_params['quit'] == 'fixed' else -1,
-                            min_epochs=hyper_params['min_epochs'],
+    trainer = KrakenTrainer(accelerator=ctx.meta['accelerator'],
+                            devices=ctx.meta['device'],
+                            precision=ctx.meta['precision'],
+                            max_epochs=params['epochs'] if params['quit'] == 'fixed' else -1,
+                            min_epochs=params['min_epochs'],
                             enable_progress_bar=True if not ctx.meta['verbose'] else False,
                             deterministic=ctx.meta['deterministic'],
-                            precision=ctx.meta['precision'],
-                            pl_logger=pl_logger,
-                            log_dir=log_dir,
+                            enable_model_summary=False,
+                            accumulate_grad_batches=params['accumulate_grad_batches'],
+                            callbacks=cbs,
+                            gradient_clip_val=params['gradient_clip_val'],
+                            num_sanity_val_steps=0,
                             **val_check_interval)
 
-    with threadpool_limits(limits=ctx.meta['threads']):
-        trainer.fit(model, dm)
 
-    if model.best_epoch == -1:
-        logger.warning('Model did not improve during training.')
-        ctx.exit(1)
+    with trainer.init_module(empty_init=False if (load or resume) else True):
+        if load:
+            message(f'Loading from checkpoint {load}.')
+            if load.endswith('ckpt'):
+                model = ROModel.load_from_checkpoint(load, config=m_config, weights_only=False)
+            else:
+                model = ROModel.load_from_weights(load, m_config)
+        elif resume:
+            message(f'Resuming from checkpoint {resume}.')
+            model = ROModel.load_from_checkpoint(resume, weights_only=False)
+        else:
+            message('Initializing new model.')
+            model = ROModel(m_config)
 
-    if not model.current_epoch:
-        logger.warning('Training aborted before end of first epoch.')
-        ctx.exit(1)
+    with threadpool_limits(limits=ctx.meta['num_threads']):
+        if resume:
+            trainer.fit(model, data_module, ckpt_path=resume)
+        else:
+            trainer.fit(model, data_module)
 
-    if quit == 'early':
-        message(f'Moving best model {model.best_model} ({model.best_metric}) to {output}_best.mlmodel')
-        logger.info(f'Moving best model {model.best_model} ({model.best_metric}) to {output}_best.mlmodel')
-        shutil.copy(f'{model.best_model}', f'{output}_best.mlmodel')
+    score = checkpoint_callback.best_model_score.item()
+    weight_path = Path(checkpoint_callback.best_model_path).with_name(f'best_{score:.4f}.{params.get("weights_format")}')
+    opath = convert_models([checkpoint_callback.best_model_path], weight_path, weights_format=params['weights_format'])
+    message(f'Converting best model {checkpoint_callback.best_model_path} (score: {score:.4f}) to weights {opath}')
 
 
 @click.command('roadd')
 @click.pass_context
-@click.option('-o', '--output', show_default=True, type=click.Path(), default='combined_seg.mlmodel', help='Combined output model file')
-@click.option('-r', '--ro-model', show_default=True, type=click.Path(exists=True, readable=True), help='Reading order model to load into segmentation model')
-@click.option('-i', '--seg-model', show_default=True, type=click.Path(exists=True, readable=True), help='Segmentation model to load')
+@click.option('-o', '--output', type=click.Path(), default='combined_seg.mlmodel', help='Combined output model file')
+@click.option('-r', '--ro-model', type=click.Path(exists=True, readable=True), help='Reading order model to load into segmentation model')
+@click.option('-i', '--seg-model', type=click.Path(exists=True, readable=True), help='Segmentation model to load')
 def roadd(ctx, output, ro_model, seg_model):
     """
     Combines a reading order model with a segmentation model.
     """
     from kraken.lib import vgsl
     from kraken.lib.ro import ROModel
+    from kraken.models import load_models
 
     message(f'Adding {ro_model} reading order model to {seg_model}.')
-    ro_net = ROModel.load_from_checkpoint(ro_model)
-    message('Line classes known to RO model:')
-    for k, v in ro_net.hparams.class_mapping.items():
+
+    # Load ROMLP — try as weights file first, fall back to checkpoint
+    try:
+        models = load_models(ro_model, tasks=['reading_order'])
+        if len(models) != 1:
+            raise ValueError(f'Found {len(models)} reading order models in {ro_model}.')
+        ro_mlp = models[0]
+    except ValueError:
+        ro_module = ROModel.load_from_checkpoint(ro_model)
+        ro_mlp = ro_module.net
+
+    ro_class_mapping = ro_mlp.user_metadata.get('class_mapping', {})
+    level = ro_mlp.user_metadata.get('level', 'baselines')
+
+    message(f'RO model level: {level}')
+    message('Classes known to RO model:')
+    for k, v in ro_class_mapping.items():
         message(f'  {k}\t{v}')
+
     seg_net = vgsl.TorchVGSLModel.load_model(seg_model)
-    if seg_net.model_type != 'segmentation':
+    if 'segmentation' not in seg_net.model_type:
         raise click.UsageError(f'Model {seg_model} is invalid {seg_net.model_type} model (expected `segmentation`).')
-    message('Line classes known to segmentation model:')
-    for k, v in seg_net.user_metadata['class_mapping']['baselines'].items():
+
+    seg_section = 'baselines' if level == 'baselines' else 'regions'
+    aux_key = 'ro_model' if level == 'baselines' else 'ro_model_regions'
+
+    message(f'{seg_section.capitalize()} classes known to segmentation model:')
+    for k, v in seg_net.user_metadata['class_mapping'][seg_section].items():
         message(f'  {k}\t{v}')
-    diff = set(ro_net.hparams.class_mapping.keys()).symmetric_difference(set(seg_net.user_metadata['class_mapping']['baselines'].keys()))
+    diff = set(ro_class_mapping.keys()).symmetric_difference(set(seg_net.user_metadata['class_mapping'][seg_section].keys()))
     diff.discard('default')
     if len(diff):
         raise click.UsageError(f'Model {seg_model} and {ro_model} class mappings mismatch.')
 
-    seg_net.aux_layers = {'ro_model': ro_net.ro_net}
-    seg_net.user_metadata['ro_class_mapping'] = ro_net.hparams.class_mapping
+    if not hasattr(seg_net, 'aux_layers') or seg_net.aux_layers is None:
+        seg_net.aux_layers = {}
+    seg_net.aux_layers[aux_key] = ro_mlp
     message(f'Saving combined model to {output}')
     seg_net.save_model(output)

@@ -35,16 +35,10 @@ from .util import _validate_manifests
 @click.option('-F', '--files', show_default=True, default=None, multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with additional paths to training data.')
-@click.option('--random-split', type=float, nargs=3, default=None, show_default=True,
-              help='Creates a fixed random split of the input data with the '
-              'proportions (train, validation, test). Overrides the save split option.')
 @click.option('--force-type', type=click.Choice(['bbox', 'baseline']), default=None, show_default=True,
               help='Forces the dataset type to a specific value. Can be used to '
                    '"convert" a line strip-type collection to a baseline-style '
                    'dataset, e.g. to disable centerline normalization.')
-@click.option('--save-splits/--ignore-splits', show_default=True, default=True,
-              help='Whether to serialize explicit splits contained in XML '
-                   'files. Is ignored in `path` mode.')
 @click.option('--skip-empty-lines/--keep-empty-lines', show_default=True, default=True,
               help='Whether to keep or skip empty text lines. Text-less '
                    'datasets are useful for unsupervised pretraining but '
@@ -57,9 +51,8 @@ from .util import _validate_manifests
 @click.option('--legacy-polygons', show_default=True, default=False, is_flag=True,
               help='Use the old polygon extractor.')
 @click.argument('ground_truth', nargs=-1, type=click.Path(exists=True, dir_okay=False))
-def compile(ctx, output, format_type, files, random_split, force_type,
-            save_splits, skip_empty_lines, recordbatch_size, ground_truth,
-            legacy_polygons):
+def compile(ctx, output, format_type, files, force_type, skip_empty_lines,
+            recordbatch_size, ground_truth, legacy_polygons):
     """
     Precompiles a binary dataset from a collection of XML files.
     """
@@ -89,16 +82,14 @@ def compile(ctx, output, format_type, files, random_split, force_type,
                 progress.start_task(extract_task)
             progress.update(extract_task, total=total, advance=advance)
 
-        arrow_dataset.build_binary_dataset(ground_truth,
-                                           output,
-                                           format_type,
-                                           ctx.meta['workers'],
-                                           save_splits,
-                                           random_split,
-                                           force_type,
-                                           recordbatch_size,
-                                           skip_empty_lines,
-                                           _update_bar,
+        arrow_dataset.build_binary_dataset(files=ground_truth,
+                                           output_file=output,
+                                           format_type=format_type,
+                                           num_workers=ctx.meta['num_workers'],
+                                           force_type=force_type,
+                                           recordbatch_size=recordbatch_size,
+                                           skip_empty_lines=skip_empty_lines,
+                                           callback=_update_bar,
                                            legacy_polygons=legacy_polygons)
 
     message(f'Output file written to {output}')

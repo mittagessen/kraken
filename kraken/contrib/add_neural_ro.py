@@ -28,17 +28,18 @@ def cli(format_type, model, files):
     from kraken.lib import segmentation, vgsl, xml
 
     from lxml import etree
-    from dataclasses import asdict
 
     try:
         net = vgsl.TorchVGSLModel.load_model(model)
-        ro_class_mapping = net.user_metadata['ro_class_mapping']
-        ro_model = net.aux_layers['ro_model']
+        ro_model = net.aux_layers.get('ro_model')
+        if ro_model is None:
+            raise ValueError('No baseline reading order model found in segmentation model.')
+        ro_class_mapping = ro_model.user_metadata.get('class_mapping', net.user_metadata.get('ro_class_mapping', {}))
     except Exception:
         from kraken.lib.ro import ROModel
         net = ROModel.load_from_checkpoint(model)
-        ro_class_mapping = net.hparams.class_mapping
-        ro_model = net.ro_net
+        ro_model = net.net
+        ro_class_mapping = ro_model.user_metadata.get('class_mapping', net.hparams.class_mapping)
 
     for doc in files:
         click.echo(f'Processing {doc} ', nl=False)
@@ -47,14 +48,14 @@ def cli(format_type, model, files):
             click.echo('Not an ALTO file. Skipping.')
             continue
         seg = doc.to_container()
-        lines = list(map(asdict, seg.lines))
-        _order = segmentation.neural_reading_order(lines=lines,
-                                                   regions=seg.regions,
+        all_regions = [reg for rgs in seg.regions.values() for reg in rgs] if seg.regions else None
+        _order = segmentation.neural_reading_order(lines=seg.lines,
+                                                   regions=all_regions,
                                                    model=ro_model,
-                                                   im_size=doc.image_size[::-1],
+                                                   im_size=doc.image_size,
                                                    class_mapping=ro_class_mapping)
         # reorder
-        lines = [lines[idx] for idx in _order]
+        lines = [seg.lines[idx] for idx in _order]
         # add ReadingOrder block to ALTO
         tree = etree.parse(doc.filename)
         alto = tree.getroot()
@@ -67,7 +68,7 @@ def cli(format_type, model, files):
         for line in lines:
             el = etree.SubElement(og, 'ElementRef')
             el.set('ID', f'_{uuid.uuid4()}')
-            el.set('REF', f'{line["id"]}')
+            el.set('REF', f'{line.id}')
         tree.find('.//{*}Layout').addprevious(ro)
         with open(doc.filename.with_suffix('.ro.xml'), 'wb') as fo:
             fo.write(etree.tostring(tree, encoding='UTF-8', xml_declaration=True, pretty_print=True))

@@ -6,7 +6,7 @@ Wrapper around TorchVGSLModel including a variety of forward pass helpers for
 sequence classification.
 """
 from os.path import abspath, expanduser, expandvars
-from typing import TYPE_CHECKING, List, Optional, Union
+from typing import TYPE_CHECKING, Optional, Union
 
 import torch
 import numpy as np
@@ -76,7 +76,7 @@ class TorchSeqRecognizer(object):
         self.temperature = temperature
         self.train = train
         self.device = device
-        if nn.model_type not in [None, 'recognition']:
+        if nn.model_type and 'recognition' not in nn.model_type:
             raise ValueError(f'Models of type {nn.model_type} are not supported by TorchSeqRecognizer')
         self.one_channel_mode = nn.one_channel_mode
         self.seg_type = nn.seg_type
@@ -109,16 +109,16 @@ class TorchSeqRecognizer(object):
         """
         if self.device:
             line = line.to(self.device)
-        o, olens = self.nn.nn(line, lens)
-        if o.size(2) != 1:
-            raise KrakenInputException('Expected dimension 3 to be 1, actual {}'.format(o.size()))
-        o = (o/self.temperature).softmax(1)
-        self.outputs = o.detach().squeeze(2).float().cpu().numpy()
+        logits, olens = self.nn.nn(line, lens)
+        if logits.size(2) != 1:
+            raise KrakenInputException('Expected dimension 3 to be 1, actual {}'.format(logits.size()))
+        probs = (logits/self.temperature).softmax(1)
+        self.outputs = probs.detach().squeeze(2).float().cpu().numpy()
         if olens is not None:
             olens = olens.cpu().numpy()
         return self.outputs, olens
 
-    def predict(self, line: torch.Tensor, lens: Optional[torch.Tensor] = None) -> List[List[tuple[str, int, int, float]]]:
+    def predict(self, line: torch.Tensor, lens: Optional[torch.Tensor] = None) -> list[list[tuple[str, int, int, float]]]:
         """
         Performs a forward pass on a torch tensor of a line with shape (N, C, H, W)
         and returns the decoding as a list of tuples (string, start, end,
@@ -129,20 +129,13 @@ class TorchSeqRecognizer(object):
             lens: Optional tensor containing sequence lengths if N > 1
 
         Returns:
-            List of decoded sequences.
+            list of decoded sequences.
         """
         o, olens = self.forward(line, lens)
-        dec_seqs = []
-        if olens is not None:
-            for seq, seq_len in zip(o, olens):
-                locs = self.decoder(seq[:, :seq_len])
-                dec_seqs.append(self.codec.decode(locs))
-        else:
-            locs = self.decoder(o[0])
-            dec_seqs.append(self.codec.decode(locs))
+        dec_seqs = [self.codec.decode(locs) for locs in self.decoder(o, olens)]
         return dec_seqs
 
-    def predict_string(self, line: torch.Tensor, lens: Optional[torch.Tensor] = None) -> List[str]:
+    def predict_string(self, line: torch.Tensor, lens: Optional[torch.Tensor] = None) -> list[str]:
         """
         Performs a forward pass on a torch tensor of a line with shape (N, C, H, W)
         and returns a string of the results.
@@ -152,30 +145,17 @@ class TorchSeqRecognizer(object):
             lens: Optional tensor containing the sequence lengths of the input batch.
         """
         o, olens = self.forward(line, lens)
-        dec_strs = []
-        if olens is not None:
-            for seq, seq_len in zip(o, olens):
-                locs = self.decoder(seq[:, :seq_len])
-                dec_strs.append(''.join(x[0] for x in self.codec.decode(locs)))
-        else:
-            locs = self.decoder(o[0])
-            dec_strs.append(''.join(x[0] for x in self.codec.decode(locs)))
+        dec_strs = [''.join(x[0] for x in self.codec.decode(locs)) for locs in self.decoder(o, olens)]
         return dec_strs
 
-    def predict_labels(self, line: torch.tensor, lens: torch.Tensor = None) -> List[List[tuple[int, int, int, float]]]:
+    def predict_labels(self, line: torch.tensor, lens: torch.Tensor = None) -> list[list[tuple[int, int, int, float]]]:
         """
         Performs a forward pass on a torch tensor of a line with shape (N, C, H, W)
         and returns a list of tuples (class, start, end, max). Max is the
         maximum value of the softmax layer in the region.
         """
         o, olens = self.forward(line, lens)
-        oseqs = []
-        if olens is not None:
-            for seq, seq_len in zip(o, olens):
-                oseqs.append(self.decoder(seq[:, :seq_len]))
-        else:
-            oseqs.append(self.decoder(o[0]))
-        return oseqs
+        return self.decoder(o, olens)
 
 
 def load_any(fname: Union['PathLike', str],

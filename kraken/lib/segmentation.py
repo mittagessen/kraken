@@ -17,8 +17,8 @@ Processing for baseline segmenter output
 """
 import logging
 from collections import defaultdict
-from typing import (TYPE_CHECKING, Dict, Literal, Optional, Sequence, Union,
-                    TypeVar, Any, Generator)
+from collections.abc import Sequence, Generator
+from typing import TYPE_CHECKING, Literal, Optional, Union, TypeVar, Any
 
 import numpy as np
 import shapely.geometry as geom
@@ -29,7 +29,6 @@ from PIL.Image import Resampling, Transform
 from scipy.ndimage import (binary_erosion, distance_transform_cdt,
                            gaussian_filter, maximum_filter, affine_transform)
 from scipy.signal import convolve2d
-from scipy.spatial.distance import pdist, squareform
 from shapely.ops import nearest_points, unary_union
 from shapely.validation import explain_validity
 from skimage import draw, filters
@@ -40,11 +39,9 @@ from skimage.measure import (approximate_polygon, label, regionprops,
 from skimage.morphology import skeletonize
 from skimage.transform import (AffineTransform, PiecewiseAffineTransform, warp)
 
-from kraken.lib import default_specs
-from kraken.lib.exceptions import KrakenInputException
 
 if TYPE_CHECKING:
-    from kraken.containers import Segmentation, BBoxLine, BaselineLine
+    from kraken.containers import Segmentation, BBoxLine, BaselineLine, Region
     from kraken.lib.vgsl import TorchVGSLModel
 
 
@@ -60,6 +57,7 @@ __all__ = ['reading_order',
            'scale_polygonal_lines',
            'scale_regions',
            'compute_polygon_section',
+           'precompute_polygon_sections',
            'extract_polygons']
 
 
@@ -84,7 +82,7 @@ class FastPiecewiseAffineTransform(PiecewiseAffineTransform):
         return result
 
 
-def reading_order(lines: Sequence[tuple[slice, slice]], text_direction: Literal['lr', 'rl'] = 'lr') -> np.ndarray:
+def _reading_order(lines: Sequence[tuple[slice, slice]], text_direction: Literal['lr', 'rl'] = 'lr') -> np.ndarray:
     """Given the list of lines (a list of 2D slices), computes
     the partial reading order.  The output is a binary 2D array
     such that order[i,j] is true if line i comes before line j
@@ -130,6 +128,27 @@ def reading_order(lines: Sequence[tuple[slice, slice]], text_direction: Literal[
                     if horizontal_order(u, v):
                         order[i, j] = 1
     return order
+
+
+def reading_order(lines: Sequence['BBoxLine'],
+                  text_direction: Literal['lr', 'rl'] = 'lr',
+                  regions: Optional[Sequence['Region']] = None) -> Sequence[int]:
+    """Given a list of BBoxLine objects, computes the reading order.
+
+    Args:
+        lines: list of BBoxLine objects.
+        text_direction: Set principal text direction for column ordering. Can
+                        be 'lr' or 'rl'.
+        regions: Accepted for signature compatibility but unused (bbox
+                 pipeline has no region-aware ordering).
+
+    Returns:
+        A list of indices defining the reading order.
+    """
+    slices = [(slice(line.bbox[1], line.bbox[3]),
+               slice(line.bbox[0], line.bbox[2])) for line in lines]
+    order = _reading_order(slices, text_direction)
+    return topsort(order)
 
 
 def topsort(order: np.ndarray) -> list[int]:
@@ -750,7 +769,7 @@ def calculate_polygonal_environment(im: Image.Image = None,
         try:
             end_points = (line[0], line[-1])
             line = geom.LineString(line)
-            offset = default_specs.SEGMENTATION_HYPER_PARAMS['line_width'] if topline is not None else 0
+            offset = 4 if topline is not None else 0
             offset_line = line.parallel_offset(offset, side='left' if topline else 'right')
             line = np.array(line.coords, dtype=float)
             offset_line = np.array(offset_line.coords, dtype=float)
@@ -782,34 +801,35 @@ def calculate_polygonal_environment(im: Image.Image = None,
     return polygons
 
 
-def polygonal_reading_order(lines: Sequence[Dict],
+def polygonal_reading_order(lines: list['BaselineLine'],
                             text_direction: Literal['lr', 'rl'] = 'lr',
-                            regions: Optional[Sequence[geom.Polygon]] = None) -> Sequence[int]:
+                            regions: Optional[Sequence['Region']] = None) -> Sequence[int]:
     """
     Given a list of baselines and regions, calculates the correct reading order
     and applies it to the input.
 
     Args:
-        lines: list of tuples containing the baseline and its polygonization.
-        regions: list of region polygons.
+        lines: list of BaselineLine objects.
+        regions: list of Region objects.
         text_direction: Set principal text direction for column ordering. Can
                         be 'lr' or 'rl'
 
     Returns:
         The indices of the ordered input.
     """
-    lines = [(line['tags']['type'], line['baseline'], line['boundary']) for line in lines]
+    baselines = [line.baseline for line in lines]
 
     bounds = []
     if regions is None:
         regions = []
+    reg_polygons = [geom.Polygon(reg.boundary) for reg in regions]
     region_lines = [[] for _ in range(len(regions))]
     indizes = {}
-    for line_idx, line in enumerate(lines):
-        s_line = geom.LineString(line[1])
+    for line_idx, line in enumerate(baselines):
+        s_line = geom.LineString(line)
         in_region = False
-        for idx, reg in enumerate(regions):
-            if is_in_region(s_line, reg):
+        for idx, reg_polygon in enumerate(reg_polygons):
+            if is_in_region(s_line, reg_polygon):
                 region_lines[idx].append((line_idx, (slice(s_line.bounds[1], s_line.bounds[3]),
                                                      slice(s_line.bounds[0], s_line.bounds[2]))))
                 in_region = True
@@ -820,16 +840,16 @@ def polygonal_reading_order(lines: Sequence[Dict],
             indizes[line_idx] = ('line', line)
     # order everything in regions
     intra_region_order = [[] for _ in range(len(regions))]
-    for idx, reg in enumerate(regions):
+    for idx, reg_polygon in enumerate(reg_polygons):
         if len(region_lines[idx]) > 0:
-            order = reading_order([x[1] for x in region_lines[idx]], text_direction)
+            order = _reading_order([x[1] for x in region_lines[idx]], text_direction)
             lsort = topsort(order)
             intra_region_order[idx] = [region_lines[idx][i][0] for i in lsort]
-            reg = reg.bounds
-            bounds.append((slice(reg[1], reg[3]), slice(reg[0], reg[2])))
+            reg_bounds = reg_polygon.bounds
+            bounds.append((slice(reg_bounds[1], reg_bounds[3]), slice(reg_bounds[0], reg_bounds[2])))
             indizes[line_idx+idx+1] = ('region', idx)
     # order unassigned lines and regions
-    order = reading_order(bounds, text_direction)
+    order = _reading_order(bounds, text_direction)
     lsort = topsort(order)
     sidz = sorted(indizes.keys())
     lsort = [sidz[i] for i in lsort]
@@ -858,19 +878,60 @@ def is_in_region(line: geom.LineString, region: geom.Polygon) -> bool:
     return region.contains(l_obj)
 
 
-def neural_reading_order(lines: Sequence[Dict],
-                         text_direction: str = 'lr',
-                         regions: Optional[Sequence[geom.Polygon]] = None,
-                         im_size: tuple[int, int] = None,
-                         model: 'TorchVGSLModel' = None,
-                         class_mapping: Dict[str, int] = None) -> Sequence[int]:
-    """
-    Given a list of baselines and regions, calculates the correct reading order
-    and applies it to the input.
+def _extract_element_features(element, image_size, class_mapping, num_classes):
+    """Extract spatial features from a BaselineLine or Region object for neural RO.
 
     Args:
-        lines: list of tuples containing the baseline and its polygonization.
-        model: torch Module for
+        element: A BaselineLine or Region object.
+        image_size: Tuple (width, height) of the source image.
+        class_mapping: Dict mapping type tags to class indices.
+        num_classes: Total number of classes (including the default class).
+
+    Returns:
+        A tuple (tag, features_tensor).
+    """
+    from kraken.lib.dataset.utils import _get_type
+
+    w, h = image_size
+    tag = _get_type(element.tags)
+    cl = torch.zeros(num_classes, dtype=torch.float)
+    cl[class_mapping.get(tag, 0)] = 1
+
+    if hasattr(element, 'baseline') and element.baseline is not None:
+        coords = np.array(element.baseline) / (w, h)
+        center = np.mean(coords, axis=0)
+        start = coords[0, :]
+        end = coords[-1, :]
+    elif hasattr(element, 'boundary') and element.boundary is not None:
+        boundary = np.array(element.boundary)
+        center = np.mean(boundary, axis=0) / (w, h)
+        start = np.array([boundary[:, 0].min(), boundary[:, 1].min()]) / (w, h)
+        end = np.array([boundary[:, 0].max(), boundary[:, 1].max()]) / (w, h)
+    else:
+        raise ValueError('Neural reading order only supports baselines or regions with polygons.')
+
+    return tag, torch.cat((cl,
+                           torch.tensor(center, dtype=torch.float),
+                           torch.tensor(start, dtype=torch.float),
+                           torch.tensor(end, dtype=torch.float)))
+
+
+def neural_reading_order(lines: Sequence[Union['BaselineLine', 'Region']],
+                         text_direction: str = 'lr',
+                         regions: Optional[Sequence['Region']] = None,
+                         im_size: tuple[int, int] = None,
+                         model: 'TorchVGSLModel' = None,
+                         class_mapping: dict[str, int] = None) -> Sequence[int]:
+    """
+    Given a list of baselines/regions, calculates the correct reading order
+    using a neural model and applies it to the input.
+
+    Args:
+        lines: list of BaselineLine or Region objects.
+        regions: list of Region objects (unused).
+        model: torch Module for reading order prediction.
+        im_size: tuple (width, height) of the input image.
+        class_mapping: dict mapping element types to indices.
 
     Returns:
         The indices of the ordered input.
@@ -880,31 +941,21 @@ def neural_reading_order(lines: Sequence[Dict],
     elif len(lines) == 1:
         return torch.tensor([0])
 
-    lines = [(line['tags']['type'], line['baseline'], line['boundary']) for line in lines]
+    if class_mapping is None:
+        class_mapping = {}
+    num_classes = max(0, *class_mapping.values()) + 1 if class_mapping else 1
+    element_features = []
+    for el in lines:
+        _, feats = _extract_element_features(el, im_size, class_mapping, num_classes)
+        element_features.append(feats)
+
     # construct all possible pairs
-    h, w = im_size
     features = []
-    for i in lines:
-        for j in lines:
-            if i == j and len(lines) != 1:
+    for i in range(len(element_features)):
+        for j in range(len(element_features)):
+            if i == j and len(element_features) != 1:
                 continue
-            num_classes = len(class_mapping) + 1
-            cl_i = torch.zeros(num_classes, dtype=torch.float)
-            cl_j = torch.zeros(num_classes, dtype=torch.float)
-            cl_i[class_mapping.get(i[0], 0)] = 1
-            cl_j[class_mapping.get(j[0], 0)] = 1
-            line_coords_i = np.array(i[1]) / (w, h)
-            line_center_i = np.mean(line_coords_i, axis=0)
-            line_coords_j = np.array(j[1]) / (w, h)
-            line_center_j = np.mean(line_coords_j, axis=0)
-            features.append(torch.cat((cl_i,
-                                       torch.tensor(line_center_i, dtype=torch.float),  # lin
-                                       torch.tensor(line_coords_i[0, :], dtype=torch.float),
-                                       torch.tensor(line_coords_i[-1, :], dtype=torch.float),
-                                       cl_j,
-                                       torch.tensor(line_center_j, dtype=torch.float),  # lin
-                                       torch.tensor(line_coords_j[0, :], dtype=torch.float),
-                                       torch.tensor(line_coords_j[-1, :], dtype=torch.float))))
+            features.append(torch.cat((element_features[i], element_features[j])))
     features = torch.stack(features)
     output = F.sigmoid(model(features))
 
@@ -1000,11 +1051,67 @@ def _test_intersect(bp, uv, bs):
     for dir in ((1, -1), (-1, 1)):
         w = (uv * dir * (1, -1))[::-1]
         z = np.dot(v, w)
-        t1 = np.cross(v, u) / (z + np.finfo(float).eps)
+        t1 = (v[:, 0] * u[:, 1] - v[:, 1] * u[:, 0]) / (z + np.finfo(float).eps)
         t2 = np.dot(u, w) / (z + np.finfo(float).eps)
         t1 = t1[np.logical_and(t2 >= 0.0, t2 <= 1.0)]
         points.extend(bp + (t1[np.where(t1 >= 0)[0].min()] * (uv * dir)))
     return np.array(points)
+
+
+def _point_in_polygon(point, polygon):
+    """
+    Tests if a point is strictly inside a polygon using the ray casting
+    algorithm. Points on the boundary are considered outside (matching
+    shapely's Polygon.contains behavior).
+    """
+    x, y = float(point[0]), float(point[1])
+    n = len(polygon)
+    inside = False
+    on_boundary = False
+    j = n - 1
+    for i in range(n):
+        xi, yi = float(polygon[i][0]), float(polygon[i][1])
+        xj, yj = float(polygon[j][0]), float(polygon[j][1])
+        # check if point is on this edge
+        if (min(yi, yj) <= y <= max(yi, yj)) and (min(xi, xj) <= x <= max(xi, xj)):
+            # check collinearity via cross product
+            if abs((xj - xi) * (y - yi) - (yj - yi) * (x - xi)) < 1e-10:
+                on_boundary = True
+                break
+        if ((yi > y) != (yj > y)) and (x < (xj - xi) * (y - yi) / (yj - yi) + xi):
+            inside = not inside
+        j = i
+    if on_boundary:
+        return False
+    return inside
+
+
+def _ray_boundary_intersection(origin, direction, polygon):
+    """
+    Finds the closest intersection point of a ray from `origin` in
+    `direction` with the edges of `polygon`.
+
+    Returns the intersection point as a numpy array, or None if no
+    intersection is found.
+    """
+    poly = np.asarray(polygon)
+    n = len(poly)
+    best_t = np.inf
+    best_point = None
+    for i in range(n):
+        p1 = poly[i]
+        p2 = poly[(i + 1) % n]
+        edge = p2 - p1
+        denom = direction[0] * edge[1] - direction[1] * edge[0]
+        if abs(denom) < np.finfo(float).eps:
+            continue
+        diff = p1 - origin
+        t = (diff[0] * edge[1] - diff[1] * edge[0]) / denom
+        u = (diff[0] * direction[1] - diff[1] * direction[0]) / denom
+        if t >= 0 and 0 <= u <= 1 and t < best_t:
+            best_t = t
+            best_point = origin + t * direction
+    return best_point
 
 
 def compute_polygon_section(baseline: Sequence[tuple[int, int]],
@@ -1035,29 +1142,32 @@ def compute_polygon_section(baseline: Sequence[tuple[int, int]],
         dist1 = np.finfo(float).eps
     if dist2 == 0:
         dist2 = np.finfo(float).eps
-    boundary_pol = geom.Polygon(boundary)
     bl = np.array(baseline)
     # extend first/last segment of baseline if not on polygon boundary
-    if boundary_pol.contains(geom.Point(bl[0])):
+    if _point_in_polygon(bl[0], boundary):
         logger.debug(f'Extending leftmost end of baseline {bl} to polygon boundary')
-        l_point = boundary_pol.boundary.intersection(geom.LineString(
-            [(bl[0][0]-10*(bl[1][0]-bl[0][0]), bl[0][1]-10*(bl[1][1]-bl[0][1])), bl[0]]))
-        # intersection is incidental with boundary so take closest point instead
-        if l_point.geom_type != 'Point':
+        direction = bl[0].astype(float) - bl[1].astype(float)
+        l_point = _ray_boundary_intersection(bl[0].astype(float), direction, boundary)
+        if l_point is not None:
+            bl[0] = np.array(l_point, 'int')
+        else:
+            # fallback: use nearest point on boundary
+            boundary_pol = geom.Polygon(boundary)
             bl[0] = np.array(nearest_points(geom.Point(bl[0]), boundary_pol)[1].coords[0], 'int')
-        else:
-            bl[0] = np.array(l_point.coords[0], 'int')
-    if boundary_pol.contains(geom.Point(bl[-1])):
+    if _point_in_polygon(bl[-1], boundary):
         logger.debug(f'Extending rightmost end of baseline {bl} to polygon boundary')
-        r_point = boundary_pol.boundary.intersection(geom.LineString(
-            [(bl[-1][0]-10*(bl[-2][0]-bl[-1][0]), bl[-1][1]-10*(bl[-2][1]-bl[-1][1])), bl[-1]]))
-        if r_point.geom_type != 'Point':
-            bl[-1] = np.array(nearest_points(geom.Point(bl[-1]), boundary_pol)[1].coords[0], 'int')
+        direction = bl[-1].astype(float) - bl[-2].astype(float)
+        r_point = _ray_boundary_intersection(bl[-1].astype(float), direction, boundary)
+        if r_point is not None:
+            bl[-1] = np.array(r_point, 'int')
         else:
-            bl[-1] = np.array(r_point.coords[0], 'int')
-    dist1 = min(geom.LineString(bl).length - np.finfo(float).eps, dist1)
-    dist2 = min(geom.LineString(bl).length - np.finfo(float).eps, dist2)
-    dists = np.cumsum(np.diag(np.roll(squareform(pdist(bl)), 1)))
+            # fallback: use nearest point on boundary
+            boundary_pol = geom.Polygon(boundary)
+            bl[-1] = np.array(nearest_points(geom.Point(bl[-1]), boundary_pol)[1].coords[0], 'int')
+    dists = np.cumsum(np.insert(np.linalg.norm(np.diff(bl, axis=0), axis=1), 0, 0))
+    bl_length = dists[-1]
+    dist1 = min(bl_length - np.finfo(float).eps, dist1)
+    dist2 = min(bl_length - np.finfo(float).eps, dist2)
     segs_idx = np.searchsorted(dists, [dist1, dist2])
     segs = np.dstack((bl[segs_idx-1], bl[segs_idx]))
     # compute unit vector of segments (NOT orthogonal)
@@ -1077,6 +1187,104 @@ def compute_polygon_section(baseline: Sequence[tuple[int, int]],
     o = np.int_(points[0]).reshape(-1, 2).tolist()
     o.extend(np.int_(np.roll(points[1], 2)).reshape(-1, 2).tolist())
     return tuple(o)
+
+
+def precompute_polygon_sections(baseline: Sequence[tuple[int, int]],
+                                boundary: Sequence[tuple[int, int]],
+                                cut_pairs: list[tuple[int, int]]) -> tuple[list[tuple], dict, float]:
+    """
+    Batch-precompute polygon sections for all characters, amortizing the
+    expensive baseline extension and cumulative distance computation.
+
+    Args:
+        baseline: A polyline ((x1, y1), ..., (xn, yn))
+        boundary: A bounding polygon around the baseline.
+        cut_pairs: List of (dist1, dist2) tuples for each character.
+
+    Returns:
+        A tuple of (char_polygons, intersection_cache, bl_length) where:
+        - char_polygons is a list of polygon tuples, one per character
+        - intersection_cache maps clamped distance values to raw
+          _test_intersect result arrays (or None on failure)
+        - bl_length is the total baseline length after extension
+    """
+    if not cut_pairs:
+        return [], {}, 0.0
+
+    eps = np.finfo(float).eps
+
+    # Extend baseline endpoints to boundary (done once)
+    bl = np.array(baseline)
+    if _point_in_polygon(bl[0], boundary):
+        logger.debug(f'Extending leftmost end of baseline {bl} to polygon boundary')
+        direction = bl[0].astype(float) - bl[1].astype(float)
+        l_point = _ray_boundary_intersection(bl[0].astype(float), direction, boundary)
+        if l_point is not None:
+            bl[0] = np.array(l_point, 'int')
+        else:
+            boundary_pol = geom.Polygon(boundary)
+            bl[0] = np.array(nearest_points(geom.Point(bl[0]), boundary_pol)[1].coords[0], 'int')
+    if _point_in_polygon(bl[-1], boundary):
+        logger.debug(f'Extending rightmost end of baseline {bl} to polygon boundary')
+        direction = bl[-1].astype(float) - bl[-2].astype(float)
+        r_point = _ray_boundary_intersection(bl[-1].astype(float), direction, boundary)
+        if r_point is not None:
+            bl[-1] = np.array(r_point, 'int')
+        else:
+            boundary_pol = geom.Polygon(boundary)
+            bl[-1] = np.array(nearest_points(geom.Point(bl[-1]), boundary_pol)[1].coords[0], 'int')
+
+    # Compute cumulative distances once
+    dists = np.cumsum(np.insert(np.linalg.norm(np.diff(bl, axis=0), axis=1), 0, 0))
+    bl_length = float(dists[-1])
+    bounds = np.array(boundary)
+
+    def _clamp(d):
+        if d == 0:
+            d = eps
+        return min(bl_length - eps, d)
+
+    # Collect all unique clamped distances
+    unique_dists = set()
+    for d1, d2 in cut_pairs:
+        unique_dists.add(_clamp(d1))
+        unique_dists.add(_clamp(d2))
+
+    # Compute intersection points for each unique distance
+    intersection_cache = {}
+    for d in unique_dists:
+        seg_idx = int(np.searchsorted(dists, d))
+        seg_start = bl[seg_idx - 1].astype(float)
+        seg_end = bl[seg_idx].astype(float)
+        direction = seg_end - seg_start
+        length = np.linalg.norm(direction)
+        if length < eps:
+            unit_vec = direction
+        else:
+            unit_vec = direction / length
+        seg_point = seg_start + (d - dists[seg_idx - 1]) * unit_vec
+        try:
+            points = _test_intersect(seg_point, unit_vec[::-1], bounds).round()
+            intersection_cache[d] = points
+        except ValueError:
+            intersection_cache[d] = None
+
+    # Assemble per-character polygons
+    char_polygons = []
+    for d1, d2 in cut_pairs:
+        cd1 = _clamp(d1)
+        cd2 = _clamp(d2)
+        p1 = intersection_cache[cd1]
+        p2 = intersection_cache[cd2]
+        if p1 is not None and p2 is not None:
+            o = np.int_(p1).reshape(-1, 2).tolist()
+            o.extend(np.int_(np.roll(p2, 2)).reshape(-1, 2).tolist())
+            char_polygons.append(tuple(o))
+        else:
+            # Fallback for malformed polygons
+            char_polygons.append(compute_polygon_section(baseline, boundary, d1, d2))
+
+    return char_polygons, intersection_cache, bl_length
 
 
 def _bevelled_warping_envelope(baseline: np.ndarray,
@@ -1184,6 +1392,12 @@ def extract_polygons(im: Image.Image,
 
     Yields:
         The extracted subimage, and the corresponding bounding box or baseline
+
+    Raises:
+        ValueError in the following cases:
+
+        * No bounding polygon defined for a baseline.
+        * Baseline, bounding polygon, or bounding box extending beyond image extents
     """
     if bounds.type == 'baselines':
         # select proper interpolation scheme depending on shape
@@ -1195,9 +1409,9 @@ def extract_polygons(im: Image.Image,
 
         for line in bounds.lines:
             if line.boundary is None:
-                raise KrakenInputException('No boundary given for line')
+                raise ValueError('No boundary given for line')
             if len(line.baseline) < 2 or geom.LineString(line.baseline).length < 5:
-                raise KrakenInputException('Baseline length below minimum 5px')
+                raise ValueError('Baseline length below minimum 5px')
             pl = np.array(line.boundary)
             baseline = np.array(line.baseline)
             c_min, c_max = int(pl[:, 0].min()), int(pl[:, 0].max())
@@ -1206,9 +1420,9 @@ def extract_polygons(im: Image.Image,
             imshape = np.array([im.height, im.width])
 
             if (pl < 0).any() or (pl.max(axis=0)[::-1] >= imshape).any():
-                raise KrakenInputException('Line polygon outside of image bounds')
+                raise ValueError('Line polygon outside of image bounds')
             if (baseline < 0).any() or (baseline.max(axis=0)[::-1] >= imshape).any():
-                raise KrakenInputException('Baseline outside of image bounds')
+                raise ValueError('Baseline outside of image bounds')
 
             if legacy:
                 im = np.asarray(im)
@@ -1382,5 +1596,5 @@ def extract_polygons(im: Image.Image,
             if (box < [0, 0, 0, 0] or box[::2] >= [im.size[0], im.size[0]] or
                     box[1::2] >= [im.size[1], im.size[1]]):
                 logger.error('bbox {} is outside of image bounds {}'.format(box, im.size))
-                raise KrakenInputException('Line outside of image bounds')
-            yield im.crop(box).rotate(angle, expand=True), box
+                raise ValueError('Line outside of image bounds')
+            yield im.crop(box).rotate(angle, expand=True), line

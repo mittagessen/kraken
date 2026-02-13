@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<PcGts xmlns="http://schema.primaresearch.org/PAGE/gts/pagecontent/2013-07-15">
+    <Metadata>
+        <Creator>test</Creator>
+    </Metadata>
+    <Page imageFilename="test.jpg" imageWidth="1000" imageHeight="1000">
+        <ReadingOrder>
+            <UnorderedGroup id="ug_top">
+                <OrderedGroup id="ro_main" caption="Main text">
+                    <RegionRefIndexed regionRef="r1" index="0"/>
+                    <RegionRefIndexed regionRef="r2" index="1"/>
+                </OrderedGroup>
+                <OrderedGroup id="ro_margin" caption="Margin text">
+                    <RegionRefIndexed regionRef="r3" index="0"/>
+                </OrderedGroup>
+            </UnorderedGroup>
+        </ReadingOrder>
+        <TextRegion id="r1">
+            <Coords points="0,0 500,0 500,300 0,300"/>
+            <TextLine id="l1">
+                <Coords points="10,10 490,10 490,140 10,140"/>
+                <Baseline points="10,130 490,130"/>
+                <TextEquiv><Unicode>Line 1</Unicode></TextEquiv>
+            </TextLine>
+        </TextRegion>
+        <TextRegion id="r2">
+            <Coords points="0,310 500,310 500,610 0,610"/>
+            <TextLine id="l2">
+                <Coords points="10,320 490,320 490,450 10,450"/>
+                <Baseline points="10,440 490,440"/>
+                <TextEquiv><Unicode>Line 2</Unicode></TextEquiv>
+            </TextLine>
+        </TextRegion>
+        <TextRegion id="r3">
+            <Coords points="500,0 1000,0 1000,300 500,300"/>
+            <TextLine id="l3">
+                <Coords points="510,10 990,10 990,140 510,140"/>
+                <Baseline points="510,130 990,130"/>
+                <TextEquiv><Unicode>Line 3</Unicode></TextEquiv>
+            </TextLine>
+        </TextRegion>
+    </Page>
+</PcGts>

@@ -1,0 +1,30 @@
+precision: 32-true
+device: auto
+num_workers: 32
+num_threads: 1
+train:
+  # training data manifests
+  training_data: 
+    - test.lst
+  # directory to save checkpoints in
+  checkpoint_path: checkpoints
+  # change to `coreml` to save best model with kraken < 7 compatibility
+  weights_format: safetensors
+  # text transforms
+  normalization: NFD
+  normalize_whitespace: true
+  # base configuration of training epochs and LR schedule
+  epochs: 24
+  lrate: 1e-3
+  schedule: constant 
+  warmup: 200 
+  augment: true
+  # effective batch size params
+  batch_size: 32
+  accumulate_grad_batches: 1
+  # codec definition
+  codec: null  # creates a codec automatically
+  # codec:  # an explicit codec can also be given
+  #   'a': [1]
+  #   'b': [22]
+  #   'c': [23, 24]

@@ -16,7 +16,8 @@
 kraken.rpred
 ~~~~~~~~~~~~
 
-Generators for recognition on lines images.
+Legacy line text recognition API. New code should use the RecognitionTaskModel
+from kraken.tasks which is more versatile and offers higher performance.
 """
 import logging
 import warnings
@@ -94,6 +95,9 @@ class mm_rpred(object):
             KrakenInputException if the mapping between segmentation tags and
             networks is incomplete.
         """
+        warnings.warn('`rpred.mm_rpred` is deprecated and will be removed with kraken 8. Use `RecognitionTaskModel` instead.',
+                      DeprecationWarning)
+
         seg_types = set(recognizer.seg_type for recognizer in nets.values())
         if isinstance(nets, defaultdict):
             seg_types.add(nets.default_factory().seg_type)
@@ -178,7 +182,6 @@ class mm_rpred(object):
         self.no_legacy_polygons = no_legacy_polygons
 
     def _recognize_box_line(self, line):
-        xmin, ymin, xmax, ymax = line.bbox
         prediction = ''
         cuts = []
         confidences = []
@@ -195,8 +198,8 @@ class mm_rpred(object):
 
         seg = dataclasses.replace(self.bounds, lines=[line])
         try:
-            box, coords = next(extract_polygons(self.im, seg, legacy=use_legacy_polygons))
-        except KrakenInputException as e:
+            box, line = next(extract_polygons(self.im, seg, legacy=use_legacy_polygons))
+        except ValueError as e:
             logger.warning(f'Extracting line failed: {e}')
             return BBoxOCRRecord('', [], [], line)
 
@@ -233,6 +236,7 @@ class mm_rpred(object):
         pred = ''.join(x[0] for x in preds)
         pos = []
         conf = []
+        coords = line.bbox
 
         for _, start, end, c in preds:
             if self.bounds.text_direction.startswith('horizontal'):
@@ -270,7 +274,7 @@ class mm_rpred(object):
 
         try:
             box, coords = next(extract_polygons(self.im, seg, legacy=use_legacy_polygons))
-        except KrakenInputException as e:
+        except ValueError as e:
             logger.warning(f'Extracting line failed: {e}')
             return BaselineOCRRecord('', [], [], line)
 

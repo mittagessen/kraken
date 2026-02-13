@@ -94,10 +94,13 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: 3.11
-      - name: Install sphinx-multiversion
-        run:  python -m pip install sphinx-multiversion sphinx-autoapi
+      - name: Install docs dependencies
+        run: |
+          pip install .[docs]
       - name: Create docs
         run:  sphinx-multiversion docs build/html
+        env:
+          SPHINX_GITHUB_CHANGELOG_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Create redirect
         run: cp docs/redirect.html build/html/index.html
       - name: Push gh-pages

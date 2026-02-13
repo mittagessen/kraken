@@ -15,8 +15,9 @@
 """
 Utility functions for data loading and training of VGSL networks.
 """
+from collections import defaultdict
 from math import factorial
-from typing import TYPE_CHECKING, Dict, Literal, Optional, Sequence, Union
+from typing import TYPE_CHECKING, Literal, Optional, Sequence, Union
 
 import numpy as np
 import torch
@@ -36,20 +37,61 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def _num_classes_from_mapping(class_mapping: dict[str, int]) -> int:
+    """Returns the number of classes needed for a potentially sparse mapping."""
+    if not class_mapping:
+        return 1
+    return max(0, *class_mapping.values()) + 1
+
+
+def _extract_features(element, image_size, class_mapping, num_classes):
+    """Extract spatial features from a BaselineLine or Region object.
+
+    Args:
+        element: A BaselineLine or Region object.
+        image_size: Tuple (width, height) of the source image.
+        class_mapping: Dict mapping type tags to class indices.
+        num_classes: Total number of classes (including the default class).
+
+    Returns:
+        A tuple (tag, features_tensor).
+    """
+    w, h = image_size
+    tag = _get_type(element.tags)
+    cl = torch.zeros(num_classes, dtype=torch.float)
+    cl[class_mapping.get(tag, 0)] = 1
+
+    if hasattr(element, 'baseline') and element.baseline is not None:
+        # BaselineLine: use baseline coords
+        coords = np.array(element.baseline) / (w, h)
+        center = np.mean(coords, axis=0)
+        start = coords[0, :]
+        end = coords[-1, :]
+    else:
+        # Region: use boundary bounding box
+        boundary = np.array(element.boundary)
+        center = np.mean(boundary, axis=0) / (w, h)
+        start = np.array([boundary[:, 0].min(), boundary[:, 1].min()]) / (w, h)
+        end = np.array([boundary[:, 0].max(), boundary[:, 1].max()]) / (w, h)
+
+    return tag, torch.cat((cl,
+                           torch.tensor(center, dtype=torch.float),
+                           torch.tensor(start, dtype=torch.float),
+                           torch.tensor(end, dtype=torch.float)))
+
+
 class PairWiseROSet(Dataset):
     """
     Dataset for training a reading order determination model.
 
     Returns random pairs of lines from the same page.
     """
-    def __init__(self, files: Sequence[Union['PathLike', str]] = None,
+    def __init__(self,
+                 files: Sequence[Union['PathLike', str]],
+                 class_mapping: dict[str, int],
                  mode: Optional[Literal['alto', 'page', 'xml']] = 'xml',
                  level: Literal['regions', 'baselines'] = 'baselines',
-                 ro_id: Optional[str] = None,
-                 valid_entities: Sequence[str] = None,
-                 merge_entities: Dict[str, Sequence[str]] = None,
-                 merge_all_entities: bool = False,
-                 class_mapping: Optional[Dict[str, int]] = None) -> None:
+                 ro_id: Optional[str] = None) -> None:
         """
         Samples pairs lines/regions from XML files for training a reading order
         model .
@@ -59,35 +101,16 @@ class PairWiseROSet(Dataset):
             level: Computes reading order tuples on line or region level.
             ro_id: ID of the reading order to sample from. Defaults to
                    `line_implicit`/`region_implicit`.
-            valid_entities: Sequence of valid baseline/regions identifiers. If `None`
-                             all are valid.
-            merge_entities: Sequence of baseline/region identifiers to merge.  Note
-                             that merging occurs after entities not in valid_*
-                             have been discarded.
-            merge_all_entities: Merges all entities types into default (after
-                                filtering with valid_entities).
             class_mapping: Explicit class mapping to use. No sanity checks are
                            performed. Takes precedence over valid_*, merge_*.
         """
         super().__init__()
 
         self._num_pairs = 0
+        self._num_classes = None
         self.failed_samples = []
-        if class_mapping:
-            self.class_mapping = class_mapping
-            self.num_classes = len(class_mapping) + 1
-            self.freeze_cls_map = True
-            valid_entities = None
-            merge_entities = None
-            merge_all_entities = None
-        else:
-            self.num_classes = 1
-            self.class_mapping = {}
-            self.freeze_cls_map = False
-
-        self.m_dict = merge_entities if merge_entities is not None else {}
-        self.merge_all_entities = merge_all_entities
-        self.valid_entities = valid_entities
+        self.class_mapping = class_mapping
+        self.class_stats = defaultdict(int)
 
         self.data = []
 
@@ -108,39 +131,25 @@ class PairWiseROSet(Dataset):
                         raise ValueError(f'Invalid RO type {level}')
                     _order = []
                     for el in order:
-                        tag_val = _get_type(el.tags)
-                        if self.valid_entities is None or tag_val in self.valid_entities:
-                            tag = self.m_dict.get(tag_val, tag_val)
-                            if self.merge_all_entities:
-                                tag = None
-                            elif tag not in self.class_mapping and self.freeze_cls_map:
-                                continue
-                            elif tag not in self.class_mapping:
-                                self.class_mapping[tag] = self.num_classes
-                                self.num_classes += 1
-                            _order.append((tag, el))
+                        tag = _get_type(el.tags)
+                        try:
+                            self.class_mapping[tag]
+                            _order.append(el)
+                            self.class_stats[tag] += 1
+                        except KeyError:
+                            continue
                     docs.append((doc.image_size, _order))
                 except KrakenInputException as e:
                     logger.warning(e)
                     continue
 
-            for (w, h), order in docs:
+            num_classes = _num_classes_from_mapping(self.class_mapping)
+            for image_size, order in docs:
                 # traverse RO and substitute features.
                 sorted_lines = []
-                for tag, line in order:
-                    line_coords = np.array(line.baseline) / (w, h)
-                    line_center = np.mean(line_coords, axis=0)
-                    cl = torch.zeros(self.num_classes, dtype=torch.float)
-                    # if class is not in class mapping default to None class (idx 0)
-                    cl[self.class_mapping.get(tag, 0)] = 1
-                    line_data = {'type': tag,
-                                 'features': torch.cat((cl,  # one hot encoded line type
-                                                        torch.tensor(line_center, dtype=torch.float),  # line center
-                                                        torch.tensor(line_coords[0, :], dtype=torch.float),  # start_point coord
-                                                        torch.tensor(line_coords[-1, :], dtype=torch.float),  # end point coord)
-                                                        )
-                                                       )
-                                 }
+                for element in order:
+                    tag, features = _extract_features(element, image_size, self.class_mapping, num_classes)
+                    line_data = {'type': tag, 'features': features}
                     sorted_lines.append(line_data)
                 if len(sorted_lines) > 1:
                     self.data.append(sorted_lines)
@@ -149,6 +158,40 @@ class PairWiseROSet(Dataset):
                     logger.info(f'Page {doc} has less than 2 lines. Skipping')
         else:
             raise Exception('invalid dataset mode')
+
+    @property
+    def num_classes(self):
+        return _num_classes_from_mapping(self.class_mapping)
+
+    @property
+    def canonical_class_mapping(self) -> dict[str, int]:
+        """Returns a one-to-one class mapping (one string per label index).
+
+        For merged classes (multiple strings -> same index), the first string
+        by insertion order is kept as the canonical name.
+        """
+        seen_indices = set()
+        canonical = {}
+        for key, idx in self.class_mapping.items():
+            if idx not in seen_indices:
+                seen_indices.add(idx)
+                canonical[key] = idx
+        return canonical
+
+    @property
+    def merged_classes(self) -> dict[str, list[str]]:
+        """Returns merged class info: {canonical_name: [aliases]}.
+
+        Only includes entries where multiple strings map to the same index.
+        """
+        idx_to_names: dict[int, list[str]] = defaultdict(list)
+        for key, idx in self.class_mapping.items():
+            idx_to_names[idx].append(key)
+        merged = {}
+        for idx, names in idx_to_names.items():
+            if len(names) > 1:
+                merged[names[0]] = names[1:]
+        return merged
 
     def __getitem__(self, idx):
         lines = []
@@ -174,14 +217,12 @@ class PageWiseROSet(Dataset):
 
     Returns all lines from the same page.
     """
-    def __init__(self, files: Sequence[Union['PathLike', str]] = None,
+    def __init__(self,
+                 files: Sequence[Union['PathLike', str]],
+                 class_mapping: dict[str, int],
                  mode: Optional[Literal['alto', 'page', 'xml']] = 'xml',
                  level: Literal['regions', 'baselines'] = 'baselines',
-                 ro_id: Optional[str] = None,
-                 valid_entities: Sequence[str] = None,
-                 merge_entities: Dict[str, Sequence[str]] = None,
-                 merge_all_entities: bool = False,
-                 class_mapping: Optional[Dict[str, int]] = None) -> None:
+                 ro_id: Optional[str] = None) -> None:
         """
         Samples pairs lines/regions from XML files for evaluating a reading order
         model.
@@ -191,31 +232,14 @@ class PageWiseROSet(Dataset):
             level: Computes reading order tuples on line or region level.
             ro_id: ID of the reading order to sample from. Defaults to
                    `line_implicit`/`region_implicit`.
-            valid_entities: Sequence of valid baseline/regions identifiers. If `None`
-                             all are valid.
-            merge_entities: Sequence of baseline/region identifiers to merge.  Note
-                             that merging occurs after entities not in valid_*
-                             have been discarded.
             class_mapping: Explicit class mapping to use. No sanity checks are performed.
         """
         super().__init__()
 
+        self._num_classes = None
         self.failed_samples = []
-        if class_mapping:
-            self.class_mapping = class_mapping
-            self.num_classes = len(class_mapping) + 1
-            self.freeze_cls_map = True
-            valid_entities = None
-            merge_entities = None
-            merge_all_entities = False
-        else:
-            self.num_classes = 1
-            self.class_mapping = {}
-            self.freeze_cls_map = False
-
-        self.m_dict = merge_entities if merge_entities is not None else {}
-        self.merge_all_entities = merge_all_entities
-        self.valid_entities = valid_entities
+        self.class_mapping = class_mapping
+        self.class_stats = defaultdict(int)
 
         self.data = []
 
@@ -236,39 +260,25 @@ class PageWiseROSet(Dataset):
                         raise ValueError(f'Invalid RO type {level}')
                     _order = []
                     for el in order:
-                        tag_val = _get_type(el.tags)
-                        if self.valid_entities is None or tag_val in self.valid_entities:
-                            tag = self.m_dict.get(tag_val, tag_val)
-                            if self.merge_all_entities:
-                                tag = None
-                            elif tag not in self.class_mapping and self.freeze_cls_map:
-                                continue
-                            elif tag not in self.class_mapping:
-                                self.class_mapping[tag] = self.num_classes
-                                self.num_classes += 1
-                            _order.append((tag, el))
+                        tag = _get_type(el.tags)
+                        try:
+                            self.class_mapping[tag]
+                            _order.append(el)
+                            self.class_stats[tag] += 1
+                        except KeyError:
+                            continue
                     docs.append((doc.image_size, _order))
                 except KrakenInputException as e:
                     logger.warning(e)
                     continue
 
-            for (w, h), order in docs:
+            num_classes = _num_classes_from_mapping(self.class_mapping)
+            for image_size, order in docs:
                 # traverse RO and substitute features.
                 sorted_lines = []
-                for tag, line in order:
-                    line_coords = np.array(line.baseline) / (w, h)
-                    line_center = np.mean(line_coords, axis=0)
-                    cl = torch.zeros(self.num_classes, dtype=torch.float)
-                    # if class is not in class mapping default to None class (idx 0)
-                    cl[self.class_mapping.get(tag, 0)] = 1
-                    line_data = {'type': tag,
-                                 'features': torch.cat((cl,  # one hot encoded line type
-                                                        torch.tensor(line_center, dtype=torch.float),  # line center
-                                                        torch.tensor(line_coords[0, :], dtype=torch.float),  # start_point coord
-                                                        torch.tensor(line_coords[-1, :], dtype=torch.float),  # end point coord)
-                                                        )
-                                                       )
-                                 }
+                for element in order:
+                    tag, features = _extract_features(element, image_size, self.class_mapping, num_classes)
+                    line_data = {'type': tag, 'features': features}
                     sorted_lines.append(line_data)
                 if len(sorted_lines) > 1:
                     self.data.append(sorted_lines)
@@ -276,6 +286,40 @@ class PageWiseROSet(Dataset):
                     logger.info(f'Page {doc} has less than 2 lines. Skipping')
         else:
             raise Exception('invalid dataset mode')
+
+    @property
+    def num_classes(self):
+        return _num_classes_from_mapping(self.class_mapping)
+
+    @property
+    def canonical_class_mapping(self) -> dict[str, int]:
+        """Returns a one-to-one class mapping (one string per label index).
+
+        For merged classes (multiple strings -> same index), the first string
+        by insertion order is kept as the canonical name.
+        """
+        seen_indices = set()
+        canonical = {}
+        for key, idx in self.class_mapping.items():
+            if idx not in seen_indices:
+                seen_indices.add(idx)
+                canonical[key] = idx
+        return canonical
+
+    @property
+    def merged_classes(self) -> dict[str, list[str]]:
+        """Returns merged class info: {canonical_name: [aliases]}.
+
+        Only includes entries where multiple strings map to the same index.
+        """
+        idx_to_names: dict[int, list[str]] = defaultdict(list)
+        for key, idx in self.class_mapping.items():
+            idx_to_names[idx].append(key)
+        merged = {}
+        for idx, names in idx_to_names.items():
+            if len(names) > 1:
+                merged[names[0]] = names[1:]
+        return merged
 
     def __getitem__(self, idx):
         xs = []

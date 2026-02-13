@@ -17,11 +17,13 @@
 kraken.pageseg
 ~~~~~~~~~~~~~~
 
-Layout analysis methods.
+The legacy bounding box segmentation method using conventional image processing
+techniques.
 """
 import logging
 import uuid
-from typing import Callable, List, Optional, Tuple, Union
+from collections.abc import Callable
+from typing import Optional, Union
 
 import numpy as np
 import PIL
@@ -30,7 +32,7 @@ from scipy.ndimage import gaussian_filter, maximum_filter, uniform_filter
 from kraken.containers import BBoxLine, Segmentation
 from kraken.lib import morph, sl
 from kraken.lib.exceptions import KrakenInputException
-from kraken.lib.segmentation import reading_order, topsort
+from kraken.lib.segmentation import reading_order
 from kraken.lib.util import get_im_str, is_bitonal, pil2array
 
 __all__ = ['segment']
@@ -45,7 +47,7 @@ class record(object):
     def __init__(self, **kw):
         self.__dict__.update(kw)
         self.label: int = 0
-        self.bounds: List = []
+        self.bounds: list = []
         self.mask: np.ndarray = None
 
 
@@ -80,7 +82,7 @@ def estimate_scale(binary: np.ndarray) -> float:
 
 
 def compute_boxmap(binary: np.ndarray, scale: float,
-                   threshold: Tuple[float, int] = (.5, 4),
+                   threshold: tuple[float, int] = (.5, 4),
                    dtype: str = 'i') -> np.ndarray:
     """
     Returns grapheme cluster-like boxes based on connected components.
@@ -97,7 +99,7 @@ def compute_boxmap(binary: np.ndarray, scale: float,
     return boxmap
 
 
-def compute_lines(segmentation: np.ndarray, scale: float) -> List[record]:
+def compute_lines(segmentation: np.ndarray, scale: float) -> list[record]:
     """Given a line segmentation map, computes a list
     of tuples consisting of 2D slices and masked images."""
     logger.debug('Convert segmentation to lines')
@@ -164,7 +166,7 @@ def compute_colseps_conv(binary: np.ndarray, scale: float = 1.0,
     return seps
 
 
-def compute_black_colseps(binary: np.ndarray, scale: float, maxcolseps: int) -> Tuple[np.ndarray, np.ndarray]:
+def compute_black_colseps(binary: np.ndarray, scale: float, maxcolseps: int) -> tuple[np.ndarray, np.ndarray]:
     """
     Computes column separators from vertical black lines.
 
@@ -183,7 +185,7 @@ def compute_black_colseps(binary: np.ndarray, scale: float, maxcolseps: int) -> 
     return colseps, binary
 
 
-def compute_white_colseps(binary: np.ndarray, scale: float, maxcolseps: int) -> Tuple[np.ndarray, np.ndarray]:
+def compute_white_colseps(binary: np.ndarray, scale: float, maxcolseps: int) -> tuple[np.ndarray, np.ndarray]:
     """
     Computes column separators either from vertical black lines or whitespace.
 
@@ -308,7 +310,7 @@ def segment(im: PIL.Image.Image,
             maxcolseps: float = 2,
             black_colseps: bool = False,
             no_hlines: bool = True,
-            pad: Union[int, Tuple[int, int]] = 0,
+            pad: Union[int, tuple[int, int]] = 0,
             mask: Optional[np.ndarray] = None,
             reading_order_fn: Callable = reading_order) -> Segmentation:
     """
@@ -415,10 +417,14 @@ def segment(im: PIL.Image.Image,
     segmentation = llabels*binary
 
     lines = compute_lines(segmentation, scale)
-    order = reading_order_fn([line.bounds for line in lines], text_direction[-2:])
-    lsort = topsort(order)
-    lines = [lines[i].bounds for i in lsort]
-    lines = [(s2.start, s1.start, s2.stop, s1.stop) for s1, s2 in lines]
+    bbox_lines = [BBoxLine(id=f'_{uuid.uuid4()}',
+                           bbox=(line.bounds[1].start,
+                                 line.bounds[0].start,
+                                 line.bounds[1].stop,
+                                 line.bounds[0].stop)) for line in lines]
+    lsort = reading_order_fn(bbox_lines, text_direction[-2:])
+    lines = [bbox_lines[i] for i in lsort]
+    lines = [(line.bbox[0], line.bbox[1], line.bbox[2], line.bbox[3]) for line in lines]
 
     if isinstance(pad, int):
         pad = (pad, pad)

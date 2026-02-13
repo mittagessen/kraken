@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
-import json
 import os
+import pickle
 import unittest
+import warnings
 from collections import defaultdict
 from pathlib import Path
 
@@ -23,173 +24,262 @@ class TestBBoxRecords(unittest.TestCase):
     Tests the bounding box OCR record.
     """
     def setUp(self):
-        with open(resources / 'records.json', 'r') as fp:
-            self.box_records = json.load(fp)
-            self.ltr_record = self.box_records[0]
+        # Arabic RTL (pre-constructed records, display_order=False i.e. logical order)
+        with open(resources / 'arabic_bbox_records.pkl', 'rb') as fp:
+            self.arabic_records = pickle.load(fp)
+            self.arabic_record = self.arabic_records[0]
 
-    def test_bbox_record_cuts(self):
-        """
-        Make sure that the cuts of a record are converted to absolute coordinates.
-        """
-        record = BBoxOCRRecord(**self.ltr_record)
-        self.assertEqual(record.cuts, [[[1437, 119], [1437, 256], [1449, 256], [1449, 119]],
-                                       [[1484, 119], [1484, 256], [1496, 256], [1496, 119]],
-                                       [[1508, 119], [1508, 256], [1520, 256], [1520, 119]],
-                                       [[1568, 119], [1568, 256], [1568, 256], [1568, 119]],
-                                       [[1603, 119], [1603, 256], [1603, 256], [1603, 119]],
-                                       [[1615, 119], [1615, 256], [1627, 256], [1627, 119]],
-                                       [[1639, 119], [1639, 256], [1639, 256], [1639, 119]],
-                                       [[1663, 119], [1663, 256], [1674, 256], [1674, 119]],
-                                       [[1698, 119], [1698, 256], [1698, 256], [1698, 119]],
-                                       [[1722, 119], [1722, 256], [1734, 256], [1734, 119]],
-                                       [[1746, 119], [1746, 256], [1758, 256], [1758, 119]],
-                                       [[1793, 119], [1793, 256], [1805, 256], [1805, 119]],
-                                       [[1817, 119], [1817, 256], [1829, 256], [1829, 119]],
-                                       [[1853, 119], [1853, 256], [1853, 256], [1853, 119]],
-                                       [[1876, 119], [1876, 256], [1888, 256], [1888, 119]],
-                                       [[1924, 119], [1924, 256], [1936, 256], [1936, 119]],
-                                       [[1959, 119], [1959, 256], [1971, 256], [1971, 119]],
-                                       [[2007, 119], [2007, 256], [2019, 256], [2019, 119]],
-                                       [[2054, 119], [2054, 256], [2054, 256], [2054, 119]],
-                                       [[2078, 119], [2078, 256], [2090, 256], [2090, 119]],
-                                       [[2149, 119], [2149, 256], [2149, 256], [2149, 119]],
-                                       [[2161, 119], [2161, 256], [2173, 256], [2173, 119]]])
+        # Latin LTR (pre-constructed records from Segmentation)
+        with open(resources / 'box_rec.pkl', 'rb') as fp:
+            seg = pickle.load(fp)
+            self.latin_record = seg.lines[5]
 
-    def test_bbox_record_redisplay(self):
+    def test_arabic_bbox_record_cuts(self):
         """
-        Test that a display order record remains in display order when
-        requesting a DO record.
+        Tests that an Arabic bbox record has the expected number of cuts.
         """
-        record = BBoxOCRRecord(**self.ltr_record, display_order=True)
-        self.assertEqual(record, record.display_order())
+        self.assertEqual(len(self.arabic_record.cuts), 52)
 
-    def test_bbox_record_relogical(self):
+    def test_arabic_bbox_record_display_identity(self):
         """
-        Test that a logical order record remains in logical order when
-        requesting a LO record.
+        Test that requesting display order on a display-order record is
+        an identity operation.
         """
-        record = BBoxOCRRecord(**self.ltr_record, display_order=False)
-        self.assertEqual(record, record.logical_order())
+        do = self.arabic_record.display_order()
+        self.assertEqual(do, do.display_order())
 
-    def test_bbox_record_display(self):
+    def test_arabic_bbox_record_logical_identity(self):
         """
-        test display order conversion of record.
+        Test that requesting logical order on a logical-order record is
+        an identity operation.
         """
-        record = BBoxOCRRecord(**self.ltr_record, display_order=False)
-        re_record = record.display_order()
-        self.assertEqual(re_record.prediction, 'في معجزاته عليه السلام')
-        self.assertEqual(re_record[:][1], ((1437, 119), (2173, 119), (2173, 256), (1437, 256)))
-        self.assertAlmostEqual(re_record[2:8][2], 0.9554762, places=4)
+        self.assertEqual(self.arabic_record, self.arabic_record.logical_order())
 
-    def test_bbox_record_logical(self):
+    def test_arabic_bbox_record_display(self):
         """
-        Test logical order conversion of record.
+        Test display order conversion of Arabic RTL record.
         """
-        record = BBoxOCRRecord(**self.ltr_record, display_order=True)
-        re_record = record.logical_order()
-        self.assertEqual(re_record.prediction, 'في معجزاته عليه السلام')
-        self.assertEqual(re_record[:][1], ((1437, 119), (2173, 119), (2173, 256), (1437, 256)))
-        self.assertAlmostEqual(re_record[2:8][2], 0.9554762, places=4)
+        do = self.arabic_record.display_order()
+        self.assertEqual(do.prediction, 'مذا ذا درع نلاهو زکذل انبا ملةدیس هىک ماف نابصل ممهع')
+        self.assertAlmostEqual(do[:][2], 0.7227956, places=4)
 
-    def test_bbox_record_slicing(self):
+    def test_arabic_bbox_record_logical(self):
         """
-        Tests simple slicing/aggregation of elements in record.
+        Test that logical order on a logical-order record preserves text.
         """
-        record = BBoxOCRRecord(**self.ltr_record, display_order=True)
-        pred, cut, conf = record[1:8]
-        self.assertEqual(pred, 'السلا ه')
-        self.assertEqual(cut, ((1484, 119), (1674, 119), (1674, 256), (1484, 256)))
-        self.assertAlmostEqual(conf, 0.9259478, places=4)
+        lo = self.arabic_record.logical_order()
+        self.assertEqual(lo.prediction, 'عهمم لصبان فام کىه سیدةلم ابنا لذکز وهالن عرد اذ اذم')
 
-    def test_bbox_record_slicing(self):
+    def test_arabic_bbox_record_slicing(self):
         """
-        Tests complex slicing/aggregation of elements in record.
+        Tests simple slicing/aggregation on Arabic bbox record.
         """
-        record = BBoxOCRRecord(**self.ltr_record, display_order=True)
-        pred, cut, conf = record[1:5:2]
-        self.assertEqual(pred, 'اس')
-        self.assertEqual(cut, ((1484, 119), (1568, 119), (1568, 256), (1484, 256)))
-        self.assertAlmostEqual(conf, 0.74411, places=4)
+        pred, cut, conf = self.arabic_record[1:8]
+        self.assertEqual(pred, 'همم لصب')
+        self.assertEqual(cut, ((861, 245), (980, 245), (980, 325), (861, 325)))
+        self.assertAlmostEqual(conf, 0.7444813, places=4)
+
+    def test_arabic_bbox_record_step_slicing(self):
+        """
+        Tests step slicing on Arabic bbox record.
+        """
+        pred, cut, conf = self.arabic_record[1:5:2]
+        self.assertEqual(pred, 'هم')
+        self.assertEqual(cut, ((936, 245), (980, 245), (980, 325), (936, 325)))
+        self.assertAlmostEqual(conf, 0.8795802, places=4)
+
+    def test_latin_bbox_record_display_identity(self):
+        """
+        Test that display order on LTR record is identity.
+        """
+        self.assertEqual(self.latin_record, self.latin_record.display_order())
+
+    def test_latin_bbox_record_logical_identity(self):
+        """
+        Test that logical order on LTR record is identity.
+        """
+        self.assertEqual(self.latin_record, self.latin_record.logical_order())
+
+    def test_latin_bbox_record_slicing(self):
+        """
+        Tests simple slicing on Latin bbox record.
+        """
+        pred, cut, conf = self.latin_record[1:8]
+        self.assertEqual(pred, 'i quelq')
+        self.assertEqual(cut, ((321, 380), (422, 380), (422, 421), (321, 421)))
+        self.assertAlmostEqual(conf, 0.9994162, places=4)
+
+    def test_latin_bbox_record_step_slicing(self):
+        """
+        Tests step slicing on Latin bbox record.
+        """
+        pred, cut, conf = self.latin_record[1:5:2]
+        self.assertEqual(pred, 'iq')
+        self.assertEqual(cut, ((321, 380), (349, 380), (349, 421), (321, 421)))
+        self.assertAlmostEqual(conf, 0.9995827, places=4)
 
 
 class TestBaselineRecords(unittest.TestCase):
     """
-    Tests the baseline OCR record.
+    Tests the baseline OCR record with both Arabic (RTL) and Latin (LTR) data.
     """
     def setUp(self):
-        with open(resources / 'bl_records.json', 'r') as fp:
-            self.bl_records = json.load(fp)
-            self.ltr_record = self.bl_records['lines'][15]
+        # Arabic RTL records (dicts, construct with desired display_order)
+        with open(resources / 'arabic_bl_records.pkl', 'rb') as fp:
+            self.arabic_records = pickle.load(fp)
+            self.arabic_record = self.arabic_records[0]
+            self.arabic_short_record = self.arabic_records[6]
 
-    def test_baseline_record_cuts(self):
-        """
-        Make sure that the cuts of a record are converted to absolute coordinates.
-        """
-        record = BaselineOCRRecord(**self.ltr_record)
+        # Latin LTR (pre-constructed records from Segmentation)
+        with open(resources / 'bl_rec.pkl', 'rb') as fp:
+            seg = pickle.load(fp)
+            self.latin_record = seg.lines[5]
 
-    def test_baseline_record_redisplay(self):
+    def test_arabic_baseline_record_construction(self):
         """
-        Test that a display order record remains in display order when
-        requesting a DO record.
+        Tests that a BaselineOCRRecord can be constructed from pickled data.
         """
-        record = BaselineOCRRecord(**self.ltr_record, display_order=True)
+        record = BaselineOCRRecord(**self.arabic_record, display_order=True)
+        self.assertGreater(len(record.prediction), 0)
+
+    def test_arabic_baseline_record_display_identity(self):
+        """
+        Test that requesting display order on a display-order record is
+        an identity operation.
+        """
+        record = BaselineOCRRecord(**self.arabic_record, display_order=True)
         self.assertEqual(record, record.display_order())
 
-    def test_baseline_record_relogical(self):
+    def test_arabic_baseline_record_logical_identity(self):
         """
-        Test that a logical order record remains in logical order when
-        requesting a LO record.
+        Test that requesting logical order on a logical-order record is
+        an identity operation.
         """
-        record = BaselineOCRRecord(**self.ltr_record, display_order=False)
+        record = BaselineOCRRecord(**self.arabic_record, display_order=False)
         self.assertEqual(record, record.logical_order())
 
-    def test_baseline_record_display(self):
+    def test_arabic_baseline_record_display_to_logical(self):
         """
-        test display order conversion of record.
+        Tests display->logical order conversion reorders Arabic text into
+        reading order.
         """
-        record = BaselineOCRRecord(**self.ltr_record, display_order=False)
-        re_record = record.display_order()
-        self.assertEqual(re_record.prediction, '.هنيدو')
-        self.assertEqual(re_record[:][1], ([1370, 1382], [1370, 1424], [1448, 1426], [1451, 1388]))
-        self.assertAlmostEqual(re_record[2:4][2], 0.9998551, places=4)
+        record = BaselineOCRRecord(**self.arabic_record, display_order=True)
+        lo = record.logical_order()
+        # expected text in logical (reading) order with explicit Unicode escapes
+        # for combining characters (hamza above U+0654, maddah above U+0653)
+        expected = ('\u0639\u0646\u062f \u0639\u062f\u0645 \u0627\u0644\u0639\u0635\u0628\u0627\u062a '
+                    '\u0627\u0630\u0627 \u0644\u0645 \u064a\u0643\u0646 \u0644\u0644\u0635\u063a\u064a\u0631\u0629 '
+                    '\u0627\u0654\u0645 \u0627\u0654\u064a\u0636\u0627\u064b \u0644\u0645\u0627\u0630 '
+                    '\u0643\u0631. . \u0648\u0644\u0646\u0627 \u0627\u0654\u0646 \u0646\u0642\u0648\u0644 '
+                    '\u0627\u0646 \u0627\u0644\u0627\u0653\u0645')
+        self.assertEqual(lo.prediction, expected)
+        self.assertAlmostEqual(lo[:][2], 0.9746356, places=4)
 
-    def test_baseline_record_logical(self):
+    def test_arabic_baseline_record_logical_to_display(self):
         """
-        Test logical order conversion of record.
+        Tests logical->display order conversion. The bidi toggle is symmetric
+        so both directions produce the same reordered text.
         """
-        record = BaselineOCRRecord(**self.ltr_record, display_order=True)
-        re_record = record.logical_order()
-        self.assertEqual(re_record.prediction, '.هنيدو')
-        self.assertEqual(re_record[:][1], ([1370, 1382], [1370, 1424], [1448, 1426], [1451, 1388]))
-        self.assertAlmostEqual(re_record[2:3][2], 0.99996733, places=4)
+        record = BaselineOCRRecord(**self.arabic_record, display_order=False)
+        do = record.display_order()
+        expected = ('\u0639\u0646\u062f \u0639\u062f\u0645 \u0627\u0644\u0639\u0635\u0628\u0627\u062a '
+                    '\u0627\u0630\u0627 \u0644\u0645 \u064a\u0643\u0646 \u0644\u0644\u0635\u063a\u064a\u0631\u0629 '
+                    '\u0627\u0654\u0645 \u0627\u0654\u064a\u0636\u0627\u064b \u0644\u0645\u0627\u0630 '
+                    '\u0643\u0631. . \u0648\u0644\u0646\u0627 \u0627\u0654\u0646 \u0646\u0642\u0648\u0644 '
+                    '\u0627\u0646 \u0627\u0644\u0627\u0653\u0645')
+        self.assertEqual(do.prediction, expected)
+        self.assertAlmostEqual(do[:][2], 0.9746356, places=4)
 
-    def test_baseline_record_slicing(self):
+    def test_arabic_baseline_record_roundtrip(self):
         """
-        Tests simple slicing/aggregation of elements in record.
+        Tests display->logical->display roundtrip produces the original record.
         """
-        record = BaselineOCRRecord(**self.ltr_record, display_order=True)
-        pred, cut, conf = record[2:5]
-        self.assertEqual(pred, 'ينه')
-        self.assertEqual(cut, ([1385, 1375], [1385, 1427], [1411, 1433], [1411, 1378]))
-        self.assertAlmostEqual(conf, 0.99957436, places=4)
+        record = BaselineOCRRecord(**self.arabic_record, display_order=True)
+        roundtripped = record.logical_order().display_order()
+        self.assertEqual(roundtripped.prediction, record.prediction)
 
-    def test_baseline_complex_record_slicing(self):
+    def test_arabic_baseline_short_record_logical(self):
         """
-        Tests complex slicing/aggregation of elements in record.
+        Tests display->logical on a short Arabic line.
         """
-        record = BaselineOCRRecord(**self.ltr_record, display_order=True)
+        record = BaselineOCRRecord(**self.arabic_short_record, display_order=True)
+        lo = record.logical_order()
+        self.assertEqual(lo.prediction, 'يتناولها .')
+
+    def test_arabic_baseline_record_slicing(self):
+        """
+        Tests simple slicing on Arabic display order record.
+        """
+        record = BaselineOCRRecord(**self.arabic_record, display_order=True)
+        pred, cut, conf = record[2:8]
+        self.assertEqual(pred, 'الا نا')
+        self.assertAlmostEqual(conf, 0.9937494, places=4)
+
+    def test_arabic_baseline_record_step_slicing(self):
+        """
+        Tests step slicing on short Arabic display order record.
+        """
+        record = BaselineOCRRecord(**self.arabic_short_record, display_order=True)
         pred, cut, conf = record[1:5:2]
-        self.assertEqual(pred, 'دن')
-        self.assertEqual(cut, ([1396, 1375], [1396, 1430], [1426, 1437], [1429, 1381]))
-        self.assertAlmostEqual(conf, 0.999982893, places=4)
+        self.assertEqual(pred, ' ه')
+        self.assertAlmostEqual(conf, 0.9366213, places=4)
+
+    def test_arabic_baseline_logical_order_slicing(self):
+        """
+        Tests slicing on a logical-order Arabic record.
+        """
+        record = BaselineOCRRecord(**self.arabic_record, display_order=True)
+        lo = record.logical_order()
+        pred, cut, conf = lo[2:8]
+        self.assertEqual(pred, 'د عدم ')
+        self.assertAlmostEqual(conf, 0.9969620, places=4)
+
+    def test_latin_baseline_record_display_identity(self):
+        """
+        Test that display order on LTR record is identity.
+        """
+        self.assertEqual(self.latin_record, self.latin_record.display_order())
+
+    def test_latin_baseline_record_logical_identity(self):
+        """
+        Test that logical order on LTR record is identity.
+        """
+        self.assertEqual(self.latin_record, self.latin_record.logical_order())
+
+    def test_latin_baseline_record_slicing(self):
+        """
+        Tests simple slicing on Latin baseline record.
+        """
+        pred, cut, conf = self.latin_record[1:8]
+        self.assertEqual(pred, 'i quelq')
+        self.assertEqual(cut, ([320, 373], [320, 419], [424, 420], [424, 368]))
+        self.assertAlmostEqual(conf, 0.9996614, places=4)
+
+    def test_latin_baseline_record_step_slicing(self):
+        """
+        Tests step slicing on Latin baseline record.
+        """
+        pred, cut, conf = self.latin_record[1:5:2]
+        self.assertEqual(pred, 'iq')
+        self.assertEqual(cut, ([320, 373], [320, 419], [346, 423], [346, 375]))
+        self.assertAlmostEqual(conf, 0.9998304, places=4)
 
 
 class TestRecognition(unittest.TestCase):
 
     """
-    Tests of the recognition facility and associated routines.
+    Tests of the legacy recognition facility (rpred/mm_rpred) and associated
+    routines.
+
+    .. deprecated::
+        These tests exercise the deprecated `kraken.rpred.rpred` and
+        `kraken.rpred.mm_rpred` APIs as well as `kraken.lib.models.load_any`.
+        All of these will be removed with kraken 8. New code should use
+        `kraken.tasks.RecognitionTaskModel` instead. See `test_tasks.py` for
+        tests of the replacement API.
     """
     def setUp(self):
+        warnings.filterwarnings('ignore', category=DeprecationWarning, message='.*deprecated.*kraken 8.*')
         self.im = Image.open(resources / 'bw.png')
         self.overfit_line = Image.open(resources / '000236.png')
         self.model = load_any(resources / 'overfit.mlmodel')

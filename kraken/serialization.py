@@ -12,13 +12,20 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
 # or implied. See the License for the specific language governing
 # permissions and limitations under the License.
+"""
+kraken.serialization
+~~~~~~~~~~~~~~~~~~~~
+
+A serializer using Jinja2 templates to write segmentation and recognition
+results.
+"""
+import regex
 import datetime
 import importlib.metadata
 import logging
-from typing import (TYPE_CHECKING, Any, Dict, Iterable, List, Literal,
-                    Optional, Sequence, Tuple)
+from typing import TYPE_CHECKING, Any, Literal, Optional
 
-import regex
+from collections.abc import Sequence, Iterable
 from jinja2 import Environment, FunctionLoader, PackageLoader
 
 from kraken.lib.util import make_printable
@@ -34,13 +41,13 @@ logger = logging.getLogger(__name__)
 __all__ = ['serialize', 'render_report']
 
 
-def _rescale(val: Sequence[float], low: float, high: float) -> List[float]:
+def _rescale(val: Sequence[float], low: float, high: float) -> list[float]:
     """
     Rescales a list of confidence value between 0 and 1 to an interval [low,
     high].
 
     Args:
-        val (float): List of values in interval (0,1)
+        val (float): list of values in interval (0,1)
         low (float): Lower bound of rescaling interval
         high (float): Upper bound of rescaling interval
 
@@ -50,7 +57,7 @@ def _rescale(val: Sequence[float], low: float, high: float) -> List[float]:
     return [(high - low) * x + low for x in val]
 
 
-def max_bbox(boxes: Iterable[Sequence[int]]) -> Tuple[int, int, int, int]:
+def max_bbox(boxes: Iterable[Sequence[int]]) -> tuple[int, int, int, int]:
     """
     Calculates the minimal bounding box containing all contained in an
     iterator.
@@ -71,12 +78,12 @@ def max_bbox(boxes: Iterable[Sequence[int]]) -> Tuple[int, int, int, int]:
 
 
 def serialize(results: 'Segmentation',
-              image_size: Tuple[int, int] = (0, 0),
+              image_size: tuple[int, int] = (0, 0),
               writing_mode: Literal['horizontal-tb', 'vertical-lr', 'vertical-rl'] = 'horizontal-tb',
               scripts: Optional[Iterable[str]] = None,
               template: ['PathLike', str] = 'alto',
               template_source: Literal['native', 'custom'] = 'native',
-              processing_steps: Optional[List['ProcessingStep']] = None,
+              processing_steps: Optional[list['ProcessingStep']] = None,
               sub_line_segmentation: bool = True) -> str:
     """
     Serializes recognition and segmentation results into an output document.
@@ -86,15 +93,13 @@ def serialize(results: 'Segmentation',
     with jinja2 templates that can either be shipped with kraken
     (`template_source` == 'native') or custom (`template_source` == 'custom').
 
-    Note: Empty records are ignored for serialization purposes.
-
     Args:
         segmentation: Segmentation container object
-        image_size: Dimensions of the source image
+        image_size: Dimensions of the source image as a (width, height) tuple.
         writing_mode: Sets the principal layout of lines and the
                       direction in which blocks progress. Valid values are
                       horizontal-tb, vertical-rl, and vertical-lr.
-        scripts: List of scripts contained in the OCR records
+        scripts: list of scripts contained in the OCR records
         template: Selector for the serialization format. May be 'hocr',
                   'alto', 'page' or any template found in the template
                   directory. If template_source is set to `custom` a path to a
@@ -111,7 +116,7 @@ def serialize(results: 'Segmentation',
         The rendered template
     """
     logger.info(f'Serialize {len(results.lines)} records from {results.imagename} with template {template}.')
-    page: Dict[str, Any] = {'entities': [],
+    page: dict[str, Any] = {'entities': [],
                             'size': image_size,
                             'name': results.imagename,
                             'writing_mode': writing_mode,
@@ -270,15 +275,15 @@ def render_report(model: str,
     Renders an accuracy report.
 
     Args:
-        model (str): Model name.
-        errors (int): Number of errors on test set.
-        char_confusions (dict): Dictionary mapping a tuple (gt, pred) to a
+        model: Model name.
+        errors: Number of errors on test set.
+        char_confusions: dictionary mapping a tuple (gt, pred) to a
                                 number of occurrences.
-        scripts (dict): Dictionary counting character per script.
-        insertions (dict): Dictionary counting insertion operations per Unicode
+        scripts: dictionary counting character per script.
+        insertions: dictionary counting insertion operations per Unicode
                            script
-        deletions (int): Number of deletions
-        substitutions (dict): Dictionary counting substitution operations per
+        deletions: Number of deletions
+        substitutions: dictionary counting substitution operations per
                               Unicode script.
 
     Returns:

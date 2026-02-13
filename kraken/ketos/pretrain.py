@@ -19,15 +19,14 @@ kraken.ketos.pretrain
 Command line driver for unsupervised recognition pretraining
 """
 import logging
+from pathlib import Path
 
 import click
 from PIL import Image
 
-from kraken.lib.register import OPTIMIZERS, SCHEDULERS, STOPPERS
-from kraken.lib.default_specs import (RECOGNITION_PRETRAIN_HYPER_PARAMS,
-                                      RECOGNITION_SPEC)
+from kraken.registry import OPTIMIZERS, SCHEDULERS, STOPPERS
 
-from .util import _expand_gt, _validate_manifests, message, to_ptl_device
+from .util import _expand_gt, _validate_manifests, message
 
 logging.captureWarnings(True)
 logger = logging.getLogger('kraken')
@@ -38,99 +37,106 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
 
 @click.command('pretrain')
 @click.pass_context
-@click.option('-B', '--batch-size', show_default=True, type=click.INT,
-              default=RECOGNITION_PRETRAIN_HYPER_PARAMS['batch_size'], help='batch sample size')
-@click.option('--pad', show_default=True, type=click.INT,
-              default=RECOGNITION_PRETRAIN_HYPER_PARAMS['pad'],
+@click.option('-B',
+              '--batch-size',
+              type=int,
+              help='batch sample size')
+@click.option('--pad',
+              'padding',
+              type=int,
               help='Left and right padding around lines')
-@click.option('-o', '--output', show_default=True, type=click.Path(), default='model', help='Output model file')
-@click.option('-s', '--spec', show_default=True, default=RECOGNITION_SPEC,
+@click.option('-o',
+              '--output',
+              'checkpoint_path',
+              type=click.Path(), help='Output checkpoint path')
+@click.option('--weights-format', default='safetensors', help='Output weights format.')
+@click.option('-s',
+              '--spec',
               help='VGSL spec of the network to train.')
-@click.option('-i', '--load', show_default=True, type=click.Path(exists=True,
-              readable=True), help='Load existing file to continue training')
-@click.option('-F', '--freq', show_default=True, default=RECOGNITION_PRETRAIN_HYPER_PARAMS['freq'], type=click.FLOAT,
+@click.option('-i',
+              '--load',
+              type=click.Path(exists=True, readable=True),
+              help='Load existing file to continue training')
+@click.option('-F',
+              '--freq',
+              type=float,
               help='Model saving and report generation frequency in epochs '
                    'during training. If frequency is >1 it must be an integer, '
                    'i.e. running validation every n-th epoch.')
 @click.option('-q',
               '--quit',
-              show_default=True,
-              default=RECOGNITION_PRETRAIN_HYPER_PARAMS['quit'],
               type=click.Choice(STOPPERS),
               help='Stop condition for training. Set to `early` for early stooping or `fixed` for fixed number of epochs')
 @click.option('-N',
               '--epochs',
-              show_default=True,
-              default=RECOGNITION_PRETRAIN_HYPER_PARAMS['epochs'],
+              type=int,
               help='Number of epochs to train for')
 @click.option('--min-epochs',
-              show_default=True,
-              default=RECOGNITION_PRETRAIN_HYPER_PARAMS['min_epochs'],
+              type=int,
               help='Minimal number of epochs to train for when using early stopping.')
 @click.option('--lag',
-              show_default=True,
-              default=RECOGNITION_PRETRAIN_HYPER_PARAMS['lag'],
+              type=int,
               help='Number of evaluations (--report frequency) to wait before stopping training without improvement')
 @click.option('--min-delta',
-              show_default=True,
-              default=RECOGNITION_PRETRAIN_HYPER_PARAMS['min_delta'],
-              type=click.FLOAT,
+              type=float,
               help='Minimum improvement between epochs to reset early stopping. Default is scales the delta by the best loss')
 @click.option('--optimizer',
-              show_default=True,
-              default=RECOGNITION_PRETRAIN_HYPER_PARAMS['optimizer'],
               type=click.Choice(OPTIMIZERS),
               help='Select optimizer')
-@click.option('-r', '--lrate', show_default=True, default=RECOGNITION_PRETRAIN_HYPER_PARAMS['lrate'], help='Learning rate')
-@click.option('-m', '--momentum', show_default=True, default=RECOGNITION_PRETRAIN_HYPER_PARAMS['momentum'], help='Momentum')
-@click.option('-w', '--weight-decay', show_default=True, type=float,
-              default=RECOGNITION_PRETRAIN_HYPER_PARAMS['weight_decay'], help='Weight decay')
-@click.option('--warmup', show_default=True, type=float,
-              default=RECOGNITION_PRETRAIN_HYPER_PARAMS['warmup'], help='Number of samples to ramp up to `lrate` initial learning rate.')
+@click.option('-r',
+              '--lrate',
+              type=float,
+              help='Learning rate')
+@click.option('-m',
+              '--momentum',
+              type=float,
+              help='Momentum')
+@click.option('-w',
+              '--weight-decay',
+              type=float, help='Weight decay')
+@click.option('--gradient-clip-val',
+              type=float,
+              help='Gradient clip value')
+@click.option('--accumulate-grad-batches',
+              type=int,
+              help='Number of batches to accumulate gradient across.')
+@click.option('--warmup',
+              type=float,
+              help='Number of samples to ramp up to `lrate` initial learning rate.')
 @click.option('--schedule',
-              show_default=True,
               type=click.Choice(SCHEDULERS),
-              default=RECOGNITION_PRETRAIN_HYPER_PARAMS['schedule'],
               help='Set learning rate scheduler. For 1cycle, cycle length is determined by the `--epoch` option.')
 @click.option('-g',
               '--gamma',
-              show_default=True,
-              default=RECOGNITION_PRETRAIN_HYPER_PARAMS['gamma'],
+              type=float,
               help='Decay factor for exponential, step, and reduceonplateau learning rate schedules')
+@click.option('--legacy-polygons', is_flag=True, help='Use the legacy polygon extractor.')
 @click.option('-ss',
               '--step-size',
-              show_default=True,
-              default=RECOGNITION_PRETRAIN_HYPER_PARAMS['step_size'],
+              type=int,
               help='Number of validation runs between learning rate decay for exponential and step LR schedules')
 @click.option('--sched-patience',
-              show_default=True,
-              default=RECOGNITION_PRETRAIN_HYPER_PARAMS['rop_patience'],
+              'rop_patience',
+              type=int,
               help='Minimal number of validation runs between LR reduction for reduceonplateau LR schedule.')
 @click.option('--cos-max',
-              show_default=True,
-              default=RECOGNITION_PRETRAIN_HYPER_PARAMS['cos_t_max'],
+              'cos_t_max',
+              type=int,
               help='Epoch of minimal learning rate for cosine LR scheduler.')
 @click.option('--cos-min-lr',
-              show_default=True,
-              default=RECOGNITION_PRETRAIN_HYPER_PARAMS['cos_min_lr'],
+              type=float,
               help='Minimal final learning rate for cosine LR scheduler.')
-@click.option('-p', '--partition', show_default=True, default=0.9,
+@click.option('-p',
+              '--partition',
+              type=float,
               help='Ground truth data partition ratio between train/validation set')
-@click.option('--fixed-splits/--ignore-fixed-splits', show_default=True, default=False,
-              help='Whether to honor fixed splits in binary datasets.')
-@click.option('-t', '--training-files', show_default=True, default=None, multiple=True,
+@click.option('-t', '--training-data', 'training_data', multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with additional paths to training data')
-@click.option('-e', '--evaluation-files', show_default=True, default=None, multiple=True,
+@click.option('-e', '--evaluation-data', 'evaluation_data', multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
-@click.option('--load-hyper-parameters/--no-load-hyper-parameters', show_default=True, default=False,
-              help='When loading an existing model, retrieve hyperparameters from the model')
-@click.option('--force-binarization/--no-binarization', show_default=True,
-              default=False, help='Forces input images to be binary, otherwise '
-              'the appropriate color format will be auto-determined through the '
-              'network specification. Will be ignored in `path` mode.')
-@click.option('-f', '--format-type', type=click.Choice(['path', 'xml', 'alto', 'page', 'binary']), default='path',
+@click.option('-f', '--format-type', type=click.Choice(['path', 'xml', 'alto', 'page', 'binary']),
               help='Sets the training data format. In ALTO and PageXML mode all '
               'data is extracted from xml files containing both line definitions and a '
               'link to source images. In `path` mode arguments are image files '
@@ -138,149 +144,132 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
               'containing the transcription. In binary mode files are datasets '
               'files containing pre-extracted text lines.')
 @click.option('--augment/--no-augment',
-              show_default=True,
-              default=RECOGNITION_PRETRAIN_HYPER_PARAMS['augment'],
               help='Enable image augmentation')
-@click.option('-mw', '--mask-width', show_default=True,
-              default=RECOGNITION_PRETRAIN_HYPER_PARAMS['mask_width'],
+@click.option('-mw',
+              '--mask-width',
+              type=int,
               help='Width of sampled masks at scale of the sampled tensor, e.g. '
                    '4X subsampling in convolutional layers with mask width 3 results '
                    'in an effective mask width of 12.')
-@click.option('-mp', '--mask-probability',
-              show_default=True,
-              default=RECOGNITION_PRETRAIN_HYPER_PARAMS['mask_prob'],
+@click.option('-mp',
+              '--mask-probability',
+              'mask_prob',
+              type=float,
               help='Probability of a particular position being the start position of a mask.')
-@click.option('-nn', '--num-negatives',
-              show_default=True,
-              default=RECOGNITION_PRETRAIN_HYPER_PARAMS['num_negatives'],
+@click.option('-nn',
+              '--num-negatives',
+              type=int,
               help='Number of negative samples for the contrastive loss.')
-@click.option('-lt', '--logit-temp',
-              show_default=True,
-              default=RECOGNITION_PRETRAIN_HYPER_PARAMS['logit_temp'],
+@click.option('-lt',
+              '--logit-temp',
+              type=float,
               help='Multiplicative factor for the logits used in contrastive loss.')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
-@click.option('--legacy-polygons', show_default=True, default=False, is_flag=True, help='Use the legacy polygon extractor.')
-def pretrain(ctx, batch_size, pad, output, spec, load, freq, quit, epochs,
-             min_epochs, lag, min_delta, optimizer, lrate, momentum,
-             weight_decay, warmup, schedule, gamma, step_size, sched_patience,
-             cos_max, cos_min_lr, partition, fixed_splits, training_files,
-             evaluation_files, load_hyper_parameters,
-             force_binarization, format_type, augment, mask_probability,
-             mask_width, num_negatives, logit_temp, ground_truth,
-             legacy_polygons):
+def pretrain(ctx, **kwargs):
     """
     Trains a model from image-text pairs.
     """
-    if not (0 <= freq <= 1) and freq % 1.0 != 0:
-        raise click.BadOptionUsage('freq', 'freq needs to be either in the interval [0,1.0] or a positive integer.')
+    params = ctx.params.copy()
+    params.update(ctx.meta)
+    resume = params.pop('resume', None)
+    load = params.pop('load', None)
+    training_data = params.pop('training_data', [])
+    ground_truth = list(params.pop('ground_truth', []))
 
-    if augment:
+    if sum(map(bool, [resume, load])) > 1:
+        raise click.BadOptionsUsage('load', 'load/resume options are mutually exclusive.')
+
+    if params.get('pl_logger') == 'tensorboard':
         try:
-            import albumentations  # NOQA
+            import tensorboard  # NOQA
         except ImportError:
-            raise click.BadOptionUsage('augment', 'augmentation needs the `albumentations` package installed.')
-
-    import shutil
+            raise click.BadOptionUsage('logger', 'tensorboard logger needs the `tensorboard` package installed.')
 
     from threadpoolctl import threadpool_limits
+    from lightning.pytorch.callbacks import ModelCheckpoint
 
     from kraken.lib.pretrain import (PretrainDataModule,
                                      RecognitionPretrainModel)
-    from kraken.lib.train import KrakenTrainer
+    from kraken.train import KrakenTrainer
+    from kraken.train.utils import KrakenOnExceptionCheckpoint
 
-    hyper_params = RECOGNITION_PRETRAIN_HYPER_PARAMS.copy()
-    hyper_params.update({'freq': freq,
-                         'pad': pad,
-                         'batch_size': batch_size,
-                         'quit': quit,
-                         'epochs': epochs,
-                         'min_epochs': min_epochs,
-                         'lag': lag,
-                         'min_delta': min_delta,
-                         'optimizer': optimizer,
-                         'lrate': lrate,
-                         'momentum': momentum,
-                         'weight_decay': weight_decay,
-                         'warmup': warmup,
-                         'schedule': schedule,
-                         'gamma': gamma,
-                         'step_size': step_size,
-                         'rop_patience': sched_patience,
-                         'cos_t_max': cos_max,
-                         'cos_min_lr': cos_min_lr,
-                         'augment': augment,
-                         'mask_prob': mask_probability,
-                         'mask_width': mask_width,
-                         'num_negatives': num_negatives,
-                         'logit_temp': logit_temp})
+    from kraken.configs import VGSLPreTrainingConfig, VGSLPreTrainingDataConfig
+    from kraken.models.convert import convert_models
 
     # disable automatic partition when given evaluation set explicitly
-    if evaluation_files:
-        partition = 1
-    ground_truth = list(ground_truth)
+    if params['evaluation_data']:
+        params['partition'] = 1
 
-    # merge training_files into ground_truth list
-    if training_files:
-        ground_truth.extend(training_files)
+    # merge training_data into ground_truth list
+    if training_data:
+        ground_truth.extend(training_data)
 
-    if len(ground_truth) == 0:
+    params['training_data'] = ground_truth
+
+    if len(params['training_data']) == 0:
         raise click.UsageError('No training data was provided to the train command. Use `-t` or the `ground_truth` argument.')
 
-    try:
-        accelerator, device = to_ptl_device(ctx.meta['device'])
-    except Exception as e:
-        raise click.BadOptionUsage('device', str(e))
-
-    if hyper_params['freq'] > 1:
-        val_check_interval = {'check_val_every_n_epoch': int(hyper_params['freq'])}
+    if params['freq'] > 1:
+        val_check_interval = {'check_val_every_n_epoch': int(params['freq'])}
     else:
-        val_check_interval = {'val_check_interval': hyper_params['freq']}
+        val_check_interval = {'val_check_interval': params['freq']}
 
-    model = RecognitionPretrainModel(hyper_params=hyper_params,
-                                     output=output,
-                                     spec=spec,
-                                     model=load,
-                                     load_hyper_parameters=load_hyper_parameters,
-                                     legacy_polygons=legacy_polygons)
+    cbs = [KrakenOnExceptionCheckpoint(dirpath=params.get('checkpoint_path'),
+                                       filename='checkpoint_abort')]
+    checkpoint_callback = ModelCheckpoint(dirpath=Path(params.pop('checkpoint_path')),
+                                          save_top_k=10,
+                                          monitor='CE',
+                                          mode='min',
+                                          auto_insert_metric_name=False,
+                                          filename='checkpoint_{epoch:02d}-{val_metric:.4f}')
+    cbs.append(checkpoint_callback)
 
-    data_module = PretrainDataModule(batch_size=hyper_params.pop('batch_size'),
-                                     pad=hyper_params.pop('pad'),
-                                     augment=hyper_params.pop('augment'),
-                                     training_data=ground_truth,
-                                     evaluation_data=evaluation_files,
-                                     partition=partition,
-                                     binary_dataset_split=fixed_splits,
-                                     num_workers=ctx.meta['workers'],
-                                     height=model.height,
-                                     width=model.width,
-                                     channels=model.channels,
-                                     force_binarization=force_binarization,
-                                     format_type=format_type,
-                                     legacy_polygons=legacy_polygons,)
+    dm_config = VGSLPreTrainingDataConfig(**params)
+    m_config = VGSLPreTrainingConfig(**params)
 
-    model.len_train_set = len(data_module.train_dataloader())
+    if resume:
+        data_module = PretrainDataModule.load_from_checkpoint(resume, weights_only=False)
+    else:
+        data_module = PretrainDataModule(dm_config)
 
-    trainer = KrakenTrainer(accelerator=accelerator,
-                            devices=device,
+    trainer = KrakenTrainer(accelerator=ctx.meta['accelerator'],
+                            devices=ctx.meta['device'],
                             precision=ctx.meta['precision'],
-                            max_epochs=hyper_params['epochs'] if hyper_params['quit'] == 'fixed' else -1,
-                            min_epochs=hyper_params['min_epochs'],
+                            max_epochs=params['epochs'] if params['quit'] == 'fixed' else -1,
+                            min_epochs=params['min_epochs'],
                             enable_progress_bar=True if not ctx.meta['verbose'] else False,
                             deterministic=ctx.meta['deterministic'],
+                            enable_model_summary=False,
+                            accumulate_grad_batches=params['accumulate_grad_batches'],
+                            callbacks=cbs,
+                            gradient_clip_val=params['gradient_clip_val'],
+                            num_sanity_val_steps=0,
+                            use_distributed_sampler=False,
                             **val_check_interval)
 
-    with threadpool_limits(limits=ctx.meta['threads']):
-        trainer.fit(model, datamodule=data_module)
+    with trainer.init_module(empty_init=False if (load or resume) else True):
+        if load:
+            message(f'Loading from checkpoint {load}.')
+            if load.endswith('ckpt'):
+                model = RecognitionPretrainModel.load_from_checkpoint(load, config=m_config, weights_only=False)
+            else:
+                model = RecognitionPretrainModel.load_from_weights(load, m_config)
+        elif resume:
+            message(f'Resuming from checkpoint {resume}.')
+            model = RecognitionPretrainModel.load_from_checkpoint(resume, weights_only=False)
+        else:
+            message('Initializing new model.')
+            model = RecognitionPretrainModel(m_config)
 
-    if model.best_epoch == -1:
-        logger.warning('Model did not improve during training.')
-        ctx.exit(1)
+    with threadpool_limits(limits=ctx.meta['num_threads']):
+        if resume:
+            trainer.fit(model, data_module, ckpt_path=resume)
+        else:
+            trainer.fit(model, data_module)
 
-    if not model.current_epoch:
-        logger.warning('Training aborted before end of first epoch.')
-        ctx.exit(1)
+    score = checkpoint_callback.best_model_score.item()
+    message(f'Best model checkpoint: {checkpoint_callback.best_model_path}')
 
-    if quit == 'early':
-        message(f'Moving best model {model.best_model} ({model.best_metric}) to {output}_best.mlmodel')
-        logger.info(f'Moving best model {model.best_model} ({model.best_metric}) to {output}_best.mlmodel')
-        shutil.copy(f'{model.best_model}', f'{output}_best.mlmodel')
+    weight_path = Path(checkpoint_callback.best_model_path).with_name(f'best_{score:.4f}.{params.get("weights_format")}')
+    opath = convert_models([checkpoint_callback.best_model_path], weight_path, weights_format=params['weights_format'])
+    message(f'Converting best model {checkpoint_callback.best_model_path} (score: {score:.4f}) to weights file {opath}')

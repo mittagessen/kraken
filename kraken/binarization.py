@@ -17,7 +17,8 @@
 kraken.binarization
 ~~~~~~~~~~~~~~~~~~~
 
-An adaptive binarization algorithm.
+An adaptive binarization algorithm. This code is legacy and only remains for
+historical reasons. Binarization is no longer necessary for most workflows.
 """
 import logging
 import warnings

@@ -18,22 +18,27 @@ kraken.ketos
 
 Command line drivers for training functionality.
 """
-
+import click
+import importlib
 import logging
 
-import click
 from PIL import Image
 from rich.traceback import install
 
 from kraken.lib import log
-from kraken.lib.register import PRECISIONS
+from kraken.registry import PRECISIONS
 
-from .dataset import compile
-from .pretrain import pretrain
-from .recognition import test, train
-from .repo import publish
-from .ro import roadd, rotrain
-from .segmentation import segtest, segtrain
+from .util import _load_config, to_ptl_device
+
+from kraken.configs import (Config,
+                            TrainingDataConfig,
+                            VGSLPreTrainingConfig,
+                            VGSLRecognitionTrainingConfig,
+                            VGSLRecognitionTrainingDataConfig,
+                            BLLASegmentationTrainingConfig,
+                            BLLASegmentationTrainingDataConfig,
+                            ROTrainingDataConfig,
+                            ROTrainingConfig)
 
 logging.captureWarnings(True)
 logger = logging.getLogger('kraken')
@@ -46,51 +51,64 @@ install(suppress=[click])
 Image.MAX_IMAGE_PIXELS = 20000 ** 2
 
 
-@click.group()
+@click.group(context_settings=dict(show_default=True,
+                                   default_map={**Config().__dict__,
+                                                **TrainingDataConfig().__dict__,
+                                                'train': {**VGSLRecognitionTrainingConfig().__dict__, **VGSLRecognitionTrainingDataConfig().__dict__},
+                                                'test': VGSLRecognitionTrainingDataConfig().__dict__,
+                                                'segtrain': {**BLLASegmentationTrainingConfig().__dict__, **BLLASegmentationTrainingDataConfig().__dict__},
+                                                'segtest': {**BLLASegmentationTrainingConfig().__dict__, **BLLASegmentationTrainingDataConfig().__dict__},
+                                                'pretrain': {**VGSLRecognitionTrainingDataConfig().__dict__, **VGSLPreTrainingConfig().__dict__},
+                                                'rotrain': {**ROTrainingConfig().__dict__, **ROTrainingDataConfig().__dict__}}))
 @click.version_option()
 @click.pass_context
 @click.option('-v', '--verbose', default=0, count=True)
-@click.option('-d', '--device', default='cpu', show_default=True,
+@click.option('-d', '--device', show_default=True,
               help='Select device to use (cpu, cuda:0, cuda:1, ...)')
 @click.option('--precision',
-              show_default=True,
-              default='32-true',
               type=click.Choice(PRECISIONS),
               help='Numerical precision to use for training. Default is 32-bit single-point precision.')
-@click.option('--workers', show_default=True, default=1, type=click.IntRange(0), help='Number of data loading worker processes.')
-@click.option('--threads', show_default=True, default=1, type=click.IntRange(1), help='Maximum size of OpenMP/BLAS thread pool.')
+@click.option('--workers', 'num_workers', type=click.IntRange(0), help='Number of data loading worker processes.')
+@click.option('--threads', 'num_threads', type=click.IntRange(1), help='Maximum size of OpenMP/BLAS thread pool.')
 @click.option('-s', '--seed', default=None, type=click.INT,
               help='Seed for numpy\'s and torch\'s RNG. Set to a fixed value to '
                    'ensure reproducible random splits of data')
-@click.option('-r', '--deterministic/--no-deterministic', default=False,
+@click.option('-r', '--deterministic/--no-deterministic',
               help="Enables deterministic training. If no seed is given and enabled the seed will be set to 42.")
-def cli(ctx, verbose, device, precision, workers, threads, seed, deterministic):
-    ctx.meta['deterministic'] = False if not deterministic else 'warn'
-    if seed:
+@click.option('--config',
+              type=click.File(mode='r', lazy=True),
+              help="Path to configuration file.",
+              callback=_load_config,
+              is_eager=True,
+              expose_value=False,
+              required=False)
+def cli(ctx, **kwargs):
+    params = ctx.params
+
+    ctx.meta['deterministic'] = False if not params['deterministic'] else 'warn'
+    if params['seed']:
         from lightning.pytorch import seed_everything
-        seed_everything(seed, workers=True)
-    elif deterministic:
+        seed_everything(params['seed'], workers=True)
+    elif params['deterministic']:
         from lightning.pytorch import seed_everything
         seed_everything(42, workers=True)
 
-    ctx.meta['verbose'] = verbose
-    ctx.meta['device'] = device
-    ctx.meta['precision'] = precision
-    ctx.meta['workers'] = workers
-    ctx.meta['threads'] = threads
+    try:
+        ctx.meta['accelerator'], ctx.meta['device'] = to_ptl_device(params['device'])
+    except Exception as e:
+        raise click.BadOptionUsage('device', str(e))
 
-    log.set_logger(logger, level=30 - min(10 * verbose, 20))
+    ctx.meta['verbose'] = params.get('verbose')
+    ctx.meta['precision'] = params.get('precision')
+    ctx.meta['num_workers'] = params.get('num_workers')
+    ctx.meta['num_threads'] = params.get('num_threads')
+
+    log.set_logger(logger, level=30 - min(10 * params['verbose'], 20))
 
 
-cli.add_command(compile)
-cli.add_command(pretrain)
-cli.add_command(train)
-cli.add_command(test)
-cli.add_command(segtrain)
-cli.add_command(segtest)
-cli.add_command(publish)
-cli.add_command(rotrain)
-cli.add_command(roadd)
+for entry_point in sorted(importlib.metadata.entry_points(group='ketos.cli')):
+    cli.add_command(entry_point.load(), name=entry_point.name)
+
 
 if __name__ == '__main__':
     cli()

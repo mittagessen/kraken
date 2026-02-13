@@ -15,5 +15,5 @@
 """
 Tools for unsupervised pretraining of recognition models.
 """
-
+from .layers import Wav2Vec2Mask  # NOQA
 from .model import PretrainDataModule, RecognitionPretrainModel  # NOQA

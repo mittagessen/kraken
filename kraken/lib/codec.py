@@ -19,9 +19,11 @@ graphemes.
 """
 import logging
 from collections import Counter
-from typing import Dict, List, Sequence, Set, Tuple, Union
+from collections.abc import Sequence
+from typing import Union
 
 import numpy as np
+import torch.serialization
 from torch import IntTensor
 
 from kraken.lib.exceptions import KrakenCodecException, KrakenEncodeException
@@ -56,7 +58,7 @@ class PytorchCodec(object):
                               entries or the mapping is non-singular or
                               non-prefix-free.
     """
-    def __init__(self, charset: Union[Dict[str, Sequence[int]], Sequence[str], str], strict=False):
+    def __init__(self, charset: Union[dict[str, Sequence[int]], Sequence[str], str], strict=False):
         if isinstance(charset, dict):
             self.c2l = charset
         else:
@@ -65,7 +67,7 @@ class PytorchCodec(object):
                 raise KrakenCodecException(f'Duplicate entry in codec definition string: {cc}')
             self.c2l = {k: [v] for v, k in enumerate(sorted(charset), start=1)}
         self.c_sorted = sorted(self.c2l.keys(), key=len, reverse=True)
-        self.l2c: Dict[Tuple[int], str] = {tuple(v): k for k, v in self.c2l.items()}
+        self.l2c: dict[tuple[int], str] = {tuple(v): k for k, v in self.c2l.items()}
         self.l2c_single = {k[0]: v for k, v in self.l2c.items() if len(k) == 1}
         self.strict = strict
         if not self.is_valid:
@@ -117,7 +119,7 @@ class PytorchCodec(object):
             KrakenEncodeException: if the a subsequence is not encodable and the
                                    codec is set to strict mode.
         """
-        labels: List[int] = []
+        labels: list[int] = []
         idx = 0
         while idx < len(s):
             encodable_suffix = False
@@ -143,7 +145,7 @@ class PytorchCodec(object):
 
         return IntTensor(labels)
 
-    def decode(self, labels: Sequence[Tuple[int, int, int, float]]) -> List[Tuple[str, int, int, float]]:
+    def decode(self, labels: Sequence[tuple[int, int, int, float]]) -> list[tuple[str, int, int, float]]:
         """
         Decodes a labelling.
 
@@ -192,7 +194,7 @@ class PytorchCodec(object):
                 idx += 1
         return decoded
 
-    def merge(self, codec: 'PytorchCodec') -> Tuple['PytorchCodec', Set]:
+    def merge(self, codec: 'PytorchCodec') -> tuple['PytorchCodec', set]:
         """
         Transforms this codec (c1) into another (c2) reusing as many labels as
         possible.
@@ -237,7 +239,7 @@ class PytorchCodec(object):
             c2l_cand[k] = [add_labels[label] for label in v]
         return PytorchCodec(c2l_cand, self.strict), set(rm_labels)
 
-    def add_labels(self, charset: Union[Dict[str, Sequence[int]], Sequence[str], str]) -> 'PytorchCodec':
+    def add_labels(self, charset: Union[dict[str, Sequence[int]], Sequence[str], str]) -> 'PytorchCodec':
         """
         Adds additional characters/labels to the codec.
 
@@ -263,3 +265,6 @@ class PytorchCodec(object):
 
     def __repr__(self):
         return f'PytorchCodec({self.c2l})'
+
+
+torch.serialization.add_safe_globals([PytorchCodec])

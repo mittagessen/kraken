@@ -1,39 +1,58 @@
 """
 Layers for VGSL models
 """
-from typing import TYPE_CHECKING, Tuple
+from typing import TYPE_CHECKING
 
 import torch
 from torch import nn
 
+from kraken.models import BaseModel
+
+import logging
+
+logger = logging.getLogger(__name__)
+
 if TYPE_CHECKING:
     from kraken.lib.vgsl import VGSLBlock
 
-# all tensors are ordered NCHW, the "feature" dimension is C, so the output of
-# an LSTM will be put into C same as the filters of a CNN.
-
-__all__ = ['MLP']
+__all__ = ['ROMLP']
 
 
-class MLP(nn.Module):
+class ROMLP(nn.Module, BaseModel):
     """
     A simple 2 layer MLP for reading order determination.
     """
-    def __init__(self, feature_size: int, hidden_size: int):
-        super(MLP, self).__init__()
-        self.fc1 = nn.Linear(feature_size, hidden_size)
+    _kraken_min_version = '5.0.0'
+    model_type = ['reading_order']
+
+    def __init__(self, **kwargs):
+        super().__init__()
+        self.user_metadata = {}
+        self.class_mapping = kwargs.get('class_mapping', None)
+        if self.class_mapping is None:
+            raise ValueError('`class_mapping` missing in reading order model arguments.')
+        self.level = kwargs.get('level', None)
+        if self.level is None:
+            raise ValueError('`level` missing in reading order model arguments.')
+
+        num_classes = max(0, *self.class_mapping.values()) + 1
+        self.feature_size = 2 * num_classes + 12
+        self.hidden_size = self.feature_size * 2
+
+        self.user_metadata = kwargs
+        self.fc1 = nn.Linear(self.feature_size, self.hidden_size)
         self.relu = nn.ReLU()
-        self.fc2 = nn.Linear(hidden_size, 1)
-        self.feature_size = feature_size
-        self.hidden_size = hidden_size
-        self.class_mapping = None
+        self.fc2 = nn.Linear(self.hidden_size, 1)
 
     def forward(self, x):
         x = self.fc1(x)
         x = self.relu(x)
         return self.fc2(x)
 
-    def get_shape(self, input: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
+    def prepare_for_inference(self, config):
+        pass
+
+    def get_shape(self, input: tuple[int, int, int, int]) -> tuple[int, int, int, int]:
         """
         Calculates the output shape from input 4D tuple NCHW.
         """

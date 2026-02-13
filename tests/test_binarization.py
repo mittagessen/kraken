@@ -41,11 +41,11 @@ class TestBinarization(unittest.TestCase):
             self.assertEqual(254, res.histogram().count(0), msg='Output not '
                              'binarized')
 
-    def test_binarize_tif(self):
+    def test_binarize_webp(self):
         """
-        Tests binarization of RGB TIFF images.
+        Tests binarization of RGB WEBP images.
         """
-        with Image.open(resources /'input.tif') as im:
+        with Image.open(resources /'input.webp') as im:
             res = nlbin(im)
             # calculate histogram and check if only pixels of value 0/255 exist
             self.assertEqual(254, res.histogram().count(0), msg='Output not '
@@ -55,7 +55,7 @@ class TestBinarization(unittest.TestCase):
         """
         Test binarization of mode 'L' images.
         """
-        with Image.open(resources / 'input.tif') as im:
+        with Image.open(resources / 'input.webp') as im:
             res = nlbin(im.convert('L'))
             # calculate histogram and check if only pixels of value 0/255 exist
             self.assertEqual(254, res.histogram().count(0), msg='Output not '

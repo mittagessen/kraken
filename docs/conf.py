@@ -1,3 +1,5 @@
+import os
+
 # Configuration file for the Sphinx documentation builder.
 #
 # For the full list of built-in configuration values, see the documentation:
@@ -7,7 +9,7 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = 'kraken'
-copyright = '2015-2025, Benjamin Kiessling'
+copyright = '2015-2026, Benjamin Kiessling'
 author = 'Benjamin Kiessling'
 
 from subprocess import Popen, PIPE
@@ -16,11 +18,12 @@ release = pipe.stdout.read().decode('utf-8')
 
 extensions = [
     'sphinx.ext.autodoc',
-    'sphinx.ext.autodoc.typehints',
+    'sphinx_autodoc_typehints',
     'autoapi.extension',
     'sphinx.ext.napoleon',
     'sphinx.ext.githubpages',
     'sphinx_multiversion',
+    'sphinx_github_changelog',
 ]
 
 templates_path = ['_templates']

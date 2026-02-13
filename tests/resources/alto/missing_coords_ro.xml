@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<alto xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xmlns="http://www.loc.gov/standards/alto/ns-v4#"
+      xsi:schemaLocation="http://www.loc.gov/standards/alto/ns-v4# http://www.loc.gov/standards/alto/v4/alto-4-3.xsd">
+  <Description>
+    <MeasurementUnit>pixel</MeasurementUnit>
+    <sourceImageInformation>
+      <fileName>bsb00084914_00007.jpg</fileName>
+    </sourceImageInformation>
+  </Description>
+  <Tags>
+    <OtherTag ID="ro_tag" DESCRIPTION="Test reading order"/>
+  </Tags>
+  <ReadingOrder>
+    <OrderedGroup ID="og_test" TAGREFS="ro_tag">
+      <ElementRef ID="e_0" REF="tb_1"/>
+      <ElementRef ID="e_1" REF="tb_nocoords"/>
+      <ElementRef ID="e_2" REF="tb_2"/>
+    </OrderedGroup>
+  </ReadingOrder>
+  <Layout>
+    <Page WIDTH="1000" HEIGHT="1000" ID="page_1">
+      <PrintSpace HPOS="0" VPOS="0" WIDTH="1000" HEIGHT="1000">
+        <TextBlock HPOS="10" VPOS="10" WIDTH="480" HEIGHT="200" ID="tb_1">
+          <TextLine ID="tl_1" BASELINE="20,180 480,180" HPOS="20" VPOS="20" WIDTH="460" HEIGHT="160">
+            <String ID="s_1" CONTENT="Line" HPOS="20" VPOS="20" WIDTH="100" HEIGHT="160"/>
+            <SP WIDTH="10" HPOS="120" VPOS="20"/>
+            <String ID="s_2" CONTENT="one" HPOS="130" VPOS="20" WIDTH="100" HEIGHT="160"/>
+          </TextLine>
+          <TextLine ID="tl_2" BASELINE="20,380 480,380" HPOS="20" VPOS="220" WIDTH="460" HEIGHT="160">
+            <String ID="s_3" CONTENT="Line" HPOS="20" VPOS="220" WIDTH="100" HEIGHT="160"/>
+            <SP WIDTH="10" HPOS="120" VPOS="220"/>
+            <String ID="s_4" CONTENT="two" HPOS="130" VPOS="220" WIDTH="100" HEIGHT="160"/>
+          </TextLine>
+        </TextBlock>
+        <!-- TextBlock without any coordinate attributes -->
+        <TextBlock ID="tb_nocoords">
+          <TextLine ID="tl_3" BASELINE="20,580 480,580" HPOS="20" VPOS="420" WIDTH="460" HEIGHT="160">
+            <String ID="s_5" CONTENT="Line" HPOS="20" VPOS="420" WIDTH="100" HEIGHT="160"/>
+            <SP WIDTH="10" HPOS="120" VPOS="420"/>
+            <String ID="s_6" CONTENT="three" HPOS="130" VPOS="420" WIDTH="100" HEIGHT="160"/>
+          </TextLine>
+        </TextBlock>
+        <TextBlock HPOS="510" VPOS="10" WIDTH="480" HEIGHT="200" ID="tb_2">
+          <TextLine ID="tl_4" BASELINE="520,180 990,180" HPOS="520" VPOS="20" WIDTH="460" HEIGHT="160">
+            <String ID="s_7" CONTENT="Line" HPOS="520" VPOS="20" WIDTH="100" HEIGHT="160"/>
+            <SP WIDTH="10" HPOS="620" VPOS="20"/>
+            <String ID="s_8" CONTENT="four" HPOS="630" VPOS="20" WIDTH="100" HEIGHT="160"/>
+          </TextLine>
+        </TextBlock>
+      </PrintSpace>
+    </Page>
+  </Layout>
+</alto>
