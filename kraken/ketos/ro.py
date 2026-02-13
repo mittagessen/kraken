@@ -108,7 +108,6 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with paths to evaluation data. Overrides the `-p` parameter')
 @click.option('-f', '--format-type', type=click.Choice(['xml', 'alto', 'page']),
->>>>>>> 59d8599 (proper typing in ketos CLI parameters)
               help='Sets the training data format. In ALTO and PageXML mode all '
               'data is extracted from xml files containing both baselines and a '
               'link to source images.')
