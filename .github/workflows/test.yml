@@ -123,13 +123,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/download-artifact@v6
+    - name: Download all the dists
+      uses: actions/download-artifact@v6
+      with:
         name: python-package-distributions
         path: dist/
-      - uses: "marvinpinto/action-automatic-releases@latest"
-        with:
-          repo_token: "${{ secrets.GITHUB_TOKEN }}"
-          prerelease: false
-          draft: true
-          files: |
-            dist/*
+    - name: Create GH release
+      uses: "marvinpinto/action-automatic-releases@latest"
+      with:
+        repo_token: "${{ secrets.GITHUB_TOKEN }}"
+        prerelease: false
+        draft: true
+        files: |
+          dist/*
