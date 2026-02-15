@@ -72,7 +72,8 @@ def get_input_parser(type_str: str) -> Callable[[str], dict[str, Any]]:
         from kraken.lib.xml import XMLPage
         return XMLPage
     elif type_str == 'image':
-        return Image.open
+        from kraken.lib.util import open_image
+        return open_image
 
 
 # chainable functions of functional components (binarization/segmentation/recognition)
@@ -89,7 +90,8 @@ def binarizer(threshold, zoom, escale, border, perc, range, low, high, input, ou
         raise click.UsageError('Binarization has to be the initial process.')
 
     try:
-        im = Image.open(input)
+        from kraken.lib.util import open_image
+        im = open_image(input)
     except IOError as e:
         raise click.BadParameter(str(e))
     message('Binarizing\t', nl=False)
@@ -140,7 +142,8 @@ def segmenter(legacy, model, config, input, output) -> None:
         ctx.meta['base_image'] = input
 
     try:
-        im = Image.open(input)
+        from kraken.lib.util import open_image
+        im = open_image(input)
     except IOError as e:
         raise click.BadParameter(str(e))
     message(f'Segmenting {ctx.meta["orig_file"]}\t', nl=False)
@@ -206,7 +209,8 @@ def recognizer(model, no_segmentation, config, input, output) -> None:
                 config.bidi_reordering = doc.base_dir
             bounds = doc.to_container()
     try:
-        im = Image.open(ctx.meta['base_image'])
+        from kraken.lib.util import open_image
+        im = open_image(ctx.meta['base_image'])
     except IOError as e:
         raise click.BadParameter(str(e))
 
@@ -250,7 +254,7 @@ def recognizer(model, no_segmentation, config, input, output) -> None:
         if ctx.meta['output_mode'] != 'native':
             from kraken import serialization
             fp.write(serialization.serialize(results=results,
-                                             image_size=Image.open(ctx.meta['base_image']).size,
+                                             image_size=open_image(ctx.meta['base_image']).size,
                                              writing_mode=ctx.meta['text_direction'],
                                              scripts=None,
                                              template=ctx.meta['output_template'],

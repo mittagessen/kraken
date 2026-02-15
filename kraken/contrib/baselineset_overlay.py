@@ -16,6 +16,7 @@ def cli(files):
     from PIL import Image
 
     from kraken.lib import dataset
+    from kraken.lib.util import open_image
 
     batch, channels, height, width = 1, 3, 1200, 0
     transforms = dataset.ImageInputTransforms(batch, height, width, channels, 0, valid_norm=False)
@@ -27,7 +28,7 @@ def cli(files):
     for idx, batch in enumerate(ds):
         img = ds.imgs[idx]
         print(img)
-        im = Image.open(img)
+        im = open_image(img)
         res_tf = tf.Compose(transforms.transforms[:2])
         scal_im = res_tf(im)
         o = batch['target'].numpy()

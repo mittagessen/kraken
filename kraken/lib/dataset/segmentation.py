@@ -36,7 +36,7 @@ from torchvision.transforms import v2
 
 from kraken.lib.dataset.utils import _get_type
 from kraken.lib.segmentation import scale_regions
-from kraken.lib.util import is_bitonal
+from kraken.lib.util import is_bitonal, open_image
 
 if TYPE_CHECKING:
     from kraken.containers import Segmentation
@@ -224,7 +224,7 @@ class BaselineSet(Dataset):
         if not isinstance(im, Image.Image):
             try:
                 logger.debug(f'Attempting to load {im}')
-                im = Image.open(im)
+                im = open_image(im)
                 im, target, baselines = self.transform(im, target)
                 self._update_im_mode(im)
                 return {'image': im, 'target': target, 'baselines': baselines}

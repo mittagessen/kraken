@@ -11,6 +11,7 @@ from itertools import cycle
 from PIL import Image, ImageDraw
 
 from kraken.binarization import nlbin
+from kraken.lib.util import open_image
 from kraken.lib import models
 from kraken.pageseg import segment
 from kraken.rpred import rpred
@@ -26,7 +27,7 @@ cmap = cycle([(230, 25, 75, 127),
 net = models.load_any(sys.argv[1])
 
 for fname in sys.argv[2:]:
-    im = Image.open(fname)
+    im = open_image(fname)
     print(fname)
     im = nlbin(im)
     res = segment(im, maxcolseps=0)

@@ -17,7 +17,15 @@ from kraken.lib.exceptions import KrakenInputException
 if TYPE_CHECKING:
     from os import PathLike
 
-__all__ = ['pil2array', 'array2pil', 'is_bitonal', 'make_printable', 'get_im_str', 'parse_gt_path']
+__all__ = ['pil2array', 'array2pil', 'is_bitonal', 'make_printable', 'get_im_str', 'open_image', 'parse_gt_path']
+
+
+def open_image(fp) -> Image.Image:
+    """Opens an image and applies EXIF rotation if present."""
+    from PIL import ImageOps
+    im = Image.open(fp)
+    im = ImageOps.exif_transpose(im)
+    return im
 
 
 def pil2array(im: Image.Image, alpha: int = 0) -> np.ndarray:
@@ -125,7 +133,7 @@ def parse_gt_path(path: Union[str, 'PathLike'],
         text_direction: Orientation of the line box.
     """
     try:
-        with Image.open(path) as im:
+        with open_image(path) as im:
             w, h = im.size
     except Exception as e:
         raise KrakenInputException(e)

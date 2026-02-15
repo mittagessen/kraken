@@ -67,6 +67,7 @@ def cli(model, text_direction, repolygonize, topline, height_scale, files):
 
     from kraken import blla
     from kraken.lib import segmentation, vgsl, xml
+    from kraken.lib.util import open_image
 
     loc = {'topline': True,
            'baseline': False,
@@ -79,7 +80,7 @@ def cli(model, text_direction, repolygonize, topline, height_scale, files):
             click.echo(f'Processing {doc} ', nl=False)
             data = xml.XMLPage(doc).to_container()
             if repolygonize:
-                im = Image.open(data.imagename).convert('L')
+                im = open_image(data.imagename).convert('L')
                 lines = data.lines
                 polygons = segmentation.calculate_polygonal_environment(im,
                                                                         [x.baseline for x in lines],
@@ -90,7 +91,7 @@ def cli(model, text_direction, repolygonize, topline, height_scale, files):
             lines = defaultdict(list)
             for line in data.lines:
                 lines[line.tags['type'][0]['type']].append(line)
-            im = Image.open(data.imagename).convert('RGBA')
+            im = open_image(data.imagename).convert('RGBA')
             for t, ls in lines.items():
                 tmp = Image.new('RGBA', im.size, (0, 0, 0, 0))
                 draw = ImageDraw.Draw(tmp)
@@ -119,7 +120,7 @@ def cli(model, text_direction, repolygonize, topline, height_scale, files):
         net = vgsl.TorchVGSLModel.load_model(model)
         for doc in files:
             click.echo(f'Processing {doc} ', nl=False)
-            im = Image.open(doc)
+            im = open_image(doc)
             res = blla.segment(im, model=net, text_direction=text_direction)
             # reorder lines by type
             lines = defaultdict(list)

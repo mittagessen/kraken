@@ -10,6 +10,8 @@ from statistics import mean
 from lxml import etree
 from PIL import Image
 
+from kraken.lib.util import open_image
+
 
 # a custom exception to indicate when a page or other element doesn't
 # have a bounding box where we would expect it.
@@ -215,7 +217,7 @@ def rewrite_ocr_page_title(xhtml, file_name, image_x, image_y):
     ocr_page = xhtml.xpath("//html:div[@class='ocr_page'][1]", namespaces={'html': "http://www.w3.org/1999/xhtml"})[0]
     image_file_name = (file_name.rsplit('.', 1)[0] + '.png')
     image_path = os.path.join(args.imageDir, image_file_name)
-    image = Image.open(image_path)
+    image = open_image(image_path)
     image_x, image_y = image.size
     new_title = "bbox 0 0 " + str(image_x) + " " + str(image_y) + ";image " + image_file_name
     ocr_page.set('title', new_title)
@@ -285,7 +287,7 @@ for root, dirs, files in os.walk(args.inputDir):
                                 # remove '.html' and add '.png'
                                 image_file_name = file_name[:-5] + '.png'
                                 image_path = os.path.join(args.imageDir, image_file_name)
-                                image = Image.open(image_path)
+                                image = open_image(image_path)
                                 image_x, image_y = image.size
                                 rewrite_ocr_page_title(xhtml, file_name, image_x, image_y)
                                 fix_word_span_area(xhtml)

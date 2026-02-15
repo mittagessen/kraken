@@ -34,9 +34,9 @@ def cli(format_type, topline, scale, files):
     from os.path import splitext
 
     from lxml import etree
-    from PIL import Image
 
     from kraken.lib import xml
+    from kraken.lib.util import open_image
     from kraken.lib.segmentation import calculate_polygonal_environment
 
     def _repl_alto(fname, polygons):
@@ -99,7 +99,7 @@ def cli(format_type, topline, scale, files):
     for doc in files:
         click.echo(f'Processing {doc} ')
         seg = xml.XMLPage(doc).to_container()
-        im = Image.open(seg.imagename).convert('L')
+        im = open_image(seg.imagename).convert('L')
         baselines = []
         for x in seg.lines:
             bl = x.baseline if x.baseline is not None else [0, 0]
