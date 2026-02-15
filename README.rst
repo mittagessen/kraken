@@ -84,6 +84,13 @@ running:
 
   $ kraken list
 
+Tests can be run with `pytest`. This requires additional installations:
+
+.. code-block:: console
+
+  $ pip install ".[augment,test]"
+  $ pytest
+
 Quickstart
 ==========
 
