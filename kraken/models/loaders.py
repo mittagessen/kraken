@@ -67,8 +67,7 @@ def load_safetensors(path: Union[str, PathLike], tasks: Optional[Sequence[_T_tas
                 for prefix in prefixes:
                     if (min_ver := Version(model_map[prefix].get('_kraken_min_version'))) > (inst_ver := Version(importlib.metadata.version('kraken'))):
                         logger.warning(f'Model {prefix} in model file {path} requires minimum kraken version {min_ver} (installed {inst_ver})')
-                        # XXX: Don't skip check on release.
-#                        continue
+                        continue
                     if tasks and not set(tasks).intersection(set(model_map[prefix].get('_tasks', []))):
                         logger.info(f'Model {prefix} in model file {path} not in demanded tasks {tasks}')
                         continue
