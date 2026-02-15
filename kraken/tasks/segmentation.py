@@ -168,22 +168,28 @@ class SegmentationTaskModel(nn.Module):
         if len(ltypes := set(type(line) for line in _lines)) > 1:
             raise ValueError(f'Mixed line data models in one segmentation task are not supported. Got {ltypes}')
 
-        if isinstance(_lines[0], BaselineLine):
-            ro_fn = config.baseline_ro_fn
-        else:
-            ro_fn = config.bbox_ro_fn
-
         all_regions = [reg for rgs in regions.values() for reg in rgs]
-        basic_lo = ro_fn(lines=_lines,
-                         regions=all_regions,
-                         text_direction=segmentations[0].text_direction[-2:])
+        if _lines:
+            if isinstance(_lines[0], BaselineLine):
+                ro_fn = config.baseline_ro_fn
+            else:
+                ro_fn = config.bbox_ro_fn
 
-        _lines = [_lines[idx] for idx in basic_lo]
+            basic_lo = ro_fn(lines=_lines,
+                             regions=all_regions,
+                             text_direction=segmentations[0].text_direction[-2:])
+
+            _lines = [_lines[idx] for idx in basic_lo]
+
+        if _lines:
+            seg_type = 'baselines' if isinstance(_lines[0], BaselineLine) else 'bbox'
+        else:
+            seg_type = segmentations[0].type
 
         return replace(segmentations[0],
                        script_detection=script_detection,
                        language=list(languages),
-                       type='baselines' if isinstance(_lines[0], BaselineLine) else 'bbox',  # Region-only model can have an arbitrary type.
+                       type=seg_type,
                        lines=_lines,
                        regions=regions)
 

@@ -337,6 +337,21 @@ class TestSegmentationTaskModel(unittest.TestCase):
         result = SegmentationTaskModel._merge_segmentations([seg], config)
         self.assertIs(result, seg)
 
+    def test_merge_segmentations_region_only(self):
+        """
+        Tests that region-only segmentations can be merged without crashing.
+        """
+        model = load_models(resources / 'CapricciosaK.mlmodel')[0]
+        config = SegmentationInferenceConfig()
+        model.prepare_for_inference(config)
+        im = Image.open(resources / 'input.webp')
+        seg = model.predict(im=im)
+        self.assertEqual(len(seg.lines), 0)
+        result = SegmentationTaskModel._merge_segmentations([seg, seg], config)
+        self.assertEqual(result.type, seg.type)
+        self.assertEqual(result.lines, [])
+        self.assertGreater(sum(len(v) for v in result.regions.values()), 0)
+
 
 class TestForcedAlignmentTaskModel(unittest.TestCase):
     """
