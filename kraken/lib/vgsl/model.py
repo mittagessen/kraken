@@ -294,12 +294,18 @@ class TorchVGSLModel(nn.Module,
             raise KrakenInvalidModelException(str(e)) from e
         except DecodeError as e:
             raise KrakenInvalidModelException('Failure parsing model protobuf: {}'.format(str(e))) from e
-        if 'vgsl' not in mlmodel.user_defined_metadata:
+        coreml_metadata = json.loads(mlmodel.user_defined_metadata.get('kraken_meta', '{}'))
+        vgsl_spec = mlmodel.user_defined_metadata.get('vgsl', coreml_metadata.get('vgsl'))
+        if vgsl_spec is None:
             raise KrakenInvalidModelException('No VGSL spec in model metadata')
+        coreml_metadata.pop('vgsl', None)
+        serialized_codec = mlmodel.user_defined_metadata.get('codec', coreml_metadata.get('codec', 'null'))
+        coreml_metadata.pop('codec', None)
+        codec = json.loads(serialized_codec) if isinstance(serialized_codec, str) else serialized_codec
 
-        nn = cls(vgsl=mlmodel.user_defined_metadata['vgsl'],
-                 codec=json.loads(mlmodel.user_defined_metadata.get('codec', 'null')),
-                 **json.loads(mlmodel.user_defined_metadata['kraken_meta']))
+        nn = cls(vgsl=vgsl_spec,
+                 codec=codec,
+                 **coreml_metadata)
 
         def _deserialize_layers(name, layer):
             logger.debug(f'Deserializing layer {name} with type {type(layer)}')
@@ -429,6 +435,8 @@ class TorchVGSLModel(nn.Module,
             mlmodel.short_description = 'kraken model'
             if getattr(self, 'codec', None):
                 mlmodel.user_defined_metadata['codec'] = json.dumps(self.codec.c2l)
+            # keep top-level VGSL metadata for compatibility with legacy loaders.
+            mlmodel.user_defined_metadata['vgsl'] = self.user_metadata.get('vgsl', self.spec)
             coreml_metadata = dict(self.user_metadata)
             # convert kraken 7-style list model_type to string compatible with older versions.
             coreml_metadata['model_type'] = coreml_metadata['model_type'][0] if coreml_metadata['model_type'] else 'unknown'
@@ -492,8 +500,6 @@ class TorchVGSLModel(nn.Module,
         # create line extraction worker pool
         if 'recognition' in self.model_type and getattr(self, '_line_extraction_pool', None) is None:
             if self._inf_config.num_line_workers == 0:
-                # Use a lightweight in-process runner to avoid OS-level
-                # semaphores that may be restricted in some environments.
                 class _InProcessPool:
                     def imap_unordered(self, func, iterable):
                         for item in iterable:

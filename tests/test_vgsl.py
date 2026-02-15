@@ -7,6 +7,8 @@ import torch
 from pytest import raises
 
 from kraken.lib import vgsl
+from kraken.lib.codec import PytorchCodec
+from kraken.lib.models import load_any
 from kraken.lib.vgsl import layers
 
 class TestVGSL(unittest.TestCase):
@@ -21,6 +23,22 @@ class TestVGSL(unittest.TestCase):
         with tempfile.TemporaryDirectory() as dir:
             rnn.save_model(dir + '/foo.mlmodel')
             self.assertTrue(os.path.exists(dir + '/foo.mlmodel'))
+
+    def test_model_roundtrip(self):
+        """
+        Tests model round-tripping through CoreML serialization.
+        """
+        rnn = vgsl.TorchVGSLModel(vgsl='[1,1,0,48 Lbx10 Do O1c57]')
+        rnn.add_codec(PytorchCodec('abc'))
+        rnn.model_type = 'recognition'
+        with tempfile.TemporaryDirectory() as dir:
+            path = dir + '/foo.mlmodel'
+            rnn.save_model(path)
+            loaded = vgsl.TorchVGSLModel.load_model(path)
+            self.assertEqual(loaded.user_metadata['vgsl'], rnn.user_metadata['vgsl'])
+            self.assertIn('vgsl', loaded.user_metadata)
+            seq = load_any(path)
+            self.assertEqual(seq.kind, 'vgsl')
 
     def test_append(self):
         """
