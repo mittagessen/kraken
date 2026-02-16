@@ -147,23 +147,11 @@ kraken is developed at the `École Pratique des Hautes Études <https://www.ephe
 
    .. container::
 
-        This project was funded in part by the European Union. (ERC, MiDRASH,
-        project number 101071829).
-
-.. container:: twocol
-
-   .. container::
-
-        .. image:: https://raw.githubusercontent.com/mittagessen/kraken/main/docs/_static/normal-reproduction-low-resolution.jpg
-          :width: 100
-          :alt: Co-financed by the European Union
-
-   .. container::
-
-        This project was partially funded through the RESILIENCE project, funded from
-        the European Union’s Horizon 2020 Framework Programme for Research and
-        Innovation.
-
+        This project was funded in part by the European Union (ATRIUM, project
+        number 101132163). This project was funded in part by the European Union
+        (ERC, MiDRASH, project number 101071829). This project was partially
+        funded through the RESILIENCE project, funded from the European Union’s
+        Horizon 2020 Framework Programme for Research and Innovation.
 
 .. container:: twocol
 
