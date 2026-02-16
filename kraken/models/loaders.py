@@ -43,6 +43,12 @@ def load_safetensors(path: Union[str, PathLike], tasks: Optional[Sequence[_T_tas
     """
     Loads one or more models in safetensors format and returns them.
 
+    Less models than contained in the model file might be returned depending on
+    the selected task filters and installed version of kraken. Model weights
+    that are ignored because they do not fit the requested tasks or require a
+    newer kraken version will cause a warning to be logged. If no models could
+    be loaded an empty list will be returned.
+
     Args:
         path: Path to the safetensors file.
         tasks: Filter for model types to load from file.
@@ -53,11 +59,14 @@ def load_safetensors(path: Union[str, PathLike], tasks: Optional[Sequence[_T_tas
     Raises:
         ValueError: When model metadata is incomplete or the safetensors file
         is invalid.
+        RuntimeError: When there are missing or unexpected keys in the weights
+        file.
     """
     from torch import nn
     from safetensors import safe_open, SafetensorError
     from safetensors.torch import load_model
     models = nn.ModuleDict()
+    skipped_prefixes = []
     try:
         with safe_open(path, framework="pt") as f:
             if (metadata := f.metadata()) is not None:
@@ -67,9 +76,11 @@ def load_safetensors(path: Union[str, PathLike], tasks: Optional[Sequence[_T_tas
                 for prefix in prefixes:
                     if (min_ver := Version(model_map[prefix].get('_kraken_min_version'))) > (inst_ver := Version(importlib.metadata.version('kraken'))):
                         logger.warning(f'Model {prefix} in model file {path} requires minimum kraken version {min_ver} (installed {inst_ver})')
+                        skipped_prefixes.append(prefix)
                         continue
                     if tasks and not set(tasks).intersection(set(model_map[prefix].get('_tasks', []))):
                         logger.info(f'Model {prefix} in model file {path} not in demanded tasks {tasks}')
+                        skipped_prefixes.append(prefix)
                         continue
                     model_map[prefix].pop('_tasks')
                     models[prefix] = create_model(model_map[prefix].get('_model'), **model_map[prefix])
@@ -82,6 +93,8 @@ def load_safetensors(path: Union[str, PathLike], tasks: Optional[Sequence[_T_tas
     # into a float32 model). PyTorch's load_state_dict handles the
     # conversion internally via copy_().
     missing, unexpected = load_model(models, path, strict=False)
+    # filter out keys belonging to models that were skipped during filtering
+    unexpected = [k for k in unexpected if not any(k.startswith(p + '.') for p in skipped_prefixes)]
     if missing or unexpected:
         raise RuntimeError(f'Error(s) in loading state_dict for {models.__class__.__name__}:\n'
                            f'    Missing key(s): {missing}\n'

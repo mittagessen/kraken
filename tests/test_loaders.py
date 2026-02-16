@@ -2,6 +2,7 @@
 """
 Tests for model loaders/writers/creators.
 """
+import json
 import os
 import torch
 import pytest
@@ -11,6 +12,7 @@ import unittest
 from pathlib import Path
 from pytest import raises
 from safetensors import safe_open
+from safetensors.torch import save_file, load_file
 
 from kraken.models.utils import create_model
 from kraken.models import load_models, write_safetensors
@@ -122,6 +124,96 @@ class TestLoadModels(unittest.TestCase):
         self.assertEqual(len(models), 1)
         for name, param in models[0].named_parameters():
             self.assertEqual(param.dtype, torch.float32, f'{name} is not float32')
+
+
+class TestVersionCompatibility(unittest.TestCase):
+    """
+    Tests for the version compatibility check in load_safetensors.
+    """
+
+    def _make_versioned_model_file(self, version_overrides, path):
+        """
+        Creates a safetensors file containing two copies of the small test
+        model, then patches _kraken_min_version in the metadata for selected
+        models.
+
+        Args:
+            version_overrides: dict mapping prefix index (0-based) to a
+                               _kraken_min_version string to set.
+            path: Output path for the safetensors file.
+
+        Returns:
+            List of prefix strings in the file (in metadata key order).
+        """
+        import copy
+        models = load_models(resources / 'model_small.safetensors')
+        write_safetensors([models[0], copy.deepcopy(models[0])], path)
+
+        tensors = load_file(path)
+        with safe_open(path, framework='pt') as f:
+            meta = json.loads(f.metadata()['kraken_meta'])
+
+        prefixes = list(meta.keys())
+        for idx, version in version_overrides.items():
+            meta[prefixes[idx]]['_kraken_min_version'] = version
+
+        save_file(tensors, path, metadata={'kraken_meta': json.dumps(meta)})
+        return prefixes
+
+    def test_compatible_and_incompatible(self):
+        """
+        In a file with one compatible and one incompatible model, only the
+        compatible model is loaded.
+        """
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / 'test.safetensors'
+            self._make_versioned_model_file({0: '999.0.0'}, path)
+            models = load_models(path)
+            self.assertEqual(len(models), 1)
+
+    def test_all_incompatible(self):
+        """
+        When all models in a file are incompatible, an empty list is returned.
+        """
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / 'test.safetensors'
+            self._make_versioned_model_file({0: '999.0.0', 1: '999.0.0'}, path)
+            models = load_models(path)
+            self.assertEqual(len(models), 0)
+
+    def test_all_compatible(self):
+        """
+        When all models in a file are compatible, all are loaded.
+        """
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / 'test.safetensors'
+            self._make_versioned_model_file({}, path)
+            models = load_models(path)
+            self.assertEqual(len(models), 2)
+
+    def test_incompatible_model_warns(self):
+        """
+        Skipping an incompatible model emits a warning containing the
+        required version.
+        """
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / 'test.safetensors'
+            self._make_versioned_model_file({0: '999.0.0'}, path)
+            with self.assertLogs('kraken.models.loaders', level='WARNING') as cm:
+                load_models(path)
+            self.assertTrue(any('999.0.0' in msg for msg in cm.output))
+
+    def test_compatible_model_has_weights(self):
+        """
+        The compatible model loaded from a mixed file has actual (non-zero)
+        weights.
+        """
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / 'test.safetensors'
+            self._make_versioned_model_file({0: '999.0.0'}, path)
+            models = load_models(path)
+            has_nonzero = any(p.abs().sum() > 0 for p in models[0].parameters())
+            self.assertTrue(has_nonzero)
 
 
 class TestWriteModels(unittest.TestCase):
