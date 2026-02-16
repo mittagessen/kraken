@@ -3,13 +3,13 @@ import os
 import tempfile
 import unittest
 
-import torch
 from pytest import raises
 
 from kraken.lib import vgsl
 from kraken.lib.codec import PytorchCodec
 from kraken.lib.models import load_any
 from kraken.lib.vgsl import layers
+
 
 class TestVGSL(unittest.TestCase):
     """

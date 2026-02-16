@@ -6,13 +6,11 @@ These tests cover RecognitionTaskModel, SegmentationTaskModel, and
 ForcedAlignmentTaskModel which are the replacements for the deprecated
 rpred/mm_rpred, blla.segment, and forced_align APIs respectively.
 """
-import json
 import pickle
 import unittest
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
-import pytest
 from PIL import Image
 from pytest import raises
 from difflib import SequenceMatcher

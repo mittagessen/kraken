@@ -18,6 +18,7 @@ from kraken.lib import xml
 thisfile = Path(__file__).resolve().parent
 resources = thisfile / 'resources'
 
+
 def roundtrip(self, records, fp):
     """
     Checks that the order of lines after serialization and deserialization is
@@ -31,6 +32,7 @@ def roundtrip(self, records, fp):
             self.assertSequenceEqual(np.array(orig_line.baseline).tolist(),
                                      np.array(parsed_line.baseline).tolist(),
                                      msg='Baselines differ after serialization.')
+
 
 def validate_hocr(self, fp):
     fp.seek(0)
@@ -56,6 +58,7 @@ def validate_page(self, fp):
     with open(resources / 'pagecontent.xsd') as schema_fp:
         page_schema = etree.XMLSchema(etree.parse(schema_fp))
         page_schema.assertValid(doc)
+
 
 def validate_alto(self, fp):
     doc = etree.fromstring(fp.getvalue().encode('utf-8'))

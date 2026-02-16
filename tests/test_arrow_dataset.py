@@ -6,25 +6,25 @@ import tempfile
 import pyarrow as pa
 
 from pathlib import Path
-from pytest import raises, fixture
+from pytest import fixture
 
-import kraken
 from kraken.lib import xml
 from kraken.lib.arrow_dataset import build_binary_dataset
 
 thisfile = Path(__file__).resolve().parent
 resources = thisfile / 'resources'
 
+
 def _validate_ds(self, path, num_lines, num_empty_lines, ds_type):
     with pa.memory_map(path, 'rb') as source:
         ds_table = pa.ipc.open_file(source).read_all()
         raw_metadata = ds_table.schema.metadata
         if not raw_metadata or b'lines' not in raw_metadata:
-            raise ValueError(f'{file} does not contain a valid metadata record.')
+            raise ValueError(f'{path} does not contain a valid metadata record.')
         metadata = json.loads(raw_metadata[b'lines'])
     self.assertEqual(metadata['type'],
-                    ds_type,
-                    f'Unexpected dataset type (expected: {ds_type}, found: {metadata["type"]}')
+                     ds_type,
+                     f'Unexpected dataset type (expected: {ds_type}, found: {metadata["type"]}')
     self.assertEqual(metadata['counts']['all'],
                      num_lines,
                      'Unexpected number of lines in dataset metadata '

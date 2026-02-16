@@ -5,16 +5,15 @@ import tempfile
 import unittest
 from pathlib import Path
 
-import click
 import numpy as np
 from click.testing import CliRunner
 from PIL import Image
-from pytest import raises
 
 from kraken.kraken import cli
 
 thisfile = Path(__file__).resolve().parent
 resources = thisfile / 'resources'
+
 
 class TestCLI(unittest.TestCase):
     """
