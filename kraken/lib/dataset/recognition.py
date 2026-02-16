@@ -40,7 +40,7 @@ from kraken.lib import functional_im_transforms as F_t
 from kraken.lib.codec import PytorchCodec
 from kraken.lib.exceptions import KrakenEncodeException, KrakenInputException
 from kraken.lib.segmentation import extract_polygons
-from kraken.lib.util import is_bitonal
+from kraken.lib.util import is_bitonal, open_image
 
 if TYPE_CHECKING:
     from os import PathLike
@@ -447,7 +447,7 @@ class PolygonGTDataset(Dataset):
             logger.debug(f'Attempting to load {item[0]}')
             im = item[0][0]
             if not isinstance(im, Image.Image):
-                im = Image.open(im)
+                im = open_image(im)
             im, _ = next(extract_polygons(im,
                                           Segmentation(type='baselines',
                                                        imagename=item[0][0],
@@ -644,7 +644,7 @@ class GroundTruthDataset(Dataset):
             flat_box = [x for point in bbox for x in point]
             xmin, xmax = min(flat_box[::2]), max(flat_box[::2])
             ymin, ymax = min(flat_box[1::2]), max(flat_box[1::2])
-            im = Image.open(im)
+            im = open_image(im)
             im = im.crop((xmin, ymin, xmax, ymax))
             im = self.transforms(im)
             if im.shape[0] == 3:

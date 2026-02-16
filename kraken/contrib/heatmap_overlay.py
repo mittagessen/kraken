@@ -22,6 +22,7 @@ def cli(model, files):
     from PIL import Image
 
     from kraken.lib import dataset, vgsl
+    from kraken.lib.util import open_image
 
     model = vgsl.TorchVGSLModel.load_model(model)
     model.eval()
@@ -33,7 +34,7 @@ def cli(model, files):
 
     for img in files:
         print(img)
-        im = Image.open(img)
+        im = open_image(img)
         xs = transforms(im)
 
         with torch.no_grad():

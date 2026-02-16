@@ -30,6 +30,7 @@ def cli(format_type, model, legacy_polygons, files):
 
     from kraken import blla
     from kraken.lib import segmentation, vgsl, xml
+    from kraken.lib.util import open_image
 
     if model is None:
         for doc in files:
@@ -38,7 +39,7 @@ def cli(format_type, model, legacy_polygons, files):
                 data = xml.XMLPage(doc, format_type)
                 if len(data.lines) > 0:
                     bounds = data.to_container()
-                    for idx, (im, box) in enumerate(segmentation.extract_polygons(Image.open(bounds.imagename), bounds, legacy=legacy_polygons)):
+                    for idx, (im, box) in enumerate(segmentation.extract_polygons(open_image(bounds.imagename), bounds, legacy=legacy_polygons)):
                         click.echo('.', nl=False)
                         im.save('{}.{}.jpg'.format(splitext(bounds.imagename)[0], idx))
                         with open('{}.{}.gt.txt'.format(splitext(bounds.imagename)[0], idx), 'w') as fp:
@@ -61,7 +62,7 @@ def cli(format_type, model, legacy_polygons, files):
         net = vgsl.TorchVGSLModel.load_model(model)
         for doc in files:
             click.echo(f'Processing {doc} ', nl=False)
-            full_im = Image.open(doc)
+            full_im = open_image(doc)
             bounds = blla.segment(full_im, model=net)
             for idx, (im, box) in enumerate(segmentation.extract_polygons(full_im, bounds, legacy=legacy_polygons)):
                 click.echo('.', nl=False)

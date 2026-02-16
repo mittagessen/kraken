@@ -32,6 +32,7 @@ from bidi.algorithm import get_display
 from PIL import Image
 
 from kraken import rpred
+from kraken.lib.util import open_image
 from kraken.containers import BaselineOCRRecord, Segmentation
 
 if TYPE_CHECKING:
@@ -54,7 +55,7 @@ def forced_align(doc: Segmentation, model: 'TorchSeqRecognizer', base_dir: Optio
     """
     warnings.warn('`forced_align` is deprecated and will be removed with kraken 8. Use `ForcedAlignmentTaskModel` instead.',
                   DeprecationWarning)
-    im = Image.open(doc.imagename)
+    im = open_image(doc.imagename)
     predictor = rpred.rpred(model, im, doc)
 
     records = []

@@ -33,7 +33,7 @@ from kraken.containers import Segmentation
 from kraken.lib import functional_im_transforms as F_t
 from kraken.lib.exceptions import KrakenInputException
 from kraken.lib.segmentation import extract_polygons
-from kraken.lib.util import is_bitonal, make_printable
+from kraken.lib.util import is_bitonal, make_printable, open_image
 from kraken.lib.xml import XMLPage
 
 if TYPE_CHECKING:
@@ -47,7 +47,7 @@ logger = logging.getLogger(__name__)
 def _extract_line(xml_record, skip_empty_lines: bool = True, legacy_polygons: bool = False):
     lines = []
     try:
-        im = Image.open(xml_record.imagename)
+        im = open_image(xml_record.imagename)
         if is_bitonal(im):
             im = im.convert('1')
     except (OSError, FileNotFoundError, UnidentifiedImageError) as err:
@@ -79,7 +79,7 @@ def _extract_line(xml_record, skip_empty_lines: bool = True, legacy_polygons: bo
 
 def _extract_path_line(xml_record, skip_empty_lines: bool = True):
     try:
-        im = Image.open(xml_record['image'])
+        im = open_image(xml_record['image'])
     except (FileNotFoundError, UnidentifiedImageError) as err:
         logger.warning(f'Error loading image {xml_record.imagename}: {err}')
         return [], None

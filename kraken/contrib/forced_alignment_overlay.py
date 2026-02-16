@@ -105,6 +105,7 @@ def cli(format_type, model, normalization, output, files):
 
     from kraken import align
     from kraken.lib import models
+    from kraken.lib.util import open_image
     from kraken.lib.xml import XMLPage
 
     if format_type == 'alto':
@@ -118,12 +119,12 @@ def cli(format_type, model, normalization, output, files):
     for doc in files:
         click.echo(f'Processing {doc} ', nl=False)
         data = XMLPage(doc)
-        im = Image.open(data.imagename).convert('RGBA')
+        im = open_image(data.imagename).convert('RGBA')
         result = align.forced_align(data.to_container(), net)
         if normalization:
             for line in data._lines:
                 line["text"] = normalize(normalization, line["text"])
-        im = Image.open(data.imagename).convert('RGBA')
+        im = open_image(data.imagename).convert('RGBA')
         result = align.forced_align(data.to_container(), net)
         if output == 'overlay':
             tmp = Image.new('RGBA', im.size, (0, 0, 0, 0))
