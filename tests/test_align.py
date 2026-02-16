@@ -12,6 +12,7 @@ from kraken.lib.models import load_any
 thisfile = Path(__file__).resolve().parent
 resources = thisfile / 'resources'
 
+
 class TestKrakenAlign(unittest.TestCase):
     """
     Tests for the legacy forced alignment module (`kraken.align.forced_align`).

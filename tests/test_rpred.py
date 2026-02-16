@@ -1,23 +1,21 @@
 # -*- coding: utf-8 -*-
-import os
 import pickle
 import unittest
 import warnings
 from collections import defaultdict
 from pathlib import Path
 
-import pytest
 from PIL import Image
 from pytest import raises
 
 from kraken.containers import (BaselineLine, BaselineOCRRecord, BBoxLine,
-                               BBoxOCRRecord, Segmentation)
-from kraken.lib.exceptions import KrakenInputException
+                               Segmentation)
 from kraken.lib.models import load_any
 from kraken.rpred import mm_rpred, rpred
 
 thisfile = Path(__file__).resolve().parent
 resources = thisfile / 'resources'
+
 
 class TestBBoxRecords(unittest.TestCase):
     """
@@ -343,7 +341,6 @@ class TestRecognition(unittest.TestCase):
                                            script_detection=True
                                           )
 
-
     def test_rpred_bbox_outbounds(self):
         """
         Tests correct handling of invalid bbox line coordinates.
@@ -381,20 +378,20 @@ class TestRecognition(unittest.TestCase):
         Test that mm_rpred fails when tags are missing
         """
         with raises(ValueError):
-            pred = mm_rpred({('type', 'default'): self.model},
-                            self.overfit_line,
-                            self.simple_box_seg,
-                            True)
+            mm_rpred({('type', 'default'): self.model},
+                     self.overfit_line,
+                     self.simple_box_seg,
+                     True)
 
     def test_mm_rpred_bl_missing_tags(self):
         """
         Test that mm_rpred fails when tags are missing
         """
         with raises(ValueError):
-            pred = mm_rpred({('type', 'default'): self.model},
-                            self.overfit_line,
-                            self.simple_bl_seg,
-                            True)
+            mm_rpred({('type', 'default'): self.model},
+                     self.overfit_line,
+                     self.simple_bl_seg,
+                     True)
 
     def test_mm_rpred_bbox_ignore_tags(self):
         """

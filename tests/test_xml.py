@@ -1,9 +1,7 @@
 # -*- coding: utf-8 -*-
-import json
 import unittest
 from pathlib import Path
 
-import numpy as np
 from pytest import raises
 
 from kraken.lib import xml
@@ -41,6 +39,8 @@ class TestXMLParser(unittest.TestCase):
         Test parsing of ALTO XML files with reading order.
         """
         doc = xml.XMLPage(self.alto_doc, filetype='alto')
+        self.assertEqual(len(doc.get_sorted_lines()), 30)
+        self.assertEqual(len([item for x in doc.regions.values() for item in x]), 5)
 
     def test_auto_parsing(self):
         """
@@ -173,7 +173,6 @@ class TestXMLParser(unittest.TestCase):
                                      None, None, None, None, None, None, None, None, None, None,
                                      {'language': [{'type': 'eng'}]}, None, None, None, None,
                                      {'language': [{'type': 'deu'}, {'type': 'eng'}]}, None])
-
 
     def test_alto_baseline_linetype(self):
         """

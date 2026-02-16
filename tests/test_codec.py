@@ -5,7 +5,7 @@ from pytest import raises
 from torch import IntTensor
 
 from kraken.lib import codec
-from kraken.lib.exceptions import KrakenCodecException, KrakenEncodeException
+from kraken.lib.exceptions import KrakenEncodeException
 
 
 class TestCodec(unittest.TestCase):
@@ -19,8 +19,8 @@ class TestCodec(unittest.TestCase):
         self.o2o_codec = codec.PytorchCodec('ab')
         self.o2o_codec_strict = codec.PytorchCodec('ab', strict=True)
         # codec mapping many code points to one label
-        self.m2o_codec = codec.PytorchCodec(['aaa' , 'aa', 'a', 'b'])
-        self.m2o_codec_strict = codec.PytorchCodec(['aaa' , 'aa', 'a', 'b'], strict=True)
+        self.m2o_codec = codec.PytorchCodec(['aaa', 'aa', 'a', 'b'])
+        self.m2o_codec_strict = codec.PytorchCodec(['aaa', 'aa', 'a', 'b'], strict=True)
         # codec mapping one code point to many labels
         self.o2m_codec = codec.PytorchCodec({'a': [10, 11, 12], 'b': [12, 45, 80]})
         self.o2m_codec_strict = codec.PytorchCodec({'a': [10, 11, 12], 'b': [12, 45, 80]}, strict=True)

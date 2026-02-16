@@ -1,5 +1,146 @@
-[project]
-
 [build-system]
-requires = ["pbr>=5.7.0", "setuptools>=36.6.0,<70.0.0", "wheel"]
-build-backend = "pbr.build"
+requires = ["hatchling", "versioningit"]
+build-backend = "hatchling.build"
+
+[project]
+name = "kraken"
+dynamic = ["version"]
+description = "OCR/HTR engine for all the languages"
+readme = {file = "README.rst", content-type = "text/x-rst"}
+license = "Apache-2.0"
+requires-python = ">=3.10,<3.14"
+authors = [
+    {name = "Benjamin Kiessling", email = "mittagessen@l.unchti.me"},
+]
+keywords = ["ocr", "htr"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Environment :: GPU",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: POSIX",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Image Recognition",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "jsonschema",
+    "lxml",
+    "requests",
+    "click>=8.1,<8.3",
+    "numpy",
+    "Pillow>=9.2.0",
+    "regex",
+    "scipy~=1.15.3",
+    "protobuf>=3.0.0",
+    "coremltools~=9.0",
+    "jinja2~=3.1.6",
+    "python-bidi~=0.6.6",
+    "torchvision>=0.5.0",
+    "torch>=2.4.0,<=2.10",
+    "scikit-learn~=1.7.2",
+    "scikit-image~=0.25.2",
+    "shapely~=2.1.2",
+    "pyarrow",
+    "htrmopo>=0.3,~=0.3",
+    "lightning~=2.6.0",
+    "torchmetrics>=1.1.0",
+    "threadpoolctl~=3.6.0",
+    "platformdirs",
+    "rich<14.1.0",
+    "safetensors",
+    "iso639-lang",
+    "packaging",
+]
+
+[project.optional-dependencies]
+test = ["hocr-spec", "pytest"]
+pdf = ["pyvips"]
+docs = [
+    "sphinx<9",
+    "sphinx-autoapi",
+    "sphinx-multiversion",
+    "sphinx-github-changelog",
+    "sphinx-autodoc-typehints",
+]
+
+[project.urls]
+Homepage = "https://kraken.re"
+
+[project.scripts]
+kraken = "kraken.kraken:cli"
+ketos = "kraken.ketos:cli"
+
+[project.entry-points."kraken.cli"]
+binarize = "kraken.kraken:binarize"
+segment = "kraken.kraken:segment"
+ocr = "kraken.kraken:ocr"
+show = "kraken.kraken:show"
+list = "kraken.kraken:list_models"
+get = "kraken.kraken:get"
+
+[project.entry-points."ketos.cli"]
+compile = "kraken.ketos.dataset:compile"
+pretrain = "kraken.ketos.pretrain:pretrain"
+train = "kraken.ketos.recognition:train"
+test = "kraken.ketos.recognition:test"
+publish = "kraken.ketos.repo:publish"
+rotrain = "kraken.ketos.ro:rotrain"
+roadd = "kraken.ketos.ro:roadd"
+segtrain = "kraken.ketos.segmentation:segtrain"
+segtest = "kraken.ketos.segmentation:segtest"
+convert = "kraken.ketos.weights:convert"
+
+[project.entry-points."kraken.models"]
+TorchVGSLModel = "kraken.lib.vgsl:TorchVGSLModel"
+Wav2Vec2Mask = "kraken.lib.pretrain:Wav2Vec2Mask"
+ROMLP = "kraken.lib.ro:ROMLP"
+
+[project.entry-points."kraken.lightning_modules"]
+blla = "kraken.train:BLLASegmentationModel"
+vgsl = "kraken.train:VGSLRecognitionModel"
+pretrain = "kraken.lib.pretrain:RecognitionPretrainModel"
+ro = "kraken.lib.ro:ROModel"
+
+[project.entry-points."kraken.loaders"]
+safetensors = "kraken.models:load_safetensors"
+coreml = "kraken.models:load_coreml"
+
+[project.entry-points."kraken.writers"]
+safetensors = "kraken.models:write_safetensors"
+coreml = "kraken.models:write_coreml"
+
+[project.entry-points."kraken.configs"]
+Config = "kraken.configs.base:Config"
+TrainingConfig = "kraken.configs.base:TrainingConfig"
+TrainingDataConfig = "kraken.configs.base:TrainingDataConfig"
+RecognitionTrainingDataConfig = "kraken.configs.base:RecognitionTrainingDataConfig"
+SegmentationTrainingDataConfig = "kraken.configs.base:SegmentationTrainingDataConfig"
+BLLASegmentationTrainingDataConfig = "kraken.configs.vgsl:BLLASegmentationTrainingDataConfig"
+BLLASegmentationTrainingConfig = "kraken.configs.vgsl:BLLASegmentationTrainingConfig"
+VGSLRecognitionTrainingDataConfig = "kraken.configs.vgsl:VGSLRecognitionTrainingDataConfig"
+VGSLRecognitionTrainingConfig = "kraken.configs.vgsl:VGSLRecognitionTrainingConfig"
+ROTrainingDataConfig = "kraken.configs.ro:ROTrainingDataConfig"
+ROTrainingConfig = "kraken.configs.ro:ROTrainingConfig"
+VGSLPreTrainingDataConfig = "kraken.configs.pretrain:VGSLPreTrainingDataConfig"
+VGSLPreTrainingConfig = "kraken.configs.pretrain:VGSLPreTrainingConfig"
+
+[project.entry-points."kraken.tasks"]
+segmentation = "kraken.tasks:SegmentationTaskModel"
+recognition = "kraken.tasks:RecognitionTaskModel"
+alignment = "kraken.tasks:ForcedAlignmentTaskModel"
+
+[tool.hatch.version]
+source = "versioningit"
+
+[tool.versioningit]
+
+[tool.hatch.build.targets.wheel]
+packages = ["kraken"]
+
+[tool.hatch.build.targets.sdist]
+include = ["kraken/"]

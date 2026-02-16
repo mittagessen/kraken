@@ -11,8 +11,8 @@ from kraken.lib.exceptions import KrakenInputException
 thisfile = Path(__file__).resolve().parent
 resources = thisfile / 'resources'
 
-class TestBinarization(unittest.TestCase):
 
+class TestBinarization(unittest.TestCase):
     """
     Tests of the nlbin function for binarization of images
     """
@@ -21,7 +21,7 @@ class TestBinarization(unittest.TestCase):
         Test that mode '1' images aren't binarized again.
         """
         with raises(KrakenInputException):
-            with Image.new('1', (1000,1000)) as im:
+            with Image.new('1', (1000, 1000)) as im:
                 nlbin(im)
 
     def test_not_binarize_bw(self):
@@ -45,7 +45,7 @@ class TestBinarization(unittest.TestCase):
         """
         Tests binarization of RGB WEBP images.
         """
-        with Image.open(resources /'input.webp') as im:
+        with Image.open(resources / 'input.webp') as im:
             res = nlbin(im)
             # calculate histogram and check if only pixels of value 0/255 exist
             self.assertEqual(254, res.histogram().count(0), msg='Output not '
