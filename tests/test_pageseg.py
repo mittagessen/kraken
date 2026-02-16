@@ -11,6 +11,7 @@ from kraken.pageseg import segment
 thisfile = Path(__file__).resolve().parent
 resources = thisfile / 'resources'
 
+
 class TestPageSeg(unittest.TestCase):
 
     """

@@ -215,7 +215,7 @@ def parse_alto(doc, filename, linetype):
                 line_pos = line.get('HPOS'), line.get('VPOS'), line.get('WIDTH'), line.get('HEIGHT')
                 try:
                     x_min, y_min, width, height = map(int, map(float, line_pos))
-                    bbox = (x_min, y_min, x_min+width, y_min+height)
+                    bbox = (x_min, y_min, x_min + width, y_min + height)
                 except (ValueError, TypeError):
                     logger.info(f'TextLine {line_id} without complete bounding box data.')
                     continue

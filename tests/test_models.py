@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import os
-import pickle
 import tempfile
 import unittest
 from pathlib import Path
@@ -12,6 +11,7 @@ from kraken.lib.exceptions import KrakenInvalidModelException
 
 thisfile = Path(__file__).resolve().parent
 resources = thisfile / 'resources'
+
 
 class TestModels(unittest.TestCase):
     """

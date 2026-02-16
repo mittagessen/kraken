@@ -104,7 +104,7 @@ class VGSLRecognitionDataModule(L.LightningDataModule):
             self.val_set = Subset(val_set, range(len(val_set)))
         elif training_data:
             train_set = self._build_dataset(DatasetClass, training_data)
-            train_len = int(len(train_set)*data_config.partition)
+            train_len = int(len(train_set) * data_config.partition)
             val_len = len(train_set) - train_len
             logger.info(f'No explicit validation data provided. Splitting off '
                         f'{val_len} (of {len(train_set)}) samples to validation '
@@ -132,9 +132,7 @@ class VGSLRecognitionDataModule(L.LightningDataModule):
             except Exception as e:
                 logger.warning(str(e))
 
-        if self.hparams.data_config.format_type == 'binary' and (self.hparams.data_config.normalization or
-                                                                 self.hparams.data_config.normalize_whitespace or
-                                                                 self.hparams.data_config.bidi_reordering):
+        if self.hparams.data_config.format_type == 'binary' and (self.hparams.data_config.normalization or self.hparams.data_config.normalize_whitespace or self.hparams.data_config.bidi_reordering):
             logger.debug('Text transformations modifying alphabet selected. Rebuilding alphabet')
             dataset.rebuild_alphabet()
 
@@ -319,7 +317,7 @@ class VGSLRecognitionModel(L.LightningModule):
         targets = []
         # decode packed target
         for offset in batch['target_lens']:
-            targets.append(''.join([x[0] for x in self._val_codec.decode([(x, 0, 0, 0) for x in batch['target'][idx:idx+offset]])]))
+            targets.append(''.join([x[0] for x in self._val_codec.decode([(x, 0, 0, 0) for x in batch['target'][idx:idx + offset]])]))
             idx += offset
         for pred, target in zip([self.net.codec.decode(locs) for locs in RecognitionInferenceConfig().decoder(preds, olens)], targets):
             pred_str = ''.join(x[0] for x in pred)
@@ -446,7 +444,7 @@ class VGSLRecognitionModel(L.LightningModule):
                         logger.info(f'Resizing codec to include {len(alpha_diff)} new code points.')
                         codec = codec.add_labels(alpha_diff)
                         self.net.add_codec(codec)
-                        logger.info(f'Resizing last layer in network to {codec.max_label+1} outputs')
+                        logger.info(f'Resizing last layer in network to {codec.max_label + 1} outputs')
                         self.net.resize_output(codec.max_label + 1)
                         train_set.encode(codec)
                     elif self.hparams.config.resize == 'new':
@@ -459,7 +457,7 @@ class VGSLRecognitionModel(L.LightningModule):
                         # Switch codec.
                         self.net.add_codec(codec)
                         logger.info(f'Deleting {len(del_labels)} output classes from network '
-                                    f'({len(codec)-len(del_labels)} retained)')
+                                    f'({len(codec) - len(del_labels)} retained)')
                         self.net.resize_output(codec.max_label + 1, del_labels)
                         train_set.encode(codec)
                     else:
@@ -473,9 +471,9 @@ class VGSLRecognitionModel(L.LightningModule):
             else:
                 codec = self.trainer.datamodule.hparams.data_config.codec
                 train_set.encode(codec)
-                logger.info(f'Creating new model {self.hparams.config.spec} with {train_set.codec.max_label+1} outputs')
+                logger.info(f'Creating new model {self.hparams.config.spec} with {train_set.codec.max_label + 1} outputs')
                 vgsl = self.hparams.config.spec.strip()
-                self.hparams.config.spec = f'[{vgsl[1:-1]} O1c{train_set.codec.max_label+1}]'
+                self.hparams.config.spec = f'[{vgsl[1:-1]} O1c{train_set.codec.max_label + 1}]'
                 from kraken.models import create_model
                 self.net = create_model('TorchVGSLModel',
                                         model_type=['recognition'],

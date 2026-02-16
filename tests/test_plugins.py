@@ -6,16 +6,8 @@ Tests the entry point-based plugin architecture used for model registration,
 loader/writer discovery, task registration, and CLI subcommand loading.
 """
 import importlib.metadata
-import os
-import tempfile
 import unittest
 from pathlib import Path
-
-import pytest
-from pytest import raises
-
-from kraken.models import load_models, write_models
-from kraken.models.utils import create_model
 
 thisfile = Path(__file__).resolve().parent
 resources = thisfile / 'resources'
@@ -89,6 +81,3 @@ class TestEntryPointRegistration(unittest.TestCase):
         eps = {ep.name for ep in importlib.metadata.entry_points(group='kraken.lightning_modules')}
         for mod in ('blla', 'vgsl', 'pretrain', 'ro'):
             self.assertIn(mod, eps)
-
-
-

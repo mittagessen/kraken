@@ -255,8 +255,8 @@ class BaselineSet(Dataset):
     def transform(self, image, target):
         orig_size = image.size
         image = self.transforms(image)
-        scale = (image.shape[2] - 2*self.pad[1])/orig_size[0]
-        t = torch.zeros((self.num_classes,) + tuple(np.subtract(image.shape[1:], (2*self.pad[1], 2*self.pad[0]))))
+        scale = (image.shape[2] - 2 * self.pad[1]) / orig_size[0]
+        t = torch.zeros((self.num_classes,) + tuple(np.subtract(image.shape[1:], (2 * self.pad[1], 2 * self.pad[0]))))
         start_sep_cls = self.class_mapping['aux']['_start_separator']
         end_sep_cls = self.class_mapping['aux']['_end_separator']
 
@@ -265,11 +265,11 @@ class BaselineSet(Dataset):
             for line in lines:
                 # buffer out line to desired width
                 line = [k for k, g in groupby(line)]
-                line = np.array(line)*scale
+                line = np.array(line) * scale
                 scaled_baselines[cls_idx].append(line.tolist())
                 shp_line = geom.LineString(line)
-                split_offset = min(5, shp_line.length/2)
-                line_pol = np.array(shp_line.buffer(self.line_width/2, cap_style=2).boundary.coords, dtype=int)
+                split_offset = min(5, shp_line.length / 2)
+                line_pol = np.array(shp_line.buffer(self.line_width / 2, cap_style=2).boundary.coords, dtype=int)
                 rr, cc = polygon(line_pol[:, 1], line_pol[:, 0], shape=image.shape[1:])
                 t[cls_idx, rr, cc] = 1
                 split_pt = shp_line.interpolate(split_offset).buffer(0.001)

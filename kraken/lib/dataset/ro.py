@@ -153,7 +153,7 @@ class PairWiseROSet(Dataset):
                     sorted_lines.append(line_data)
                 if len(sorted_lines) > 1:
                     self.data.append(sorted_lines)
-                    self._num_pairs += int(factorial(len(sorted_lines))/factorial(len(sorted_lines)-2))
+                    self._num_pairs += int(factorial(len(sorted_lines)) / factorial(len(sorted_lines) - 2))
                 else:
                     logger.info(f'Page {doc} has less than 2 lines. Skipping')
         else:

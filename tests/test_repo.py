@@ -9,6 +9,7 @@ from kraken import repo
 thisfile = Path(__file__).resolve().parent
 resources = thisfile / 'resources'
 
+
 class TestRepo(unittest.TestCase):
     """
     Testing our wrappers around HTRMoPo

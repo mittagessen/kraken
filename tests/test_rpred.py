@@ -282,52 +282,46 @@ class TestRecognition(unittest.TestCase):
         self.overfit_line = Image.open(resources / '000236.png')
         self.model = load_any(resources / 'overfit.mlmodel')
         self.invalid_box_seg = Segmentation(type='bbox',
-                                            imagename = resources / 'bw.png',
+                                            imagename=resources / 'bw.png',
                                             lines=[BBoxLine(id='foo',
                                                             bbox=[-1, -1, 10000, 10000])],
                                             text_direction='horizontal-lr',
-                                            script_detection=False
-                                           )
+                                            script_detection=False)
         self.invalid_bl_seg = Segmentation(type='baselines',
-                                           imagename = resources / 'bw.png',
+                                           imagename=resources / 'bw.png',
                                            lines=[BaselineLine(id='bar',
                                                                tags={'type': 'default'},
-                                                               baseline=[[0,0], [10000, 0]],
+                                                               baseline=[[0, 0], [10000, 0]],
                                                                boundary=[[-1, -1], [-1, 10000], [10000, 10000], [10000, -1]])],
                                            text_direction='horizontal-lr',
-                                           script_detection=False
-                                          )
+                                           script_detection=False)
 
         self.simple_box_seg = Segmentation(type='bbox',
-                                           imagename = resources / 'bw.png',
+                                           imagename=resources / 'bw.png',
                                            lines=[BBoxLine(id='foo',
                                                            bbox=[0, 0, 2544, 156])],
                                            text_direction='horizontal-lr',
-                                           script_detection=False
-                                          )
+                                           script_detection=False)
         self.simple_bl_seg = Segmentation(type='baselines',
-                                          imagename = resources / 'bw.png',
+                                          imagename=resources / 'bw.png',
                                           lines=[BaselineLine(id='foo',
                                                               baseline=[[0, 10], [2543, 10]],
                                                               boundary=[[0, 0], [2543, 0], [2543, 155], [0, 155]])],
-                                           text_direction='horizontal-lr',
-                                           script_detection=False
-                                         )
+                                          text_direction='horizontal-lr',
+                                          script_detection=False)
 
         self.tagged_box_seg = Segmentation(type='bbox',
-                                           imagename = resources / 'bw.png',
+                                           imagename=resources / 'bw.png',
                                            lines=[BBoxLine(id='foo',
                                                            bbox=[0, 0, 2544, 156],
                                                            tags={'type': [{'type': 'foobar'}]}),
                                                   BBoxLine(id='bar',
                                                            bbox=[0, 0, 2544, 156],
-                                                           tags={'type': [{'type': 'default'}]})
-                                                 ],
+                                                           tags={'type': [{'type': 'default'}]})],
                                            text_direction='horizontal-lr',
-                                           script_detection=True
-                                          )
+                                           script_detection=True)
         self.tagged_bl_seg = Segmentation(type='baselines',
-                                          imagename = resources / 'bw.png',
+                                          imagename=resources / 'bw.png',
                                           lines=[BaselineLine(id='foo',
                                                               baseline=[[0, 10], [2543, 10]],
                                                               boundary=[[0, 0], [2543, 0], [2543, 155], [0, 155]],
@@ -335,11 +329,9 @@ class TestRecognition(unittest.TestCase):
                                                  BaselineLine(id='bar',
                                                               baseline=[[0, 10], [2543, 10]],
                                                               boundary=[[0, 0], [2543, 0], [2543, 155], [0, 155]],
-                                                              tags={'type': [{'type': 'default'}]})
-                                                ],
-                                           text_direction='horizontal-lr',
-                                           script_detection=True
-                                          )
+                                                              tags={'type': [{'type': 'default'}]})],
+                                          text_direction='horizontal-lr',
+                                          script_detection=True)
 
     def test_rpred_bbox_outbounds(self):
         """
@@ -467,4 +459,4 @@ class TestRecognition(unittest.TestCase):
                         self.simple_box_seg,
                         bidi_reordering=False)
         record = next(pred)
-        self.assertEqual(record.prediction,  'ܕܗܣܐܕ ܪܝ .ܡܡ ܐܠܠ ܗܠ ܐܘܗ ܟܘܗܢ ܡܡ ܐܠ')
+        self.assertEqual(record.prediction, 'ܕܗܣܐܕ ܪܝ .ܡܡ ܐܠܠ ܗܠ ܐܘܗ ܟܘܗܢ ܡܡ ܐܠ')

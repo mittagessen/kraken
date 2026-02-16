@@ -81,12 +81,12 @@ def nlbin(im: 'Image.Image',
     raw = pil2array(im)
     logger.debug('Scaling and normalizing')
     # rescale image to between -1 or 0 and 1
-    raw = raw/float(np.iinfo(raw.dtype).max)
+    raw = raw / float(np.iinfo(raw.dtype).max)
     # perform image normalization
     if np.amax(raw) == np.amin(raw):
         logger.warning(f'Trying to binarize empty image {im_str}')
         raise KrakenInputException('Image is empty')
-    image = raw-np.amin(raw)
+    image = raw - np.amin(raw)
     image /= np.amax(image)
 
     logger.debug('Interpolation and percentile filtering')
@@ -97,31 +97,31 @@ def nlbin(im: 'Image.Image',
         m = percentile_filter(m, perc, size=(2, range))
         mh, mw = m.shape
         oh, ow = image.shape
-        scale = np.diag([mh * 1.0/oh, mw * 1.0/ow])
+        scale = np.diag([mh * 1.0 / oh, mw * 1.0 / ow])
         m = affine_transform(m, scale, output_shape=image.shape)
     w, h = np.minimum(np.array(image.shape), np.array(m.shape))
-    flat = np.clip(image[:w, :h]-m[:w, :h]+1, 0, 1)
+    flat = np.clip(image[:w, :h] - m[:w, :h] + 1, 0, 1)
 
     # estimate low and high thresholds
     d0, d1 = flat.shape
-    o0, o1 = int(border*d0), int(border*d1)
-    est = flat[o0:d0-o0, o1:d1-o1]
+    o0, o1 = int(border * d0), int(border * d1)
+    est = flat[o0:d0 - o0, o1:d1 - o1]
     logger.debug('Threshold estimates {}'.format(est))
     # by default, we use only regions that contain
     # significant variance; this makes the percentile
     # based low and high estimates more reliable
     logger.debug('Refine estimates')
-    v = est-gaussian_filter(est, escale*20.0)
-    v = gaussian_filter(v**2, escale*20.0)**0.5
-    v = (v > 0.3*np.amax(v))
+    v = est - gaussian_filter(est, escale * 20.0)
+    v = gaussian_filter(v**2, escale * 20.0)**0.5
+    v = (v > 0.3 * np.amax(v))
     v = binary_dilation(v, structure=np.ones((int(escale * 50), 1)))
     v = binary_dilation(v, structure=np.ones((1, int(escale * 50))))
     est = est[v]
     lo = np.percentile(est.ravel(), low)
     hi = np.percentile(est.ravel(), high)
     flat -= lo
-    flat /= (hi-lo)
+    flat /= (hi - lo)
     flat = np.clip(flat, 0, 1)
     logger.debug(f'Thresholding at {threshold}')
-    bin = np.array(255*(flat > threshold), 'B')
+    bin = np.array(255 * (flat > threshold), 'B')
     return array2pil(bin)

@@ -229,9 +229,9 @@ class mm_rpred(object):
         logger.debug('Convert to absolute coordinates')
         # calculate recognized LSTM locations of characters
         # scale between network output and network input
-        self.net_scale = ts_box.shape[2]/net.outputs.shape[2]
+        self.net_scale = ts_box.shape[2] / net.outputs.shape[2]
         # scale between network input and original line
-        self.in_scale = box.size[0]/(ts_box.shape[2]-2*self.pad)
+        self.in_scale = box.size[0] / (ts_box.shape[2] - 2 * self.pad)
 
         pred = ''.join(x[0] for x in preds)
         pos = []
@@ -297,9 +297,9 @@ class mm_rpred(object):
         preds = net.predict(ts_box.unsqueeze(0))[0]
         # calculate recognized LSTM locations of characters
         # scale between network output and network input
-        self.net_scale = ts_box.shape[2]/net.outputs.shape[2]
+        self.net_scale = ts_box.shape[2] / net.outputs.shape[2]
         # scale between network input and original line
-        self.in_scale = box.size[0]/(ts_box.shape[2]-2*self.pad)
+        self.in_scale = box.size[0] / (ts_box.shape[2] - 2 * self.pad)
 
         # XXX: fix bounding box calculation ocr_record for multi-codepoint labels.
         pred = ''.join(x[0] for x in preds)
@@ -327,7 +327,7 @@ class mm_rpred(object):
         return self.len
 
     def _scale_val(self, val, min_val, max_val):
-        return int(round(min(max(((val*self.net_scale)-self.pad)*self.in_scale, min_val), max_val-1)))
+        return int(round(min(max(((val * self.net_scale) - self.pad) * self.in_scale, min_val), max_val - 1)))
 
     def _choose_legacy_polygon_extractor(self, net) -> bool:
         # grouping the checks here to display warnings only once

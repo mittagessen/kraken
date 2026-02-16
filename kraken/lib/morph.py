@@ -132,5 +132,5 @@ def select_regions(binary, f, min=0, nbest=100000):
         for i in best[-nbest:]:
             if scores[i] <= min:
                 continue
-            keep[i+1] = 1
+            keep[i + 1] = 1
     return keep[labels]

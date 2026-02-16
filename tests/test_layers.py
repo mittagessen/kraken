@@ -5,6 +5,7 @@ import torch
 
 from kraken.lib.vgsl import layers
 
+
 class TestLayers(unittest.TestCase):
     """
     Testing VGSL custom layer implementations.

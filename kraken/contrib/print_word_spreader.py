@@ -8,8 +8,6 @@ import sys
 from statistics import mean
 
 from lxml import etree
-from PIL import Image
-
 from kraken.lib.util import open_image
 
 
@@ -233,8 +231,7 @@ try:
     if not os.path.exists(args.outputDir):
         os.makedirs(args.outputDir, exist_ok=True)
 except Exception as e:
-    print("Error on creating output directory '" + args.outputDir +
-          "':\n\t" + str(e) + "\n\tExiting ...")
+    print("Error on creating output directory '" + args.outputDir + "':\n\t" + str(e) + "\n\tExiting ...")
     sys.exit(1)
 
 if (args.verbose):
@@ -277,8 +274,7 @@ for root, dirs, files in os.walk(args.inputDir):
                             fix_word_span_area(xhtml)
                         except BboxError:
                             if (args.verbose):
-                                print("we get a bbox error while trying to fix word span areas on " +
-                                      file_name + " so we'll try to rewrite the page bbox using imageDir")
+                                print("we get a bbox error while trying to fix word span areas on " + file_name + " so we'll try to rewrite the page bbox using imageDir")
                             try:
                                 # todo check that args.imageDir is set
                                 if not (os.path.isdir(args.imageDir)):

@@ -5,7 +5,6 @@ Tests for model loaders/writers/creators.
 import json
 import os
 import torch
-import pytest
 import tempfile
 import unittest
 

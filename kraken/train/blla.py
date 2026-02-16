@@ -124,7 +124,7 @@ class BLLASegmentationDataModule(L.LightningDataModule):
                                                            'baselines': self.hparams.data_config.line_class_mapping,
                                                            'regions': self.hparams.data_config.region_class_mapping})
 
-            train_len = int(len(train_set)*data_config.partition)
+            train_len = int(len(train_set) * data_config.partition)
             val_len = len(train_set) - train_len
             logger.info(f'No explicit validation data provided. Splitting off '
                         f'{val_len} (of {len(train_set)}) samples to validation '
@@ -530,8 +530,7 @@ class BLLASegmentationModel(L.LightningModule):
 
                         del_indices = [net_class_mapping['baselines'][x] for x in del_bls]
                         del_indices.extend(net_class_mapping['regions'][x] for x in del_regions)
-                        self.net.resize_output(cls_idx + len(new_bls) + len(new_regions) -
-                                               len(del_bls) - len(del_regions) + 1, del_indices)
+                        self.net.resize_output(cls_idx + len(new_bls) + len(new_regions) - len(del_bls) - len(del_regions) + 1, del_indices)
 
                         # delete old baseline/region types
                         cls_idx = min(min(net_class_mapping['baselines'].values()) if net_class_mapping['baselines'] else torch.inf, # noqa

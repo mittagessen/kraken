@@ -91,9 +91,9 @@ def compute_boxmap(binary: np.ndarray, scale: float,
     bysize = sorted(objects, key=sl.area)
     boxmap = np.zeros(binary.shape, dtype)
     for o in bysize:
-        if sl.area(o)**.5 < threshold[0]*scale:
+        if sl.area(o)**.5 < threshold[0] * scale:
             continue
-        if sl.area(o)**.5 > threshold[1]*scale:
+        if sl.area(o)**.5 > threshold[1] * scale:
             continue
         boxmap[o] = 1
     return boxmap
@@ -108,13 +108,13 @@ def compute_lines(segmentation: np.ndarray, scale: float) -> list[record]:
     for i, o in enumerate(lobjects):
         if o is None:
             continue
-        if sl.dim1(o) < 2*scale or sl.dim0(o) < scale:
+        if sl.dim1(o) < 2 * scale or sl.dim0(o) < scale:
             continue
-        mask = (segmentation[o] == i+1)
+        mask = (segmentation[o] == i + 1)
         if np.amax(mask) == 0:
             continue
         result = record()
-        result.label = i+1
+        result.label = i + 1
         result.bounds = o
         result.mask = mask
         lines.append(result)
@@ -124,13 +124,13 @@ def compute_lines(segmentation: np.ndarray, scale: float) -> list[record]:
 def compute_separators_morph(binary: np.ndarray, scale: float, sepwiden: int = 10, maxcolseps: int = 2) -> np.ndarray:
     """Finds vertical black lines corresponding to column separators."""
     logger.debug('Finding vertical black column lines')
-    d0 = int(max(5, scale/4))
+    d0 = int(max(5, scale / 4))
     d1 = int(max(5, scale)) + sepwiden
     thick = morph.r_dilation(binary, (d0, d1))
-    vert = morph.rb_opening(thick, (10*scale, 1))
-    vert = morph.r_erosion(vert, (d0//2, sepwiden))
-    vert = morph.select_regions(vert, sl.dim1, min=3, nbest=2*maxcolseps)
-    vert = morph.select_regions(vert, sl.dim0, min=20*scale, nbest=maxcolseps)
+    vert = morph.rb_opening(thick, (10 * scale, 1))
+    vert = morph.r_erosion(vert, (d0 // 2, sepwiden))
+    vert = morph.select_regions(vert, sl.dim1, min=3, nbest=2 * maxcolseps)
+    vert = morph.select_regions(vert, sl.dim0, min=20 * scale, nbest=maxcolseps)
     return vert
 
 
@@ -150,18 +150,18 @@ def compute_colseps_conv(binary: np.ndarray, scale: float = 1.0,
     """
     logger.debug(f'Finding max {maxcolseps} column separators')
     # find vertical whitespace by thresholding
-    smoothed = gaussian_filter(1.0*binary, (scale, scale*0.5))
-    smoothed = uniform_filter(smoothed, (5.0*scale, 1))
-    thresh = (smoothed < np.amax(smoothed)*0.1)
+    smoothed = gaussian_filter(1.0 * binary, (scale, scale * 0.5))
+    smoothed = uniform_filter(smoothed, (5.0 * scale, 1))
+    thresh = (smoothed < np.amax(smoothed) * 0.1)
     # find column edges by filtering
-    grad = gaussian_filter(1.0*binary, (scale, scale*0.5), order=(0, 1))
-    grad = uniform_filter(grad, (10.0*scale, 1))
-    grad = (grad > 0.5*np.amax(grad))
+    grad = gaussian_filter(1.0 * binary, (scale, scale * 0.5), order=(0, 1))
+    grad = uniform_filter(grad, (10.0 * scale, 1))
+    grad = (grad > 0.5 * np.amax(grad))
     # combine edges and whitespace
-    seps = np.minimum(thresh, maximum_filter(grad, (int(scale), int(5*scale))))
-    seps = maximum_filter(seps, (int(2*scale), 1))
+    seps = np.minimum(thresh, maximum_filter(grad, (int(scale), int(5 * scale))))
+    seps = maximum_filter(seps, (int(2 * scale), 1))
     # select only the biggest column separators
-    seps = morph.select_regions(seps, sl.dim0, min=minheight*scale,
+    seps = morph.select_regions(seps, sl.dim0, min=minheight * scale,
                                 nbest=maxcolseps)
     return seps
 
@@ -181,7 +181,7 @@ def compute_black_colseps(binary: np.ndarray, scale: float, maxcolseps: int) -> 
     logger.debug('Extract vertical black column separators from lines')
     seps = compute_separators_morph(binary, scale, maxcolseps)
     colseps = np.maximum(compute_colseps_conv(binary, scale, maxcolseps=maxcolseps), seps)
-    binary = np.minimum(binary, 1-seps)
+    binary = np.minimum(binary, 1 - seps)
     return colseps, binary
 
 
@@ -203,7 +203,7 @@ def norm_max(v: np.ndarray) -> np.ndarray:
     """
     Normalizes the input array by maximum value.
     """
-    return v/np.amax(v)
+    return v / np.amax(v)
 
 
 def compute_gradmaps(binary: np.ndarray, scale: float, gauss: bool = False):
@@ -221,15 +221,16 @@ def compute_gradmaps(binary: np.ndarray, scale: float, gauss: bool = False):
     # use gradient filtering to find baselines
     logger.debug('Computing gradient maps')
     boxmap = compute_boxmap(binary, scale)
-    cleaned = boxmap*binary
+    cleaned = boxmap * binary
     if gauss:
-        grad = gaussian_filter(1.0*cleaned, (0.3*scale, 6*scale), order=(1, 0))
+        grad = gaussian_filter(1.0 * cleaned, (0.3 * scale, 6 * scale), order=(1, 0))
     else:
-        grad = gaussian_filter(1.0*cleaned, (max(4, 0.3*scale),
-                                             scale), order=(1, 0))
-        grad = uniform_filter(grad, (1, 6*scale))
-    bottom = norm_max((grad < 0)*(-grad))
-    top = norm_max((grad > 0)*grad)
+        grad = gaussian_filter(1.0 * cleaned,
+                               (max(4, 0.3 * scale), scale),
+                               order=(1, 0))
+        grad = uniform_filter(grad, (1, 6 * scale))
+    bottom = norm_max((grad < 0) * (-grad))
+    top = norm_max((grad > 0) * grad)
     return bottom, top, boxmap
 
 
@@ -243,26 +244,25 @@ def compute_line_seeds(binary: np.ndarray, bottom: np.ndarray, top: np.ndarray,
     vrange = int(scale)
     bmarked = maximum_filter(bottom == maximum_filter(bottom, (vrange, 0)),
                              (2, 2))
-    bmarked = bmarked * (bottom > threshold*np.amax(bottom)*threshold)*(1-colseps)
+    bmarked = bmarked * (bottom > threshold * np.amax(bottom) * threshold) * (1 - colseps)
     tmarked = maximum_filter(top == maximum_filter(top, (vrange, 0)), (2, 2))
-    tmarked = tmarked * (top > threshold*np.amax(top)*threshold/2)*(1-colseps)
+    tmarked = tmarked * (top > threshold * np.amax(top) * threshold / 2) * (1 - colseps)
     tmarked = maximum_filter(tmarked, (1, 20))
     seeds = np.zeros(binary.shape, 'i')
-    delta = max(3, int(scale/2))
+    delta = max(3, int(scale / 2))
     for x in range(bmarked.shape[1]):
-        transitions = sorted([(y, 1) for y in find(bmarked[:, x])] +
-                             [(y, 0) for y in find(tmarked[:, x])])[::-1]
+        transitions = sorted([(y, 1) for y in find(bmarked[:, x])] + [(y, 0) for y in find(tmarked[:, x])])[::-1]
         transitions += [(0, 0)]
-        for ls in range(len(transitions)-1):
+        for ls in range(len(transitions) - 1):
             y0, s0 = transitions[ls]
             if s0 == 0:
                 continue
-            seeds[y0-delta:y0, x] = 1
-            y1, s1 = transitions[ls+1]
-            if s1 == 0 and (y0-y1) < 5*scale:
+            seeds[y0 - delta:y0, x] = 1
+            y1, s1 = transitions[ls + 1]
+            if s1 == 0 and (y0 - y1) < 5 * scale:
                 seeds[y1:y0, x] = 1
-    seeds = maximum_filter(seeds, (1, int(1+scale)))
-    seeds = seeds * (1-colseps)
+    seeds = maximum_filter(seeds, (1, int(1 + scale)))
+    seeds = seeds * (1 - colseps)
     seeds, _ = morph.label(seeds)
     return seeds
 
@@ -284,8 +284,8 @@ def remove_hlines(binary: np.ndarray, scale: float, maxsize: int = 10) -> np.nda
     labels, _ = morph.label(binary)
     objects = morph.find_objects(labels)
     for i, b in enumerate(objects):
-        if sl.width(b) > maxsize*scale:
-            labels[b][labels[b] == i+1] = 0
+        if sl.width(b) > maxsize * scale:
+            labels[b][labels[b] == i + 1] = 0
     return np.array(labels != 0, 'B')
 
 
@@ -297,7 +297,7 @@ def rotate_lines(lines: np.ndarray, angle: float, offset: int) -> np.ndarray:
     angle = np.radians(angle)
     r = np.array([[np.cos(angle), -np.sin(angle)], [np.sin(angle), np.cos(angle)]])
     p = np.array(lines).reshape((-1, 2))
-    offset = np.array([2*offset])
+    offset = np.array([2 * offset])
     p = p.dot(r).reshape((-1, 4)).astype(int) + offset
     x = np.sort(p[:, [0, 2]])
     y = np.sort(p[:, [1, 3]])
@@ -374,13 +374,13 @@ def segment(im: PIL.Image.Image,
     im = im.rotate(angle, expand=True)
 
     a = pil2array(im)
-    binary = np.array(a > 0.5*(np.amin(a) + np.amax(a)), 'i')
+    binary = np.array(a > 0.5 * (np.amin(a) + np.amax(a)), 'i')
     binary = 1 - binary
 
     _, ccs = morph.label(1 - binary)
-    if ccs > np.dot(*im.size)/(30*30):
+    if ccs > np.dot(*im.size) / (30 * 30):
         logger.warning(f'Too many connected components for a page image: {ccs}')
-        return {'text_direction': text_direction, 'boxes':  []}
+        return {'text_direction': text_direction, 'boxes': []}
 
     if not scale:
         scale = estimate_scale(binary)
@@ -407,14 +407,14 @@ def segment(im: PIL.Image.Image,
             colseps = compute_white_colseps(binary, scale, maxcolseps)
     except ValueError:
         logger.warning(f'Exception in column finder (probably empty image) for {im_str}')
-        return {'text_direction': text_direction, 'boxes':  []}
+        return {'text_direction': text_direction, 'boxes': []}
 
     bottom, top, boxmap = compute_gradmaps(binary, scale)
     seeds = compute_line_seeds(binary, bottom, top, colseps, scale)
     llabels = morph.propagate_labels(boxmap, seeds, conflict=0)
     spread = morph.spread_labels(seeds, maxdist=scale)
-    llabels = np.where(llabels > 0, llabels, spread*binary)
-    segmentation = llabels*binary
+    llabels = np.where(llabels > 0, llabels, spread * binary)
+    segmentation = llabels * binary
 
     lines = compute_lines(segmentation, scale)
     bbox_lines = [BBoxLine(id=f'_{uuid.uuid4()}',
@@ -428,8 +428,8 @@ def segment(im: PIL.Image.Image,
 
     if isinstance(pad, int):
         pad = (pad, pad)
-    lines = [(max(x[0]-pad[0], 0), x[1], min(x[2]+pad[1], im.size[0]), x[3]) for x in lines]
-    lines = [BBoxLine(id=f'_{uuid.uuid4()}', bbox=line) for line in rotate_lines(lines, 360-angle, offset).tolist()]
+    lines = [(max(x[0] - pad[0], 0), x[1], min(x[2] + pad[1], im.size[0]), x[3]) for x in lines]
+    lines = [BBoxLine(id=f'_{uuid.uuid4()}', bbox=line) for line in rotate_lines(lines, 360 - angle, offset).tolist()]
 
     return Segmentation(text_direction=text_direction,
                         imagename=getattr(im, 'filename', None),

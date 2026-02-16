@@ -29,8 +29,6 @@ from typing import TYPE_CHECKING, Literal, Optional
 
 import torch
 from bidi.algorithm import get_display
-from PIL import Image
-
 from kraken import rpred
 from kraken.lib.util import open_image
 from kraken.containers import BaselineOCRRecord, Segmentation
@@ -66,9 +64,9 @@ def forced_align(doc: Segmentation, model: 'TorchSeqRecognizer', base_dir: Optio
         # encode into labels, ignoring unencodable sequences
         labels = model.codec.encode(do_text).long()
         next(predictor)
-        if model.outputs.shape[2] < 2*len(labels):
+        if model.outputs.shape[2] < 2 * len(labels):
             logger.warning(f'Could not align line {idx}. Output sequence length {model.outputs.shape[2]} < '
-                           f'{2*len(labels)} (length of "{line.text}" after encoding).')
+                           f'{2 * len(labels)} (length of "{line.text}" after encoding).')
             records.append(BaselineOCRRecord('', [], [], line))
             continue
         emission = torch.tensor(model.outputs).squeeze().log_softmax(0).T

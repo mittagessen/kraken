@@ -75,9 +75,9 @@ def _fixed_resize(img: 'Image.Image', size: tuple[int, int], interpolation: int 
     w, h = img.size
     oh, ow = size
     if oh == 0:
-        oh = int(h * ow/w)
+        oh = int(h * ow / w)
     elif ow == 0:
-        ow = int(w * oh/h)
+        ow = int(w * oh / h)
     img = img.resize((ow, oh), interpolation)
     return img
 

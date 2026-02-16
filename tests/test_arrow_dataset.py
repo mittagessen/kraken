@@ -52,7 +52,7 @@ class TestKrakenArrowCompilation(unittest.TestCase):
 
     def test_build_path_dataset(self):
         with tempfile.NamedTemporaryFile() as tmp_file:
-            build_binary_dataset(files=4*self.box_lines,
+            build_binary_dataset(files=4 * self.box_lines,
                                  output_file=tmp_file.name,
                                  format_type='path')
             _validate_ds(self, tmp_file.name, 4, 0, 'kraken_recognition_bbox')
@@ -73,7 +73,7 @@ class TestKrakenArrowCompilation(unittest.TestCase):
 
     def test_forced_type_dataset(self):
         with tempfile.NamedTemporaryFile() as tmp_file:
-            build_binary_dataset(files=4*self.box_lines,
+            build_binary_dataset(files=4 * self.box_lines,
                                  output_file=tmp_file.name,
                                  format_type='path',
                                  force_type='kraken_recognition_baseline')

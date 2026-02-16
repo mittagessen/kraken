@@ -139,8 +139,8 @@ class PytorchCodec(object):
 
             if not encodable_suffix:
                 if self.strict:
-                    raise KrakenEncodeException(f'Non-encodable sequence {s[idx:idx+5]}... encountered.')
-                logger.warning(f'Non-encodable sequence {s[idx:idx+5]}... encountered. Advancing one code point.')
+                    raise KrakenEncodeException(f'Non-encodable sequence {s[idx:idx + 5]}... encountered.')
+                logger.warning(f'Non-encodable sequence {s[idx:idx + 5]}... encountered. Advancing one code point.')
                 idx += 1
 
         return IntTensor(labels)
@@ -179,7 +179,7 @@ class PytorchCodec(object):
                 decodable_suffix = True
             else:
                 for code in self.l2c.keys():
-                    if code == labels[idx:idx+len(code)]:
+                    if code == labels[idx:idx + len(code)]:
                         decoded.extend([(c, s, e, u) for c, s, e, u in zip(self.l2c[code],
                                                                            len(self.l2c[code]) * [start[idx]],
                                                                            len(self.l2c[code]) * [end[idx + len(code) - 1]],
@@ -189,8 +189,8 @@ class PytorchCodec(object):
                         break
             if not decodable_suffix:
                 if self.strict:
-                    raise KrakenEncodeException(f'Non-decodable sequence {labels[idx:idx+5]}... encountered.')
-                logger.debug(f'Non-decodable sequence {labels[idx:idx+5]}... encountered. Advancing one label.')
+                    raise KrakenEncodeException(f'Non-decodable sequence {labels[idx:idx + 5]}... encountered.')
+                logger.debug(f'Non-decodable sequence {labels[idx:idx + 5]}... encountered. Advancing one label.')
                 idx += 1
         return decoded
 
@@ -227,9 +227,9 @@ class PytorchCodec(object):
                     rm_labels.remove(label)
         # iteratively remove labels, decrementing subsequent labels to close
         # (new) holes in the codec.
-        offset_rm_labels = [v-idx for idx, v in enumerate(sorted(set(rm_labels)))]
+        offset_rm_labels = [v - idx for idx, v in enumerate(sorted(set(rm_labels)))]
         for rlabel in offset_rm_labels:
-            c2l_cand = {k: [label-1 if label > rlabel else label for label in v] for k, v in c2l_cand.items()}
+            c2l_cand = {k: [label - 1 if label > rlabel else label for label in v] for k, v in c2l_cand.items()}
         # add mappings not in original codec
         add_list = {cseq: enc for cseq, enc in codec.c2l.items() if cseq not in self.c2l}
         # renumber
@@ -260,7 +260,7 @@ class PytorchCodec(object):
             c2l.update(charset)
         else:
             c2l = self.c2l.copy()
-            c2l.update({k: [v] for v, k in enumerate(sorted(charset), start=self.max_label+1)})
+            c2l.update({k: [v] for v, k in enumerate(sorted(charset), start=self.max_label + 1)})
         return PytorchCodec(c2l, self.strict)
 
     def __repr__(self):

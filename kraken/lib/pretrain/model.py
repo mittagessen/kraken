@@ -76,9 +76,7 @@ class PretrainDataModule(VGSLRecognitionDataModule):
                 dataset.add(**sample)
             except Exception as e:
                 logger.warning(str(e))
-        if self.hparams.data_config.format_type == 'binary' and (self.hparams.data_config.normalization or
-                                                                 self.hparams.data_config.normalize_whitespace or
-                                                                 self.hparams.data_config.bidi_reordering):
+        if self.hparams.data_config.format_type == 'binary' and (self.hparams.data_config.normalization or self.hparams.data_config.normalize_whitespace or self.hparams.data_config.bidi_reordering):
             logger.debug('Text transformations modifying alphabet selected. Rebuilding alphabet')
             dataset.rebuild_alphabet()
 
@@ -264,7 +262,7 @@ class RecognitionPretrainModel(L.LightningModule):
 
         if not hasattr(self, 'wav2vec2mask'):
             self.wav2vec2mask = create_model('Wav2Vec2Mask',
-                                             context_encoder_input_dim=self.net.nn[idx-1].output_shape[1],
+                                             context_encoder_input_dim=self.net.nn[idx - 1].output_shape[1],
                                              final_dim=final_dim_layer.output_shape[1],
                                              mask_width=self.hparams.config.mask_width,
                                              mask_prob=self.hparams.config.mask_prob,

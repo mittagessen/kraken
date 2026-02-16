@@ -134,7 +134,7 @@ def vec_lines(heatmap: torch.Tensor,
     for bl_idx in range(len(baselines)):
         bl = baselines[bl_idx]
         bl_ls = geom.LineString(bl[1])
-        suppl_obj = [x[1] for x in baselines[:bl_idx] + baselines[bl_idx+1:]]
+        suppl_obj = [x[1] for x in baselines[:bl_idx] + baselines[bl_idx + 1:]]
         for reg_idx, reg_pol in enumerate(reg_pols):
             if is_in_region(bl_ls, reg_pol):
                 suppl_obj.append(regions[reg_idx])
@@ -192,8 +192,8 @@ class VGSLSegmentationInference:
                 suppl_obj.extend(regs)
 
         # convert back to net scale
-        suppl_obj = scale_regions([x.boundary for x in suppl_obj], 1/rets['scale'])
-        line_regs = scale_regions([x.boundary for x in line_regs], 1/rets['scale'])
+        suppl_obj = scale_regions([x.boundary for x in suppl_obj], 1 / rets['scale'])
+        line_regs = scale_regions([x.boundary for x in line_regs], 1 / rets['scale'])
 
         lines = vec_lines(**rets,
                           regions=line_regs,

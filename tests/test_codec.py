@@ -200,7 +200,6 @@ class TestCodec(unittest.TestCase):
                           ('a', 203, 831, 0.8195729875383888),
                           ('a', 203, 831, 0.8195729875383888)])
 
-
     def test_o2o_encode_invalid_nonstrict(self):
         """
         Test correct handling of noisy character sequences (one-to-one encoder)

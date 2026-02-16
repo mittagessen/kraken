@@ -111,9 +111,9 @@ class ForcedAlignmentTaskModel(nn.Module):
             # encode into labels, ignoring unencodable sequences
             labels = self.net.codec.encode(do_text).long()
 
-            if record.logits.shape[-1] < 2*len(labels):
+            if record.logits.shape[-1] < 2 * len(labels):
                 logger.warning(f'Could not align line {idx}. Output sequence length {record.logits.shape[-1]} < '
-                               f'{2*len(labels)} (length of "{record.text}" after encoding).')
+                               f'{2 * len(labels)} (length of "{record.text}" after encoding).')
                 records.append(record.__class__('', [], [], segmentation.lines[idx]))
                 continue
             emission = record.logits.squeeze().log_softmax(0).T
@@ -125,7 +125,7 @@ class ForcedAlignmentTaskModel(nn.Module):
             conf = []
             # net_scale should stay fairly static, but in_scale changes between
             # lines so we just set it here again.
-            self.net.in_scale = record.image.width/(record.logits.shape[-1]*self.net.net_scale-2*config.padding)
+            self.net.in_scale = record.image.width / (record.logits.shape[-1] * self.net.net_scale - 2 * config.padding)
             for seg in path:
                 pred.append(seg.label)
                 pos.append((self.net._scale_val(seg.start, 0, record.image.width),

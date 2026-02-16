@@ -214,15 +214,14 @@ def boundary_tracing(region):
     idx_start = 0
     while True:  # asserting that the starting point is not isolated
         start = [y[idx_start], x[idx_start]]
-        focus_start = binary[start[0]-1:start[0]+2, start[1]-1:start[1]+2]
+        focus_start = binary[start[0] - 1:start[0] + 2, start[1] - 1:start[1] + 2]
         if np.sum(focus_start) > 1:
             break
         idx_start += 1
 
     # Determining backtrack pixel for the first element
-    if (binary[start[0] + 1, start[1]] == 0 and
-            binary[start[0]+1, start[1]-1] == 0):
-        backtrack_start = [start[0]+1, start[1]]
+    if (binary[start[0] + 1, start[1]] == 0 and binary[start[0] + 1, start[1] - 1] == 0):
+        backtrack_start = [start[0] + 1, start[1]]
     else:
         backtrack_start = [start[0], start[1] - 1]
 
@@ -236,7 +235,7 @@ def boundary_tracing(region):
         x = neighbors_current[:, 1]
         idx = np.argmax(binary[tuple([y, x])])
         boundary.append(current)
-        backtrack = neighbors_current[idx-1]
+        backtrack = neighbors_current[idx - 1]
         current = neighbors_current[idx]
 
         if (np.all(current == start) and np.all(backtrack == backtrack_start)):
@@ -271,16 +270,16 @@ def _extend_boundaries(baselines, bin_bl_map):
             continue
         # 'left' side
         if boundary_pol.contains(geom.Point(bl[0])):
-            l_point = boundary_pol.boundary.intersection(geom.LineString([(bl[0][0]-10*(bl[1][0]-bl[0][0]),
-                                                                           bl[0][1]-10*(bl[1][1]-bl[0][1])), bl[0]]))
+            l_point = boundary_pol.boundary.intersection(geom.LineString([(bl[0][0] - 10 * (bl[1][0] - bl[0][0]),
+                                                                           bl[0][1] - 10 * (bl[1][1] - bl[0][1])), bl[0]]))
             if l_point.geom_type != 'Point':
                 bl[0] = np.array(nearest_points(geom.Point(bl[0]), boundary_pol)[1].coords[0], 'int').tolist()
             else:
                 bl[0] = np.array(l_point.coords[0], 'int').tolist()
         # 'right' side
         if boundary_pol.contains(geom.Point(bl[-1])):
-            r_point = boundary_pol.boundary.intersection(geom.LineString([(bl[-1][0]-10*(bl[-2][0]-bl[-1][0]),
-                                                                           bl[-1][1]-10*(bl[-2][1]-bl[-1][1])), bl[-1]]))
+            r_point = boundary_pol.boundary.intersection(geom.LineString([(bl[-1][0] - 10 * (bl[-2][0] - bl[-1][0]),
+                                                                           bl[-1][1] - 10 * (bl[-2][1] - bl[-1][1])), bl[-1]]))
             if r_point.geom_type != 'Point':
                 bl[-1] = np.array(nearest_points(geom.Point(bl[-1]), boundary_pol)[1].coords[0], 'int').tolist()
             else:
@@ -437,7 +436,7 @@ def _rotate(image: _T_pil_or_np,
         rows, cols = image.shape[:2]
         assert len(image.shape) == 3 or len(image.shape) == 2, 'Image must be 2D or 3D'
 
-    tform = AffineTransform(rotation=angle, scale=(1/scale, 1))
+    tform = AffineTransform(rotation=angle, scale=(1 / scale, 1))
     corners = np.array([
         [0, 0],
         [0, rows - 1],
@@ -454,7 +453,7 @@ def _rotate(image: _T_pil_or_np,
     output_shape = tuple(int(o) for o in np.around((out_rows, out_cols)))
     # fit output image in new shape
     translation = tform([[minc, minr]])
-    tform = AffineTransform(rotation=angle, scale=(1/scale, 1), translation=[f for f in translation.flatten()])
+    tform = AffineTransform(rotation=angle, scale=(1 / scale, 1), translation=[f for f in translation.flatten()])
 
     if isinstance(image, Image.Image):
         # PIL is much faster than scipy
@@ -529,7 +528,7 @@ def _calc_seam(baseline, polygon, angle, im_feats, bias=150):
     MASK_VAL = 99999
     c_min, c_max = int(polygon[:, 0].min()), int(polygon[:, 0].max())
     r_min, r_max = int(polygon[:, 1].min()), int(polygon[:, 1].max())
-    patch = im_feats[r_min:r_max+2, c_min:c_max+2].copy()
+    patch = im_feats[r_min:r_max + 2, c_min:c_max + 2].copy()
     # bias feature matrix by distance from baseline
     mask = np.ones_like(patch)
     for line_seg in zip(baseline[:-1] - (c_min, r_min), baseline[1:] - (c_min, r_min)):
@@ -540,15 +539,15 @@ def _calc_seam(baseline, polygon, angle, im_feats, bias=150):
         mask[line_locs] = 0
     dist_bias = distance_transform_cdt(mask)
     # absolute mask
-    mask = np.array(make_polygonal_mask(polygon-(c_min, r_min), patch.shape[::-1])) <= 128
+    mask = np.array(make_polygonal_mask(polygon - (c_min, r_min), patch.shape[::-1])) <= 128
     # dilate mask to compensate for aliasing during rotation
     mask = binary_erosion(mask, border_value=True, iterations=2)
     # combine weights with features
     patch[mask] = MASK_VAL
-    patch += (dist_bias*(np.mean(patch[patch != MASK_VAL])/bias))
+    patch += (dist_bias * (np.mean(patch[patch != MASK_VAL]) / bias))
     extrema = baseline[(0, -1), :] - (c_min, r_min)
     # scale line image to max 600 pixel width
-    scale = min(1.0, 600/(c_max-c_min))
+    scale = min(1.0, 600 / (c_max - c_min))
     tform, rotated_patch = _rotate(patch,
                                    angle,
                                    center=extrema[0],
@@ -557,32 +556,34 @@ def _calc_seam(baseline, polygon, angle, im_feats, bias=150):
                                    use_skimage_warp=True)
     # ensure to cut off padding after rotation
     x_offsets = np.sort(np.around(tform.inverse(extrema)[:, 0]).astype('int'))
-    rotated_patch = rotated_patch[:, x_offsets[0]:x_offsets[1]+1]
+    rotated_patch = rotated_patch[:, x_offsets[0]:x_offsets[1] + 1]
     # infinity pad for seamcarve
-    rotated_patch = np.pad(rotated_patch, ((1, 1), (0, 0)),  mode='constant', constant_values=np.inf)
+    rotated_patch = np.pad(rotated_patch, ((1, 1), (0, 0)), mode='constant', constant_values=np.inf)
     r, c = rotated_patch.shape
     # fold into shape (c, r-2 3)
-    A = np.lib.stride_tricks.as_strided(rotated_patch, (c, r-2, 3), (rotated_patch.strides[1],
-                                                                     rotated_patch.strides[0],
-                                                                     rotated_patch.strides[0]))
+    A = np.lib.stride_tricks.as_strided(rotated_patch,
+                                        (c, r - 2, 3),
+                                        (rotated_patch.strides[1],
+                                         rotated_patch.strides[0],
+                                         rotated_patch.strides[0]))
     B = rotated_patch[1:-1, 1:].swapaxes(0, 1)
     backtrack = np.zeros_like(B, dtype='int')
     T = np.empty((B.shape[1]), 'f')
-    R = np.arange(-1, len(T)-1)
-    for i in np.arange(c-1):
+    R = np.arange(-1, len(T) - 1)
+    for i in np.arange(c - 1):
         A[i].min(1, T)
         backtrack[i] = A[i].argmin(1) + R
         B[i] += T
     # backtrack
     seam = []
     j = np.argmin(rotated_patch[1:-1, -1])
-    for i in range(c-2, -2, -1):
-        seam.append((i+x_offsets[0]+1, j))
+    for i in range(c - 2, -2, -1):
+        seam.append((i + x_offsets[0] + 1, j))
         j = backtrack[i, j]
     seam = np.array(seam)[::-1]
     seam_mean = seam[:, 1].mean()
     seam_std = seam[:, 1].std()
-    seam[:, 1] = np.clip(seam[:, 1], seam_mean-seam_std, seam_mean+seam_std)
+    seam[:, 1] = np.clip(seam[:, 1], seam_mean - seam_std, seam_mean + seam_std)
     # rotate back
     seam = tform(seam).astype('int')
     # filter out seam points in masked area of original patch/in padding
@@ -618,14 +619,14 @@ def _extract_patch(env_up, env_bottom, baseline, offset_baseline, end_points, di
 
     # ugly workaround against GEOM parallel_offset bug creating a
     # MultiLineString out of offset LineString
-    if upper_seam.parallel_offset(offset//2, side='right').geom_type == 'MultiLineString' or offset == 0:
+    if upper_seam.parallel_offset(offset // 2, side='right').geom_type == 'MultiLineString' or offset == 0:
         upper_seam = np.array(upper_seam.coords, dtype=int)
     else:
-        upper_seam = np.array(upper_seam.parallel_offset(offset//2, side='right').coords, dtype=int)[::-1]
-    if bottom_seam.parallel_offset(offset//2, side='left').geom_type == 'MultiLineString' or offset == 0:
+        upper_seam = np.array(upper_seam.parallel_offset(offset // 2, side='right').coords, dtype=int)[::-1]
+    if bottom_seam.parallel_offset(offset // 2, side='left').geom_type == 'MultiLineString' or offset == 0:
         bottom_seam = np.array(bottom_seam.coords, dtype=int)
     else:
-        bottom_seam = np.array(bottom_seam.parallel_offset(offset//2, side='left').coords, dtype=int)
+        bottom_seam = np.array(bottom_seam.parallel_offset(offset // 2, side='left').coords, dtype=int)
 
     # offsetting might produce bounds outside the image. Clip it to the image bounds.
     polygon = np.concatenate(([end_points[0]], upper_seam, [end_points[-1]], bottom_seam[::-1]))
@@ -652,8 +653,8 @@ def _calc_roi(line, bounds, baselines, suppl_obj, p_dir):
     upper_bounds_intersects = []
     bottom_bounds_intersects = []
     for point in ip_line:
-        upper_bounds_intersects.append(_ray_intersect_boundaries(point, (p_dir*(-1, 1))[::-1], bounds+1).astype('int'))
-        bottom_bounds_intersects.append(_ray_intersect_boundaries(point, (p_dir*(1, -1))[::-1], bounds+1).astype('int'))
+        upper_bounds_intersects.append(_ray_intersect_boundaries(point, (p_dir * (-1, 1))[::-1], bounds + 1).astype('int'))
+        bottom_bounds_intersects.append(_ray_intersect_boundaries(point, (p_dir * (1, -1))[::-1], bounds + 1).astype('int'))
     # build polygon between baseline and bbox intersects
     upper_polygon = geom.Polygon(ip_line.tolist() + upper_bounds_intersects)
     bottom_polygon = geom.Polygon(ip_line.tolist() + bottom_bounds_intersects)
@@ -742,11 +743,11 @@ def calculate_polygonal_environment(im: Image.Image = None,
         w, h = im.size
         oh, ow = scale
         if oh == 0:
-            oh = int(h * ow/w)
+            oh = int(h * ow / w)
         elif ow == 0:
-            ow = int(w * oh/h)
+            ow = int(w * oh / h)
         im = im.resize((ow, oh))
-        scale = np.array((ow/w, oh/h))
+        scale = np.array((ow / w, oh / h))
         # rescale baselines
         baselines = [(np.array(bl) * scale).astype('int').tolist() for bl in baselines]
         # rescale suppl_obj
@@ -776,9 +777,9 @@ def calculate_polygonal_environment(im: Image.Image = None,
 
             # calculate magnitude-weighted average direction vector
             lengths = np.linalg.norm(np.diff(line.T), axis=0)
-            p_dir = np.mean(np.diff(line.T) * lengths/lengths.sum(), axis=1)
+            p_dir = np.mean(np.diff(line.T) * lengths / lengths.sum(), axis=1)
             p_dir = (p_dir.T / np.sqrt(np.sum(p_dir**2, axis=-1)))
-            env_up, env_bottom = _calc_roi(line, bounds, baselines[:idx] + baselines[idx+1:], suppl_obj, p_dir)
+            env_up, env_bottom = _calc_roi(line, bounds, baselines[:idx] + baselines[idx + 1:], suppl_obj, p_dir)
 
             polygons.append(_extract_patch(env_up,
                                            env_bottom,
@@ -797,7 +798,7 @@ def calculate_polygonal_environment(im: Image.Image = None,
             polygons.append(None)
 
     if scale is not None:
-        polygons = [(np.array(pol)/scale).astype('uint').tolist() if pol is not None else None for pol in polygons]
+        polygons = [(np.array(pol) / scale).astype('uint').tolist() if pol is not None else None for pol in polygons]
     return polygons
 
 
@@ -847,7 +848,7 @@ def polygonal_reading_order(lines: list['BaselineLine'],
             intra_region_order[idx] = [region_lines[idx][i][0] for i in lsort]
             reg_bounds = reg_polygon.bounds
             bounds.append((slice(reg_bounds[1], reg_bounds[3]), slice(reg_bounds[0], reg_bounds[2])))
-            indizes[line_idx+idx+1] = ('region', idx)
+            indizes[line_idx + idx + 1] = ('region', idx)
     # order unassigned lines and regions
     order = _reading_order(bounds, text_direction)
     lsort = topsort(order)
@@ -986,7 +987,7 @@ def _greedy_order_decoder(P):
     """
     A = P + torch.finfo(torch.float).eps
     N = P.shape[0]
-    A = (A + (1-A).T)/2
+    A = (A + (1 - A).T) / 2
     for i in range(A.shape[0]):
         A[i, i] = torch.finfo(torch.float).eps
     best_path = []
@@ -1169,13 +1170,13 @@ def compute_polygon_section(baseline: Sequence[tuple[int, int]],
     dist1 = min(bl_length - np.finfo(float).eps, dist1)
     dist2 = min(bl_length - np.finfo(float).eps, dist2)
     segs_idx = np.searchsorted(dists, [dist1, dist2])
-    segs = np.dstack((bl[segs_idx-1], bl[segs_idx]))
+    segs = np.dstack((bl[segs_idx - 1], bl[segs_idx]))
     # compute unit vector of segments (NOT orthogonal)
     norm_vec = (segs[..., 1] - segs[..., 0])
     norm_vec_len = np.sqrt(np.sum(norm_vec**2, axis=1))
     unit_vec = norm_vec / np.tile(norm_vec_len, (2, 1)).T
     # find point start/end point on segments
-    seg_dists = (dist1, dist2) - dists[segs_idx-1]
+    seg_dists = (dist1, dist2) - dists[segs_idx - 1]
     seg_points = segs[..., 0] + (seg_dists * unit_vec.T).T
     # get intersects
     bounds = np.array(boundary)
@@ -1305,8 +1306,8 @@ def _bevelled_warping_envelope(baseline: np.ndarray,
     bl_seg_normals = np.array([-diff_bl_normed[:, 1], diff_bl_normed[:, 0]]).T
     ini_point = baseline[0] - diff_bl_normed[0] * output_bl_start[0]
     source_envelope = [
-        _as_int_tuple(ini_point + envelope_dy[0]*bl_seg_normals[0]),
-        _as_int_tuple(ini_point + envelope_dy[1]*bl_seg_normals[0]),
+        _as_int_tuple(ini_point + envelope_dy[0] * bl_seg_normals[0]),
+        _as_int_tuple(ini_point + envelope_dy[1] * bl_seg_normals[0]),
     ]
     target_envelope = [
         (0, 0),
@@ -1315,23 +1316,23 @@ def _bevelled_warping_envelope(baseline: np.ndarray,
     MAX_BEVEL_WIDTH = output_shape[0] / 3
     BEVEL_STEP_WIDTH = MAX_BEVEL_WIDTH / 2
 
-    for k in range(l_bl-2):
-        pt = baseline[k+1]
+    for k in range(l_bl - 2):
+        pt = baseline[k + 1]
         seg_prev = baseline[k] - pt
-        seg_next = baseline[k+2] - pt
+        seg_next = baseline[k + 2] - pt
         bevel_prev = seg_prev / max(2., np.linalg.norm(seg_prev) / MAX_BEVEL_WIDTH)
         bevel_next = seg_next / max(2., np.linalg.norm(seg_next) / MAX_BEVEL_WIDTH)
         bevel_nsteps = max(1, np.round((np.linalg.norm(bevel_prev) + np.linalg.norm(bevel_next)) / BEVEL_STEP_WIDTH))
         l_prev = np.linalg.norm(bevel_prev)
         l_next = np.linalg.norm(bevel_next)
-        for i in range(int(bevel_nsteps)+1):
+        for i in range(int(bevel_nsteps) + 1):
             # bezier interp
             t = i / bevel_nsteps
-            tpt = pt + (1-t)**2 * bevel_prev + t**2 * bevel_next
-            tx = output_bl_start[0] + cum_lens[k+1] - (1-t)**2 * l_prev + t**2 * l_next
-            tnormal = (1-t) * bl_seg_normals[k] + t * bl_seg_normals[k+1]
+            tpt = pt + (1 - t)**2 * bevel_prev + t**2 * bevel_next
+            tx = output_bl_start[0] + cum_lens[k + 1] - (1 - t)**2 * l_prev + t**2 * l_next
+            tnormal = (1 - t) * bl_seg_normals[k] + t * bl_seg_normals[k + 1]
             tnormal /= np.linalg.norm(tnormal)
-            source_points = [_as_int_tuple(tpt + envelope_dy[0]*tnormal), _as_int_tuple(tpt + envelope_dy[1]*tnormal)]
+            source_points = [_as_int_tuple(tpt + envelope_dy[0] * tnormal), _as_int_tuple(tpt + envelope_dy[1] * tnormal)]
             target_points = [(int(tx), 0), (int(tx), output_shape[0])]
             # avoid duplicate points leading to singularities
             if source_points[0] == source_envelope[-2] or source_points[1] == source_envelope[-1] or target_points[0] == target_envelope[-2]:
@@ -1339,10 +1340,10 @@ def _bevelled_warping_envelope(baseline: np.ndarray,
             source_envelope += source_points
             target_envelope += target_points
 
-    end_point = baseline[-1] + diff_bl_normed[-1]*(output_shape[1]-cum_lens[-1]-output_bl_start[0])
+    end_point = baseline[-1] + diff_bl_normed[-1] * (output_shape[1] - cum_lens[-1] - output_bl_start[0])
     source_envelope += [
-        end_point + envelope_dy[0]*bl_seg_normals[-1],
-        end_point + envelope_dy[1]*bl_seg_normals[-1],
+        end_point + envelope_dy[0] * bl_seg_normals[-1],
+        end_point + envelope_dy[1] * bl_seg_normals[-1],
     ]
     target_envelope += [
         (output_shape[1], 0),
@@ -1432,10 +1433,10 @@ def extract_polygons(im: Image.Image,
                     baseline = baseline.astype(float)
                     # calculate direction vector
                     lengths = np.linalg.norm(np.diff(baseline.T), axis=0)
-                    p_dir = np.mean(np.diff(baseline.T) * lengths/lengths.sum(), axis=1)
+                    p_dir = np.mean(np.diff(baseline.T) * lengths / lengths.sum(), axis=1)
                     p_dir = (p_dir.T / np.sqrt(np.sum(p_dir**2, axis=-1)))
                     angle = np.arctan2(p_dir[1], p_dir[0])
-                    patch = im[r_min:r_max+1, c_min:c_max+1].copy()
+                    patch = im[r_min:r_max + 1, c_min:c_max + 1].copy()
                     offset_polygon = pl - (c_min, r_min)
                     offset_polygon2 = offset_polygon.flatten().tolist()
                     img = Image.new('L', patch.shape[:2][::-1], 0)
@@ -1462,18 +1463,18 @@ def extract_polygons(im: Image.Image,
                         npoint = np.array(point.coords)[0]
                         line_idx, dist, intercept = min(((idx, line.project(point),
                                                         np.array(line.interpolate(line.project(point)).coords)) for idx, line in enumerate(bl)),
-                                                        key=lambda x: np.linalg.norm(npoint-x[2]))
+                                                        key=lambda x: np.linalg.norm(npoint - x[2]))
                         # absolute distance from start of line
                         line_dist = cum_lens[line_idx] + dist
                         intercept = np.array(intercept)
                         # side of line the point is at
-                        side = np.linalg.det(np.array([[baseline[line_idx+1][0]-baseline[line_idx][0],
-                                                        npoint[0]-baseline[line_idx][0]],
-                                                       [baseline[line_idx+1][1]-baseline[line_idx][1],
-                                                           npoint[1]-baseline[line_idx][1]]]))
+                        side = np.linalg.det(np.array([[baseline[line_idx + 1][0] - baseline[line_idx][0],
+                                                        npoint[0] - baseline[line_idx][0]],
+                                                       [baseline[line_idx + 1][1] - baseline[line_idx][1],
+                                                           npoint[1] - baseline[line_idx][1]]]))
                         side = np.sign(side)
                         # signed perpendicular distance from the rectified distance
-                        per_dist = side * np.linalg.norm(npoint-intercept)
+                        per_dist = side * np.linalg.norm(npoint - intercept)
                         control_pts.append((line_dist, per_dist))
                     # calculate baseline destination points
                     bl_dst_pts = baseline[0] + np.dstack((cum_lens, np.zeros_like(cum_lens)))[0]
@@ -1483,7 +1484,7 @@ def extract_polygons(im: Image.Image,
                     c_dst_min, c_dst_max = int(pol_dst_pts[:, 0].min()), int(pol_dst_pts[:, 0].max())
                     r_dst_min, r_dst_max = int(pol_dst_pts[:, 1].min()), int(pol_dst_pts[:, 1].max())
                     output_shape = np.around((r_dst_max - r_dst_min + 1, c_dst_max - c_dst_min + 1))
-                    patch = im[r_min:r_max+1, c_min:c_max+1].copy()
+                    patch = im[r_min:r_max + 1, c_min:c_max + 1].copy()
                     # offset src points by patch shape
                     offset_polygon = full_polygon - (c_min, r_min)
                     offset_baseline = baseline - (c_min, r_min)
@@ -1511,11 +1512,11 @@ def extract_polygons(im: Image.Image,
                     baseline = baseline.astype(float)
                     # calculate direction vector
                     lengths = np.linalg.norm(np.diff(baseline.T), axis=0)
-                    p_dir = np.mean(np.diff(baseline.T) * lengths/lengths.sum(), axis=1)
+                    p_dir = np.mean(np.diff(baseline.T) * lengths / lengths.sum(), axis=1)
                     p_dir = (p_dir.T / np.sqrt(np.sum(p_dir**2, axis=-1)))
                     angle = np.arctan2(p_dir[1], p_dir[0])
                     # crop out bounding box
-                    patch = im.crop((c_min, r_min, c_max+1, r_max+1))
+                    patch = im.crop((c_min, r_min, c_max + 1, r_max + 1))
                     offset_polygon = pl - (c_min, r_min)
                     patch = apply_polygonal_mask(patch, offset_polygon, cval=0)
                     extrema = offset_polygon[(0, -1), :]
@@ -1560,7 +1561,7 @@ def extract_polygons(im: Image.Image,
                     c_dst_min, c_dst_max = int(pol_dst_pts[:, 0].min()), int(pol_dst_pts[:, 0].max())
                     r_dst_min, r_dst_max = int(pol_dst_pts[:, 1].min()), int(pol_dst_pts[:, 1].max())
                     output_shape = np.around((r_dst_max - r_dst_min + 1, c_dst_max - c_dst_min + 1))
-                    patch = im.crop((c_min, r_min, c_max+1, r_max+1))
+                    patch = im.crop((c_min, r_min, c_max + 1, r_max + 1))
                     # offset src points by patch shape
                     offset_polygon = full_polygon - (c_min, r_min)
                     offset_baseline = baseline - (c_min, r_min)
@@ -1574,10 +1575,10 @@ def extract_polygons(im: Image.Image,
                     # mesh for PIL, as (box, quad) tuples : box is (NW, SE) and quad is (NW, SW, SE, NE)
                     deform_mesh = [
                         (
-                            (*target_envelope[i], *target_envelope[i+3]),
-                            (*source_envelope[i], *source_envelope[i+1], *source_envelope[i+3], *source_envelope[i+2])
+                            (*target_envelope[i], *target_envelope[i + 3]),
+                            (*source_envelope[i], *source_envelope[i + 1], *source_envelope[i + 3], *source_envelope[i + 2])
                         )
-                        for i in range(0, len(source_envelope)-3, 2)
+                        for i in range(0, len(source_envelope) - 3, 2)
                     ]
                     # warp
                     resample = {0: Resampling.NEAREST, 1: Resampling.BILINEAR, 2: Resampling.BICUBIC, 3: Resampling.BICUBIC}.get(order, Resampling.NEAREST)
@@ -1593,8 +1594,7 @@ def extract_polygons(im: Image.Image,
             box = line.bbox
             if isinstance(box, tuple):
                 box = list(box)
-            if (box < [0, 0, 0, 0] or box[::2] >= [im.size[0], im.size[0]] or
-                    box[1::2] >= [im.size[1], im.size[1]]):
+            if (box < [0, 0, 0, 0] or box[::2] >= [im.size[0], im.size[0]] or box[1::2] >= [im.size[1], im.size[1]]):
                 logger.error('bbox {} is outside of image bounds {}'.format(box, im.size))
                 raise ValueError('Line outside of image bounds')
             yield im.crop(box).rotate(angle, expand=True), line

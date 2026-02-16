@@ -1,12 +1,10 @@
 # -*- coding: utf-8 -*-
 
-from contextlib import contextmanager
 import unittest
 import tempfile
 from unittest.mock import Mock, patch
 from pathlib import Path
 from traceback import print_exc
-import warnings
 from typing import Optional, List, Union
 
 from PIL import Image
@@ -15,15 +13,11 @@ from click.testing import CliRunner
 
 from kraken.containers import (
     BaselineLine,
-    BaselineOCRRecord,
-    BBoxLine,
-    BBoxOCRRecord,
     Segmentation,
 )
-from kraken.lib import xml
 from kraken.lib import segmentation
 from kraken.lib.models import load_any
-from kraken.rpred import mm_rpred, rpred
+from kraken.rpred import rpred
 from kraken.kraken import cli as kraken_cli
 from kraken.ketos import cli as ketos_cli
 import re
@@ -31,8 +25,10 @@ import re
 thisfile = Path(__file__).resolve().parent
 resources = thisfile / "resources"
 
+
 def mock_extract_polygons():
     return Mock(side_effect=segmentation.extract_polygons)
+
 
 class TestNewPolygons(unittest.TestCase):
     """
@@ -63,10 +59,10 @@ class TestNewPolygons(unittest.TestCase):
             script_detection=False,
         )
 
-    ## RECIPES
+    # RECIPES
 
     @patch("kraken.rpred.extract_polygons", new_callable=mock_extract_polygons)
-    def _test_rpred(self, extractor_mock: Mock, *, model, force_no_legacy: bool=False, expect_legacy: bool):
+    def _test_rpred(self, extractor_mock: Mock, *, model, force_no_legacy: bool = False, expect_legacy: bool):
         """
         Base recipe for testing rpred with a given model and polygon extraction method
         """
@@ -78,7 +74,7 @@ class TestNewPolygons(unittest.TestCase):
             self.assertEqual(cl[2]["legacy"], expect_legacy)
 
     @patch("kraken.lib.vgsl.rpred.extract_polygons", new_callable=mock_extract_polygons)
-    def _test_krakencli(self, extractor_mock: Mock, *, args, force_no_legacy: bool=False, expect_legacy: bool,):
+    def _test_krakencli(self, extractor_mock: Mock, *, args, force_no_legacy: bool = False, expect_legacy: bool,):
         """
         Base recipe for testing kraken_cli with a given polygon extraction method
         """
@@ -132,7 +128,7 @@ class TestNewPolygons(unittest.TestCase):
         self.assertEqual(len(models), 1, f"Expected exactly one best model in {model_dir}, found {models}")
         return str(models[0])
 
-    ## TESTS
+    # TESTS
 
     def test_rpred_from_old_model(self):
         """
@@ -151,7 +147,6 @@ class TestNewPolygons(unittest.TestCase):
         Test rpred with new model, check that it uses new polygon extraction method
         """
         self._test_rpred(model=self.new_model, force_no_legacy=False, expect_legacy=False)
-
 
     def test_krakencli_ocr_old_model(self):
         """
@@ -185,7 +180,6 @@ class TestNewPolygons(unittest.TestCase):
                 force_no_legacy=False,
                 expect_legacy=False,
             )
-
 
     def test_ketoscli_test_old_model(self):
         """
@@ -225,7 +219,7 @@ class TestNewPolygons(unittest.TestCase):
             self._test_ketoscli(
                 args=['--workers', '0', 'train', '-f', 'xml', '-N', '1', '-q', 'fixed', '-o', mfp, self.segmented_img],
                 expect_legacy=False,
-                check_exit_code=[0, 1], # Model may not improve during training
+                check_exit_code=[0, 1],  # Model may not improve during training
             )
 
             self._test_krakencli(
@@ -244,7 +238,7 @@ class TestNewPolygons(unittest.TestCase):
             self._test_ketoscli(
                 args=['--workers', '0', 'train', '--legacy-polygons', '-f', 'xml', '-N', '1', '-q', 'fixed', '-o', mfp, self.segmented_img],
                 expect_legacy=True,
-                check_exit_code=[0, 1], # Model may not improve during training
+                check_exit_code=[0, 1],  # Model may not improve during training
             )
 
             self._test_krakencli(
@@ -263,7 +257,7 @@ class TestNewPolygons(unittest.TestCase):
             self._test_ketoscli(
                 args=['--workers', '0', 'train', '-f', 'xml', '-N', '1', '-q', 'fixed', '-i', self.old_model_path, '--resize', 'union', '-o', mfp, self.segmented_img],
                 expect_legacy=False,
-                check_exit_code=[0, 1], # Model may not improve during training
+                check_exit_code=[0, 1],  # Model may not improve during training
             )
             self._test_krakencli(
                 args=['-f', 'xml', '-i', self.segmented_img, fp, 'ocr', '-m', self._find_best_model(mfp)],
@@ -281,7 +275,7 @@ class TestNewPolygons(unittest.TestCase):
             self._test_ketoscli(
                 args=['--workers', '0', 'train', '--legacy-polygons', '-f', 'xml', '-N', '1', '-q', 'fixed', '-i', self.old_model_path, '--resize', 'union', '-o', mfp, self.segmented_img],
                 expect_legacy=True,
-                check_exit_code=[0, 1], # Model may not improve during training
+                check_exit_code=[0, 1],  # Model may not improve during training
             )
             self._test_krakencli(
                 args=['-f', 'xml', '-i', self.segmented_img, fp, 'ocr', '-m', self._find_best_model(mfp)],
@@ -299,7 +293,7 @@ class TestNewPolygons(unittest.TestCase):
             self._test_ketoscli(
                 args=['--workers', '0', 'pretrain', '-f', 'xml', '-N', '1', '-q', 'fixed', '-o', mfp, self.segmented_img],
                 expect_legacy=False,
-                check_exit_code=[0, 1], # Model may not improve during training
+                check_exit_code=[0, 1],  # Model may not improve during training
             )
             self._test_krakencli(
                 args=['-f', 'xml', '-i', self.segmented_img, fp, 'ocr', '-m', self._find_best_model(mfp)],
@@ -317,7 +311,7 @@ class TestNewPolygons(unittest.TestCase):
             self._test_ketoscli(
                 args=['--workers', '0', 'pretrain', '--legacy-polygons', '-f', 'xml', '-N', '1', '-q', 'fixed', '-o', mfp, self.segmented_img],
                 expect_legacy=True,
-                check_exit_code=[0, 1], # Model may not improve during training
+                check_exit_code=[0, 1],  # Model may not improve during training
             )
 
             self._test_krakencli(
@@ -336,14 +330,13 @@ class TestNewPolygons(unittest.TestCase):
             self._test_ketoscli(
                 args=['--workers', '0', 'pretrain', '-f', 'xml', '-N', '1', '-q', 'fixed', '-i', self.old_model_path, '-o', mfp, self.segmented_img],
                 expect_legacy=False,
-                check_exit_code=[0, 1], # Model may not improve during training
+                check_exit_code=[0, 1],  # Model may not improve during training
             )
 
             self._test_krakencli(
                 args=['-f', 'xml', '-i', self.segmented_img, fp, 'ocr', '-m', self._find_best_model(mfp)],
                 expect_legacy=False,
             )
-
 
     def _assertWarnsWhenTrainingArrow(self,
                                       model: str,
@@ -396,7 +389,6 @@ class TestNewPolygons(unittest.TestCase):
 
             self._assertWarnsWhenTrainingArrow(mfp, dset, force_legacy=False, expect_not_warning_msgs=["WARNING Setting dataset legacy polygon status to False based on training set", "the new model will be flagged to use legacy"])
             self._assertWarnsWhenTrainingArrow(mfp2, dset, force_legacy=True, expect_warning_msgs=["WARNING Setting dataset legacy polygon status to False based on training set", "the new model will be flagged to use new"])
-
 
     def test_ketos_new_arrow_force_legacy(self):
         """

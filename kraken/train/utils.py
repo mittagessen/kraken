@@ -264,16 +264,16 @@ def configure_optimizer_and_lr_scheduler(hparams, params, len_train_set=None, lo
                                                 weight_decay=weight_decay)
     lr_sched = {}
     if schedule == 'exponential':
-        lr_sched = {'scheduler': lr_scheduler.ExponentialLR(optim, gamma, last_epoch=completed_epochs-1),
+        lr_sched = {'scheduler': lr_scheduler.ExponentialLR(optim, gamma, last_epoch=completed_epochs - 1),
                     'interval': 'step'}
     elif schedule == 'cosine':
         lr_sched = {'scheduler': lr_scheduler.CosineAnnealingLR(optim,
                                                                 cos_t_max,
                                                                 cos_min_lr,
-                                                                last_epoch=completed_epochs-1),
+                                                                last_epoch=completed_epochs - 1),
                     'interval': 'step'}
     elif schedule == 'step':
-        lr_sched = {'scheduler': lr_scheduler.StepLR(optim, step_size, gamma, last_epoch=completed_epochs-1),
+        lr_sched = {'scheduler': lr_scheduler.StepLR(optim, step_size, gamma, last_epoch=completed_epochs - 1),
                     'interval': 'step'}
     elif schedule == 'reduceonplateau':
         lr_sched = {'scheduler': lr_scheduler.ReduceLROnPlateau(optim,
@@ -286,7 +286,7 @@ def configure_optimizer_and_lr_scheduler(hparams, params, len_train_set=None, lo
             raise ValueError('1cycle learning rate scheduler selected but '
                              'number of epochs is less than 0 '
                              f'({epochs}).')
-        last_epoch = completed_epochs*len_train_set if completed_epochs else -1
+        last_epoch = completed_epochs * len_train_set if completed_epochs else -1
         lr_sched = {'scheduler': lr_scheduler.OneCycleLR(optim,
                                                          max_lr=lrate,
                                                          epochs=epochs,

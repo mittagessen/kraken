@@ -47,6 +47,7 @@ def validate_hocr(self, fp):
     counts = Counter(ids)
     self.assertEqual(counts.most_common(1)[0][1], 1, msg='Duplicate IDs in hOCR output')
 
+
 def validate_page(self, fp):
     doc = etree.fromstring(fp.getvalue().encode('utf-8'))
 
@@ -133,6 +134,7 @@ class TestSerializations(unittest.TestCase):
                                                                    'models': 'bar.mlmodel',
                                                                    'pad': 16,
                                                                    'bidi_reordering': True})]
+
     def test_box_vertical_hocr_serialization(self):
         """
         Test vertical line hOCR serialization

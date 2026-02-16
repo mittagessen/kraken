@@ -331,7 +331,7 @@ class Reshape(Module):
         input = input.permute(perm)
         o = input.reshape(input.shape[:dest] + (input.shape[dest] * input.shape[dest + 1],) + input.shape[dest + 2:])
         if seq_len is not None:
-            seq_len = (seq_len * (float(initial_len)/o.shape[3])).int()
+            seq_len = (seq_len * (float(initial_len) / o.shape[3])).int()
         return o, seq_len
 
     def get_shape(self, input: tuple[int, int, int, int]) -> tuple[int, int, int, int]:
@@ -384,14 +384,14 @@ class MaxPool(Module):
                 output_shape: Optional[tuple[int, int]] = None) -> tuple[torch.Tensor, Optional[torch.Tensor]]:
         o = self.layer(inputs)
         if seq_len is not None:
-            seq_len = torch.floor((seq_len-(self.kernel_size[1]-1)-1).float()/self.stride[1]+1).int()
+            seq_len = torch.floor((seq_len - (self.kernel_size[1] - 1) - 1).float() / self.stride[1] + 1).int()
         return o, seq_len
 
     def get_shape(self, input: tuple[int, int, int, int]) -> tuple[int, int, int, int]:
         self.output_shape = (input[0],
                              input[1],
-                             int(np.floor((input[2]-(self.kernel_size[0]-1)-1)/self.stride[0]+1) if input[2] != 0 else 0),
-                             int(np.floor((input[3]-(self.kernel_size[1]-1)-1)/self.stride[1]+1) if input[3] != 0 else 0))
+                             int(np.floor((input[2] - (self.kernel_size[0] - 1) - 1) / self.stride[0] + 1) if input[2] != 0 else 0),
+                             int(np.floor((input[3] - (self.kernel_size[1] - 1) - 1) / self.stride[1] + 1) if input[3] != 0 else 0))
         return self.output_shape
 
     def deserialize(self, name, spec) -> None:
@@ -499,7 +499,7 @@ class TransposedSummarizingRNN(Module):
             self.input_size += 1
         self.hidden_size = hidden_size
         self.bidi = direction == 'b'
-        self.output_size = hidden_size if not self.bidi else 2*hidden_size
+        self.output_size = hidden_size if not self.bidi else 2 * hidden_size
 
         if legacy == 'ocropy':
             self.layer = PeepholeBidiLSTM(self.input_size, hidden_size)
@@ -648,8 +648,7 @@ class TransposedSummarizingRNN(Module):
                                                    ) if not self.legacy else None,
                                   W_h_back=_reorder_indim(self.layer.weight_hh_l0_reverse),
                                   W_x_back=_reorder_indim(self.layer.weight_ih_l0_reverse),
-                                  b_back=_reorder_indim((self.layer.bias_ih_l0_reverse +
-                                                        self.layer.bias_hh_l0_reverse)) if not self.legacy else None,
+                                  b_back=_reorder_indim((self.layer.bias_ih_l0_reverse + self.layer.bias_hh_l0_reverse)) if not self.legacy else None,
                                   hidden_size=self.hidden_size,
                                   input_size=self.input_size,
                                   input_names=[input],
@@ -854,14 +853,10 @@ class ActConv2D(Module):
 
         if seq_len is not None:
             if self.transposed:
-                seq_len = torch.floor(
-                    ((seq_len - 1) * self.stride[1]
-                        - 2 * self.padding[1]
-                        + self.dilation[1] * (self.kernel_size[1] - 1)
-                        + 1))
+                seq_len = torch.floor(((seq_len - 1) * self.stride[1] - 2 * self.padding[1] + self.dilation[1] * (self.kernel_size[1] - 1) + 1))
             else:
                 seq_len = torch.clamp(torch.floor(
-                    (seq_len+2*self.padding[1]-self.dilation[1]*(self.kernel_size[1]-1)-1).float()/self.stride[1]+1), min=1).int()
+                    (seq_len + 2 * self.padding[1] - self.dilation[1] * (self.kernel_size[1] - 1) - 1).float() / self.stride[1] + 1), min=1).int()
         return o, seq_len
 
     def get_shape(self, input: tuple[int, int, int, int], target_shape: Optional[tuple[int, int, int, int]] = None) -> tuple[int, int, int, int]:
@@ -878,10 +873,8 @@ class ActConv2D(Module):
         else:
             self.output_shape = (input[0],
                                  self.out_channels,
-                                 int(max(np.floor((input[2]+2*self.padding[0]-self.dilation[0]*(self.kernel_size[0]-1)-1) /
-                                     self.stride[0]+1), 1) if input[2] != 0 else 0),
-                                 int(max(np.floor((input[3]+2*self.padding[1]-self.dilation[1]*(self.kernel_size[1]-1)-1) /
-                                     self.stride[1]+1), 1) if input[3] != 0 else 0))
+                                 int(max(np.floor((input[2] + 2 * self.padding[0] - self.dilation[0] * (self.kernel_size[0] - 1) - 1) / self.stride[0] + 1), 1) if input[2] != 0 else 0),
+                                 int(max(np.floor((input[3] + 2 * self.padding[1] - self.dilation[1] * (self.kernel_size[1] - 1) - 1) / self.stride[1] + 1), 1) if input[3] != 0 else 0))
         return self.output_shape
 
     def deserialize(self, name: str, spec) -> None:

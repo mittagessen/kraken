@@ -13,6 +13,7 @@ from kraken.lib.util import is_bitonal
 thisfile = Path(__file__).resolve().parent
 resources = thisfile / 'resources'
 
+
 def check_output(self, config, im, output_tensor):
     if config['height'] != 0:
         self.assertEqual(config['height'], output_tensor.shape[1])
@@ -22,6 +23,7 @@ def check_output(self, config, im, output_tensor):
         self.assertEqual(len(output_tensor.int().unique()), 2)
     if config['channels'] == 3:
         self.assertEqual(output_tensor.shape[0], 3)
+
 
 class TestBaselineSet(unittest.TestCase):
     """
@@ -451,4 +453,4 @@ class TestInputTransforms(unittest.TestCase):
         ImageInputTransforms instantiation with invalid number of channels
         """
         with raises(KrakenInputException):
-            tf = ImageInputTransforms(**self.invalid_channels)
+            ImageInputTransforms(**self.invalid_channels)

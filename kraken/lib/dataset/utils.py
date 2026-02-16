@@ -391,7 +391,7 @@ def collate_sequences(batch):
     seqs = [x['image'] for x in sorted_batch]
     seq_lens = torch.LongTensor([seq.shape[2] for seq in seqs])
     max_len = seqs[0].shape[2]
-    seqs = torch.stack([F.pad(seq, pad=(0, max_len-seq.shape[2])) for seq in seqs])
+    seqs = torch.stack([F.pad(seq, pad=(0, max_len - seq.shape[2])) for seq in seqs])
     if isinstance(sorted_batch[0]['target'], str):
         labels = [x['target'] for x in sorted_batch]
     else:

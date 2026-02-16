@@ -10,6 +10,7 @@ from kraken.containers import BaselineLine, BBoxLine
 thisfile = Path(__file__).resolve().parent
 resources = thisfile / 'resources'
 
+
 class TestXMLParser(unittest.TestCase):
     """
     Tests XML (ALTO/PAGE) parsing
@@ -511,7 +512,7 @@ class TestXMLParser(unittest.TestCase):
         seg = doc.to_container()
         # All 4 lines should be present
         self.assertEqual(len(seg.lines), 4)
-        line_ids = [l.id for l in seg.lines]
+        line_ids = [line.id for line in seg.lines]
         self.assertIn('tl_3', line_ids)
         # line_orders should contain valid indices
         for order in seg.line_orders:
@@ -583,7 +584,7 @@ class TestXMLParser(unittest.TestCase):
         seg = doc.to_container()
         # All 4 lines should be present
         self.assertEqual(len(seg.lines), 4)
-        line_ids = [l.id for l in seg.lines]
+        line_ids = [line.id for line in seg.lines]
         self.assertIn('l3', line_ids)
         for order in seg.line_orders:
             for idx in order:

@@ -46,16 +46,16 @@ def cli(bounding_region, topline, pad, output_identifiers, model):
         print('-> Updating class maps')
         if 'baselines' in new_cls_map:
             print('new baseline identifiers:')
-            old_cls = {v: k for k,v in net.user_metadata['class_mapping']['baselines'].items()}
-            new_cls = {v: k for k,v in new_cls_map['baselines'].items()}
+            old_cls = {v: k for k, v in net.user_metadata['class_mapping']['baselines'].items()}
+            new_cls = {v: k for k, v in new_cls_map['baselines'].items()}
             old_cls.update(new_cls)
             net.user_metadata['class_mapping']['baselines'] = {v: k for k, v in old_cls.items()}
             for k, v in net.user_metadata['class_mapping']['baselines'].items():
                 print(f'  {k}\t{v}')
         if 'regions' in new_cls_map:
             print('new region identifiers:')
-            old_cls = {v: k for k,v in net.user_metadata['class_mapping']['regions'].items()}
-            new_cls = {v: k for k,v in new_cls_map['regions'].items()}
+            old_cls = {v: k for k, v in net.user_metadata['class_mapping']['regions'].items()}
+            new_cls = {v: k for k, v in new_cls_map['regions'].items()}
             old_cls.update(new_cls)
             net.user_metadata['class_mapping']['regions'] = {v: k for k, v in old_cls.items()}
             for k, v in net.user_metadata['class_mapping']['regions'].items():

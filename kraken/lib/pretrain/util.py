@@ -20,7 +20,7 @@ def positive_integers_with_sum(n, total):
     ls = sorted(ls)
     ls.append(total)
     for i in range(1, len(ls)):
-        rv.append(ls[i] - ls[i-1])
+        rv.append(ls[i] - ls[i - 1])
     return rv
 
 
@@ -50,12 +50,12 @@ def compute_masks(mask_prob: int,
     num_neg_samples = num_masks * num_neg_samples
     num_masks += num_neg_samples
 
-    indices = [x+mask_width for x in positive_integers_with_sum(num_masks, sum(seq_lens)-num_masks*mask_width)]
+    indices = [x + mask_width for x in positive_integers_with_sum(num_masks, sum(seq_lens) - num_masks * mask_width)]
     start = 0
     mask_slices = []
     for i in indices:
-        i_start = random.randint(start, i+start-mask_width)
-        mask_slices.append(slice(i_start, i_start+mask_width))
+        i_start = random.randint(start, i + start - mask_width)
+        mask_slices.append(slice(i_start, i_start + mask_width))
         start += i
 
     neg_idx = random.sample(range(len(mask_slices)), num_neg_samples)

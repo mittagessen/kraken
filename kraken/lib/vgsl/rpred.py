@@ -127,7 +127,7 @@ class VGSLRecognitionInference:
                              lines: list[tuple['torch.Tensor', 'Image.Image', int]],
                              segmentation: 'Segmentation') -> Generator[tuple[BBoxOCRRecord, int], None, None]:
         max_len = max([seq.shape[2] for seq, *_ in lines])
-        seqs = torch.stack([F.pad(seq, pad=(0, max_len-seq.shape[2])) for seq, *_ in lines])
+        seqs = torch.stack([F.pad(seq, pad=(0, max_len - seq.shape[2])) for seq, *_ in lines])
         seq_lens = torch.LongTensor([seq.shape[2] for seq, *_ in lines])
 
         preds, olens = self._rec_predict(seqs, seq_lens)
@@ -135,9 +135,9 @@ class VGSLRecognitionInference:
         for idx, (pred, olen) in enumerate(zip(preds, olens)):
             # calculate recognized LSTM locations of characters
             # scale between network output and network input
-            self.net_scale = lines[idx][0].shape[2]/olen.item()
+            self.net_scale = lines[idx][0].shape[2] / olen.item()
             # scale between network input and original line
-            self.in_scale = lines[idx][1].width/(lines[idx][0].shape[2]-2*self._inf_config.padding)
+            self.in_scale = lines[idx][1].width / (lines[idx][0].shape[2] - 2 * self._inf_config.padding)
 
             # XXX: fix bounding box calculation ocr_record for multi-codepoint labels.
             pred_str = ''.join(x[0] for x in pred)
@@ -172,7 +172,7 @@ class VGSLRecognitionInference:
                                   lines: list[tuple['torch.Tensor', 'Image.Image', int]],
                                   segmentation: 'Segmentation') -> Generator[tuple[BaselineOCRRecord, int], None, None]:
         max_len = max([seq.shape[2] for seq, *_ in lines])
-        seqs = torch.stack([F.pad(seq, pad=(0, max_len-seq.shape[2])) for seq, *_ in lines])
+        seqs = torch.stack([F.pad(seq, pad=(0, max_len - seq.shape[2])) for seq, *_ in lines])
         seq_lens = torch.LongTensor([seq.shape[2] for seq, *_ in lines])
 
         preds, olens = self._rec_predict(seqs, seq_lens)
@@ -182,9 +182,9 @@ class VGSLRecognitionInference:
             # network output and network input. It should stay fixed, as the
             # reduction factor is constant, but non-divisibility can cause
             # slight differences between lines.
-            self.net_scale = lines[idx][0].shape[2]/olen.item()
+            self.net_scale = lines[idx][0].shape[2] / olen.item()
             # scale between network input and original line
-            self.in_scale = lines[idx][1].width/(lines[idx][0].shape[2]-2*self._inf_config.padding)
+            self.in_scale = lines[idx][1].width / (lines[idx][0].shape[2] - 2 * self._inf_config.padding)
             # XXX: fix bounding box calculation ocr_record for multi-codepoint labels.
             pred_str = ''.join(x[0] for x in pred)
             pos = []
@@ -223,10 +223,10 @@ class VGSLRecognitionInference:
             List of decoded sequences.
         """
         logits, olens = self.nn(line, lens)
-        probs = (logits/self._inf_config.temperature).softmax(1)
+        probs = (logits / self._inf_config.temperature).softmax(1)
         self.outputs = probs.detach().squeeze(2)
         dec_seqs = [self.codec.decode(locs) for locs in self._inf_config.decoder(self.outputs, olens)]
         return dec_seqs, olens
 
     def _scale_val(self, val, min_val, max_val):
-        return int(round(min(max(((val*self.net_scale)-self._inf_config.padding)*self.in_scale, min_val), max_val-1)))
+        return int(round(min(max(((val * self.net_scale) - self._inf_config.padding) * self.in_scale, min_val), max_val - 1)))

@@ -239,7 +239,7 @@ class XMLPage(object):
         for line in region_lines:
             if line.id not in ro_order:
                 raise ValueError('Fetching lines by region is only possible for flat orders')
-        return sorted(region_lines, key=lambda l: ro_order.index(l.id))
+        return sorted(region_lines, key=lambda ln: ro_order.index(ln.id))
 
     def get_lines_by_tag(self, key, value):
         return {k: v for k, v in self._lines.items() if v.tags.get(key) == value}
