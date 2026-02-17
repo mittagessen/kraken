@@ -24,7 +24,11 @@ def open_image(fp) -> Image.Image:
     """Opens an image and applies EXIF rotation if present."""
     from PIL import ImageOps
     im = Image.open(fp)
+    filename = getattr(im, 'filename', None)
     im = ImageOps.exif_transpose(im)
+    # exif_transpose may return a new image object without filename metadata.
+    if filename is not None and not getattr(im, 'filename', None):
+        im.filename = filename
     return im
 
 

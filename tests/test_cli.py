@@ -97,6 +97,8 @@ class TestCLISegmentation(unittest.TestCase):
                 with open(fp.name, 'r') as f:
                     content = f.read()
                 self.assertIn('alto', content.lower())
+                self.assertNotIn('<fileName>None</fileName>', content)
+                self.assertIn(self.bw_img.name, content)
             finally:
                 os.unlink(fp.name)
 
