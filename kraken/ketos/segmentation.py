@@ -214,7 +214,7 @@ def _build_segtest_class_diagnostics(model_mapping, dataset_mapping, dataset_sta
 @click.option('-bl', '--baseline', 'topline', flag_value=False)
 @click.option('--logger',
               'pl_logger',
-              type=click.Choice(['tensorboard']),
+              type=click.Choice(['tensorboard', 'wandb']),
               help='Logger used by PyTorch Lightning to track metrics such as loss and accuracy.')
 @click.option('--log-dir',
               type=click.Path(exists=True, dir_okay=True, writable=True),

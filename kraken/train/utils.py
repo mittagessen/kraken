@@ -130,6 +130,11 @@ class KrakenTrainer(L.Trainer):
             elif pl_logger == 'tensorboard':
                 logger.debug('Creating default experiment logger')
                 kwargs['logger'] = L.pytorch.loggers.TensorBoardLogger(log_dir)
+            elif pl_logger == 'wandb':
+                logger.debug('Creating wandb experiment logger')
+                kwargs['logger'] = L.pytorch.loggers.WandbLogger(project='kraken',
+                                                                  save_dir=log_dir,
+                                                                  log_model=False)
             else:
                 logger.error('`pl_logger` was set, but %s is not an accepted value', pl_logger)
                 raise ValueError(f'{pl_logger} is not acceptable as logger')

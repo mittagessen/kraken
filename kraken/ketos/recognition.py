@@ -128,7 +128,7 @@ logger = logging.getLogger('kraken')
               'files containing pre-extracted text lines.')
 @click.option('--augment/--no-augment',
               help='Enable image augmentation')
-@click.option('--logger', 'pl_logger', type=click.Choice(['tensorboard']),
+@click.option('--logger', 'pl_logger', type=click.Choice(['tensorboard', 'wandb']),
               help='Logger used by PyTorch Lightning to track metrics such as loss and accuracy.')
 @click.option('--log-dir', type=click.Path(exists=True, dir_okay=True, writable=True),
               help='Path to directory where the logger will store the logs. If not set, a directory will be created in the current working directory.')

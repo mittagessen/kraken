@@ -164,6 +164,10 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
               '--logit-temp',
               type=float,
               help='Multiplicative factor for the logits used in contrastive loss.')
+@click.option('--logger', 'pl_logger', type=click.Choice(['tensorboard', 'wandb']),
+              help='Logger used by PyTorch Lightning to track metrics such as loss and accuracy.')
+@click.option('--log-dir', type=click.Path(exists=True, dir_okay=True, writable=True),
+              help='Path to directory where the logger will store the logs. If not set, a directory will be created in the current working directory.')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def pretrain(ctx, **kwargs):
     """
@@ -184,6 +188,12 @@ def pretrain(ctx, **kwargs):
             import tensorboard  # NOQA
         except ImportError:
             raise click.BadOptionUsage('logger', 'tensorboard logger needs the `tensorboard` package installed.')
+
+    if params.get('pl_logger') == 'wandb':
+        try:
+            import wandb  # NOQA
+        except ImportError:
+            raise click.BadOptionUsage('logger', 'wandb logger needs the `wandb` package installed.')
 
     from threadpoolctl import threadpool_limits
     from lightning.pytorch.callbacks import ModelCheckpoint

@@ -111,7 +111,7 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
               help='Sets the training data format. In ALTO and PageXML mode all '
               'data is extracted from xml files containing both baselines and a '
               'link to source images.')
-@click.option('--logger', 'pl_logger', type=click.Choice(['tensorboard']),
+@click.option('--logger', 'pl_logger', type=click.Choice(['tensorboard', 'wandb']),
               help='Logger used by PyTorch Lightning to track metrics such as loss and accuracy.')
 @click.option('--log-dir', type=click.Path(exists=True, dir_okay=True, writable=True),
               help='Path to directory where the logger will store the logs. If not set, a directory will be created in the current working directory.')
