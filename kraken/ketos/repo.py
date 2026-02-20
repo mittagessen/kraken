@@ -76,6 +76,35 @@ def _get_field_list(name,
     return values
 
 
+def _get_serialization_kind(path: Path) -> str:
+    """
+    Returns a software hint value for the model serialization format.
+    """
+    suffix = path.suffix.lower()
+    if suffix == '.mlmodel':
+        return 'coreml'
+    if suffix == '.safetensors':
+        return 'safetensors'
+    if suffix:
+        return suffix[1:]
+    return 'unknown'
+
+
+def _get_segmentation_model_hint(class_mapping: dict) -> str | None:
+    """
+    Returns a segmentation subtype hint from class mapping metadata.
+    """
+    has_lines = bool(class_mapping.get('baselines', {}))
+    has_regions = bool(class_mapping.get('regions', {}))
+    if has_lines and has_regions:
+        return 'combined'
+    if has_lines:
+        return 'line'
+    if has_regions:
+        return 'region'
+    return None
+
+
 @click.command('publish')
 @click.pass_context
 @click.option('-i', '--metadata', show_default=True,
@@ -96,10 +125,11 @@ def publish(ctx, metadata, access_token, doi, private, model):
 
     from htrmopo import publish_model, update_model
 
-    from kraken.lib.vgsl import TorchVGSLModel
     from kraken.lib.progress import KrakenDownloadProgressBar
+    from kraken.models import load_models
 
     pub_fn = publish_model
+    model_path = Path(model)
 
     _yaml_delim = r'(?:---|\+\+\+)'
     _yaml = r'(.*?)'
@@ -107,7 +137,12 @@ def publish(ctx, metadata, access_token, doi, private, model):
     _re_pattern = r'^\s*' + _yaml_delim + _yaml + _yaml_delim + _content
     _yaml_regex = re.compile(_re_pattern, re.S | re.M)
 
-    nn = TorchVGSLModel.load_model(model)
+    models = load_models(model_path)
+    if not models:
+        raise click.UsageError(f'No models found in {model_path}.')
+    if len(models) > 1:
+        logger.warning(f'More than one model found in {model_path}. Using first model for repository metadata.')
+    nn = models[0]
 
     frontmatter = {}
     # construct metadata if none is given
@@ -159,7 +194,9 @@ def publish(ctx, metadata, access_token, doi, private, model):
         if len(base_model := _get_field_list('base model URL')):
             frontmatter['base_model'] = base_model
 
-    software_hints = ['kind=vgsl']
+    software_hints = [f'kind={_get_serialization_kind(model_path)}']
+    if min_version := getattr(nn, '_kraken_min_version', None):
+        software_hints.append(f'version>={min_version}')
 
     # take last metrics field, falling back to accuracy field in model metadata
     if 'recognition' in nn.model_type:
@@ -174,7 +211,10 @@ def publish(ctx, metadata, access_token, doi, private, model):
         frontmatter['metrics'] = metrics
 
         # some recognition-specific software hints and metrics
-        software_hints.extend([f'seg_type={nn.seg_type}', f'one_channel_mode={nn.one_channel_mode}', f'legacy_polygons={nn.user_metadata["legacy_polygons"]}'])
+        software_hints.extend([f'seg_type={nn.seg_type}', f'one_channel_mode={nn.one_channel_mode}', f'legacy_polygons={nn.use_legacy_polygons}'])
+    if 'segmentation' in nn.model_type:
+        if seg_hint := _get_segmentation_model_hint(nn.user_metadata.get('class_mapping', {})):
+            software_hints.append(f'segmentation={seg_hint}')
 
     frontmatter['software_hints'] = software_hints
 
@@ -185,9 +225,9 @@ def publish(ctx, metadata, access_token, doi, private, model):
     with tempfile.TemporaryDirectory() as tmpdir, KrakenDownloadProgressBar() as progress:
         upload_task = progress.add_task('Uploading', total=0, visible=True if not ctx.meta['verbose'] else False)
 
-        model = Path(model).resolve()
+        model_path = model_path.resolve()
         tmpdir = Path(tmpdir)
-        (tmpdir / model.name).resolve().symlink_to(model)
+        (tmpdir / model_path.name).resolve().symlink_to(model_path)
         if 'recognition' in nn.model_type:
             # v0 metadata only supports recognition models
             v0_metadata = {
@@ -195,7 +235,7 @@ def publish(ctx, metadata, access_token, doi, private, model):
                 'description': content,
                 'license': frontmatter['license'],
                 'script': frontmatter['script'],
-                'name': model.name,
+                'name': model_path.name,
                 'graphemes': [char for char in ''.join(nn.codec.c2l.keys())]
             }
             if frontmatter['metrics']:
