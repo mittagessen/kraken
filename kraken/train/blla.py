@@ -563,11 +563,8 @@ class BLLASegmentationModel(L.LightningModule):
                         raise ValueError(f'invalid resize parameter value {self.resize}')
                 # backfill train_set/val_set mapping if key-equal as the actual
                 # numbering in the train_set might be different
-                num_classes = max(v for d in net_class_mapping.values() for v in d.values()) + 1
                 self.trainer.datamodule.train_set.dataset.class_mapping = net_class_mapping
-                self.trainer.datamodule.train_set.dataset.num_classes = num_classes
                 self.trainer.datamodule.val_set.dataset.class_mapping = net_class_mapping
-                self.trainer.datamodule.val_set.dataset.num_classes = num_classes
 
             # store canonical (one-to-one) class mapping in model metadata for inference
             self.net.user_metadata['class_mapping'] = self.trainer.datamodule.train_set.dataset.canonical_class_mapping
