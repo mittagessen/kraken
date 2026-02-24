@@ -555,6 +555,7 @@ class VGSLRecognitionModel(L.LightningModule):
         Save hyperparameters a second time so we can set parameters that
         shouldn't be overwritten in on_load_checkpoint.
         """
+        self.hparams.config.spec = self.net.spec
         checkpoint['_module_config'] = self.hparams.config
         checkpoint['_one_channel_mode'] = self.trainer.datamodule.train_set.dataset.im_mode
         checkpoint['_seg_type'] = self.trainer.datamodule.train_set.dataset.seg_type
