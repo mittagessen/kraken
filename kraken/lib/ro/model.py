@@ -264,9 +264,7 @@ class ROModel(L.LightningModule):
                 # numbering in the train_set might be different
                 num_classes = max(0, *net_class_mapping.values()) + 1
                 self.trainer.datamodule.train_set.dataset.class_mapping = net_class_mapping
-                self.trainer.datamodule.train_set.dataset.num_classes = num_classes
                 self.trainer.datamodule.val_set.dataset.class_mapping = net_class_mapping
-                self.trainer.datamodule.val_set.dataset.num_classes = num_classes
 
             self.net.user_metadata['metrics'] = []
             # store canonical (one-to-one) class mapping in model metadata for inference
