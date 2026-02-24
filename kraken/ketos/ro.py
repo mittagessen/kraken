@@ -162,7 +162,7 @@ def rotrain(ctx, **kwargs):
             )
 
     if sum(map(bool, [resume, load])) > 1:
-        raise click.BadOptionsUsage('load', 'load/resume options are mutually exclusive.')
+        raise click.BadOptionUsage('load', 'load/resume options are mutually exclusive.')
 
     if params.get('pl_logger') == 'tensorboard':
         try:
