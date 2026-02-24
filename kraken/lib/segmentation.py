@@ -863,18 +863,21 @@ def polygonal_reading_order(lines: list['BaselineLine'],
     return ordered_idxs
 
 
-def is_in_region(line: geom.LineString, region: geom.Polygon) -> bool:
+def is_in_region(line: Union[geom.LineString, geom.Polygon], region: geom.Polygon) -> bool:
     """
     Tests if a line is inside a region, i.e. if the mid point of the baseline
     is inside the region.
 
     Args:
-        line: line to test
+        line: line geometry (LineString for baselines, Polygon for bboxes) to
+              test. Polygons are reduced to their centroid.
         region: region to test against
 
     Returns:
         False if line is not inside region, True otherwise.
     """
+    if isinstance(line, geom.Polygon):
+        return region.contains(line.centroid)
     l_obj = line.interpolate(0.5, normalized=True)
     return region.contains(l_obj)
 

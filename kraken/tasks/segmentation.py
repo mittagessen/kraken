@@ -159,9 +159,16 @@ class SegmentationTaskModel(nn.Module):
         _lines = []
         for line in lines:
             line_regs = []
+            if hasattr(line, 'baseline') and line.baseline:
+                line_geom = geom.LineString(line.baseline)
+            elif hasattr(line, 'bbox') and line.bbox:
+                xmin, ymin, xmax, ymax = line.bbox
+                line_geom = geom.box(xmin, ymin, xmax, ymax)
+            else:
+                _lines.append(line)
+                continue
             for reg_id, reg in _shp_regs.items():
-                line_ls = geom.LineString(line.baseline)
-                if is_in_region(line_ls, reg):
+                if is_in_region(line_geom, reg):
                     line_regs.append(reg_id)
             _lines.append(replace(line, regions=line_regs))
 
