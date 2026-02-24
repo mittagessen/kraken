@@ -128,7 +128,8 @@ def rotrain(ctx, **kwargs):
     """
     Trains a baseline labeling model for layout analysis
     """
-    params = ctx.params
+    params = ctx.meta.copy()
+    params.update(ctx.params)
     resume = params.pop('resume', None)
     load = params.pop('load', None)
     training_data = params.pop('training_data', [])

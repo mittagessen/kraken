@@ -226,8 +226,8 @@ def segtrain(ctx, **kwargs):
     """
     Trains a baseline labeling model for layout analysis
     """
-    params = ctx.params.copy()
-    params.update(ctx.meta)
+    params = ctx.meta.copy()
+    params.update(ctx.params)
     resume = params.pop('resume', None)
     load = params.pop('load', None)
     training_data = params.pop('training_data', [])
