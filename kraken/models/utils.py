@@ -21,5 +21,11 @@ def create_model(name, *args, **kwargs) -> 'BaseModel':
     except ValueError:
         raise ValueError(f'`{name}` is not in model registry.')
 
-    cls = entry_point.load()
-    return cls(*args, **kwargs)
+    try:
+        cls = entry_point.load()
+    except (ImportError, ModuleNotFoundError) as e:
+        raise ValueError(f'Failed to load model class {name}: {e}') from e
+    try:
+        return cls(*args, **kwargs)
+    except Exception as e:
+        raise ValueError(f'Failed to instantiate model {name}: {e}') from e

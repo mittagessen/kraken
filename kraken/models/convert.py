@@ -1,3 +1,4 @@
+import logging
 import importlib
 
 from pathlib import Path
@@ -7,6 +8,8 @@ from kraken.models.loaders import load_models
 
 if TYPE_CHECKING:
     from os import PathLike
+
+logger = logging.getLogger(__name__)
 
 __all__ = ['convert_models', 'load_from_checkpoint']
 
@@ -20,13 +23,17 @@ def load_from_checkpoint(path):
         safe_globals.append(ep.load())
     torch.serialization.add_safe_globals(safe_globals)
 
+    errors = []
     for entry_point in importlib.metadata.entry_points(group='kraken.lightning_modules'):
         module = entry_point.load()
         try:
             return module.load_from_checkpoint(path, weights_only=True, map_location='cpu')
-        except Exception:
+        except Exception as e:
+            logger.debug(f'Lightning module {entry_point.name} failed for {path}: {e}')
+            errors.append((entry_point.name, e))
             continue
-    raise ValueError(f'No lightning module found for checkpoint {path}')
+    error_details = '\n'.join(f'  {name}: {err}' for name, err in errors)
+    raise ValueError(f'No lightning module found for checkpoint {path}. Tried:\n{error_details}')
 
 
 def convert_models(paths: Iterable[Union[str, 'PathLike']],
@@ -67,7 +74,7 @@ def convert_models(paths: Iterable[Union[str, 'PathLike']],
         (entry_point,) = importlib.metadata.entry_points(group='kraken.writers', name=weights_format)
         writer = entry_point.load()
     except ValueError:
-        raise ValueError('No writer for format {weights_format} found.')
+        raise ValueError(f'No writer for format {weights_format} found.')
 
     models = []
     for ckpt in paths:

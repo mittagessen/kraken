@@ -31,12 +31,16 @@ def load_models(path: Union[str, 'PathLike'], tasks: Optional[Sequence[_T_tasks]
     path = Path(path)
     if not path.is_file():
         raise ValueError(f'{path} is not a regular file.')
+    errors = []
     for loader in importlib.metadata.entry_points(group='kraken.loaders'):
         try:
             return loader.load()(path, tasks=tasks)
-        except ValueError:
+        except ValueError as e:
+            logger.debug(f'Loader {loader.name} failed for {path}: {e}')
+            errors.append((loader.name, e))
             continue
-    raise ValueError(f'No loader found for {path}')
+    error_details = '\n'.join(f'  {name}: {err}' for name, err in errors)
+    raise ValueError(f'No loader found for {path}. Tried:\n{error_details}')
 
 
 def load_safetensors(path: Union[str, PathLike], tasks: Optional[Sequence[_T_tasks]] = None) -> list[BaseModel]:
@@ -83,11 +87,14 @@ def load_safetensors(path: Union[str, PathLike], tasks: Optional[Sequence[_T_tas
                         skipped_prefixes.append(prefix)
                         continue
                     model_map[prefix].pop('_tasks')
-                    models[prefix] = create_model(model_map[prefix].get('_model'), **model_map[prefix])
+                    try:
+                        models[prefix] = create_model(model_map[prefix].get('_model'), **model_map[prefix])
+                    except Exception as e:
+                        raise ValueError(f'Failed to create model {model_map[prefix].get("_model")} (prefix {prefix}) from {path}: {e}') from e
             else:
                 raise ValueError(f'No model metadata found in {path}.')
     except SafetensorError as e:
-        raise ValueError(f'Invalid model file {path}') from e
+        raise ValueError(f'Invalid safetensors file {path}: {e}') from e
     # load weights into models with strict=False to allow dtype mismatches
     # between saved weights and model parameters (e.g. bfloat16 weights
     # into a float32 model). PyTorch's load_state_dict handles the
@@ -96,7 +103,7 @@ def load_safetensors(path: Union[str, PathLike], tasks: Optional[Sequence[_T_tas
     # filter out keys belonging to models that were skipped during filtering
     unexpected = [k for k in unexpected if not any(k.startswith(p + '.') for p in skipped_prefixes)]
     if missing or unexpected:
-        raise RuntimeError(f'Error(s) in loading state_dict for {models.__class__.__name__}:\n'
+        raise RuntimeError(f'Error(s) in loading state_dict from {path} for {models.__class__.__name__}:\n'
                            f'    Missing key(s): {missing}\n'
                            f'    Unexpected key(s): {unexpected}')
     return list(models.values())
@@ -131,7 +138,7 @@ def load_coreml(path: Union[str, PathLike], tasks: Optional[Sequence[_T_tasks]] 
     try:
         mlmodel = MLModel(path)
     except TypeError as e:
-        raise ValueError(str(e)) from e
+        raise ValueError(f'Failed to load CoreML model {path}: {e}') from e
     except DecodeError as e:
         raise ValueError(f'Failure parsing model protobuf: {e}') from e
 
@@ -149,10 +156,13 @@ def load_coreml(path: Union[str, PathLike], tasks: Optional[Sequence[_T_tasks]] 
         logger.info(f'Model file {path} not in demanded tasks {tasks}')
         return []
 
-    model = create_model('TorchVGSLModel',
-                         vgsl=vgsl_spec,
-                         codec=json.loads(mlmodel.user_defined_metadata.get('codec', 'null')),
-                         **metadata)
+    try:
+        model = create_model('TorchVGSLModel',
+                             vgsl=vgsl_spec,
+                             codec=json.loads(mlmodel.user_defined_metadata.get('codec', 'null')),
+                             **metadata)
+    except Exception as e:
+        raise ValueError(f'Failed to create TorchVGSLModel from {path}: {e}') from e
 
     # construct state dict
     weights = {}
@@ -161,7 +171,10 @@ def load_coreml(path: Union[str, PathLike], tasks: Optional[Sequence[_T_tasks]] 
     for cml_parser in _coreml_parsers:
         weights.update(cml_parser(spec))
 
-    model.load_state_dict(weights)
+    try:
+        model.load_state_dict(weights)
+    except Exception as e:
+        raise ValueError(f'Failed to load weights from CoreML model {path}: {e}') from e
     models.append(model)
 
     # construct additional models if auxiliary layers are defined.
