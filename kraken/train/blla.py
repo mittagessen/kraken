@@ -566,6 +566,7 @@ class BLLASegmentationModel(L.LightningModule):
                 self.trainer.datamodule.train_set.dataset.class_mapping = net_class_mapping
                 self.trainer.datamodule.val_set.dataset.class_mapping = net_class_mapping
 
+            self.net.user_metadata['metrics'] = []
             # store canonical (one-to-one) class mapping in model metadata for inference
             self.net.user_metadata['class_mapping'] = self.trainer.datamodule.train_set.dataset.canonical_class_mapping
 
@@ -660,6 +661,12 @@ class BLLASegmentationModel(L.LightningModule):
         checkpoint['_module_config'] = self.hparams.config
         checkpoint['_one_channel_mode'] = self.trainer.datamodule.train_set.dataset.im_mode
         checkpoint['_canonical_class_mapping'] = self.net.user_metadata['class_mapping']
+        # populate validation metrics
+        metrics = {k: v.item() if hasattr(v, 'item') else v
+                   for k, v in self.trainer.callback_metrics.items()
+                   if k.startswith('val_')}
+        if metrics:
+            self.net.user_metadata['metrics'].append((self.current_epoch, metrics))
 
     @classmethod
     def load_from_weights(cls,

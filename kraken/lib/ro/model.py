@@ -240,6 +240,12 @@ class ROModel(L.LightningModule):
         shouldn't be overwritten in on_load_checkpoint.
         """
         checkpoint['_module_config'] = self.hparams.config
+        # populate validation metrics
+        metrics = {k: v.item() if hasattr(v, 'item') else v
+                   for k, v in self.trainer.callback_metrics.items()
+                   if k.startswith('val_')}
+        if metrics:
+            self.net.user_metadata['metrics'].append((self.current_epoch, metrics))
 
     def setup(self, stage: Optional[str] = None):
         if stage in [None, 'fit']:
@@ -261,6 +267,7 @@ class ROModel(L.LightningModule):
                 self.trainer.datamodule.val_set.dataset.class_mapping = net_class_mapping
                 self.trainer.datamodule.val_set.dataset.num_classes = num_classes
 
+            self.net.user_metadata['metrics'] = []
             # store canonical (one-to-one) class mapping in model metadata for inference
             self.net.user_metadata['class_mapping'] = self.trainer.datamodule.train_set.dataset.canonical_class_mapping
 

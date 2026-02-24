@@ -494,6 +494,7 @@ class VGSLRecognitionModel(L.LightningModule):
                 logger.warning(f'Neural network has been trained on mode {self.net.one_channel_mode} images, '
                                f'training set contains mode {train_set.im_mode} data. Consider binarizing your data.')
 
+            self.net.user_metadata['metrics'] = []
             self.net.model_type = ['recognition']
 
             if not self.net.seg_type:
@@ -559,6 +560,12 @@ class VGSLRecognitionModel(L.LightningModule):
         checkpoint['_module_config'] = self.hparams.config
         checkpoint['_one_channel_mode'] = self.trainer.datamodule.train_set.dataset.im_mode
         checkpoint['_seg_type'] = self.trainer.datamodule.train_set.dataset.seg_type
+        # populate validation metrics
+        metrics = {k: v.item() if hasattr(v, 'item') else v
+                   for k, v in self.trainer.callback_metrics.items()
+                   if k.startswith('val_')}
+        if metrics:
+            self.net.user_metadata['metrics'].append((self.current_epoch, metrics))
 
     @classmethod
     def load_from_weights(cls,
