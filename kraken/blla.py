@@ -363,6 +363,21 @@ def segment(im: PIL.Image.Image,
                                boundary=line['boundary'],
                                tags=line['tags']) for line in _lines]
 
+        # assign region IDs to lines before neural RO
+        _shp_regs = {}
+        for reg_type, rgs in _regions.items():
+            for reg in rgs:
+                _shp_regs[reg.id] = geom.Polygon(reg.boundary)
+        _lines_with_regs = []
+        for line in _lines:
+            line_regs = []
+            line_ls = geom.LineString(line.baseline)
+            for reg_id, reg in _shp_regs.items():
+                if is_in_region(line_ls, reg):
+                    line_regs.append(reg_id)
+            _lines_with_regs.append(replace(line, regions=line_regs))
+        _lines = _lines_with_regs
+
         if 'ro_model' in net.aux_layers or 'ro_model_regions' in net.aux_layers:
             logger.info(f'Using reading order model(s) found in segmentation model {net}.')
             flat_regs = [reg for rgs in _regions.values() for reg in rgs]
