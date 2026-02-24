@@ -275,6 +275,8 @@ class ArrowIPCRecognitionDataset(Dataset):
                 im_mode = b'R'
             elif im.shape[0] == 1:
                 im_mode = b'L'
+            else:
+                im_mode = b'R'
             if is_bitonal(im):
                 im_mode = b'1'
 
@@ -464,6 +466,8 @@ class PolygonGTDataset(Dataset):
                 im_mode = b'R'
             elif im.shape[0] == 1:
                 im_mode = b'L'
+            else:
+                im_mode = b'R'
             if is_bitonal(im):
                 im_mode = b'1'
 
@@ -651,6 +655,8 @@ class GroundTruthDataset(Dataset):
                 im_mode = b'R'
             elif im.shape[0] == 1:
                 im_mode = b'L'
+            else:
+                im_mode = b'R'
             if is_bitonal(im):
                 im_mode = b'1'
             with self._im_mode.get_lock():
