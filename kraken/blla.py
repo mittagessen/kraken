@@ -302,7 +302,7 @@ def segment(im: PIL.Image.Image,
         are high. In addition, neural reading order determination is disabled
         when more than one model outputs lines.
     """
-    warnings.warn('`blla.segment)` is deprecated and will be removed with kraken 8. Use `SegmentationTaskModel` instead.',
+    warnings.warn('`blla.segment()` is deprecated and will be removed with kraken 8. Use `SegmentationTaskModel` instead.',
                   DeprecationWarning)
 
     if model is None:
