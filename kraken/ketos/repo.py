@@ -140,9 +140,17 @@ def publish(ctx, metadata, access_token, doi, private, model):
     models = load_models(model_path)
     if not models:
         raise click.UsageError(f'No models found in {model_path}.')
-    if len(models) > 1:
-        logger.warning(f'More than one model found in {model_path}. Using first model for repository metadata.')
-    nn = models[0]
+
+    rec_models = [m for m in models if 'recognition' in m.model_type]
+    seg_models = [m for m in models if 'segmentation' in m.model_type]
+    ro_models = [m for m in models if 'reading_order' in m.model_type]
+
+    # build deduplicated combined model type
+    combined_model_type = []
+    for m in models:
+        for t in (m.model_type if isinstance(m.model_type, list) else [m.model_type]):
+            if t not in combined_model_type:
+                combined_model_type.append(t)
 
     frontmatter = {}
     # construct metadata if none is given
@@ -195,31 +203,43 @@ def publish(ctx, metadata, access_token, doi, private, model):
             frontmatter['base_model'] = base_model
 
     software_hints = [f'kind={_get_serialization_kind(model_path)}']
-    if min_version := getattr(nn, '_kraken_min_version', None):
-        software_hints.append(f'version>={min_version}')
 
-    # take last metrics field, falling back to accuracy field in model metadata
-    if 'recognition' in nn.model_type:
+    # version hint from the model requiring the highest version
+    from packaging.version import Version
+    versions = [getattr(m, '_kraken_min_version', None) for m in models]
+    versions = [v for v in versions if v is not None]
+    if versions:
+        software_hints.append(f'version>={max(versions, key=Version)}')
+
+    # recognition-specific hints and metrics
+    if rec_models:
+        nn_rec = rec_models[0]
         metrics = {}
-        if len(nn.user_metadata.get('metrics', '')):
-            if (val_accuracy := nn.user_metadata['metrics'][-1][1].get('val_accuracy', None)) is not None:
+        if len(nn_rec.user_metadata.get('metrics', '')):
+            if (val_accuracy := nn_rec.user_metadata['metrics'][-1][1].get('val_accuracy', None)) is not None:
                 metrics['cer'] = 100 - (val_accuracy * 100)
-            if (val_word_accuracy := nn.user_metadata['metrics'][-1][1].get('val_word_accuracy', None)) is not None:
+            if (val_word_accuracy := nn_rec.user_metadata['metrics'][-1][1].get('val_word_accuracy', None)) is not None:
                 metrics['wer'] = 100 - (val_word_accuracy * 100)
-        elif (accuracy := nn.user_metadata.get('accuracy', None)) is not None:
+        elif (accuracy := nn_rec.user_metadata.get('accuracy', None)) is not None:
             metrics['cer'] = 100 - accuracy
         frontmatter['metrics'] = metrics
+        software_hints.extend([f'seg_type={nn_rec.seg_type}', f'one_channel_mode={nn_rec.one_channel_mode}', f'legacy_polygons={nn_rec.use_legacy_polygons}'])
 
-        # some recognition-specific software hints and metrics
-        software_hints.extend([f'seg_type={nn.seg_type}', f'one_channel_mode={nn.one_channel_mode}', f'legacy_polygons={nn.use_legacy_polygons}'])
-    if 'segmentation' in nn.model_type:
-        if seg_hint := _get_segmentation_model_hint(nn.user_metadata.get('class_mapping', {})):
+    # segmentation-specific hints
+    if seg_models:
+        if seg_hint := _get_segmentation_model_hint(seg_models[0].user_metadata.get('class_mapping', {})):
             software_hints.append(f'segmentation={seg_hint}')
+
+    # reading order hints
+    for nn_ro in ro_models:
+        ro_level = nn_ro.user_metadata.get('level', None)
+        if ro_level:
+            software_hints.append(f'ro_level={ro_level}')
 
     frontmatter['software_hints'] = software_hints
 
     frontmatter['software_name'] = 'kraken'
-    frontmatter['model_type'] = nn.model_type
+    frontmatter['model_type'] = combined_model_type
 
     # build temporary directory
     with tempfile.TemporaryDirectory() as tmpdir, KrakenDownloadProgressBar() as progress:
@@ -228,18 +248,19 @@ def publish(ctx, metadata, access_token, doi, private, model):
         model_path = model_path.resolve()
         tmpdir = Path(tmpdir)
         (tmpdir / model_path.name).resolve().symlink_to(model_path)
-        if 'recognition' in nn.model_type:
+        if rec_models:
             # v0 metadata only supports recognition models
+            nn_rec = rec_models[0]
             v0_metadata = {
                 'summary': frontmatter['summary'],
                 'description': content,
                 'license': frontmatter['license'],
                 'script': frontmatter['script'],
                 'name': model_path.name,
-                'graphemes': [char for char in ''.join(nn.codec.c2l.keys())]
+                'graphemes': [char for char in ''.join(nn_rec.codec.c2l.keys())]
             }
-            if frontmatter['metrics']:
-                v0_metadata['accuracy'] = 100 - metrics['cer']
+            if frontmatter.get('metrics'):
+                v0_metadata['accuracy'] = 100 - frontmatter['metrics']['cer']
             with open(tmpdir / 'metadata.json', 'w') as fo:
                 json.dump(v0_metadata, fo)
         kwargs = {'model': tmpdir,

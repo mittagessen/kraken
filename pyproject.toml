@@ -46,7 +46,7 @@ dependencies = [
     "scikit-image~=0.25.2",
     "shapely~=2.1.2",
     "pyarrow",
-    "htrmopo>=0.3,~=0.3",
+    "htrmopo>=0.5,~=0.5",
     "lightning~=2.6.0",
     "torchmetrics>=1.1.0",
     "threadpoolctl~=3.6.0",

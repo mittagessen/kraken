@@ -713,6 +713,7 @@ def show(ctx, metadata_version, model_id):
 @click.option('--all', 'model_type', flag_value='all', default=True, help='List both segmentation and recognition models.')
 @click.option('--recognition', 'model_type', flag_value='recognition', help='Only list recognition models.')
 @click.option('--segmentation', 'model_type', flag_value='segmentation', help='Only list segmentation models.')
+@click.option('--reading-order', 'model_type', flag_value='reading_order', help='Only list reading order models.')
 @click.option('-l', '--language', default=None, multiple=True, help='Filter for language by ISO 639-3 codes')
 @click.option('-s', '--script', default=None, multiple=True, help='Filter for script by ISO 15924 codes')
 @click.option('-k', '--keyword', default=None, multiple=True, help='Filter by keyword.')
@@ -796,7 +797,7 @@ def get(ctx, model_id):
         download_task = progress.add_task('Processing', total=0, visible=True if not ctx.meta['verbose'] else False)
         model_dir = get_model(model_id,
                               callback=lambda total, advance: progress.update(download_task, total=total, advance=advance))
-    model_candidates = list(filter(lambda x: x.suffix == '.mlmodel', model_dir.iterdir()))
+    model_candidates = list(filter(lambda x: x.suffix in ['.mlmodel', '.safetensors'], model_dir.iterdir()))
     message(f'Model dir: {model_dir} (model files: {", ".join(x.name for x in model_candidates)})')
 
 
