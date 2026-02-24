@@ -7,6 +7,7 @@ import os
 import torch
 import tempfile
 import unittest
+from contextlib import contextmanager
 
 from pathlib import Path
 from pytest import raises
@@ -15,9 +16,29 @@ from safetensors.torch import save_file, load_file
 
 from kraken.models.utils import create_model
 from kraken.models import load_models, write_safetensors
+from kraken.models.loaders import load_coreml, load_safetensors
 
 thisfile = Path(__file__).resolve().parent
 resources = thisfile / 'resources'
+
+
+@contextmanager
+def _patched_safetensors_model_type(path: Path, model_type: list[str] = ['recognition']):
+    """
+    Creates a temporary copy of a safetensors file with explicit model_type.
+    """
+    tensors = load_file(path)
+    with safe_open(path, framework='pt') as f:
+        metadata = json.loads(f.metadata()['kraken_meta'])
+    for rec in metadata.values():
+        rec['model_type'] = model_type
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.safetensors') as fp:
+        tmp_path = Path(fp.name)
+    try:
+        save_file(tensors, tmp_path, metadata={'kraken_meta': json.dumps(metadata)})
+        yield tmp_path
+    finally:
+        tmp_path.unlink(missing_ok=True)
 
 
 class TestCreateModel(unittest.TestCase):
@@ -95,7 +116,8 @@ class TestLoadModels(unittest.TestCase):
 
     def test_load_fp32(self):
         """Load a standard fp32 model and verify all parameters are float32."""
-        models = load_models(resources / 'model_small.safetensors')
+        with _patched_safetensors_model_type(resources / 'model_small.safetensors') as model_path:
+            models = load_models(model_path)
         self.assertEqual(len(models), 1)
         for name, param in models[0].named_parameters():
             self.assertEqual(param.dtype, torch.float32, f'{name} is not float32')
@@ -108,7 +130,8 @@ class TestLoadModels(unittest.TestCase):
         This test verifies that loading fp16 weights into a float32 model
         succeeds (the strict=False fix).
         """
-        models = load_models(resources / 'model_small_fp16.safetensors')
+        with _patched_safetensors_model_type(resources / 'model_small_fp16.safetensors') as model_path:
+            models = load_models(model_path)
         self.assertEqual(len(models), 1)
         for name, param in models[0].named_parameters():
             self.assertEqual(param.dtype, torch.float32, f'{name} is not float32')
@@ -119,10 +142,73 @@ class TestLoadModels(unittest.TestCase):
         Conv layer weights are stored as fp16, linear layer weights as fp32.
         After loading, all parameters are float32 due to copy_() semantics.
         """
-        models = load_models(resources / 'model_small_mixed.safetensors')
+        with _patched_safetensors_model_type(resources / 'model_small_mixed.safetensors') as model_path:
+            models = load_models(model_path)
         self.assertEqual(len(models), 1)
         for name, param in models[0].named_parameters():
             self.assertEqual(param.dtype, torch.float32, f'{name} is not float32')
+
+    def test_load_safetensors_missing_min_version_metadata(self):
+        """
+        Missing _kraken_min_version in safetensors metadata raises ValueError.
+        """
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / 'bad_min_version.safetensors'
+            tensors = load_file(resources / 'model_small.safetensors')
+            with safe_open(resources / 'model_small.safetensors', framework='pt') as f:
+                metadata = json.loads(f.metadata()['kraken_meta'])
+            for rec in metadata.values():
+                rec['model_type'] = 'recognition'
+                rec.pop('_kraken_min_version', None)
+            save_file(tensors, path, metadata={'kraken_meta': json.dumps(metadata)})
+            with raises(ValueError, match='_kraken_min_version'):
+                load_safetensors(path)
+
+    def test_load_safetensors_invalid_tasks_metadata(self):
+        """
+        Invalid _tasks type in safetensors metadata raises ValueError.
+        """
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / 'bad_tasks.safetensors'
+            tensors = load_file(resources / 'model_small.safetensors')
+            with safe_open(resources / 'model_small.safetensors', framework='pt') as f:
+                metadata = json.loads(f.metadata()['kraken_meta'])
+            for rec in metadata.values():
+                rec['model_type'] = 'recognition'
+                rec['_tasks'] = {'recognition': True}
+            save_file(tensors, path, metadata={'kraken_meta': json.dumps(metadata)})
+            with raises(ValueError, match='_tasks'):
+                load_safetensors(path)
+
+    def test_load_safetensors_missing_model_type_metadata(self):
+        """
+        Missing model_type in safetensors metadata raises ValueError.
+        """
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / 'bad_model_type.safetensors'
+            tensors = load_file(resources / 'model_small.safetensors')
+            with safe_open(resources / 'model_small.safetensors', framework='pt') as f:
+                metadata = json.loads(f.metadata()['kraken_meta'])
+            for rec in metadata.values():
+                rec.pop('model_type', None)
+            save_file(tensors, path, metadata={'kraken_meta': json.dumps(metadata)})
+            with raises(ValueError, match='model_type'):
+                load_safetensors(path)
+
+    def test_load_coreml_missing_model_type_metadata(self):
+        """
+        Missing model_type in CoreML metadata raises ValueError.
+        """
+        from coremltools.models import MLModel
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / 'missing_model_type.mlmodel'
+            model = MLModel((resources / 'overfit.mlmodel').as_posix())
+            metadata = json.loads(model.user_defined_metadata.get('kraken_meta', '{}'))
+            metadata.pop('model_type', None)
+            model.user_defined_metadata['kraken_meta'] = json.dumps(metadata)
+            model.save(path.as_posix())
+            with raises(ValueError, match='model_type'):
+                load_coreml(path)
 
 
 class TestVersionCompatibility(unittest.TestCase):
@@ -145,7 +231,8 @@ class TestVersionCompatibility(unittest.TestCase):
             List of prefix strings in the file (in metadata key order).
         """
         import copy
-        models = load_models(resources / 'model_small.safetensors')
+        with _patched_safetensors_model_type(resources / 'model_small.safetensors') as model_path:
+            models = load_models(model_path)
         write_safetensors([models[0], copy.deepcopy(models[0])], path)
 
         tensors = load_file(path)
@@ -223,7 +310,8 @@ class TestWriteModels(unittest.TestCase):
         """
         Tests that models can be written and read back in safetensors format.
         """
-        models = load_models(resources / 'model_small.safetensors')
+        with _patched_safetensors_model_type(resources / 'model_small.safetensors') as model_path:
+            models = load_models(model_path)
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / 'test_model.safetensors'
             opath = write_safetensors(models, path)
@@ -234,7 +322,8 @@ class TestWriteModels(unittest.TestCase):
 
     def test_roundtrip_fp16(self):
         """Cast model to fp16, write, and verify stored tensors are fp16."""
-        models = load_models(resources / 'model_small.safetensors')
+        with _patched_safetensors_model_type(resources / 'model_small.safetensors') as model_path:
+            models = load_models(model_path)
         models[0].to(torch.float16)
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -249,7 +338,8 @@ class TestWriteModels(unittest.TestCase):
 
     def test_roundtrip_mixed(self):
         """Cast only conv layer to fp16, write, and verify stored dtypes."""
-        models = load_models(resources / 'model_small.safetensors')
+        with _patched_safetensors_model_type(resources / 'model_small.safetensors') as model_path:
+            models = load_models(model_path)
         models[0].nn.C_0.to(torch.float16)
 
         with tempfile.TemporaryDirectory() as tmpdir:

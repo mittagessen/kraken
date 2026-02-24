@@ -71,26 +71,66 @@ def load_safetensors(path: Union[str, PathLike], tasks: Optional[Sequence[_T_tas
     from safetensors.torch import load_model
     models = nn.ModuleDict()
     skipped_prefixes = []
+    inst_ver = Version(importlib.metadata.version('kraken'))
     try:
         with safe_open(path, framework="pt") as f:
             if (metadata := f.metadata()) is not None:
-                model_map = json.loads(metadata.get('kraken_meta', 'null'))
+                try:
+                    model_map = json.loads(metadata.get('kraken_meta', 'null'))
+                except json.JSONDecodeError as e:
+                    raise ValueError(f'Invalid `kraken_meta` JSON in {path}: {e}') from e
+                if not isinstance(model_map, dict):
+                    raise ValueError(f'Invalid `kraken_meta` metadata in {path}: expected object, got {type(model_map).__name__}.')
                 prefixes = list(model_map.keys())
                 # construct models
                 for prefix in prefixes:
-                    if (min_ver := Version(model_map[prefix].get('_kraken_min_version'))) > (inst_ver := Version(importlib.metadata.version('kraken'))):
+                    model_data = model_map[prefix]
+                    if not isinstance(model_data, dict):
+                        raise ValueError(f'Invalid metadata for model `{prefix}` in {path}: expected object, got {type(model_data).__name__}.')
+
+                    if '_kraken_min_version' not in model_data:
+                        raise ValueError(f'Missing `_kraken_min_version` for model `{prefix}` in {path}.')
+                    min_ver_raw = model_data.get('_kraken_min_version')
+                    if not isinstance(min_ver_raw, str):
+                        raise ValueError(f'Invalid `_kraken_min_version` for model `{prefix}` in {path}: expected string, got {type(min_ver_raw).__name__}.')
+                    try:
+                        min_ver = Version(min_ver_raw)
+                    except Exception as e:
+                        raise ValueError(f'Invalid `_kraken_min_version` for model `{prefix}` in {path}: {min_ver_raw!r}.') from e
+                    if min_ver > inst_ver:
                         logger.warning(f'Model {prefix} in model file {path} requires minimum kraken version {min_ver} (installed {inst_ver})')
                         skipped_prefixes.append(prefix)
                         continue
-                    if tasks and not set(tasks).intersection(set(model_map[prefix].get('_tasks', []))):
+
+                    model_tasks = model_data.get('_tasks', [])
+                    if model_tasks is None:
+                        model_tasks = []
+                    if isinstance(model_tasks, str):
+                        model_tasks = [model_tasks]
+                    if not isinstance(model_tasks, list) or not all(isinstance(x, str) for x in model_tasks):
+                        raise ValueError(f'Invalid `_tasks` for model `{prefix}` in {path}: expected string, list[str], or null.')
+                    if tasks and not set(tasks).intersection(set(model_tasks)):
                         logger.info(f'Model {prefix} in model file {path} not in demanded tasks {tasks}')
                         skipped_prefixes.append(prefix)
                         continue
-                    model_map[prefix].pop('_tasks')
+
+                    model_name = model_data.get('_model')
+                    if not isinstance(model_name, str):
+                        raise ValueError(f'Missing or invalid `_model` for model `{prefix}` in {path}.')
+
+                    model_type = model_data.get('model_type')
+                    if isinstance(model_type, str):
+                        model_type = [model_type] if model_type else []
+                    if not isinstance(model_type, list) or not model_type or not all(isinstance(x, str) and x for x in model_type):
+                        raise ValueError(f'Missing or invalid `model_type` for model `{prefix}` in {path}.')
+
+                    model_args = dict(model_data)
+                    model_args.pop('_tasks', None)
+                    model_args['model_type'] = model_type
                     try:
-                        models[prefix] = create_model(model_map[prefix].get('_model'), **model_map[prefix])
+                        models[prefix] = create_model(model_name, **model_args)
                     except Exception as e:
-                        raise ValueError(f'Failed to create model {model_map[prefix].get("_model")} (prefix {prefix}) from {path}: {e}') from e
+                        raise ValueError(f'Failed to create model {model_name} (prefix {prefix}) from {path}: {e}') from e
             else:
                 raise ValueError(f'No model metadata found in {path}.')
     except SafetensorError as e:
@@ -142,9 +182,20 @@ def load_coreml(path: Union[str, PathLike], tasks: Optional[Sequence[_T_tasks]] 
     except DecodeError as e:
         raise ValueError(f'Failure parsing model protobuf: {e}') from e
 
-    metadata = json.loads(mlmodel.user_defined_metadata.get('kraken_meta', '{}'))
-    # convert kraken < 7 string syle model_type to list
-    metadata['model_type'] = [metadata['model_type']] if metadata['model_type'] else []
+    try:
+        metadata = json.loads(mlmodel.user_defined_metadata.get('kraken_meta', '{}'))
+    except json.JSONDecodeError as e:
+        raise ValueError(f'Invalid `kraken_meta` JSON in {path}: {e}') from e
+    if not isinstance(metadata, dict):
+        raise ValueError(f'Invalid `kraken_meta` metadata in {path}: expected object, got {type(metadata).__name__}.')
+
+    # convert kraken < 7 string style model_type to list and validate shape.
+    model_type = metadata.get('model_type')
+    if isinstance(model_type, str):
+        model_type = [model_type] if model_type else []
+    if not isinstance(model_type, list) or not model_type or not all(isinstance(x, str) and x for x in model_type):
+        raise ValueError(f'Invalid `model_type` metadata in {path}: expected string or list[str], got {type(model_type).__name__}.')
+    metadata['model_type'] = model_type
     vgsl_spec = mlmodel.user_defined_metadata.get('vgsl') or metadata.get('vgsl')
     # avoid passing codec/vgsl twice (once in metadata, once as explicit argument)
     metadata.pop('codec', None)
