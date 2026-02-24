@@ -81,8 +81,9 @@ class RODataModule(L.LightningDataModule):
 
         if not evaluation_data:
             np.random.shuffle(training_data)
-            training_data = training_data[:int(partition * len(training_data))]
-            evaluation_data = training_data[int(partition * len(training_data)):]
+            split_idx = int(partition * len(training_data))
+            evaluation_data = training_data[split_idx:]
+            training_data = training_data[:split_idx]
         train_set = PairWiseROSet(training_data,
                                   mode=self.hparams.data_config.format_type,
                                   level=self.hparams.data_config.level,
