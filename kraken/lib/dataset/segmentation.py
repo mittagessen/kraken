@@ -229,7 +229,6 @@ class BaselineSet(Dataset):
                 self._update_im_mode(im)
                 return {'image': im, 'target': target, 'baselines': baselines}
             except Exception:
-                raise
                 self.failed_samples.add(idx)
                 idx = np.random.randint(0, len(self.imgs))
                 logger.debug(traceback.format_exc())
