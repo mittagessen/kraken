@@ -519,10 +519,10 @@ def segtest(ctx, **kwargs):
     table = Table('Category', 'Class Name', 'Pixel Accuracy', 'IOU', 'Object Count')
     class_iu = test_metrics.class_iu.tolist()
     class_pixel_accuracy = test_metrics.class_pixel_accuracy.tolist()
-    for i, idx in enumerate(pixel_idxs):
+    for idx in pixel_idxs:
         cat, class_name = idx_to_name[idx]
         count = f'{data_module.test_set.dataset.class_stats[cat][class_name]}' if cat != 'aux' else 'N/A'
-        table.add_row(cat, class_name, f'{class_pixel_accuracy[i]:.3f}', f'{class_iu[i]:.3f}', count)
+        table.add_row(cat, class_name, f'{class_pixel_accuracy[idx]:.3f}', f'{class_iu[idx]:.3f}', count)
     console.print(table)
 
     # baseline detection metrics table
