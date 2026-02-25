@@ -382,7 +382,7 @@ class VGSLRecognitionModel(L.LightningModule):
 
         # reset metrics even if not sanity checking
         self.test_cer.reset()
-        self.test_cer_case_insensitive.compute()
+        self.test_cer_case_insensitive.reset()
         self.test_wer.reset()
 
         self.test_metrics = RecognitionTestMetrics(character_counts=self.characters,
