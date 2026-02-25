@@ -209,9 +209,6 @@ def aggregate_detection_metrics(page_metrics: list[dict[str, float]]) -> dict[st
 
     precision = sum(m['precision'] for m in page_metrics) / n
     recall = sum(m['recall'] for m in page_metrics) / n
-    if precision + recall > 0:
-        f1 = 2 * precision * recall / (precision + recall)
-    else:
-        f1 = 0.0
+    f1 = sum(m['f1'] for m in page_metrics) / n
 
     return {'precision': precision, 'recall': recall, 'f1': f1}
