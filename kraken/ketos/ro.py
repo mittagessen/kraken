@@ -210,7 +210,7 @@ def rotrain(ctx, **kwargs):
                                           filename='checkpoint_{epoch:02d}-{val_metric:.4f}')
     cbs.append(checkpoint_callback)
 
-    dm_config = ROTrainingDataConfig(**params, **ctx.meta)
+    dm_config = ROTrainingDataConfig(**params)
     m_config = ROTrainingConfig(**params)
 
     if resume:
