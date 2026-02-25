@@ -126,6 +126,8 @@ def load_safetensors(path: Union[str, PathLike], tasks: Optional[Sequence[_T_tas
 
                     model_args = dict(model_data)
                     model_args.pop('_tasks', None)
+                    model_args.pop('_kraken_min_version', None)
+                    model_args.pop('_model', None)
                     model_args['model_type'] = model_type
                     try:
                         models[prefix] = create_model(model_name, **model_args)
