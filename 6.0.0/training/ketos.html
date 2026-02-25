@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Training &#8212; kraken  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=27fed22d" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
+    <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=89a84cc7" />
+    <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="canonical" href="kraken.re/training/ketos.html" />
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="API Reference" href="../api_docs.html" />
+    <link rel="prev" title="VGSL network specification" href="../advanced/vgsl.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="training">
+<span id="ketos"></span><h1>Training<a class="headerlink" href="#training" title="Link to this heading">¶</a></h1>
+<p>This page describes the training utilities available through the <code class="docutils literal notranslate"><span class="pre">ketos</span></code>
+command line utility in depth. For a gentle introduction on model training
+please refer to the <a class="reference internal" href="../tutorials/training.html#training"><span class="std std-ref">tutorial</span></a>.</p>
+<p>There are currently three trainable components in the kraken processing pipeline:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="segtrain.html#segtrain"><span class="std std-ref">Segmentation</span></a>: finding lines and regions in images</p></li>
+<li><p><a class="reference internal" href="rotrain.html#rotrain"><span class="std std-ref">Reading Order</span></a>: ordering lines found in the previous segmentation step. Reading order models are closely linked to segmentation models and both are usually trained on the same dataset.</p></li>
+<li><p><a class="reference internal" href="rectrain.html#rectrain"><span class="std std-ref">Recognition</span></a>: recognition models transform images of lines into text.</p></li>
+</ul>
+<p>Related to recognition training are various ways to reduce training data
+requirements:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="synth.html#ketos-synth"><span class="std std-ref">Synthetic training data</span></a>: rendering synthetic training data from digital texts and typefaces.</p></li>
+<li><p><a class="reference internal" href="rectrain.html#pretrain"><span class="std std-ref">Semi-supervised pretraining</span></a>: pretraining the weights of a recognition model from segmented pages without transcription.</p></li>
+</ul>
+<p>Depending on the use case it is not necessary to manually train new models for
+each material. The default segmentation model works well on quite a variety of
+handwritten and printed documents, a reading order model might not perform
+better than the default heuristic for simple text flows, and there are
+recognition models for some types of material available in the repository.</p>
+<p>The main <code class="docutils literal notranslate"><span class="pre">ketos</span></code> command has some common options that configure how most of
+its sub-commands use computational resources:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>option</p></th>
+<th class="head"><p>action</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>-d, --device</p></td>
+<td><p>Select device to use (cpu, cuda:0, cuda:1,…). GPU acceleration requires in addition to hardware the requisite libraries (CUDA, ROCM, …). It can be set to <cite>auto</cite> to select the best device available.</p></td>
+</tr>
+<tr class="row-odd"><td><p>--precision</p></td>
+<td><p>The precision to run neural network operations in. On GPU, bfloat16 (<cite>bf16-true</cite> or <cite>bf16-mixed</cite>) can lead to considerable speedup.</p></td>
+</tr>
+<tr class="row-even"><td><p>--workers</p></td>
+<td><p>Number of workers processes to spawn for data loading, transformation, or compilation.</p></td>
+</tr>
+<tr class="row-odd"><td><p>--threads</p></td>
+<td><p>Number of threads to use for intra-op parallelization like OpenMP, BLAS, …</p></td>
+</tr>
+</tbody>
+</table>
+<section id="training-data-formats">
+<h2>Training data formats<a class="headerlink" href="#training-data-formats" title="Link to this heading">¶</a></h2>
+<p id="ketos-format">The training tools accept a variety of training data formats, usually some kind
+of custom low level format, the XML-based formats that are commony used for
+archival of annotation and transcription data, and in the case of recognizer
+training a precompiled binary format. It is recommended to use the XML formats
+for segmentation and reading order training and the binary format for
+recognition training.</p>
+<section id="alto">
+<h3>ALTO<a class="headerlink" href="#alto" title="Link to this heading">¶</a></h3>
+<p>Kraken parses ALTO files using schema version 4.2 or upwards and produces files
+according to ALTO 4.4. An example showing the attributes necessary for
+segmentation, recognition, and reading order training follows:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="cp">&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;</span>
+<span class="nt">&lt;alto</span><span class="w"> </span><span class="na">xmlns:xsi=</span><span class="s">&quot;http://www.w3.org/2001/XMLSchema-instance&quot;</span>
+<span class="w">	</span><span class="na">xmlns=</span><span class="s">&quot;http://www.loc.gov/standards/alto/ns-v4#&quot;</span>
+<span class="w">	</span><span class="na">xsi:schemaLocation=</span><span class="s">&quot;http://www.loc.gov/standards/alto/ns-v4# http://www.loc.gov/standards/alto/v4/alto-4-0.xsd&quot;</span><span class="nt">&gt;</span>
+<span class="w">	</span><span class="nt">&lt;Description&gt;</span>
+<span class="w">		</span><span class="nt">&lt;sourceImageInformation&gt;</span>
+<span class="w">			</span><span class="nt">&lt;fileName&gt;</span>filename.jpg<span class="nt">&lt;/fileName&gt;</span><span class="cm">&lt;!-- relative path in relation to XML location of the image file--&gt;</span>
+<span class="w">		</span><span class="nt">&lt;/sourceImageInformation&gt;</span>
+<span class="w">		</span>....
+<span class="w">	</span><span class="nt">&lt;/Description&gt;</span>
+<span class="w">	</span><span class="nt">&lt;Layout&gt;</span>
+<span class="w">		</span><span class="nt">&lt;Page...&gt;</span>
+<span class="w">			</span><span class="nt">&lt;PrintSpace...&gt;</span>
+<span class="w">				</span><span class="nt">&lt;ComposedBlockType</span><span class="w"> </span><span class="na">ID=</span><span class="s">&quot;block_I&quot;</span>
+<span class="w">						   </span><span class="na">HPOS=</span><span class="s">&quot;125&quot;</span>
+<span class="w">						   </span><span class="na">VPOS=</span><span class="s">&quot;523&quot;</span>
+<span class="w">						   </span><span class="na">WIDTH=</span><span class="s">&quot;5234&quot;</span>
+<span class="w">						   </span><span class="na">HEIGHT=</span><span class="s">&quot;4000&quot;</span>
+<span class="w">						   </span><span class="na">TYPE=</span><span class="s">&quot;region_type&quot;</span><span class="nt">&gt;</span><span class="cm">&lt;!-- for textlines part of a semantic region --&gt;</span>
+<span class="w">					</span><span class="nt">&lt;TextBlock</span><span class="w"> </span><span class="na">ID=</span><span class="s">&quot;textblock_N&quot;</span><span class="nt">&gt;</span>
+<span class="w">						</span><span class="nt">&lt;TextLine</span><span class="w"> </span><span class="na">ID=</span><span class="s">&quot;line_0&quot;</span>
+<span class="w">							  </span><span class="na">HPOS=</span><span class="s">&quot;...&quot;</span>
+<span class="w">							  </span><span class="na">VPOS=</span><span class="s">&quot;...&quot;</span>
+<span class="w">							  </span><span class="na">WIDTH=</span><span class="s">&quot;...&quot;</span>
+<span class="w">							  </span><span class="na">HEIGHT=</span><span class="s">&quot;...&quot;</span>
+<span class="w">							  </span><span class="na">BASELINE=</span><span class="s">&quot;10 20 15 20 400 20&quot;</span><span class="nt">&gt;</span><span class="cm">&lt;!-- necessary for segmentation training --&gt;</span>
+<span class="w">							</span><span class="nt">&lt;String</span><span class="w"> </span><span class="na">ID=</span><span class="s">&quot;segment_K&quot;</span>
+<span class="w">								</span><span class="na">CONTENT=</span><span class="s">&quot;word_text&quot;</span><span class="nt">&gt;</span><span class="cm">&lt;!-- necessary for recognition training. Text is retrieved from &lt;String&gt; and &lt;SP&gt; tags. Lower level glyphs are ignored. --&gt;</span>
+<span class="w">								</span>...
+<span class="w">							</span><span class="nt">&lt;/String&gt;</span>
+<span class="w">							</span><span class="nt">&lt;SP.../&gt;</span>
+<span class="w">						</span><span class="nt">&lt;/TextLine&gt;</span>
+<span class="w">					</span><span class="nt">&lt;/TextBlock&gt;</span>
+<span class="w">				</span><span class="nt">&lt;/ComposedBlockType&gt;</span>
+<span class="w">				</span><span class="nt">&lt;TextBlock</span><span class="w"> </span><span class="na">ID=</span><span class="s">&quot;textblock_M&quot;</span><span class="nt">&gt;</span><span class="cm">&lt;!-- for textlines not part of a region --&gt;</span>
+<span class="w">				</span>...
+<span class="w">				</span><span class="nt">&lt;/TextBlock&gt;</span>
+<span class="w">			</span><span class="nt">&lt;/PrintSpace&gt;</span>
+<span class="w">		</span><span class="nt">&lt;/Page&gt;</span>
+<span class="w">	</span><span class="nt">&lt;/Layout&gt;</span>
+<span class="nt">&lt;/alto&gt;</span>
+</pre></div>
+</div>
+<p>Importantly, the parser only works with measurements in the pixel domain, i.e.
+an unset <cite>MeasurementUnit</cite> or one with an element value of <cite>pixel</cite>.</p>
+<p>For a more in-depth description of how kraken parses and writes ALTO files see
+<span class="xref std std-ref">here</span>.</p>
+</section>
+<section id="page-xml">
+<h3>PAGE XML<a class="headerlink" href="#page-xml" title="Link to this heading">¶</a></h3>
+<p>PAGE XML is parsed and produced according to the 2019-07-15 version of the
+schema, although the parser is not strict and works with non-conformant output
+from a variety of tools. As with ALTO, PAGE XML files can be used to train
+segmentation, reading order, and recognition models.</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;PcGts</span><span class="w"> </span><span class="na">xmlns=</span><span class="s">&quot;http://schema.primaresearch.org/PAGE/gts/pagecontent/2019-07-15&quot;</span><span class="w"> </span><span class="na">xmlns:xsi=</span><span class="s">&quot;http://www.w3.org/2001/XMLSchema-instance&quot;</span><span class="w"> </span><span class="na">xsi:schemaLocation=</span><span class="s">&quot;http://schema.primaresearch.org/PAGE/gts/pagecontent/2019-07-15 http://schema.primaresearch.org/PAGE/gts/pagecontent/2019-07-15/pagecontent.xsd&quot;</span><span class="nt">&gt;</span>
+<span class="w">	</span><span class="nt">&lt;Metadata&gt;</span>...<span class="nt">&lt;/Metadata&gt;</span>
+<span class="w">	</span><span class="nt">&lt;Page</span><span class="w"> </span><span class="na">imageFilename=</span><span class="s">&quot;filename.jpg&quot;</span><span class="err">...</span><span class="nt">&gt;</span><span class="cm">&lt;!-- relative path to an image file from the location of the XML document --&gt;</span>
+<span class="w">		</span><span class="nt">&lt;TextRegion</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;block_N&quot;</span>
+<span class="w">			    </span><span class="na">custom=</span><span class="s">&quot;structure {type:region_type;}&quot;</span><span class="nt">&gt;</span><span class="cm">&lt;!-- region type is a free text field--&gt;</span>
+<span class="w">			</span><span class="nt">&lt;Coords</span><span class="w"> </span><span class="na">points=</span><span class="s">&quot;10,20 500,20 400,200, 500,300, 10,300 5,80&quot;</span><span class="nt">/&gt;</span><span class="cm">&lt;!-- polygon for region boundary --&gt;</span>
+<span class="w">			</span><span class="nt">&lt;TextLine</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;line_K&quot;</span><span class="nt">&gt;</span>
+<span class="w">				</span><span class="nt">&lt;Baseline</span><span class="w"> </span><span class="na">points=</span><span class="s">&quot;80,200 100,210, 400,198&quot;</span><span class="nt">/&gt;</span><span class="cm">&lt;!-- required for baseline segmentation training --&gt;</span>
+<span class="w">				</span><span class="nt">&lt;TextEquiv&gt;&lt;Unicode&gt;</span>text<span class="w"> </span>text<span class="w"> </span>text<span class="nt">&lt;/Unicode&gt;&lt;/TextEquiv&gt;</span><span class="cm">&lt;!-- only TextEquiv tags immediately below the TextLine tag are parsed for recognition training --&gt;</span>
+<span class="w">				</span><span class="nt">&lt;Word&gt;</span>
+<span class="w">				</span>...
+<span class="w">			</span><span class="nt">&lt;/TextLine&gt;</span>
+<span class="w">			</span>....
+<span class="w">		</span><span class="nt">&lt;/TextRegion&gt;</span>
+<span class="w">		</span><span class="nt">&lt;TextRegion</span><span class="w"> </span><span class="na">id=</span><span class="s">&quot;textblock_M&quot;</span><span class="nt">&gt;</span><span class="cm">&lt;!-- for lines not contained in any region. TextRegions without a type are automatically assigned the &#39;text&#39; type which can be filtered out for training. --&gt;</span>
+<span class="w">			</span><span class="nt">&lt;Coords</span><span class="w"> </span><span class="na">points=</span><span class="s">&quot;0,0 0,{{ page.size[1] }} {{ page.size[0] }},{{ page.size[1] }} {{ page.size[0] }},0&quot;</span><span class="nt">/&gt;</span>
+<span class="w">			</span><span class="nt">&lt;TextLine&gt;</span>...<span class="nt">&lt;/TextLine&gt;</span><span class="cm">&lt;!-- same as above --&gt;</span>
+<span class="w">			</span>....
+<span class="w">                </span><span class="nt">&lt;/TextRegion&gt;</span>
+<span class="w">	</span><span class="nt">&lt;/Page&gt;</span>
+<span class="nt">&lt;/PcGts&gt;</span>
+</pre></div>
+</div>
+<p>For a more in-depth description of how kraken parses and writes ALTO files see
+<span class="xref std std-ref">here</span>.</p>
+</section>
+<section id="binary-datasets">
+<h3>Binary Datasets<a class="headerlink" href="#binary-datasets" title="Link to this heading">¶</a></h3>
+<p id="id1">In addition to training recognition models directly from XML and image files, a
+binary dataset format offering a couple of advantages is supported for
+recognition training. Binary datasets drastically improve loading performance
+allowing the saturation of most GPUs with minimal computational overhead while
+also allowing training with datasets that are larger than the systems main
+memory. A minor drawback is a ~30% increase in dataset size in comparison to
+the raw images + XML approach.</p>
+<p>To realize this speedup the dataset has to be compiled first:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>compile<span class="w"> </span>-f<span class="w"> </span>xml<span class="w"> </span>-o<span class="w"> </span>dataset.arrow<span class="w"> </span>file_1.xml<span class="w"> </span>file_2.xml<span class="w"> </span>...
+</pre></div>
+</div>
+<p>if there are a lot of individual lines containing many lines this process can
+take a long time. It can easily be parallelized by specifying the number of
+separate parsing workers with the <code class="docutils literal notranslate"><span class="pre">--workers</span></code> option:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>--workers<span class="w"> </span><span class="m">8</span><span class="w"> </span>compile<span class="w"> </span>-f<span class="w"> </span>xml<span class="w"> </span>...
+</pre></div>
+</div>
+<p>In addition, binary datasets can contain fixed splits which allow
+reproducibility and comparability between training and evaluation runs.
+Training, validation, and test splits can be pre-defined from multiple sources.
+Per default they are sourced from tags defined in the source XML files unless
+the option telling kraken to ignore them is set:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>compile<span class="w"> </span>--ignore-splits<span class="w"> </span>-f<span class="w"> </span>xml<span class="w"> </span>...
+</pre></div>
+</div>
+<p>Alternatively fixed-proportion random splits can be created ad-hoc during
+compile time:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>compile<span class="w"> </span>--random-split<span class="w"> </span><span class="m">0</span>.8<span class="w"> </span><span class="m">0</span>.1<span class="w"> </span><span class="m">0</span>.1<span class="w"> </span>...
+</pre></div>
+</div>
+<p>The above line splits assigns 80% of the source lines to the training set, 10%
+to the validation set, and 10% to the test set. The training and validation
+sets in the dataset file are used automatically by <cite>ketos train</cite> (unless told
+otherwise) while the remaining 10% of the test set is selected by <cite>ketos test</cite>.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Fixed splits in datasets are ignored during training and testing per
+default as they require loading the entire dataset into main memory at
+once, drastically increasing memory consumption and causing initial delays.
+Use the <cite>--fixed-splits</cite> option in <cite>ketos train</cite> and <cite>ketos test</cite> to
+respect fixed splits.</p>
+</div>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/kraken.png" alt="Logo of kraken"/>
+            </a></p>
+  <div>
+    <h3><a href="../index.html">Table of Contents</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">Training</a><ul>
+<li><a class="reference internal" href="#training-data-formats">Training data formats</a><ul>
+<li><a class="reference internal" href="#alto">ALTO</a></li>
+<li><a class="reference internal" href="#page-xml">PAGE XML</a></li>
+<li><a class="reference internal" href="#binary-datasets">Binary Datasets</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+  </div><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="../advanced/vgsl.html" title="previous chapter">VGSL network specification</a></li>
+      <li>Next: <a href="../api_docs.html" title="next chapter">API Reference</a></li>
+  </ul></li>
+</ul>
+</div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+<h3>Versions</h3>
+<ul>
+  <li><a href="../../2.0.0/index.html">2.0.0</a></li>
+  <li><a href="../../3.0/index.html">3.0</a></li>
+  <li><a href="../../4.0/index.html">4.0</a></li>
+  <li><a href="../../4.1/index.html">4.1</a></li>
+  <li><a href="../../4.2.0/index.html">4.2.0</a></li>
+  <li><a href="../../4.3.0/index.html">4.3.0</a></li>
+  <li><a href="../../5.0.0/index.html">5.0.0</a></li>
+  <li><a href="../../5.1/index.html">5.1</a></li>
+  <li><a href="../../5.2/index.html">5.2</a></li>
+  <li><a href="../../5.3.0/index.html">5.3.0</a></li>
+  <li><a href="ketos.html">6.0.0</a></li>
+</ul>
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2015-2026, Benjamin Kiessling.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/training/ketos.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

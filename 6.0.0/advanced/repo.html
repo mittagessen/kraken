@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Model Repository &#8212; kraken  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=27fed22d" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
+    <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=89a84cc7" />
+    <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="canonical" href="kraken.re/advanced/repo.html" />
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="VGSL network specification" href="vgsl.html" />
+    <link rel="prev" title="Recognition" href="recognition.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="model-repository">
+<h1>Model Repository<a class="headerlink" href="#model-repository" title="Link to this heading">¶</a></h1>
+<p id="repo">There is a semi-curated <a class="reference external" href="https://zenodo.org/communities/ocr_models">repository</a> of freely licensed recognition
+models that can be interacted with from the command line using a few
+subcommands. With the 5.x releases of kraken the repository has been upgraded
+to follow the <a class="reference external" href="https://github.com/mittagessen/HTRMoPo">HTRMoPo</a> schema which
+adds model card support and allows publishing of arbitrary models. Previous
+versions only permitted rudimentary metadata for text recognition models. While
+kraken is downwards compatible with the earlier <cite>v0</cite> schema, the information
+provided by these records is obviously much more limited.</p>
+<section id="querying-and-model-retrieval">
+<h2>Querying and model retrieval<a class="headerlink" href="#querying-and-model-retrieval" title="Link to this heading">¶</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">list</span></code> subcommand retrieves a list of all models available and prints
+them including the most important metadata fields:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>list
+<span class="go">┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓</span>
+<span class="go">┃ DOI                         ┃ summary                        ┃ model type   ┃ keywords                       ┃</span>
+<span class="go">┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩</span>
+<span class="go">│ 10.5281/zenodo.7051645      │                                │              │                                │</span>
+<span class="go">│ ├── 10.5281/zenodo.14585602 │ Printed Urdu Base Model        │ recognition  │ automatic-text-recognition     │</span>
+<span class="go">│ ├── 10.5281/zenodo.14574660 │ Printed Urdu Base Model        │ recognition  │ kraken_pytorch                 │</span>
+<span class="go">│ └── 10.5281/zenodo.7051646  │ Printed Urdu Base Model        │ recognition  │ kraken_pytorch                 │</span>
+<span class="go">│                             │                                │              │                                │</span>
+<span class="go">│                             │                                │              │                                │</span>
+<span class="go">│                             │                                │              │                                │</span>
+<span class="go">│ 10.5281/zenodo.10066218     │                                │              │                                │</span>
+<span class="go">│ ├── 10.5281/zenodo.12743230 │ CATMuS Medieval 1.5.0          │ recognition  │ kraken_pytorch; handwritten    │</span>
+<span class="go">│ └── 10.5281/zenodo.10066219 │ CATMuS Medieval                │ recognition  │ text recognition; htr; middle  │</span>
+<span class="go">│                             │                                │              │ ages                           │</span>
+<span class="go">│                             │                                │              │ kraken_pytorch; handwritten    │</span>
+<span class="go">│                             │                                │              │ text recognition; htr; middle  │</span>
+<span class="go">│                             │                                │              │ ages                           │</span>
+<span class="go">│ 10.5281/zenodo.13788176     │                                │              │                                │</span>
+<span class="go">│ └── 10.5281/zenodo.13788177 │ McCATMuS - Transcription model │ recognition  │ kraken_pytorch; HTR; OCR;      │</span>
+<span class="go">│                             │ for handwritten, printed and   │              │ generic model                  │</span>
+<span class="go">│                             │ typewritten documents from the │              │                                │</span>
+<span class="go">│                             │ 16th century to the 21st       │              │                                │</span>
+<span class="go">│                             │ century                        │              │                                │</span>
+<span class="go">│ 10.5281/zenodo.14602568     │                                │              │                                │</span>
+<span class="go">│ └── 10.5281/zenodo.14602569 │ General segmentation model for │ segmentation │ multiscriptal                  │</span>
+<span class="go">│                             │ print and handwriting          │              │                                │</span>
+<span class="go">│ 10.5281/zenodo.5468572      │                                │              │                                │</span>
+<span class="go">│ └── 10.5281/zenodo.5468573  │ Medieval Hebrew manuscripts in │ recognition  │ kraken_pytorch</span>
+<span class="go">...</span>
+</pre></div>
+</div>
+<p>Models in the repository are identified by a unique, persistent identifier
+called a <a class="reference external" href="https://en.wikipedia.org/wiki/Digital_object_identifier">DOI</a>.
+Since the repository supports versioning, each model has two DOIs: a <em>concept
+DOI</em>, which represents the model as a whole and always points to the latest
+version, and a <em>version DOI</em>, which refers to a specific version of the model.
+In the DOI column, this relationship is shown as a tree: the root is the
+concept DOI, and each branch beneath it represents a different version,
+starting with the most recent.</p>
+<p>Per default the whole content of the repository is printed which can be
+confusing when looking for a particular model. The output of <cite>list</cite> can be
+filtered by model type, language, script, and keywords:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>show<span class="w"> </span>--recognition<span class="w">  </span><span class="c1"># Only lists recognition models</span>
+<span class="gp">$ </span>kraken<span class="w"> </span>show<span class="w"> </span>--segmentation<span class="w"> </span><span class="c1"># Only lists segmentation models</span>
+<span class="gp">$ </span>kraken<span class="w"> </span>show<span class="w"> </span>--language<span class="w"> </span>eng<span class="w"> </span><span class="c1"># Only lists models (recognition or segmentation) claiming support for English language input</span>
+<span class="gp">$ </span>kraken<span class="w"> </span>show<span class="w"> </span>--script<span class="w"> </span>Arab<span class="w"> </span><span class="c1"># Only lists models (recognition or segmentation) claiming support for Arabic script input</span>
+<span class="gp">$ </span>kraken<span class="w"> </span>show<span class="w"> </span>--keyword<span class="w"> </span><span class="s2">&quot;middle ages&quot;</span><span class="w"> </span><span class="c1"># Only lists models (recognition or segmentation) containing the &quot;middle ages&quot; keyword</span>
+</pre></div>
+</div>
+<p>Defining multiple filters of different type will <cite>AND</cite> them:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>show<span class="w"> </span>--recognition<span class="w"> </span>--script<span class="w"> </span>Cyrl<span class="w"> </span>--language<span class="w"> </span>srp
+</pre></div>
+</div>
+<p>will match recognition models for Serbian in Cyrillic script.</p>
+<p>Defining multiple filters of the same type will <cite>OR</cite> them:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>show<span class="w"> </span>--recognition<span class="w"> </span>--language<span class="w"> </span>ota<span class="w"> </span>--language<span class="w"> </span>fas
+</pre></div>
+</div>
+<p>will match recognition models for either Ottoman Turkish or Persian.</p>
+<p>Identifiers for scripts use <a class="reference external" href="https://www.unicode.org/iso15924/iso15924-codes.html">ISO 15924 four letter codes</a>, languages are identified by <a class="reference external" href="https://iso639-3.sil.org/code_tables/639/data">ISO 693-3 codes</a>.</p>
+<p>The full metadata record of a particular model can be accessed using the <cite>show</cite> command:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>show<span class="w"> </span><span class="m">10</span>.5281/zenodo.14585602
+<span class="go">                             Printed Urdu Base Model Trained on the OpenITI Corpus</span>
+<span class="go">┌──────────────────┬───────────────────────────────────────────────────────────────────────────────────────────┐</span>
+<span class="go">│ DOI              │ 10.5281/zenodo.14585602                                                                   │</span>
+<span class="go">│ concept DOI      │ 10.5281/zenodo.7051645                                                                    │</span>
+<span class="go">│ publication date │ 2025-01-01T20:18:17+00:00                                                                 │</span>
+<span class="go">│ model type       │ recognition                                                                               │</span>
+<span class="go">│ language         │ Urdu                                                                                      │</span>
+<span class="go">│ script           │ Arabic                                                                                    │</span>
+<span class="go">│ keywords         │ automatic-text-recognition                                                                │</span>
+<span class="go">│ datasets         │ https://github.com/OpenITI/arabic_print_data.git                                          │</span>
+<span class="go">│ metrics          │ cer: 4.13                                                                                 │</span>
+<span class="go">│ base model       │ https://doi.org/10.5281/zenodo.7050296                                                    │</span>
+<span class="go">│ software         │ kraken                                                                                    │</span>
+<span class="go">│ software_hints   │ segmentation=baseline                                                                     │</span>
+<span class="go">│                  │ version&gt;=2.0                                                                              │</span>
+<span class="go">│ license          │ Apache-2.0                                                                                │</span>
+<span class="go">│ creators         │ Benjamin Kiessling (École Pratique des Hautes Études, PSL University)                     │</span>
+<span class="go">│ description      │ ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓ │</span>
+<span class="go">│                  │ ┃                 Printed Urdu Base Model Trained on the OpenITI Corpus                 ┃ │</span>
+<span class="go">│                  │ ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛ │</span>
+<span class="go">│                  │                                                                                           │</span>
+<span class="go">│                  │ This is a text recognition model trained on the OpenITI dataset of printed Arabic-script  │</span>
+<span class="go">│                  │ text available here in its state of 2022-09-03. It encompasses Urdu (~11k lines) material │</span>
+<span class="go">│                  │ in a variety of typefaces. The model has been obtained by fine-tuning the Arabic-script   │</span>
+<span class="go">│                  │ base model on the purely Urdu subset of the corpus.                                       │</span>
+<span class="go">│                  │                                                                                           │</span>
+<span class="go">│                  │ The ground truth was lightly normalized to NFD but is otherwise untouched.                │</span>
+<span class="go">│                  │                                                                                           │</span>
+<span class="go">│                  │                                                                                           │</span>
+<span class="go">│                  │                                       Architecture                                        │</span>
+<span class="go">│                  │                                                                                           │</span>
+<span class="go">│                  │ The default model architecture and hyperparameters of kraken 4.x where used.              │</span>
+<span class="go">│                  │                                                                                           │</span>
+<span class="go">│                  │                                                                                           │</span>
+<span class="go">│                  │                                           Uses                                            │</span>
+<span class="go">│                  │                                                                                           │</span>
+<span class="go">│                  │ The model is trained on a variety of highly diverse typefaces it is mostly intended as a  │</span>
+<span class="go">│                  │ base model for fine-tuning more specific models from it. In line with this it has not     │</span>
+<span class="go">│                  │ been extensively verified or optimized.                                                   │</span>
+<span class="go">│                  │                                                                                           │</span>
+<span class="go">│                  │                                                                                           │</span>
+<span class="go">│                  │                             How to Get Started with the Model                             │</span>
+<span class="go">│                  │                                                                                           │</span>
+<span class="go">│                  │ Follow the instructions on installing and using kraken from the website.                  │</span>
+<span class="go">│                  │                                                                                           │</span>
+<span class="go">│                  │                                          Metrics                                          │</span>
+<span class="go">│                  │                                                                                           │</span>
+<span class="go">│                  │ CER: 4.13%                                                                                │</span>
+<span class="go">└──────────────────┴───────────────────────────────────────────────────────────────────────────────────────────┘</span>
+</pre></div>
+</div>
+<p>The contents of the metadata record can vary between individual records as many
+are in the legacy <cite>v0</cite> schema format and do not contain information such as
+model provenance, software compatiblity hints, etc.</p>
+<p>If a suitable model has been decided upon it can be retrieved using the <code class="docutils literal notranslate"><span class="pre">get</span></code>
+subcommand:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>get<span class="w"> </span><span class="m">10</span>.5281/zenodo.14585602
+<span class="go">Processing ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━   0% 0/0 bytes -:--:-- 0:00:00</span>
+<span class="go">Model dir: /home/mittagessen/.local/share/htrmopo/bf1b4396-5b29-5c57-a1d3-f2c6c9ef2b90 (model files: urdu_best.mlmodel)</span>
+</pre></div>
+</div>
+<p>Models will be placed in the indicated location and can be accessed using their name as
+printed in the last line of the <code class="docutils literal notranslate"><span class="pre">kraken</span> <span class="pre">get</span></code> output.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>-i<span class="w"> </span>...<span class="w"> </span>...<span class="w"> </span>ocr<span class="w"> </span>-m<span class="w"> </span>urdu_best.mlmodel
+</pre></div>
+</div>
+</section>
+<section id="publishing">
+<h2>Publishing<a class="headerlink" href="#publishing" title="Link to this heading">¶</a></h2>
+<p>Models can be shared on the repository by anyone with a Zenodo account. The
+process consists of 2 stages: the creation of the deposit on the Zenodo
+platform followed by approval of the model in the community making it
+discoverable for other kraken users.</p>
+<p>For uploading models a personal access token is required. After account
+creation tokens can be created under the account settings:</p>
+<a class="reference internal image-reference" href="../_images/pat.png"><img alt="Zenodo token creation dialogue" src="../_images/pat.png" style="width: 800px;" />
+</a>
+<p>To upload a model file you will also need a metadata file consisting of a YAML
+header with the machine readable part of the record and a model card body in
+Markdown format:</p>
+<div class="highlight-markdown notranslate"><div class="highlight"><pre><span></span>---
+authors:
+<span class="k">-</span><span class="w"> </span>affiliation: &quot;\xC9cole Pratique des Hautes \xC9tudes, PSL University&quot;
+  name: Benjamin Kiessling
+base_model:
+<span class="k">-</span><span class="w"> </span>https://doi.org/10.5281/zenodo.7050296
+datasets:
+<span class="k">-</span><span class="w"> </span>https://github.com/OpenITI/arabic_print_data.git
+id: 10.5281/zenodo.14585602
+language:
+<span class="k">-</span><span class="w"> </span>urd
+license: Apache-2.0
+metrics:
+  cer: 4.13
+model_type:
+<span class="k">-</span><span class="w"> </span>recognition
+script:
+<span class="k">-</span><span class="w"> </span>Arab
+software_hints:
+<span class="k">-</span><span class="w"> </span>segmentation=baseline
+<span class="k">-</span><span class="w"> </span>version&gt;=2.0
+software_name: kraken
+summary: Printed Urdu Base Model Trained on the OpenITI Corpus
+tags:
+<span class="gu">- automatic-text-recognition</span>
+<span class="gu">---</span>
+<span class="gh"># Printed Urdu Base Model Trained on the OpenITI Corpus</span>
+
+This is a text recognition model trained on the OpenITI dataset of printed
+Arabic-script text available [<span class="nt">here</span>](<span class="na">https://github.com/OpenITI/arabic_print_data.git</span>) in its state of 2022-09-03. It encompasses
+Urdu (~11k lines) material in a variety of typefaces. The model has been
+obtained by fine-tuning the [<span class="nt">Arabic-script base model</span>](<span class="na">https://doi.org/10.5281/zenodo.7050296</span>) on the purely Urdu
+subset of the corpus. 
+
+ The ground truth was lightly normalized to NFD but is otherwise untouched.
+
+<span class="gu">## Architecture</span>
+
+The default model architecture and hyperparameters of kraken 4.x where used.
+
+<span class="gu">## Uses</span>
+
+The model is trained on a variety of highly diverse typefaces it is mostly
+intended as a base model for fine-tuning more specific models from it. In line
+with this it has not been extensively verified or optimized.
+
+<span class="gu">## How to Get Started with the Model</span>
+
+Follow the instructions on installing and using kraken from the
+[<span class="nt">website</span>](<span class="na">https://kraken.re</span>).
+
+<span class="gu">#### Metrics</span>
+
+CER: 4.13%
+</pre></div>
+</div>
+<p>It is not necessary to fill in the ID field of the metadata header as kraken
+will automatically request a new DOI and add it by itself. A new record can
+then be created like this:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>publish<span class="w"> </span>-a<span class="w"> </span><span class="nv">$ACCESS_TOKEN</span><span class="w"> </span>-i<span class="w"> </span>metadata.yaml<span class="w"> </span>aaebv2-2.mlmodel
+<span class="go">DOI: 10.5281/zenodo.5617783</span>
+</pre></div>
+</div>
+<p>Kraken will verify that the metadata conforms to the schema and afterwards
+deposit the model at Zenodo. This deposit is persistent, i.e. can’t be changed
+or deleted later so it is important to make sure that all the information is
+correct. Nevertheless, a new version of an existing record can be created, for
+example to update metadata or when a model has been retrained and achieves
+better results on the target domain:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>publish<span class="w"> </span>-a<span class="w"> </span><span class="nv">$ACCESS_TOKEN</span><span class="w"> </span>-i<span class="w"> </span>metadata.yaml<span class="w"> </span>aaebv2-2.mlmodel<span class="w"> </span>-d<span class="w"> </span><span class="m">10</span>.5281/zenodo.5617783
+<span class="go">DOI: 10.5281/zenodo.5617784</span>
+</pre></div>
+</div>
+<p>Once a deposit has been created a request (requiring manual approval) for
+inclusion in the repository will automatically be created which will make it
+discoverable by other users.</p>
+<p>It is possible to deposit models without including them in the queryable
+repository. Models uploaded this way are not truly private and can still be
+found through the standard Zenodo search and be downloaded with <cite>kraken get</cite>
+and its DOI. It is mostly suggested for preliminary models that might get
+updated later:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>publish<span class="w"> </span>--private<span class="w"> </span>-i<span class="w"> </span>metadata.yaml<span class="w"> </span>-a<span class="w"> </span><span class="nv">$ACCESS_TOKEN</span><span class="w"> </span>aaebv2-2.mlmodel
+<span class="go">DOI: 10.5281/zenodo.5617734</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/kraken.png" alt="Logo of kraken"/>
+            </a></p>
+  <div>
+    <h3><a href="../index.html">Table of Contents</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">Model Repository</a><ul>
+<li><a class="reference internal" href="#querying-and-model-retrieval">Querying and model retrieval</a></li>
+<li><a class="reference internal" href="#publishing">Publishing</a></li>
+</ul>
+</li>
+</ul>
+
+  </div><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Advanced Usage</a><ul>
+      <li>Previous: <a href="recognition.html" title="previous chapter">Recognition</a></li>
+      <li>Next: <a href="vgsl.html" title="next chapter">VGSL network specification</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+<h3>Versions</h3>
+<ul>
+  <li><a href="../../2.0.0/index.html">2.0.0</a></li>
+  <li><a href="../../3.0/index.html">3.0</a></li>
+  <li><a href="../../4.0/index.html">4.0</a></li>
+  <li><a href="../../4.1/index.html">4.1</a></li>
+  <li><a href="../../4.2.0/index.html">4.2.0</a></li>
+  <li><a href="../../4.3.0/index.html">4.3.0</a></li>
+  <li><a href="../../5.0.0/index.html">5.0.0</a></li>
+  <li><a href="../../5.1/index.html">5.1</a></li>
+  <li><a href="../../5.2/index.html">5.2</a></li>
+  <li><a href="../../5.3.0/index.html">5.3.0</a></li>
+  <li><a href="repo.html">6.0.0</a></li>
+</ul>
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2015-2026, Benjamin Kiessling.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/advanced/repo.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

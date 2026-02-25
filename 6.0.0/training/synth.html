@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Synthetic training data &#8212; kraken  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=27fed22d" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
+    <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=89a84cc7" />
+    <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="canonical" href="kraken.re/training/synth.html" />
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="synthetic-training-data">
+<span id="ketos-synth"></span><h1>Synthetic training data<a class="headerlink" href="#synthetic-training-data" title="Link to this heading">¶</a></h1>
+<p>Synthetic training data is intended to decrease the amount of manually
+annotated data needed for training recognition models. Kraken does not include
+a synthetic training data generation util anymore but <a class="reference external" href="https://github.com/mittagessen/pangoline">pangoline</a> can be used with only minor
+adaptation necessary. The data produced through this way is most useful for
+training models intended to recognize machine-printed text due to it using
+digital fonts to create type approximating real world data which is usually
+insufficiently close to handwritten text to achieve acceptable error rates.</p>
+<section id="installing-pangoline">
+<h2>Installing pangoline<a class="headerlink" href="#installing-pangoline" title="Link to this heading">¶</a></h2>
+<p>The most up-to-date instructions on pangoline installation can be found <a class="reference external" href="https://github.com/mittagessen/pangoline">here</a> but the basic procedure is fairly
+simple:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>pipx<span class="w"> </span>install<span class="w"> </span>pangoline-tool
+</pre></div>
+</div>
+<p>Note that pangoline requires the pygobject, pango, and cairo libraries to be
+installed on the system in order to function properly. It is usually necessary
+to install them through the package manager of your operating system. An
+alternative is to use <a class="reference external" href="https://anaconda.org">anaconda</a> which has binary
+packages for all dependencies:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>conda<span class="w"> </span>create<span class="w"> </span>--name<span class="w"> </span>pangoline-py3.11<span class="w"> </span>-c<span class="w"> </span>conda-forge<span class="w"> </span><span class="nv">python</span><span class="o">=</span><span class="m">3</span>.11
+<span class="gp">$ </span>conda<span class="w"> </span>activate<span class="w"> </span>pangoline-py3.11
+<span class="gp">$ </span>conda<span class="w"> </span>install<span class="w"> </span>-c<span class="w"> </span>conda-forge<span class="w"> </span>pygobject<span class="w"> </span>pango<span class="w"> </span>Cairo<span class="w"> </span>click<span class="w"> </span>jinja2<span class="w"> </span>rich<span class="w"> </span>pypdfium2<span class="w"> </span>lxml<span class="w"> </span>pillow
+<span class="gp">$ </span>pip<span class="w"> </span>install<span class="w"> </span>pangoline-tool
+</pre></div>
+</div>
+</section>
+<section id="rendering-text">
+<h2>Rendering text<a class="headerlink" href="#rendering-text" title="Link to this heading">¶</a></h2>
+<p>Pangoline produces output data in two steps. First text is rendered into vector
+PDFs with blank canvases and ALTO files containing physical dimensions are
+written. In a second pass the vectorized data is rasterized with the desired
+resolution, optionally placed on a background image, and the ALTO’s positional
+information converted into the pixel domain.</p>
+<p>The most basic invocation of pangoline is:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>pangoline<span class="w"> </span>render<span class="w"> </span>doc.txt
+<span class="go">Rendering ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00</span>
+</pre></div>
+</div>
+<p>which will produce output <cite>doc.0.pdf, doc.0.xml, doc.1.pdf, doc.1.xml</cite>…</p>
+<p>Various options to direct rendering such as page size, margins, language, and
+base direction can be manually set, for example:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>pangoline<span class="w"> </span>render<span class="w"> </span>-p<span class="w"> </span><span class="m">216</span><span class="w"> </span><span class="m">279</span><span class="w"> </span>-l<span class="w"> </span>en-us<span class="w"> </span>-f<span class="w"> </span><span class="s2">&quot;Noto Sans 24&quot;</span><span class="w"> </span>doc.txt
+<span class="go"> Rendering ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00</span>
+</pre></div>
+</div>
+<p>which renders the text with the Noto Sans font in size 24 onto US Letter size
+pages (216x279mm) and sets the language to American English.</p>
+<p>Text can also be styled with <a class="reference external" href="https://docs.gtk.org/Pango/pango_markup.html">Pango Markup</a>. Parsing is disabled per
+default but can be enabled with a switch:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>pangoline<span class="w"> </span>render<span class="w"> </span>--markup<span class="w"> </span>doc.txt
+<span class="go">Rendering ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00</span>
+</pre></div>
+</div>
+<p>A more useful approach in most cases is to apply random styles (bolding,
+italicization, …) to some words in the source text:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>pangoline<span class="w"> </span>render<span class="w"> </span>--random-markup-probability<span class="w"> </span><span class="m">0</span>.01<span class="w"> </span>doc.txt
+<span class="go">Rendering ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00</span>
+</pre></div>
+</div>
+<p>The above command will apply one or more random styles to roughly 1% of words.
+The set of styles to apply can also be configured:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>pangoline<span class="w"> </span>render<span class="w"> </span>--random-markup-probability<span class="w"> </span><span class="m">0</span>.01<span class="w"> </span>--random-markup<span class="w"> </span>style_italic<span class="w"> </span>--random-markup<span class="w"> </span>variant_smallcaps<span class="w"> </span>doc.txt
+<span class="go">Rendering ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00</span>
+</pre></div>
+</div>
+<p>A list of available styles as well as the set of default styles is available on
+the help screen <cite>pangoline render –help</cite>. The semantics of each value can be
+found in the <a class="reference external" href="https://docs.gtk.org/Pango/pango_markup.html">pango
+documentation</a>.</p>
+</section>
+<section id="rasterization">
+<h2>Rasterization<a class="headerlink" href="#rasterization" title="Link to this heading">¶</a></h2>
+<p>In a second step those vector files can be rasterized into PNGs and the
+coordinates in the ALTO files scaled to the selected resolution (per default
+300dpi):</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>pangoline<span class="w"> </span>rasterize<span class="w"> </span>doc.0.xml<span class="w"> </span>doc.1.xml<span class="w"> </span>...
+<span class="go">Rasterizing ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00</span>
+</pre></div>
+</div>
+<p>To obtain slightly more realistic input images it is possible to overlay the
+rasterized text into images of writing surfaces.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>pangoline<span class="w"> </span>rasterize<span class="w"> </span>-w<span class="w"> </span>~/background_1.jpg<span class="w"> </span>doc.0.xml<span class="w"> </span>doc.1.xml<span class="w"> </span>...
+<span class="go">Rasterizing ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00</span>
+</pre></div>
+</div>
+<p>Rasterization can be invoked with multiple background images in which case they
+will be sampled randomly for each output page. A tarball with 70 empty paper
+backgrounds of different origins, digitization qualities, and states of
+preservation can be found <a class="reference external" href="http://l.unchti.me/paper.tar">here</a>. A more
+ergonomic way to specify multiple background images exists with the <cite>-W</cite>
+option that takes a manifest file containing a list of image file paths:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>cat<span class="w"> </span>backgrounds.lst
+<span class="go">background_0.jpg</span>
+<span class="go">background_1.jpg</span>
+<span class="go">...</span>
+<span class="go">background_N.jpg</span>
+<span class="gp">$ </span>pangoline<span class="w"> </span>rasterize<span class="w"> </span>-W<span class="w"> </span>backgrounds.lst<span class="w"> </span>doc.0.xml<span class="w"> </span>doc.1.xml<span class="w"> </span>...
+<span class="go">Rasterizing ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00</span>
+</pre></div>
+</div>
+</section>
+<section id="repolygonization">
+<h2>Repolygonization<a class="headerlink" href="#repolygonization" title="Link to this heading">¶</a></h2>
+<p>The ALTO files produced by pangoline contain baselines and bounding polygons
+for each text line. Nevertheless, they are not immediately usable for training
+purposes as the bounding polygons provided through the Pango layout engine are
+just rectangular boxes that are quite different from the bounding polygons
+produced by kraken’s native polygonizer. Hence, it is necessary to recompute
+the bounding polygons around the line content.</p>
+<p>The kraken source repository contains a <a class="reference external" href="https://github.com/mittagessen/kraken/blob/main/kraken/contrib/repolygonize.py">script</a>
+that aids in repolygonization by wrapping the API in an easy to use command
+line interface. After downloading it you can repolygonize XML files as such:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>python<span class="w"> </span>repolygonize.py<span class="w"> </span>-f<span class="w"> </span>alto<span class="w"> </span>*.xml
+</pre></div>
+</div>
+<p>The repolygonized files with have a <cite>_rewrite.xml</cite> suffix attached to them. You
+can use these files as is or <a class="reference internal" href="ketos.html#id1"><span class="std std-ref">compile</span></a> them into binary
+datasets.</p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/kraken.png" alt="Logo of kraken"/>
+            </a></p>
+  <div>
+    <h3><a href="../index.html">Table of Contents</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">Synthetic training data</a><ul>
+<li><a class="reference internal" href="#installing-pangoline">Installing pangoline</a></li>
+<li><a class="reference internal" href="#rendering-text">Rendering text</a></li>
+<li><a class="reference internal" href="#rasterization">Rasterization</a></li>
+<li><a class="reference internal" href="#repolygonization">Repolygonization</a></li>
+</ul>
+</li>
+</ul>
+
+  </div><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+<h3>Versions</h3>
+<ul>
+  <li><a href="../../2.0.0/index.html">2.0.0</a></li>
+  <li><a href="../../3.0/index.html">3.0</a></li>
+  <li><a href="../../4.0/index.html">4.0</a></li>
+  <li><a href="../../4.1/index.html">4.1</a></li>
+  <li><a href="../../4.2.0/index.html">4.2.0</a></li>
+  <li><a href="../../4.3.0/index.html">4.3.0</a></li>
+  <li><a href="../../5.0.0/index.html">5.0.0</a></li>
+  <li><a href="../../5.1/index.html">5.1</a></li>
+  <li><a href="../../5.2/index.html">5.2</a></li>
+  <li><a href="../../5.3.0/index.html">5.3.0</a></li>
+  <li><a href="synth.html">6.0.0</a></li>
+</ul>
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2015-2026, Benjamin Kiessling.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/training/synth.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

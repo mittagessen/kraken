@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Training kraken &#8212; kraken  documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=27fed22d" />
+    <link rel="stylesheet" type="text/css" href="_static/graphviz.css?v=4ae1632d" />
+    <link rel="stylesheet" type="text/css" href="_static/custom.css?v=89a84cc7" />
+    <script src="_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="_static/doctools.js?v=9bcbadda"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="canonical" href="kraken.re/training.html" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="training-kraken">
+<span id="training"></span><h1>Training kraken<a class="headerlink" href="#training-kraken" title="Link to this heading">¶</a></h1>
+<p>kraken is an optical character recognition package that can be trained fairly
+easily for a large number of scripts. In contrast to other system requiring
+segmentation down to glyph level before classification, it is uniquely suited
+for the recognition of connected scripts, because the neural network is trained
+to assign correct character to unsegmented training data.</p>
+<p>Both segmentation, the process finding lines and regions on a page image, and
+recognition, the conversion of line images into text, can be trained in kraken.
+To train models for either we require training data, i.e. examples of page
+segmentations and transcriptions that are similar to what we want to be able to
+recognize. For segmentation the examples are  the location of baselines, i.e.
+the imaginary lines the text is written on, and polygons of regions. For
+recognition these are the text contained in a line. There are multiple ways to
+supply training data but the easiest is through PageXML or ALTO files.</p>
+<section id="installing-kraken">
+<h2>Installing kraken<a class="headerlink" href="#installing-kraken" title="Link to this heading">¶</a></h2>
+<p>The easiest way to install and use kraken is through <a class="reference external" href="https://www.anaconda.com/download/">conda</a>. kraken works both on Linux and Mac OS
+X. After installing conda, download the environment file and create the
+environment for kraken:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>wget<span class="w"> </span>https://raw.githubusercontent.com/mittagessen/kraken/master/environment.yml
+<span class="gp">$ </span>conda<span class="w"> </span>env<span class="w"> </span>create<span class="w"> </span>-f<span class="w"> </span>environment.yml
+</pre></div>
+</div>
+<p>Each time you want to use the kraken environment in a shell is has to be
+activated first:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>conda<span class="w"> </span>activate<span class="w"> </span>kraken
+</pre></div>
+</div>
+</section>
+<section id="image-acquisition-and-preprocessing">
+<h2>Image acquisition and preprocessing<a class="headerlink" href="#image-acquisition-and-preprocessing" title="Link to this heading">¶</a></h2>
+<p>First a number of high quality scans, preferably color or grayscale and at
+least 300dpi are required. Scans should be in a lossless image format such as
+TIFF or PNG, images in PDF files have to be extracted beforehand using a tool
+such as <code class="docutils literal notranslate"><span class="pre">pdftocairo</span></code> or <code class="docutils literal notranslate"><span class="pre">pdfimages</span></code>. While each of these requirements can
+be relaxed to a degree, the final accuracy will suffer to some extent. For
+example, only slightly compressed JPEG scans are generally suitable for
+training and recognition.</p>
+<p>Depending on the source of the scans some preprocessing such as splitting scans
+into pages, correcting skew and warp, and removing speckles can be advisable
+although it isn’t strictly necessary as the segmenter can be trained to treat
+noisy material with a high accuracy. A fairly user-friendly software for
+semi-automatic batch processing of image scans is <a class="reference external" href="http://scantailor.org">Scantailor</a> albeit most work can be done using a standard image
+editor.</p>
+<p>The total number of scans required depends on the kind of model to train
+(segmentation or recognition), the complexity of the layout or the nature of
+the script to recognize. Only features that are found in the training data can
+later be recognized, so it is important that the coverage of typographic
+features is exhaustive. Training a small segmentation model for a particular
+kind of material might require less than a few hundred samples while a general
+model can well go into the thousands of pages. Likewise a specific recognition
+model for printed script with a small grapheme inventory such as Arabic or
+Hebrew requires around 800 lines, with manuscripts, complex scripts (such as
+polytonic Greek), and general models for multiple typefaces and hands needing
+more training data for the same accuracy.</p>
+<p>There is no hard rule for the amount of training data and it may be required to
+retrain a model after the initial training data proves insufficient. Most
+<code class="docutils literal notranslate"><span class="pre">western</span></code> texts contain between 25 and 40 lines per page, therefore upward of
+30 pages have to be preprocessed and later transcribed.</p>
+</section>
+<section id="annotation-and-transcription">
+<h2>Annotation and transcription<a class="headerlink" href="#annotation-and-transcription" title="Link to this heading">¶</a></h2>
+<p>kraken does not provide internal tools for the annotation and transcription of
+baselines, regions, and text. There are a number of tools available that can
+create ALTO and PageXML files containing the requisite information for either
+segmentation or recognition training: <a class="reference external" href="https://escripta.hypotheses.org">escriptorium</a> integrates kraken tightly including
+training and inference, <a class="reference external" href="https://www.primaresearch.org/tools/Aletheia">Aletheia</a> is a powerful desktop
+application that can create fine grained annotations.</p>
+</section>
+<section id="dataset-compilation">
+<h2>Dataset Compilation<a class="headerlink" href="#dataset-compilation" title="Link to this heading">¶</a></h2>
+</section>
+<section id="compilation">
+<span id="id1"></span><h2>Training<a class="headerlink" href="#compilation" title="Link to this heading">¶</a></h2>
+<p id="training-step">The training data, e.g. a collection of PAGE XML documents, obtained through
+annotation and transcription may now be used to train segmentation and/or
+transcription models.</p>
+<p>The training data in <code class="docutils literal notranslate"><span class="pre">output_dir</span></code> may now be used to train a new model by
+invoking the <code class="docutils literal notranslate"><span class="pre">ketos</span> <span class="pre">train</span></code> command. Just hand a list of images to the command
+such as:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>train<span class="w"> </span>output_dir/*.png
+</pre></div>
+</div>
+<p>to start training.</p>
+<p>A number of lines will be split off into a separate held-out set that is used
+to estimate the actual recognition accuracy achieved in the real world. These
+are never shown to the network during training but will be recognized
+periodically to evaluate the accuracy of the model. Per default the validation
+set will comprise of 10% of the training data.</p>
+<p>Basic model training is mostly automatic albeit there are multiple parameters
+that can be adjusted:</p>
+<dl class="option-list">
+<dt><kbd><span class="option">--output</span></kbd></dt>
+<dd><p>Sets the prefix for models generated during training. They will best as
+<code class="docutils literal notranslate"><span class="pre">prefix_epochs.mlmodel</span></code>.</p>
+</dd>
+<dt><kbd><span class="option">--report</span></kbd></dt>
+<dd><p>How often evaluation passes are run on the validation set. It is an
+integer equal or larger than 1 with 1 meaning a report is created each
+time the complete training set has been seen by the network.</p>
+</dd>
+<dt><kbd><span class="option">--savefreq</span></kbd></dt>
+<dd><p>How often intermediate models are saved to disk. It is an integer with
+the same semantics as <code class="docutils literal notranslate"><span class="pre">--report</span></code>.</p>
+</dd>
+<dt><kbd><span class="option">--load</span></kbd></dt>
+<dd><p>Continuing training is possible by loading an existing model file with
+<code class="docutils literal notranslate"><span class="pre">--load</span></code>. To continue training from a base model with another
+training set refer to the full <a class="reference internal" href="ketos.html#ketos"><span class="std std-ref">ketos</span></a> documentation.</p>
+</dd>
+<dt><kbd><span class="option">--preload</span></kbd></dt>
+<dd><p>Enables/disables preloading of the training set into memory for
+accelerated training. The default setting preloads data sets with less
+than 2500 lines, explicitly adding <code class="docutils literal notranslate"><span class="pre">--preload</span></code> will preload arbitrary
+sized sets. <code class="docutils literal notranslate"><span class="pre">--no-preload</span></code> disables preloading in all circumstances.</p>
+</dd>
+</dl>
+<p>Training a network will take some time on a modern computer, even with the
+default parameters. While the exact time required is unpredictable as training
+is a somewhat random process a rough guide is that accuracy seldom improves
+after 50 epochs reached between 8 and 24 hours of training.</p>
+<p>When to stop training is a matter of experience; the default setting employs a
+fairly reliable approach known as <a class="reference external" href="https://en.wikipedia.org/wiki/Early_stopping">early stopping</a> that stops training as soon as
+the error rate on the validation set doesn’t improve anymore.  This will
+prevent <a class="reference external" href="https://en.wikipedia.org/wiki/Overfitting">overfitting</a>, i.e.
+fitting the model to recognize only the training data properly instead of the
+general patterns contained therein.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>train<span class="w"> </span>output_dir/*.png
+<span class="go">Building training set  [####################################]  100%</span>
+<span class="go">Building validation set  [####################################]  100%</span>
+<span class="go">[270.2364] alphabet mismatch {&#39;9&#39;, &#39;8&#39;, &#39;݂&#39;, &#39;3&#39;, &#39;݀&#39;, &#39;4&#39;, &#39;1&#39;, &#39;7&#39;, &#39;5&#39;, &#39;\xa0&#39;}</span>
+<span class="go">Initializing model ✓</span>
+<span class="go">Accuracy report (0) -1.5951 3680 9550</span>
+<span class="go">epoch 0/-1  [####################################]  788/788</span>
+<span class="go">Accuracy report (1) 0.0245 3504 3418</span>
+<span class="go">epoch 1/-1  [####################################]  788/788</span>
+<span class="go">Accuracy report (2) 0.8445 3504 545</span>
+<span class="go">epoch 2/-1  [####################################]  788/788</span>
+<span class="go">Accuracy report (3) 0.9541 3504 161</span>
+<span class="go">epoch 3/-1  [------------------------------------]  13/788  0d 00:22:09</span>
+<span class="go">...</span>
+</pre></div>
+</div>
+<p>By now there should be a couple of models model_name-1.mlmodel,
+model_name-2.mlmodel, … in the directory the script was executed in. Lets
+take a look at each part of the output.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Building training set  [####################################]  100%</span>
+<span class="go">Building validation set  [####################################]  100%</span>
+</pre></div>
+</div>
+<p>shows the progress of loading the training and validation set into memory. This
+might take a while as preprocessing the whole set and putting it into memory is
+computationally intensive. Loading can be made faster without preloading at the
+cost of performing preprocessing repeatedly during the training process.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">[270.2364] alphabet mismatch {&#39;9&#39;, &#39;8&#39;, &#39;݂&#39;, &#39;3&#39;, &#39;݀&#39;, &#39;4&#39;, &#39;1&#39;, &#39;7&#39;, &#39;5&#39;, &#39;\xa0&#39;}</span>
+</pre></div>
+</div>
+<p>is a warning about missing characters in either the validation or training set,
+i.e.  that the alphabets of the sets are not equal. Increasing the size of the
+validation set will often remedy this warning.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Accuracy report (2) 0.8445 3504 545</span>
+</pre></div>
+</div>
+<p>this line shows the results of the validation set evaluation. The error after 2
+epochs is 545 incorrect characters out of 3504 characters in the validation set
+for a character accuracy of 84.4%. It should decrease fairly rapidly.  If
+accuracy remains around 0.30 something is amiss, e.g. non-reordered
+right-to-left or wildly incorrect transcriptions. Abort training, correct the
+error(s) and start again.</p>
+<p>After training is finished the best model is saved as
+<code class="docutils literal notranslate"><span class="pre">model_name_best.mlmodel</span></code>. It is highly recommended to also archive the
+training log and data for later reference.</p>
+<p><code class="docutils literal notranslate"><span class="pre">ketos</span></code> can also produce more verbose output with training set and network
+information by appending one or more <code class="docutils literal notranslate"><span class="pre">-v</span></code> to the command:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>-vv<span class="w"> </span>train<span class="w"> </span>syr/*.png
+<span class="go">[0.7272] Building ground truth set from 876 line images</span>
+<span class="go">[0.7281] Taking 88 lines from training for evaluation</span>
+<span class="go">...</span>
+<span class="go">[0.8479] Training set 788 lines, validation set 88 lines, alphabet 48 symbols</span>
+<span class="go">[0.8481] alphabet mismatch {&#39;\xa0&#39;, &#39;0&#39;, &#39;:&#39;, &#39;݀&#39;, &#39;܇&#39;, &#39;݂&#39;, &#39;5&#39;}</span>
+<span class="go">[0.8482] grapheme       count</span>
+<span class="go">[0.8484] SPACE  5258</span>
+<span class="go">[0.8484]        ܐ       3519</span>
+<span class="go">[0.8485]        ܘ       2334</span>
+<span class="go">[0.8486]        ܝ       2096</span>
+<span class="go">[0.8487]        ܠ       1754</span>
+<span class="go">[0.8487]        ܢ       1724</span>
+<span class="go">[0.8488]        ܕ       1697</span>
+<span class="go">[0.8489]        ܗ       1681</span>
+<span class="go">[0.8489]        ܡ       1623</span>
+<span class="go">[0.8490]        ܪ       1359</span>
+<span class="go">[0.8491]        ܬ       1339</span>
+<span class="go">[0.8491]        ܒ       1184</span>
+<span class="go">[0.8492]        ܥ       824</span>
+<span class="go">[0.8492]        .       811</span>
+<span class="go">[0.8493] COMBINING DOT BELOW    646</span>
+<span class="go">[0.8493]        ܟ       599</span>
+<span class="go">[0.8494]        ܫ       577</span>
+<span class="go">[0.8495] COMBINING DIAERESIS    488</span>
+<span class="go">[0.8495]        ܚ       431</span>
+<span class="go">[0.8496]        ܦ       428</span>
+<span class="go">[0.8496]        ܩ       307</span>
+<span class="go">[0.8497] COMBINING DOT ABOVE    259</span>
+<span class="go">[0.8497]        ܣ       256</span>
+<span class="go">[0.8498]        ܛ       204</span>
+<span class="go">[0.8498]        ܓ       176</span>
+<span class="go">[0.8499]        ܀       132</span>
+<span class="go">[0.8499]        ܙ       81</span>
+<span class="go">[0.8500]        *       66</span>
+<span class="go">[0.8501]        ܨ       59</span>
+<span class="go">[0.8501]        ܆       40</span>
+<span class="go">[0.8502]        [       40</span>
+<span class="go">[0.8503]        ]       40</span>
+<span class="go">[0.8503]        1       18</span>
+<span class="go">[0.8504]        2       11</span>
+<span class="go">[0.8504]        ܇       9</span>
+<span class="go">[0.8505]        3       8</span>
+<span class="go">[0.8505]                6</span>
+<span class="go">[0.8506]        5       5</span>
+<span class="go">[0.8506] NO-BREAK SPACE 4</span>
+<span class="go">[0.8507]        0       4</span>
+<span class="go">[0.8507]        6       4</span>
+<span class="go">[0.8508]        :       4</span>
+<span class="go">[0.8508]        8       4</span>
+<span class="go">[0.8509]        9       3</span>
+<span class="go">[0.8510]        7       3</span>
+<span class="go">[0.8510]        4       3</span>
+<span class="go">[0.8511] SYRIAC FEMININE DOT    1</span>
+<span class="go">[0.8511] SYRIAC RUKKAKHA        1</span>
+<span class="go">[0.8512] Encoding training set</span>
+<span class="go">[0.9315] Creating new model [1,1,0,48 Lbx100 Do] with 49 outputs</span>
+<span class="go">[0.9318] layer          type    params</span>
+<span class="go">[0.9350] 0              rnn     direction b transposed False summarize False out 100 legacy None</span>
+<span class="go">[0.9361] 1              dropout probability 0.5 dims 1</span>
+<span class="go">[0.9381] 2              linear  augmented False out 49</span>
+<span class="go">[0.9918] Constructing RMSprop optimizer (lr: 0.001, momentum: 0.9)</span>
+<span class="go">[0.9920] Set OpenMP threads to 4</span>
+<span class="go">[0.9920] Moving model to device cpu</span>
+<span class="go">[0.9924] Starting evaluation run</span>
+</pre></div>
+</div>
+<p>indicates that the training is running on 788 transcribed lines and a
+validation set of 88 lines. 49 different classes, i.e. Unicode code points,
+where found in these 788 lines. These affect the output size of the network;
+obviously only these 49 different classes/code points can later be output by
+the network.  Importantly, we can see that certain characters occur markedly
+less often than others. Characters like the Syriac feminine dot and numerals
+that occur less than 10 times will most likely not be recognized well by the
+trained net.</p>
+</section>
+<section id="evaluation-and-validation">
+<h2>Evaluation and Validation<a class="headerlink" href="#evaluation-and-validation" title="Link to this heading">¶</a></h2>
+<p>While output during training is detailed enough to know when to stop training
+one usually wants to know the specific kinds of errors to expect. Doing more
+in-depth error analysis also allows to pinpoint weaknesses in the training
+data, e.g. above average error rates for numerals indicate either a lack of
+representation of numerals in the training data or erroneous transcription in
+the first place.</p>
+<p>First the trained model has to be applied to some line transcriptions with the
+<cite>ketos test</cite> command:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-m<span class="w"> </span>syriac_best.mlmodel<span class="w"> </span>lines/*.png
+<span class="go">Loading model syriac_best.mlmodel ✓</span>
+<span class="go">Evaluating syriac_best.mlmodel</span>
+<span class="go">Evaluating  [#-----------------------------------]    3%  00:04:56</span>
+<span class="go">...</span>
+</pre></div>
+</div>
+<p>After all lines have been processed a evaluation report will be printed:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">=== report  ===</span>
+
+<span class="go">35619     Characters</span>
+<span class="go">336       Errors</span>
+<span class="go">99.06%    Accuracy</span>
+
+<span class="go">157       Insertions</span>
+<span class="go">81        Deletions</span>
+<span class="go">98        Substitutions</span>
+
+<span class="go">Count     Missed  %Right</span>
+<span class="go">27046     143     99.47%  Syriac</span>
+<span class="go">7015      52      99.26%  Common</span>
+<span class="go">1558      60      96.15%  Inherited</span>
+
+<span class="go">Errors    Correct-Generated</span>
+<span class="go">25        {  } - { COMBINING DOT BELOW }</span>
+<span class="go">25        { COMBINING DOT BELOW } - {  }</span>
+<span class="go">15        { . } - {  }</span>
+<span class="go">15        { COMBINING DIAERESIS } - {  }</span>
+<span class="go">12        { ܢ } - {  }</span>
+<span class="go">10        {  } - { . }</span>
+<span class="go">8 { COMBINING DOT ABOVE } - {  }</span>
+<span class="go">8 { ܝ } - {  }</span>
+<span class="go">7 { ZERO WIDTH NO-BREAK SPACE } - {  }</span>
+<span class="go">7 { ܆ } - {  }</span>
+<span class="go">7 { SPACE } - {  }</span>
+<span class="go">7 { ܣ } - {  }</span>
+<span class="go">6 {  } - { ܝ }</span>
+<span class="go">6 { COMBINING DOT ABOVE } - { COMBINING DIAERESIS }</span>
+<span class="go">5 { ܙ } - {  }</span>
+<span class="go">5 { ܬ } - {  }</span>
+<span class="go">5 {  } - { ܢ }</span>
+<span class="go">4 { NO-BREAK SPACE } - {  }</span>
+<span class="go">4 { COMBINING DIAERESIS } - { COMBINING DOT ABOVE }</span>
+<span class="go">4 {  } - { ܒ }</span>
+<span class="go">4 {  } - { COMBINING DIAERESIS }</span>
+<span class="go">4 { ܗ } - {  }</span>
+<span class="go">4 {  } - { ܬ }</span>
+<span class="go">4 {  } - { ܘ }</span>
+<span class="go">4 { ܕ } - { ܢ }</span>
+<span class="go">3 {  } - { ܕ }</span>
+<span class="go">3 { ܐ } - {  }</span>
+<span class="go">3 { ܗ } - { ܐ }</span>
+<span class="go">3 { ܝ } - { ܢ }</span>
+<span class="go">3 { ܀ } - { . }</span>
+<span class="go">3 {  } - { ܗ }</span>
+
+<span class="go">  .....</span>
+</pre></div>
+</div>
+<p>The first section of the report consists of a simple accounting of the number
+of characters in the ground truth, the errors in the recognition output and the
+resulting accuracy in per cent.</p>
+<p>The next table lists the number of insertions (characters occurring in the
+ground truth but not in the recognition output), substitutions (misrecognized
+characters), and deletions (superfluous characters recognized by the model).</p>
+<p>Next is a grouping of errors (insertions and substitutions) by Unicode script.</p>
+<p>The final part of the report are errors sorted by frequency and a per
+character accuracy report. Importantly most errors are incorrect recognition of
+combining marks such as dots and diaereses. These may have several sources:
+different dot placement in training and validation set, incorrect transcription
+such as non-systematic transcription, or unclean speckled scans. Depending on
+the error source, correction most often involves adding more training data and
+fixing transcriptions. Sometimes it may even be advisable to remove
+unrepresentative data from the training set.</p>
+</section>
+<section id="recognition">
+<h2>Recognition<a class="headerlink" href="#recognition" title="Link to this heading">¶</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">kraken</span></code> utility is employed for all non-training related tasks. Optical
+character recognition is a multi-step process consisting of binarization
+(conversion of input images to black and white), page segmentation (extracting
+lines from the image), and recognition (converting line image to character
+sequences). All of these may be run in a single call like this:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>-i<span class="w"> </span>INPUT_IMAGE<span class="w"> </span>OUTPUT_FILE<span class="w"> </span>binarize<span class="w"> </span>segment<span class="w"> </span>ocr<span class="w"> </span>-m<span class="w"> </span>MODEL_FILE
+</pre></div>
+</div>
+<p>producing a text file from the input image. There are also <a class="reference external" href="http://hocr.info">hocr</a> and <a class="reference external" href="https://www.loc.gov/standards/alto/">ALTO</a> output
+formats available through the appropriate switches:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>-i<span class="w"> </span>...<span class="w"> </span>ocr<span class="w"> </span>-h
+<span class="gp">$ </span>kraken<span class="w"> </span>-i<span class="w"> </span>...<span class="w"> </span>ocr<span class="w"> </span>-a
+</pre></div>
+</div>
+<p>For debugging purposes it is sometimes helpful to run each step manually and
+inspect intermediate results:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>-i<span class="w"> </span>INPUT_IMAGE<span class="w"> </span>BW_IMAGE<span class="w"> </span>binarize
+<span class="gp">$ </span>kraken<span class="w"> </span>-i<span class="w"> </span>BW_IMAGE<span class="w"> </span>LINES<span class="w"> </span>segment
+<span class="gp">$ </span>kraken<span class="w"> </span>-i<span class="w"> </span>BW_IMAGE<span class="w"> </span>OUTPUT_FILE<span class="w"> </span>ocr<span class="w"> </span>-l<span class="w"> </span>LINES<span class="w"> </span>...
+</pre></div>
+</div>
+<p>It is also possible to recognize more than one file at a time by just chaining
+<code class="docutils literal notranslate"><span class="pre">-i</span> <span class="pre">...</span> <span class="pre">...</span></code> clauses like this:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>-i<span class="w"> </span>input_1<span class="w"> </span>output_1<span class="w"> </span>-i<span class="w"> </span>input_2<span class="w"> </span>output_2<span class="w"> </span>...
+</pre></div>
+</div>
+<p>Finally, there is a central repository containing freely available models.
+Getting a list of all available models:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>list
+</pre></div>
+</div>
+<p>Retrieving model metadata for a particular model:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>show<span class="w"> </span>arabic-alam-al-kutub
+<span class="go">name: arabic-alam-al-kutub.mlmodel</span>
+
+<span class="go">An experimental model for Classical Arabic texts.</span>
+
+<span class="go">Network trained on 889 lines of [0] as a test case for a general Classical</span>
+<span class="go">Arabic model. Ground truth was prepared by Sarah Savant</span>
+<span class="go">&lt;sarah.savant@aku.edu&gt; and Maxim Romanov &lt;maxim.romanov@uni-leipzig.de&gt;.</span>
+
+<span class="go">Vocalization was omitted in the ground truth. Training was stopped at ~35000</span>
+<span class="go">iterations with an accuracy of 97%.</span>
+
+<span class="go">[0] Ibn al-Faqīh (d. 365 AH). Kitāb al-buldān. Edited by Yūsuf al-Hādī, 1st</span>
+<span class="go">edition. Bayrūt: ʿĀlam al-kutub, 1416 AH/1996 CE.</span>
+<span class="go">alphabet:  !()-.0123456789:[] «»،؟ءابةتثجحخدذرزسشصضطظعغفقكلمنهوىي ARABIC</span>
+<span class="go">MADDAH ABOVE, ARABIC HAMZA ABOVE, ARABIC HAMZA BELOW</span>
+</pre></div>
+</div>
+<p>and actually fetching the model:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>get<span class="w"> </span>arabic-alam-al-kutub
+</pre></div>
+</div>
+<p>The downloaded model can then be used for recognition by the name shown in its metadata, e.g.:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>-i<span class="w"> </span>INPUT_IMAGE<span class="w"> </span>OUTPUT_FILE<span class="w"> </span>binarize<span class="w"> </span>segment<span class="w"> </span>ocr<span class="w"> </span>-m<span class="w"> </span>arabic-alam-al-kutub.mlmodel
+</pre></div>
+</div>
+<p>For more documentation see the kraken <a class="reference external" href="http://kraken.re">website</a>.</p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="index.html">
+              <img class="logo" src="_static/kraken.png" alt="Logo of kraken"/>
+            </a></p>
+  <div>
+    <h3><a href="index.html">Table of Contents</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">Training kraken</a><ul>
+<li><a class="reference internal" href="#installing-kraken">Installing kraken</a></li>
+<li><a class="reference internal" href="#image-acquisition-and-preprocessing">Image acquisition and preprocessing</a></li>
+<li><a class="reference internal" href="#annotation-and-transcription">Annotation and transcription</a></li>
+<li><a class="reference internal" href="#dataset-compilation">Dataset Compilation</a></li>
+<li><a class="reference internal" href="#compilation">Training</a></li>
+<li><a class="reference internal" href="#evaluation-and-validation">Evaluation and Validation</a></li>
+<li><a class="reference internal" href="#recognition">Recognition</a></li>
+</ul>
+</li>
+</ul>
+
+  </div><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+<h3>Versions</h3>
+<ul>
+  <li><a href="../2.0.0/training.html">2.0.0</a></li>
+  <li><a href="../3.0/training.html">3.0</a></li>
+  <li><a href="../4.0/training.html">4.0</a></li>
+  <li><a href="../4.1/training.html">4.1</a></li>
+  <li><a href="../4.2.0/training.html">4.2.0</a></li>
+  <li><a href="training.html">4.3.0</a></li>
+  <li><a href="../5.0.0/training.html">5.0.0</a></li>
+  <li><a href="../5.1/training.html">5.1</a></li>
+  <li><a href="../5.2/training.html">5.2</a></li>
+  <li><a href="../5.3.0/training.html">5.3.0</a></li>
+  <li><a href="../6.0.0/index.html">6.0.0</a></li>
+</ul>
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2015-2026, Benjamin Kiessling.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="_sources/training.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

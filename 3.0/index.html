@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>kraken &#8212; kraken  documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=27fed22d" />
+    <link rel="stylesheet" type="text/css" href="_static/graphviz.css?v=4ae1632d" />
+    <link rel="stylesheet" type="text/css" href="_static/custom.css?v=89a84cc7" />
+    <script src="_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="_static/doctools.js?v=9bcbadda"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="canonical" href="kraken.re/index.html" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Advanced Usage" href="advanced.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="kraken">
+<h1>kraken<a class="headerlink" href="#kraken" title="Link to this heading">¶</a></h1>
+<div class="toctree-wrapper compound">
+</div>
+<p>kraken is a turn-key OCR system optimized for historical and non-Latin script
+material.</p>
+</section>
+<section id="features">
+<h1>Features<a class="headerlink" href="#features" title="Link to this heading">¶</a></h1>
+<p>kraken’s main features are:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Fully trainable layout analysis and character recognition</p></li>
+<li><p><a class="reference external" href="https://en.wikipedia.org/wiki/Right-to-left">Right-to-Left</a>, <a class="reference external" href="https://en.wikipedia.org/wiki/Bi-directional_text">BiDi</a>, and Top-to-Bottom
+script support</p></li>
+<li><p><a class="reference external" href="https://www.loc.gov/standards/alto/">ALTO</a>, PageXML, abbyXML, and hOCR
+output</p></li>
+<li><p>Word bounding boxes and character cuts</p></li>
+<li><p>Multi-script recognition support</p></li>
+<li><p><a class="reference external" href="https://zenodo.org/communities/ocr_models">Public repository</a> of model files</p></li>
+<li><p><a class="reference internal" href="models.html#models"><span class="std std-ref">Lightweight model files</span></a></p></li>
+<li><p><a class="reference internal" href="vgsl.html#vgsl"><span class="std std-ref">Variable recognition network architectures</span></a></p></li>
+</ul>
+</div></blockquote>
+<p>Pull requests and code contributions are always welcome.</p>
+</section>
+<section id="installation">
+<h1>Installation<a class="headerlink" href="#installation" title="Link to this heading">¶</a></h1>
+<p>kraken requires some external libraries to run. On Debian/Ubuntu they may be
+installed using:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>apt<span class="w"> </span>install<span class="w"> </span>libpangocairo-1.0<span class="w"> </span>libxml2<span class="w"> </span>libblas3<span class="w"> </span>liblapack3<span class="w"> </span>python3-dev<span class="w"> </span>python3-pip<span class="w"> </span>libvips
+</pre></div>
+</div>
+<section id="pip">
+<h2>pip<a class="headerlink" href="#pip" title="Link to this heading">¶</a></h2>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>pip3<span class="w"> </span>install<span class="w"> </span>kraken
+</pre></div>
+</div>
+<p>or by running pip in the git repository:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>pip3<span class="w"> </span>install<span class="w"> </span>.
+</pre></div>
+</div>
+</section>
+<section id="conda">
+<h2>conda<a class="headerlink" href="#conda" title="Link to this heading">¶</a></h2>
+<p>Install the latest development version through <a class="reference external" href="https://anaconda.org">conda</a>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ wget https://raw.githubusercontent.com/mittagessen/kraken/master/environment.yml
+$ conda env create -f environment.yml
+</pre></div>
+</div>
+<p>or:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ wget https://raw.githubusercontent.com/mittagessen/kraken/master/environment_cuda.yml
+$ conda env create -f environment_cuda.yml
+</pre></div>
+</div>
+<p>for CUDA acceleration with the appropriate hardware.</p>
+</section>
+<section id="models">
+<h2>Models<a class="headerlink" href="#models" title="Link to this heading">¶</a></h2>
+<p>Finally you’ll have to scrounge up a recognition model to do the actual
+recognition of characters. To download the default English text recognition
+model and place it in the user’s kraken directory:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>get<span class="w"> </span><span class="m">10</span>.5281/zenodo.2577813
+</pre></div>
+</div>
+<p>A list of libre models available in the central repository can be retrieved by
+running:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>list
+</pre></div>
+</div>
+<p>Model metadata can be extracted using:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>show<span class="w"> </span><span class="m">10</span>.5281/zenodo.2577813
+<span class="go">name: 10.5281/zenodo.2577813</span>
+
+<span class="go">A generalized model for English printed text</span>
+
+<span class="go">This model has been trained on a large corpus of modern printed English text\naugmented with ~10000 lines of historical p</span>
+<span class="go">scripts: Latn</span>
+<span class="go">alphabet: !&quot;#$%&amp;&#39;()+,-./0123456789:;&lt;=&gt;?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]`abcdefghijklmnopqrstuvwxyz{} SPACE</span>
+<span class="go">accuracy: 99.95%</span>
+<span class="go">license: Apache-2.0</span>
+<span class="go">author(s): Kiessling, Benjamin</span>
+<span class="go">date: 2019-02-26</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="quickstart">
+<h1>Quickstart<a class="headerlink" href="#quickstart" title="Link to this heading">¶</a></h1>
+<p>Recognizing text on an image using the default parameters including the
+prerequisite steps of binarization and page segmentation:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>-i<span class="w"> </span>image.tif<span class="w"> </span>image.txt<span class="w"> </span>segment<span class="w"> </span>-bl<span class="w"> </span>ocr
+<span class="go">Loading RNN     ✓</span>
+<span class="go">Processing      ⣻</span>
+</pre></div>
+</div>
+<p>To binarize a single image using the nlbin algorithm (usually not required with the baseline segmenter):</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>-i<span class="w"> </span>image.tif<span class="w"> </span>bw.tif<span class="w"> </span>binarize
+</pre></div>
+</div>
+<p>To segment a binarized image into reading-order sorted baselines and regions:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>-i<span class="w"> </span>bw.tif<span class="w"> </span>lines.json<span class="w"> </span>segment<span class="w"> </span>-bl
+</pre></div>
+</div>
+<p>To OCR an image using the default RNN:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>-i<span class="w"> </span>bw.tif<span class="w"> </span>image.txt<span class="w"> </span>segment<span class="w"> </span>-bl<span class="w"> </span>ocr
+</pre></div>
+</div>
+<p>All commands and their parameters are documented, just add the standard
+<code class="docutils literal notranslate"><span class="pre">--help</span></code> flag for further information.</p>
+</section>
+<section id="training-tutorial">
+<h1>Training Tutorial<a class="headerlink" href="#training-tutorial" title="Link to this heading">¶</a></h1>
+<p>There is a training tutorial at <a class="reference internal" href="training.html"><span class="doc">Training kraken</span></a>.</p>
+</section>
+<section id="license">
+<span id="id2"></span><h1>License<a class="headerlink" href="#license" title="Link to this heading">¶</a></h1>
+<p><code class="docutils literal notranslate"><span class="pre">Kraken</span></code> is provided under the terms and conditions of the <a class="reference external" href="https://github.com/mittagessen/kraken/blob/master/LICENSE">Apache 2.0
+License</a>.</p>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="#">
+              <img class="logo" src="_static/kraken.png" alt="Logo of kraken"/>
+            </a></p><h3>Useful Links</h3>
+<ul>
+  <li><a href="https://kraken.re">The Kraken Website</a></li>
+  <li><a href="https://pypi.python.org/pypi/kraken">kraken @ PyPI</a></li>
+  <li><a href="https://github.com/mittagessen/kraken">kraken @ github</a></li>
+  <li><a href="https://github.com/mittagessen/kraken/issues">Issue Tracker</a></li>
+</ul><h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="advanced.html">Advanced Usage</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ketos.html">Training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api_docs.html">API reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="models.html">Models</a></li>
+</ul>
+
+
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+<h3>Versions</h3>
+<ul>
+  <li><a href="../2.0.0/index.html">2.0.0</a></li>
+  <li><a href="index.html">3.0</a></li>
+  <li><a href="../4.0/index.html">4.0</a></li>
+  <li><a href="../4.1/index.html">4.1</a></li>
+  <li><a href="../4.2.0/index.html">4.2.0</a></li>
+  <li><a href="../4.3.0/index.html">4.3.0</a></li>
+  <li><a href="../5.0.0/index.html">5.0.0</a></li>
+  <li><a href="../5.1/index.html">5.1</a></li>
+  <li><a href="../5.2/index.html">5.2</a></li>
+  <li><a href="../5.3.0/index.html">5.3.0</a></li>
+  <li><a href="../6.0.0/index.html">6.0.0</a></li>
+</ul>
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2015-2026, Benjamin Kiessling.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="_sources/index.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

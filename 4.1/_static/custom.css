@@ -1,0 +1,24 @@
+pre {
+    white-space: pre-wrap;
+}
+svg {
+    width: 100%;
+}
+.highlight .err {
+    border: inherit;
+    box-sizing: inherit;
+}
+
+div.leftside {
+    width: 110px;
+    padding: 0px 3px 0px 0px;
+    float: left;
+}
+
+div.rightside {
+    margin-left: 125px;
+}
+
+dl.py {
+    margin-top: 25px;
+}

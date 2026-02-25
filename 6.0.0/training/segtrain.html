@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Segmentation Training &#8212; kraken  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=27fed22d" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
+    <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=89a84cc7" />
+    <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="canonical" href="kraken.re/training/segtrain.html" />
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="segmentation-training">
+<span id="segtrain"></span><h1>Segmentation Training<a class="headerlink" href="#segmentation-training" title="Link to this heading">¶</a></h1>
+<p>Segmentation training allows kraken to perform layout analysis, finding text
+lines and regions, on material that is insufficiently well recognized by the
+default model. It is not necessary to train a new segmentation model for each
+new type of document, the default segmentation model works well on quite a
+variety of handwritten and printed documents. On the other hand, if a specific
+typology of lines and regions is needed or the output is subpar it can often be
+a good choice to train a new segmentation model.</p>
+<section id="best-practices">
+<h2>Best practices<a class="headerlink" href="#best-practices" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>The segmenter is fairly robust when it comes to hyperparameter choice.</p></li>
+<li><p>Start by finetuning from the default model for a fixed number of epochs (50 for reasonably sized datasets) with a cosine schedule.</p></li>
+<li><p>Segmentation models’ performance is difficult to evaluate. Pixel accuracy doesn’t mean much because there are many more pixels that aren’t part of a line or region than just background. Frequency-weighted IoU is good for overall performance, while mean IoU overrepresents rare classes. The best way to evaluate segmentation models is to look at the output on unlabelled data.</p></li>
+<li><p>If you don’t have rare classes you can use a fairly small validation set to make sure everything is converging and just visually validate on unlabelled data.</p></li>
+<li><p>Upload your models to the <a class="reference internal" href="../advanced/repo.html#repo"><span class="std std-ref">model repository</span></a>.</p></li>
+</ul>
+</section>
+<section id="training-data-formats">
+<h2>Training data formats<a class="headerlink" href="#training-data-formats" title="Link to this heading">¶</a></h2>
+<p>Segmentation training supports the XML formats described in the <a class="reference internal" href="ketos.html#ketos-format"><span class="std std-ref">data
+format</span></a> section.</p>
+</section>
+<section id="training">
+<h2>Training<a class="headerlink" href="#training" title="Link to this heading">¶</a></h2>
+<p>Training a segmentation model is very similar to training models for <a class="reference internal" href="rectrain.html#rectrain"><span class="std std-ref">text
+recognition</span></a> in terms of overall process and available options. The
+basic invocation is:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>segtrain<span class="w"> </span>-f<span class="w"> </span>xml<span class="w"> </span>training_data/*.xml
+</pre></div>
+</div>
+<p>This takes all text lines and regions encoded in the XML files and trains a
+model to recognize them.</p>
+<p>Most other options available in transcription training are also available in
+segmentation training. CUDA acceleration:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>-d<span class="w"> </span>cuda<span class="w"> </span>segtrain<span class="w"> </span>-f<span class="w"> </span>xml<span class="w"> </span>training_data/*.xml
+</pre></div>
+</div>
+<p>Defining custom architectures:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>-d<span class="w"> </span>cuda<span class="w"> </span>segtrain<span class="w"> </span>-s<span class="w"> </span><span class="s1">&#39;[1,1200,0,3 Cr7,7,64,2,2 Gn32 Cr3,3,128,2,2 Gn32 Cr3,3,128 Gn32 Cr3,3,256 Gn32]&#39;</span><span class="w"> </span>-f<span class="w"> </span>xml<span class="w"> </span>training_data/*.xml
+</pre></div>
+</div>
+<p>Fine tuning/transfer learning with last layer adaptation and slicing:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>segtrain<span class="w"> </span>--resize<span class="w"> </span>new<span class="w"> </span>-i<span class="w"> </span>segmodel_best.mlmodel<span class="w"> </span>training_data/*.xml
+<span class="gp">$ </span>ketos<span class="w"> </span>segtrain<span class="w"> </span>-i<span class="w"> </span>segmodel_best.mlmodel<span class="w"> </span>--append<span class="w"> </span><span class="m">7</span><span class="w"> </span>-s<span class="w"> </span><span class="s1">&#39;[Cr3,3,64 Do0.1]&#39;</span><span class="w"> </span>training_data/*.xml
+</pre></div>
+</div>
+<p>In addition there are a couple of specific options that allow filtering of
+baseline and region types. Datasets are often annotated to a level that is too
+detailed or contains undesirable types, e.g. when combining segmentation data
+from different sources. The most basic option is the suppression of <em>all</em> of
+either baseline or region data contained in the dataset:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>segtrain<span class="w"> </span>--suppress-baselines<span class="w"> </span>-f<span class="w"> </span>xml<span class="w"> </span>training_data/*.xml
+<span class="go">Training line types:</span>
+<span class="go">Training region types:</span>
+<span class="go">  graphic       3       135</span>
+<span class="go">  text  4       1128</span>
+<span class="go">  separator     5       5431</span>
+<span class="go">  paragraph     6       10218</span>
+<span class="go">  table 7       16</span>
+<span class="go">...</span>
+<span class="gp">$ </span>ketos<span class="w"> </span>segtrain<span class="w"> </span>--suppress-regions<span class="w"> </span>-f<span class="w"> </span>xml<span class="w"> </span>training-data/*.xml
+<span class="go">Training line types:</span>
+<span class="go">  default 2     53980</span>
+<span class="go">  foo     8     134</span>
+<span class="go">...</span>
+</pre></div>
+</div>
+<p>It is also possible to filter out baselines/regions selectively:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>segtrain<span class="w"> </span>-f<span class="w"> </span>xml<span class="w"> </span>--valid-baselines<span class="w"> </span>default<span class="w"> </span>training_data/*.xml
+<span class="go">Training line types:</span>
+<span class="go">  default 2     53980</span>
+<span class="go">Training region types:</span>
+<span class="go">  graphic       3       135</span>
+<span class="go">  text  4       1128</span>
+<span class="go">  separator     5       5431</span>
+<span class="go">  paragraph     6       10218</span>
+<span class="go">  table 7       16</span>
+<span class="gp">$ </span>ketos<span class="w"> </span>segtrain<span class="w"> </span>-f<span class="w"> </span>xml<span class="w"> </span>--valid-regions<span class="w"> </span>graphic<span class="w"> </span>--valid-regions<span class="w"> </span>paragraph<span class="w"> </span>training_data/*.xml
+<span class="go">Training line types:</span>
+<span class="go">  default 2     53980</span>
+<span class="go">  foo     3     134</span>
+<span class="go"> Training region types:</span>
+<span class="go">  graphic       4       135</span>
+<span class="go">  paragraph     5       10218</span>
+</pre></div>
+</div>
+<p>We can merge baselines and regions into each other:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>segtrain<span class="w"> </span>-f<span class="w"> </span>xml<span class="w"> </span>--merge-baselines<span class="w"> </span>default:foo<span class="w"> </span>training_data/*.xml
+<span class="go">Training line types:</span>
+<span class="go">  default 2     54114</span>
+<span class="go">...</span>
+<span class="gp">$ </span>ketos<span class="w"> </span>segtrain<span class="w"> </span>-f<span class="w"> </span>xml<span class="w"> </span>--merge-regions<span class="w"> </span>text:paragraph<span class="w"> </span>--merge-regions<span class="w"> </span>graphic:table<span class="w"> </span>training_data/*.xml
+<span class="go">...</span>
+<span class="go">Training region types:</span>
+<span class="go">  graphic       3       151</span>
+<span class="go">  text  4       11346</span>
+<span class="go">  separator     5       5431</span>
+<span class="go">...</span>
+</pre></div>
+</div>
+<p>Finally, it is possible to merge all baseline or region types into a single type with the <code class="docutils literal notranslate"><span class="pre">--merge-all-*</span></code> options:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>segtrain<span class="w"> </span>-f<span class="w"> </span>xml<span class="w"> </span>--merge-all-baselines<span class="w"> </span>DefaultLine<span class="w"> </span>training_data/*.xml
+<span class="go">Training line types:</span>
+<span class="go">  DefaultLine 2 54114</span>
+<span class="go">...</span>
+<span class="gp">$ </span>ketos<span class="w"> </span>segtrain<span class="w"> </span>-f<span class="w"> </span>xml<span class="w"> </span>--merge-all-regions<span class="w"> </span>DefaultRegion<span class="w"> </span>training_data/*.xml
+<span class="go">...</span>
+<span class="go">Training region types:</span>
+<span class="go">  DefaultRegion 3       16928</span>
+<span class="go">...</span>
+</pre></div>
+</div>
+<p>These options are combinable to massage the dataset into any typology you want.
+Tags containing the separator character <cite>:</cite> can be specified by escaping them
+with backslash.</p>
+<p>Then there are some options that set metadata fields controlling the
+postprocessing. When computing the bounding polygons the recognized baselines
+are offset slightly to ensure overlap with the line corpus. This offset is per
+default upwards for baselines but as it is possible to annotate toplines (for
+scripts like Hebrew) and centerlines (for baseline-free scripts like Chinese)
+the appropriate offset can be selected with an option:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>segtrain<span class="w"> </span>--topline<span class="w"> </span>-f<span class="w"> </span>xml<span class="w"> </span>hebrew_training_data/*.xml
+<span class="gp">$ </span>ketos<span class="w"> </span>segtrain<span class="w"> </span>--centerline<span class="w"> </span>-f<span class="w"> </span>xml<span class="w"> </span>chinese_training_data/*.xml
+<span class="gp">$ </span>ketos<span class="w"> </span>segtrain<span class="w"> </span>--baseline<span class="w"> </span>-f<span class="w"> </span>xml<span class="w"> </span>latin_training_data/*.xml
+</pre></div>
+</div>
+</section>
+<section id="evaluation">
+<h2>Evaluation<a class="headerlink" href="#evaluation" title="Link to this heading">¶</a></h2>
+<p>Numerical evaluation options are of limited value for the segmenter and it is
+generally recommended to visually confirm the quality of an existing or newly
+created model.</p>
+<p>Nevertheless, the <code class="docutils literal notranslate"><span class="pre">segtest</span></code> tool exists which is able</p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/kraken.png" alt="Logo of kraken"/>
+            </a></p>
+  <div>
+    <h3><a href="../index.html">Table of Contents</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">Segmentation Training</a><ul>
+<li><a class="reference internal" href="#best-practices">Best practices</a></li>
+<li><a class="reference internal" href="#training-data-formats">Training data formats</a></li>
+<li><a class="reference internal" href="#training">Training</a></li>
+<li><a class="reference internal" href="#evaluation">Evaluation</a></li>
+</ul>
+</li>
+</ul>
+
+  </div><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+<h3>Versions</h3>
+<ul>
+  <li><a href="../../2.0.0/index.html">2.0.0</a></li>
+  <li><a href="../../3.0/index.html">3.0</a></li>
+  <li><a href="../../4.0/index.html">4.0</a></li>
+  <li><a href="../../4.1/index.html">4.1</a></li>
+  <li><a href="../../4.2.0/index.html">4.2.0</a></li>
+  <li><a href="../../4.3.0/index.html">4.3.0</a></li>
+  <li><a href="../../5.0.0/index.html">5.0.0</a></li>
+  <li><a href="../../5.1/index.html">5.1</a></li>
+  <li><a href="../../5.2/index.html">5.2</a></li>
+  <li><a href="../../5.3.0/index.html">5.3.0</a></li>
+  <li><a href="segtrain.html">6.0.0</a></li>
+</ul>
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2015-2026, Benjamin Kiessling.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/training/segtrain.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Reading Order Training &#8212; kraken  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=27fed22d" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
+    <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=89a84cc7" />
+    <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="canonical" href="kraken.re/training/rotrain.html" />
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="reading-order-training">
+<span id="rotrain"></span><h1>Reading Order Training<a class="headerlink" href="#reading-order-training" title="Link to this heading">¶</a></h1>
+<p>Reading order models work slightly differently from segmentation and reading
+order models. They are closely linked to the typology used in the dataset they
+were trained on as they use type information on lines and regions to make
+ordering decisions. As the same typology was probably used to train a specific
+segmentation model, reading order models are trained separately but bundled
+with their segmentation model in a subsequent step. The general sequence is
+therefore:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>segtrain<span class="w"> </span>-o<span class="w"> </span>fr_manu_seg.mlmodel<span class="w"> </span>-f<span class="w"> </span>xml<span class="w"> </span>french/*.xml
+<span class="go">...</span>
+<span class="gp">$ </span>ketos<span class="w"> </span>rotrain<span class="w"> </span>-o<span class="w"> </span>fr_manu_ro.mlmodel<span class="w"> </span>-f<span class="w"> </span>xml<span class="w"> </span>french/*.xml
+<span class="go">...</span>
+<span class="gp">$ </span>ketos<span class="w"> </span>roadd<span class="w"> </span>-o<span class="w"> </span>fr_manu_seg_with_ro.mlmodel<span class="w"> </span>-i<span class="w"> </span>fr_manu_seg_best.mlmodel<span class="w">  </span>-r<span class="w"> </span>fr_manu_ro_best.mlmodel
+</pre></div>
+</div>
+<p>Only the <cite>fr_manu_seg_with_ro.mlmodel</cite> file will contain the trained reading
+order model.  Segmentation models can exist with or without reading order
+models. If one is added, the neural reading order will be computed <em>in
+addition</em> to the one produced by the default heuristic during segmentation and
+serialized in the final XML output (in ALTO/PAGE XML).</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Reading order models work purely on the typology and geometric features
+of the lines and regions. They construct an approximate ordering matrix
+by feeding feature vectors of two lines (or regions) into the network
+to decide which of those two lines precedes the other.</p>
+<p>These feature vectors are quite simple; just the lines’ types, and
+their start, center, and end points. Therefore they can <em>not</em> reliably
+learn any ordering relying on graphical features of the input page such
+as: line color, typeface, or writing system.</p>
+</div>
+<p>Reading order models are extremely simple and do not require a lot of memory or
+computational power to train. In fact, the default parameters are extremely
+conservative and it is recommended to increase the batch size for improved
+training speed. Large batch size above 128k are easily possible with
+sufficiently large training datasets:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>rotrain<span class="w"> </span>-o<span class="w"> </span>fr_manu_ro.mlmodel<span class="w"> </span>-B<span class="w"> </span><span class="m">128000</span><span class="w"> </span>-f<span class="w"> </span>french/*.xml
+<span class="go">Training RO on following baselines types:</span>
+<span class="go">  DefaultLine   1</span>
+<span class="go">  DropCapitalLine       2</span>
+<span class="go">  HeadingLine   3</span>
+<span class="go">  InterlinearLine       4</span>
+<span class="go">GPU available: False, used: False</span>
+<span class="go">TPU available: False, using: 0 TPU cores</span>
+<span class="go">IPU available: False, using: 0 IPUs</span>
+<span class="go">HPU available: False, using: 0 HPUs</span>
+<span class="go">┏━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┓</span>
+<span class="go">┃   ┃ Name        ┃ Type              ┃ Params ┃</span>
+<span class="go">┡━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━╇━━━━━━━━┩</span>
+<span class="go">│ 0 │ criterion   │ BCEWithLogitsLoss │      0 │</span>
+<span class="go">│ 1 │ ro_net      │ MLP               │  1.1 K │</span>
+<span class="go">│ 2 │ ro_net.fc1  │ Linear            │  1.0 K │</span>
+<span class="go">│ 3 │ ro_net.relu │ ReLU              │      0 │</span>
+<span class="go">│ 4 │ ro_net.fc2  │ Linear            │     45 │</span>
+<span class="go">└───┴─────────────┴───────────────────┴────────┘</span>
+<span class="go">Trainable params: 1.1 K</span>
+<span class="go">Non-trainable params: 0</span>
+<span class="go">Total params: 1.1 K</span>
+<span class="go">Total estimated model params size (MB): 0</span>
+<span class="go">stage 0/∞ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 0/35 0:00:00 • -:--:-- 0.00it/s val_spearman: 0.912 val_loss: 0.701 early_stopping: 0/300 inf</span>
+</pre></div>
+</div>
+<p>During validation a metric called Spearman’s footrule is computed. To calculate
+Spearman’s footrule, the ranks of the lines of text in the ground truth reading
+order and the predicted reading order are compared. The footrule is then
+calculated as the sum of the absolute differences between the ranks of pairs of
+lines. The score increases by 1 for each line between the correct and predicted
+positions of a line.</p>
+<p>A lower footrule score indicates a better alignment between the two orders. A
+score of 0 implies perfect alignment of line ranks.</p>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/kraken.png" alt="Logo of kraken"/>
+            </a></p><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+<h3>Versions</h3>
+<ul>
+  <li><a href="../../2.0.0/index.html">2.0.0</a></li>
+  <li><a href="../../3.0/index.html">3.0</a></li>
+  <li><a href="../../4.0/index.html">4.0</a></li>
+  <li><a href="../../4.1/index.html">4.1</a></li>
+  <li><a href="../../4.2.0/index.html">4.2.0</a></li>
+  <li><a href="../../4.3.0/index.html">4.3.0</a></li>
+  <li><a href="../../5.0.0/index.html">5.0.0</a></li>
+  <li><a href="../../5.1/index.html">5.1</a></li>
+  <li><a href="../../5.2/index.html">5.2</a></li>
+  <li><a href="../../5.3.0/index.html">5.3.0</a></li>
+  <li><a href="rotrain.html">6.0.0</a></li>
+</ul>
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2015-2026, Benjamin Kiessling.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/training/rotrain.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

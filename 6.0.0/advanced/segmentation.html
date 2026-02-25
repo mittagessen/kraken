@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Page Segmentation &#8212; kraken  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=27fed22d" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
+    <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=89a84cc7" />
+    <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="canonical" href="kraken.re/advanced/segmentation.html" />
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Recognition" href="recognition.html" />
+    <link rel="prev" title="Input and Outputs" href="inputs.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="page-segmentation">
+<h1>Page Segmentation<a class="headerlink" href="#page-segmentation" title="Link to this heading">¶</a></h1>
+<p>The <cite>segment</cite> subcommand accesses page segmentation into lines and regions with
+the two layout analysis methods implemented: the trainable baseline segmenter
+that is capable of detecting both lines of different types and regions and a
+legacy non-trainable segmenter that produces bounding boxes.</p>
+<p>Universal parameters of either segmenter are:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>option</p></th>
+<th class="head"><p>action</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>-d, --text-direction</p></td>
+<td><p>Sets principal text direction. Valid values are <cite>horizontal-lr</cite>, <cite>horizontal-rl</cite>, <cite>vertical-lr</cite>, and <cite>vertical-rl</cite>.</p></td>
+</tr>
+<tr class="row-odd"><td><p>-m, --mask</p></td>
+<td><p>Segmentation mask suppressing page areas for line detection. A simple black and white mask image where 0-valued (black) areas are ignored for segmentation purposes.</p></td>
+</tr>
+</tbody>
+</table>
+<section id="baseline-segmentation">
+<h2>Baseline Segmentation<a class="headerlink" href="#baseline-segmentation" title="Link to this heading">¶</a></h2>
+<p>The baseline segmenter works by applying a segmentation model on a page image
+which labels each pixel on the image with one or more classes with each class
+corresponding to a line or region of a specific type. In addition there are two
+auxiliary classes that are used to determine the line orientation. A simplified
+example of a composite image of the auxiliary classes and a single line type
+without regions can be seen below:</p>
+<a class="reference internal image-reference" href="../_images/blla_heatmap.jpg"><img alt="BLLA output heatmap" src="../_images/blla_heatmap.jpg" style="width: 800px;" />
+</a>
+<p>In a second step the raw heatmap is vectorized to extract line instances and
+region boundaries, followed by bounding polygon computation for the baselines,
+and text line ordering. The final output can be visualized as:</p>
+<a class="reference internal image-reference" href="../_images/blla_output.jpg"><img alt="BLLA final output" src="../_images/blla_output.jpg" style="width: 800px;" />
+</a>
+<p>The primary determinant of segmentation quality is the segmentation model
+employed. There is a default model that works reasonably well on printed and
+handwritten material on undegraded, even writing surfaces such as paper or
+parchment. The output of this model consists of a single line type and a
+generic text region class that denotes coherent blocks of text. This model is
+employed automatically when the baseline segment is activated with the <cite>-bl</cite>
+option:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>-i<span class="w"> </span>input.jpg<span class="w"> </span>segmentation.json<span class="w"> </span>segment<span class="w"> </span>-bl
+</pre></div>
+</div>
+<p>New models optimized for other kinds of documents can be trained (see
+<a class="reference internal" href="../training/segtrain.html#segtrain"><span class="std std-ref">here</span></a>). These can be applied with the <cite>-i</cite> option of the
+<cite>segment</cite> subcommand:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>-i<span class="w"> </span>input.jpg<span class="w"> </span>segmentation.json<span class="w"> </span>segment<span class="w"> </span>-bl<span class="w"> </span>-i<span class="w"> </span>fancy_model.mlmodel
+</pre></div>
+</div>
+</section>
+<section id="legacy-box-segmentation">
+<h2>Legacy Box Segmentation<a class="headerlink" href="#legacy-box-segmentation" title="Link to this heading">¶</a></h2>
+<p>The legacy page segmentation is mostly parameterless, although a couple of
+switches exist to tweak it for particular inputs. Its output consists of
+rectangular bounding boxes in reading order and the general text direction
+(horizontal, i.e. LTR or RTL text in top-to-bottom reading order or
+vertical-ltr/rtl for vertical lines read from left-to-right or right-to-left).</p>
+<p>Apart from the limitations of the bounding box paradigm (rotated and curved
+lines cannot be effectively extracted) another important drawback of the legacy
+segmenter is the requirement for binarized input images. It is therefore
+necessary to apply binarization first or supply only
+pre-binarized inputs.</p>
+<p>The legacy segmenter can be applied on some input image with:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>-i<span class="w"> </span><span class="m">14</span>.tif<span class="w"> </span>lines.json<span class="w"> </span>segment<span class="w"> </span>-x
+<span class="gp">$ </span>cat<span class="w"> </span>lines.json
+</pre></div>
+</div>
+<p>Available specific parameters are:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>option</p></th>
+<th class="head"><p>action</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>--scale FLOAT</p></td>
+<td><p>Estimate of the average line height on the page</p></td>
+</tr>
+<tr class="row-odd"><td><p>-m, --maxcolseps</p></td>
+<td><p>Maximum number of columns in the input document. Set to <cite>0</cite> for uni-column layouts.</p></td>
+</tr>
+<tr class="row-even"><td><p>-b, --black-colseps / -w, --white-colseps</p></td>
+<td><p>Switch to black column separators.</p></td>
+</tr>
+<tr class="row-odd"><td><p>-r, --remove-hlines / -l, --hlines</p></td>
+<td><p>Disables prefiltering of small horizontal lines. Improves segmenter output on some Arabic texts.</p></td>
+</tr>
+<tr class="row-even"><td><p>-p, --pad</p></td>
+<td><p>Adds left and right padding around lines in the output.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="principal-text-direction">
+<h2>Principal Text Direction<a class="headerlink" href="#principal-text-direction" title="Link to this heading">¶</a></h2>
+<p>The principal text direction selected with the <code class="docutils literal notranslate"><span class="pre">-d/--text-direction</span></code> is a
+switch used in the reading order heuristic to determine the order of text
+blocks (regions) and individual lines. It roughly corresponds to the <a class="reference external" href="https://www.w3.org/TR/css-writing-modes-3/#block-flow-direction">block
+flow direction</a> in CSS with
+an additional option. Valid options consist of two parts, an initial principal
+line orientation (<cite>horizontal</cite> or <cite>vertical</cite>) followed by a block order (<cite>lr</cite>
+for left-to-right or <cite>rl</cite> for right-to-left).</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>The principal text direction is independent of the direction of the
+<em>inline text direction</em> (which is left-to-right for writing systems like
+Latin and right-to-left for ones like Hebrew or Arabic). Kraken deals
+automatically with the inline text direction through the BiDi algorithm
+but can’t infer the principal text direction automatically as it is
+determined by factors like layout, type of document, primary script in
+the document, and other factors. The different types of text
+directionality and their relation can be confusing, the <a class="reference external" href="https://www.w3.org/TR/css-writing-modes-3/">W3C writing
+mode</a> document explains
+the fundamentals, although the model used in Kraken differs slightly.</p>
+</div>
+<p>The first part is usually <cite>horizontal</cite> for scripts like Latin, Arabic, or
+Hebrew where the lines are horizontally oriented on the page and are written/read from
+top to bottom:</p>
+<a class="reference internal image-reference" href="../_images/bw.png"><img alt="Horizontal Latin script text" src="../_images/bw.png" style="width: 800px;" />
+</a>
+<p>Other scripts like Chinese can be written with vertical lines that are
+written/read from left to right or right to left:</p>
+<a class="reference internal image-reference" href="https://upload.wikimedia.org/wikipedia/commons/thumb/6/66/Chinese_manuscript_Ti-i_ch%27i-shu._Wellcome_L0020843.jpg/577px-Chinese_manuscript_Ti-i_ch%27i-shu._Wellcome_L0020843.jpg"><img alt="Vertical Chinese text" src="https://upload.wikimedia.org/wikipedia/commons/thumb/6/66/Chinese_manuscript_Ti-i_ch%27i-shu._Wellcome_L0020843.jpg/577px-Chinese_manuscript_Ti-i_ch%27i-shu._Wellcome_L0020843.jpg" style="width: 800px;" />
+</a>
+<p>The second part is dependent on a number of factors as the order in which text
+blocks are read is not fixed for every writing system. In mono-script texts it
+is usually determined by the inline text direction, i.e. Latin script texts
+columns are read starting with the top-left column followed by the column to
+its right and so on, continuing with the left-most column below if none remain
+to the right (inverse for right-to-left scripts like Arabic which start on the
+top right-most columns, continuing leftward, and returning to the right-most
+column just below when none remain).</p>
+<p>In multi-script documents the order is determined by the primary writing
+system employed in the document, e.g. for a modern book containing both Latin
+and Arabic script text it would be set to <cite>lr</cite> when Latin is primary, e.g. when
+the binding is on the left side of the book seen from the title cover, and
+vice-versa (<cite>rl</cite> if binding is on the right on the title cover). The analogue
+applies to text written with vertical lines.</p>
+<p>With these explications there are four different text directions available:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Text Direction</p></th>
+<th class="head"><p>Examples</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>horizontal-lr</p></td>
+<td><p>Latin script texts, Mixed LTR/RTL docs with principal LTR script</p></td>
+</tr>
+<tr class="row-odd"><td><p>horizontal-rl</p></td>
+<td><p>Arabic script texts, Mixed LTR/RTL docs with principal RTL script</p></td>
+</tr>
+<tr class="row-even"><td><p>vertical-lr</p></td>
+<td><p>Vertical script texts read from left-to-right.</p></td>
+</tr>
+<tr class="row-odd"><td><p>vertical-rl</p></td>
+<td><p>Vertical script texts read from right-to-left.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="masking">
+<h2>Masking<a class="headerlink" href="#masking" title="Link to this heading">¶</a></h2>
+<p>It is possible to keep the segmenter from finding text lines and regions on
+certain areas of the input image. This is done through providing a binary mask
+image that has the same size as the input image where blocked out regions are
+white and valid regions black:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>-i<span class="w"> </span>input.jpg<span class="w"> </span>segmentation.json<span class="w"> </span>segment<span class="w"> </span>-bl<span class="w"> </span>-m<span class="w"> </span>mask.png
+</pre></div>
+</div>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/kraken.png" alt="Logo of kraken"/>
+            </a></p>
+  <div>
+    <h3><a href="../index.html">Table of Contents</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">Page Segmentation</a><ul>
+<li><a class="reference internal" href="#baseline-segmentation">Baseline Segmentation</a></li>
+<li><a class="reference internal" href="#legacy-box-segmentation">Legacy Box Segmentation</a></li>
+<li><a class="reference internal" href="#principal-text-direction">Principal Text Direction</a></li>
+<li><a class="reference internal" href="#masking">Masking</a></li>
+</ul>
+</li>
+</ul>
+
+  </div><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Advanced Usage</a><ul>
+      <li>Previous: <a href="inputs.html" title="previous chapter">Input and Outputs</a></li>
+      <li>Next: <a href="recognition.html" title="next chapter">Recognition</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+<h3>Versions</h3>
+<ul>
+  <li><a href="../../2.0.0/index.html">2.0.0</a></li>
+  <li><a href="../../3.0/index.html">3.0</a></li>
+  <li><a href="../../4.0/index.html">4.0</a></li>
+  <li><a href="../../4.1/index.html">4.1</a></li>
+  <li><a href="../../4.2.0/index.html">4.2.0</a></li>
+  <li><a href="../../4.3.0/index.html">4.3.0</a></li>
+  <li><a href="../../5.0.0/index.html">5.0.0</a></li>
+  <li><a href="../../5.1/index.html">5.1</a></li>
+  <li><a href="../../5.2/index.html">5.2</a></li>
+  <li><a href="../../5.3.0/index.html">5.3.0</a></li>
+  <li><a href="segmentation.html">6.0.0</a></li>
+</ul>
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2015-2026, Benjamin Kiessling.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/advanced/segmentation.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

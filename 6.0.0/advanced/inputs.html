@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Input and Outputs &#8212; kraken  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=27fed22d" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
+    <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=89a84cc7" />
+    <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="canonical" href="kraken.re/advanced/inputs.html" />
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Page Segmentation" href="segmentation.html" />
+    <link rel="prev" title="Advanced Usage" href="index.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="input-and-outputs">
+<h1>Input and Outputs<a class="headerlink" href="#input-and-outputs" title="Link to this heading">¶</a></h1>
+<p>Kraken inputs and their outputs can be defined in multiple ways. The most
+simple are input-output pairs, i.e. producing one output document for one input
+document follow the basic syntax:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>-i<span class="w"> </span>input_1<span class="w"> </span>output_1<span class="w"> </span>-i<span class="w"> </span>input_2<span class="w"> </span>output_2<span class="w"> </span>...<span class="w"> </span>subcommand_1<span class="w"> </span>subcommand_2<span class="w"> </span>...<span class="w"> </span>subcommand_n
+</pre></div>
+</div>
+<p>In particular subcommands may be chained.</p>
+<p>There are other ways to define inputs and outputs as the syntax shown above can
+become rather cumbersome for large amounts of files.</p>
+<p>As such there are a couple of ways to deal with multiple files in a compact
+way. The first is batch processing:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>-I<span class="w"> </span><span class="s1">&#39;*.png&#39;</span><span class="w"> </span>-o<span class="w"> </span>ocr.txt<span class="w"> </span>segment<span class="w"> </span>...
+</pre></div>
+</div>
+<p>which expands the <a class="reference external" href="https://en.wikipedia.org/wiki/Glob_(programming)">glob expression</a> in kraken internally and
+appends the suffix defined with <cite>-o</cite> to each output file. An input file
+<cite>xyz.png</cite> will therefore produce an output file <cite>xyz.png.ocr.txt</cite>. <cite>-I</cite> batch
+inputs can also be specified multiple times:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>-I<span class="w"> </span><span class="s1">&#39;*.png&#39;</span><span class="w"> </span>-I<span class="w"> </span><span class="s1">&#39;*.jpg&#39;</span><span class="w"> </span>-I<span class="w"> </span><span class="s1">&#39;*.tif&#39;</span><span class="w"> </span>-o<span class="w"> </span>ocr.txt<span class="w"> </span>segment<span class="w"> </span>...
+</pre></div>
+</div>
+<p>A second way is to input multi-image files directly. These can be either in
+PDF, TIFF, or JPEG2000 format and are specified like:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>-I<span class="w"> </span>some.pdf<span class="w"> </span>-o<span class="w"> </span>ocr.txt<span class="w"> </span>-f<span class="w"> </span>pdf<span class="w"> </span>segment<span class="w"> </span>...
+</pre></div>
+</div>
+<p>This will internally extract all page images from the input PDF file and write
+one output file with an index (can be changed using the <cite>-p</cite> option) and the
+suffix defined with <cite>-o</cite>.</p>
+<p>The <cite>-f</cite> option can not only be used to extract data from PDF/TIFF/JPEG2000
+files but also various XML formats. In these cases the appropriate data is
+automatically selected from the inputs, image data for segmentation or line and
+region segmentation for recognition:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>-i<span class="w"> </span>alto.xml<span class="w"> </span>alto.ocr.txt<span class="w"> </span>-i<span class="w"> </span>page.xml<span class="w"> </span>page.ocr.txt<span class="w"> </span>-f<span class="w"> </span>xml<span class="w"> </span>ocr<span class="w"> </span>...
+</pre></div>
+</div>
+<p>The code is able to automatically determine if a file is in PageXML or ALTO format.</p>
+<section id="output-formats">
+<h2>Output formats<a class="headerlink" href="#output-formats" title="Link to this heading">¶</a></h2>
+<p>All commands have a default output format such as raw text for <cite>ocr</cite>, a plain
+image for <cite>binarize</cite>, or a JSON definition of the the segmentation for
+<cite>segment</cite>. These are specific to kraken and generally not suitable for further
+processing by other software but a number of standardized data exchange formats
+can be selected. Per default <a class="reference external" href="http://www.loc.gov/standards/alto/">ALTO</a>,
+<a class="reference external" href="https://en.wikipedia.org/wiki/PAGE_(XML)">PageXML</a>, <a class="reference external" href="http://hocr.info">hOCR</a>, and abbyyXML containing additional metadata such as
+bounding boxes and confidences are implemented. In addition, custom <a class="reference external" href="https://jinja.palletsprojects.com">jinja</a> templates can be loaded to create
+individualised output such as TEI.</p>
+<p>Output formats are selected on the main <cite>kraken</cite> command and apply to the last
+subcommand defined in the subcommand chain. For example:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>--alto<span class="w"> </span>-i<span class="w"> </span>...<span class="w"> </span>segment<span class="w"> </span>-bl
+</pre></div>
+</div>
+<p>will serialize a plain segmentation in ALTO into the specified output file.</p>
+<p>The currently available format switches are:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>-n<span class="w"> </span>-i<span class="w"> </span>...<span class="w"> </span>...<span class="w"> </span><span class="c1"># native output</span>
+<span class="gp">$ </span>kraken<span class="w"> </span>-a<span class="w"> </span>-i<span class="w"> </span>...<span class="w"> </span>...<span class="w"> </span><span class="c1"># ALTO output</span>
+<span class="gp">$ </span>kraken<span class="w"> </span>-x<span class="w"> </span>-i<span class="w"> </span>...<span class="w"> </span>...<span class="w"> </span><span class="c1"># PageXML output</span>
+<span class="gp">$ </span>kraken<span class="w"> </span>-h<span class="w"> </span>-i<span class="w"> </span>...<span class="w"> </span>...<span class="w"> </span><span class="c1"># hOCR output</span>
+<span class="gp">$ </span>kraken<span class="w"> </span>-y<span class="w"> </span>-i<span class="w"> </span>...<span class="w"> </span>...<span class="w"> </span><span class="c1"># abbyyXML output</span>
+</pre></div>
+</div>
+<p>Custom templates can be loaded with the <code class="docutils literal notranslate"><span class="pre">--template</span></code> option:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>--template<span class="w"> </span>/my/awesome/template.tmpl<span class="w"> </span>-i<span class="w"> </span>...<span class="w"> </span>...
+</pre></div>
+</div>
+<p>The data objects used by the templates are considered internal to kraken and
+can change from time to time. The best way to get some orientation when writing
+a new template from scratch is to have a look at the existing templates <a class="reference external" href="https://github.com/mittagessen/kraken/tree/main/kraken/templates">here</a>.</p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/kraken.png" alt="Logo of kraken"/>
+            </a></p>
+  <div>
+    <h3><a href="../index.html">Table of Contents</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">Input and Outputs</a><ul>
+<li><a class="reference internal" href="#output-formats">Output formats</a></li>
+</ul>
+</li>
+</ul>
+
+  </div><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Advanced Usage</a><ul>
+      <li>Previous: <a href="index.html" title="previous chapter">Advanced Usage</a></li>
+      <li>Next: <a href="segmentation.html" title="next chapter">Page Segmentation</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+<h3>Versions</h3>
+<ul>
+  <li><a href="../../2.0.0/index.html">2.0.0</a></li>
+  <li><a href="../../3.0/index.html">3.0</a></li>
+  <li><a href="../../4.0/index.html">4.0</a></li>
+  <li><a href="../../4.1/index.html">4.1</a></li>
+  <li><a href="../../4.2.0/index.html">4.2.0</a></li>
+  <li><a href="../../4.3.0/index.html">4.3.0</a></li>
+  <li><a href="../../5.0.0/index.html">5.0.0</a></li>
+  <li><a href="../../5.1/index.html">5.1</a></li>
+  <li><a href="../../5.2/index.html">5.2</a></li>
+  <li><a href="../../5.3.0/index.html">5.3.0</a></li>
+  <li><a href="inputs.html">6.0.0</a></li>
+</ul>
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2015-2026, Benjamin Kiessling.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/advanced/inputs.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

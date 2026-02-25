@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Advanced Usage &#8212; kraken  documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=27fed22d" />
+    <link rel="stylesheet" type="text/css" href="_static/graphviz.css?v=4ae1632d" />
+    <link rel="stylesheet" type="text/css" href="_static/custom.css?v=89a84cc7" />
+    <script src="_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="_static/doctools.js?v=9bcbadda"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="canonical" href="kraken.re/advanced.html" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Training" href="ketos.html" />
+    <link rel="prev" title="kraken" href="index.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="advanced-usage">
+<span id="advanced"></span><h1>Advanced Usage<a class="headerlink" href="#advanced-usage" title="Link to this heading">¶</a></h1>
+<p>Optical character recognition is the serial execution of multiple steps, in the
+case of kraken, layout analysis/page segmentation (extracting topological text
+lines from an image), recognition (feeding text lines images into a
+classifier), and finally serialization of results into an appropriate format
+such as ALTO or PageXML.</p>
+<section id="input-and-outputs">
+<h2>Input and Outputs<a class="headerlink" href="#input-and-outputs" title="Link to this heading">¶</a></h2>
+<p>Kraken inputs and their outputs can be defined in multiple ways. The most
+simple are input-output pairs, i.e. producing one output document for one input
+document follow the basic syntax:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>-i<span class="w"> </span>input_1<span class="w"> </span>output_1<span class="w"> </span>-i<span class="w"> </span>input_2<span class="w"> </span>output_2<span class="w"> </span>...<span class="w"> </span>subcommand_1<span class="w"> </span>subcommand_2<span class="w"> </span>...<span class="w"> </span>subcommand_n
+</pre></div>
+</div>
+<p>In particular subcommands may be chained.</p>
+<p>There are other ways to define inputs and outputs as the syntax shown above can
+become rather cumbersome for large amounts of files.</p>
+<p>As such there are a couple of ways to deal with multiple files in a compact
+way. The first is batch processing:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>-I<span class="w"> </span><span class="s1">&#39;*.png&#39;</span><span class="w"> </span>-o<span class="w"> </span>ocr.txt<span class="w"> </span>segment<span class="w"> </span>...
+</pre></div>
+</div>
+<p>which expands the <a class="reference external" href="https://en.wikipedia.org/wiki/Glob_(programming)">glob expression</a> in kraken internally and
+appends the suffix defined with <cite>-o</cite> to each output file. An input file
+<cite>xyz.png</cite> will therefore produce an output file <cite>xyz.png.ocr.txt</cite>. A second way
+is to input multi-image files directly. These can be either in PDF, TIFF, or
+JPEG2000 format and are specified like:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>-I<span class="w"> </span>some.pdf<span class="w"> </span>-o<span class="w"> </span>ocr.txt<span class="w"> </span>-f<span class="w"> </span>pdf<span class="w"> </span>segment<span class="w"> </span>...
+</pre></div>
+</div>
+<p>This will internally extract all page images from the input PDF file and write
+one output file with an index (can be changed using the <cite>-p</cite> option) and the
+suffix defined with <cite>-o</cite>.</p>
+<p>The <cite>-f</cite> option can not only be used to extract data from PDF/TIFF/JPEG2000
+files but also various XML formats. In these cases the appropriate data is
+automatically selected from the inputs, image data for segmentation or line and
+region segmentation for recognition:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>-i<span class="w"> </span>alto.xml<span class="w"> </span>alto.ocr.txt<span class="w"> </span>-i<span class="w"> </span>page.xml<span class="w"> </span>page.ocr.txt<span class="w"> </span>-f<span class="w"> </span>xml<span class="w"> </span>ocr<span class="w"> </span>...
+</pre></div>
+</div>
+<p>The code is able to automatically determine if a file is in PageXML or ALTO format.</p>
+<section id="output-formats">
+<h3>Output formats<a class="headerlink" href="#output-formats" title="Link to this heading">¶</a></h3>
+<p>All commands have a default output format such as raw text for <cite>ocr</cite>, a plain
+image for <cite>binarize</cite>, or a JSON definition of the the segmentation for
+<cite>segment</cite>. These are specific to kraken and generally not suitable for further
+processing by other software but a number of standardized data exchange formats
+can be selected. Per default <a class="reference external" href="http://www.loc.gov/standards/alto/">ALTO</a>,
+<a class="reference external" href="https://en.wikipedia.org/wiki/PAGE_(XML)">PageXML</a>, <a class="reference external" href="http://hocr.info">hOCR</a>, and abbyyXML containing additional metadata such as
+bounding boxes and confidences are implemented. In addition, custom <a class="reference external" href="https://jinja.palletsprojects.com">jinja</a> templates can be loaded to crate
+individualised output such as TEI.</p>
+<p>Output formats are selected on the main <cite>kraken</cite> command and apply to the last
+subcommand defined in the subcommand chain. For example:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>--alto<span class="w"> </span>-i<span class="w"> </span>...<span class="w"> </span>segment<span class="w"> </span>-bl
+</pre></div>
+</div>
+<p>will serialize a plain segmentation in ALTO into the specified output file.</p>
+<p>The currently available format switches are:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>-n<span class="w"> </span>-i<span class="w"> </span>...<span class="w"> </span>...<span class="w"> </span><span class="c1"># native output</span>
+<span class="gp">$ </span>kraken<span class="w"> </span>-a<span class="w"> </span>-i<span class="w"> </span>...<span class="w"> </span>...<span class="w"> </span><span class="c1"># ALTO output</span>
+<span class="gp">$ </span>kraken<span class="w"> </span>-x<span class="w"> </span>-i<span class="w"> </span>...<span class="w"> </span>...<span class="w"> </span><span class="c1"># PageXML output</span>
+<span class="gp">$ </span>kraken<span class="w"> </span>-h<span class="w"> </span>-i<span class="w"> </span>...<span class="w"> </span>...<span class="w"> </span><span class="c1"># hOCR output</span>
+<span class="gp">$ </span>kraken<span class="w"> </span>-y<span class="w"> </span>-i<span class="w"> </span>...<span class="w"> </span>...<span class="w"> </span><span class="c1"># abbyyXML output</span>
+</pre></div>
+</div>
+<p>Custom templates can be loaded with the <cite>–template</cite> option:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>--template<span class="w"> </span>/my/awesome/template.tmpl<span class="w"> </span>-i<span class="w"> </span>...<span class="w"> </span>...
+</pre></div>
+</div>
+<p>The data objects used by the templates are considered internal to kraken and
+can change from time to time. The best way to get some orientation when writing
+a new template from scratch is to have a look at the existing templates <a class="reference external" href="https://github.com/mittagessen/kraken/tree/master/kraken/templates">here</a>.</p>
+</section>
+</section>
+<section id="binarization">
+<h2>Binarization<a class="headerlink" href="#binarization" title="Link to this heading">¶</a></h2>
+<div class="admonition note" id="id1">
+<p class="admonition-title">Note</p>
+<p>Binarization is deprecated and mostly not necessary anymore. It can often
+worsen text recognition results especially for documents with uneven
+lighting, faint writing, etc.</p>
+</div>
+<p>The binarization subcommand converts a color or grayscale input image into an
+image containing only two color levels: white (background) and black
+(foreground, i.e. text). It accepts almost the same parameters as
+<code class="docutils literal notranslate"><span class="pre">ocropus-nlbin</span></code>. Only options not related to binarization, e.g. skew
+detection are missing. In addition, error checking (image sizes, inversion
+detection, grayscale enforcement) is always disabled and kraken will happily
+binarize any image that is thrown at it.</p>
+<p>Available parameters are:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>option</p></th>
+<th class="head"><p>type</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>–threshold</p></td>
+<td><p>FLOAT</p></td>
+</tr>
+<tr class="row-odd"><td><p>–zoom</p></td>
+<td><p>FLOAT</p></td>
+</tr>
+<tr class="row-even"><td><p>–escale</p></td>
+<td><p>FLOAT</p></td>
+</tr>
+<tr class="row-odd"><td><p>–border</p></td>
+<td><p>FLOAT</p></td>
+</tr>
+<tr class="row-even"><td><p>–perc</p></td>
+<td><p>INTEGER RANGE</p></td>
+</tr>
+<tr class="row-odd"><td><p>–range</p></td>
+<td><p>INTEGER</p></td>
+</tr>
+<tr class="row-even"><td><p>–low</p></td>
+<td><p>INTEGER RANGE</p></td>
+</tr>
+<tr class="row-odd"><td><p>–high</p></td>
+<td><p>INTEGER RANGE</p></td>
+</tr>
+</tbody>
+</table>
+<p>To binarize a image:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>-i<span class="w"> </span>input.jpg<span class="w"> </span>bw.png<span class="w"> </span>binarize
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Some image formats, notably JPEG, do not support a black and white
+image mode. Per default the output format according to the output file
+name extension will be honored. If this is not possible, a warning will
+be printed and the output forced to PNG:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>-i<span class="w"> </span>input.jpg<span class="w"> </span>bw.jpg<span class="w"> </span>binarize
+<span class="go">Binarizing      [06/24/22 09:56:23] WARNING  jpeg does not support 1bpp images. Forcing to png.</span>
+<span class="go">✓</span>
+</pre></div>
+</div>
+</div>
+</section>
+<section id="page-segmentation">
+<h2>Page Segmentation<a class="headerlink" href="#page-segmentation" title="Link to this heading">¶</a></h2>
+<p>The <cite>segment</cite> subcommand accesses page segmentation into lines and regions with
+the two layout analysis methods implemented: the trainable baseline segmenter
+that is capable of detecting both lines of different types and regions and a
+legacy non-trainable segmenter that produces bounding boxes.</p>
+<p>Universal parameters of either segmenter are:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>option</p></th>
+<th class="head"><p>action</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>-d, –text-direction</p></td>
+<td><p>Sets principal text direction. Valid values are <cite>horizontal-lr</cite>, <cite>horizontal-rl</cite>, <cite>vertical-lr</cite>, and <cite>vertical-rl</cite>.</p></td>
+</tr>
+<tr class="row-odd"><td><p>-m, –mask</p></td>
+<td><p>Segmentation mask suppressing page areas for line detection. A simple black and white mask image where 0-valued (black) areas are ignored for segmentation purposes.</p></td>
+</tr>
+</tbody>
+</table>
+<section id="baseline-segmentation">
+<h3>Baseline Segmentation<a class="headerlink" href="#baseline-segmentation" title="Link to this heading">¶</a></h3>
+<p>The baseline segmenter works by applying a segmentation model on a page image
+which labels each pixel on the image with one or more classes with each class
+corresponding to a line or region of a specific type. In addition there are two
+auxiliary classes that are used to determine the line orientation. A simplified
+example of a composite image of the auxiliary classes and a single line type
+without regions can be seen below:</p>
+<a class="reference internal image-reference" href="_images/blla_heatmap.jpg"><img alt="BLLA output heatmap" src="_images/blla_heatmap.jpg" style="width: 800px;" />
+</a>
+<p>In a second step the raw heatmap is vectorized to extract line instances and
+region boundaries, followed by bounding polygon computation for the baselines,
+and text line ordering. The final output can be visualized as:</p>
+<a class="reference internal image-reference" href="_images/blla_output.jpg"><img alt="BLLA final output" src="_images/blla_output.jpg" style="width: 800px;" />
+</a>
+<p>The primary determinant of segmentation quality is the segmentation model
+employed. There is a default model that works reasonably well on printed and
+handwritten material on undegraded, even writing surfaces such as paper or
+parchment. The output of this model consists of a single line type and a
+generic text region class that denotes coherent blocks of text. This model is
+employed automatically when the baseline segment is activated with the <cite>-bl</cite>
+option:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>-i<span class="w"> </span>input.jpg<span class="w"> </span>segmentation.json<span class="w"> </span>segment<span class="w"> </span>-bl
+</pre></div>
+</div>
+<p>New models optimized for other kinds of documents can be trained (see
+<a class="reference internal" href="ketos.html#segtrain"><span class="std std-ref">here</span></a>). These can be applied with the <cite>-i</cite> option of the
+<cite>segment</cite> subcommand:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>-i<span class="w"> </span>input.jpg<span class="w"> </span>segmentation.json<span class="w"> </span>segment<span class="w"> </span>-bl<span class="w"> </span>-i<span class="w"> </span>fancy_model.mlmodel
+</pre></div>
+</div>
+</section>
+<section id="legacy-box-segmentation">
+<h3>Legacy Box Segmentation<a class="headerlink" href="#legacy-box-segmentation" title="Link to this heading">¶</a></h3>
+<p>The legacy page segmentation is mostly parameterless, although a couple of
+switches exist to tweak it for particular inputs. Its output consists of
+rectangular bounding boxes in reading order and the general text direction
+(horizontal, i.e. LTR or RTL text in top-to-bottom reading order or
+vertical-ltr/rtl for vertical lines read from left-to-right or right-to-left).</p>
+<p>Apart from the limitations of the bounding box paradigm (rotated and curved
+lines cannot be effectively extracted) another important drawback of the legacy
+segmenter is the requirement for binarized input images. It is therefore
+necessary to apply <a class="reference internal" href="#id1"><span class="std std-ref">binarization</span></a> first or supply only
+pre-binarized inputs.</p>
+<p>The legacy segmenter can be applied on some input image with:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>-i<span class="w"> </span><span class="m">14</span>.tif<span class="w"> </span>lines.json<span class="w"> </span>segment<span class="w"> </span>-x
+<span class="gp">$ </span>cat<span class="w"> </span>lines.json
+</pre></div>
+</div>
+<p>Available specific parameters are:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>option</p></th>
+<th class="head"><p>action</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>–scale FLOAT</p></td>
+<td><p>Estimate of the average line height on the page</p></td>
+</tr>
+<tr class="row-odd"><td><p>-m, –maxcolseps</p></td>
+<td><p>Maximum number of columns in the input document. Set to <cite>0</cite> for uni-column layouts.</p></td>
+</tr>
+<tr class="row-even"><td><p>-b, –black-colseps / -w, –white-colseps</p></td>
+<td><p>Switch to black column separators.</p></td>
+</tr>
+<tr class="row-odd"><td><p>-r, –remove-hlines / -l, –hlines</p></td>
+<td><p>Disables prefiltering of small horizontal lines. Improves segmenter output on some Arabic texts.</p></td>
+</tr>
+<tr class="row-even"><td><p>-p, –pad</p></td>
+<td><p>Adds left and right padding around lines in the output.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="principal-text-direction">
+<h3>Principal Text Direction<a class="headerlink" href="#principal-text-direction" title="Link to this heading">¶</a></h3>
+<p>The principal text direction selected with the <cite>-d/–text-direction</cite> is a
+switch used in the reading order heuristic to determine the order of text
+blocks (regions) and individual lines. It roughly corresponds to the <a class="reference external" href="https://www.w3.org/TR/css-writing-modes-3/#block-flow-direction">block
+flow direction</a> in CSS with
+an additional option. Valid options consist of two parts, an initial principal
+line orientation (<cite>horizontal</cite> or <cite>vertical</cite>) followed by a block order (<cite>lr</cite>
+for left-to-right or <cite>rl</cite> for right-to-left).</p>
+<p>The first part is usually <cite>horizontal</cite> for scripts like Latin, Arabic, or
+Hebrew where the lines are horizontally oriented on the page and are written/read from
+top to bottom:</p>
+<a class="reference internal image-reference" href="_images/bw.png"><img alt="Horizontal Latin script text" src="_images/bw.png" style="width: 800px;" />
+</a>
+<p>Other scripts like Chinese can be written with vertical lines that are
+written/read from left to right or right to left:</p>
+<a class="reference internal image-reference" href="https://upload.wikimedia.org/wikipedia/commons/thumb/6/66/Chinese_manuscript_Ti-i_ch%27i-shu._Wellcome_L0020843.jpg/577px-Chinese_manuscript_Ti-i_ch%27i-shu._Wellcome_L0020843.jpg"><img alt="Vertical Chinese text" src="https://upload.wikimedia.org/wikipedia/commons/thumb/6/66/Chinese_manuscript_Ti-i_ch%27i-shu._Wellcome_L0020843.jpg/577px-Chinese_manuscript_Ti-i_ch%27i-shu._Wellcome_L0020843.jpg" style="width: 800px;" />
+</a>
+<p>The second part is dependent on a number of factors as the order in which text
+blocks are read is not fixed for every writing system. In mono-script texts it
+is usually determined by the inline text direction, i.e. Latin script texts
+columns are read starting with the top-left column followed by the column to
+its right and so on, continuing with the left-most column below if none remain
+to the right (inverse for right-to-left scripts like Arabic which start on the
+top right-most columns, continuing leftward, and returning to the right-most
+column just below when none remain).</p>
+<p>In multi-script documents the order of is determined by the primary writing
+system employed in the document, e.g. for a modern book containing both Latin
+and Arabic script text it would be set to <cite>lr</cite> when Latin is primary, e.g. when
+the binding is on the left side of the book seen from the title cover, and
+vice-versa (<cite>rl</cite> if binding is on the right on the title cover). The analogue
+applies to text written with vertical lines.</p>
+<p>With these explications there are four different text directions available:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Text Direction</p></th>
+<th class="head"><p>Examples</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>horizontal-lr</p></td>
+<td><p>Latin script texts, Mixed LTR/RTL docs with principal LTR script</p></td>
+</tr>
+<tr class="row-odd"><td><p>horizontal-rl</p></td>
+<td><p>Arabic script texts, Mixed LTR/RTL docs with principal RTL script</p></td>
+</tr>
+<tr class="row-even"><td><p>vertical-lr</p></td>
+<td><p>Vertical script texts read from left-to-right.</p></td>
+</tr>
+<tr class="row-odd"><td><p>vertical-rl</p></td>
+<td><p>Vertical script texts read from right-to-left.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="masking">
+<h3>Masking<a class="headerlink" href="#masking" title="Link to this heading">¶</a></h3>
+<p>It is possible to keep the segmenter from finding text lines and regions on
+certain areas of the input image. This is done through providing a binary mask
+image that has the same size as the input image where blocked out regions are
+black and valid regions white:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>-i<span class="w"> </span>input.jpg<span class="w"> </span>segmentation.json<span class="w"> </span>segment<span class="w"> </span>-bl<span class="w"> </span>-m<span class="w"> </span>mask.png
+</pre></div>
+</div>
+</section>
+</section>
+<section id="model-repository">
+<h2>Model Repository<a class="headerlink" href="#model-repository" title="Link to this heading">¶</a></h2>
+<p id="repo">There is a semi-curated <a class="reference external" href="https://zenodo.org/communities/ocr_models">repository</a> of freely licensed recognition
+models that can be interacted with from the command line using a few
+subcommands.</p>
+<section id="querying-and-model-retrieval">
+<h3>Querying and Model Retrieval<a class="headerlink" href="#querying-and-model-retrieval" title="Link to this heading">¶</a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">list</span></code> subcommand retrieves a list of all models available and prints
+them including some additional information (identifier, type, and a short
+description):</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>list
+<span class="go">Retrieving model list ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 8/8 0:00:00 0:00:07</span>
+<span class="go">10.5281/zenodo.6542744 (pytorch) - LECTAUREP Contemporary French Model (Administration)</span>
+<span class="go">10.5281/zenodo.5617783 (pytorch) - Cremma-Medieval Old French Model (Litterature)</span>
+<span class="go">10.5281/zenodo.5468665 (pytorch) - Medieval Hebrew manuscripts in Sephardi bookhand version 1.0</span>
+<span class="go">...</span>
+</pre></div>
+</div>
+<p>To access more detailed information the <code class="docutils literal notranslate"><span class="pre">show</span></code> subcommand may be used:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>show<span class="w"> </span><span class="m">10</span>.5281/zenodo.5617783
+<span class="go">name: 10.5281/zenodo.5617783</span>
+
+<span class="go">Cremma-Medieval Old French Model (Litterature)</span>
+
+<span class="go">....</span>
+<span class="go">scripts: Latn</span>
+<span class="go">alphabet: &amp;&#39;(),-.0123456789:;?ABCDEFGHIJKLMNOPQRSTUVXabcdefghijklmnopqrstuvwxyz¶ãíñõ÷ħĩłũƺᵉẽ’•⁊⁹ꝑꝓꝯꝰ SPACE, COMBINING ACUTE ACCENT, COMBINING TILDE, COMBINING MACRON, COMBINING ZIGZAG ABOVE, COMBINING LATIN SMALL LETTER A, COMBINING LATIN SMALL LETTER E, COMBINING LATIN SMALL LETTER I, COMBINING LATIN SMALL LETTER O, COMBINING LATIN SMALL LETTER U, COMBINING LATIN SMALL LETTER C, COMBINING LATIN SMALL LETTER R, COMBINING LATIN SMALL LETTER T, COMBINING UR ABOVE, COMBINING US ABOVE, COMBINING LATIN SMALL LETTER S, 0xe8e5, 0xf038, 0xf128</span>
+<span class="go">accuracy: 95.49%</span>
+<span class="go">license: CC-BY-SA-2.0</span>
+<span class="go">author(s): Pinche, Ariane</span>
+<span class="go">date: 2021-10-29</span>
+</pre></div>
+</div>
+<p>If a suitable model has been decided upon it can be retrieved using the <code class="docutils literal notranslate"><span class="pre">get</span></code>
+subcommand:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>get<span class="w"> </span><span class="m">10</span>.5281/zenodo.5617783
+<span class="go">Processing ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 16.1/16.1 MB 0:00:00 0:00:10</span>
+<span class="go">Model name: cremma_medieval_bicerin.mlmodel</span>
+</pre></div>
+</div>
+<p>Models will be placed in <code class="docutils literal notranslate"><span class="pre">$XDG_BASE_DIR</span></code> and can be accessed using their name as
+printed in the last line of the <code class="docutils literal notranslate"><span class="pre">kraken</span> <span class="pre">get</span></code> output.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>-i<span class="w"> </span>...<span class="w"> </span>...<span class="w"> </span>ocr<span class="w"> </span>-m<span class="w"> </span>cremma_medieval_bicerin.mlmodel
+</pre></div>
+</div>
+</section>
+<section id="publishing">
+<h3>Publishing<a class="headerlink" href="#publishing" title="Link to this heading">¶</a></h3>
+<p>When one would like to share a model with the wider world (for fame and glory!)
+it is possible (and recommended) to upload them to repository. The process
+consists of 2 stages: the creation of the deposit on the Zenodo platform
+followed by approval of the model in the community making it discoverable for
+other kraken users.</p>
+<p>For uploading model a Zenodo account and a personal access token is required.
+After account creation tokens can be created under the account settings:</p>
+<a class="reference internal image-reference" href="_images/pat.png"><img alt="Zenodo token creation dialogue" src="_images/pat.png" style="width: 800px;" />
+</a>
+<p>With the token models can then be uploaded:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>publish<span class="w"> </span>-a<span class="w"> </span><span class="nv">$ACCESS_TOKEN</span><span class="w"> </span>aaebv2-2.mlmodel
+<span class="go">DOI: 10.5281/zenodo.5617783</span>
+</pre></div>
+</div>
+<p>A number of important metadata will be asked for such as a short description of
+the model, long form description, recognized scripts, and authorship.
+Afterwards the model is deposited at Zenodo. This deposit is persistent, i.e.
+can’t be changed or deleted so it is important to make sure that all the
+information is correct. Each deposit also has a unique persistent identifier, a
+DOI, that can be used to refer to it, e.g. in publications or when pointing
+someone to a particular model.</p>
+<p>Once the deposit has been created a request (requiring manual approval) for
+inclusion in the repository will automatically be created which will make it
+discoverable by other users.</p>
+<p>It is possible to deposit models without including them in the queryable
+repository. Models uploaded this way are not truly private and can still be
+found through the standard Zenodo search and be downloaded with <cite>kraken get</cite>
+and its DOI. It is mostly suggested for preliminary models that might get
+updated later:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>publish<span class="w"> </span>--private<span class="w"> </span>-a<span class="w"> </span><span class="nv">$ACCESS_TOKEN</span><span class="w"> </span>aaebv2-2.mlmodel
+<span class="go">DOI: 10.5281/zenodo.5617734</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="recognition">
+<h2>Recognition<a class="headerlink" href="#recognition" title="Link to this heading">¶</a></h2>
+<p>Recognition requires a grey-scale or binarized image, a page segmentation for
+that image, and a model file. In particular there is no requirement to use the
+page segmentation algorithm contained in the <code class="docutils literal notranslate"><span class="pre">segment</span></code> subcommand or the
+binarization provided by kraken.</p>
+<p>Multi-script recognition is possible by supplying a script-annotated
+segmentation and a mapping between scripts and models:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>-i<span class="w"> </span>...<span class="w"> </span>...<span class="w"> </span>ocr<span class="w"> </span>-m<span class="w"> </span>Grek:porson.clstm<span class="w"> </span>-m<span class="w"> </span>Latn:antiqua.clstm
+</pre></div>
+</div>
+<p>All polytonic Greek text portions will be recognized using the <cite>porson.clstm</cite>
+model while Latin text will be fed into the <cite>antiqua.clstm</cite> model. It is
+possible to define a fallback model that other text will be fed to:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>kraken<span class="w"> </span>-i<span class="w"> </span>...<span class="w"> </span>...<span class="w"> </span>ocr<span class="w"> </span>-m<span class="w"> </span>...<span class="w"> </span>-m<span class="w"> </span>...<span class="w"> </span>-m<span class="w"> </span>default:porson.clstm
+</pre></div>
+</div>
+<p>It is also possible to disable recognition on a particular script by mapping to
+the special model keyword <cite>ignore</cite>. Ignored lines will still be serialized but
+will not contain any recognition results.</p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="index.html">
+              <img class="logo" src="_static/kraken.png" alt="Logo of kraken"/>
+            </a></p>
+  <div>
+    <h3><a href="index.html">Table of Contents</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">Advanced Usage</a><ul>
+<li><a class="reference internal" href="#input-and-outputs">Input and Outputs</a><ul>
+<li><a class="reference internal" href="#output-formats">Output formats</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#binarization">Binarization</a></li>
+<li><a class="reference internal" href="#page-segmentation">Page Segmentation</a><ul>
+<li><a class="reference internal" href="#baseline-segmentation">Baseline Segmentation</a></li>
+<li><a class="reference internal" href="#legacy-box-segmentation">Legacy Box Segmentation</a></li>
+<li><a class="reference internal" href="#principal-text-direction">Principal Text Direction</a></li>
+<li><a class="reference internal" href="#masking">Masking</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#model-repository">Model Repository</a><ul>
+<li><a class="reference internal" href="#querying-and-model-retrieval">Querying and Model Retrieval</a></li>
+<li><a class="reference internal" href="#publishing">Publishing</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#recognition">Recognition</a></li>
+</ul>
+</li>
+</ul>
+
+  </div><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="index.html" title="previous chapter">kraken</a></li>
+      <li>Next: <a href="ketos.html" title="next chapter">Training</a></li>
+  </ul></li>
+</ul>
+</div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+<h3>Versions</h3>
+<ul>
+  <li><a href="../2.0.0/advanced.html">2.0.0</a></li>
+  <li><a href="../3.0/advanced.html">3.0</a></li>
+  <li><a href="../4.0/advanced.html">4.0</a></li>
+  <li><a href="../4.1/advanced.html">4.1</a></li>
+  <li><a href="../4.2.0/advanced.html">4.2.0</a></li>
+  <li><a href="advanced.html">4.3.0</a></li>
+  <li><a href="../5.0.0/advanced.html">5.0.0</a></li>
+  <li><a href="../5.1/advanced.html">5.1</a></li>
+  <li><a href="../5.2/advanced.html">5.2</a></li>
+  <li><a href="../5.3.0/advanced.html">5.3.0</a></li>
+  <li><a href="../6.0.0/index.html">6.0.0</a></li>
+</ul>
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2015-2026, Benjamin Kiessling.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="_sources/advanced.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

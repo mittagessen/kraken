@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>API Quickstart &#8212; kraken  documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=27fed22d" />
+    <link rel="stylesheet" type="text/css" href="_static/graphviz.css?v=4ae1632d" />
+    <link rel="stylesheet" type="text/css" href="_static/custom.css?v=89a84cc7" />
+    <script src="_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="_static/doctools.js?v=9bcbadda"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <link rel="canonical" href="kraken.re/api.html" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="API reference" href="api_docs.html" />
+    <link rel="prev" title="Training" href="ketos.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="api-quickstart">
+<h1>API Quickstart<a class="headerlink" href="#api-quickstart" title="Link to this heading">¶</a></h1>
+<p>Kraken provides routines which are usable by third party tools to access all
+functionality of the OCR engine. Most functional blocks, binarization,
+segmentation, recognition, and serialization  are encapsulated in one high
+level method each.</p>
+<p>Simple use cases of the API which are mostly useful for debugging purposes are
+contained in the <cite>contrib</cite> directory. In general it is recommended to look at
+this tutorial, these scripts, or the API reference. The command line drivers
+are unnecessarily complex for straightforward applications as they contain lots
+of boilerplate to enable all use cases.</p>
+<section id="basic-concepts">
+<h2>Basic Concepts<a class="headerlink" href="#basic-concepts" title="Link to this heading">¶</a></h2>
+<p>The fundamental modules of the API are similar to the command line drivers.
+Image inputs and outputs are generally <a class="reference external" href="https://python-pillow.org/">Pillow</a>
+objects and numerical outputs numpy arrays.</p>
+<p>Top-level modules implement high level functionality while <code class="xref py py-mod docutils literal notranslate"><span class="pre">kraken.lib</span></code>
+contains loaders and low level methods that usually should not be used if
+access to intermediate results is not required.</p>
+</section>
+<section id="preprocessing-and-segmentation">
+<h2>Preprocessing and Segmentation<a class="headerlink" href="#preprocessing-and-segmentation" title="Link to this heading">¶</a></h2>
+<p>The primary preprocessing function is binarization although depending on the
+particular setup of the pipeline and the models utilized it can be optional.
+For the non-trainable legacy bounding box segmenter binarization is mandatory
+although it is still possible to feed color and grayscale images to the
+recognizer. The trainable baseline segmenter can work with black and white,
+grayscale, and color images, depending on the training data and netork
+configuration utilized; though grayscale and color data are used in almost all
+cases.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">PIL</span><span class="w"> </span><span class="kn">import</span> <span class="n">Image</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">kraken</span><span class="w"> </span><span class="kn">import</span> <span class="n">binarization</span>
+
+<span class="go"># can be any supported image format and mode</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">im</span> <span class="o">=</span> <span class="n">Image</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s1">&#39;foo.png&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">bw_im</span> <span class="o">=</span> <span class="n">binarization</span><span class="o">.</span><span class="n">nlbin</span><span class="p">(</span><span class="n">im</span><span class="p">)</span>
+</pre></div>
+</div>
+<section id="legacy-segmentation">
+<h3>Legacy segmentation<a class="headerlink" href="#legacy-segmentation" title="Link to this heading">¶</a></h3>
+<p>The basic parameter of the legacy segmenter consists just of a b/w image
+object, although some additional parameters exist, largely to change the
+principal text direction (important for column ordering and top-to-bottom
+scripts) and explicit masking of non-text image regions:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">kraken</span><span class="w"> </span><span class="kn">import</span> <span class="n">pageseg</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">seg</span> <span class="o">=</span> <span class="n">pageseg</span><span class="o">.</span><span class="n">segment</span><span class="p">(</span><span class="n">bw_im</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">seg</span>
+<span class="go">{&#39;text_direction&#39;: &#39;horizontal-lr&#39;,</span>
+<span class="go"> &#39;boxes&#39;: [[0, 29, 232, 56],</span>
+<span class="go">           [28, 54, 121, 84],</span>
+<span class="go">           [9, 73, 92, 117],</span>
+<span class="go">           [103, 76, 145, 131],</span>
+<span class="go">           [7, 105, 119, 230],</span>
+<span class="go">           [10, 228, 126, 345],</span>
+<span class="go">           ...</span>
+<span class="go">          ],</span>
+<span class="go"> &#39;script_detection&#39;: False}</span>
+</pre></div>
+</div>
+</section>
+<section id="baseline-segmentation">
+<h3>Baseline segmentation<a class="headerlink" href="#baseline-segmentation" title="Link to this heading">¶</a></h3>
+<p>The baseline segmentation method is based on a neural network that classifies
+image pixels into baselines and regions. Because it is trainable, a
+segmentation model is required in addition to the image to be segmentation and
+it has to be loaded first:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">kraken</span><span class="w"> </span><span class="kn">import</span> <span class="n">blla</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">kraken.lib</span><span class="w"> </span><span class="kn">import</span> <span class="n">vgsl</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model_path</span> <span class="o">=</span> <span class="s1">&#39;path/to/model/file&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span> <span class="o">=</span> <span class="n">vgsl</span><span class="o">.</span><span class="n">TorchVGSLModel</span><span class="o">.</span><span class="n">load_model</span><span class="p">(</span><span class="n">model_path</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Afterwards they can be fed into the segmentation method
+<code class="xref py py-func docutils literal notranslate"><span class="pre">kraken.blla.segment()</span></code> with image objects:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">kraken</span><span class="w"> </span><span class="kn">import</span> <span class="n">blla</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">baseline_seg</span> <span class="o">=</span> <span class="n">blla</span><span class="o">.</span><span class="n">segment</span><span class="p">(</span><span class="n">im</span><span class="p">,</span> <span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">baseline_seg</span>
+<span class="go">{&#39;text_direction&#39;: &#39;horizontal-lr&#39;,</span>
+<span class="go"> &#39;type&#39;: &#39;baselines&#39;,</span>
+<span class="go"> &#39;script_detection&#39;: False,</span>
+<span class="go"> &#39;lines&#39;: [{&#39;script&#39;: &#39;default&#39;,</span>
+<span class="go">            &#39;baseline&#39;: [[471, 1408], [524, 1412], [509, 1397], [1161, 1412], [1195, 1412]],</span>
+<span class="go">            &#39;boundary&#39;: [[471, 1408], [491, 1408], [515, 1385], [562, 1388], [575, 1377], ... [473, 1410]]},</span>
+<span class="go">           ...],</span>
+<span class="go"> &#39;regions&#39;: {&#39;$tip&#39;:[[[536, 1716], ... [522, 1708], [524, 1716], [536, 1716], ...]</span>
+<span class="go">             &#39;$par&#39;: ...</span>
+<span class="go">             &#39;$nop&#39;:  ...}}</span>
+</pre></div>
+</div>
+<p>Optional parameters are largely the same as for the legacy segmenter, i.e. text
+direction and masking.</p>
+<p>Images are automatically converted into the proper mode for recognition, except
+in the case of models trained on binary images as there is a plethora of
+different algorithms available, each with strengths and weaknesses. For most
+material the kraken-provided binarization should be sufficient, though. This
+does not mean that a segmentation model trained on RGB images will have equal
+accuracy for B/W, grayscale, and RGB inputs. Nevertheless the drop in quality
+will often be modest or non-existant in for color models while non-binarized
+inputs to a binary model will cause severe degradation (and a warning to that
+notion).</p>
+<p>Per default segmentation is performed on the CPU although the neural network
+can be run on a GPU with the <cite>device</cite> argument. As the vast majority of the
+processing required is postprocessing the performance gain will most likely
+modest though.</p>
+</section>
+</section>
+<section id="recognition">
+<h2>Recognition<a class="headerlink" href="#recognition" title="Link to this heading">¶</a></h2>
+<p>The character recognizer is equally based on a neural network which has to be
+loaded first.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">kraken.lib</span><span class="w"> </span><span class="kn">import</span> <span class="n">models</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">rec_model_path</span> <span class="o">=</span> <span class="s1">&#39;/path/to/recognition/model&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">load_any</span><span class="p">(</span><span class="n">rec_model_path</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Afterwards, given an image, a segmentation and the model one can perform text
+recognition. The code is identical for both legacy and baseline segmentations.
+Like for segmentation input images are auto-converted to the correct color
+mode, except in the case of binary models and a warning will be raised if there
+is a mismatch for binary input models.</p>
+<p>There are two methods for recognition, a basic single model call
+<code class="xref py py-func docutils literal notranslate"><span class="pre">kraken.rpred.rpred()</span></code> and a multi-model recognizer
+<code class="xref py py-func docutils literal notranslate"><span class="pre">kraken.rpred.mm_rpred()</span></code>. The latter is useful for recognizing
+multi-scriptal documents, i.e. applying different models to different parts of
+a document.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">kraken</span><span class="w"> </span><span class="kn">import</span> <span class="n">rpred</span>
+<span class="go"># single model recognition</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">pred_it</span> <span class="o">=</span> <span class="n">rpred</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">im</span><span class="p">,</span> <span class="n">baseline_seg</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">pred_it</span><span class="p">:</span>
+<span class="go">        print(record)</span>
+</pre></div>
+</div>
+<p>The output isn’t just a sequence of characters but a record object containing
+the character prediction, cuts (approximate locations), and confidences.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">record</span><span class="o">.</span><span class="n">cuts</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">record</span><span class="o">.</span><span class="n">prediction</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">record</span><span class="o">.</span><span class="n">confidences</span>
+</pre></div>
+</div>
+<p>it is also possible to access the original line information:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># for baselines</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="n">record</span><span class="o">.</span><span class="n">type</span>
+<span class="s1">&#39;baselines&#39;</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="n">record</span><span class="o">.</span><span class="n">line</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="n">record</span><span class="o">.</span><span class="n">baseline</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="n">record</span><span class="o">.</span><span class="n">script</span>
+
+<span class="c1"># for box lines</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="n">record</span><span class="o">.</span><span class="n">type</span>
+<span class="s1">&#39;box&#39;</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="n">record</span><span class="o">.</span><span class="n">line</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="n">record</span><span class="o">.</span><span class="n">script</span>
+</pre></div>
+</div>
+<p>Sometimes the undecoded raw output of the network is required. The <span class="math notranslate nohighlight">\(C
+\times W\)</span> softmax output matrix is accessible as an attribute on the
+<code class="xref py py-class docutils literal notranslate"><span class="pre">kraken.lib.models.TorchSeqRecognizer</span></code> after each step of the <code class="xref py py-func docutils literal notranslate"><span class="pre">kraken.rpred.rpred()</span></code> iterator. To get a mapping
+from the label space <span class="math notranslate nohighlight">\(C\)</span> the network operates in to Unicode code points a
+codec is used. An arbitrary sequence of labels can generate an arbitrary number
+of Unicode code points although usually the relation is one-to-one.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">pred_it</span> <span class="o">=</span> <span class="n">rpred</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">im</span><span class="p">,</span> <span class="n">baseline_seg</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">next</span><span class="p">(</span><span class="n">pred_it</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="o">.</span><span class="n">output</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="o">.</span><span class="n">codec</span><span class="o">.</span><span class="n">l2c</span>
+<span class="go">{&#39;\x01&#39;: &#39; &#39;,</span>
+<span class="go"> &#39;\x02&#39;: &#39;&quot;&#39;,</span>
+<span class="go"> &#39;\x03&#39;: &quot;&#39;&quot;,</span>
+<span class="go"> &#39;\x04&#39;: &#39;(&#39;,</span>
+<span class="go"> &#39;\x05&#39;: &#39;)&#39;,</span>
+<span class="go"> &#39;\x06&#39;: &#39;-&#39;,</span>
+<span class="go"> &#39;\x07&#39;: &#39;/&#39;,</span>
+<span class="go"> ...</span>
+<span class="go">}</span>
+</pre></div>
+</div>
+<p>There are several different ways to convert the output matrix to a sequence of
+labels that can be decoded into a character sequence. These are contained in
+<a class="reference internal" href="api_docs.html#module-kraken.lib.ctc_decoder" title="kraken.lib.ctc_decoder"><code class="xref py py-mod docutils literal notranslate"><span class="pre">kraken.lib.ctc_decoder</span></code></a> with
+<a class="reference internal" href="api_docs.html#kraken.lib.ctc_decoder.greedy_decoder" title="kraken.lib.ctc_decoder.greedy_decoder"><code class="xref py py-func docutils literal notranslate"><span class="pre">kraken.lib.ctc_decoder.greedy_decoder()</span></code></a> being the default.</p>
+</section>
+<section id="xml-parsing">
+<h2>XML Parsing<a class="headerlink" href="#xml-parsing" title="Link to this heading">¶</a></h2>
+<p>Sometimes it is desired to take the data in an existing XML serialization
+format like PageXML or ALTO and apply an OCR function on it. The
+<a class="reference internal" href="api_docs.html#module-kraken.lib.xml" title="kraken.lib.xml"><code class="xref py py-mod docutils literal notranslate"><span class="pre">kraken.lib.xml</span></code></a> module includes parsers extracting information into data
+structures processable with minimal transformtion by the functional blocks:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">kraken.lib</span><span class="w"> </span><span class="kn">import</span> <span class="n">xml</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">alto_doc</span> <span class="o">=</span> <span class="s1">&#39;/path/to/alto&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">xml</span><span class="o">.</span><span class="n">parse_alto</span><span class="p">(</span><span class="n">alto_doc</span><span class="p">)</span>
+<span class="go">{&#39;image&#39;: &#39;/path/to/image/file&#39;,</span>
+<span class="go"> &#39;type&#39;: &#39;baselines&#39;,</span>
+<span class="go"> &#39;lines&#39;: [{&#39;baseline&#39;: [(24, 2017), (25, 2078)],</span>
+<span class="go">            &#39;boundary&#39;: [(69, 2016), (70, 2077), (20, 2078), (19, 2017)],</span>
+<span class="go">            &#39;text&#39;: &#39;&#39;,</span>
+<span class="go">            &#39;script&#39;: &#39;default&#39;},</span>
+<span class="go">           {&#39;baseline&#39;: [(79, 2016), (79, 2041)],</span>
+<span class="go">            &#39;boundary&#39;: [(124, 2016), (124, 2041), (74, 2041), (74, 2016)],</span>
+<span class="go">            &#39;text&#39;: &#39;&#39;,</span>
+<span class="go">            &#39;script&#39;: &#39;default&#39;}, ...],</span>
+<span class="go"> &#39;regions&#39;: {&#39;Image/Drawing/Figure&#39;: [[(-5, 3398), (207, 3398), (207, 2000), (-5, 2000)],</span>
+<span class="go">                                      [(253, 3292), (668, 3292), (668, 3455), (253, 3455)],</span>
+<span class="go">                                      [(216, -4), (1015, -4), (1015, 534), (216, 534)]],</span>
+<span class="go">             &#39;Handwritten text&#39;: [[(2426, 3367), (2483, 3367), (2483, 3414), (2426, 3414)],</span>
+<span class="go">                                  [(1824, 3437), (2072, 3437), (2072, 3514), (1824, 3514)]],</span>
+<span class="go">             ...}</span>
+<span class="go">}</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">page_doc</span> <span class="o">=</span> <span class="s1">&#39;/path/to/page&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">xml</span><span class="o">.</span><span class="n">parse_page</span><span class="p">(</span><span class="n">page_doc</span><span class="p">)</span>
+<span class="go">{&#39;image&#39;: &#39;/path/to/image/file&#39;,</span>
+<span class="go"> &#39;type&#39;: &#39;baselines&#39;,</span>
+<span class="go"> &#39;lines&#39;: [{&#39;baseline&#39;: [(24, 2017), (25, 2078)],</span>
+<span class="go">            &#39;boundary&#39;: [(69, 2016), (70, 2077), (20, 2078), (19, 2017)],</span>
+<span class="go">            &#39;text&#39;: &#39;&#39;,</span>
+<span class="go">            &#39;script&#39;: &#39;default&#39;},</span>
+<span class="go">           {&#39;baseline&#39;: [(79, 2016), (79, 2041)],</span>
+<span class="go">            &#39;boundary&#39;: [(124, 2016), (124, 2041), (74, 2041), (74, 2016)],</span>
+<span class="go">            &#39;text&#39;: &#39;&#39;,</span>
+<span class="go">            &#39;script&#39;: &#39;default&#39;}, ...],</span>
+<span class="go"> &#39;regions&#39;: {&#39;Image/Drawing/Figure&#39;: [[(-5, 3398), (207, 3398), (207, 2000), (-5, 2000)],</span>
+<span class="go">                                      [(253, 3292), (668, 3292), (668, 3455), (253, 3455)],</span>
+<span class="go">                                      [(216, -4), (1015, -4), (1015, 534), (216, 534)]],</span>
+<span class="go">             &#39;Handwritten text&#39;: [[(2426, 3367), (2483, 3367), (2483, 3414), (2426, 3414)],</span>
+<span class="go">                                  [(1824, 3437), (2072, 3437), (2072, 3514), (1824, 3514)]],</span>
+<span class="go">             ...}</span>
+</pre></div>
+</div>
+</section>
+<section id="serialization">
+<h2>Serialization<a class="headerlink" href="#serialization" title="Link to this heading">¶</a></h2>
+<p>The serialization module can be used to transform the <code class="xref py py-class docutils literal notranslate"><span class="pre">ocr_records</span></code> returned by the prediction iterator into a text
+based (most often XML) format for archival. The module renders <a class="reference external" href="https://jinja.palletsprojects.com">jinja2</a> templates in <cite>kraken/templates</cite> through
+the <code class="xref py py-func docutils literal notranslate"><span class="pre">kraken.serialization.serialize()</span></code> function.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">kraken.lib</span><span class="w"> </span><span class="kn">import</span> <span class="n">serialization</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="n">records</span> <span class="o">=</span> <span class="p">[</span><span class="n">record</span> <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">pred_it</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">alto</span> <span class="o">=</span> <span class="n">serialization</span><span class="o">.</span><span class="n">serialize</span><span class="p">(</span><span class="n">records</span><span class="p">,</span> <span class="n">image_name</span><span class="o">=</span><span class="s1">&#39;path/to/image&#39;</span><span class="p">,</span> <span class="n">image_size</span><span class="o">=</span><span class="n">im</span><span class="o">.</span><span class="n">size</span><span class="p">,</span> <span class="n">template</span><span class="o">=</span><span class="s1">&#39;alto&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s1">&#39;output.xml&#39;</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">fp</span><span class="p">:</span>
+<span class="go">        fp.write(alto)</span>
+</pre></div>
+</div>
+</section>
+<section id="training">
+<h2>Training<a class="headerlink" href="#training" title="Link to this heading">¶</a></h2>
+<p>There are catch-all constructors for quickly setting up
+<a href="#id1"><span class="problematic" id="id2">:cls:`kraken.lib.train.KrakenTrainer`</span></a> instances for all training needs. They
+largely map the comand line utils <cite>ketos train</cite> and <cite>ketos segtrain</cite> to a
+programmatic interface. The arguments are identical, apart from a
+differentiation between general arguments (data sources and setup, file names,
+devices, …) and hyperparameters (optimizers, learning rate schedules,
+augmentation.</p>
+<p>Training a recognition model from a number of xml files in ALTO or PAGE XML:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">kraken.lib.train</span><span class="w"> </span><span class="kn">import</span> <span class="n">KrakenTrainer</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">ground_truth</span> <span class="o">=</span> <span class="n">glob</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="s1">&#39;training/*.xml&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">training_files</span> <span class="o">=</span> <span class="n">ground_truth</span><span class="p">[:</span><span class="mi">250</span><span class="p">]</span> <span class="c1"># training data is shuffled internally</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">evaluation_files</span> <span class="o">=</span> <span class="n">ground_truth</span><span class="p">[</span><span class="mi">250</span><span class="p">:]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">trainer</span> <span class="o">=</span> <span class="n">KrakenTrainer</span><span class="o">.</span><span class="n">recognition_train_gen</span><span class="p">(</span><span class="n">training_data</span><span class="o">=</span><span class="n">training_files</span><span class="p">,</span> <span class="n">evaluation_data</span><span class="o">=</span><span class="n">evaluation_files</span><span class="p">,</span> <span class="n">format_type</span><span class="o">=</span><span class="s1">&#39;xml&#39;</span><span class="p">,</span> <span class="n">augment</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">trainer</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>Likewise for a baseline and region segmentation model:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">kraken.lib.train</span><span class="w"> </span><span class="kn">import</span> <span class="n">KrakenTrainer</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">ground_truth</span> <span class="o">=</span> <span class="n">glob</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="s1">&#39;training/*.xml&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">training_files</span> <span class="o">=</span> <span class="n">ground_truth</span><span class="p">[:</span><span class="mi">250</span><span class="p">]</span> <span class="c1"># training data is shuffled internally</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">evaluation_files</span> <span class="o">=</span> <span class="n">ground_truth</span><span class="p">[</span><span class="mi">250</span><span class="p">:]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">trainer</span> <span class="o">=</span> <span class="n">KrakenTrainer</span><span class="o">.</span><span class="n">segmentation_train_gen</span><span class="p">(</span><span class="n">training_data</span><span class="o">=</span><span class="n">training_files</span><span class="p">,</span> <span class="n">evaluation_data</span><span class="o">=</span><span class="n">evaluation_files</span><span class="p">,</span> <span class="n">format_type</span><span class="o">=</span><span class="s1">&#39;xml&#39;</span><span class="p">,</span> <span class="n">augment</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">trainer</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>Both constructing the trainer object and the training itself can take quite a
+bit of time. The constructor provides a callback for each iterative process
+during object initialization that is intended to set up a progress bar:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">kraken.lib.train</span><span class="w"> </span><span class="kn">import</span> <span class="n">KrakenTrainer</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="k">def</span><span class="w"> </span><span class="nf">progress_callback</span><span class="p">(</span><span class="n">string</span><span class="p">,</span> <span class="n">length</span><span class="p">):</span>
+<span class="go">        print(f&#39;starting process &quot;{string}&quot; of length {length}&#39;)</span>
+<span class="go">        return lambda: print(&#39;.&#39;, end=&#39;&#39;)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">ground_truth</span> <span class="o">=</span> <span class="n">glob</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="s1">&#39;training/*.xml&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">training_files</span> <span class="o">=</span> <span class="n">ground_truth</span><span class="p">[:</span><span class="mi">25</span><span class="p">]</span> <span class="c1"># training data is shuffled internally</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">evaluation_files</span> <span class="o">=</span> <span class="n">ground_truth</span><span class="p">[</span><span class="mi">25</span><span class="p">:</span><span class="mi">95</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">trainer</span> <span class="o">=</span> <span class="n">KrakenTrainer</span><span class="o">.</span><span class="n">segmentation_train_gen</span><span class="p">(</span><span class="n">training_data</span><span class="o">=</span><span class="n">training_files</span><span class="p">,</span> <span class="n">evaluation_data</span><span class="o">=</span><span class="n">evaluation_files</span><span class="p">,</span> <span class="n">format_type</span><span class="o">=</span><span class="s1">&#39;xml&#39;</span><span class="p">,</span> <span class="n">progress_callback</span><span class="o">=</span><span class="n">progress_callback</span><span class="p">,</span> <span class="n">augment</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="go">starting process &quot;Building training set&quot; of length 25</span>
+<span class="go">.........................</span>
+<span class="go">starting process &quot;Building validation set&quot; of length 70</span>
+<span class="go">......................................................................</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">trainer</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>Executing the trainer object has two callbacks as arguments, one called after
+each iteration and one returning the evaluation metrics after the end of each
+epoch:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">kraken.lib.train</span><span class="w"> </span><span class="kn">import</span> <span class="n">KrakenTrainer</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">ground_truth</span> <span class="o">=</span> <span class="n">glob</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="s1">&#39;training/*.xml&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">training_files</span> <span class="o">=</span> <span class="n">ground_truth</span><span class="p">[:</span><span class="mi">250</span><span class="p">]</span> <span class="c1"># training data is shuffled internally</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">evaluation_files</span> <span class="o">=</span> <span class="n">ground_truth</span><span class="p">[</span><span class="mi">250</span><span class="p">:]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">trainer</span> <span class="o">=</span> <span class="n">KrakenTrainer</span><span class="o">.</span><span class="n">segmentation_train_gen</span><span class="p">(</span><span class="n">training_data</span><span class="o">=</span><span class="n">training_files</span><span class="p">,</span> <span class="n">evaluation_data</span><span class="o">=</span><span class="n">evaluation_files</span><span class="p">,</span> <span class="n">format_type</span><span class="o">=</span><span class="s1">&#39;xml&#39;</span><span class="p">,</span> <span class="n">augment</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">def</span><span class="w"> </span><span class="nf">_update_progress</span><span class="p">():</span>
+<span class="go">        print(&#39;.&#39;, end=&#39;&#39;)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">def</span><span class="w"> </span><span class="nf">_print_eval</span><span class="p">(</span><span class="n">epoch</span><span class="p">,</span> <span class="n">accuracy</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="go">        print(accuracy)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">trainer</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">_print_eval</span><span class="p">,</span> <span class="n">_update_progress</span><span class="p">)</span>
+<span class="go">.........................0.0</span>
+<span class="go">.........................0.0</span>
+<span class="go">.........................0.0</span>
+<span class="go">.........................0.0</span>
+<span class="go">.........................0.0</span>
+<span class="go">...</span>
+</pre></div>
+</div>
+<p>The metrics differ for recognition
+(<code class="xref py py-func docutils literal notranslate"><span class="pre">kraken.lib.train.recognition_evaluator_fn()</span></code>) and segmentation
+(<code class="xref py py-func docutils literal notranslate"><span class="pre">kraken.lib.train.baseline_label_evaluator_fn()</span></code>).</p>
+<p>Depending on the stopping method chosen the last model file might not be the
+one with the best accuracy. Per default early stopping is used which aborts
+training after a certain number of epochs without improvement. In that case the
+best model and evaluation loss can be determined through:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">trainer</span><span class="o">.</span><span class="n">stopper</span><span class="o">.</span><span class="n">best_epoch</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">trainer</span><span class="o">.</span><span class="n">stopper</span><span class="o">.</span><span class="n">best_loss</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">best_model_path</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">trainer</span><span class="o">.</span><span class="n">filename_prefix</span><span class="si">}</span><span class="s1">_</span><span class="si">{</span><span class="n">trainer</span><span class="o">.</span><span class="n">stopper</span><span class="o">.</span><span class="n">best_epoch</span><span class="si">}</span><span class="s1">.mlmodel&#39;</span>
+</pre></div>
+</div>
+<p>This is only a small subset of the training functionality. It is suggested to
+have a closer look at the command line parameters for features as transfer
+learning, region and baseline filtering, training continuation, and so on.</p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="index.html">
+              <img class="logo" src="_static/kraken.png" alt="Logo of kraken"/>
+            </a></p>
+  <div>
+    <h3><a href="index.html">Table of Contents</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">API Quickstart</a><ul>
+<li><a class="reference internal" href="#basic-concepts">Basic Concepts</a></li>
+<li><a class="reference internal" href="#preprocessing-and-segmentation">Preprocessing and Segmentation</a><ul>
+<li><a class="reference internal" href="#legacy-segmentation">Legacy segmentation</a></li>
+<li><a class="reference internal" href="#baseline-segmentation">Baseline segmentation</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#recognition">Recognition</a></li>
+<li><a class="reference internal" href="#xml-parsing">XML Parsing</a></li>
+<li><a class="reference internal" href="#serialization">Serialization</a></li>
+<li><a class="reference internal" href="#training">Training</a></li>
+</ul>
+</li>
+</ul>
+
+  </div><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="ketos.html" title="previous chapter">Training</a></li>
+      <li>Next: <a href="api_docs.html" title="next chapter">API reference</a></li>
+  </ul></li>
+</ul>
+</div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+<h3>Versions</h3>
+<ul>
+  <li><a href="../2.0.0/api.html">2.0.0</a></li>
+  <li><a href="api.html">3.0</a></li>
+  <li><a href="../4.0/api.html">4.0</a></li>
+  <li><a href="../4.1/api.html">4.1</a></li>
+  <li><a href="../4.2.0/api.html">4.2.0</a></li>
+  <li><a href="../4.3.0/api.html">4.3.0</a></li>
+  <li><a href="../5.0.0/api.html">5.0.0</a></li>
+  <li><a href="../5.1/api.html">5.1</a></li>
+  <li><a href="../5.2/api.html">5.2</a></li>
+  <li><a href="../5.3.0/api.html">5.3.0</a></li>
+  <li><a href="../6.0.0/index.html">6.0.0</a></li>
+</ul>
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2015-2026, Benjamin Kiessling.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="_sources/api.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Recognition Training &#8212; kraken  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=27fed22d" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
+    <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=89a84cc7" />
+    <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="canonical" href="kraken.re/training/rectrain.html" />
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="recognition-training">
+<span id="rectrain"></span><h1>Recognition Training<a class="headerlink" href="#recognition-training" title="Link to this heading">¶</a></h1>
+<p>This page describes the recognition training command line utility in depth. For
+a gentle introduction on model training please refer to the <a class="reference internal" href="../tutorials/training.html#training"><span class="std std-ref">tutorial</span></a>.</p>
+<p>The main <code class="docutils literal notranslate"><span class="pre">ketos</span></code> command has some common options that configure how most of
+its sub-commands use computational resources:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>option</p></th>
+<th class="head"><p>action</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>-d, --device</p></td>
+<td><p>Select device to use (cpu, cuda:0, cuda:1,…). GPU acceleration requires CUDA.</p></td>
+</tr>
+<tr class="row-odd"><td><p>--precision</p></td>
+<td><p>The precision to run neural network operations in. On GPU, bfloat16 can lead to considerable speedup.</p></td>
+</tr>
+<tr class="row-even"><td><p>--workers</p></td>
+<td><p>Number of workers processes to spawn for data loading, transformation, or compilation.</p></td>
+</tr>
+<tr class="row-odd"><td><p>--threads</p></td>
+<td><p>Number of threads to use for intra-op parallelization like OpenMP, BLAS, …</p></td>
+</tr>
+</tbody>
+</table>
+<section id="best-practices">
+<h2>Best practices<a class="headerlink" href="#best-practices" title="Link to this heading">¶</a></h2>
+<p>Here is a list of best practices in recognition model training that will be
+helpful both for experienced users and beginners having read through the
+tutorial:</p>
+<ul class="simple">
+<li><p>The default architecture works well for decently sized datasets but is limited in its generalization capabilities. Generalized model that are intended to recognize very diverse material or a number of different languages can benefit from scaling up the depth and width of the network using the built-in <a class="reference internal" href="../advanced/vgsl.html#vgsl"><span class="std std-ref">VGSL</span></a> language.</p></li>
+<li><p>Use precompiled binary datasets and put them in a place where they can be memory mapped during training (local storage, not NFS or similar).</p></li>
+<li><p>Fixed splits in precompiled datasets increase memory use and slow down startup as the dataset needs to be loaded once into the dataset. It is recommended to create explicit splits by compiling source XML files into separate datasets.</p></li>
+<li><p>Use the <code class="docutils literal notranslate"><span class="pre">--logger</span></code> flag to track your training metrics across experiments using Tensorboard.</p></li>
+<li><p>If the network doesn’t converge before the early stopping aborts training, increase <code class="docutils literal notranslate"><span class="pre">--min-epochs</span></code>. Training losses are logged on the progress bar and should decrease during training. Stable or oscillating losses can point to erroneous data preparation or wrong hyperparameter choice.</p></li>
+<li><p>Use the flag <code class="docutils literal notranslate"><span class="pre">--augment</span></code> to activate data augmentation.</p></li>
+<li><p>Increase the amount of <code class="docutils literal notranslate"><span class="pre">--workers</span></code> to speedup data loading. This is essential when you use the <code class="docutils literal notranslate"><span class="pre">--augment</span></code> option.</p></li>
+<li><p>When using an Nvidia GPU, set the <code class="docutils literal notranslate"><span class="pre">--precision</span></code> option to <code class="docutils literal notranslate"><span class="pre">bf16-mixed</span></code> to use automatic mixed precision (AMP). This can provide significant speedup without any loss in accuracy.</p></li>
+<li><p>Use option <code class="docutils literal notranslate"><span class="pre">-B</span></code> to scale batch size until GPU utilization reaches 100%. When using a larger batch size, it is recommended to use option -r to scale the learning rate by the square root of the batch size (1e-3 * sqrt(batch_size)).</p></li>
+<li><p>When fine-tuning, it is recommended to use <code class="docutils literal notranslate"><span class="pre">new</span></code> mode not <code class="docutils literal notranslate"><span class="pre">union</span></code> as the network will rapidly unlearn missing labels in the new dataset.</p></li>
+<li><p>If the new dataset is fairly dissimilar or your base model has been pretrained with ketos pretrain, use <code class="docutils literal notranslate"><span class="pre">--warmup</span></code> in conjunction with <code class="docutils literal notranslate"><span class="pre">--freeze-backbone</span></code> for one 1 or 2 epochs.</p></li>
+<li><p>Upload your models to the <a class="reference internal" href="../advanced/repo.html#repo"><span class="std std-ref">model repository</span></a>.</p></li>
+</ul>
+</section>
+<section id="training-data-formats">
+<h2>Training data formats<a class="headerlink" href="#training-data-formats" title="Link to this heading">¶</a></h2>
+<p>Recognition training supports the XML formats described in the <a class="reference internal" href="ketos.html#ketos-format"><span class="std std-ref">data
+format</span></a> section, compiled binary dataset files created from XML
+files, and a legacy format of line strip images with separate transcription
+text files. For performance reasons it is recommended to use binary datasets
+whenever possible.</p>
+<section id="legacy-line-strip-datasets">
+<h3>Legacy Line Strip Datasets<a class="headerlink" href="#legacy-line-strip-datasets" title="Link to this heading">¶</a></h3>
+<p>Before the advent of trainable segmenters using the baseline paradigm a common
+format for text recognition training consisted of individual line images cut
+out of the page and parallel text files containing the transcription, sharing a
+common file name prefix. An example of such a dataset can be found <a class="reference external" href="https://github.com/chreul/OCR_Testdata_EarlyPrintedBooks">here</a>.</p>
+<p>Kraken still supports training models from data in this format, albeit the
+models trained on this kind of data are not compatible with baseline
+segmentation so little is to be gained using such datasets.</p>
+<p>Files are expected to share a prefix until the last extension of the image file
+with the corresponding ground truth transcription having a <code class="docutils literal notranslate"><span class="pre">.gt.txt</span></code> suffix,
+for example <code class="docutils literal notranslate"><span class="pre">line_img_0.train.png`</span></code> and <code class="docutils literal notranslate"><span class="pre">line_img_0.train.gt.txt</span></code>. To
+enable this legacy format use the <code class="docutils literal notranslate"><span class="pre">path</span></code> value with the <code class="docutils literal notranslate"><span class="pre">--format-type</span></code>
+option as with other support formats.</p>
+</section>
+</section>
+<section id="training">
+<h2>Training<a class="headerlink" href="#training" title="Link to this heading">¶</a></h2>
+<p>The training utility allows training of <a class="reference internal" href="../advanced/vgsl.html#vgsl"><span class="std std-ref">VGSL</span></a> specified models
+both from scratch and from existing models. Here are its most important command
+line options:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>option</p></th>
+<th class="head"><p>action</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>-o, --output</p></td>
+<td><p>Output model file prefix. Defaults to model.</p></td>
+</tr>
+<tr class="row-odd"><td><p>-s, --spec</p></td>
+<td><p>VGSL spec of the network to train. CTC layer will be added automatically. default: [1,48,0,1 Cr3,3,32 Do0.1,2 Mp2,2 Cr3,3,64 Do0.1,2 Mp2,2 S1(1x12)1,3 Lbx100 Do]</p></td>
+</tr>
+<tr class="row-even"><td><p>-a, --append</p></td>
+<td><p>Removes layers before argument and then appends spec. Only works when loading an existing model</p></td>
+</tr>
+<tr class="row-odd"><td><p>-i, --load</p></td>
+<td><p>Load existing file to continue training</p></td>
+</tr>
+<tr class="row-even"><td><p>-F, --savefreq</p></td>
+<td><p>Model save frequency in epochs during training</p></td>
+</tr>
+<tr class="row-odd"><td><p>-q, --quit</p></td>
+<td><p>Stop condition for training. Set to <cite>early</cite> for early stopping (default) or <cite>fixed</cite> for fixed number of epochs.</p></td>
+</tr>
+<tr class="row-even"><td><p>-N, --epochs</p></td>
+<td><p>Number of epochs to train for.</p></td>
+</tr>
+<tr class="row-odd"><td><p>--min-epochs</p></td>
+<td><p>Minimum number of epochs to train for when using early stopping.</p></td>
+</tr>
+<tr class="row-even"><td><p>--lag</p></td>
+<td><p>Number of epochs to wait before stopping training without improvement. Only used when using early stopping.</p></td>
+</tr>
+<tr class="row-odd"><td><p>--optimizer</p></td>
+<td><p>Select optimizer (Adam, AdamW, SGD, RMSprop).</p></td>
+</tr>
+<tr class="row-even"><td><p>-r, --lrate</p></td>
+<td><p>Learning rate  [default: 0.001]</p></td>
+</tr>
+<tr class="row-odd"><td><p>-m, --momentum</p></td>
+<td><p>Momentum used with SGD optimizer. Ignored otherwise.</p></td>
+</tr>
+<tr class="row-even"><td><p>-w, --weight-decay</p></td>
+<td><p>Weight decay.</p></td>
+</tr>
+<tr class="row-odd"><td><p>--schedule</p></td>
+<td><p>Sets the learning rate scheduler. May be either constant, 1cycle, exponential, cosine, step, or reduceonplateau. For 1cycle the cycle length is determined by the <cite>–epoch</cite> option.</p></td>
+</tr>
+<tr class="row-even"><td><p>-p, --partition</p></td>
+<td><p>Ground truth data partition ratio between train/validation set</p></td>
+</tr>
+<tr class="row-odd"><td><p>-u, --normalization</p></td>
+<td><p>Ground truth Unicode normalization. One of NFC, NFKC, NFD, NFKD.</p></td>
+</tr>
+<tr class="row-even"><td><p>-c, --codec</p></td>
+<td><p>Load a codec JSON definition (invalid if loading existing model)</p></td>
+</tr>
+<tr class="row-odd"><td><p>--resize</p></td>
+<td><p>Codec/output layer resizing option. If set to <cite>union</cite> code points will be added, <cite>new</cite> will set the layer to match exactly the training data, <cite>fail</cite> will abort if training data and model codec do not match. Only valid when refining an existing model.</p></td>
+</tr>
+<tr class="row-even"><td><p>-n, --reorder / --no-reorder</p></td>
+<td><p>Reordering of code points to display order.</p></td>
+</tr>
+<tr class="row-odd"><td><p>-t, --training-files</p></td>
+<td><p>File(s) with additional paths to training data. Used to enforce an explicit train/validation set split and deal with training sets with more lines than the command line can process. Can be used more than once.</p></td>
+</tr>
+<tr class="row-even"><td><p>-e, --evaluation-files</p></td>
+<td><p>File(s) with paths to evaluation data. Overrides the <cite>-p</cite> parameter.</p></td>
+</tr>
+<tr class="row-odd"><td><p>-f, --format-type</p></td>
+<td><p>Sets the training and evaluation data format. Valid choices are ‘path’, ‘xml’ (default), ‘alto’, ‘page’, or binary. In <cite>alto</cite>, <cite>page</cite>, and xml mode all data is extracted from XML files containing both baselines and a link to source images. In <cite>path</cite> mode arguments are image files sharing a prefix up to the last extension with <cite>.gt.txt</cite> text files containing the transcription. In binary mode files are datasets files containing pre-extracted text lines.</p></td>
+</tr>
+<tr class="row-even"><td><p>--augment / --no-augment</p></td>
+<td><p>Enables/disables data augmentation.</p></td>
+</tr>
+</tbody>
+</table>
+<section id="from-scratch">
+<h3>From Scratch<a class="headerlink" href="#from-scratch" title="Link to this heading">¶</a></h3>
+<p>The absolute minimal example to train a new recognition model from a number of
+ALTO or PAGE XML documents is similar to the segmentation training:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>train<span class="w"> </span>-f<span class="w"> </span>xml<span class="w"> </span>training_data/*.xml
+</pre></div>
+</div>
+<p>Training will continue until the validation metric does not improve anymore and
+the best model (among intermediate results) will be saved in the current
+directory; this approach is called early stopping.</p>
+<p>In some cases changing the network architecture might be useful. One such
+example would be material that is not well recognized in the grayscale domain,
+as the default architecture definition converts images into grayscale. The
+input definition can be changed quite easily to train on color data (RGB) instead:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>train<span class="w"> </span>-f<span class="w"> </span>page<span class="w"> </span>-s<span class="w"> </span><span class="s1">&#39;[1,120,0,3 Cr3,13,32 Do0.1,2 Mp2,2 Cr3,13,32 Do0.1,2 Mp2,2 Cr3,9,64 Do0.1,2 Mp2,2 Cr3,9,64 Do0.1,2 S1(1x0)1,3 Lbx200 Do0.1,2 Lbx200 Do0.1,2 Lbx200 Do]]&#39;</span><span class="w"> </span>syr/*.xml
+</pre></div>
+</div>
+<p>Complete documentation for the network description language can be found on the
+<a class="reference internal" href="../advanced/vgsl.html#vgsl"><span class="std std-ref">VGSL</span></a> page.</p>
+<p>Sometimes the early stopping default parameters might produce suboptimal
+results such as stopping training too soon, for example when training</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>train<span class="w"> </span>-f<span class="w"> </span>page<span class="w"> </span>--lag<span class="w"> </span><span class="m">10</span><span class="w"> </span>syr/*.xml
+</pre></div>
+</div>
+<p>To switch optimizers from Adam to any other supported algorithm just set the
+option:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>train<span class="w"> </span>--optimizer<span class="w"> </span>SGD<span class="w"> </span>syr/*.png
+</pre></div>
+</div>
+<p>It is possible to resume training from a previously saved model:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>train<span class="w"> </span>-i<span class="w"> </span>model_25.mlmodel<span class="w"> </span>syr/*.png
+</pre></div>
+</div>
+<p>A good configuration for a small precompiled print dataset and GPU acceleration
+would be:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>-d<span class="w"> </span>cuda<span class="w"> </span>train<span class="w"> </span>-f<span class="w"> </span>binary<span class="w"> </span>dataset.arrow
+</pre></div>
+</div>
+<p>A better configuration for large and complicated datasets such as handwritten texts:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>--workers<span class="w"> </span><span class="m">4</span><span class="w"> </span>-d<span class="w"> </span>cuda<span class="w"> </span>train<span class="w"> </span>--augment-f<span class="w"> </span>binary<span class="w"> </span>--min-epochs<span class="w"> </span><span class="m">20</span><span class="w"> </span>-w<span class="w"> </span><span class="m">0</span><span class="w"> </span>-s<span class="w"> </span><span class="s1">&#39;[1,120,0,1 Cr3,13,32 Do0.1,2 Mp2,2 Cr3,13,32 Do0.1,2 Mp2,2 Cr3,9,64 Do0.1,2 Mp2,2 Cr3,9,64 Do0.1,2 S1(1x0)1,3 Lbx200 Do0.1,2 Lbx200 Do.1,2 Lbx200 Do]&#39;</span><span class="w"> </span>-r<span class="w"> </span><span class="m">0</span>.0001<span class="w"> </span>dataset_large.arrow
+</pre></div>
+</div>
+<p>This configuration is slower to train and often requires a couple of epochs to
+output any sensible text at all. Therefore we tell ketos to train for at least
+20 epochs so the early stopping algorithm doesn’t prematurely interrupt the
+training process.</p>
+</section>
+<section id="fine-tuning">
+<h3>Fine Tuning<a class="headerlink" href="#fine-tuning" title="Link to this heading">¶</a></h3>
+<p>Fine tuning an existing model for another typeface or new characters is also
+possible with the same syntax as resuming regular training:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>train<span class="w"> </span>-f<span class="w"> </span>page<span class="w"> </span>-i<span class="w"> </span>model_best.mlmodel<span class="w"> </span>syr/*.xml
+</pre></div>
+</div>
+<p>The caveat is that the alphabet of the base model and training data have to be
+an exact match. Otherwise an error will be raised:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>train<span class="w"> </span>-i<span class="w"> </span>model_5.mlmodel<span class="w"> </span>kamil/*.xml
+<span class="go">Building training set  [####################################]  100%</span>
+<span class="go">Building validation set  [####################################]  100%</span>
+<span class="go">[0.8616] alphabet mismatch {&#39;~&#39;, &#39;»&#39;, &#39;8&#39;, &#39;9&#39;, &#39;ـ&#39;}</span>
+<span class="go">Network codec not compatible with training set</span>
+<span class="go">[0.8620] Training data and model codec alphabets mismatch: {&#39;ٓ&#39;, &#39;؟&#39;, &#39;!&#39;, &#39;ص&#39;, &#39;،&#39;, &#39;ذ&#39;, &#39;ة&#39;, &#39;ي&#39;, &#39;و&#39;, &#39;ب&#39;, &#39;ز&#39;, &#39;ح&#39;, &#39;غ&#39;, &#39;~&#39;, &#39;ف&#39;, &#39;)&#39;, &#39;د&#39;, &#39;خ&#39;, &#39;م&#39;, &#39;»&#39;, &#39;ع&#39;, &#39;ى&#39;, &#39;ق&#39;, &#39;ش&#39;, &#39;ا&#39;, &#39;ه&#39;, &#39;ك&#39;, &#39;ج&#39;, &#39;ث&#39;, &#39;(&#39;, &#39;ت&#39;, &#39;ظ&#39;, &#39;ض&#39;, &#39;ل&#39;, &#39;ط&#39;, &#39;؛&#39;, &#39;ر&#39;, &#39;س&#39;, &#39;ن&#39;, &#39;ء&#39;, &#39;ٔ&#39;, &#39;«&#39;, &#39;ـ&#39;, &#39;ٕ&#39;}</span>
+</pre></div>
+</div>
+<p>There are two modes dealing with mismatching alphabets, <code class="docutils literal notranslate"><span class="pre">union</span></code> and <code class="docutils literal notranslate"><span class="pre">new</span></code>.
+<code class="docutils literal notranslate"><span class="pre">union</span></code> resizes the output layer and codec of the loaded model to include all
+characters in the new training set without removing any characters. <code class="docutils literal notranslate"><span class="pre">new</span></code>
+will make the resulting model an exact match with the new training set by both
+removing unused characters from the model and adding new ones.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>-v<span class="w"> </span>train<span class="w"> </span>--resize<span class="w"> </span>union<span class="w"> </span>-i<span class="w"> </span>model_5.mlmodel<span class="w"> </span>syr/*.xml
+<span class="go">...</span>
+<span class="go">[0.7943] Training set 788 lines, validation set 88 lines, alphabet 50 symbols</span>
+<span class="go">...</span>
+<span class="go">[0.8337] Resizing codec to include 3 new code points</span>
+<span class="go">[0.8374] Resizing last layer in network to 52 outputs</span>
+<span class="go">...</span>
+</pre></div>
+</div>
+<p>In this example 3 characters were added for a network that is able to
+recognize 52 different characters after sufficient additional training.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>-v<span class="w"> </span>train<span class="w"> </span>--resize<span class="w"> </span>new<span class="w"> </span>-i<span class="w"> </span>model_5.mlmodel<span class="w"> </span>syr/*.xml
+<span class="go">...</span>
+<span class="go">[0.7593] Training set 788 lines, validation set 88 lines, alphabet 49 symbols</span>
+<span class="go">...</span>
+<span class="go">[0.7857] Resizing network or given codec to 49 code sequences</span>
+<span class="go">[0.8344] Deleting 2 output classes from network (46 retained)</span>
+<span class="go">...</span>
+</pre></div>
+</div>
+<p>In <code class="docutils literal notranslate"><span class="pre">new</span></code> mode 2 of the original characters were removed and 3 new ones were added.</p>
+</section>
+<section id="slicing">
+<h3>Slicing<a class="headerlink" href="#slicing" title="Link to this heading">¶</a></h3>
+<p>Refining on mismatched alphabets has its limits. If the alphabets are highly
+different the modification of the final linear layer to add/remove character
+will destroy the inference capabilities of the network. Even when this is the
+case fine-tuning from a good base model will often produce better results, as
+the model will not have to learn good features from the input data from
+scratch, so there is usually no need to not utilize the standard fine-tuning
+capabilities offered by <cite>–resize</cite>. Nevertheless, it is possible to
+reinitialize layers of the network completely using a slicing mechanism.</p>
+<p>Taking the default network definition as printed in the debug log (<cite>ketos -vvv
+train …</cite>) we can see the layer indices of the model:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">[0.8760] Creating new model [1,48,0,1 Cr3,3,32 Do0.1,2 Mp2,2 Cr3,3,64 Do0.1,2 Mp2,2 S1(1x12)1,3 Lbx100 Do] with 48 outputs</span>
+<span class="go">[0.8762] layer          type    params</span>
+<span class="go">[0.8790] 0              conv    kernel 3 x 3 filters 32 activation r</span>
+<span class="go">[0.8795] 1              dropout probability 0.1 dims 2</span>
+<span class="go">[0.8797] 2              maxpool kernel 2 x 2 stride 2 x 2</span>
+<span class="go">[0.8802] 3              conv    kernel 3 x 3 filters 64 activation r</span>
+<span class="go">[0.8804] 4              dropout probability 0.1 dims 2</span>
+<span class="go">[0.8806] 5              maxpool kernel 2 x 2 stride 2 x 2</span>
+<span class="go">[0.8813] 6              reshape from 1 1 x 12 to 1/3</span>
+<span class="go">[0.8876] 7              rnn     direction b transposed False summarize False out 100 legacy None</span>
+<span class="go">[0.8878] 8              dropout probability 0.5 dims 1</span>
+<span class="go">[0.8883] 9              linear  augmented False out 48</span>
+</pre></div>
+</div>
+<p>To remove everything after the initial convolutional stack and add untrained
+layers we define a network stub and index for appending:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>train<span class="w"> </span>-i<span class="w"> </span>model_1.mlmodel<span class="w"> </span>--append<span class="w"> </span><span class="m">7</span><span class="w"> </span>-s<span class="w"> </span><span class="s1">&#39;[Lbx256 Do]&#39;</span><span class="w"> </span>syr/*.xml
+<span class="go">Building training set  [####################################]  100%</span>
+<span class="go">Building validation set  [####################################]  100%</span>
+<span class="go">[0.8014] alphabet mismatch {&#39;8&#39;, &#39;3&#39;, &#39;9&#39;, &#39;7&#39;, &#39;܇&#39;, &#39;݀&#39;, &#39;݂&#39;, &#39;4&#39;, &#39;:&#39;, &#39;0&#39;}</span>
+<span class="go">Slicing and dicing model ✓</span>
+</pre></div>
+</div>
+<p>The new model will behave exactly like a new one, except potentially training a
+lot faster.</p>
+</section>
+<section id="text-normalization-and-unicode">
+<h3>Text Normalization and Unicode<a class="headerlink" href="#text-normalization-and-unicode" title="Link to this heading">¶</a></h3>
+<span class="target" id="text-norm"></span><p>Text can be encoded in multiple different ways when using Unicode. For many
+scripts characters with diacritics can be encoded either as a single code point
+or a base character and the diacritic, <a class="reference external" href="https://jkorpela.fi/chars/spaces.html">different types of whitespace</a> exist, and mixed bidirectional text
+can be written differently depending on the <a class="reference external" href="https://www.w3.org/International/articles/inline-bidi-markup/uba-basics#context">base line direction</a>.</p>
+<p>Ketos provides options to largely normalize input into normalized forms that
+make processing of data from multiple sources possible. Principally, two
+options are available: one for <a class="reference external" href="https://unicode.org/reports/tr15/">Unicode normalization</a> and one for whitespace normalization. The
+Unicode normalization (disabled per default) switch allows one to select one of
+the 4 normalization forms:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>train<span class="w"> </span>--normalization<span class="w"> </span>NFD<span class="w"> </span>-f<span class="w"> </span>xml<span class="w"> </span>training_data/*.xml
+<span class="gp">$ </span>ketos<span class="w"> </span>train<span class="w"> </span>--normalization<span class="w"> </span>NFC<span class="w"> </span>-f<span class="w"> </span>xml<span class="w"> </span>training_data/*.xml
+<span class="gp">$ </span>ketos<span class="w"> </span>train<span class="w"> </span>--normalization<span class="w"> </span>NFKD<span class="w"> </span>-f<span class="w"> </span>xml<span class="w"> </span>training_data/*.xml
+<span class="gp">$ </span>ketos<span class="w"> </span>train<span class="w"> </span>--normalization<span class="w"> </span>NFKC<span class="w"> </span>-f<span class="w"> </span>xml<span class="w"> </span>training_data/*.xml
+</pre></div>
+</div>
+<p>Whitespace normalization is enabled per default and converts all Unicode
+whitespace characters into a simple space (U+0020). It is highly recommended to
+leave this function enabled as the variation of space width, resulting either
+from text justification or the irregularity of handwriting, is difficult for a
+recognition model to accurately model and map onto the different space code
+points. Nevertheless it can be disabled through:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>train<span class="w"> </span>--no-normalize-whitespace<span class="w"> </span>-f<span class="w"> </span>xml<span class="w"> </span>training_data/*.xml
+</pre></div>
+</div>
+<p>Further the behavior of the <a class="reference external" href="https://unicode.org/reports/tr9/">BiDi algorithm</a> can be influenced through two options. The
+configuration of the algorithm is important as the recognition network is
+trained to output characters (or rather labels which are mapped to code points
+by a <a class="reference internal" href="#id1"><span class="std std-ref">codec</span></a>) in the order a line is fed into the network, i.e.
+left-to-right also called display order. Unicode text is encoded as a stream of
+code points in logical order, i.e. the order the characters in a line are read
+in by a human reader, for example (mostly) right-to-left for a text in Hebrew.
+The BiDi algorithm resolves this logical order to the display order expected by
+the network and vice versa. The primary parameter of the algorithm is the base
+direction which is just the default direction of the input fields of the user
+when the ground truth was initially transcribed. Base direction will be
+automatically determined by kraken when using PAGE XML or ALTO files that
+contain it, otherwise it will have to be supplied if it differs from the
+default when training a model:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>train<span class="w"> </span>--base-dir<span class="w"> </span>R<span class="w"> </span>-f<span class="w"> </span>xml<span class="w"> </span>rtl_training_data/*.xml
+</pre></div>
+</div>
+<p>It is also possible to disable BiDi processing completely, e.g. when the text
+has been brought into display order already:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>train<span class="w"> </span>--no-reorder<span class="w"> </span>-f<span class="w"> </span>xml<span class="w"> </span>rtl_display_data/*.xml
+</pre></div>
+</div>
+</section>
+<section id="codecs">
+<h3>Codecs<a class="headerlink" href="#codecs" title="Link to this heading">¶</a></h3>
+<p id="id1">Codecs map between the label decoded from the raw network output and Unicode
+code points (see <a class="reference internal" href="../tutorials/api.html#recognition-steps"><span class="std std-ref">this</span></a> diagram for the precise steps
+involved in text line recognition). Codecs are attached to a recognition model
+and are usually defined once at initial training time, although they can be
+adapted either explicitly (with the API) or implicitly through domain adaptation.</p>
+<p>The default behavior of kraken is to auto-infer this mapping from all the
+characters in the training set and map each code point to one separate label.
+This is usually sufficient for alphabetic scripts, abjads, and abugidas apart
+from very specialised use cases. Logographic writing systems with a very large
+number of different graphemes, such as all the variants of Han characters or
+Cuneiform, can be more problematic as their large inventory makes recognition
+both slow and error-prone. In such cases it can be advantageous to decompose
+each code point into multiple labels to reduce the output dimensionality of the
+network. During decoding valid sequences of labels will be mapped to their
+respective code points as usual.</p>
+<p>There are multiple approaches one could follow constructing a custom codec:
+<em>randomized block codes</em>, i.e. producing random fixed-length labels for each code
+point, <em>Huffmann coding</em>, i.e. variable length label sequences depending on the
+frequency of each code point in some text (not necessarily the training set),
+or <em>structural decomposition</em>, i.e. describing each code point through a
+sequence of labels that describe the shape of the grapheme similar to how some
+input systems for Chinese characters function.</p>
+<p>Custom codecs can be supplied as simple JSON files that contain a dictionary
+mapping between strings and integer sequences, e.g.:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>train<span class="w"> </span>-c<span class="w"> </span>sample.codec<span class="w"> </span>-f<span class="w"> </span>xml<span class="w"> </span>training_data/*.xml
+</pre></div>
+</div>
+<p>with <cite>sample.codec</cite> containing:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="nt">&quot;S&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="mi">50</span><span class="p">,</span><span class="w"> </span><span class="mi">53</span><span class="p">,</span><span class="w"> </span><span class="mi">74</span><span class="p">,</span><span class="w"> </span><span class="mi">23</span><span class="p">],</span>
+<span class="w"> </span><span class="nt">&quot;A&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="mi">95</span><span class="p">,</span><span class="w"> </span><span class="mi">60</span><span class="p">,</span><span class="w"> </span><span class="mi">19</span><span class="p">,</span><span class="w"> </span><span class="mi">95</span><span class="p">],</span>
+<span class="w"> </span><span class="nt">&quot;B&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">96</span><span class="p">,</span><span class="w"> </span><span class="mi">28</span><span class="p">,</span><span class="w"> </span><span class="mi">29</span><span class="p">],</span>
+<span class="w"> </span><span class="nt">&quot;\u1f05&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="mi">91</span><span class="p">,</span><span class="w"> </span><span class="mi">14</span><span class="p">,</span><span class="w"> </span><span class="mi">95</span><span class="p">,</span><span class="w"> </span><span class="mi">90</span><span class="p">]}</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="unsupervised-recognition-pretraining">
+<h2>Unsupervised recognition pretraining<a class="headerlink" href="#unsupervised-recognition-pretraining" title="Link to this heading">¶</a></h2>
+<p id="pretrain">Text recognition models can be pretrained in an unsupervised fashion from text
+line images, both in bounding box and baseline format. The pretraining is
+performed through a contrastive surrogate task aiming to distinguish in-painted
+parts of the input image features from randomly sampled distractor slices.</p>
+<p>All data sources accepted by the supervised trainer are valid for pretraining
+but for performance reasons it is recommended to use pre-compiled binary
+datasets. One thing to keep in mind is that compilation filters out empty
+(non-transcribed) text lines per default which is undesirable for pretraining.
+With the <code class="docutils literal notranslate"><span class="pre">--keep-empty-lines</span></code> option all valid lines will be written to the
+dataset file:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>compile<span class="w"> </span>--keep-empty-lines<span class="w"> </span>-f<span class="w"> </span>xml<span class="w"> </span>-o<span class="w"> </span>foo.arrow<span class="w"> </span>*.xml
+</pre></div>
+</div>
+<p>The basic pretraining call is very similar to a training one:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>pretrain<span class="w"> </span>-f<span class="w"> </span>binary<span class="w"> </span>foo.arrow
+</pre></div>
+</div>
+<p>There are a couple of hyperparameters that are specific to pretraining: the
+mask width (at the subsampling level of the last convolutional layer), the
+probability of a particular position being the start position of a mask, and
+the number of negative distractor samples.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>pretrain<span class="w"> </span>-o<span class="w"> </span>pretrain<span class="w"> </span>--mask-width<span class="w"> </span><span class="m">4</span><span class="w"> </span>--mask-probability<span class="w"> </span><span class="m">0</span>.2<span class="w"> </span>--num-negatives<span class="w"> </span><span class="m">3</span><span class="w"> </span>-f<span class="w"> </span>binary<span class="w"> </span>foo.arrow
+</pre></div>
+</div>
+<p>Once a model has been pretrained it has to be adapted to perform actual
+recognition with a standard labelled dataset, although training data
+requirements will usually be much reduced:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>train<span class="w"> </span>-i<span class="w"> </span>pretrain_best.mlmodel<span class="w"> </span>--warmup<span class="w"> </span><span class="m">5000</span><span class="w"> </span>--freeze-backbone<span class="w"> </span><span class="m">1000</span><span class="w"> </span>-f<span class="w"> </span>binary<span class="w"> </span>labelled.arrow
+</pre></div>
+</div>
+<p>It is necessary to use learning rate warmup (<cite>–warmup</cite>) for at least a couple
+of epochs in addition to freezing the backbone (all but the last fully
+connected layer performing the classification) to have the model converge
+during fine-tuning. Fine-tuning models from pre-trained weights is quite a bit
+less stable than training from scratch or fine-tuning an existing model. As
+such it can be necessary to run a couple of trials with different
+hyperparameters (principally learning rate) to find workable ones. It is
+entirely possible that pretrained models do not converge at all even with
+reasonable hyperparameter configurations.</p>
+</section>
+<section id="recognition-testing">
+<h2>Recognition testing<a class="headerlink" href="#recognition-testing" title="Link to this heading">¶</a></h2>
+<p>Picking a particular model from a pool or getting a more detailed look on the
+recognition accuracy can be done with the <cite>test</cite> command. It uses transcribed
+lines, the test set, in the same formats supported by the <cite>train</cite> command,
+recognizes the line images with one or more models, and creates a detailed
+report of the differences from the ground truth for each of them.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>option</p></th>
+<th class="head"><p>action</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>-f, --format-type</p></td>
+<td><p>Sets the test set data format.
+Valid choices are ‘path’, ‘xml’ (default), ‘alto’, ‘page’, or binary.
+In <cite>alto</cite>, <cite>page</cite>, and xml mode all data is extracted from XML files
+containing both baselines and a link to source images.
+In <cite>path</cite> mode arguments are image files sharing a prefix up to the last
+extension with JSON <cite>.path</cite> files containing the baseline information.
+In <cite>binary</cite> mode arguments are precompiled binary dataset files.</p></td>
+</tr>
+<tr class="row-odd"><td><p>-m, --model</p></td>
+<td><p>Model(s) to evaluate.</p></td>
+</tr>
+<tr class="row-even"><td><p>-e, --evaluation-files</p></td>
+<td><p>File(s) with paths to evaluation data.</p></td>
+</tr>
+</tbody>
+</table>
+<p>The <cite>test</cite> command supports the same text normalization options as <cite>train</cite>
+which allows adapting unnormalized test sets to the normalization(s) used
+during training.</p>
+<p>Transcriptions are handed to the command in the same way as for the <cite>train</cite>
+command, either through a manifest with <code class="docutils literal notranslate"><span class="pre">-e/--evaluation-files</span></code> or by just
+adding a number of image files as the final argument:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-m<span class="w"> </span><span class="nv">$model</span><span class="w"> </span>-e<span class="w"> </span>test.txt<span class="w"> </span>test/*.xml
+<span class="go">Evaluating $model</span>
+<span class="go">Evaluating  [####################################]  100%</span>
+<span class="go">=== report test_model.mlmodel ===</span>
+
+<span class="go">7012 Characters</span>
+<span class="go">6022 Errors</span>
+<span class="go">14.12%       Accuracy</span>
+
+<span class="go">5226 Insertions</span>
+<span class="go">2    Deletions</span>
+<span class="go">794  Substitutions</span>
+
+<span class="go">Count Missed   %Right</span>
+<span class="go">1567  575    63.31%  Common</span>
+<span class="go">5230  5230   0.00%   Arabic</span>
+<span class="go">215   215    0.00%   Inherited</span>
+
+<span class="go">Errors       Correct-Generated</span>
+<span class="go">773  { ا } - {  }</span>
+<span class="go">536  { ل } - {  }</span>
+<span class="go">328  { و } - {  }</span>
+<span class="go">274  { ي } - {  }</span>
+<span class="go">266  { م } - {  }</span>
+<span class="go">256  { ب } - {  }</span>
+<span class="go">246  { ن } - {  }</span>
+<span class="go">241  { SPACE } - {  }</span>
+<span class="go">207  { ر } - {  }</span>
+<span class="go">199  { ف } - {  }</span>
+<span class="go">192  { ه } - {  }</span>
+<span class="go">174  { ع } - {  }</span>
+<span class="go">172  { ARABIC HAMZA ABOVE } - {  }</span>
+<span class="go">144  { ت } - {  }</span>
+<span class="go">136  { ق } - {  }</span>
+<span class="go">122  { س } - {  }</span>
+<span class="go">108  { ، } - {  }</span>
+<span class="go">106  { د } - {  }</span>
+<span class="go">82   { ك } - {  }</span>
+<span class="go">81   { ح } - {  }</span>
+<span class="go">71   { ج } - {  }</span>
+<span class="go">66   { خ } - {  }</span>
+<span class="go">62   { ة } - {  }</span>
+<span class="go">60   { ص } - {  }</span>
+<span class="go">39   { ، } - { - }</span>
+<span class="go">38   { ش } - {  }</span>
+<span class="go">30   { ا } - { - }</span>
+<span class="go">30   { ن } - { - }</span>
+<span class="go">29   { ى } - {  }</span>
+<span class="go">28   { ذ } - {  }</span>
+<span class="go">27   { ه } - { - }</span>
+<span class="go">27   { ARABIC HAMZA BELOW } - {  }</span>
+<span class="go">25   { ز } - {  }</span>
+<span class="go">23   { ث } - {  }</span>
+<span class="go">22   { غ } - {  }</span>
+<span class="go">20   { م } - { - }</span>
+<span class="go">20   { ي } - { - }</span>
+<span class="go">20   { ) } - {  }</span>
+<span class="go">19   { : } - {  }</span>
+<span class="go">19   { ط } - {  }</span>
+<span class="go">19   { ل } - { - }</span>
+<span class="go">18   { ، } - { . }</span>
+<span class="go">17   { ة } - { - }</span>
+<span class="go">16   { ض } - {  }</span>
+<span class="go">...</span>
+<span class="go">Average accuracy: 14.12%, (stddev: 0.00)</span>
+</pre></div>
+</div>
+<p>The report(s) contains character accuracy measured per script and a detailed
+list of confusions. When evaluating multiple models the last line of the output
+will the average accuracy and the standard deviation across all of them.</p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/kraken.png" alt="Logo of kraken"/>
+            </a></p>
+  <div>
+    <h3><a href="../index.html">Table of Contents</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">Recognition Training</a><ul>
+<li><a class="reference internal" href="#best-practices">Best practices</a></li>
+<li><a class="reference internal" href="#training-data-formats">Training data formats</a><ul>
+<li><a class="reference internal" href="#legacy-line-strip-datasets">Legacy Line Strip Datasets</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#training">Training</a><ul>
+<li><a class="reference internal" href="#from-scratch">From Scratch</a></li>
+<li><a class="reference internal" href="#fine-tuning">Fine Tuning</a></li>
+<li><a class="reference internal" href="#slicing">Slicing</a></li>
+<li><a class="reference internal" href="#text-normalization-and-unicode">Text Normalization and Unicode</a></li>
+<li><a class="reference internal" href="#codecs">Codecs</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#unsupervised-recognition-pretraining">Unsupervised recognition pretraining</a></li>
+<li><a class="reference internal" href="#recognition-testing">Recognition testing</a></li>
+</ul>
+</li>
+</ul>
+
+  </div><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+<h3>Versions</h3>
+<ul>
+  <li><a href="../../2.0.0/index.html">2.0.0</a></li>
+  <li><a href="../../3.0/index.html">3.0</a></li>
+  <li><a href="../../4.0/index.html">4.0</a></li>
+  <li><a href="../../4.1/index.html">4.1</a></li>
+  <li><a href="../../4.2.0/index.html">4.2.0</a></li>
+  <li><a href="../../4.3.0/index.html">4.3.0</a></li>
+  <li><a href="../../5.0.0/index.html">5.0.0</a></li>
+  <li><a href="../../5.1/index.html">5.1</a></li>
+  <li><a href="../../5.2/index.html">5.2</a></li>
+  <li><a href="../../5.3.0/index.html">5.3.0</a></li>
+  <li><a href="rectrain.html">6.0.0</a></li>
+</ul>
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2015-2026, Benjamin Kiessling.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/training/rectrain.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

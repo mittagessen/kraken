@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>kraken API &#8212; kraken  documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=27fed22d" />
+    <link rel="stylesheet" type="text/css" href="_static/graphviz.css?v=4ae1632d" />
+    <link rel="stylesheet" type="text/css" href="_static/custom.css?v=89a84cc7" />
+    <script src="_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="_static/doctools.js?v=9bcbadda"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="canonical" href="kraken.re/api.html" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Models" href="models.html" />
+    <link rel="prev" title="Training" href="ketos.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="module-kraken">
+<span id="kraken-api"></span><h1>kraken API<a class="headerlink" href="#module-kraken" title="Link to this heading">¶</a></h1>
+<p>Kraken provides routines which are usable by third party tools. In general
+you can expect function in the <code class="docutils literal notranslate"><span class="pre">kraken</span></code> package to remain stable. We will try
+to keep these backward compatible, but as kraken is still in an early
+development stage and the API is still quite rudimentary nothing can be
+garantueed.</p>
+<section id="module-kraken.binarization">
+<span id="kraken-binarization-module"></span><h2>kraken.binarization module<a class="headerlink" href="#module-kraken.binarization" title="Link to this heading">¶</a></h2>
+<section id="kraken-binarization">
+<h3>kraken.binarization<a class="headerlink" href="#kraken-binarization" title="Link to this heading">¶</a></h3>
+<p>An adaptive binarization algorithm.</p>
+</section>
+<dl class="py function">
+<dt class="sig sig-object py" id="kraken.binarization.nlbin">
+<span class="sig-prename descclassname"><span class="pre">kraken.binarization.</span></span><span class="sig-name descname"><span class="pre">nlbin</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">im</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">threshold</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">zoom</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">escale</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">border</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">perc</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">80</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">range</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">20</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">low</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">high</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">90</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#kraken.binarization.nlbin" title="Link to this definition">¶</a></dt>
+<dd><p>Performs binarization using non-linear processing.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type">&lt;module ‘PIL.Image’ from ‘/opt/hostedtoolcache/Python/3.13.12/x64/lib/python3.13/site-packages/PIL/Image.py’&gt;</span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>im</strong> (<em>PIL.Image</em>)</p></li>
+<li><p><strong>threshold</strong> (<em>float</em>)</p></li>
+<li><p><strong>zoom</strong> (<em>float</em>) – Zoom for background page estimation</p></li>
+<li><p><strong>escale</strong> (<em>float</em>) – Scale for estimating a mask over the text region</p></li>
+<li><p><strong>border</strong> (<em>float</em>) – Ignore this much of the border</p></li>
+<li><p><strong>perc</strong> (<em>int</em>) – Percentage for filters</p></li>
+<li><p><strong>range</strong> (<em>int</em>) – Range for filters</p></li>
+<li><p><strong>low</strong> (<em>int</em>) – Percentile for black estimation</p></li>
+<li><p><strong>high</strong> (<em>int</em>) – Percentile for white estimation</p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>PIL.Image containing the binarized image</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>KrakenInputException when trying to binarize an empty image.</strong> – </p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="kraken-serialization-module">
+<h2>kraken.serialization module<a class="headerlink" href="#kraken-serialization-module" title="Link to this heading">¶</a></h2>
+</section>
+<section id="kraken-pageseg-module">
+<h2>kraken.pageseg module<a class="headerlink" href="#kraken-pageseg-module" title="Link to this heading">¶</a></h2>
+</section>
+<section id="kraken-rpred-module">
+<h2>kraken.rpred module<a class="headerlink" href="#kraken-rpred-module" title="Link to this heading">¶</a></h2>
+</section>
+<section id="module-kraken.transcribe">
+<span id="kraken-transcribe-module"></span><h2>kraken.transcribe module<a class="headerlink" href="#module-kraken.transcribe" title="Link to this heading">¶</a></h2>
+<p>Utility functions for ground truth transcription.</p>
+</section>
+<section id="module-kraken.linegen">
+<span id="kraken-linegen-module"></span><h2>kraken.linegen module<a class="headerlink" href="#module-kraken.linegen" title="Link to this heading">¶</a></h2>
+<section id="linegen">
+<h3>linegen<a class="headerlink" href="#linegen" title="Link to this heading">¶</a></h3>
+<p>An advanced line generation tool using Pango for proper text shaping. The
+actual drawing code was adapted from the create_image utility from nototools
+available at [0].</p>
+<p>Line degradation uses a local model described in [1].</p>
+<p>[0] <a class="reference external" href="https://github.com/googlei18n/nototools">https://github.com/googlei18n/nototools</a>
+[1] Kanungo, Tapas, et al. “A statistical, nonparametric methodology for document degradation model validation.” IEEE Transactions on Pattern Analysis and Machine Intelligence 22.11 (2000): 1209-1223.</p>
+</section>
+<dl class="py class">
+<dt class="sig sig-object py" id="kraken.linegen.LineGenerator">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">kraken.linegen.</span></span><span class="sig-name descname"><span class="pre">LineGenerator</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">family</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'Sans'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">font_size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">32</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">font_weight</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">400</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">language</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#kraken.linegen.LineGenerator" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Produces degraded line images using a single collection of font families.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="kraken.linegen.LineGenerator.render_line">
+<span class="sig-name descname"><span class="pre">render_line</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">text</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#kraken.linegen.LineGenerator.render_line" title="Link to this definition">¶</a></dt>
+<dd><p>Draws a line onto a Cairo surface which will be converted to an pillow
+Image.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>text</strong> (<em>unicode</em>) – A string which will be rendered as a single line.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>PIL.Image of mode ‘L’.</p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>KrakenCairoSurfaceException if the Cairo surface couldn't be created</strong> – </p></li>
+<li><p><strong>(</strong><strong>usually caused by invalid dimensions.</strong> – </p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="kraken.linegen.degrade_line">
+<span class="sig-prename descclassname"><span class="pre">kraken.linegen.</span></span><span class="sig-name descname"><span class="pre">degrade_line</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">im</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eta</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alpha</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1.5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">beta</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1.5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alpha_0</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">beta_0</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1.0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#kraken.linegen.degrade_line" title="Link to this definition">¶</a></dt>
+<dd><p>Degrades a line image by adding noise.</p>
+<p>For parameter meanings consult [1].</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>im</strong> (<em>PIL.Image</em>) – Input image</p></li>
+<li><p><strong>eta</strong> (<em>float</em>)</p></li>
+<li><p><strong>alpha</strong> (<em>float</em>)</p></li>
+<li><p><strong>beta</strong> (<em>float</em>)</p></li>
+<li><p><strong>alpha_0</strong> (<em>float</em>)</p></li>
+<li><p><strong>beta_0</strong> (<em>float</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>PIL.Image in mode ‘1’</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="kraken.linegen.distort_line">
+<span class="sig-prename descclassname"><span class="pre">kraken.linegen.</span></span><span class="sig-name descname"><span class="pre">distort_line</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">im</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">distort</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">3.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sigma</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eps</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.03</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">delta</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.3</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#kraken.linegen.distort_line" title="Link to this definition">¶</a></dt>
+<dd><p>Distorts a line image.</p>
+<p>Run BEFORE degrade_line as a white border of 5 pixels will be added.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>im</strong> (<em>PIL.Image</em>) – Input image</p></li>
+<li><p><strong>distort</strong> (<em>float</em>)</p></li>
+<li><p><strong>sigma</strong> (<em>float</em>)</p></li>
+<li><p><strong>eps</strong> (<em>float</em>)</p></li>
+<li><p><strong>delta</strong> (<em>float</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>PIL.Image in mode ‘L’</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="kraken.linegen.ocropy_degrade">
+<span class="sig-prename descclassname"><span class="pre">kraken.linegen.</span></span><span class="sig-name descname"><span class="pre">ocropy_degrade</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">im</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">distort</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dsigma</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">20.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eps</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.03</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">delta</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.3</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degradations</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">(0.5,</span> <span class="pre">0.0,</span> <span class="pre">0.5,</span> <span class="pre">0.0)</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#kraken.linegen.ocropy_degrade" title="Link to this definition">¶</a></dt>
+<dd><p>Degrades and distorts a line using the same noise model used by ocropus.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>im</strong> (<em>PIL.Image</em>) – Input image</p></li>
+<li><p><strong>distort</strong> (<em>float</em>)</p></li>
+<li><p><strong>dsigma</strong> (<em>float</em>)</p></li>
+<li><p><strong>eps</strong> (<em>float</em>)</p></li>
+<li><p><strong>delta</strong> (<em>float</em>)</p></li>
+<li><p><strong>degradations</strong> (<em>list</em>) – list returning 4-tuples corresponding to
+the degradations argument of ocropus-linegen.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>PIL.Image in mode ‘L’</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="kraken-lib-models-module">
+<h2>kraken.lib.models module<a class="headerlink" href="#kraken-lib-models-module" title="Link to this heading">¶</a></h2>
+</section>
+<section id="kraken-lib-vgsl-module">
+<h2>kraken.lib.vgsl module<a class="headerlink" href="#kraken-lib-vgsl-module" title="Link to this heading">¶</a></h2>
+</section>
+<section id="module-kraken.lib.codec">
+<span id="kraken-lib-codec"></span><h2>kraken.lib.codec<a class="headerlink" href="#module-kraken.lib.codec" title="Link to this heading">¶</a></h2>
+<p>pytorch compatible codec with many-to-many mapping between labels and
+graphemes.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="kraken.lib.codec.PytorchCodec">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">kraken.lib.codec.</span></span><span class="sig-name descname"><span class="pre">PytorchCodec</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">charset</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#kraken.lib.codec.PytorchCodec" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Translates between labels and graphemes.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>charset</strong> (<em>Dict</em><em>[</em><em>str</em><em>, </em><em>Sequence</em><em>[</em><em>int</em><em>]</em><em>] </em><em>| </em><em>Sequence</em><em>[</em><em>str</em><em>] </em><em>| </em><em>str</em>)</p>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="kraken.lib.codec.PytorchCodec.decode">
+<span class="sig-name descname"><span class="pre">decode</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">labels</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#kraken.lib.codec.PytorchCodec.decode" title="Link to this definition">¶</a></dt>
+<dd><p>Decodes a labelling.</p>
+<p>Given a labelling with cuts and  confidences returns a string with the
+cuts and confidences aggregated across label-code point
+correspondences. When decoding multilabels to code points the resulting
+cuts are min/max, confidences are averaged.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">List</span></code>[<code class="xref py py-data docutils literal notranslate"><span class="pre">Tuple</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code>]]</span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>labels</strong> (<em>list</em>) – Input containing tuples (label, start, end,
+confidence).</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A list of tuples (code point, start, end, confidence)</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>list</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="kraken.lib.codec.PytorchCodec.encode">
+<span class="sig-name descname"><span class="pre">encode</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">s</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#kraken.lib.codec.PytorchCodec.encode" title="Link to this definition">¶</a></dt>
+<dd><p>Encodes a string into a sequence of labels.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">IntTensor</span></code></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>s</strong> (<em>str</em>) – Input unicode string</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>(torch.IntTensor) encoded label sequence</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>KrakenEncodeException if encoding fails.</strong> – </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="kraken.lib.codec.PytorchCodec.max_label">
+<span class="sig-name descname"><span class="pre">max_label</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#kraken.lib.codec.PytorchCodec.max_label" title="Link to this definition">¶</a></dt>
+<dd><p>Returns the maximum label value.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="kraken.lib.codec.PytorchCodec.merge">
+<span class="sig-name descname"><span class="pre">merge</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">codec</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#kraken.lib.codec.PytorchCodec.merge" title="Link to this definition">¶</a></dt>
+<dd><p>Transforms this codec (c1) into another (c2) reusing as many labels as
+possible.</p>
+<p>The resulting codec is able to encode the same code point sequences
+while not necessarily having the same labels for them as c2.
+Retains matching character -&gt; label mappings from both codecs, removes
+mappings not c2, and adds mappings not in c1. Compound labels in c2 for
+code point sequences not in c1 containing labels also in use in c1 are
+added as separate labels.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Tuple</span></code>[<a class="reference internal" href="#kraken.lib.codec.PytorchCodec" title="kraken.lib.codec.PytorchCodec"><code class="xref py py-class docutils literal notranslate"><span class="pre">PytorchCodec</span></code></a>, <code class="xref py py-class docutils literal notranslate"><span class="pre">Set</span></code>]</span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>codec</strong> (<a class="reference internal" href="#kraken.lib.codec.PytorchCodec" title="kraken.lib.codec.PytorchCodec"><em>kraken.lib.codec.PytorchCodec</em></a>)</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A merged codec and a list of labels that were removed from the
+original codec.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="kraken-lib-train-module">
+<h2>kraken.lib.train module<a class="headerlink" href="#kraken-lib-train-module" title="Link to this heading">¶</a></h2>
+</section>
+<section id="kraken-lib-dataset-module">
+<h2>kraken.lib.dataset module<a class="headerlink" href="#kraken-lib-dataset-module" title="Link to this heading">¶</a></h2>
+</section>
+<section id="module-kraken.lib.ctc_decoder">
+<span id="kraken-lib-ctc-decoder"></span><h2>kraken.lib.ctc_decoder<a class="headerlink" href="#module-kraken.lib.ctc_decoder" title="Link to this heading">¶</a></h2>
+<p>Decoders for softmax outputs of CTC trained networks.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="kraken.lib.ctc_decoder.beam_decoder">
+<span class="sig-prename descclassname"><span class="pre">kraken.lib.ctc_decoder.</span></span><span class="sig-name descname"><span class="pre">beam_decoder</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">outputs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">beam_size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">3</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#kraken.lib.ctc_decoder.beam_decoder" title="Link to this definition">¶</a></dt>
+<dd><p>Translates back the network output to a label sequence using
+same-prefix-merge beam search decoding as described in [0].</p>
+<p>[0] Hannun, Awni Y., et al. “First-pass large vocabulary continuous speech
+recognition using bi-directional recurrent DNNs.” arXiv preprint
+arXiv:1408.2873 (2014).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">List</span></code>[<code class="xref py py-data docutils literal notranslate"><span class="pre">Tuple</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code>]]</span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>output</strong> (<em>numpy.array</em>) – (C, W) shaped softmax output tensor</p></li>
+<li><p><strong>outputs</strong> (<em>ndarray</em>)</p></li>
+<li><p><strong>beam_size</strong> (<em>int</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A list with tuples (class, start, end, prob). max is the maximum value
+of the softmax layer in the region.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="kraken.lib.ctc_decoder.blank_threshold_decoder">
+<span class="sig-prename descclassname"><span class="pre">kraken.lib.ctc_decoder.</span></span><span class="sig-name descname"><span class="pre">blank_threshold_decoder</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">outputs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">threshold</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.5</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#kraken.lib.ctc_decoder.blank_threshold_decoder" title="Link to this definition">¶</a></dt>
+<dd><p>Translates back the network output to a label sequence as the original
+ocropy/clstm.</p>
+<p>Thresholds on class 0, then assigns the maximum (non-zero) class to each
+region.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">List</span></code>[<code class="xref py py-data docutils literal notranslate"><span class="pre">Tuple</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code>]]</span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>output</strong> (<em>numpy.array</em>) – (C, W) shaped softmax output tensor</p></li>
+<li><p><strong>threshold</strong> (<em>float</em>) – Threshold for 0 class when determining possible
+label locations.</p></li>
+<li><p><strong>outputs</strong> (<em>ndarray</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A list with tuples (class, start, end, max). max is the maximum value
+of the softmax layer in the region.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="kraken.lib.ctc_decoder.greedy_decoder">
+<span class="sig-prename descclassname"><span class="pre">kraken.lib.ctc_decoder.</span></span><span class="sig-name descname"><span class="pre">greedy_decoder</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">outputs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#kraken.lib.ctc_decoder.greedy_decoder" title="Link to this definition">¶</a></dt>
+<dd><p>Translates back the network output to a label sequence using greedy/best
+path decoding as described in [0].</p>
+<p>[0] Graves, Alex, et al. “Connectionist temporal classification: labelling
+unsegmented sequence data with recurrent neural networks.” Proceedings of
+the 23rd international conference on Machine learning. ACM, 2006.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">List</span></code>[<code class="xref py py-data docutils literal notranslate"><span class="pre">Tuple</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code>]]</span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>output</strong> (<em>numpy.array</em>) – (C, W) shaped softmax output tensor</p></li>
+<li><p><strong>outputs</strong> (<em>ndarray</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A list with tuples (class, start, end, max). max is the maximum value
+of the softmax layer in the region.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="index.html">
+              <img class="logo" src="_static/kraken.png" alt="Logo of kraken"/>
+            </a></p>
+  <div>
+    <h3><a href="index.html">Table of Contents</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">kraken API</a><ul>
+<li><a class="reference internal" href="#module-kraken.binarization">kraken.binarization module</a><ul>
+<li><a class="reference internal" href="#kraken-binarization">kraken.binarization</a></li>
+<li><a class="reference internal" href="#kraken.binarization.nlbin"><code class="docutils literal notranslate"><span class="pre">nlbin()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#kraken-serialization-module">kraken.serialization module</a></li>
+<li><a class="reference internal" href="#kraken-pageseg-module">kraken.pageseg module</a></li>
+<li><a class="reference internal" href="#kraken-rpred-module">kraken.rpred module</a></li>
+<li><a class="reference internal" href="#module-kraken.transcribe">kraken.transcribe module</a></li>
+<li><a class="reference internal" href="#module-kraken.linegen">kraken.linegen module</a><ul>
+<li><a class="reference internal" href="#linegen">linegen</a></li>
+<li><a class="reference internal" href="#kraken.linegen.LineGenerator"><code class="docutils literal notranslate"><span class="pre">LineGenerator</span></code></a><ul>
+<li><a class="reference internal" href="#kraken.linegen.LineGenerator.render_line"><code class="docutils literal notranslate"><span class="pre">LineGenerator.render_line()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#kraken.linegen.degrade_line"><code class="docutils literal notranslate"><span class="pre">degrade_line()</span></code></a></li>
+<li><a class="reference internal" href="#kraken.linegen.distort_line"><code class="docutils literal notranslate"><span class="pre">distort_line()</span></code></a></li>
+<li><a class="reference internal" href="#kraken.linegen.ocropy_degrade"><code class="docutils literal notranslate"><span class="pre">ocropy_degrade()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#kraken-lib-models-module">kraken.lib.models module</a></li>
+<li><a class="reference internal" href="#kraken-lib-vgsl-module">kraken.lib.vgsl module</a></li>
+<li><a class="reference internal" href="#module-kraken.lib.codec">kraken.lib.codec</a><ul>
+<li><a class="reference internal" href="#kraken.lib.codec.PytorchCodec"><code class="docutils literal notranslate"><span class="pre">PytorchCodec</span></code></a><ul>
+<li><a class="reference internal" href="#kraken.lib.codec.PytorchCodec.decode"><code class="docutils literal notranslate"><span class="pre">PytorchCodec.decode()</span></code></a></li>
+<li><a class="reference internal" href="#kraken.lib.codec.PytorchCodec.encode"><code class="docutils literal notranslate"><span class="pre">PytorchCodec.encode()</span></code></a></li>
+<li><a class="reference internal" href="#kraken.lib.codec.PytorchCodec.max_label"><code class="docutils literal notranslate"><span class="pre">PytorchCodec.max_label()</span></code></a></li>
+<li><a class="reference internal" href="#kraken.lib.codec.PytorchCodec.merge"><code class="docutils literal notranslate"><span class="pre">PytorchCodec.merge()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#kraken-lib-train-module">kraken.lib.train module</a></li>
+<li><a class="reference internal" href="#kraken-lib-dataset-module">kraken.lib.dataset module</a></li>
+<li><a class="reference internal" href="#module-kraken.lib.ctc_decoder">kraken.lib.ctc_decoder</a><ul>
+<li><a class="reference internal" href="#kraken.lib.ctc_decoder.beam_decoder"><code class="docutils literal notranslate"><span class="pre">beam_decoder()</span></code></a></li>
+<li><a class="reference internal" href="#kraken.lib.ctc_decoder.blank_threshold_decoder"><code class="docutils literal notranslate"><span class="pre">blank_threshold_decoder()</span></code></a></li>
+<li><a class="reference internal" href="#kraken.lib.ctc_decoder.greedy_decoder"><code class="docutils literal notranslate"><span class="pre">greedy_decoder()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+  </div><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="ketos.html" title="previous chapter">Training</a></li>
+      <li>Next: <a href="models.html" title="next chapter">Models</a></li>
+  </ul></li>
+</ul>
+</div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+<h3>Versions</h3>
+<ul>
+  <li><a href="api.html">2.0.0</a></li>
+  <li><a href="../3.0/api.html">3.0</a></li>
+  <li><a href="../4.0/api.html">4.0</a></li>
+  <li><a href="../4.1/api.html">4.1</a></li>
+  <li><a href="../4.2.0/api.html">4.2.0</a></li>
+  <li><a href="../4.3.0/api.html">4.3.0</a></li>
+  <li><a href="../5.0.0/api.html">5.0.0</a></li>
+  <li><a href="../5.1/api.html">5.1</a></li>
+  <li><a href="../5.2/api.html">5.2</a></li>
+  <li><a href="../5.3.0/api.html">5.3.0</a></li>
+  <li><a href="../6.0.0/index.html">6.0.0</a></li>
+</ul>
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2015-2026, Benjamin Kiessling.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="_sources/api.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
