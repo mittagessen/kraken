@@ -329,7 +329,7 @@ class VGSLRecognitionModel(L.LightningModule):
            self.hparams.config.batch_size * batch_idx < 16 and \
            getattr(self.logger.experiment, 'add_image', None) is not None:
             for i in range(self.hparams.config.batch_size):
-                count = self.hparams.config.batch_sizd * batch_idx + i
+                count = self.hparams.config.batch_size * batch_idx + i
                 if count < 16:
                     self.logger.experiment.add_image(f'Validation #{count}, target: {targets[i]}',
                                                      batch['image'][i],
