@@ -41,7 +41,7 @@ class RecognitionTaskModel(nn.Module):
         models = [net for net in models if 'recognition' in net.model_type]
 
         if not len(models):
-            raise ValueError('No recognition model in model list {models}.')
+            raise ValueError(f'No recognition model in model list {models}.')
         if len(models) > 1:
             logger.warning('More than one recognition model in model collection. Using first model.')
 

@@ -81,7 +81,7 @@ def _extract_path_line(xml_record, skip_empty_lines: bool = True):
     try:
         im = open_image(xml_record['image'])
     except (FileNotFoundError, UnidentifiedImageError) as err:
-        logger.warning(f'Error loading image {xml_record.imagename}: {err}')
+        logger.warning(f'Error loading image {xml_record["image"]}: {err}')
         return [], None
     if not xml_record['lines'][0]['text'] and skip_empty_lines:
         return [], None

@@ -58,7 +58,7 @@ class SegmentationTaskModel(nn.Module):
         self.ro_models = [net for net in models if 'reading_order' in net.model_type]
 
         if not len(self.seg_models):
-            raise ValueError('No segmentation models in model list {models}.')
+            raise ValueError(f'No segmentation models in model list {models}.')
 
         # validate RO models: no duplicates at the same level, class
         # mappings match the segmentation model's.
