@@ -320,7 +320,10 @@ def cli(**kwargs):
     """
     ctx = click.get_current_context()
     params = ctx.params
-    ctx.meta['accelerator'], ctx.meta['device'] = to_ptl_device(params['device'])
+    try:
+        ctx.meta['accelerator'], ctx.meta['device'] = to_ptl_device(params['device'])
+    except Exception as e:
+        raise click.BadOptionUsage('device', str(e))
     ctx.meta['precision'] = params['precision']
     ctx.meta['input_format_type'] = params['format_type'] if params['format_type'] != 'pdf' else 'image'
     ctx.meta['raise_failed'] = params['raise_on_error']
