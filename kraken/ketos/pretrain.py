@@ -57,6 +57,7 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
               '--load',
               type=click.Path(exists=True, readable=True),
               help='Load existing file to continue training')
+@click.option('--resume', type=click.Path(exists=True, readable=True), help='Load a checkpoint to continue training')
 @click.option('-F',
               '--freq',
               type=float,
