@@ -50,7 +50,7 @@ class ROTrainingDataConfig(SegmentationTrainingDataConfig):
 
 class ROTrainingConfig(TrainingConfig):
     """
-    Base configuration for training a BLLA VGSL recognition model.
+    Base configuration for training a reading order model.
 
     Arg:
     """
