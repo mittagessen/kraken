@@ -86,7 +86,7 @@ def cli(ctx, **kwargs):
     params = ctx.params
 
     ctx.meta['deterministic'] = False if not params['deterministic'] else 'warn'
-    if params['seed']:
+    if params['seed'] is not None:
         from lightning.pytorch import seed_everything
         seed_everything(params['seed'], workers=True)
     elif params['deterministic']:
