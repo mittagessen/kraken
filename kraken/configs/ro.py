@@ -62,5 +62,5 @@ class ROTrainingConfig(TrainingConfig):
         kwargs.setdefault('weight_decay', 0.01)
         kwargs.setdefault('schedule', 'cosine')
         kwargs.setdefault('cos_t_max', 100)
-        kwargs.setdefault('cos_min_lr', 0.001)
+        kwargs.setdefault('cos_min_lr', 1e-5)
         super().__init__(**kwargs)
