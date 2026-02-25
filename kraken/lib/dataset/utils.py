@@ -157,7 +157,7 @@ class ImageInputTransforms(transforms.Compose):
         self.transforms.append(v2.PILToTensor())
         self.transforms.append(v2.ToDtype(self._dtype, scale=True))
         # invert
-        self.transforms.append(v2.RandomInvert(p=1.0))
+        self.transforms.append(F_t.tensor_invert)
         self.transforms.append(partial(F_t.tensor_permute, perm=perm))
 
     @property
