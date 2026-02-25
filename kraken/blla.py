@@ -363,20 +363,19 @@ def segment(im: PIL.Image.Image,
                                boundary=line['boundary'],
                                tags=line['tags']) for line in _lines]
 
-        # assign region IDs to lines before neural RO
-        _shp_regs = {}
-        for reg_type, rgs in _regions.items():
-            for reg in rgs:
-                _shp_regs[reg.id] = geom.Polygon(reg.boundary)
-        _lines_with_regs = []
-        for line in _lines:
-            line_regs = []
-            line_ls = geom.LineString(line.baseline)
-            for reg_id, reg in _shp_regs.items():
-                if is_in_region(line_ls, reg):
-                    line_regs.append(reg_id)
-            _lines_with_regs.append(replace(line, regions=line_regs))
-        _lines = _lines_with_regs
+        # build temporary line-to-region mapping for neural RO grouping
+        _line_reg_map = {}
+        if _regions:
+            _shp_regs = {}
+            for reg_type, rgs in _regions.items():
+                for reg in rgs:
+                    _shp_regs[reg.id] = geom.Polygon(reg.boundary)
+            for line in _lines:
+                line_ls = geom.LineString(line.baseline)
+                for reg_id, reg in _shp_regs.items():
+                    if is_in_region(line_ls, reg):
+                        _line_reg_map[line.id] = reg_id
+                        break
 
         if 'ro_model' in net.aux_layers or 'ro_model_regions' in net.aux_layers:
             logger.info(f'Using reading order model(s) found in segmentation model {net}.')
@@ -405,8 +404,9 @@ def segment(im: PIL.Image.Image,
                     region_line_map = defaultdict(list)
                     region_ids = {reg.id for reg in ordered_regs}
                     for line in _lines:
-                        if line.regions and line.regions[0] in region_ids:
-                            region_line_map[line.regions[0]].append(line)
+                        line_reg = _line_reg_map.get(line.id)
+                        if line_reg in region_ids:
+                            region_line_map[line_reg].append(line)
                         else:
                             region_line_map[None].append(line)
                     ordered_lines = []
@@ -449,7 +449,7 @@ def segment(im: PIL.Image.Image,
                 used = set()
                 for reg in ordered_regs:
                     for line in _lines:
-                        if line.regions and line.regions[0] == reg.id and id(line) not in used:
+                        if _line_reg_map.get(line.id) == reg.id and id(line) not in used:
                             ordered_lines.append(line)
                             used.add(id(line))
                 for line in _lines:
