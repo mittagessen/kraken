@@ -755,8 +755,6 @@ def list_models(ctx, model_type, language, script, keyword):
         repository = get_listing(callback=lambda total, advance: progress.update(download_task, total=total, advance=advance),
                                  filter_fn=_filter_fn)
 
-    if model_type is not None:
-        repository
     table = Table(show_header=True)
     table.add_column('DOI', justify="left", no_wrap=True)
     table.add_column('summary', justify="left", no_wrap=False)
