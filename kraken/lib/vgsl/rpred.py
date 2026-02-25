@@ -44,7 +44,7 @@ def _extract_line(im, segmentation, line_idx, legacy: bool = False):
     try:
         im, _ = next(extract_polygons(im, seg, legacy=legacy))
         return im, line_idx
-    except Exception:
+    except ValueError:
         return None, line_idx
 
 
