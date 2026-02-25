@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_all_ = ['write_models', 'write_safetensors', 'write_coreml']
+__all__ = ['write_models', 'write_safetensors', 'write_coreml']
 
 
 def write_models(objs: list[BaseModel], path: Union[str, PathLike]) -> PathLike:

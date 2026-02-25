@@ -493,7 +493,7 @@ class TorchVGSLModel(nn.Module,
         Configures the model for inference.
         """
         if (isinstance(config, RecognitionInferenceConfig) and 'recognition' not in self.model_type) or (isinstance(config, SegmentationInferenceConfig) and 'segmentation' not in self.model_type):
-            raise ValueError(f'{self} is a {self.model_type} model. Got incompatible {config.__class__.__name}.')
+            raise ValueError(f'{self} is a {self.model_type} model. Got incompatible {config.__class__.__name__}.')
 
         self.eval()
         self._inf_config = config
