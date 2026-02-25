@@ -380,7 +380,13 @@ def segment(im: PIL.Image.Image,
     _, ccs = morph.label(1 - binary)
     if ccs > np.dot(*im.size) / (30 * 30):
         logger.warning(f'Too many connected components for a page image: {ccs}')
-        return {'text_direction': text_direction, 'boxes': []}
+        return Segmentation(text_direction=text_direction,
+                            imagename=getattr(im, 'filename', None),
+                            type='bbox',
+                            regions=None,
+                            line_orders=None,
+                            lines=[],
+                            script_detection=False)
 
     if not scale:
         scale = estimate_scale(binary)
@@ -407,7 +413,13 @@ def segment(im: PIL.Image.Image,
             colseps = compute_white_colseps(binary, scale, maxcolseps)
     except ValueError:
         logger.warning(f'Exception in column finder (probably empty image) for {im_str}')
-        return {'text_direction': text_direction, 'boxes': []}
+        return Segmentation(text_direction=text_direction,
+                            imagename=getattr(im, 'filename', None),
+                            type='bbox',
+                            regions=None,
+                            line_orders=None,
+                            lines=[],
+                            script_detection=False)
 
     bottom, top, boxmap = compute_gradmaps(binary, scale)
     seeds = compute_line_seeds(binary, bottom, top, colseps, scale)
