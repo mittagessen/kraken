@@ -105,10 +105,8 @@ def load_safetensors(path: Union[str, PathLike], tasks: Optional[Sequence[_T_tas
                     model_tasks = model_data.get('_tasks', [])
                     if model_tasks is None:
                         model_tasks = []
-                    if isinstance(model_tasks, str):
-                        model_tasks = [model_tasks]
                     if not isinstance(model_tasks, list) or not all(isinstance(x, str) for x in model_tasks):
-                        raise ValueError(f'Invalid `_tasks` for model `{prefix}` in {path}: expected string, list[str], or null.')
+                        raise ValueError(f'Invalid `_tasks` for model `{prefix}` in {path}: expected list[str] or null.')
                     if tasks and not set(tasks).intersection(set(model_tasks)):
                         logger.info(f'Model {prefix} in model file {path} not in demanded tasks {tasks}')
                         skipped_prefixes.append(prefix)
@@ -118,17 +116,11 @@ def load_safetensors(path: Union[str, PathLike], tasks: Optional[Sequence[_T_tas
                     if not isinstance(model_name, str):
                         raise ValueError(f'Missing or invalid `_model` for model `{prefix}` in {path}.')
 
-                    model_type = model_data.get('model_type')
-                    if isinstance(model_type, str):
-                        model_type = [model_type] if model_type else []
-                    if not isinstance(model_type, list) or not model_type or not all(isinstance(x, str) and x for x in model_type):
-                        raise ValueError(f'Missing or invalid `model_type` for model `{prefix}` in {path}.')
-
                     model_args = dict(model_data)
                     model_args.pop('_tasks', None)
                     model_args.pop('_kraken_min_version', None)
                     model_args.pop('_model', None)
-                    model_args['model_type'] = model_type
+                    model_args['model_type'] = model_tasks 
                     try:
                         models[prefix] = create_model(model_name, **model_args)
                     except Exception as e:
