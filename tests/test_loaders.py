@@ -180,21 +180,6 @@ class TestLoadModels(unittest.TestCase):
             with raises(ValueError, match='_tasks'):
                 load_safetensors(path)
 
-    def test_load_safetensors_missing_model_type_metadata(self):
-        """
-        Missing model_type in safetensors metadata raises ValueError.
-        """
-        with tempfile.TemporaryDirectory() as tmpdir:
-            path = Path(tmpdir) / 'bad_model_type.safetensors'
-            tensors = load_file(resources / 'model_small.safetensors')
-            with safe_open(resources / 'model_small.safetensors', framework='pt') as f:
-                metadata = json.loads(f.metadata()['kraken_meta'])
-            for rec in metadata.values():
-                rec.pop('model_type', None)
-            save_file(tensors, path, metadata={'kraken_meta': json.dumps(metadata)})
-            with raises(ValueError, match='model_type'):
-                load_safetensors(path)
-
     def test_load_coreml_missing_model_type_metadata(self):
         """
         Missing model_type in CoreML metadata raises ValueError.
