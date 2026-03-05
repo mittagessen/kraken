@@ -148,22 +148,6 @@ class TestLoadModels(unittest.TestCase):
         for name, param in models[0].named_parameters():
             self.assertEqual(param.dtype, torch.float32, f'{name} is not float32')
 
-    def test_load_safetensors_missing_min_version_metadata(self):
-        """
-        Missing _kraken_min_version in safetensors metadata raises ValueError.
-        """
-        with tempfile.TemporaryDirectory() as tmpdir:
-            path = Path(tmpdir) / 'bad_min_version.safetensors'
-            tensors = load_file(resources / 'model_small.safetensors')
-            with safe_open(resources / 'model_small.safetensors', framework='pt') as f:
-                metadata = json.loads(f.metadata()['kraken_meta'])
-            for rec in metadata.values():
-                rec['model_type'] = 'recognition'
-                rec.pop('_kraken_min_version', None)
-            save_file(tensors, path, metadata={'kraken_meta': json.dumps(metadata)})
-            with raises(ValueError, match='_kraken_min_version'):
-                load_safetensors(path)
-
     def test_load_safetensors_invalid_tasks_metadata(self):
         """
         Invalid _tasks type in safetensors metadata raises ValueError.
@@ -199,58 +183,22 @@ class TestLoadModels(unittest.TestCase):
 class TestVersionCompatibility(unittest.TestCase):
     """
     Tests for the version compatibility check in load_safetensors.
+
+    The version check uses the model class's _kraken_min_version property
+    (the single source of truth) rather than metadata. Tests mock the
+    installed kraken version to simulate compatibility scenarios.
     """
 
-    def _make_versioned_model_file(self, version_overrides, path):
+    def _make_multi_model_file(self, count, path):
         """
-        Creates a safetensors file containing two copies of the small test
-        model, then patches _kraken_min_version in the metadata for selected
-        models.
-
-        Args:
-            version_overrides: dict mapping prefix index (0-based) to a
-                               _kraken_min_version string to set.
-            path: Output path for the safetensors file.
-
-        Returns:
-            List of prefix strings in the file (in metadata key order).
+        Creates a safetensors file containing `count` copies of the small
+        test model.
         """
         import copy
         with _patched_safetensors_model_type(resources / 'model_small.safetensors') as model_path:
             models = load_models(model_path)
-        write_safetensors([models[0], copy.deepcopy(models[0])], path)
-
-        tensors = load_file(path)
-        with safe_open(path, framework='pt') as f:
-            meta = json.loads(f.metadata()['kraken_meta'])
-
-        prefixes = list(meta.keys())
-        for idx, version in version_overrides.items():
-            meta[prefixes[idx]]['_kraken_min_version'] = version
-
-        save_file(tensors, path, metadata={'kraken_meta': json.dumps(meta)})
-        return prefixes
-
-    def test_compatible_and_incompatible(self):
-        """
-        In a file with one compatible and one incompatible model, only the
-        compatible model is loaded.
-        """
-        with tempfile.TemporaryDirectory() as tmpdir:
-            path = Path(tmpdir) / 'test.safetensors'
-            self._make_versioned_model_file({0: '999.0.0'}, path)
-            models = load_models(path)
-            self.assertEqual(len(models), 1)
-
-    def test_all_incompatible(self):
-        """
-        When all models in a file are incompatible, an empty list is returned.
-        """
-        with tempfile.TemporaryDirectory() as tmpdir:
-            path = Path(tmpdir) / 'test.safetensors'
-            self._make_versioned_model_file({0: '999.0.0', 1: '999.0.0'}, path)
-            models = load_models(path)
-            self.assertEqual(len(models), 0)
+        objs = [models[0]] + [copy.deepcopy(models[0]) for _ in range(count - 1)]
+        write_safetensors(objs, path)
 
     def test_all_compatible(self):
         """
@@ -258,30 +206,46 @@ class TestVersionCompatibility(unittest.TestCase):
         """
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / 'test.safetensors'
-            self._make_versioned_model_file({}, path)
+            self._make_multi_model_file(2, path)
             models = load_models(path)
             self.assertEqual(len(models), 2)
+
+    def test_all_incompatible(self):
+        """
+        When the installed version is below the model's minimum, all models
+        are skipped and an empty list is returned.
+        """
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / 'test.safetensors'
+            self._make_multi_model_file(2, path)
+            with patch('importlib.metadata.version', return_value='0.0.1'):
+                models = load_models(path)
+            self.assertEqual(len(models), 0)
 
     def test_incompatible_model_warns(self):
         """
         Skipping an incompatible model emits a warning containing the
-        required version.
+        required version from the model class.
         """
+        from unittest.mock import patch
+
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / 'test.safetensors'
-            self._make_versioned_model_file({0: '999.0.0'}, path)
-            with self.assertLogs('kraken.models.loaders', level='WARNING') as cm:
-                load_models(path)
-            self.assertTrue(any('999.0.0' in msg for msg in cm.output))
+            self._make_multi_model_file(1, path)
+            with patch('importlib.metadata.version', return_value='0.0.1'):
+                with self.assertLogs('kraken.models.loaders', level='WARNING') as cm:
+                    load_models(path)
+            self.assertTrue(any('5.0.0' in msg for msg in cm.output))
 
     def test_compatible_model_has_weights(self):
         """
-        The compatible model loaded from a mixed file has actual (non-zero)
-        weights.
+        A compatible model has actual (non-zero) weights loaded.
         """
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / 'test.safetensors'
-            self._make_versioned_model_file({0: '999.0.0'}, path)
+            self._make_multi_model_file(1, path)
             models = load_models(path)
             has_nonzero = any(p.abs().sum() > 0 for p in models[0].parameters())
             self.assertTrue(has_nonzero)

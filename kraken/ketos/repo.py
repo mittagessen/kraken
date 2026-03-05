@@ -206,8 +206,7 @@ def publish(ctx, metadata, access_token, doi, private, model):
 
     # version hint from the model requiring the highest version
     from packaging.version import Version
-    versions = [getattr(m, '_kraken_min_version', None) for m in models]
-    versions = [v for v in versions if v is not None]
+    versions = [m._kraken_min_version for m in models]
     if versions:
         software_hints.append(f'version>={max(versions, key=Version)}')
 

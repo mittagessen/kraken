@@ -88,20 +88,6 @@ def load_safetensors(path: Union[str, PathLike], tasks: Optional[Sequence[_T_tas
                     if not isinstance(model_data, dict):
                         raise ValueError(f'Invalid metadata for model `{prefix}` in {path}: expected object, got {type(model_data).__name__}.')
 
-                    if '_kraken_min_version' not in model_data:
-                        raise ValueError(f'Missing `_kraken_min_version` for model `{prefix}` in {path}.')
-                    min_ver_raw = model_data.get('_kraken_min_version')
-                    if not isinstance(min_ver_raw, str):
-                        raise ValueError(f'Invalid `_kraken_min_version` for model `{prefix}` in {path}: expected string, got {type(min_ver_raw).__name__}.')
-                    try:
-                        min_ver = Version(min_ver_raw)
-                    except Exception as e:
-                        raise ValueError(f'Invalid `_kraken_min_version` for model `{prefix}` in {path}: {min_ver_raw!r}.') from e
-                    if min_ver > inst_ver:
-                        logger.warning(f'Model {prefix} in model file {path} requires minimum kraken version {min_ver} (installed {inst_ver})')
-                        skipped_prefixes.append(prefix)
-                        continue
-
                     model_tasks = model_data.get('_tasks', [])
                     if model_tasks is None:
                         model_tasks = []
@@ -120,11 +106,19 @@ def load_safetensors(path: Union[str, PathLike], tasks: Optional[Sequence[_T_tas
                     model_args.pop('_tasks', None)
                     model_args.pop('_kraken_min_version', None)
                     model_args.pop('_model', None)
-                    model_args['model_type'] = model_tasks 
+                    model_args['model_type'] = model_tasks
                     try:
-                        models[prefix] = create_model(model_name, **model_args)
+                        model = create_model(model_name, **model_args)
                     except Exception as e:
                         raise ValueError(f'Failed to create model {model_name} (prefix {prefix}) from {path}: {e}') from e
+
+                    min_ver = Version(model._kraken_min_version)
+                    if min_ver > inst_ver:
+                        logger.warning(f'Model {prefix} in model file {path} requires minimum kraken version {min_ver} (installed {inst_ver})')
+                        skipped_prefixes.append(prefix)
+                        continue
+
+                    models[prefix] = model
             else:
                 raise ValueError(f'No model metadata found in {path}.')
     except SafetensorError as e:
