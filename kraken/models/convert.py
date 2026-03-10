@@ -18,7 +18,9 @@ def load_from_checkpoint(path):
     import torch.serialization
     from collections import defaultdict
 
-    safe_globals = [defaultdict]
+    from kraken.containers import BaselineLine, BBoxLine, Region, Segmentation
+
+    safe_globals = [defaultdict, Segmentation, BaselineLine, BBoxLine, Region]
     for ep in importlib.metadata.entry_points(group='kraken.configs'):
         safe_globals.append(ep.load())
     torch.serialization.add_safe_globals(safe_globals)
