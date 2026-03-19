@@ -143,7 +143,7 @@ def serialize(results: 'Segmentation',
 
     page['typology'] = list(set(types))
 
-    page['line_orders'] = [ro['order'] for ro in results.line_orders if not ro['description'].startswith('Implicit')]
+    page['line_orders'] = [[results.lines[idx].id for idx in ro] for ro in results.line_orders] if results.line_orders else []
     # build region ID to region dict
     reg_dict = {}
     for key, regs in results.regions.items():
@@ -174,15 +174,24 @@ def serialize(results: 'Segmentation',
 
         # set field to indicate the availability of baseline segmentation in
         # addition to bounding boxes
+        if record.type == 'baselines' and record.boundary:
+            line_bbox = max_bbox([record.boundary])
+            line_boundary = [list(x) for x in record.boundary]
+        elif getattr(record, 'bbox', None):
+            line_bbox = record.bbox
+            line_boundary = [[record.bbox[0], record.bbox[1]],
+                             [record.bbox[2], record.bbox[1]],
+                             [record.bbox[2], record.bbox[3]],
+                             [record.bbox[0], record.bbox[3]]]
+        else:
+            line_bbox = []
+            line_boundary = []
         line = {'id': record.id,
-                'bbox': max_bbox([record.boundary]) if record.type == 'baselines' else record.bbox,
+                'bbox': line_bbox,
                 'cuts': [list(x) for x in getattr(record, 'cuts', [])],
                 'confidences': getattr(record, 'confidences', []),
                 'recognition': [],
-                'boundary': [list(x) for x in record.boundary] if record.type == 'baselines' else [[record.bbox[0], record.bbox[1]],
-                                                                                                   [record.bbox[2], record.bbox[1]],
-                                                                                                   [record.bbox[2], record.bbox[3]],
-                                                                                                   [record.bbox[0], record.bbox[3]]],
+                'boundary': line_boundary,
                 'language': record.language,
                 'base_dir': record.base_dir,
                 'type': 'line'
@@ -232,8 +241,8 @@ def serialize(results: 'Segmentation',
     logger.debug(f'No lines given but {len(results.regions)}. Serialize all regions.')
     for reg in reg_dict.values():
         region = {'id': reg.id,
-                  'bbox': max_bbox([reg.boundary]),
-                  'boundary': [list(x) for x in reg.boundary],
+                  'bbox': max_bbox([reg.boundary]) if reg.boundary else [],
+                  'boundary': [list(x) for x in reg.boundary] if reg.boundary else [],
                   'tags': reg.tags,
                   'lines': [],
                   'type': 'region'

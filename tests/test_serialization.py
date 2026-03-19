@@ -119,6 +119,28 @@ class TestSerializations(unittest.TestCase):
                                                            lines=[],
                                                            regions=self.bl_regions)
 
+        no_boundary_line = containers.BaselineLine(
+            id='line_no_boundary',
+            baseline=[(10, 50), (200, 50)],
+            boundary=None,
+            text='test text',
+        )
+        normal_bl_line = containers.BaselineLine(
+            id='line_normal',
+            baseline=[(10, 100), (200, 100)],
+            boundary=[(10, 80), (200, 80), (200, 120), (10, 120)],
+            text='normal text',
+        )
+
+        self.bl_no_boundary_seg = containers.Segmentation(
+            type='baselines',
+            imagename='foo.png',
+            text_direction='horizontal-lr',
+            lines=[no_boundary_line, normal_bl_line],
+            script_detection=False,
+            regions={},
+        )
+
         self.metadata_steps = [containers.ProcessingStep(id=str(uuid.uuid4()),
                                                          category='preprocessing',
                                                          description='PDF image extraction',
@@ -309,3 +331,38 @@ class TestSerializations(unittest.TestCase):
         fp.write(serialization.serialize(self.bl_segmentation, image_size=(2000, 2000), template='pagexml', processing_steps=self.metadata_steps))
         validate_page(self, fp)
         roundtrip(self, self.bl_records, fp)
+
+    def test_no_boundary_alto_serialization_validation(self):
+        """
+        Validates ALTO output for lines without boundary polygon.
+        """
+        fp = StringIO()
+        fp.write(serialization.serialize(self.bl_no_boundary_seg, image_size=(2000, 2000), template='alto'))
+        validate_alto(self, fp)
+
+    def test_no_boundary_pagexml_serialization_validation(self):
+        """
+        Validates PageXML output for lines without boundary polygon.
+        """
+        fp = StringIO()
+        fp.write(serialization.serialize(self.bl_no_boundary_seg, image_size=(2000, 2000), template='pagexml'))
+        validate_page(self, fp)
+
+    def test_no_boundary_abbyyxml_serialization_validation(self):
+        """
+        Validates abbyyXML output for lines without boundary polygon.
+        """
+        fp = StringIO()
+        fp.write(serialization.serialize(self.bl_no_boundary_seg, image_size=(2000, 2000), template='abbyyxml'))
+        doc = etree.fromstring(fp.getvalue().encode('utf-8'))
+        with open(resources / 'FineReader10-schema-v1.xml') as schema_fp:
+            abbyy_schema = etree.XMLSchema(etree.parse(schema_fp))
+            abbyy_schema.assertValid(doc)
+
+    def test_no_boundary_hocr_serialization_validation(self):
+        """
+        Validates hOCR output for lines without boundary polygon.
+        """
+        fp = StringIO()
+        fp.write(serialization.serialize(self.bl_no_boundary_seg, image_size=(2000, 2000), template='hocr'))
+        validate_hocr(self, fp)

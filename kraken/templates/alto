@@ -4,7 +4,7 @@
 %}
 {% set ws_join = joiner(" ") %}
 {%+ macro render_line(page, line) +%}
-                    <TextLine ID="{{ line.id }}" HPOS="{{ line.bbox[0] }}" VPOS="{{ line.bbox[1] }}" WIDTH="{{ line.bbox[2] - line.bbox[0] }}" HEIGHT="{{ line.bbox[3] - line.bbox[1] }}"
+                    <TextLine ID="{{ line.id }}"{% if line.bbox %} HPOS="{{ line.bbox[0] }}" VPOS="{{ line.bbox[1] }}" WIDTH="{{ line.bbox[2] - line.bbox[0] }}" HEIGHT="{{ line.bbox[3] - line.bbox[1] }}"{% endif %}
                     {%- if line.baseline %} BASELINE="{{ line.baseline|sum(start=[])|join(' ') }}"{% endif %}
                     {%- if line.tags %} TAGREFS="{% set types = [] %}{% for type, label in page.typology | sort %}{% if type in line.tags %}{% set outer_loop = loop %}{% for tag_val in line.tags[type] %}{% if tag_val["type"] == label -%}{% set _ = types.append('TYPE_' ~ outer_loop.index) %}{% endif %}{% endfor %}{% endif %}{% endfor %}{{ types | join(' ') }}"{% endif %}
                     {%- if line.base_dir %} BASEDIRECTION="{{ {"L": "rtl", "R": "rtl"}[line.base_dir] }}"{% endif %}>

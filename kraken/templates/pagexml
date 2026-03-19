@@ -1,5 +1,5 @@
 {%+ macro render_line(line) +%}
-            <TextLine id="{{ line.id }}"
+            {% if line.boundary %}<TextLine id="{{ line.id }}"
                       {%- if line.tags %} custom="{% set items = [] -%}
                           {%- for k, v in line.tags | dictsort -%}
                               {%- for tag in v -%}
@@ -41,7 +41,7 @@
                 {% endfor %}
                 {%+ if line.confidences|length %}<TextEquiv conf="{{ (line.confidences|sum / line.confidences|length)|round(4) }}"><Unicode>{% for segment in line.recognition %}{{ segment.text|e }}{% endfor %}</Unicode></TextEquiv>{% endif +%}
                 {% endif %}
-            </TextLine>
+            </TextLine>{% endif %}
 {%+ endmacro %}
 <?xml version="1.0" encoding="UTF-8"?>
 <PcGts xmlns="http://schema.primaresearch.org/PAGE/gts/pagecontent/2019-07-15" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://schema.primaresearch.org/PAGE/gts/pagecontent/2019-07-15 http://schema.primaresearch.org/PAGE/gts/pagecontent/2019-07-15/pagecontent.xsd">
@@ -71,7 +71,7 @@
                     {{ items | join(' ') }}"
                     {%- endif -%}
                     {% if entity.base_dir %} readingDirection="{{ {'R': 'right-to-left', 'L': 'left-to-right'}[entity.base_dir] }}"{% endif %}>
-                {% if entity.boundary %}<Coords points="{% for point in entity.boundary %}{{ point|join(',') }}{% if not loop.last %} {% endif %}{% endfor %}"/>{% endif %}
+                {% if entity.boundary %}<Coords points="{% for point in entity.boundary %}{{ point|join(',') }}{% if not loop.last %} {% endif %}{% endfor %}"/>{% else %}<Coords points="0,0 0,0 0,0"/>{% endif %}
             {%- for line in entity.lines -%}
             {{ render_line(line) }}
             {%- endfor %}

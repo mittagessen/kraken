@@ -1,5 +1,5 @@
 {%+ macro render_line(page, line) +%}
-                    <line baseline="{{ ((line.bbox[1] + line.bbox[3]) / 2)|int }}" l="{{ line.bbox[0] }}" r="{{ line.bbox[2] }}" t="{{ line.bbox[1] }}" b="{{ line.bbox[3] }}"><formatting lang="">
+                    {% if line.bbox %}<line baseline="{{ ((line.bbox[1] + line.bbox[3]) / 2)|int }}" l="{{ line.bbox[0] }}" r="{{ line.bbox[2] }}" t="{{ line.bbox[1] }}" b="{{ line.bbox[3] }}"><formatting lang="">
                         {% for segment in line.recognition %}
                         {% for char in segment.recognition %}
                         {% if loop.first %}
@@ -10,7 +10,7 @@
                         {% endfor %}
                         {% endfor %}
                     </formatting>
-                    </line>
+                    </line>{% endif %}
 {%+ endmacro %}
 <?xml version="1.0" encoding="UTF-8"?>
 <document xmlns="http://www.abbyy.com/FineReader_xml/FineReader10-schema-v1.xml" version="1.0" producer="kraken {{ metadata.version}}">
