@@ -1,0 +1,1477 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Changelog &#8212; kraken  documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=27fed22d" />
+    <link rel="stylesheet" type="text/css" href="_static/graphviz.css?v=4ae1632d" />
+    <link rel="stylesheet" type="text/css" href="_static/custom.css?v=89a84cc7" />
+    <script src="_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="_static/doctools.js?v=9bcbadda"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="canonical" href="kraken.re/changelog.html" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="API Reference" href="api/reference.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="changelog">
+<h1>Changelog<a class="headerlink" href="#changelog" title="Link to this heading">¶</a></h1>
+<section id="release-7-0-0b7">
+<h2>7.0.0b7: 7th beta release<a class="headerlink" href="#release-7-0-0b7" title="Link to this heading">¶</a></h2>
+<p><em>Released on 2026-03-23 - <a class="reference external" href="https://github.com/mittagessen/kraken/releases/tag/7.0.0b7">GitHub</a> - <a class="reference external" href="https://pypi.org/project/kraken/7.0.0b7/">PyPI</a></em></p>
+<h1>What's Changed</h1>
+<ul>
+<li>Makes serializer and default shipped templates compatible with lines that do not have boundaries defined (the parser can emit them now)</li>
+<li>Enables deserialization in weights_only mode of training objects that have been initialized with container classes.</li>
+<li>Determines minimum kraken versions for running models from classes not weights.</li>
+</ul></section>
+<section id="release-7-0-0b6">
+<h2>7.0.0b6: 6th beta release<a class="headerlink" href="#release-7-0-0b6" title="Link to this heading">¶</a></h2>
+<p><em>Released on 2026-03-04 - <a class="reference external" href="https://github.com/mittagessen/kraken/releases/tag/7.0.0b6">GitHub</a> - <a class="reference external" href="https://pypi.org/project/kraken/7.0.0b6/">PyPI</a></em></p>
+<h1>What's changed</h1>
+<ul>
+<li>Some safetensor load validations were overly strict.</li>
+</ul></section>
+<section id="release-7-0-0b5">
+<h2>7.0.0b5: 7.0 5th beta release<a class="headerlink" href="#release-7-0-0b5" title="Link to this heading">¶</a></h2>
+<p><em>Released on 2026-02-25 - <a class="reference external" href="https://github.com/mittagessen/kraken/releases/tag/7.0.0b5">GitHub</a> - <a class="reference external" href="https://pypi.org/project/kraken/7.0.0b5/">PyPI</a></em></p>
+<h1>What's Changed</h1>
+<ul>
+<li>Sets inversion in recognizer input to previous implementation</li>
+<li>Correct cosine LR schedule in rotrain</li>
+<li>validates more metadata during model loading</li>
+<li>fixes hybrid neural reading order computation</li>
+<li>Makes <code>_merge_segmentations()</code> work with bounding box segmentations</li>
+<li>Corrects <code>ketos segtest</code> class indices and makes F1 score macro as precision/recall.</li>
+<li>Sets metrics in user_metadata field of the checkpoint</li>
+<li><code>pageseg.segment()</code> now always returns a Segmentation object</li>
+<li>Allows setting seed to 0 instead of treating it as a random seed request.</li>
+</ul></section>
+<section id="release-7-0-0b4">
+<h2>7.0.0b4: 7.0 4th beta release<a class="headerlink" href="#release-7-0-0b4" title="Link to this heading">¶</a></h2>
+<p><em>Released on 2026-02-23 - <a class="reference external" href="https://github.com/mittagessen/kraken/releases/tag/7.0.0b4">GitHub</a> - <a class="reference external" href="https://pypi.org/project/kraken/7.0.0b4/">PyPI</a></em></p>
+<h1>What's changed</h1>
+<ul>
+<li>Fixes a regression in segmentation training</li>
+<li>Updates in repository model handling/fetching</li>
+<li>Pins safetensors to 0.6.2</li>
+<li>Adds WandB logging support</li>
+</ul></section>
+<section id="release-7-0-0b3">
+<h2>7.0.0b3: 7.0 3rd beta release<a class="headerlink" href="#release-7-0-0b3" title="Link to this heading">¶</a></h2>
+<p><em>Released on 2026-02-16 - <a class="reference external" href="https://github.com/mittagessen/kraken/releases/tag/7.0.0b3">GitHub</a> - <a class="reference external" href="https://pypi.org/project/kraken/7.0.0b3/">PyPI</a></em></p>
+<h2>What's Changed</h2>
+<ul>
+<li>Rotate images according to EXIF metadata</li>
+<li>Port build system to pyproject.toml/hatchling</li>
+<li>Enables the model loading version compatibility check</li>
+<li>Enables segmentation with region-only models</li>
+<li>Fixes an incorrect metric tracking direction in reading order training.</li>
+</ul></section>
+<section id="release-7-0-0b2">
+<h2>7.0.0b2: 7.0 beta release<a class="headerlink" href="#release-7-0-0b2" title="Link to this heading">¶</a></h2>
+<p><em>Released on 2026-02-15 - <a class="reference external" href="https://github.com/mittagessen/kraken/releases/tag/7.0.0b2">GitHub</a> - <a class="reference external" href="https://pypi.org/project/kraken/7.0.0b2/">PyPI</a></em></p>
+<p>kraken 7.0 introduces major changes to training, inference, model handling, and extensibility.<br>
+If you are upgrading from 6.0.x as an average user, start with <strong>Breaking Changes</strong> and <strong>Command Line Behavior</strong>.</p>
+<h2>Installing the Beta</h2>
+<p>Install the latest available 7.0 pre-release from PyPI:</p>
+<div class="highlight highlight-source-shell notranslate position-relative overflow-auto" data-snippet-clipboard-copy-content="$ pip install --upgrade --pre kraken"><pre>$ pip install --upgrade --pre kraken</pre></div>
+<p>Install this specific beta explicitly:</p>
+<div class="highlight highlight-source-shell notranslate position-relative overflow-auto" data-snippet-clipboard-copy-content="$ pip install --upgrade &quot;kraken==7.0b1&quot;"><pre>$ pip install --upgrade <span class="pl-s"><span class="pl-pds">"</span>kraken==7.0b1<span class="pl-pds">"</span></span></pre></div>
+<h2>Breaking Changes</h2>
+<ul>
+<li>Python 3.9 support was dropped. kraken now supports Python 3.10 through 3.13.</li>
+<li>Device and precision options are now global on both <code>kraken</code> and <code>ketos</code> commands.</li>
+<li>Training and evaluation manifest option names changed from <code>--training-files/--evaluation-files</code> to <code>--training-data/--evaluation-data</code>.</li>
+<li><code>ketos train</code>, <code>ketos segtrain</code>, <code>ketos rotrain</code>, and <code>ketos pretrain</code> now produce checkpoints and convert the best checkpoint to a weights file after training.</li>
+<li>Segmentation training class filtering/merging CLI options were removed. Class mapping is now defined in YAML experiment files.</li>
+<li><code>ketos segtest</code> metrics are now computed against a configurable class mapping, and baseline detection metrics replace the older, less informative pixel accuracy/IoU-only view.</li>
+<li><code>ketos compile</code> fixed splits were removed due to a significant performance penalty. Use separate dataset files per split instead.</li>
+<li>The API for both training and inference has been reworked extensively.</li>
+<li><code>safetensors</code> is now the default output format for trained weights.</li>
+<li>Neural reading order models are only executed when using the new task API.</li>
+<li>Recognition and segmentation inference accelerators now default to <code>auto</code>, selecting the highest-performance available device.</li>
+</ul>
+<p>In practice: most existing workflows keep working after small updates, but training artifacts and API entry points changed enough that scripted pipelines and API-use will need adaptation.</p>
+<h2>Bug Fixes</h2>
+<ul>
+<li>Fixed a breaking bug in reading order models that prevented trained model weights from loading.</li>
+</ul>
+<h2>Features and Improvements</h2>
+<ul>
+<li>A plugin system now allows easy extension of kraken functionality with new segmentation, recognition, and reading order implementations.</li>
+<li>Persistent configuration through experiment YAML files has been added to <code>ketos</code>.</li>
+<li>The new recognition API supports batching plus parallelized line extraction/processing, enabling effective GPU inference. Speedups of around 80% were observed on CPU, with even larger gains with GPU acceleration.</li>
+<li>Character cuts on <code>BaselineOCRRecord</code> are now computed at initialization using a more efficient algorithm. This substantially reduces serialization overhead in the default <code>--subline-segmentation</code> mode.</li>
+<li>Baseline detection metrics inspired by the <a href="https://github.com/Transkribus/TranskribusBaseLineEvaluationScheme">Transkribus Evaluation Scheme</a> are now computed during segmentation training. Unlike older pixel-based metrics, these scores correlate more directly with actual line detection quality.</li>
+<li>The XML parser has been reworked for better robustness against invalid input. When PageXML files contain invalid image dimensions, kraken now attempts to read dimensions from the referenced image file. Reading-order parsing was also fully reimplemented to handle partial explicit orders and multi-level ordering more gracefully.</li>
+</ul>
+<h2>Plugins</h2>
+<p>kraken can now use external implementations of layout analysis, text recognition, and reading order determination through Python entry points.</p>
+<p>Plugins are distributed as regular Python packages. After installation, kraken discovers them automatically through entry points. Plugin model files are then used exactly like native kraken model files: pass them to <code>--model</code> on the CLI or load them via task classes in Python.</p>
+<p>Example workflow with a D-FINE layout analysis plugin model:</p>
+<div class="highlight highlight-source-shell notranslate position-relative overflow-auto" data-snippet-clipboard-copy-content="# install plugin package
+$ pip install git+https://github.com/mittagessen/dfine_kraken.git
+
+# run layout analysis with a plugin model file
+$ kraken -i page.tif page.json segment --baseline --model dfine_layout.safetensors"><pre><span class="pl-c"><span class="pl-c">#</span> install plugin package</span>
+$ pip install git+https://github.com/mittagessen/dfine_kraken.git
+
+<span class="pl-c"><span class="pl-c">#</span> run layout analysis with a plugin model file</span>
+$ kraken -i page.tif page.json segment --baseline --model dfine_layout.safetensors</pre></div>
+<p>The same model can be loaded programmatically with <code>SegmentationTaskModel.load_model('dfine_layout.safetensors')</code>.</p>
+<h2>Command Line Behavior</h2>
+<h3>Inference</h3>
+<p>Device and precision are now global options on <code>kraken</code>.<br>
+Set them before subcommands:</p>
+<div class="highlight highlight-source-shell notranslate position-relative overflow-auto" data-snippet-clipboard-copy-content="# CPU inference in full precision
+$ kraken -i page.tif page.txt --device cpu --precision 32-true \
+  segment -bl ocr -m model.safetensors
+
+# GPU inference with mixed bfloat16 precision
+$ kraken -i page.tif page.txt --device cuda:0 --precision bf16-mixed \
+  segment -bl ocr -m model.safetensors"><pre><span class="pl-c"><span class="pl-c">#</span> CPU inference in full precision</span>
+$ kraken -i page.tif page.txt --device cpu --precision 32-true \
+  segment -bl ocr -m model.safetensors
+
+<span class="pl-c"><span class="pl-c">#</span> GPU inference with mixed bfloat16 precision</span>
+$ kraken -i page.tif page.txt --device cuda:0 --precision bf16-mixed \
+  segment -bl ocr -m model.safetensors</pre></div>
+<p>Recognition now exposes two throughput controls:</p>
+<ul>
+<li><code>-B/--batch-size</code>: number of extracted line images sent per recognition forward pass.</li>
+<li><code>--num-line-workers</code>: number of CPU worker processes used to extract/preprocess line images. Use <code>0</code> to keep extraction in-process.</li>
+</ul>
+<div class="highlight highlight-source-shell notranslate position-relative overflow-auto" data-snippet-clipboard-copy-content="# conservative settings for small GPUs or CPU-only runs
+$ kraken -i page.tif page.txt segment -bl ocr -m model.safetensors \
+  -B 8 --num-line-workers 2
+
+# higher-throughput GPU settings
+$ kraken -i page.tif page.txt --device cuda:0 --precision bf16-mixed \
+  segment -bl ocr -m model.safetensors -B 64 --num-line-workers 8"><pre><span class="pl-c"><span class="pl-c">#</span> conservative settings for small GPUs or CPU-only runs</span>
+$ kraken -i page.tif page.txt segment -bl ocr -m model.safetensors \
+  -B 8 --num-line-workers 2
+
+<span class="pl-c"><span class="pl-c">#</span> higher-throughput GPU settings</span>
+$ kraken -i page.tif page.txt --device cuda:0 --precision bf16-mixed \
+  segment -bl ocr -m model.safetensors -B 64 --num-line-workers 8</pre></div>
+<h3>Training</h3>
+<h4>Experiment Files</h4>
+<p>Managing non-trivial training configurations from CLI flags alone was difficult, especially when heavily modifying segmentation class taxonomies. To address this, <code>ketos</code> now supports YAML experiment files.</p>
+<p>Pass an experiment file with <code>--config</code> before the command name:</p>
+<div class="highlight highlight-source-shell notranslate position-relative overflow-auto" data-snippet-clipboard-copy-content="$ ketos --config experiments.yml segtrain"><pre>$ ketos --config experiments.yml segtrain</pre></div>
+<p>YAML keys correspond to the internal parameter names used by the CLI.</p>
+<p>Minimal segmentation training experiment file:</p>
+<div class="highlight highlight-source-yaml notranslate position-relative overflow-auto" data-snippet-clipboard-copy-content="precision: 32-true
+device: auto
+num_workers: 16
+num_threads: 1
+segtrain:
+  training_data:
+    - seg_train.lst
+  evaluation_data:
+    - seg_val.lst
+  format_type: xml
+  checkpoint_path: seg_checkpoints
+  weights_format: safetensors
+  line_class_mapping:
+    - ['*', 3]
+    - ['DefaultLine', 3]"><pre><span class="pl-ent">precision</span>: <span class="pl-s">32-true</span>
+<span class="pl-ent">device</span>: <span class="pl-s">auto</span>
+<span class="pl-ent">num_workers</span>: <span class="pl-c1">16</span>
+<span class="pl-ent">num_threads</span>: <span class="pl-c1">1</span>
+<span class="pl-ent">segtrain</span>:
+  <span class="pl-ent">training_data</span>:
+    - <span class="pl-s">seg_train.lst</span>
+  <span class="pl-ent">evaluation_data</span>:
+    - <span class="pl-s">seg_val.lst</span>
+  <span class="pl-ent">format_type</span>: <span class="pl-s">xml</span>
+  <span class="pl-ent">checkpoint_path</span>: <span class="pl-s">seg_checkpoints</span>
+  <span class="pl-ent">weights_format</span>: <span class="pl-s">safetensors</span>
+  <span class="pl-ent">line_class_mapping</span>:
+    - <span class="pl-s">['*', 3]</span>
+    - <span class="pl-s">['DefaultLine', 3]</span></pre></div>
+<p>Single experiment file containing multiple commands:</p>
+<div class="highlight highlight-source-yaml notranslate position-relative overflow-auto" data-snippet-clipboard-copy-content="precision: 32-true
+device: auto
+num_workers: 16
+num_threads: 1
+
+train:
+  training_data:
+    - rec_train.lst
+  evaluation_data:
+    - rec_val.lst
+  format_type: xml
+  checkpoint_path: rec_checkpoints
+  weights_format: safetensors
+
+segtrain:
+  training_data:
+    - seg_train.lst
+  evaluation_data:
+    - seg_val.lst
+  format_type: xml
+  checkpoint_path: seg_checkpoints
+  weights_format: safetensors"><pre><span class="pl-ent">precision</span>: <span class="pl-s">32-true</span>
+<span class="pl-ent">device</span>: <span class="pl-s">auto</span>
+<span class="pl-ent">num_workers</span>: <span class="pl-c1">16</span>
+<span class="pl-ent">num_threads</span>: <span class="pl-c1">1</span>
+
+<span class="pl-ent">train</span>:
+  <span class="pl-ent">training_data</span>:
+    - <span class="pl-s">rec_train.lst</span>
+  <span class="pl-ent">evaluation_data</span>:
+    - <span class="pl-s">rec_val.lst</span>
+  <span class="pl-ent">format_type</span>: <span class="pl-s">xml</span>
+  <span class="pl-ent">checkpoint_path</span>: <span class="pl-s">rec_checkpoints</span>
+  <span class="pl-ent">weights_format</span>: <span class="pl-s">safetensors</span>
+
+<span class="pl-ent">segtrain</span>:
+  <span class="pl-ent">training_data</span>:
+    - <span class="pl-s">seg_train.lst</span>
+  <span class="pl-ent">evaluation_data</span>:
+    - <span class="pl-s">seg_val.lst</span>
+  <span class="pl-ent">format_type</span>: <span class="pl-s">xml</span>
+  <span class="pl-ent">checkpoint_path</span>: <span class="pl-s">seg_checkpoints</span>
+  <span class="pl-ent">weights_format</span>: <span class="pl-s">safetensors</span></pre></div>
+<p>Configurations for multiple commands can be saved in the same experiment file.</p>
+<p>Recommendation: move non-trivial setups (class mappings, optimizer/scheduler settings, hardware defaults) into YAML so runs are reproducible and easier to review.</p>
+<h4>Training Outputs, Checkpoints, and Weights</h4>
+<p>For <code>ketos train</code>, <code>ketos segtrain</code>, and <code>ketos rotrain</code>, training now produces Lightning checkpoints (<code>.ckpt</code>) as the primary artifact instead of writing CoreML weights directly during training.</p>
+<p>Checkpoint files include full training state (model weights, optimizer state, scheduler state, epoch/step counters, and serialized training config), enabling exact continuation of interrupted runs.</p>
+<p>There are now two distinct continuation modes:</p>
+<ul>
+<li><code>--resume</code> restores and continues from the checkpoint's exact previous training state. The checkpoint state is authoritative, even if command-line flags or config files specify different values.</li>
+<li><code>--load</code> keeps the previous fine-tune/start-new-run behavior. It loads weights only and starts a fresh run using current CLI/config hyperparameters.</li>
+</ul>
+<p>Use <code>--resume</code> when you want to continue the same run.<br>
+Use <code>--load</code> when you want to start a new run from existing weights.</p>
+<p>In addition to regular checkpoints, kraken now writes an emergency abort checkpoint by default (<code>checkpoint_abort.ckpt</code>) when a training run exits via exception (for example, a crash or a forceful abort). This gives you a recovery point even when a run terminates unexpectedly.</p>
+<p>Because checkpoints contain much more than deployable model weights and may execute arbitrary python code on load, distribute converted weights files rather than raw checkpoints. Conversion strips training-only state and produces a distribution-safe weights artifact.</p>
+<p>At the end of training, kraken automatically converts the best checkpoint into a weights file. You can also convert manually with <code>ketos convert</code>.</p>
+<p>The default weights format is now <code>safetensors</code>. Compared to legacy <code>coreml</code> weights, <code>safetensors</code> supports serialization of arbitrary model types, while <code>coreml</code> is limited to core model methods implemented in kraken.</p>
+<p>Use <code>--weights-format coreml</code> only when you explicitly need legacy compatibility.</p>
+<h3>Testing</h3>
+<p>Segmentation test output now includes metrics computed on vectorized baselines that correlate with segmentation quality, making model selection for line detection much easier. <code>segtest</code> behavior also changed with the checkpoint/weights distinction. In previous releases, test data often had to mirror post-merge/post-filter training mappings, which made evaluation cumbersome without rewriting source labels.</p>
+<p>In short: you can now evaluate more datasets directly, with less taxonomy rewriting.</p>
+<p>Example <code>segtest</code> invocation:</p>
+<div class="highlight highlight-source-shell notranslate position-relative overflow-auto" data-snippet-clipboard-copy-content="$ ketos --device cpu segtest -m best_0.9471.safetensors -e test_manifest.lst -f xml"><pre>$ ketos --device cpu segtest -m best_0.9471.safetensors -e test_manifest.lst -f xml</pre></div>
+<p>Example output excerpt:</p>
+<div class="snippet-clipboard-content notranslate position-relative overflow-auto" data-snippet-clipboard-copy-content="Category  Class Name    Pixel Accuracy  IOU    Object Count
+aux       _start_sep    1.000           1.000  N/A
+aux       _end_sep      1.000           1.000  N/A
+regions   Text_Region   0.992           0.964  184
+regions   Foot_Notes    0.973           0.887  36
+
+Class         Precision  Recall  F1
+Overall       0.947      0.933   0.940
+DefaultLine   0.959      0.946   0.952
+Marginalia    0.891      0.874   0.882"><pre lang="text" class="notranslate"><code>Category  Class Name    Pixel Accuracy  IOU    Object Count
+aux       _start_sep    1.000           1.000  N/A
+aux       _end_sep      1.000           1.000  N/A
+regions   Text_Region   0.992           0.964  184
+regions   Foot_Notes    0.973           0.887  36
+
+Class         Precision  Recall  F1
+Overall       0.947      0.933   0.940
+DefaultLine   0.959      0.946   0.952
+Marginalia    0.891      0.874   0.882
+</code></pre></div>
+<p>Class mappings are now stored in two forms in checkpoints and new weights files:</p>
+<ul>
+<li>A full mapping with all transformations (merges/filtering) from training taxonomy to model outputs.</li>
+<li>A canonical one-to-one mapping between label indices and class strings.</li>
+</ul>
+<p>By default, evaluation uses the full mapping. Canonical mapping is used when explicitly requested and as a fallback for pre-7.0 model files. Fully custom mappings can also be defined in an experiment file.</p>
+<p>Class mapping modes in <code>ketos segtest</code>:</p>
+<div class="highlight highlight-source-shell notranslate position-relative overflow-auto" data-snippet-clipboard-copy-content="# Use full (many-to-one) training mapping from checkpoint metadata
+$ ketos segtest -m model.ckpt -e test.lst --test-class-mapping-mode full
+
+# Use canonical one-to-one model output mapping
+$ ketos segtest -m model.safetensors -e test.lst --test-class-mapping-mode canonical
+
+# Provide explicit mapping for the test set taxonomy
+$ ketos --config segtest_custom.yml segtest -m model.safetensors -e test.lst \
+  --test-class-mapping-mode custom"><pre><span class="pl-c"><span class="pl-c">#</span> Use full (many-to-one) training mapping from checkpoint metadata</span>
+$ ketos segtest -m model.ckpt -e test.lst --test-class-mapping-mode full
+
+<span class="pl-c"><span class="pl-c">#</span> Use canonical one-to-one model output mapping</span>
+$ ketos segtest -m model.safetensors -e test.lst --test-class-mapping-mode canonical
+
+<span class="pl-c"><span class="pl-c">#</span> Provide explicit mapping for the test set taxonomy</span>
+$ ketos --config segtest_custom.yml segtest -m model.safetensors -e test.lst \
+  --test-class-mapping-mode custom</pre></div>
+<div class="highlight highlight-source-yaml notranslate position-relative overflow-auto" data-snippet-clipboard-copy-content="# segtest_custom.yml
+segtest:
+  line_class_mapping:
+    - ['DefaultLine', 3]
+    - ['Running_Title', 3]
+    - ['Marginal_Note', 4]
+  region_class_mapping:
+    - ['Text_Region', 5]
+    - ['Foot_Notes', 6]"><pre><span class="pl-c"><span class="pl-c">#</span> segtest_custom.yml</span>
+<span class="pl-ent">segtest</span>:
+  <span class="pl-ent">line_class_mapping</span>:
+    - <span class="pl-s">['DefaultLine', 3]</span>
+    - <span class="pl-s">['Running_Title', 3]</span>
+    - <span class="pl-s">['Marginal_Note', 4]</span>
+  <span class="pl-ent">region_class_mapping</span>:
+    - <span class="pl-s">['Text_Region', 5]</span>
+    - <span class="pl-s">['Foot_Notes', 6]</span></pre></div>
+<p>For easier debugging, <code>ketos segtest</code> now prints an explicit mapping between test-set classes and model classes, including clear indicators for merges, missing labels, and conflicts.</p>
+<p>Example class taxonomy diagnostics table:</p>
+<div class="snippet-clipboard-content notranslate position-relative overflow-auto" data-snippet-clipboard-copy-content="Class Mapping Diagnostics (model=full, dataset=effective)
+Category   Class Name      Model Idx  Dataset Idx  Observed  Effective  Status
+baselines  DefaultLine     3          3            812       812        ok
+baselines  Running_Title   3          3            57        57         ok
+baselines  Rubrication     4          -            14        0          ignored by dataset mapping
+regions    Text_Region     5          5            184       184        ok
+regions    Illustration    -          7            22        22         missing in model mapping"><pre lang="text" class="notranslate"><code>Class Mapping Diagnostics (model=full, dataset=effective)
+Category   Class Name      Model Idx  Dataset Idx  Observed  Effective  Status
+baselines  DefaultLine     3          3            812       812        ok
+baselines  Running_Title   3          3            57        57         ok
+baselines  Rubrication     4          -            14        0          ignored by dataset mapping
+regions    Text_Region     5          5            184       184        ok
+regions    Illustration    -          7            22        22         missing in model mapping
+</code></pre></div>
+<h2>API</h2>
+<h3>Configuration Classes</h3>
+<p>In previous versions of kraken, training and inference hyperparameters were defined in dictionaries in the <code>default_specs</code> module. This was error-prone and resulted in verbose code in the command line drivers.</p>
+<p>If you maintain Python training/inference scripts, migrate to typed config classes for better defaults, clearer parameter names, and safer checkpoint serialization.</p>
+<p>Before (<code>6.0.x</code>) using <code>default_specs</code> dictionaries:</p>
+<div class="highlight highlight-source-python notranslate position-relative overflow-auto" data-snippet-clipboard-copy-content="from kraken.lib.default_specs import RECOGNITION_HYPER_PARAMS
+from kraken.lib.train import RecognitionModel
+
+hyper_params = RECOGNITION_HYPER_PARAMS.copy()
+hyper_params.update({'batch_size': 8, 'lrate': 1e-3})
+model = RecognitionModel(hyper_params=hyper_params, training_data=['train.lst'])"><pre><span class="pl-k">from</span> <span class="pl-s1">kraken</span>.<span class="pl-s1">lib</span>.<span class="pl-s1">default_specs</span> <span class="pl-k">import</span> <span class="pl-c1">RECOGNITION_HYPER_PARAMS</span>
+<span class="pl-k">from</span> <span class="pl-s1">kraken</span>.<span class="pl-s1">lib</span>.<span class="pl-s1">train</span> <span class="pl-k">import</span> <span class="pl-v">RecognitionModel</span>
+
+<span class="pl-s1">hyper_params</span> <span class="pl-c1">=</span> <span class="pl-c1">RECOGNITION_HYPER_PARAMS</span>.<span class="pl-c1">copy</span>()
+<span class="pl-s1">hyper_params</span>.<span class="pl-c1">update</span>({<span class="pl-s">'batch_size'</span>: <span class="pl-c1">8</span>, <span class="pl-s">'lrate'</span>: <span class="pl-c1">1e-3</span>})
+<span class="pl-s1">model</span> <span class="pl-c1">=</span> <span class="pl-en">RecognitionModel</span>(<span class="pl-s1">hyper_params</span><span class="pl-c1">=</span><span class="pl-s1">hyper_params</span>, <span class="pl-s1">training_data</span><span class="pl-c1">=</span>[<span class="pl-s">'train.lst'</span>])</pre></div>
+<p>After (<code>7.0</code>) using typed configuration classes:</p>
+<div class="highlight highlight-source-python notranslate position-relative overflow-auto" data-snippet-clipboard-copy-content="from kraken.configs import (RecognitionInferenceConfig,
+                            VGSLRecognitionTrainingConfig,
+                            VGSLRecognitionTrainingDataConfig)
+
+infer_cfg = RecognitionInferenceConfig(batch_size=8,
+                                       num_line_workers=4,
+                                       precision='bf16-mixed')
+
+train_cfg = VGSLRecognitionTrainingConfig(lrate=1e-3,
+                                          quit='early',
+                                          epochs=24)
+data_cfg = VGSLRecognitionTrainingDataConfig(training_data=['train.lst'],
+                                             evaluation_data=['val.lst'],
+                                             format_type='xml')"><pre><span class="pl-k">from</span> <span class="pl-s1">kraken</span>.<span class="pl-s1">configs</span> <span class="pl-k">import</span> (<span class="pl-v">RecognitionInferenceConfig</span>,
+                            <span class="pl-v">VGSLRecognitionTrainingConfig</span>,
+                            <span class="pl-v">VGSLRecognitionTrainingDataConfig</span>)
+
+<span class="pl-s1">infer_cfg</span> <span class="pl-c1">=</span> <span class="pl-en">RecognitionInferenceConfig</span>(<span class="pl-s1">batch_size</span><span class="pl-c1">=</span><span class="pl-c1">8</span>,
+                                       <span class="pl-s1">num_line_workers</span><span class="pl-c1">=</span><span class="pl-c1">4</span>,
+                                       <span class="pl-s1">precision</span><span class="pl-c1">=</span><span class="pl-s">'bf16-mixed'</span>)
+
+<span class="pl-s1">train_cfg</span> <span class="pl-c1">=</span> <span class="pl-en">VGSLRecognitionTrainingConfig</span>(<span class="pl-s1">lrate</span><span class="pl-c1">=</span><span class="pl-c1">1e-3</span>,
+                                          <span class="pl-s1">quit</span><span class="pl-c1">=</span><span class="pl-s">'early'</span>,
+                                          <span class="pl-s1">epochs</span><span class="pl-c1">=</span><span class="pl-c1">24</span>)
+<span class="pl-s1">data_cfg</span> <span class="pl-c1">=</span> <span class="pl-en">VGSLRecognitionTrainingDataConfig</span>(<span class="pl-s1">training_data</span><span class="pl-c1">=</span>[<span class="pl-s">'train.lst'</span>],
+                                             <span class="pl-s1">evaluation_data</span><span class="pl-c1">=</span>[<span class="pl-s">'val.lst'</span>],
+                                             <span class="pl-s1">format_type</span><span class="pl-c1">=</span><span class="pl-s">'xml'</span>)</pre></div>
+<h3>Task-based API for Inference</h3>
+<p><code>blla.segment()</code>, <code>align.forced_align()</code>, and <code>rpred.rpred()</code>/<code>rpred.mm_rpred()</code> have been replaced by implementation-agnostic task classes that provide better performance and flexibility. The largest gains are in text recognition, where CPU inference improves by roughly 80% through parallelization. Batching additionally enables efficient GPU utilization.</p>
+<p>If you call legacy APIs directly, plan a migration to <code>kraken.tasks</code> soon. Legacy interfaces remain available for now but are deprecated.</p>
+<p>To migrate an existing segmentation workflow, replace:</p>
+<div class="highlight highlight-source-python notranslate position-relative overflow-auto" data-snippet-clipboard-copy-content="from PIL import Image
+from kraken.blla import segment
+from kraken.lib.vgsl import TorchVGSLModel
+
+model = TorchVGSLModel.load_model('/path/to/segmentation/model.coreml')
+im = Image.open('sample.jpg')
+seg = segment(im, model=model)"><pre><span class="pl-k">from</span> <span class="pl-c1">PIL</span> <span class="pl-k">import</span> <span class="pl-v">Image</span>
+<span class="pl-k">from</span> <span class="pl-s1">kraken</span>.<span class="pl-s1">blla</span> <span class="pl-k">import</span> <span class="pl-s1">segment</span>
+<span class="pl-k">from</span> <span class="pl-s1">kraken</span>.<span class="pl-s1">lib</span>.<span class="pl-s1">vgsl</span> <span class="pl-k">import</span> <span class="pl-v">TorchVGSLModel</span>
+
+<span class="pl-s1">model</span> <span class="pl-c1">=</span> <span class="pl-v">TorchVGSLModel</span>.<span class="pl-c1">load_model</span>(<span class="pl-s">'/path/to/segmentation/model.coreml'</span>)
+<span class="pl-s1">im</span> <span class="pl-c1">=</span> <span class="pl-v">Image</span>.<span class="pl-c1">open</span>(<span class="pl-s">'sample.jpg'</span>)
+<span class="pl-s1">seg</span> <span class="pl-c1">=</span> <span class="pl-en">segment</span>(<span class="pl-s1">im</span>, <span class="pl-s1">model</span><span class="pl-c1">=</span><span class="pl-s1">model</span>)</pre></div>
+<p>with:</p>
+<div class="highlight highlight-source-python notranslate position-relative overflow-auto" data-snippet-clipboard-copy-content="from PIL import Image
+from kraken.tasks import SegmentationTaskModel
+from kraken.configs import SegmentationInferenceConfig
+
+segmenter = SegmentationTaskModel.load_model('/path/to/segmentation/models.safetensors')
+im = Image.open('sample.jpg')
+seg = segmenter.predict(im=im, config=SegmentationInferenceConfig())"><pre><span class="pl-k">from</span> <span class="pl-c1">PIL</span> <span class="pl-k">import</span> <span class="pl-v">Image</span>
+<span class="pl-k">from</span> <span class="pl-s1">kraken</span>.<span class="pl-s1">tasks</span> <span class="pl-k">import</span> <span class="pl-v">SegmentationTaskModel</span>
+<span class="pl-k">from</span> <span class="pl-s1">kraken</span>.<span class="pl-s1">configs</span> <span class="pl-k">import</span> <span class="pl-v">SegmentationInferenceConfig</span>
+
+<span class="pl-s1">segmenter</span> <span class="pl-c1">=</span> <span class="pl-v">SegmentationTaskModel</span>.<span class="pl-c1">load_model</span>(<span class="pl-s">'/path/to/segmentation/models.safetensors'</span>)
+<span class="pl-s1">im</span> <span class="pl-c1">=</span> <span class="pl-v">Image</span>.<span class="pl-c1">open</span>(<span class="pl-s">'sample.jpg'</span>)
+<span class="pl-s1">seg</span> <span class="pl-c1">=</span> <span class="pl-s1">segmenter</span>.<span class="pl-c1">predict</span>(<span class="pl-s1">im</span><span class="pl-c1">=</span><span class="pl-s1">im</span>, <span class="pl-s1">config</span><span class="pl-c1">=</span><span class="pl-en">SegmentationInferenceConfig</span>())</pre></div>
+<p>For recognition. Before:</p>
+<div class="highlight highlight-source-python notranslate position-relative overflow-auto" data-snippet-clipboard-copy-content="from PIL import Image
+from kraken.rpred import rpred
+from kraken.lib.models import load_any
+
+net = load_any('/path/to/recognition/model.mlmodel')
+for record in rpred(net, im, segmentation=seg):
+    print(record)"><pre><span class="pl-k">from</span> <span class="pl-c1">PIL</span> <span class="pl-k">import</span> <span class="pl-v">Image</span>
+<span class="pl-k">from</span> <span class="pl-s1">kraken</span>.<span class="pl-s1">rpred</span> <span class="pl-k">import</span> <span class="pl-s1">rpred</span>
+<span class="pl-k">from</span> <span class="pl-s1">kraken</span>.<span class="pl-s1">lib</span>.<span class="pl-s1">models</span> <span class="pl-k">import</span> <span class="pl-s1">load_any</span>
+
+<span class="pl-s1">net</span> <span class="pl-c1">=</span> <span class="pl-en">load_any</span>(<span class="pl-s">'/path/to/recognition/model.mlmodel'</span>)
+<span class="pl-k">for</span> <span class="pl-s1">record</span> <span class="pl-c1">in</span> <span class="pl-en">rpred</span>(<span class="pl-s1">net</span>, <span class="pl-s1">im</span>, <span class="pl-s1">segmentation</span><span class="pl-c1">=</span><span class="pl-s1">seg</span>):
+    <span class="pl-en">print</span>(<span class="pl-s1">record</span>)</pre></div>
+<p>After:</p>
+<div class="highlight highlight-source-python notranslate position-relative overflow-auto" data-snippet-clipboard-copy-content="from kraken.tasks import RecognitionTaskModel
+from kraken.configs import RecognitionInferenceConfig
+
+recognizer = RecognitionTaskModel.load_model('/path/to/recognition/model.safetensors')
+for record in recognizer.predict(im=im, segmentation=seg, config=RecognitionInferenceConfig(batch_size=8, num_line_workers=4)):
+    print(record)"><pre><span class="pl-k">from</span> <span class="pl-s1">kraken</span>.<span class="pl-s1">tasks</span> <span class="pl-k">import</span> <span class="pl-v">RecognitionTaskModel</span>
+<span class="pl-k">from</span> <span class="pl-s1">kraken</span>.<span class="pl-s1">configs</span> <span class="pl-k">import</span> <span class="pl-v">RecognitionInferenceConfig</span>
+
+<span class="pl-s1">recognizer</span> <span class="pl-c1">=</span> <span class="pl-v">RecognitionTaskModel</span>.<span class="pl-c1">load_model</span>(<span class="pl-s">'/path/to/recognition/model.safetensors'</span>)
+<span class="pl-k">for</span> <span class="pl-s1">record</span> <span class="pl-c1">in</span> <span class="pl-s1">recognizer</span>.<span class="pl-c1">predict</span>(<span class="pl-s1">im</span><span class="pl-c1">=</span><span class="pl-s1">im</span>, <span class="pl-s1">segmentation</span><span class="pl-c1">=</span><span class="pl-s1">seg</span>, <span class="pl-s1">config</span><span class="pl-c1">=</span><span class="pl-en">RecognitionInferenceConfig</span>(<span class="pl-s1">batch_size</span><span class="pl-c1">=</span><span class="pl-c1">8</span>, <span class="pl-s1">num_line_workers</span><span class="pl-c1">=</span><span class="pl-c1">4</span>)):
+    <span class="pl-en">print</span>(<span class="pl-s1">record</span>)</pre></div>
+<p>Recognition now supports batching (<code>batch_size</code> in <code>RecognitionInferenceConfig</code>) and parallel line extraction (<code>num_line_workers</code>), making GPU acceleration practical.</p>
+<p>CUDA example with explicit accelerator/device settings:</p>
+<div class="highlight highlight-source-python notranslate position-relative overflow-auto" data-snippet-clipboard-copy-content="from PIL import Image
+from kraken.tasks import RecognitionTaskModel
+from kraken.configs import RecognitionInferenceConfig
+
+recognizer = RecognitionTaskModel.load_model('/path/to/recognition/model.safetensors')
+config = RecognitionInferenceConfig(accelerator='gpu',
+                                    device=[0],
+                                    precision='bf16-mixed',
+                                    batch_size=64,
+                                    num_line_workers=8)
+for record in recognizer.predict(im=Image.open('page.tif'), segmentation=seg, config=config):
+    print(record.prediction)"><pre><span class="pl-k">from</span> <span class="pl-c1">PIL</span> <span class="pl-k">import</span> <span class="pl-v">Image</span>
+<span class="pl-k">from</span> <span class="pl-s1">kraken</span>.<span class="pl-s1">tasks</span> <span class="pl-k">import</span> <span class="pl-v">RecognitionTaskModel</span>
+<span class="pl-k">from</span> <span class="pl-s1">kraken</span>.<span class="pl-s1">configs</span> <span class="pl-k">import</span> <span class="pl-v">RecognitionInferenceConfig</span>
+
+<span class="pl-s1">recognizer</span> <span class="pl-c1">=</span> <span class="pl-v">RecognitionTaskModel</span>.<span class="pl-c1">load_model</span>(<span class="pl-s">'/path/to/recognition/model.safetensors'</span>)
+<span class="pl-s1">config</span> <span class="pl-c1">=</span> <span class="pl-en">RecognitionInferenceConfig</span>(<span class="pl-s1">accelerator</span><span class="pl-c1">=</span><span class="pl-s">'gpu'</span>,
+                                    <span class="pl-s1">device</span><span class="pl-c1">=</span>[<span class="pl-c1">0</span>],
+                                    <span class="pl-s1">precision</span><span class="pl-c1">=</span><span class="pl-s">'bf16-mixed'</span>,
+                                    <span class="pl-s1">batch_size</span><span class="pl-c1">=</span><span class="pl-c1">64</span>,
+                                    <span class="pl-s1">num_line_workers</span><span class="pl-c1">=</span><span class="pl-c1">8</span>)
+<span class="pl-k">for</span> <span class="pl-s1">record</span> <span class="pl-c1">in</span> <span class="pl-s1">recognizer</span>.<span class="pl-c1">predict</span>(<span class="pl-s1">im</span><span class="pl-c1">=</span><span class="pl-v">Image</span>.<span class="pl-c1">open</span>(<span class="pl-s">'page.tif'</span>), <span class="pl-s1">segmentation</span><span class="pl-c1">=</span><span class="pl-s1">seg</span>, <span class="pl-s1">config</span><span class="pl-c1">=</span><span class="pl-s1">config</span>):
+    <span class="pl-en">print</span>(<span class="pl-s1">record</span>.<span class="pl-c1">prediction</span>)</pre></div>
+<p>The new recognition API does not support tag-based multi-model recognition (<code>rpred.mm_rpred()</code>), which was dropped to simplify batched inference.</p>
+<p>For forced alignment. Before:</p>
+<div class="highlight highlight-source-python notranslate position-relative overflow-auto" data-snippet-clipboard-copy-content="from PIL import Image
+from kraken.containers import Segmentation, BaselineLine
+from kraken.align import forced_align
+from kraken.lib.models import load_any
+
+model = load_any('model.mlmodel')
+# Create a dummy segmentation with a line and a transcription
+line = BaselineLine(baseline=[(0,0), (100,0)], boundary=[(0,-10), (100,-10), (100,10), (0,10)], text='Hello World')
+segmentation = Segmentation(imagename='image.png', lines=[line])
+
+aligned_segmentation = forced_align(segmentation, model) 
+record = aligned_segmentation.lines[0]
+print(record.prediction)
+print(record.cuts)
+"><pre><span class="pl-k">from</span> <span class="pl-c1">PIL</span> <span class="pl-k">import</span> <span class="pl-v">Image</span>
+<span class="pl-k">from</span> <span class="pl-s1">kraken</span>.<span class="pl-s1">containers</span> <span class="pl-k">import</span> <span class="pl-v">Segmentation</span>, <span class="pl-v">BaselineLine</span>
+<span class="pl-k">from</span> <span class="pl-s1">kraken</span>.<span class="pl-s1">align</span> <span class="pl-k">import</span> <span class="pl-s1">forced_align</span>
+<span class="pl-k">from</span> <span class="pl-s1">kraken</span>.<span class="pl-s1">lib</span>.<span class="pl-s1">models</span> <span class="pl-k">import</span> <span class="pl-s1">load_any</span>
+
+<span class="pl-s1">model</span> <span class="pl-c1">=</span> <span class="pl-en">load_any</span>(<span class="pl-s">'model.mlmodel'</span>)
+<span class="pl-c"># Create a dummy segmentation with a line and a transcription</span>
+<span class="pl-s1">line</span> <span class="pl-c1">=</span> <span class="pl-en">BaselineLine</span>(<span class="pl-s1">baseline</span><span class="pl-c1">=</span>[(<span class="pl-c1">0</span>,<span class="pl-c1">0</span>), (<span class="pl-c1">100</span>,<span class="pl-c1">0</span>)], <span class="pl-s1">boundary</span><span class="pl-c1">=</span>[(<span class="pl-c1">0</span>,<span class="pl-c1">-</span><span class="pl-c1">10</span>), (<span class="pl-c1">100</span>,<span class="pl-c1">-</span><span class="pl-c1">10</span>), (<span class="pl-c1">100</span>,<span class="pl-c1">10</span>), (<span class="pl-c1">0</span>,<span class="pl-c1">10</span>)], <span class="pl-s1">text</span><span class="pl-c1">=</span><span class="pl-s">'Hello World'</span>)
+<span class="pl-s1">segmentation</span> <span class="pl-c1">=</span> <span class="pl-en">Segmentation</span>(<span class="pl-s1">imagename</span><span class="pl-c1">=</span><span class="pl-s">'image.png'</span>, <span class="pl-s1">lines</span><span class="pl-c1">=</span>[<span class="pl-s1">line</span>])
+
+<span class="pl-s1">aligned_segmentation</span> <span class="pl-c1">=</span> <span class="pl-en">forced_align</span>(<span class="pl-s1">segmentation</span>, <span class="pl-s1">model</span>) 
+<span class="pl-s1">record</span> <span class="pl-c1">=</span> <span class="pl-s1">aligned_segmentation</span>.<span class="pl-c1">lines</span>[<span class="pl-c1">0</span>]
+<span class="pl-en">print</span>(<span class="pl-s1">record</span>.<span class="pl-c1">prediction</span>)
+<span class="pl-en">print</span>(<span class="pl-s1">record</span>.<span class="pl-c1">cuts</span>)</pre></div>
+<p>After:</p>
+<div class="highlight highlight-source-python notranslate position-relative overflow-auto" data-snippet-clipboard-copy-content="from PIL import Image
+from kraken.tasks import ForcedAlignmentTaskModel
+from kraken.containers import Segmentation, BaselineLine
+from kraken.configs import RecognitionInferenceConfig
+                                                                                                                    
+# Assume `model.mlmodel` is a recognition model
+model = ForcedAlignmentTaskModel.load_model('model.mlmodel')
+im = Image.open('image.png')
+# Create a dummy segmentation with a line and a transcription
+line = BaselineLine(baseline=[(0,0), (100,0)], boundary=[(0,-10), (100,-10), (100,10), (0,10)], text='Hello World')
+segmentation = Segmentation(lines=[line])
+config = RecognitionInferenceConfig()
+                                                                                                                    
+aligned_segmentation = model.predict(im, segmentation, config)
+record = aligned_segmentation.lines[0]
+print(record.prediction)
+print(record.cuts)"><pre><span class="pl-k">from</span> <span class="pl-c1">PIL</span> <span class="pl-k">import</span> <span class="pl-v">Image</span>
+<span class="pl-k">from</span> <span class="pl-s1">kraken</span>.<span class="pl-s1">tasks</span> <span class="pl-k">import</span> <span class="pl-v">ForcedAlignmentTaskModel</span>
+<span class="pl-k">from</span> <span class="pl-s1">kraken</span>.<span class="pl-s1">containers</span> <span class="pl-k">import</span> <span class="pl-v">Segmentation</span>, <span class="pl-v">BaselineLine</span>
+<span class="pl-k">from</span> <span class="pl-s1">kraken</span>.<span class="pl-s1">configs</span> <span class="pl-k">import</span> <span class="pl-v">RecognitionInferenceConfig</span>
+                                                                                                                    
+<span class="pl-c"># Assume `model.mlmodel` is a recognition model</span>
+<span class="pl-s1">model</span> <span class="pl-c1">=</span> <span class="pl-v">ForcedAlignmentTaskModel</span>.<span class="pl-c1">load_model</span>(<span class="pl-s">'model.mlmodel'</span>)
+<span class="pl-s1">im</span> <span class="pl-c1">=</span> <span class="pl-v">Image</span>.<span class="pl-c1">open</span>(<span class="pl-s">'image.png'</span>)
+<span class="pl-c"># Create a dummy segmentation with a line and a transcription</span>
+<span class="pl-s1">line</span> <span class="pl-c1">=</span> <span class="pl-en">BaselineLine</span>(<span class="pl-s1">baseline</span><span class="pl-c1">=</span>[(<span class="pl-c1">0</span>,<span class="pl-c1">0</span>), (<span class="pl-c1">100</span>,<span class="pl-c1">0</span>)], <span class="pl-s1">boundary</span><span class="pl-c1">=</span>[(<span class="pl-c1">0</span>,<span class="pl-c1">-</span><span class="pl-c1">10</span>), (<span class="pl-c1">100</span>,<span class="pl-c1">-</span><span class="pl-c1">10</span>), (<span class="pl-c1">100</span>,<span class="pl-c1">10</span>), (<span class="pl-c1">0</span>,<span class="pl-c1">10</span>)], <span class="pl-s1">text</span><span class="pl-c1">=</span><span class="pl-s">'Hello World'</span>)
+<span class="pl-s1">segmentation</span> <span class="pl-c1">=</span> <span class="pl-en">Segmentation</span>(<span class="pl-s1">lines</span><span class="pl-c1">=</span>[<span class="pl-s1">line</span>])
+<span class="pl-s1">config</span> <span class="pl-c1">=</span> <span class="pl-en">RecognitionInferenceConfig</span>()
+                                                                                                                    
+<span class="pl-s1">aligned_segmentation</span> <span class="pl-c1">=</span> <span class="pl-s1">model</span>.<span class="pl-c1">predict</span>(<span class="pl-s1">im</span>, <span class="pl-s1">segmentation</span>, <span class="pl-s1">config</span>)
+<span class="pl-s1">record</span> <span class="pl-c1">=</span> <span class="pl-s1">aligned_segmentation</span>.<span class="pl-c1">lines</span>[<span class="pl-c1">0</span>]
+<span class="pl-en">print</span>(<span class="pl-s1">record</span>.<span class="pl-c1">prediction</span>)
+<span class="pl-en">print</span>(<span class="pl-s1">record</span>.<span class="pl-c1">cuts</span>)</pre></div>
+<p>The old interfaces remain available but are deprecated and will be removed in kraken 8.</p>
+<h3>Training Refactor</h3>
+<p>The training module has been moved from <code>kraken.lib.train</code> to <code>kraken.train</code> (with reading order and pretraining modules in <code>kraken.lib.ro</code>/<code>kraken.lib.pretrain</code>). Training now uses explicit configuration objects and consistently uses LightningDataModule-derived classes.</p>
+<p>If you run training programmatically, update imports and constructors and switch hyperparameter dicts to config objects.</p>
+<p>Before (<code>6.0.x</code>) style instantiation:</p>
+<div class="highlight highlight-source-python notranslate position-relative overflow-auto" data-snippet-clipboard-copy-content="from kraken.lib.train import RecognitionModel, SegmentationModel
+from kraken.lib.pretrain.model import RecognitionPretrainModel
+from kraken.lib.ro.model import RODataModule, ROModel
+
+rec = RecognitionModel(hyper_params={'batch_size': 8},
+                       training_data=['train.lst'],
+                       evaluation_data=['val.lst'])
+seg = SegmentationModel(hyper_params={'epochs': 50},
+                        training_data=['seg_train.lst'],
+                        evaluation_data=['seg_val.lst'])
+pre = RecognitionPretrainModel(hyper_params={'mask_prob': 0.5})
+ro_dm = RODataModule(training_data=['ro_train.lst'], evaluation_data=['ro_val.lst'])
+ro = ROModel(feature_dim=128, class_mapping={'default': 1}, hyper_params={'epochs': 3000})"><pre><span class="pl-k">from</span> <span class="pl-s1">kraken</span>.<span class="pl-s1">lib</span>.<span class="pl-s1">train</span> <span class="pl-k">import</span> <span class="pl-v">RecognitionModel</span>, <span class="pl-v">SegmentationModel</span>
+<span class="pl-k">from</span> <span class="pl-s1">kraken</span>.<span class="pl-s1">lib</span>.<span class="pl-s1">pretrain</span>.<span class="pl-s1">model</span> <span class="pl-k">import</span> <span class="pl-v">RecognitionPretrainModel</span>
+<span class="pl-k">from</span> <span class="pl-s1">kraken</span>.<span class="pl-s1">lib</span>.<span class="pl-s1">ro</span>.<span class="pl-s1">model</span> <span class="pl-k">import</span> <span class="pl-v">RODataModule</span>, <span class="pl-v">ROModel</span>
+
+<span class="pl-s1">rec</span> <span class="pl-c1">=</span> <span class="pl-en">RecognitionModel</span>(<span class="pl-s1">hyper_params</span><span class="pl-c1">=</span>{<span class="pl-s">'batch_size'</span>: <span class="pl-c1">8</span>},
+                       <span class="pl-s1">training_data</span><span class="pl-c1">=</span>[<span class="pl-s">'train.lst'</span>],
+                       <span class="pl-s1">evaluation_data</span><span class="pl-c1">=</span>[<span class="pl-s">'val.lst'</span>])
+<span class="pl-s1">seg</span> <span class="pl-c1">=</span> <span class="pl-en">SegmentationModel</span>(<span class="pl-s1">hyper_params</span><span class="pl-c1">=</span>{<span class="pl-s">'epochs'</span>: <span class="pl-c1">50</span>},
+                        <span class="pl-s1">training_data</span><span class="pl-c1">=</span>[<span class="pl-s">'seg_train.lst'</span>],
+                        <span class="pl-s1">evaluation_data</span><span class="pl-c1">=</span>[<span class="pl-s">'seg_val.lst'</span>])
+<span class="pl-s1">pre</span> <span class="pl-c1">=</span> <span class="pl-en">RecognitionPretrainModel</span>(<span class="pl-s1">hyper_params</span><span class="pl-c1">=</span>{<span class="pl-s">'mask_prob'</span>: <span class="pl-c1">0.5</span>})
+<span class="pl-s1">ro_dm</span> <span class="pl-c1">=</span> <span class="pl-en">RODataModule</span>(<span class="pl-s1">training_data</span><span class="pl-c1">=</span>[<span class="pl-s">'ro_train.lst'</span>], <span class="pl-s1">evaluation_data</span><span class="pl-c1">=</span>[<span class="pl-s">'ro_val.lst'</span>])
+<span class="pl-s1">ro</span> <span class="pl-c1">=</span> <span class="pl-en">ROModel</span>(<span class="pl-s1">feature_dim</span><span class="pl-c1">=</span><span class="pl-c1">128</span>, <span class="pl-s1">class_mapping</span><span class="pl-c1">=</span>{<span class="pl-s">'default'</span>: <span class="pl-c1">1</span>}, <span class="pl-s1">hyper_params</span><span class="pl-c1">=</span>{<span class="pl-s">'epochs'</span>: <span class="pl-c1">3000</span>})</pre></div>
+<p>After (<code>7.0</code>) style instantiation:</p>
+<div class="highlight highlight-source-python notranslate position-relative overflow-auto" data-snippet-clipboard-copy-content="from kraken.train import (KrakenTrainer,
+                          VGSLRecognitionDataModule, VGSLRecognitionModel,
+                          BLLASegmentationDataModule, BLLASegmentationModel)
+from kraken.lib.pretrain import PretrainDataModule, RecognitionPretrainModel
+from kraken.lib.ro import RODataModule, ROModel
+from kraken.configs import (VGSLRecognitionTrainingConfig, VGSLRecognitionTrainingDataConfig,
+                            BLLASegmentationTrainingConfig, BLLASegmentationTrainingDataConfig,
+                            VGSLPreTrainingConfig, VGSLPreTrainingDataConfig,
+                            ROTrainingConfig, ROTrainingDataConfig)
+
+rec_dm = VGSLRecognitionDataModule(VGSLRecognitionTrainingDataConfig(training_data=['train.lst'], evaluation_data=['val.lst'], format_type='xml'))
+rec_model = VGSLRecognitionModel(VGSLRecognitionTrainingConfig(epochs=24, quit='early'))
+
+seg_dm = BLLASegmentationDataModule(BLLASegmentationTrainingDataConfig(training_data=['seg_train.lst'], evaluation_data=['seg_val.lst'], format_type='xml'))
+seg_model = BLLASegmentationModel(BLLASegmentationTrainingConfig(epochs=50, quit='fixed'))
+
+pre_dm = PretrainDataModule(VGSLPreTrainingDataConfig(training_data=['pretrain_train.lst'], evaluation_data=['pretrain_val.lst'], format_type='path'))
+pre_model = RecognitionPretrainModel(VGSLPreTrainingConfig(mask_prob=0.5))
+
+ro_dm = RODataModule(ROTrainingDataConfig(training_data=['ro_train.lst'], evaluation_data=['ro_val.lst'], format_type='xml', level='baselines'))
+ro_model = ROModel(ROTrainingConfig(epochs=3000, quit='early'))"><pre><span class="pl-k">from</span> <span class="pl-s1">kraken</span>.<span class="pl-s1">train</span> <span class="pl-k">import</span> (<span class="pl-v">KrakenTrainer</span>,
+                          <span class="pl-v">VGSLRecognitionDataModule</span>, <span class="pl-v">VGSLRecognitionModel</span>,
+                          <span class="pl-v">BLLASegmentationDataModule</span>, <span class="pl-v">BLLASegmentationModel</span>)
+<span class="pl-k">from</span> <span class="pl-s1">kraken</span>.<span class="pl-s1">lib</span>.<span class="pl-s1">pretrain</span> <span class="pl-k">import</span> <span class="pl-v">PretrainDataModule</span>, <span class="pl-v">RecognitionPretrainModel</span>
+<span class="pl-k">from</span> <span class="pl-s1">kraken</span>.<span class="pl-s1">lib</span>.<span class="pl-s1">ro</span> <span class="pl-k">import</span> <span class="pl-v">RODataModule</span>, <span class="pl-v">ROModel</span>
+<span class="pl-k">from</span> <span class="pl-s1">kraken</span>.<span class="pl-s1">configs</span> <span class="pl-k">import</span> (<span class="pl-v">VGSLRecognitionTrainingConfig</span>, <span class="pl-v">VGSLRecognitionTrainingDataConfig</span>,
+                            <span class="pl-v">BLLASegmentationTrainingConfig</span>, <span class="pl-v">BLLASegmentationTrainingDataConfig</span>,
+                            <span class="pl-v">VGSLPreTrainingConfig</span>, <span class="pl-v">VGSLPreTrainingDataConfig</span>,
+                            <span class="pl-v">ROTrainingConfig</span>, <span class="pl-v">ROTrainingDataConfig</span>)
+
+<span class="pl-s1">rec_dm</span> <span class="pl-c1">=</span> <span class="pl-en">VGSLRecognitionDataModule</span>(<span class="pl-en">VGSLRecognitionTrainingDataConfig</span>(<span class="pl-s1">training_data</span><span class="pl-c1">=</span>[<span class="pl-s">'train.lst'</span>], <span class="pl-s1">evaluation_data</span><span class="pl-c1">=</span>[<span class="pl-s">'val.lst'</span>], <span class="pl-s1">format_type</span><span class="pl-c1">=</span><span class="pl-s">'xml'</span>))
+<span class="pl-s1">rec_model</span> <span class="pl-c1">=</span> <span class="pl-en">VGSLRecognitionModel</span>(<span class="pl-en">VGSLRecognitionTrainingConfig</span>(<span class="pl-s1">epochs</span><span class="pl-c1">=</span><span class="pl-c1">24</span>, <span class="pl-s1">quit</span><span class="pl-c1">=</span><span class="pl-s">'early'</span>))
+
+<span class="pl-s1">seg_dm</span> <span class="pl-c1">=</span> <span class="pl-en">BLLASegmentationDataModule</span>(<span class="pl-en">BLLASegmentationTrainingDataConfig</span>(<span class="pl-s1">training_data</span><span class="pl-c1">=</span>[<span class="pl-s">'seg_train.lst'</span>], <span class="pl-s1">evaluation_data</span><span class="pl-c1">=</span>[<span class="pl-s">'seg_val.lst'</span>], <span class="pl-s1">format_type</span><span class="pl-c1">=</span><span class="pl-s">'xml'</span>))
+<span class="pl-s1">seg_model</span> <span class="pl-c1">=</span> <span class="pl-en">BLLASegmentationModel</span>(<span class="pl-en">BLLASegmentationTrainingConfig</span>(<span class="pl-s1">epochs</span><span class="pl-c1">=</span><span class="pl-c1">50</span>, <span class="pl-s1">quit</span><span class="pl-c1">=</span><span class="pl-s">'fixed'</span>))
+
+<span class="pl-s1">pre_dm</span> <span class="pl-c1">=</span> <span class="pl-en">PretrainDataModule</span>(<span class="pl-en">VGSLPreTrainingDataConfig</span>(<span class="pl-s1">training_data</span><span class="pl-c1">=</span>[<span class="pl-s">'pretrain_train.lst'</span>], <span class="pl-s1">evaluation_data</span><span class="pl-c1">=</span>[<span class="pl-s">'pretrain_val.lst'</span>], <span class="pl-s1">format_type</span><span class="pl-c1">=</span><span class="pl-s">'path'</span>))
+<span class="pl-s1">pre_model</span> <span class="pl-c1">=</span> <span class="pl-en">RecognitionPretrainModel</span>(<span class="pl-en">VGSLPreTrainingConfig</span>(<span class="pl-s1">mask_prob</span><span class="pl-c1">=</span><span class="pl-c1">0.5</span>))
+
+<span class="pl-s1">ro_dm</span> <span class="pl-c1">=</span> <span class="pl-en">RODataModule</span>(<span class="pl-en">ROTrainingDataConfig</span>(<span class="pl-s1">training_data</span><span class="pl-c1">=</span>[<span class="pl-s">'ro_train.lst'</span>], <span class="pl-s1">evaluation_data</span><span class="pl-c1">=</span>[<span class="pl-s">'ro_val.lst'</span>], <span class="pl-s1">format_type</span><span class="pl-c1">=</span><span class="pl-s">'xml'</span>, <span class="pl-s1">level</span><span class="pl-c1">=</span><span class="pl-s">'baselines'</span>))
+<span class="pl-s1">ro_model</span> <span class="pl-c1">=</span> <span class="pl-en">ROModel</span>(<span class="pl-en">ROTrainingConfig</span>(<span class="pl-s1">epochs</span><span class="pl-c1">=</span><span class="pl-c1">3000</span>, <span class="pl-s1">quit</span><span class="pl-c1">=</span><span class="pl-s">'early'</span>))</pre></div>
+<p>The <code>KrakenTrainer</code> module works as before.</p>
+<p>In addition, separate test routines are now integrated into Lightning modules, allowing straightforward programmatic execution of the test loop for segmentation and recognition.</p>
+<p>Example: programmatic test loop execution with <code>KrakenTrainer.test()</code>:</p>
+<p><code>KrakenTrainer.test()</code> returns typed metric containers:</p>
+<ul>
+<li>Recognition (<code>RecognitionTestMetrics</code>): <code>character_counts</code>, <code>num_errors</code>, <code>cer</code>, <code>wer</code>, <code>case_insensitive_cer</code>, <code>confusions</code>, <code>scripts</code>, <code>insertions</code>, <code>deletes</code>, <code>substitutions</code></li>
+<li>Segmentation (<code>SegmentationTestMetrics</code>): <code>class_pixel_accuracy</code>, <code>mean_accuracy</code>, <code>class_iu</code>, <code>mean_iu</code>, <code>freq_iu</code>, <code>region_iu</code>, <code>bl_precision</code>, <code>bl_recall</code>, <code>bl_f1</code>, <code>bl_detection_per_class</code></li>
+</ul>
+<div class="highlight highlight-source-python notranslate position-relative overflow-auto" data-snippet-clipboard-copy-content="from kraken.train import (KrakenTrainer,
+                          VGSLRecognitionDataModule, VGSLRecognitionModel,
+                          BLLASegmentationDataModule, BLLASegmentationModel)
+from kraken.configs import (VGSLRecognitionTrainingConfig, VGSLRecognitionTrainingDataConfig,
+                            BLLASegmentationTrainingConfig, BLLASegmentationTestDataConfig)
+
+trainer = KrakenTrainer(accelerator='cpu', devices=1, precision='32-true')
+
+rec_model = VGSLRecognitionModel.load_from_weights('rec_best.safetensors',
+                                                   VGSLRecognitionTrainingConfig())
+rec_dm = VGSLRecognitionDataModule(VGSLRecognitionTrainingDataConfig(test_data=['rec_test.lst'], format_type='xml'))
+rec_metrics = trainer.test(rec_model, rec_dm)
+
+seg_model = BLLASegmentationModel.load_from_weights('seg_best.safetensors',
+                                                    BLLASegmentationTrainingConfig())
+seg_dm = BLLASegmentationDataModule(BLLASegmentationTestDataConfig(test_data=['seg_test.lst'],
+                                                                   format_type='xml',
+                                                                   test_class_mapping_mode='canonical'))
+seg_metrics = trainer.test(seg_model, seg_dm)"><pre><span class="pl-k">from</span> <span class="pl-s1">kraken</span>.<span class="pl-s1">train</span> <span class="pl-k">import</span> (<span class="pl-v">KrakenTrainer</span>,
+                          <span class="pl-v">VGSLRecognitionDataModule</span>, <span class="pl-v">VGSLRecognitionModel</span>,
+                          <span class="pl-v">BLLASegmentationDataModule</span>, <span class="pl-v">BLLASegmentationModel</span>)
+<span class="pl-k">from</span> <span class="pl-s1">kraken</span>.<span class="pl-s1">configs</span> <span class="pl-k">import</span> (<span class="pl-v">VGSLRecognitionTrainingConfig</span>, <span class="pl-v">VGSLRecognitionTrainingDataConfig</span>,
+                            <span class="pl-v">BLLASegmentationTrainingConfig</span>, <span class="pl-v">BLLASegmentationTestDataConfig</span>)
+
+<span class="pl-s1">trainer</span> <span class="pl-c1">=</span> <span class="pl-en">KrakenTrainer</span>(<span class="pl-s1">accelerator</span><span class="pl-c1">=</span><span class="pl-s">'cpu'</span>, <span class="pl-s1">devices</span><span class="pl-c1">=</span><span class="pl-c1">1</span>, <span class="pl-s1">precision</span><span class="pl-c1">=</span><span class="pl-s">'32-true'</span>)
+
+<span class="pl-s1">rec_model</span> <span class="pl-c1">=</span> <span class="pl-v">VGSLRecognitionModel</span>.<span class="pl-c1">load_from_weights</span>(<span class="pl-s">'rec_best.safetensors'</span>,
+                                                   <span class="pl-en">VGSLRecognitionTrainingConfig</span>())
+<span class="pl-s1">rec_dm</span> <span class="pl-c1">=</span> <span class="pl-en">VGSLRecognitionDataModule</span>(<span class="pl-en">VGSLRecognitionTrainingDataConfig</span>(<span class="pl-s1">test_data</span><span class="pl-c1">=</span>[<span class="pl-s">'rec_test.lst'</span>], <span class="pl-s1">format_type</span><span class="pl-c1">=</span><span class="pl-s">'xml'</span>))
+<span class="pl-s1">rec_metrics</span> <span class="pl-c1">=</span> <span class="pl-s1">trainer</span>.<span class="pl-c1">test</span>(<span class="pl-s1">rec_model</span>, <span class="pl-s1">rec_dm</span>)
+
+<span class="pl-s1">seg_model</span> <span class="pl-c1">=</span> <span class="pl-v">BLLASegmentationModel</span>.<span class="pl-c1">load_from_weights</span>(<span class="pl-s">'seg_best.safetensors'</span>,
+                                                    <span class="pl-en">BLLASegmentationTrainingConfig</span>())
+<span class="pl-s1">seg_dm</span> <span class="pl-c1">=</span> <span class="pl-en">BLLASegmentationDataModule</span>(<span class="pl-en">BLLASegmentationTestDataConfig</span>(<span class="pl-s1">test_data</span><span class="pl-c1">=</span>[<span class="pl-s">'seg_test.lst'</span>],
+                                                                   <span class="pl-s1">format_type</span><span class="pl-c1">=</span><span class="pl-s">'xml'</span>,
+                                                                   <span class="pl-s1">test_class_mapping_mode</span><span class="pl-c1">=</span><span class="pl-s">'canonical'</span>))
+<span class="pl-s1">seg_metrics</span> <span class="pl-c1">=</span> <span class="pl-s1">trainer</span>.<span class="pl-c1">test</span>(<span class="pl-s1">seg_model</span>, <span class="pl-s1">seg_dm</span>)</pre></div>
+<h3>Plugin System and Model Base Classes</h3>
+<p>kraken now supports alternative segmentation and recognition implementations through a plugin system based on Python entry points. To be compatible, plugins must implement the interfaces defined by the abstract <code>kraken.models.BaseModel</code> class. <code>kraken.models.SegmentationBaseModel</code> and <code>kraken.models.RecognitionBaseModel</code> provide task-specific base interfaces.</p>
+<p>This is primarily relevant if you are extending kraken with custom model types or distributing third-party integrations.</p>
+<p>Rough implementation skeletons:</p>
+<div class="highlight highlight-source-python notranslate position-relative overflow-auto" data-snippet-clipboard-copy-content="from torch import nn
+from kraken.models import BaseModel, SegmentationBaseModel, RecognitionBaseModel
+
+class MySegmentationModel(nn.Module, SegmentationBaseModel):
+    _kraken_min_version = '7.0.0'
+    model_type = ['segmentation']
+
+    def prepare_for_inference(self, config): self.eval()
+    def predict(self, im): ...
+
+
+class MyRecognitionModel(nn.Module, RecognitionBaseModel):
+    _kraken_min_version = '7.0.0'
+    model_type = ['recognition']
+
+    def prepare_for_inference(self, config): self.eval()
+    def predict(self, im, segmentation): ..."><pre><span class="pl-k">from</span> <span class="pl-s1">torch</span> <span class="pl-k">import</span> <span class="pl-s1">nn</span>
+<span class="pl-k">from</span> <span class="pl-s1">kraken</span>.<span class="pl-s1">models</span> <span class="pl-k">import</span> <span class="pl-v">BaseModel</span>, <span class="pl-v">SegmentationBaseModel</span>, <span class="pl-v">RecognitionBaseModel</span>
+
+<span class="pl-k">class</span> <span class="pl-v">MySegmentationModel</span>(<span class="pl-s1">nn</span>.<span class="pl-c1">Module</span>, <span class="pl-v">SegmentationBaseModel</span>):
+    <span class="pl-s1">_kraken_min_version</span> <span class="pl-c1">=</span> <span class="pl-s">'7.0.0'</span>
+    <span class="pl-s1">model_type</span> <span class="pl-c1">=</span> [<span class="pl-s">'segmentation'</span>]
+
+    <span class="pl-k">def</span> <span class="pl-en">prepare_for_inference</span>(<span class="pl-s1">self</span>, <span class="pl-s1">config</span>): <span class="pl-s1">self</span>.<span class="pl-c1">eval</span>()
+    <span class="pl-k">def</span> <span class="pl-en">predict</span>(<span class="pl-s1">self</span>, <span class="pl-s1">im</span>): ...
+
+
+<span class="pl-k">class</span> <span class="pl-v">MyRecognitionModel</span>(<span class="pl-s1">nn</span>.<span class="pl-c1">Module</span>, <span class="pl-v">RecognitionBaseModel</span>):
+    <span class="pl-s1">_kraken_min_version</span> <span class="pl-c1">=</span> <span class="pl-s">'7.0.0'</span>
+    <span class="pl-s1">model_type</span> <span class="pl-c1">=</span> [<span class="pl-s">'recognition'</span>]
+
+    <span class="pl-k">def</span> <span class="pl-en">prepare_for_inference</span>(<span class="pl-s1">self</span>, <span class="pl-s1">config</span>): <span class="pl-s1">self</span>.<span class="pl-c1">eval</span>()
+    <span class="pl-k">def</span> <span class="pl-en">predict</span>(<span class="pl-s1">self</span>, <span class="pl-s1">im</span>, <span class="pl-s1">segmentation</span>): ...</pre></div>
+<p>To be discoverable by kraken, these classes must be registered as entry points in your setup.cfg or similar under the <code>kraken.models</code> group with their class name:</p>
+<p>Example from kraken's own <code>setup.cfg</code>:</p>
+<div class="highlight highlight-source-ini notranslate position-relative overflow-auto" data-snippet-clipboard-copy-content="[entry_points]
+kraken.models =
+  TorchVGSLModel = kraken.lib.vgsl:TorchVGSLModel
+  Wav2Vec2Mask = kraken.lib.pretrain:Wav2Vec2Mask
+  ROMLP = kraken.lib.ro:ROMLP"><pre><span class="pl-en">[entry_points]</span>
+<span class="pl-k">kraken.models</span> =
+  <span class="pl-k">TorchVGSLModel</span> = kraken.lib.vgsl:TorchVGSLModel
+  <span class="pl-k">Wav2Vec2Mask</span> = kraken.lib.pretrain:Wav2Vec2Mask
+  <span class="pl-k">ROMLP</span> = kraken.lib.ro:ROMLP</pre></div>
+<p>There is an example plugin in <a href="https://github.com/mittagessen/dfine_kraken">D-FINE kraken</a> incorporating the D-FINE object detector for layout analysis.</p>
+<h3>Model Handling</h3>
+<p>kraken replaced type-specific model loaders with a modular serialization/deserialization architecture. Models can also be loaded directly via task APIs. The default serialization format is now <code>safetensors</code>, which supports arbitrary model types. The new API in <code>kraken.models</code> can read (<code>kraken.models.load_models</code>) and write model collections (<code>kraken.models.write_safetensors</code>). Model files are designed to contain multiple models (for example, layout + reading order), so these routines accept and return lists of models. You can mix "native" kraken implementations and plugin implementations in the same model file, such as a BLLA line segmentation and D-FINE region segmentation model. CoreML support remains, but only for legacy models from kraken 6 and earlier.</p>
+<p>For most users: prefer <code>safetensors</code>, treat checkpoints as training artifacts, and distribute converted weights files.</p>
+<p>Before (<code>6.0.x</code>) model loading:</p>
+<div class="highlight highlight-source-python notranslate position-relative overflow-auto" data-snippet-clipboard-copy-content="# recognition
+from kraken.lib.models import load_any
+rec_model = load_any('recognition_model.mlmodel')
+
+# segmentation
+from kraken.lib.vgsl import TorchVGSLModel
+seg_model = TorchVGSLModel.load_model('segmentation_model.mlmodel')"><pre><span class="pl-c"># recognition</span>
+<span class="pl-k">from</span> <span class="pl-s1">kraken</span>.<span class="pl-s1">lib</span>.<span class="pl-s1">models</span> <span class="pl-k">import</span> <span class="pl-s1">load_any</span>
+<span class="pl-s1">rec_model</span> <span class="pl-c1">=</span> <span class="pl-en">load_any</span>(<span class="pl-s">'recognition_model.mlmodel'</span>)
+
+<span class="pl-c"># segmentation</span>
+<span class="pl-k">from</span> <span class="pl-s1">kraken</span>.<span class="pl-s1">lib</span>.<span class="pl-s1">vgsl</span> <span class="pl-k">import</span> <span class="pl-v">TorchVGSLModel</span>
+<span class="pl-s1">seg_model</span> <span class="pl-c1">=</span> <span class="pl-v">TorchVGSLModel</span>.<span class="pl-c1">load_model</span>(<span class="pl-s">'segmentation_model.mlmodel'</span>)</pre></div>
+<p>After (<code>7.0</code>) unified loading:</p>
+<div class="highlight highlight-source-python notranslate position-relative overflow-auto" data-snippet-clipboard-copy-content="from kraken.models import load_models
+from kraken.tasks import RecognitionTaskModel, SegmentationTaskModel
+
+# load by task type
+rec_models = load_models('model_bundle.safetensors', tasks=['recognition'])
+seg_and_ro_models = load_models('model_bundle.safetensors', tasks=['segmentation', 'reading_order'])
+
+# use via task API
+recognizer = RecognitionTaskModel(rec_models)
+segmenter = SegmentationTaskModel(seg_and_ro_models)"><pre><span class="pl-k">from</span> <span class="pl-s1">kraken</span>.<span class="pl-s1">models</span> <span class="pl-k">import</span> <span class="pl-s1">load_models</span>
+<span class="pl-k">from</span> <span class="pl-s1">kraken</span>.<span class="pl-s1">tasks</span> <span class="pl-k">import</span> <span class="pl-v">RecognitionTaskModel</span>, <span class="pl-v">SegmentationTaskModel</span>
+
+<span class="pl-c"># load by task type</span>
+<span class="pl-s1">rec_models</span> <span class="pl-c1">=</span> <span class="pl-en">load_models</span>(<span class="pl-s">'model_bundle.safetensors'</span>, <span class="pl-s1">tasks</span><span class="pl-c1">=</span>[<span class="pl-s">'recognition'</span>])
+<span class="pl-s1">seg_and_ro_models</span> <span class="pl-c1">=</span> <span class="pl-en">load_models</span>(<span class="pl-s">'model_bundle.safetensors'</span>, <span class="pl-s1">tasks</span><span class="pl-c1">=</span>[<span class="pl-s">'segmentation'</span>, <span class="pl-s">'reading_order'</span>])
+
+<span class="pl-c"># use via task API</span>
+<span class="pl-s1">recognizer</span> <span class="pl-c1">=</span> <span class="pl-en">RecognitionTaskModel</span>(<span class="pl-s1">rec_models</span>)
+<span class="pl-s1">segmenter</span> <span class="pl-c1">=</span> <span class="pl-en">SegmentationTaskModel</span>(<span class="pl-s1">seg_and_ro_models</span>)</pre></div>
+<p>The new model stack explicitly distinguishes checkpoints from weights files. After training, checkpoints should be converted to weights. The universal conversion routine <code>kraken.models.convert_models</code> relies on additional entry points: a checkpoint LightningModule (or compatible class exposing <code>load_from_checkpoint</code>) and any configuration classes serialized into model weights. During conversion, checkpoints are loaded in <code>weights_only</code> mode. To support safe deserialization, kraken adds all classes registered under <code>kraken.configs</code> to PyTorch safe globals.</p>
+<p>Minimal plugin registration in <code>setup.cfg</code> for checkpoint conversion:</p>
+<div class="highlight highlight-source-ini notranslate position-relative overflow-auto" data-snippet-clipboard-copy-content="[entry_points]
+kraken.lightning_modules =
+  MyVGSLLightningModule = mypkg.training:MyVGSLLightningModule
+kraken.configs =
+  MyTrainingConfig = mypkg.configs:MyTrainingConfig
+kraken.models =
+  MyModel = mypkg.models:MyModel"><pre><span class="pl-en">[entry_points]</span>
+<span class="pl-k">kraken.lightning_modules</span> =
+  <span class="pl-k">MyVGSLLightningModule</span> = mypkg.training:MyVGSLLightningModule
+<span class="pl-k">kraken.configs</span> =
+  <span class="pl-k">MyTrainingConfig</span> = mypkg.configs:MyTrainingConfig
+<span class="pl-k">kraken.models</span> =
+  <span class="pl-k">MyModel</span> = mypkg.models:MyModel</pre></div>
+<p>Checkpoint/weights conversion examples:</p>
+<div class="highlight highlight-source-shell notranslate position-relative overflow-auto" data-snippet-clipboard-copy-content="# CLI
+$ ketos convert -i checkpoint_09-0.9431.ckpt -o model_best.safetensors"><pre><span class="pl-c"><span class="pl-c">#</span> CLI</span>
+$ ketos convert -i checkpoint_09-0.9431.ckpt -o model_best.safetensors</pre></div>
+<div class="highlight highlight-source-python notranslate position-relative overflow-auto" data-snippet-clipboard-copy-content="from kraken.models import convert_models, load_models
+from kraken.models.convert import load_from_checkpoint
+
+# checkpoint to weights
+convert_models(['checkpoint_09-0.9431.ckpt'], 'model_best.safetensors')
+
+# load lightning module from checkpoint (weights_only mode)
+module = load_from_checkpoint('checkpoint_09-0.9431.ckpt')
+net = module.net
+
+# load converted weights
+models = load_models('model_best.safetensors')"><pre><span class="pl-k">from</span> <span class="pl-s1">kraken</span>.<span class="pl-s1">models</span> <span class="pl-k">import</span> <span class="pl-s1">convert_models</span>, <span class="pl-s1">load_models</span>
+<span class="pl-k">from</span> <span class="pl-s1">kraken</span>.<span class="pl-s1">models</span>.<span class="pl-s1">convert</span> <span class="pl-k">import</span> <span class="pl-s1">load_from_checkpoint</span>
+
+<span class="pl-c"># checkpoint to weights</span>
+<span class="pl-en">convert_models</span>([<span class="pl-s">'checkpoint_09-0.9431.ckpt'</span>], <span class="pl-s">'model_best.safetensors'</span>)
+
+<span class="pl-c"># load lightning module from checkpoint (weights_only mode)</span>
+<span class="pl-s1">module</span> <span class="pl-c1">=</span> <span class="pl-en">load_from_checkpoint</span>(<span class="pl-s">'checkpoint_09-0.9431.ckpt'</span>)
+<span class="pl-s1">net</span> <span class="pl-c1">=</span> <span class="pl-s1">module</span>.<span class="pl-c1">net</span>
+
+<span class="pl-c"># load converted weights</span>
+<span class="pl-s1">models</span> <span class="pl-c1">=</span> <span class="pl-en">load_models</span>(<span class="pl-s">'model_best.safetensors'</span>)</pre></div></section>
+<section id="release-6-0-4">
+<h2>6.0.4: Hotfix release for blla.segment()<a class="headerlink" href="#release-6-0-4" title="Link to this heading">¶</a></h2>
+<p><em>Released on 2026-02-13 - <a class="reference external" href="https://github.com/mittagessen/kraken/releases/tag/6.0.4">GitHub</a> - <a class="reference external" href="https://pypi.org/project/kraken/6.0.4/">PyPI</a></em></p>
+<p>Corrects a regression where <code>blla.segment()</code> would not load a default model when none was explicitly defined on the CLI.</p></section>
+<section id="release-6-0-3">
+<h2>6.0.3<a class="headerlink" href="#release-6-0-3" title="Link to this heading">¶</a></h2>
+<p><em>Released on 2025-12-13 - <a class="reference external" href="https://github.com/mittagessen/kraken/releases/tag/6.0.3">GitHub</a> - <a class="reference external" href="https://pypi.org/project/kraken/6.0.3/">PyPI</a></em></p>
+<h2>Bug Fixes</h2>
+<ul>
+<li>Fixes a regression in tag-based recognition.</li>
+<li>Pin rich to below 14.1 and relax pytorch pin to 2.9.x.</li>
+<li>Remove <code>--device</code> option from <code>ketos rotrain</code> and use the value from the base command instead.</li>
+<li>Fixes small typos in documentation (Stefan Weil) <a href="https://github.com/mittagessen/kraken/pull/741" data-hovercard-type="pull_request" data-hovercard-url="/mittagessen/kraken/pull/741/hovercard">#741</a></li>
+</ul></section>
+<section id="release-6-0-2">
+<h2>6.0.2 hotfix release<a class="headerlink" href="#release-6-0-2" title="Link to this heading">¶</a></h2>
+<p><em>Released on 2025-12-11 - <a class="reference external" href="https://github.com/mittagessen/kraken/releases/tag/6.0.2">GitHub</a> - <a class="reference external" href="https://pypi.org/project/kraken/6.0.2/">PyPI</a></em></p>
+<p>Another hotfix release. <code>blla.segment()</code> would access incorrect fields of the new tags data structure.</p></section>
+<section id="release-6-0-1">
+<h2>6.0.1 hotfix release<a class="headerlink" href="#release-6-0-1" title="Link to this heading">¶</a></h2>
+<p><em>Released on 2025-12-11 - <a class="reference external" href="https://github.com/mittagessen/kraken/releases/tag/6.0.1">GitHub</a> - <a class="reference external" href="https://pypi.org/project/kraken/6.0.1/">PyPI</a></em></p>
+<p>This is a hotfix release pinning click to below <code>8.3</code> as flag option parsing is inconsistent in later releases.</p></section>
+<section id="release-6-0-0">
+<h2>6.0.0<a class="headerlink" href="#release-6-0-0" title="Link to this heading">¶</a></h2>
+<p><em>Released on 2025-09-03 - <a class="reference external" href="https://github.com/mittagessen/kraken/releases/tag/6.0.0">GitHub</a> - <a class="reference external" href="https://pypi.org/project/kraken/6.0.0/">PyPI</a></em></p>
+<p>The 6.0 release does not introduce any major new features but changes the behavior of multiple components and introduces non-backward-compatible API changes, necessitating a major release.</p>
+<h2>Backward-incompatible changes</h2>
+<p>Ketos subcommand options that were shared by many commands, namely <code>--device</code>, <code>--workers</code>, <code>--precision</code>, and <code>--threads</code> have been moved to the main command.</p>
+<p>For <code>ketos compile</code>:</p>
+<div class="snippet-clipboard-content notranslate position-relative overflow-auto" data-snippet-clipboard-copy-content="ketos compile --workers 16 .... # OLD
+ketos --workers 16 compile ... # NEW"><pre class="notranslate"><code>ketos compile --workers 16 .... # OLD
+ketos --workers 16 compile ... # NEW
+</code></pre></div>
+<p>For <code>ketos train/segtrain/rotrain/test/segtest/pretrain</code>:</p>
+<div class="snippet-clipboard-content notranslate position-relative overflow-auto" data-snippet-clipboard-copy-content="ketos train -d cuda:0 --workers 16 --threads 23 --precision bf16-true # OLD
+ketos -d cuda:0 --workers 16 --threads 23 --precision bf16-true # NEW"><pre class="notranslate"><code>ketos train -d cuda:0 --workers 16 --threads 23 --precision bf16-true # OLD
+ketos -d cuda:0 --workers 16 --threads 23 --precision bf16-true # NEW
+</code></pre></div>
+<p>Tag parsing has changed which not only affects the internal data structures of the container classes but also the user-facing command line interface. The mapping of line tags to recognition models in the <code>kraken ocr</code>'s <code>-m</code> argument now always uses the resolved type of the line. The resolved type is determined for ALTO files by any tag reference pointing to a tag element either with a <code>TYPE</code> attribute with value <code>type</code> or no <code>TYPE</code> attribute at all. For PageXML files this is determined by the custom string <code>structure {type: $value;}</code>.</p>
+<p>These changes are in preparation for the eventual removal of per-tag-recognition as it prevents optimizing recognition throughput with batching.</p>
+<h2>New features</h2>
+<p>The model repository has seen a major upgrade with a new metadata schema called <a href="https://github.com/mittagessen/htrmopo">HTRMoPo</a> that allows uploading more model types (segmentation, recognition, reading order, ...) and includes support for informative huggingface-style model cards. The new implementation also caches the model repository state for faster querying, has support for versioned models, and allows filtering of output based on various metadata fields. Interaction with the repository using the command line drivers is documented <a href="https://kraken.re/6.0.0/advanced/repo.html" rel="nofollow">here</a>.</p>
+<p>The API and command line driver for reading order model training (<code>ketos rotrain</code>) now supports the same filtering and merging options as the segmentation training tools which makes it easier to train RO models when the corresponding segmentation model has been trained using these options.</p>
+<p>Testing recognition models with <code>ketos test</code> now also computes a case-insensitive character error rate. (Thanks Weslley Oliveira!).</p>
+<p>Per-step and average epoch training loss is now printed on the progress bars of all training tools (<code>ketos pretrain, ketos rotrain, ketos segtrain, ketos train</code>).</p>
+<p>The <a href="/mittagessen/kraken/blob/6.0.0/kraken/contrib/repolygonize.py">contrib/repolygonize.py</a> now allows setting the scale of the polygonization input with the <code>--scale</code> option. (Thanks Weslley Oliveira!)</p>
+<p><a href="/mittagessen/kraken/blob/6.0.0/kraken/contrib/set_seg_options.py">contrib/set_seg_options.py</a> can set the segmentation model option for line location to centerline as well.</p>
+<p>A new <a href="/mittagessen/kraken/blob/6.0.0/kraken/contrib/add_neural_ro.py">contrib/add_neural_ro.py</a> script can be used to add a new reading order generated by a neural reading order model to an existing XML facsimile.</p>
+<p>A softmax temperature option has been added to smooth out the confidence distribution of the character confidences of text recognition output. The option is available as an argument to <code>TorchSeqRecognizer</code> and the <code>--temperature</code> setting on the <code>kraken ocr</code> subcommand.</p>
+<h2>Removed features</h2>
+<p>The synthetic line generation tools were removed as they were only useful for training legacy line-strip recognition models. The recommended alternative that is compatible with baseline-style models is the new <a href="https://github.com/mittagessen/pangoline">pangoline</a> tool. A short description how to prepare kraken training data with it is available <a href="https://kraken.re/6.0.0/training/synth.html#ketos-synth" rel="nofollow">here</a> in the docs.</p>
+<p>Likewise, the legacy HTML file-based transcription environment was removed as it never supported transcription of baseline segmentation data. <a href="https://escriptorium.fr" rel="nofollow">eScriptorium</a> is the suggested replacement.</p>
+<p>Installation through <a href="https://anaconda.org" rel="nofollow">anaconda</a> is gone. Due to coreml not being maintained in conda-forge it has not been possible to do a pure conda installation without side-loading packages through pip for a long while.</p>
+<h2>Misc. Changes</h2>
+<p>All valid floating point precision values known to pytorch lightning can now be used with the <code>--precision</code> option of <code>ketos</code>.</p>
+<p><code>scripts.json</code> has been updated to include the new scripts encoded by Unicode 16.</p>
+<p>The reading order training code has been refactored.</p>
+<p>Region filtering now supports types containing <code>$</code>.</p>
+<p><a href="/mittagessen/kraken/blob/6.0.0/kraken/contrib/extract_lines.py">contrib/extract_lines.py</a> writes output always as RGB images.</p>
+<p>The pytorch pin has been relaxed to accept versions between 2.4.0 and 2.7.x.</p>
+<h2>API changes</h2>
+<p>The XML parsing, container classes, and tagging have been revamped, introducing a number of changes.</p>
+<h3>Tags</h3>
+<p>Tags on the container classes (<code>Region, BaselineLine, BboxLine</code>) were previously a simple dictionary containing string keys and values which was less expressive than the Transkribus-style custom strings mapping an identifier to one or more dictionaries, e.g. <code>language {id: eng; name: English} language {id: heb; name: Hebrew}</code>. With the current release all tags are in dict-list-of-dicts format, taking the example above <code>{'language': [{'id': 'eng', 'name': 'English'}, {'id': 'heb', 'name': 'Hebrew'}]}</code>, no matter their source (PageXML or ALTO files). Tags parsed from ALTO's tag reference system, which only allows serialization of key-value paris, are expanded by introducing a dummy key 'type' in the value dicts, i.e.</p>
+<div class="snippet-clipboard-content notranslate position-relative overflow-auto" data-snippet-clipboard-copy-content="&lt;Tags&gt;
+&lt;OtherTag&gt; ID=&quot;foo&quot; LABEL=&quot;heb&quot; TYPE=&quot;language&quot;/&gt;
+...
+&lt;/Tags&gt;
+...
+&lt;TextLine ... TAGREFS=&quot;foo&quot;&gt;..."><pre class="notranslate"><code>&lt;Tags&gt;
+&lt;OtherTag&gt; ID="foo" LABEL="heb" TYPE="language"/&gt;
+...
+&lt;/Tags&gt;
+...
+&lt;TextLine ... TAGREFS="foo"&gt;...
+</code></pre></div>
+<p>will have a value of the tags property of the parsed line <code>{'language': [{'type': 'heb'}]}</code>. When multiple tags with the same <code>TYPE</code> are referenced, the value dicts will be aggregated into a list (PageXML custom string are treated analogously):</p>
+<div class="snippet-clipboard-content notranslate position-relative overflow-auto" data-snippet-clipboard-copy-content="&lt;Tags&gt;
+&lt;OtherTag&gt; ID=&quot;foo&quot; LABEL=&quot;heb&quot; TYPE=&quot;language&quot;/&gt;
+&lt;OtherTag&gt; ID=&quot;foo&quot; LABEL=&quot;eng&quot; TYPE=&quot;language&quot;/&gt;
+...
+&lt;/Tags&gt;
+...
+&lt;TextLine ... TAGREFS=&quot;foo&quot;&gt;..."><pre class="notranslate"><code>&lt;Tags&gt;
+&lt;OtherTag&gt; ID="foo" LABEL="heb" TYPE="language"/&gt;
+&lt;OtherTag&gt; ID="foo" LABEL="eng" TYPE="language"/&gt;
+...
+&lt;/Tags&gt;
+...
+&lt;TextLine ... TAGREFS="foo"&gt;...
+</code></pre></div>
+<p>will be parsed as <code>{'language': [{'type': 'heb'}, {'type': 'eng']}</code>. The <code>TYPE</code> field on ALTO files is not obligatory, if it is missing the <code>TYPE</code> will be treated as having the value <code>type</code>.</p>
+<h3>Baseline and Bbox XML parsing</h3>
+<p>The <code>XMLPage</code> class is now able to parse input facsimile files as either containing bounding-box or baselines by changing the value of the <code>linetype</code> argument:</p>
+<div class="snippet-clipboard-content notranslate position-relative overflow-auto" data-snippet-clipboard-copy-content="&gt; from kraken.lib.xml import XMLPage
+&gt; doc = XMLPage('alto.xml', linetype='baselines').to_container()
+&gt; print(doc.type)
+baselines
+&gt; doc.lines[0]
+BaselineLine(id='eSc_line_192895', baseline=[(848, 682), (934, 678), (1027, 689), (1214, 696), (2731, 700)], boundary=[(844, 678), (851, 635), (1038, 649), (1053, 635), (1110, 635), (1182, 664), (1311, 656), (1351, 635), (1365, 649), (1469, 635), (1505, 664), (1552, 646), (1570, 660), (1599, 635), (1685, 667), (1746, 653), (1786, 664), (1822, 639), (1947, 667), (2199, 667), (2289, 639), (2346, 667), (2386, 649), (2422, 667), (2497, 667), (2526, 642), (2619, 664), (2637, 649), (2670, 667), (2716, 656), (2727, 696), (2716, 761), (2673, 761), (2645, 735), (2555, 739), (2537, 753), (2508, 743), (2490, 761), (2458, 735), (2393, 757), (2364, 739), (2267, 761), (2163, 743), (2080, 761), (2005, 739), (1969, 761), (1929, 739), (1865, 757), (1807, 739), (1764, 761), (1732, 739), (1602, 761), (1530, 743), (1509, 753), (1484, 735), (1459, 757), (1405, 743), (1351, 757), (1304, 735), (1283, 757), (1232, 757), (1193, 732), (1168, 757), (1124, 757), (1067, 732), (1045, 746), (999, 732), (848, 732)], text=&quot;בשאול וגו' ˙ אם יחבאו בראש הכרמל וגו' אם ילכו בשבי וגו' אין חשך ואין [צל']&quot;, base_dir='L', type='baselines', imagename=None, tags=None, split=None, regions=['eSc_textblock_10523'], language=['iai'])
+&gt; doc = XMLPage('alto.xml', linetype='bbox').to_container()
+&gt; print(doc.type)
+bbox
+&gt; doc.lines[0]
+BBoxLine(id='eSc_line_192895', bbox=(844, 635, 2727, 761), text=&quot;בשאול וגו' ˙ אם יחבאו בראש הכרמל וגו' אם ילכו בשבי וגו' אין חשך ואין [צל']&quot;, base_dir='L', type='bbox', imagename=None, tags=None, split=None, regions=['eSc_textblock_10523'], text_direction='horizontal-lr', language=['iai'])"><pre class="notranslate"><code>&gt; from kraken.lib.xml import XMLPage
+&gt; doc = XMLPage('alto.xml', linetype='baselines').to_container()
+&gt; print(doc.type)
+baselines
+&gt; doc.lines[0]
+BaselineLine(id='eSc_line_192895', baseline=[(848, 682), (934, 678), (1027, 689), (1214, 696), (2731, 700)], boundary=[(844, 678), (851, 635), (1038, 649), (1053, 635), (1110, 635), (1182, 664), (1311, 656), (1351, 635), (1365, 649), (1469, 635), (1505, 664), (1552, 646), (1570, 660), (1599, 635), (1685, 667), (1746, 653), (1786, 664), (1822, 639), (1947, 667), (2199, 667), (2289, 639), (2346, 667), (2386, 649), (2422, 667), (2497, 667), (2526, 642), (2619, 664), (2637, 649), (2670, 667), (2716, 656), (2727, 696), (2716, 761), (2673, 761), (2645, 735), (2555, 739), (2537, 753), (2508, 743), (2490, 761), (2458, 735), (2393, 757), (2364, 739), (2267, 761), (2163, 743), (2080, 761), (2005, 739), (1969, 761), (1929, 739), (1865, 757), (1807, 739), (1764, 761), (1732, 739), (1602, 761), (1530, 743), (1509, 753), (1484, 735), (1459, 757), (1405, 743), (1351, 757), (1304, 735), (1283, 757), (1232, 757), (1193, 732), (1168, 757), (1124, 757), (1067, 732), (1045, 746), (999, 732), (848, 732)], text="בשאול וגו' ˙ אם יחבאו בראש הכרמל וגו' אם ילכו בשבי וגו' אין חשך ואין [צל']", base_dir='L', type='baselines', imagename=None, tags=None, split=None, regions=['eSc_textblock_10523'], language=['iai'])
+&gt; doc = XMLPage('alto.xml', linetype='bbox').to_container()
+&gt; print(doc.type)
+bbox
+&gt; doc.lines[0]
+BBoxLine(id='eSc_line_192895', bbox=(844, 635, 2727, 761), text="בשאול וגו' ˙ אם יחבאו בראש הכרמל וגו' אם ילכו בשבי וגו' אין חשך ואין [צל']", base_dir='L', type='bbox', imagename=None, tags=None, split=None, regions=['eSc_textblock_10523'], text_direction='horizontal-lr', language=['iai'])
+</code></pre></div>
+<p>This simplifies using text recognition models trained on bounding box data with input data in XML format. Instead of manually creating the appropriate <code>Segmentation</code> object it is now possible to just run the parser with <code>linetype</code> set and hand the container to <code>rpred.rpred()</code>.</p>
+<p>When the source files are PageXML, the bounding boxes around lines are computed from the maximum extend of the line bounding polygon. For ALTO files the bounding boxes are taken from the <code>HPOS, VPOS, HEIGHT, WIDTH</code> attributes which means that no bounding polygons need to be defined in a <code>Shape</code> element.</p>
+<h3>Language parsing</h3>
+<p>In addition, it now parses language information in source files, <code>Region/BBoxLine/BaselineLine</code> classes have a new <code>language</code> property containing a list of language identifiers, and the standard output format templates serialize the field correctly. For PageXML files these identifiers are validated to the ISO639-3 standard, for ALTO files the values are gathered as is. Inheritance from the page and region level is handled correctly but the notion of <code>primaryLanguage</code> and <code>secondaryLanguage</code> attributes is lost during parsing as they are merged with any language identifiers in the custom string. For ALTO files language information is taken from the <code>LANG</code> attribute and any references to tags that have a type of <code>language</code>. The current uses of this system are limited but are in preparation for integration of the new <a href="https://github.com/mittagessen/party">party</a> recognizer.</p>
+<h3>Hyperparameter register</h3>
+<p><a href="/mittagessen/kraken/blob/6.0.0/kraken/lib/register.py">lib/register.py</a> is a new module that contains valid values for hyperparameters like optimizers, schedulers, precision, and stoppers.</p>
+<h2>Bugfixes</h2>
+<ul>
+<li><a class="commit-link" data-hovercard-type="commit" data-hovercard-url="https://github.com/mittagessen/kraken/commit/0053402978c08a25c95e0a20ab0a4cfa89518e3f/hovercard" href="https://github.com/mittagessen/kraken/commit/0053402978c08a25c95e0a20ab0a4cfa89518e3f"><tt>0053402</tt></a>: Correct return value for image load error in extract line &amp; line path (rlskoeser) <a href="https://github.com/mittagessen/kraken/pull/665" data-hovercard-type="pull_request" data-hovercard-url="/mittagessen/kraken/pull/665/hovercard">#665</a></li>
+<li><a class="commit-link" data-hovercard-type="commit" data-hovercard-url="https://github.com/mittagessen/kraken/commit/d3565877577484424685569b1ac64ff7afb00819/hovercard" href="https://github.com/mittagessen/kraken/commit/d3565877577484424685569b1ac64ff7afb00819"><tt>d356587</tt></a>: Add a test for image error handling (rlskoeser) <a href="https://github.com/mittagessen/kraken/pull/665" data-hovercard-type="pull_request" data-hovercard-url="/mittagessen/kraken/pull/665/hovercard">#665</a></li>
+<li><a class="commit-link" data-hovercard-type="commit" data-hovercard-url="https://github.com/mittagessen/kraken/commit/bbf433675b96856c3c1af952fa2cb194fbaf8f0b/hovercard" href="https://github.com/mittagessen/kraken/commit/bbf433675b96856c3c1af952fa2cb194fbaf8f0b"><tt>bbf4336</tt></a>: Fix Augmentation Issues (Weslley Oliveira) <a href="https://github.com/mittagessen/kraken/pull/673" data-hovercard-type="pull_request" data-hovercard-url="/mittagessen/kraken/pull/673/hovercard">#673</a></li>
+<li><a class="commit-link" data-hovercard-type="commit" data-hovercard-url="https://github.com/mittagessen/kraken/commit/b435c77ba4065a9c401979cfb40eb13333d948d6/hovercard" href="https://github.com/mittagessen/kraken/commit/b435c77ba4065a9c401979cfb40eb13333d948d6"><tt>b435c77</tt></a>: Bug fix for class determination in RO dataset</li>
+<li><a class="commit-link" data-hovercard-type="commit" data-hovercard-url="https://github.com/mittagessen/kraken/commit/8a13475cf7c0d507aa61c639f91c2fa096792572/hovercard" href="https://github.com/mittagessen/kraken/commit/8a13475cf7c0d507aa61c639f91c2fa096792572"><tt>8a13475</tt></a>: Fix a situation where unicodedata.category is not covering up enough (Thibault Clérice) <a href="https://github.com/mittagessen/kraken/pull/692" data-hovercard-type="pull_request" data-hovercard-url="/mittagessen/kraken/pull/692/hovercard">#692</a></li>
+<li><a class="commit-link" data-hovercard-type="commit" data-hovercard-url="https://github.com/mittagessen/kraken/commit/9a218ce8294b4dd3174d83bfc1a7a52df14a9686/hovercard" href="https://github.com/mittagessen/kraken/commit/9a218ce8294b4dd3174d83bfc1a7a52df14a9686"><tt>9a218ce</tt></a>: Prefix uuids with <code>_</code> to make them valid xml:ids</li>
+</ul>
+<p>Among many others.</p></section>
+<section id="release-5-2-9">
+<h2>5.2.9 - Bugfix release<a class="headerlink" href="#release-5-2-9" title="Link to this heading">¶</a></h2>
+<p><em>Released on 2024-08-27 - <a class="reference external" href="https://github.com/mittagessen/kraken/releases/tag/5.2.9">GitHub</a> - <a class="reference external" href="https://pypi.org/project/kraken/5.2.9/">PyPI</a></em></p>
+<h2>What's Changed</h2>
+<ul>
+<li>Pins python-bidi to a version that supports our internal data structure mangling</li>
+<li>Fixes a small regression in pretraining</li>
+<li>Various PageXML serialization improvements</li>
+<li>ketos now prints a helpful message when trying to use a binary file with the <code>-t/-e</code> options expecting manifest files</li>
+<li>Fixes serialization of dummy boxes by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/PonteIneptique/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/PonteIneptique">@PonteIneptique</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2342999419" data-permission-text="Title is private" data-url="https://github.com/mittagessen/kraken/issues/612" data-hovercard-type="pull_request" data-hovercard-url="/mittagessen/kraken/pull/612/hovercard" href="https://github.com/mittagessen/kraken/pull/612">#612</a></li>
+<li>Update alto to not produce Polygon tag on default blocks by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/PonteIneptique/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/PonteIneptique">@PonteIneptique</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2392618911" data-permission-text="Title is private" data-url="https://github.com/mittagessen/kraken/issues/620" data-hovercard-type="pull_request" data-hovercard-url="/mittagessen/kraken/pull/620/hovercard" href="https://github.com/mittagessen/kraken/pull/620">#620</a></li>
+<li>corrected mask of patch by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/saiprabhath2002/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/saiprabhath2002">@saiprabhath2002</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2385748516" data-permission-text="Title is private" data-url="https://github.com/mittagessen/kraken/issues/617" data-hovercard-type="pull_request" data-hovercard-url="/mittagessen/kraken/pull/617/hovercard" href="https://github.com/mittagessen/kraken/pull/617">#617</a></li>
+</ul>
+<h2>New Contributors</h2>
+<ul>
+<li><a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/saiprabhath2002/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/saiprabhath2002">@saiprabhath2002</a> made their first contribution in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2385748516" data-permission-text="Title is private" data-url="https://github.com/mittagessen/kraken/issues/617" data-hovercard-type="pull_request" data-hovercard-url="/mittagessen/kraken/pull/617/hovercard" href="https://github.com/mittagessen/kraken/pull/617">#617</a></li>
+</ul>
+<p><strong>Full Changelog</strong>: <a class="commit-link" href="https://github.com/mittagessen/kraken/compare/5.2.5...5.2.9"><tt>5.2.5...5.2.9</tt></a></p></section>
+<section id="release-5-2-5">
+<h2>5.2.5 Bugfix release<a class="headerlink" href="#release-5-2-5" title="Link to this heading">¶</a></h2>
+<p><em>Released on 2024-05-23 - <a class="reference external" href="https://github.com/mittagessen/kraken/releases/tag/5.2.5">GitHub</a> - <a class="reference external" href="https://pypi.org/project/kraken/5.2.5/">PyPI</a></em></p>
+<ul>
+<li>Fixes XML serialization of segmentation results (<a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2267420365" data-permission-text="Title is private" data-url="https://github.com/mittagessen/kraken/issues/597" data-hovercard-type="issue" data-hovercard-url="/mittagessen/kraken/issues/597/hovercard" href="https://github.com/mittagessen/kraken/issues/597">#597</a>)</li>
+<li>Removes regression in polygonization code introduced with performance enhancements (<a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2292105049" data-permission-text="Title is private" data-url="https://github.com/mittagessen/kraken/issues/605" data-hovercard-type="issue" data-hovercard-url="/mittagessen/kraken/issues/605/hovercard" href="https://github.com/mittagessen/kraken/issues/605">#605</a>)</li>
+<li><code>extract_polygons()</code> now raises an exception when processing baselines &lt; 5px in length (<a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2295251041" data-permission-text="Title is private" data-url="https://github.com/mittagessen/kraken/issues/606" data-hovercard-type="issue" data-hovercard-url="/mittagessen/kraken/issues/606/hovercard" href="https://github.com/mittagessen/kraken/issues/606">#606</a>)</li>
+<li>Various small improvements to <code>contrib/segmentation_overlay.py</code></li>
+<li><code>ketos compile</code> progress bar now displays elapsed/remaining time (<a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1710104155" data-permission-text="Title is private" data-url="https://github.com/mittagessen/kraken/issues/504" data-hovercard-type="issue" data-hovercard-url="/mittagessen/kraken/issues/504/hovercard" href="https://github.com/mittagessen/kraken/issues/504">#504</a>)</li>
+</ul></section>
+<section id="release-5-2-4">
+<h2>5.2.4: Hotfix release<a class="headerlink" href="#release-5-2-4" title="Link to this heading">¶</a></h2>
+<p><em>Released on 2024-05-09 - <a class="reference external" href="https://github.com/mittagessen/kraken/releases/tag/5.2.4">GitHub</a> - <a class="reference external" href="https://pypi.org/project/kraken/5.2.4/">PyPI</a></em></p>
+<ul>
+<li>Fixes a regression in container-based binary dataset building</li>
+<li>Fixes spurious updates of validation metrics after sanity checking</li>
+</ul></section>
+<section id="release-5-2-3">
+<h2>5.2.3: Hotfix for segmentation training<a class="headerlink" href="#release-5-2-3" title="Link to this heading">¶</a></h2>
+<p><em>Released on 2024-05-09 - <a class="reference external" href="https://github.com/mittagessen/kraken/releases/tag/5.2.3">GitHub</a> - <a class="reference external" href="https://pypi.org/project/kraken/5.2.3/">PyPI</a></em></p>
+<h2>What's Changed</h2>
+<ul>
+<li>Hotfix for segmentation training</li>
+</ul></section>
+<section id="release-5-2-2">
+<h2>5.2.2: Hotfix for no_segmentation mode recognition<a class="headerlink" href="#release-5-2-2" title="Link to this heading">¶</a></h2>
+<p><em>Released on 2024-04-30 - <a class="reference external" href="https://github.com/mittagessen/kraken/releases/tag/5.2.2">GitHub</a> - <a class="reference external" href="https://pypi.org/project/kraken/5.2.2/">PyPI</a></em></p>
+<p>Hotfix release fixing a regression in no_segmentation recognition.</p></section>
+<section id="release-5-2-1">
+<h2>5.2.1 hotfix release<a class="headerlink" href="#release-5-2-1" title="Link to this heading">¶</a></h2>
+<p><em>Released on 2024-04-22 - <a class="reference external" href="https://github.com/mittagessen/kraken/releases/tag/5.2.1">GitHub</a> - <a class="reference external" href="https://pypi.org/project/kraken/5.2.1/">PyPI</a></em></p>
+<p>This release contains two small fixes for a regression related to bumping lightning up to 2.2 and a crash in <code>Segmentation</code> instantiation occurring when the first region type does not contain a region/dict.</p></section>
+<section id="release-5-2">
+<h2>5.2: 5.0 release with minor bugfixes<a class="headerlink" href="#release-5-2" title="Link to this heading">¶</a></h2>
+<p><em>Released on 2024-04-21 - <a class="reference external" href="https://github.com/mittagessen/kraken/releases/tag/5.2">GitHub</a> - <a class="reference external" href="https://pypi.org/project/kraken/5.2/">PyPI</a></em></p>
+<p>Kraken 5.x is a major release introducing trainable reading order, a cleaner API, and changes resulting in a ~50% performance improvement of recognition inference, in addition to a large number of smaller bug fixes and stability improvements.</p>
+<h2>What's Changed</h2>
+<ul>
+<li>Trainable reading order based on an neural order relation operator adapted from <a href="https://ieeexplore.ieee.org/document/9413256" rel="nofollow">this</a> method (<a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="1670040950" data-permission-text="Title is private" data-url="https://github.com/mittagessen/kraken/issues/492" data-hovercard-type="pull_request" data-hovercard-url="/mittagessen/kraken/pull/492/hovercard" href="https://github.com/mittagessen/kraken/pull/492">#492</a>)</li>
+<li>Updates to the ALTO/PageXML templates and the serializer which correct serialization of region and line taxonomies, use UUIDs, and reuse identifiers from input XML files in output.</li>
+<li>Requirements are now mostly pinned to avoid pytorch/lightning accuracy and speed regressions that popped up semi-regularly with more free package versions.</li>
+<li>Threadpool limits are now set in all CLI drivers to prevent slowdown from unreasonably large numbers of threads in libraries like OpenCV. As a result the <code>--threads</code> option of all commands has been split into <code>--workers</code> and --<code>threads</code>.</li>
+<li><code>kraken.repo</code> methods have been adapted to the new Zenodo API. They also correctly handle versioned records now.</li>
+<li>A small fix enabling recognition inference with AMP.</li>
+<li>Support for <code>--fixed-splits</code> in <code>ketos test</code> (<a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/PonteIneptique/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/PonteIneptique">@PonteIneptique</a>)</li>
+<li>Performance increase for polygon extraction by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/Evarin/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/Evarin">@Evarin</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2024169511" data-permission-text="Title is private" data-url="https://github.com/mittagessen/kraken/issues/555" data-hovercard-type="pull_request" data-hovercard-url="/mittagessen/kraken/pull/555/hovercard" href="https://github.com/mittagessen/kraken/pull/555">#555</a></li>
+<li>Speed up legacy polygon extraction by <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/anutkk/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/anutkk">@anutkk</a> in <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="2232022687" data-permission-text="Title is private" data-url="https://github.com/mittagessen/kraken/issues/586" data-hovercard-type="pull_request" data-hovercard-url="/mittagessen/kraken/pull/586/hovercard" href="https://github.com/mittagessen/kraken/pull/586">#586</a></li>
+<li>New container classes in <code>kraken.containers</code> replace the previous dicts produced and expected by <code>segment/rpred/serialize</code>.</li>
+<li><code>kraken.serialize.serialize_segmentation()</code> has been removed as part of the container class rework.</li>
+<li><code>train/rotrain/segtrain/pretrain</code> cosine annealing scheduling now allows setting the final learning rate with <code>--cos-min-lr</code>.</li>
+<li>Lots of PEP8/whitespace/spelling mistake fixes from <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/stweil/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/stweil">@stweil</a></li>
+</ul>
+<h2>New features</h2>
+<h3>Reading order training</h3>
+<p>Reading order can now be learned with <code>ketos rotrain</code> and reading order models can be added to segmentation model files. The training process is documented <a href="https://kraken.re/5.2/ketos.html#reading-order-training" rel="nofollow">here</a>.</p>
+<h2>Upgrade guide</h2>
+<h3>Command line</h3>
+<h4>Polygon extractor</h4>
+<p>The polygon extractor is responsible for taking a page image, baselines, and their bounding polygons and dewarping + masking out the line. Here is an example:</p>
+<p><a target="_blank" rel="noopener noreferrer" href="https://github.com/user-attachments/assets/fec6900a-fe23-40c3-89c0-50ecfc73f320"><img src="https://github.com/user-attachments/assets/fec6900a-fe23-40c3-89c0-50ecfc73f320" alt="kraken_faster" content-type-secured-asset="image/png" style="max-width: 100%;"></a></p>
+<p>The new polygon extractor reduces line extraction time 30x, roughly halving inference time and significantly speeding up training from XML files and compilation of datasets. It should be noted that polygon extraction <em>does not</em> concern data in the legacy bounding box format nor does it touch the segmentation process as it is only a preprocessing step in the recognizer on an already existing segmentation.</p>
+<p>Not all improvements in the polygon extractor are backward compatible, causing models trained with data extracted with the old implementation to suffer from a slight reduction in accuracy (usually &lt;0.25 percentage points). Therefore models now contain a flag in their metadata indicating which implementation has been used to train them. This flag can be overridden, e.g.:</p>
+<div class="snippet-clipboard-content notranslate position-relative overflow-auto" data-snippet-clipboard-copy-content="$ kraken --no-legacy-polygons -i ... ... ocr ..."><pre class="notranslate"><code>$ kraken --no-legacy-polygons -i ... ... ocr ...
+</code></pre></div>
+<p>to enable all speedups for a slight increase in character error rate.</p>
+<p>For training the new extractor is enabled per default, i.e. models trained with kraken 5.x will perform slightly worse on earlier kraken version but will still work. It is possible to force use of only backwards compatible speedups:</p>
+<div class="snippet-clipboard-content notranslate position-relative overflow-auto" data-snippet-clipboard-copy-content="$ ketos compile --legacy-polygons ...
+$ ketos train --legacy-polygons ....
+$ ketos pretrain --legacy-polygons ..."><pre class="notranslate"><code>$ ketos compile --legacy-polygons ...
+$ ketos train --legacy-polygons ....
+$ ketos pretrain --legacy-polygons ...
+</code></pre></div>
+<h4>Threads and Multiprocessing</h4>
+<p>The command line tools now handle multiprocessing and thread pools more completely and configurably. <code>--workers</code> has been split into <code>--threads</code> and <code>--workers</code>, the former option limiting the size of thread pools (as much as possible) for intra-op parallelization, the latter setting the number of worker processes, usually for the purpose of data loading in training and dataset compilation.</p>
+<h3>API changes</h3>
+<p>While 5.x preserves the general OCR functional blocks, the existing dictionary-based data structures have been replaced with <a href="https://kraken.re/5.2/api_docs.html#kraken-containers-module" rel="nofollow">container classes</a> and the XML parser has been reworked.</p>
+<h4>Container classes</h4>
+<p>For straightforward processing little has changed. Most keys of the dictionaries have been converted into attributes of their respective classes.</p>
+<p>The segmentation methods now return a <a href="https://kraken.re/5.2/api_docs.html#kraken.containers.Segmentation" rel="nofollow">Segmentation</a> object containing <a href="https://kraken.re/5.2/api_docs.html#kraken.containers.Region" rel="nofollow">Region</a> and <a href="https://kraken.re/5.2/api_docs.html#kraken.containers.BaselineLine" rel="nofollow">BaselineLine</a>/<a href="https://kraken.re/5.2/api_docs.html#kraken.containers.BBoxLine" rel="nofollow">BBoxLine</a> objects:</p>
+<div class="snippet-clipboard-content notranslate position-relative overflow-auto" data-snippet-clipboard-copy-content="&gt;&gt;&gt; pageseg.segment(im)
+{'text_direction': 'horizontal-lr',
+ 'boxes': [(x1, y1, x2, y2),...],
+ 'script_detection': False
+}
+
+&gt;&gt;&gt; blla.segment(im)
+{'text_direction': '$dir',
+ 'type': 'baseline',
+ 'lines': [{'baseline': [[x0, y0], [x1, y1], ..., [x_n, y_n]], 'boundary': [[x0, y0, x1, y1], ... [x_m, y_m]]}, ...
+          {'baseline': [[x0, ...]], 'boundary': [[x0, ...]]}]
+ 'regions': [{'region': [[x0, y0], [x1, y1], ..., [x_n, y_n]], 'type': 'image'}, ...
+             {'region': [[x0, ...]], 'type': 'text'}]
+}"><pre class="notranslate"><code>&gt;&gt;&gt; pageseg.segment(im)
+{'text_direction': 'horizontal-lr',
+ 'boxes': [(x1, y1, x2, y2),...],
+ 'script_detection': False
+}
+
+&gt;&gt;&gt; blla.segment(im)
+{'text_direction': '$dir',
+ 'type': 'baseline',
+ 'lines': [{'baseline': [[x0, y0], [x1, y1], ..., [x_n, y_n]], 'boundary': [[x0, y0, x1, y1], ... [x_m, y_m]]}, ...
+          {'baseline': [[x0, ...]], 'boundary': [[x0, ...]]}]
+ 'regions': [{'region': [[x0, y0], [x1, y1], ..., [x_n, y_n]], 'type': 'image'}, ...
+             {'region': [[x0, ...]], 'type': 'text'}]
+}
+</code></pre></div>
+<p>becomes:</p>
+<div class="snippet-clipboard-content notranslate position-relative overflow-auto" data-snippet-clipboard-copy-content="&gt;&gt;&gt; pageseg.segment(im)
+Segmentation(type='bbox', 
+             imagename=None,
+             text_direction='horizontal-lr',
+             script_detection=False,
+             lines=[BBoxLine(id='f1d5b1e2-030c-41d5-b299-8a114eb0996e',
+                             bbox=[34, 198, 279, 251],
+                             text=None,
+                             base_dir=None,
+                             type='bbox',
+                             imagename=None,
+                             tags=None,
+                             split=None,
+                             regions=None,
+                             text_direction='horizontal-lr'),
+                    BBoxLine(...],
+             line_orders=[])
+
+&gt;&gt;&gt; blla.segment(im)
+Segmentation(type='baseline', 
+             imagename=im,
+             text_direction='horizontal-lr',
+             script_detection=False,
+             lines=[BaselineLine(id='50ab1a29-c3b6-4659-9713-ff246b21d2dc',
+                                 baseline=[[183, 284], [272, 282]],
+                                 boundary=[[183, 284], ... ,[183, 284]],
+                                 text=None,
+                                 base_dir=None,
+                                 type='baselines',
+                                 tags={'type': 'default'},
+                                 split=None,
+                                 regions=['e28ccb6b-2874-4be0-8e0d-38948f0fdf09']), ...],
+             regions={'text': [Region(id='e28ccb6b-2874-4be0-8e0d-38948f0fdf09',
+                                      boundary=[[123, 218], ..., [123, 218]],
+                                      tags={'type': 'text'}), ...],
+                               'foo': [Region(...), ...]},
+             line_orders=[])"><pre class="notranslate"><code>&gt;&gt;&gt; pageseg.segment(im)
+Segmentation(type='bbox', 
+             imagename=None,
+             text_direction='horizontal-lr',
+             script_detection=False,
+             lines=[BBoxLine(id='f1d5b1e2-030c-41d5-b299-8a114eb0996e',
+                             bbox=[34, 198, 279, 251],
+                             text=None,
+                             base_dir=None,
+                             type='bbox',
+                             imagename=None,
+                             tags=None,
+                             split=None,
+                             regions=None,
+                             text_direction='horizontal-lr'),
+                    BBoxLine(...],
+             line_orders=[])
+
+&gt;&gt;&gt; blla.segment(im)
+Segmentation(type='baseline', 
+             imagename=im,
+             text_direction='horizontal-lr',
+             script_detection=False,
+             lines=[BaselineLine(id='50ab1a29-c3b6-4659-9713-ff246b21d2dc',
+                                 baseline=[[183, 284], [272, 282]],
+                                 boundary=[[183, 284], ... ,[183, 284]],
+                                 text=None,
+                                 base_dir=None,
+                                 type='baselines',
+                                 tags={'type': 'default'},
+                                 split=None,
+                                 regions=['e28ccb6b-2874-4be0-8e0d-38948f0fdf09']), ...],
+             regions={'text': [Region(id='e28ccb6b-2874-4be0-8e0d-38948f0fdf09',
+                                      boundary=[[123, 218], ..., [123, 218]],
+                                      tags={'type': 'text'}), ...],
+                               'foo': [Region(...), ...]},
+             line_orders=[])
+</code></pre></div>
+<p>The recognizer now yields<br>
+<a href="https://kraken.re/5.2/api_docs.html#kraken.containers.BaselineOCRRecord" rel="nofollow"><code>BaselineOCRRecords</code></a>/<a href="https://kraken.re/5.2/api_docs.html#kraken.containers.BBoxOCRRecord" rel="nofollow"><code>BBoxOCRRecords</code></a><br>
+which both inherit from the <code>BaselineLine</code>/<code>BBoxLine</code> classes:</p>
+<div class="snippet-clipboard-content notranslate position-relative overflow-auto" data-snippet-clipboard-copy-content="&gt;&gt;&gt; record = rpred(network=model,
+                   im=im,
+                   segmentation=baseline_seg)
+&gt;&gt;&gt; record = next(rpred.rpred(im))
+&gt;&gt;&gt; record
+BaselineOCRRecord pred: 'predicted text' baseline: ...
+&gt;&gt;&gt; record.type
+'baselines'
+&gt;&gt;&gt; record.line
+BaselineLine(...)
+&gt;&gt;&gt; record.prediction
+'predicted text'"><pre class="notranslate"><code>&gt;&gt;&gt; record = rpred(network=model,
+                   im=im,
+                   segmentation=baseline_seg)
+&gt;&gt;&gt; record = next(rpred.rpred(im))
+&gt;&gt;&gt; record
+BaselineOCRRecord pred: 'predicted text' baseline: ...
+&gt;&gt;&gt; record.type
+'baselines'
+&gt;&gt;&gt; record.line
+BaselineLine(...)
+&gt;&gt;&gt; record.prediction
+'predicted text'
+</code></pre></div>
+<p>One complication is the new serialization function which now accepts a<br>
+<code>Segmentation</code> object instead of a list of <code>ocr_records</code> and ancillary metadata:</p>
+<div class="snippet-clipboard-content notranslate position-relative overflow-auto" data-snippet-clipboard-copy-content="&gt;&gt;&gt; records = list(x for x in rpred(...))
+&gt;&gt;&gt; serialize(records,
+              image_name=im.filename,
+              image_size=im.size,
+              writing_mode='horizontal-tb',
+              scripts=['Latn', 'Hebr'],
+              regions=[{...}],
+              template='alto',
+              template_source='native',
+              processing_steps=proc_steps)"><pre class="notranslate"><code>&gt;&gt;&gt; records = list(x for x in rpred(...))
+&gt;&gt;&gt; serialize(records,
+              image_name=im.filename,
+              image_size=im.size,
+              writing_mode='horizontal-tb',
+              scripts=['Latn', 'Hebr'],
+              regions=[{...}],
+              template='alto',
+              template_source='native',
+              processing_steps=proc_steps)
+</code></pre></div>
+<p>becomes:</p>
+<div class="snippet-clipboard-content notranslate position-relative overflow-auto" data-snippet-clipboard-copy-content="&gt;&gt;&gt; import dataclasses
+&gt;&gt;&gt; baseline_seg
+Segmentation(...)
+&gt;&gt;&gt; records = list(x for x in rpred(..., segmentation=baseline_seg))
+&gt;&gt;&gt; results = dataclasses.replace(baseline_seg, lines=records)
+&gt;&gt;&gt; serialize(results,
+              image_size=im.size,
+              writing_mode='horizontal-tb',
+              scripts=['Latn', 'Hebr'],
+              template='alto',
+              template_source='native',
+              processing_steps=proc_steps)"><pre class="notranslate"><code>&gt;&gt;&gt; import dataclasses
+&gt;&gt;&gt; baseline_seg
+Segmentation(...)
+&gt;&gt;&gt; records = list(x for x in rpred(..., segmentation=baseline_seg))
+&gt;&gt;&gt; results = dataclasses.replace(baseline_seg, lines=records)
+&gt;&gt;&gt; serialize(results,
+              image_size=im.size,
+              writing_mode='horizontal-tb',
+              scripts=['Latn', 'Hebr'],
+              template='alto',
+              template_source='native',
+              processing_steps=proc_steps)
+</code></pre></div>
+<p>This requires the construction of a new <code>Segmentation</code> object that contains the<br>
+records produced by the text predictor. The most straightforward way to create<br>
+this new <code>Segmentation</code> is through the <code>dataclasses.replace</code> function as our<br>
+container classes are immutable.</p>
+<p>Lastly, <code>serialize_segmentation</code> has been removed. The <code>serialize</code> function now<br>
+accepts <code>Segmentation</code> objects which do not contain text predictions:</p>
+<div class="snippet-clipboard-content notranslate position-relative overflow-auto" data-snippet-clipboard-copy-content="&gt;&gt;&gt; serialize_segmentation(segresult={'text_direction': '$dir',
+                                      'type': 'baseline',
+                                      'lines': [{'baseline': [[x0, y0], [x1, y1], ..., [x_n, y_n]], 'boundary': [[x0, y0, x1, y1], ... [x_m, y_m]]}, ...
+                                          {'baseline': [[x0, ...]], 'boundary': [[x0, ...]]}]
+                                      'regions': [{'region': [[x0, y0], [x1, y1], ..., [x_n, y_n]], 'type': 'image'}, ...
+                                                  {'region': [[x0, ...]], 'type': 'text'}]
+                                     },
+                           image_name=im.filename,
+                           image_size=im.size,
+                           template='alto',
+                           template_source='native',
+                           processing_steps=proc_steps)"><pre class="notranslate"><code>&gt;&gt;&gt; serialize_segmentation(segresult={'text_direction': '$dir',
+                                      'type': 'baseline',
+                                      'lines': [{'baseline': [[x0, y0], [x1, y1], ..., [x_n, y_n]], 'boundary': [[x0, y0, x1, y1], ... [x_m, y_m]]}, ...
+                                          {'baseline': [[x0, ...]], 'boundary': [[x0, ...]]}]
+                                      'regions': [{'region': [[x0, y0], [x1, y1], ..., [x_n, y_n]], 'type': 'image'}, ...
+                                                  {'region': [[x0, ...]], 'type': 'text'}]
+                                     },
+                           image_name=im.filename,
+                           image_size=im.size,
+                           template='alto',
+                           template_source='native',
+                           processing_steps=proc_steps)
+</code></pre></div>
+<p>is replaced by:</p>
+<div class="snippet-clipboard-content notranslate position-relative overflow-auto" data-snippet-clipboard-copy-content="&gt;&gt;&gt; baseline_seg
+Segmentation(...)
+&gt;&gt;&gt; serialize(baseline_seg,
+              image_size=im.size,
+              writing_mode='horizontal-tb',
+              scripts=['Latn', 'Hebr'],
+              template='alto',
+              template_source='native',
+              processing_steps=proc_steps)"><pre class="notranslate"><code>&gt;&gt;&gt; baseline_seg
+Segmentation(...)
+&gt;&gt;&gt; serialize(baseline_seg,
+              image_size=im.size,
+              writing_mode='horizontal-tb',
+              scripts=['Latn', 'Hebr'],
+              template='alto',
+              template_source='native',
+              processing_steps=proc_steps)
+</code></pre></div>
+<h4>XML parsing</h4>
+<p>The <code>kraken.lib.xml.parse_{xml,alto,page}</code> methods have been replaced by a single <a href="https://kraken.re/5.2/api.html#xml-parsing" rel="nofollow"><code>kraken.lib.xml.XMLPage</code></a> class.</p>
+<div class="snippet-clipboard-content notranslate position-relative overflow-auto" data-snippet-clipboard-copy-content="&gt;&gt;&gt; parse_xml('xyz.xml')
+{'image': impath,
+ 'lines': [{'boundary': [[x0, y0], ...],
+            'baseline': [[x0, y0], ...],
+            'text': apdjfqpf',
+            'tags': {'type': 'default', ...}},
+           ...
+           {...}],
+ 'regions': {'region_type_0': [[[x0, y0], ...], ...], ...}}"><pre class="notranslate"><code>&gt;&gt;&gt; parse_xml('xyz.xml')
+{'image': impath,
+ 'lines': [{'boundary': [[x0, y0], ...],
+            'baseline': [[x0, y0], ...],
+            'text': apdjfqpf',
+            'tags': {'type': 'default', ...}},
+           ...
+           {...}],
+ 'regions': {'region_type_0': [[[x0, y0], ...], ...], ...}}
+</code></pre></div>
+<p>becomes</p>
+<div class="snippet-clipboard-content notranslate position-relative overflow-auto" data-snippet-clipboard-copy-content="&gt;&gt;&gt; XMLPage('xyz.xml')
+XMLPage xyz.xml (format: alto, image: impath)"><pre class="notranslate"><code>&gt;&gt;&gt; XMLPage('xyz.xml')
+XMLPage xyz.xml (format: alto, image: impath)
+</code></pre></div>
+<p>As the parser is now aware of reading order the <code>XMLPage.lines</code> attribute is an<br>
+unordered dict of <code>BaselineLine</code>/<code>BBoxLine</code> container classes. As ALTO/PageXML<br>
+files can generally contain multiple different reading orders the<br>
+<code>XMLPage.get_sorted_lines()/XMLPAge.get_sorted_regions()</code> method on the object<br>
+provides an ordered view of lines or regions. The default order<br>
+<code>line_implicit</code>/<code>region_implicit</code> corresponds to the order produced by the<br>
+previous parsers, i.e. the order formed by the sequence of elements in the XML<br>
+tree.</p>
+<p><code>XMLPage</code> objects can be converted into a <code>Segmentation</code> container using the<br>
+<code>XMLPage.to_container()</code> method:</p>
+<div class="snippet-clipboard-content notranslate position-relative overflow-auto" data-snippet-clipboard-copy-content="&gt;&gt;&gt; XMLPage('xyz.xml').to_container()
+Segmentation(...)"><pre class="notranslate"><code>&gt;&gt;&gt; XMLPage('xyz.xml').to_container()
+Segmentation(...)
+</code></pre></div>
+<p><strong>Full Changelog</strong>: <a class="commit-link" href="https://github.com/mittagessen/kraken/compare/4.3.13...5.2"><tt>4.3.13...5.2</tt></a></p></section>
+<section id="release-4-3-10">
+<h2>4.3.10<a class="headerlink" href="#release-4-3-10" title="Link to this heading">¶</a></h2>
+<p><em>Released on 2023-04-18 - <a class="reference external" href="https://github.com/mittagessen/kraken/releases/tag/4.3.10">GitHub</a> - <a class="reference external" href="https://pypi.org/project/kraken/4.3.10/">PyPI</a></em></p>
+<p>This is mostly a bugfix release but also includes a couple of minor improvements and changes.</p>
+<h2>Changes</h2>
+<ul>
+<li>Deterministic mode is now set to 'warn' preventing crashes in deterministic recognition training (CTC loss does not have a deterministic implementation).</li>
+<li><code>contrib/extract_lines.py</code> work with binary datasets</li>
+<li>'Word' error rate has been added as a validation metric in recognition training</li>
+<li>The fine-tuning options (<code>--resize</code>) add/both have been renamed to union/new. (Thibault Clérice) <a href="https://github.com/mittagessen/kraken/pull/488" data-hovercard-type="pull_request" data-hovercard-url="/mittagessen/kraken/pull/488/hovercard">#488</a></li>
+<li>Tensorboard logging now also logs a couple of training images</li>
+</ul></section>
+<section id="release-4-3-5">
+<h2>4.3.5<a class="headerlink" href="#release-4-3-5" title="Link to this heading">¶</a></h2>
+<p><em>Released on 2023-02-22 - <a class="reference external" href="https://github.com/mittagessen/kraken/releases/tag/4.3.5">GitHub</a> - <a class="reference external" href="https://pypi.org/project/kraken/4.3.5/">PyPI</a></em></p>
+<p>This is just another hotfix release.</p>
+<h2>Changes</h2>
+<ul>
+<li><a class="commit-link" data-hovercard-type="commit" data-hovercard-url="https://github.com/mittagessen/kraken/commit/799ee784dca835d253efc714e0fd2be9f2b76c1b/hovercard" href="https://github.com/mittagessen/kraken/commit/799ee784dca835d253efc714e0fd2be9f2b76c1b"><tt>799ee78</tt></a>: Propagation of the --raise-on-error for raising non-blocking errors in blla segmentation (Thibault Clérice) <a href="https://github.com/mittagessen/kraken/pull/444" data-hovercard-type="pull_request" data-hovercard-url="/mittagessen/kraken/pull/444/hovercard">#444</a></li>
+<li><a class="commit-link" data-hovercard-type="commit" data-hovercard-url="https://github.com/mittagessen/kraken/commit/d81e8985d4066b138d7b1c3321d809915c44ddf6/hovercard" href="https://github.com/mittagessen/kraken/commit/d81e8985d4066b138d7b1c3321d809915c44ddf6"><tt>d81e898</tt></a>: adds pl_logger to default hyperparams dict (Benjamin Kiessling)</li>
+</ul></section>
+<section id="release-4-3-4">
+<h2>4.3.4<a class="headerlink" href="#release-4-3-4" title="Link to this heading">¶</a></h2>
+<p><em>Released on 2023-02-20 - <a class="reference external" href="https://github.com/mittagessen/kraken/releases/tag/4.3.4">GitHub</a> - <a class="reference external" href="https://pypi.org/project/kraken/4.3.4/">PyPI</a></em></p>
+<p>This is a hotfix release to 4.3.0 correcting a regression in the CLI, fixing pretrain validation losses, and the conda environment files.</p>
+<h2>Commits</h2>
+<ul>
+<li><a class="commit-link" data-hovercard-type="commit" data-hovercard-url="https://github.com/mittagessen/kraken/commit/ac5fab67f03fae3b67575ca02720013437b582fd/hovercard" href="https://github.com/mittagessen/kraken/commit/ac5fab67f03fae3b67575ca02720013437b582fd"><tt>ac5fab6</tt></a>: Invalid type in click option definition for loggers (Benjamin Kiessling)</li>
+<li><a class="commit-link" data-hovercard-type="commit" data-hovercard-url="https://github.com/mittagessen/kraken/commit/0cb9e0ee2f938f2aa54f0a1ab537033ec43d51e0/hovercard" href="https://github.com/mittagessen/kraken/commit/0cb9e0ee2f938f2aa54f0a1ab537033ec43d51e0"><tt>0cb9e0e</tt></a>: fix validation loss computation in pretrain (Benjamin Kiessling)</li>
+<li><a class="commit-link" data-hovercard-type="commit" data-hovercard-url="https://github.com/mittagessen/kraken/commit/7d5069b7e2600f884b157678ecdd98c99e0d0363/hovercard" href="https://github.com/mittagessen/kraken/commit/7d5069b7e2600f884b157678ecdd98c99e0d0363"><tt>7d5069b</tt></a>: Remove former development raise in segmentation (Thibault Clérice) <a href="https://github.com/mittagessen/kraken/pull/441" data-hovercard-type="pull_request" data-hovercard-url="/mittagessen/kraken/pull/441/hovercard">#441</a></li>
+<li><a class="commit-link" data-hovercard-type="commit" data-hovercard-url="https://github.com/mittagessen/kraken/commit/0e3d10fe3ddbaf0009405029276b58f88d43cecc/hovercard" href="https://github.com/mittagessen/kraken/commit/0e3d10fe3ddbaf0009405029276b58f88d43cecc"><tt>0e3d10f</tt></a>: Install coremltools from pip for conda environments (Benjamin Kiessling)</li>
+</ul></section>
+<section id="release-4-3-0">
+<h2>4.3.0<a class="headerlink" href="#release-4-3-0" title="Link to this heading">¶</a></h2>
+<p><em>Released on 2023-02-13 - <a class="reference external" href="https://github.com/mittagessen/kraken/releases/tag/4.3.0">GitHub</a> - <a class="reference external" href="https://pypi.org/project/kraken/4.3.0/">PyPI</a></em></p>
+<h2>What's Changed</h2>
+<ul>
+<li>Pretraining has been reimplemented to be more faithful to the <a href="https://arxiv.org/abs/2112.08692" rel="nofollow">original publication</a> for more stable memory consumption and easier hyperparameter selection</li>
+<li>Learning rate warmup and backbone freezing in recognition training with <code>--warmup</code> and <code>--freeze-backbone</code> (mostly to enable fine-tuning pretrained models)</li>
+<li>Enable <code>ketos compile</code> to create precompiled datasets with lines without a corresponding transcription with the <code>--keep-empty-lines</code> switch (mostly for pretraining models).</li>
+<li><code>--failed-sample-threshold</code> in training modules, aborting training after a certain number of samples failed to load</li>
+<li>tensorboard logging with <code>--logger/--log-dir</code> options</li>
+<li>Change codec construction during training when training and validation dataset alphabets don't match. Prior code points that only exist in the validation set would be copied to the model codec. Now the model codec only contains trained code points.</li>
+<li>Replace <code>ocr_record</code> with new smart classes <code>BaselineOCRRecord</code> and <code>BBoxOCRRecord</code>. These keep track of reading/display order, compute bounding polygons from the whole line bounding polygon, and average confidences when slicing.</li>
+<li>ALTO parsing now deals with any <em>reasonable</em> PointsType (see <a class="issue-link js-issue-link" data-error-text="Failed to load title" data-id="335205029" data-permission-text="Title is private" data-url="https://github.com/altoxml/schema/issues/49" data-hovercard-type="issue" data-hovercard-url="/altoxml/schema/issues/49/hovercard" href="https://github.com/altoxml/schema/issues/49">altoxml/schema#49</a>)</li>
+<li>The fallback line orientation heuristic now takes into account the principal text orientation defined with <code>--text-direction</code> instead of assuming horizontal lines (<code>--text-direction horizontal-lr/-rl</code>).</li>
+<li>Baseline segmentation now supports padding of input images with <code>--pad</code>.</li>
+<li>CLI now allows serialization with custom jinja2 templates through the <code>--template</code> option.</li>
+<li>Switch validation metrics computation to torchmetrics.</li>
+<li>Various bugfixes, mostly to deal with shapely shenanigans.</li>
+</ul>
+<h2>Thanks</h2>
+<ul>
+<li><a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/sixtyfive/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/sixtyfive">@sixtyfive</a>, <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/anutkk/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/anutkk">@anutkk</a>, <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/stweil/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/stweil">@stweil</a>, <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/colibrisson/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/colibrisson">@colibrisson</a>, <a class="user-mention notranslate" data-hovercard-type="user" data-hovercard-url="/users/PonteIneptique/hovercard" data-octo-click="hovercard-link-click" data-octo-dimensions="link_type:self" href="https://github.com/PonteIneptique">@PonteIneptique</a>  for their contributions to this release.</li>
+</ul>
+<p><strong>Full Changelog</strong>: <a class="commit-link" href="https://github.com/mittagessen/kraken/compare/4.2.0...4.3.0"><tt>4.2.0...4.3.0</tt></a></p></section>
+<section id="release-4-1-2">
+<h2>4.1.2<a class="headerlink" href="#release-4-1-2" title="Link to this heading">¶</a></h2>
+<p><em>Released on 2022-06-07 - <a class="reference external" href="https://github.com/mittagessen/kraken/releases/tag/4.1.2">GitHub</a> - <a class="reference external" href="https://pypi.org/project/kraken/4.1.2/">PyPI</a></em></p>
+<h2>Commits</h2>
+<ul>
+<li><a class="commit-link" data-hovercard-type="commit" data-hovercard-url="https://github.com/mittagessen/kraken/commit/3e101580339721c2e052cfb1cfdf377dcb5bf4d8/hovercard" href="https://github.com/mittagessen/kraken/commit/3e101580339721c2e052cfb1cfdf377dcb5bf4d8"><tt>3e10158</tt></a>: set border value in erosion in seamcarve (Benjamin Kiessling)</li>
+</ul></section>
+<section id="release-3-0-6">
+<h2>3.0.6<a class="headerlink" href="#release-3-0-6" title="Link to this heading">¶</a></h2>
+<p><em>Released on 2021-11-08 - <a class="reference external" href="https://github.com/mittagessen/kraken/releases/tag/3.0.6">GitHub</a> - <a class="reference external" href="https://pypi.org/project/kraken/3.0.6/">PyPI</a></em></p>
+<p>This is mainly a bugfix release containing small improvements such as additional tests, typing, spelling corrections, additional contrib scripts, and fixes for rarely used functionality.</p>
+<h2>Bugfixes</h2>
+<ul>
+<li>Orthography and missing help messages in the CLI drivers</li>
+<li>Documentation for batch input specifications</li>
+<li>Fix a regression in early stopping when training on GPU</li>
+<li>Fix a regression in polygonization in the presence of regions</li>
+<li>Do not duplicate regions during serialization</li>
+<li>Add dummy String beneath <code>TextLine</code> w/o text in ALTO to avoid standard-violating empty <code>TextLine</code>s</li>
+<li>The codec loading functionality of <code>ketos train</code> and <code>KrakenTrainer</code> actually loads a given codec now.</li>
+<li>Fall back to simple scaling when centerline dewarping fails</li>
+<li>Drop (duplicate) short option form -p for --pad in all ketos commands</li>
+</ul>
+<h2>Features</h2>
+<ul>
+<li>The forced alignment script <code>contrib/forced_alignment_overlay.py</code> now preserves the input file and only replaces the character cuts.</li>
+<li>Add reading order tests</li>
+<li>Explicit model sanity checks in blla.segment()</li>
+<li>Add baseline offset options to repolygonization script</li>
+<li>Make codec self-synchronizing</li>
+<li>Add <code>TextEquiv</code> for <code>Word</code> and <code>TextLine</code> in PAGE XML output</li>
+<li>Raise PIL image size limit to 20k*20k image dimensions</li>
+</ul></section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="index.html">
+              <img class="logo" src="_static/kraken.png" alt="Logo of kraken"/>
+            </a></p>
+  <div>
+    <h3><a href="index.html">Table of Contents</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">Changelog</a><ul>
+<li><a class="reference internal" href="#release-7-0-0b7">7.0.0b7: 7th beta release</a></li>
+<li><a class="reference internal" href="#release-7-0-0b6">7.0.0b6: 6th beta release</a></li>
+<li><a class="reference internal" href="#release-7-0-0b5">7.0.0b5: 7.0 5th beta release</a></li>
+<li><a class="reference internal" href="#release-7-0-0b4">7.0.0b4: 7.0 4th beta release</a></li>
+<li><a class="reference internal" href="#release-7-0-0b3">7.0.0b3: 7.0 3rd beta release</a></li>
+<li><a class="reference internal" href="#release-7-0-0b2">7.0.0b2: 7.0 beta release</a></li>
+<li><a class="reference internal" href="#release-6-0-4">6.0.4: Hotfix release for blla.segment()</a></li>
+<li><a class="reference internal" href="#release-6-0-3">6.0.3</a></li>
+<li><a class="reference internal" href="#release-6-0-2">6.0.2 hotfix release</a></li>
+<li><a class="reference internal" href="#release-6-0-1">6.0.1 hotfix release</a></li>
+<li><a class="reference internal" href="#release-6-0-0">6.0.0</a></li>
+<li><a class="reference internal" href="#release-5-2-9">5.2.9 - Bugfix release</a></li>
+<li><a class="reference internal" href="#release-5-2-5">5.2.5 Bugfix release</a></li>
+<li><a class="reference internal" href="#release-5-2-4">5.2.4: Hotfix release</a></li>
+<li><a class="reference internal" href="#release-5-2-3">5.2.3: Hotfix for segmentation training</a></li>
+<li><a class="reference internal" href="#release-5-2-2">5.2.2: Hotfix for no_segmentation mode recognition</a></li>
+<li><a class="reference internal" href="#release-5-2-1">5.2.1 hotfix release</a></li>
+<li><a class="reference internal" href="#release-5-2">5.2: 5.0 release with minor bugfixes</a></li>
+<li><a class="reference internal" href="#release-4-3-10">4.3.10</a></li>
+<li><a class="reference internal" href="#release-4-3-5">4.3.5</a></li>
+<li><a class="reference internal" href="#release-4-3-4">4.3.4</a></li>
+<li><a class="reference internal" href="#release-4-3-0">4.3.0</a></li>
+<li><a class="reference internal" href="#release-4-1-2">4.1.2</a></li>
+<li><a class="reference internal" href="#release-3-0-6">3.0.6</a></li>
+</ul>
+</li>
+</ul>
+
+  </div><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="api/reference.html" title="previous chapter">API Reference</a></li>
+  </ul></li>
+</ul>
+</div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+<h3>Versions</h3>
+<ul>
+  <li><a href="../2.0.0/index.html">2.0.0</a></li>
+  <li><a href="../3.0/index.html">3.0</a></li>
+  <li><a href="../4.0/index.html">4.0</a></li>
+  <li><a href="../4.1/index.html">4.1</a></li>
+  <li><a href="../4.2.0/index.html">4.2.0</a></li>
+  <li><a href="../4.3.0/index.html">4.3.0</a></li>
+  <li><a href="../5.0.0/index.html">5.0.0</a></li>
+  <li><a href="../5.1/index.html">5.1</a></li>
+  <li><a href="../5.2/index.html">5.2</a></li>
+  <li><a href="../5.3.0/index.html">5.3.0</a></li>
+  <li><a href="../6.0.0/index.html">6.0.0</a></li>
+  <li><a href="changelog.html">main</a></li>
+</ul>
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2015-2026, Benjamin Kiessling.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="_sources/changelog.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
