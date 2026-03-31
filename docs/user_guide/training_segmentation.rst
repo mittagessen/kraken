@@ -142,7 +142,7 @@ possible to suppress classes by not having a catch-all ``*`` class and simply
 omitting the identifier from the mapping. It is also possible to suppress a
 category entirely by setting a class mapping to an empty dictionary. For
 example, to train a model that only detects baselines without any region
-output, set ``region_class_mapping`` to ``{}``.
+output, set ``region_class_mapping`` to ``[]``.
 
 Baseline Position
 -----------------
