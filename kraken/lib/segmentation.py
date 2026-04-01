@@ -311,7 +311,7 @@ class LineMCP(MCP_Connect):
 
 
 def vectorize_lines(im: np.ndarray, threshold: float = 0.17, min_length=5,
-                    text_direction: str = 'horizontal'):
+                    text_direction: str = 'horizontal', max_fragments: int = 500):
     """
     Vectorizes lines from a binarized array.
 
@@ -323,6 +323,10 @@ def vectorize_lines(im: np.ndarray, threshold: float = 0.17, min_length=5,
         min_length (int): Minimal length of output baselines.
         text_direction (str): Base orientation of the text line (horizontal or
                               vertical).
+        max_fragments (int): Maximum number of connected components in the
+                             binarized baseline map before vectorization is
+                             skipped. Prevents excessive computation when
+                             heatmaps are too fragmented.
 
     Returns:
         [[x0, y0, ... xn, yn], [xm, ym, ..., xk, yk], ... ]
@@ -337,6 +341,11 @@ def vectorize_lines(im: np.ndarray, threshold: float = 0.17, min_length=5,
     bl_map = im[2]
     bl_map = filters.sato(bl_map, black_ridges=False, mode='constant')
     bin_bl_map = bl_map > threshold
+    # early exit if heatmap is too fragmented (e.g. poorly trained model)
+    num_ccs = label(bin_bl_map, return_num=True)[1]
+    if num_ccs > max_fragments:
+        logger.info(f'Skipping vectorization: {num_ccs} connected components exceed limit of {max_fragments}')
+        return []
     # skeletonize
     line_skel = skeletonize(bin_bl_map)
     # find end points
