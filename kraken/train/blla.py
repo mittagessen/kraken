@@ -25,6 +25,7 @@ import torch.nn.functional as F
 from lightning.pytorch.callbacks import EarlyStopping
 
 from torch import nn
+from kraken.train.losses import SoftDiceLoss
 from torch.optim import lr_scheduler
 from torch.utils.data import DataLoader, Subset, default_collate, random_split
 from torchmetrics.classification import MultilabelAccuracy, MultilabelJaccardIndex
@@ -270,6 +271,12 @@ class BLLASegmentationModel(L.LightningModule):
 
         self.criterion = nn.BCEWithLogitsLoss()
 
+        self.dice_weight = config.dice_weight
+        if self.dice_weight > 0:
+            self.dice = SoftDiceLoss()
+        else:
+            self.dice = None
+
     def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         return self.net(x)
 
@@ -278,6 +285,8 @@ class BLLASegmentationModel(L.LightningModule):
         output, _ = self.net(x)
         output = F.interpolate(output, size=(y.size(2), y.size(3)))
         loss = self.criterion(output, y)
+        if self.dice is not None:
+            loss = loss + self.dice_weight * self.dice(torch.sigmoid(output), y)
         self.log('train_loss',
                  loss,
                  on_step=True,
