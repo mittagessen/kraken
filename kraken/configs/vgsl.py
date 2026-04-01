@@ -124,7 +124,6 @@ class BLLASegmentationTrainingConfig(TrainingConfig):
         self.resize = kwargs.pop('resize', 'fail')
         self.bl_tol = kwargs.pop('bl_tol', 10.0)
         self.dice_weight = kwargs.pop('dice_weight', 0.5)
-        self.cldice_weight = kwargs.pop('cldice_weight', 0.5)
 
         kwargs.setdefault('quit', 'fixed')
         kwargs.setdefault('epochs', 50)

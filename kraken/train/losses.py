@@ -14,13 +14,8 @@
 # permissions and limitations under the License.
 """
 Loss functions for segmentation training.
-
-Implements soft Dice loss for region segmentation and soft clDice
-(Shit et al., CVPR 2021) for connectivity preservation in thin
-curvilinear structures such as text baselines.
 """
 import torch
-import torch.nn.functional as F
 
 from torch import nn
 
@@ -53,82 +48,3 @@ class SoftDiceLoss(nn.Module):
 
         dice = (2.0 * intersection + self.smooth) / (cardinality + self.smooth)
         return 1.0 - dice.mean()
-
-
-class SoftSkeletonize(nn.Module):
-    """
-    Differentiable soft skeletonization via iterative morphological erosion.
-
-    Approximates the morphological skeleton by iteratively computing:
-        skeleton += x - opening(x)
-        x = erosion(x)
-
-    where erosion uses max-pooling on (1-x) and opening is erosion followed
-    by dilation.
-    """
-    def __init__(self, num_iter: int = 3):
-        super().__init__()
-        self.num_iter = num_iter
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Args:
-            x: Tensor of shape [B, C, H, W] with values in [0, 1].
-
-        Returns:
-            Soft skeleton of same shape.
-        """
-        skeleton = torch.zeros_like(x)
-        for _ in range(self.num_iter):
-            eroded = self._erode(x)
-            opened = self._dilate(eroded)
-            skeleton = skeleton + F.relu(x - opened)
-            x = eroded
-        return skeleton
-
-    @staticmethod
-    def _erode(x: torch.Tensor, kernel_size: int = 3) -> torch.Tensor:
-        pad = kernel_size // 2
-        return 1.0 - F.max_pool2d(1.0 - x, kernel_size, stride=1, padding=pad)
-
-    @staticmethod
-    def _dilate(x: torch.Tensor, kernel_size: int = 3) -> torch.Tensor:
-        pad = kernel_size // 2
-        return F.max_pool2d(x, kernel_size, stride=1, padding=pad)
-
-
-class SoftClDiceLoss(nn.Module):
-    """
-    Soft centerline Dice loss for tubular structure segmentation.
-
-    Computes the Dice coefficient on morphological soft skeletons of
-    prediction and target, penalizing broken connectivity and spurious
-    branches in thin structures.
-
-    Reference:
-        Shit et al., "clDice -- A Novel Topology-Preserving Loss Function
-        for Tubular Structure Segmentation", CVPR 2021.
-    """
-    def __init__(self, num_iter: int = 3, smooth: float = 1.0):
-        super().__init__()
-        self.skeletonize = SoftSkeletonize(num_iter)
-        self.smooth = smooth
-
-    def forward(self, pred: torch.Tensor, target: torch.Tensor, target_skeleton: torch.Tensor) -> torch.Tensor:
-        """
-        Args:
-            pred: Predicted probabilities [B, C, H, W] in [0, 1].
-            target: Binary ground truth [B, C, H, W].
-            target_skeleton: Precomputed binary skeleton of the target
-                [B, C, H, W].
-
-        Returns:
-            Scalar loss value (1 - clDice).
-        """
-        skel_pred = self.skeletonize(pred)
-
-        tprec = ((skel_pred * target).sum() + self.smooth) / (skel_pred.sum() + self.smooth)
-        tsens = ((target_skeleton * pred).sum() + self.smooth) / (target_skeleton.sum() + self.smooth)
-
-        cl_dice = 2.0 * tprec * tsens / (tprec + tsens + 1e-7)
-        return 1.0 - cl_dice

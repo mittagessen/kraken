@@ -216,10 +216,6 @@ def _build_segtest_class_diagnostics(model_mapping, dataset_mapping, dataset_sta
               default=0.5,
               type=float,
               help='Weight for Dice loss on all channels (0 to disable).')
-@click.option('--cldice-weight',
-              default=0.5,
-              type=float,
-              help='Weight for soft clDice loss on baseline channels (0 to disable).')
 @click.option('--logger',
               'pl_logger',
               type=click.Choice(['tensorboard', 'wandb']),
