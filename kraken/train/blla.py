@@ -603,7 +603,7 @@ class BLLASegmentationModel(L.LightningModule):
             self.val_freq_iu = MultilabelJaccardIndex(average='weighted', num_labels=num_pixel_labels)
 
             # baseline detection setup
-            self.bl_cls_idxs = list(final_mapping['baselines'].values())
+            self.bl_cls_idxs = sorted(set(final_mapping['baselines'].values()))
             self.start_sep_idx = final_mapping['aux']['_start_separator']
             self.end_sep_idx = final_mapping['aux']['_end_separator']
             self.val_bl_metrics = []
