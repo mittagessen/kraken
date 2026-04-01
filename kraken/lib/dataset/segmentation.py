@@ -227,18 +227,18 @@ class BaselineSet(Dataset):
             try:
                 logger.debug(f'Attempting to load {im}')
                 im = open_image(im)
-                im, target, baselines = self.transform(im, target)
+                im, target, skeleton_target, baselines = self.transform(im, target)
                 self._update_im_mode(im)
-                return {'image': im, 'target': target, 'baselines': baselines}
+                return {'image': im, 'target': target, 'skeleton_target': skeleton_target, 'baselines': baselines}
             except Exception:
                 self.failed_samples.add(idx)
                 idx = np.random.randint(0, len(self.imgs))
                 logger.debug(traceback.format_exc())
                 logger.info(f'Failed. Replacing with sample {idx}')
                 return self[idx]
-        im, target, baselines = self.transform(im, target)
+        im, target, skeleton_target, baselines = self.transform(im, target)
         self._update_im_mode(im)
-        return {'image': im, 'target': target, 'baselines': baselines}
+        return {'image': im, 'target': target, 'skeleton_target': skeleton_target, 'baselines': baselines}
 
     @staticmethod
     def _get_ortho_line(lineseg, point, line_width, offset):
@@ -257,7 +257,9 @@ class BaselineSet(Dataset):
         orig_size = image.size
         image = self.transforms(image)
         scale = (image.shape[2] - 2 * self.pad[1]) / orig_size[0]
-        t = torch.zeros((self.num_classes,) + tuple(np.subtract(image.shape[1:], (2 * self.pad[1], 2 * self.pad[0]))))
+        spatial_shape = tuple(np.subtract(image.shape[1:], (2 * self.pad[1], 2 * self.pad[0])))
+        t = torch.zeros((self.num_classes,) + spatial_shape)
+        skel_t = torch.zeros((self.num_classes,) + spatial_shape)
         start_sep_cls = self.class_mapping['aux']['_start_separator']
         end_sep_cls = self.class_mapping['aux']['_end_separator']
 
@@ -273,6 +275,10 @@ class BaselineSet(Dataset):
                 line_pol = np.array(shp_line.buffer(self.line_width / 2, cap_style=2).boundary.coords, dtype=int)
                 rr, cc = polygon(line_pol[:, 1], line_pol[:, 0], shape=image.shape[1:])
                 t[cls_idx, rr, cc] = 1
+                # thin baseline skeleton (2px buffer) for clDice target
+                skel_pol = np.array(shp_line.buffer(2, cap_style=2).boundary.coords, dtype=int)
+                rr_sk, cc_sk = polygon(skel_pol[:, 1], skel_pol[:, 0], shape=image.shape[1:])
+                skel_t[cls_idx, rr_sk, cc_sk] = 1
                 split_pt = shp_line.interpolate(split_offset).buffer(0.001)
                 # top
                 start_sep = np.array((split(shp_line, split_pt).geoms[0].buffer(self.line_width,
@@ -292,10 +298,14 @@ class BaselineSet(Dataset):
                 region = np.array(scale_regions([region.boundary], scale)[0])
                 rr, cc = polygon(region[:, 1], region[:, 0], shape=image.shape[1:])
                 t[cls_idx, rr, cc] = 1
-        target = F.pad(t, self.pad)
+        # concatenate target and skeleton for joint padding/augmentation
+        combined = torch.cat([t, skel_t], dim=0)
+        combined = F.pad(combined, self.pad)
         if self.aug:
-            image, target = self.aug(image, target)
-        return image, target, dict(scaled_baselines)
+            image, combined = self.aug(image, combined)
+        target = combined[:self.num_classes]
+        skeleton_target = combined[self.num_classes:]
+        return image, target, skeleton_target, dict(scaled_baselines)
 
     def __len__(self):
         return len(self.imgs)

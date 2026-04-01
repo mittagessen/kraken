@@ -296,7 +296,10 @@ class BLLASegmentationModel(L.LightningModule):
         if self.cldice is not None and self.bl_cls_idxs:
             bl_pred = torch.sigmoid(output[:, self.bl_cls_idxs, :, :])
             bl_target = y[:, self.bl_cls_idxs, :, :]
-            loss = loss + self.cldice_weight * self.cldice(bl_pred, bl_target)
+            skel = batch['skeleton_target']
+            skel = F.interpolate(skel, size=(y.size(2), y.size(3)))
+            bl_skel = skel[:, self.bl_cls_idxs, :, :]
+            loss = loss + self.cldice_weight * self.cldice(bl_pred, bl_target, bl_skel)
         self.log('train_loss',
                  loss,
                  on_step=True,

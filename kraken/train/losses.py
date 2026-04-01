@@ -114,20 +114,21 @@ class SoftClDiceLoss(nn.Module):
         self.skeletonize = SoftSkeletonize(num_iter)
         self.smooth = smooth
 
-    def forward(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+    def forward(self, pred: torch.Tensor, target: torch.Tensor, target_skeleton: torch.Tensor) -> torch.Tensor:
         """
         Args:
             pred: Predicted probabilities [B, C, H, W] in [0, 1].
             target: Binary ground truth [B, C, H, W].
+            target_skeleton: Precomputed binary skeleton of the target
+                [B, C, H, W].
 
         Returns:
             Scalar loss value (1 - clDice).
         """
         skel_pred = self.skeletonize(pred)
-        skel_target = self.skeletonize(target)
 
         tprec = ((skel_pred * target).sum() + self.smooth) / (skel_pred.sum() + self.smooth)
-        tsens = ((skel_target * pred).sum() + self.smooth) / (skel_target.sum() + self.smooth)
+        tsens = ((target_skeleton * pred).sum() + self.smooth) / (target_skeleton.sum() + self.smooth)
 
         cl_dice = 2.0 * tprec * tsens / (tprec + tsens + 1e-7)
         return 1.0 - cl_dice
