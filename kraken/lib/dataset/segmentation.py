@@ -114,6 +114,28 @@ class BaselineSet(Dataset):
             for key, val in sub_dict.items():
                 if not isinstance(val, int) or isinstance(val, bool) or val < 0:
                     raise ValueError(f'class_mapping[{section!r}][{key!r}] must be a non-negative integer, got {val!r}')
+        # validate that explicit baseline/region indices are >= 2 (0, 1 reserved for aux)
+        for section in ('baselines', 'regions'):
+            sub_dict = class_mapping[section]
+            for key, val in sub_dict.items():
+                if val < 2:
+                    raise ValueError(f'class_mapping[{section!r}][{key!r}] has index {val}, '
+                                     f'but indices 0 and 1 are reserved for aux classes. Minimum allowed is 2.')
+            # for defaultdicts check that the default factory produces valid indices
+            if isinstance(sub_dict, defaultdict) and sub_dict.default_factory is not None:
+                factory = sub_dict.default_factory
+                # peek at counter value without consuming it
+                next_val = factory.n if hasattr(factory, 'n') else factory()
+                if next_val < 2:
+                    raise ValueError(f'class_mapping[{section!r}] default factory produces index {next_val}, '
+                                     f'but minimum allowed is 2.')
+        # validate that baselines and regions occupy disjoint index ranges
+        baseline_indices = set(class_mapping['baselines'].values())
+        region_indices = set(class_mapping['regions'].values())
+        overlap = baseline_indices & region_indices
+        if overlap:
+            raise ValueError(f'Baseline and region class mappings must not share indices. '
+                             f'Overlapping indices: {overlap}')
         self.imgs = []
         self.pad = padding
         self.targets = []

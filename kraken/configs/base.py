@@ -124,9 +124,15 @@ class SegmentationTrainingDataConfig(TrainingDataConfig):
             topline, None = centerline.
 
     Notes:
-        line_class_mapping and region_class_mapping share a label space, i.e.,
-        duplicate label values will result in merging of classes. This feature
-        can be used to merge multiple line or region types into a single class:
+        line_class_mapping and region_class_mapping share a single output
+        label space with the auxiliary classes. Indices 0 and 1 are reserved
+        for aux classes (_start_separator, _end_separator); user-defined
+        baseline and region indices must start at 2 or above. Baselines and
+        regions must occupy disjoint index ranges — overlapping indices would
+        cause lines and regions to be merged into the same output channel.
+
+        Merging *within* a category is supported by mapping multiple types to
+        the same index:
 
         ```
         line_class_mapping = OrderedDict([('line_type_1', 2), ('line_type_2', 2)])
