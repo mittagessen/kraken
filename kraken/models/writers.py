@@ -45,7 +45,37 @@ def write_safetensors(objs: list[BaseModel], path: Union[str, PathLike]) -> Path
     """
     Writes a set of models as a safetensors.
     """
+    from collections import defaultdict
     from safetensors.torch import save_model
+
+    # Clone tensors in packed storage groups (e.g. from LSTM/GRU
+    # flatten_parameters) where no single tensor covers the entire storage.
+    # See https://github.com/huggingface/safetensors/issues/657.
+    for model in objs:
+        state_dict = model.state_dict()
+        storage_to_names = defaultdict(set)
+        for name, tensor in state_dict.items():
+            storage_to_names[tensor.untyped_storage().data_ptr()].add(name)
+        for names in storage_to_names.values():
+            if len(names) <= 1:
+                continue
+            has_complete = any(
+                state_dict[n].data_ptr() == state_dict[n].untyped_storage().data_ptr()
+                and state_dict[n].nelement() * state_dict[n].element_size() == state_dict[n].untyped_storage().size()
+                for n in names
+            )
+            if not has_complete:
+                for name in names:
+                    parts = name.split('.')
+                    mod = model
+                    for part in parts[:-1]:
+                        mod = getattr(mod, part)
+                    old = getattr(mod, parts[-1])
+                    if isinstance(old, nn.Parameter):
+                        setattr(mod, parts[-1], nn.Parameter(old.data.clone(), requires_grad=old.requires_grad))
+                    else:
+                        mod.register_buffer(parts[-1], old.clone())
+
     # assign unique prefixes to each model in model list
     prefixes = nn.ModuleDict({str(uuid.uuid4()): model for model in objs})
     metadata = {k: {'_kraken_min_version': v._kraken_min_version,
