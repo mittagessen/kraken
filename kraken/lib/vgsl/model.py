@@ -512,8 +512,8 @@ class TorchVGSLModel(nn.Module,
             else:
                 from torch.multiprocessing import Pool
                 self._line_extraction_pool = Pool(self._inf_config.num_line_workers)
-            import atexit
-            atexit.register(self._line_extraction_pool.terminate)
+            import weakref
+            weakref.finalize(self, self._line_extraction_pool.terminate)
 
         self._fabric = Fabric(accelerator=self._inf_config.accelerator,
                               devices=self._inf_config.device,

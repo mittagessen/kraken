@@ -158,9 +158,7 @@ def segmenter(legacy, model, config, input, output) -> None:
                                   no_hlines=config.legacy_no_hlines,
                                   pad=config.bbox_line_padding)
         else:
-            from kraken.tasks import SegmentationTaskModel
-            task = SegmentationTaskModel.load_model(model)
-            res = task.predict(im=im, config=config)
+            res = model.predict(im=im, config=config)
     except Exception:
         if ctx.meta['raise_failed']:
             raise
@@ -190,7 +188,6 @@ def recognizer(model, no_segmentation, config, input, output) -> None:
     import json
 
     from kraken.lib import vgsl  # NOQA
-    from kraken.tasks import RecognitionTaskModel
     from kraken.containers import BBoxLine, Segmentation
     from kraken.lib.progress import KrakenProgressBar
 
@@ -234,8 +231,7 @@ def recognizer(model, no_segmentation, config, input, output) -> None:
     elif no_segmentation:
         logger.warning('no_segmentation mode enabled but segmentation defined. Ignoring --no-segmentation option.')
 
-    predictor = RecognitionTaskModel.load_model(model)
-    it = predictor.predict(im=im, segmentation=bounds, config=config)
+    it = model.predict(im=im, segmentation=bounds, config=config)
 
     preds = []
 
@@ -519,6 +515,8 @@ def segment(ctx, **kwargs):
                 break
         if not location:
             raise click.BadParameter(f'No model for {model} found')
+        from kraken.tasks import SegmentationTaskModel
+        model = SegmentationTaskModel.load_model(location)
     else:
         model = None
         ctx.meta['steps'].append(ProcessingStep(id=f'_{uuid.uuid4()}',
@@ -618,8 +616,10 @@ def ocr(ctx, **kwargs):
 
     # set output mode
     ctx.meta['text_direction'] = params['text_direction']
+    from kraken.tasks import RecognitionTaskModel
+    model = RecognitionTaskModel.load_model(location)
     return partial(recognizer,
-                   model=location,
+                   model=model,
                    no_segmentation=params['no_segmentation'],
                    config=config)
 
