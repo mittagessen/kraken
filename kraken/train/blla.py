@@ -315,7 +315,7 @@ class BLLASegmentationModel(L.LightningModule):
         # baseline detection metrics
         if self.bl_cls_idxs:
             gt_baselines = batch['baselines'][0]  # batch_size=1
-            pred_np = pred_probs.detach().squeeze(0).cpu().numpy()
+            pred_np = pred_probs.detach().squeeze(0).cpu().float().numpy()
             pred_h, pred_w = pred.shape[2], pred.shape[3]
             scale_x = pred_w / target_w
             scale_y = pred_h / target_h
@@ -399,7 +399,7 @@ class BLLASegmentationModel(L.LightningModule):
 
         # baseline detection metrics
         gt_baselines = batch['baselines'][0]  # batch_size=1
-        pred_np = pred_raw.detach().squeeze(0).cpu().numpy()
+        pred_np = pred_raw.detach().squeeze(0).cpu().float().numpy()
         pred_h, pred_w = pred_raw.shape[2], pred_raw.shape[3]
         scale_x = pred_w / target_w
         scale_y = pred_h / target_h
