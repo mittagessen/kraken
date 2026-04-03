@@ -311,7 +311,7 @@ class LineMCP(MCP_Connect):
 
 
 def vectorize_lines(im: np.ndarray, threshold: float = 0.17, min_length=5,
-                    text_direction: str = 'horizontal', max_fragments: int = 500):
+                    text_direction: str = 'horizontal', max_endpoints: int = 400):
     """
     Vectorizes lines from a binarized array.
 
@@ -323,10 +323,11 @@ def vectorize_lines(im: np.ndarray, threshold: float = 0.17, min_length=5,
         min_length (int): Minimal length of output baselines.
         text_direction (str): Base orientation of the text line (horizontal or
                               vertical).
-        max_fragments (int): Maximum number of connected components in the
-                             binarized baseline map before vectorization is
-                             skipped. Prevents excessive computation when
-                             heatmaps are too fragmented.
+        max_endpoints (int): Maximum number of skeleton endpoints before
+                             noisy skeleton components are filtered. The MCP
+                             path algorithm creates O(n²) connections between
+                             endpoints within connected components, so large
+                             endpoint counts cause excessive memory use.
 
     Returns:
         [[x0, y0, ... xn, yn], [xm, ym, ..., xk, yk], ... ]
@@ -341,16 +342,43 @@ def vectorize_lines(im: np.ndarray, threshold: float = 0.17, min_length=5,
     bl_map = im[2]
     bl_map = filters.sato(bl_map, black_ridges=False, mode='constant')
     bin_bl_map = bl_map > threshold
-    # early exit if heatmap is too fragmented (e.g. poorly trained model)
-    num_ccs = label(bin_bl_map, return_num=True)[1]
-    if num_ccs > max_fragments:
-        logger.info(f'Skipping vectorization: {num_ccs} connected components exceed limit of {max_fragments}')
-        return []
-    # skeletonize
     line_skel = skeletonize(bin_bl_map)
     # find end points
     kernel = np.array([[1, 1, 1], [1, 10, 1], [1, 1, 1]])
     line_extrema = np.transpose(np.where((convolve2d(line_skel, kernel, mode='same') == 11) * line_skel))
+
+    if len(line_extrema) > max_endpoints:
+        _MAX_ENDPOINTS_PER_CC = 10
+        skel_labels = label(line_skel)
+        extrema_cc = skel_labels[line_extrema[:, 0], line_extrema[:, 1]]
+        cc_ids, cc_counts = np.unique(extrema_cc, return_counts=True)
+        ep_count_map = dict(zip(cc_ids.tolist(), cc_counts.tolist()))
+
+        valid_ccs = {cid for cid, cnt in ep_count_map.items() if cnt <= _MAX_ENDPOINTS_PER_CC}
+
+        remaining_eps = sum(ep_count_map[c] for c in valid_ccs)
+        if remaining_eps > max_endpoints:
+            cc_sizes = np.bincount(skel_labels.ravel())
+            sorted_ccs = sorted(valid_ccs, key=lambda c: cc_sizes[c], reverse=True)
+            budget_ccs = set()
+            budget = 0
+            for cc_id in sorted_ccs:
+                ep = ep_count_map[cc_id]
+                if budget + ep > max_endpoints:
+                    break
+                budget_ccs.add(cc_id)
+                budget += ep
+            valid_ccs = budget_ccs
+
+        mask = np.isin(extrema_cc, list(valid_ccs))
+        n_before = len(line_extrema)
+        line_extrema = line_extrema[mask]
+        logger.info(f'Filtered {n_before - len(line_extrema)} endpoints from '
+                    f'{len(cc_ids) - len(valid_ccs)} skeleton components '
+                    f'({n_before} -> {len(line_extrema)} endpoints)')
+
+    if len(line_extrema) < 2:
+        return []
 
     mcp = LineMCP(~line_skel)
     try:
