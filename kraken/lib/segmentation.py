@@ -807,7 +807,7 @@ def calculate_polygonal_environment(im: Image.Image = None,
         try:
             end_points = (line[0], line[-1])
             line = geom.LineString(line)
-            offset = 4 if topline is not None else 0
+            offset = 8 if topline is not None else 0
             offset_line = line.parallel_offset(offset, side='left' if topline else 'right')
             line = np.array(line.coords, dtype=float)
             offset_line = np.array(offset_line.coords, dtype=float)
