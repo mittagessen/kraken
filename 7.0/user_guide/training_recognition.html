@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Recognition Model Training &#8212; kraken  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=27fed22d" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
+    <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=89a84cc7" />
+    <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="canonical" href="kraken.re/user_guide/training_recognition.html" />
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Segmentation Model Training" href="training_segmentation.html" />
+    <link rel="prev" title="Inference with kraken" href="inference.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="recognition-model-training">
+<span id="training-recognition"></span><h1>Recognition Model Training<a class="headerlink" href="#recognition-model-training" title="Link to this heading">¶</a></h1>
+<p>This guide covers the training, fine-tuning, and evaluation of recognition
+models.</p>
+<section id="changes-since-6-0">
+<h2>Changes Since 6.0<a class="headerlink" href="#changes-since-6-0" title="Link to this heading">¶</a></h2>
+<div class="admonition important">
+<p class="admonition-title">Important</p>
+<p>For a consolidated migration checklist, see <a class="reference internal" href="migration_6_0.html"><span class="doc">Upgrading from 6.0</span></a>.</p>
+</div>
+<ul class="simple">
+<li><p>Training now creates checkpoint files that need to be converted into final
+weights format.</p></li>
+<li><p>Manifest options were renamed to <code class="docutils literal notranslate"><span class="pre">--training-data</span></code> and
+<code class="docutils literal notranslate"><span class="pre">--evaluation-data</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--resume</span></code> continues a run from a checkpoint with optimizer/scheduler
+state, while <code class="docutils literal notranslate"><span class="pre">--load</span></code> starts a fresh run from existing weights.</p></li>
+</ul>
+</section>
+<section id="data-preparation">
+<h2>Data Preparation<a class="headerlink" href="#data-preparation" title="Link to this heading">¶</a></h2>
+<p>Before training a recognition model, you need to prepare your training data.
+kraken can use ALTO and PageXML files as a source of training data.
+Alternatively, you can use a simple line-based format, where each line in a
+text file corresponds to a line image with the same name.</p>
+<p>For annotating training data, we recommend the <a class="reference external" href="https://www.escriptorium.fr/">eScriptorium</a> platform which
+is tightly integrated with kraken.</p>
+<p>The recommended way to provide training and evaluation data to kraken is
+through manifest files. A manifest is a simple text file containing a list of
+paths to image files, one per line. These manifests are passed to the <code class="docutils literal notranslate"><span class="pre">ketos</span></code>
+training commands using the <code class="docutils literal notranslate"><span class="pre">-t</span></code> and <code class="docutils literal notranslate"><span class="pre">-e</span></code> options.</p>
+<p>To speed up training, it is recommended to compile the training data into a
+binary format using the <code class="docutils literal notranslate"><span class="pre">ketos</span> <span class="pre">compile</span></code> command.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>compile<span class="w"> </span>-f<span class="w"> </span>xml<span class="w"> </span>-o<span class="w"> </span>training_data.arrow<span class="w"> </span>*.xml
+</pre></div>
+</div>
+<p>This will create a file named <code class="docutils literal notranslate"><span class="pre">training_data.arrow</span></code> that can be used for
+training. The manifest would then contain the path to this <code class="docutils literal notranslate"><span class="pre">.arrow</span></code> file.
+When using compiled datasets, set <code class="docutils literal notranslate"><span class="pre">format_type</span></code> to <code class="docutils literal notranslate"><span class="pre">binary</span></code>.</p>
+</section>
+<section id="use-cases">
+<h2>Use Cases<a class="headerlink" href="#use-cases" title="Link to this heading">¶</a></h2>
+<section id="training-from-scratch">
+<h3>Training from Scratch<a class="headerlink" href="#training-from-scratch" title="Link to this heading">¶</a></h3>
+<p>To train a new model from scratch, you need to provide at least a training
+set. It is highly recommended to also provide a validation set to evaluate the
+model’s performance during training.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>train<span class="w"> </span>-t<span class="w"> </span>training_manifest.txt<span class="w"> </span>-e<span class="w"> </span>validation_manifest.txt
+</pre></div>
+</div>
+<p>This will train a model using the data specified in the manifest files.
+Checkpoints will be saved periodically, and the best performing model on the
+validation set will be saved as a weights file at the end.</p>
+<p>If no explicit validation set is given, the training data is automatically
+split according to the <code class="docutils literal notranslate"><span class="pre">--partition</span></code> ratio (default: 0.9, meaning 90%
+training, 10% validation). This automatic split is entirely random so will
+change between training runs which in turn makes the reported validation
+metrics not comparable.</p>
+</section>
+<section id="fine-tuning">
+<h3>Fine-tuning<a class="headerlink" href="#fine-tuning" title="Link to this heading">¶</a></h3>
+<p>To fine-tune a pre-existing model, use the <code class="docutils literal notranslate"><span class="pre">--load</span></code> option to load its
+weights. This is useful when you want to adapt a general-purpose model to a
+specific type of material.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>train<span class="w"> </span>--load<span class="w"> </span>existing_model.safetensors<span class="w"> </span>-t<span class="w"> </span>training_manifest.txt<span class="w"> </span>-e<span class="w"> </span>validation_manifest.txt
+</pre></div>
+</div>
+<p>This will initialize the model with the weights from
+<code class="docutils literal notranslate"><span class="pre">existing_model.safetensors</span></code> and then start training on your new data. The
+learning rate schedule is reset.</p>
+<p>When fine-tuning, the <code class="docutils literal notranslate"><span class="pre">--resize</span></code> option controls how the output layer is
+adapted when the training data contains characters not seen in the original
+model:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">fail</span></code>: Abort if training data and model codec do not match (default).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">union</span></code>: Add new code points to the existing codec.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">new</span></code>: Replace the output layer to match exactly the training data codec.</p></li>
+</ul>
+</section>
+<section id="resuming-training">
+<h3>Resuming Training<a class="headerlink" href="#resuming-training" title="Link to this heading">¶</a></h3>
+<p>If a training run is interrupted (e.g. by a crash, timeout, or manual
+cancellation), it can be continued from the last saved checkpoint using the
+<code class="docutils literal notranslate"><span class="pre">--resume</span></code> option:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>train<span class="w"> </span>--resume<span class="w"> </span>checkpoint_0005.ckpt
+</pre></div>
+</div>
+<p>Unlike <code class="docutils literal notranslate"><span class="pre">--load</span></code>, which only restores the model weights and starts a fresh
+training run, <code class="docutils literal notranslate"><span class="pre">--resume</span></code> restores the full training state: model weights,
+optimizer state, learning rate scheduler position, and the current epoch count.
+Training continues exactly where it left off. No training data or
+hyperparameter options need to be provided on the command line as these are
+restored from the checkpoint as well.</p>
+<p>kraken also saves an emergency checkpoint (<code class="docutils literal notranslate"><span class="pre">checkpoint_abort.ckpt</span></code>) when
+training is interrupted by an unhandled exception.</p>
+</section>
+<section id="freezing-the-backbone">
+<h3>Freezing the Backbone<a class="headerlink" href="#freezing-the-backbone" title="Link to this heading">¶</a></h3>
+<p>When fine-tuning on a small dataset, it can be useful to freeze the backbone
+(all layers except the output layer) for an initial number of samples to avoid
+catastrophic forgetting. The <code class="docutils literal notranslate"><span class="pre">--freeze-backbone</span></code> option sets the number of
+training samples to keep the backbone frozen for:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>train<span class="w"> </span>--load<span class="w"> </span>existing_model.safetensors<span class="w"> </span>--freeze-backbone<span class="w"> </span><span class="m">5000</span><span class="w"> </span>--resize<span class="w"> </span>union<span class="w"> </span>-t<span class="w"> </span>training_manifest.txt
+</pre></div>
+</div>
+</section>
+</section>
+<section id="early-stopping">
+<h2>Early Stopping<a class="headerlink" href="#early-stopping" title="Link to this heading">¶</a></h2>
+<p>By default, the <code class="docutils literal notranslate"><span class="pre">train</span></code> command uses early stopping (<code class="docutils literal notranslate"><span class="pre">--quit</span> <span class="pre">early</span></code>). This
+means training will stop when the validation metric (character accuracy) does
+not improve for <code class="docutils literal notranslate"><span class="pre">--lag</span></code> consecutive evaluation runs. The <code class="docutils literal notranslate"><span class="pre">--min-epochs</span></code>
+option ensures a minimum number of epochs are trained regardless of early
+stopping. Set <code class="docutils literal notranslate"><span class="pre">--quit</span> <span class="pre">fixed</span></code> combined with <code class="docutils literal notranslate"><span class="pre">--epochs</span></code> to train for an exact
+number of epochs.</p>
+</section>
+<section id="learning-rate-schedules">
+<h2>Learning Rate Schedules<a class="headerlink" href="#learning-rate-schedules" title="Link to this heading">¶</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">--schedule</span></code> option selects a learning rate schedule:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">constant</span></code>: Fixed learning rate throughout training.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">1cycle</span></code>: One-cycle policy; cycle length is determined by <code class="docutils literal notranslate"><span class="pre">--epochs</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">exponential</span></code>: Exponential decay by <code class="docutils literal notranslate"><span class="pre">--gamma</span></code> every <code class="docutils literal notranslate"><span class="pre">--step-size</span></code>
+validation runs.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">step</span></code>: Step-wise decay by <code class="docutils literal notranslate"><span class="pre">--gamma</span></code> every <code class="docutils literal notranslate"><span class="pre">--step-size</span></code> validation
+runs.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">reduceonplateau</span></code>: Reduce by <code class="docutils literal notranslate"><span class="pre">--gamma</span></code> when validation loss stagnates
+for <code class="docutils literal notranslate"><span class="pre">--sched-patience</span></code> evaluation runs.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">cosine</span></code>: Cosine annealing from <code class="docutils literal notranslate"><span class="pre">--lrate</span></code> to <code class="docutils literal notranslate"><span class="pre">--cos-min-lr</span></code> over
+<code class="docutils literal notranslate"><span class="pre">--cos-max</span></code> epochs.</p></li>
+</ul>
+<p>All schedules support <code class="docutils literal notranslate"><span class="pre">--warmup</span></code> which linearly ramps the learning rate from
+zero to <code class="docutils literal notranslate"><span class="pre">--lrate</span></code> over the specified number of steps.</p>
+</section>
+<section id="experiment-files">
+<h2>Experiment Files<a class="headerlink" href="#experiment-files" title="Link to this heading">¶</a></h2>
+<p>Instead of supplying all options through the command line, it is possible to
+put options into a YAML file and pass it to the <code class="docutils literal notranslate"><span class="pre">ketos</span></code> command using the
+<code class="docutils literal notranslate"><span class="pre">--config</span></code> option:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>--config<span class="w"> </span>experiment.yml<span class="w"> </span>train
+</pre></div>
+</div>
+<p>Global options (<code class="docutils literal notranslate"><span class="pre">precision</span></code>, <code class="docutils literal notranslate"><span class="pre">device</span></code>, <code class="docutils literal notranslate"><span class="pre">workers</span></code>, <code class="docutils literal notranslate"><span class="pre">threads</span></code>, <code class="docutils literal notranslate"><span class="pre">seed</span></code>,
+<code class="docutils literal notranslate"><span class="pre">deterministic</span></code>) are placed at the top level of the YAML file. Subcommand
+options are nested under the subcommand name:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">precision</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">32-true</span>
+<span class="nt">device</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">auto</span>
+<span class="nt">num_workers</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">32</span>
+<span class="nt">num_threads</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="nt">train</span><span class="p">:</span>
+<span class="w">  </span><span class="c1"># training data manifests</span>
+<span class="w">  </span><span class="nt">training_data</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">train.lst</span>
+<span class="w">  </span><span class="nt">evaluation_data</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">val.lst</span>
+<span class="w">  </span><span class="c1"># format of the training data</span>
+<span class="w">  </span><span class="nt">format_type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">xml</span>
+<span class="w">  </span><span class="c1"># directory to save checkpoints in</span>
+<span class="w">  </span><span class="nt">checkpoint_path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">checkpoints</span>
+<span class="w">  </span><span class="c1"># change to `coreml` to save best model with kraken &lt; 7 compatibility</span>
+<span class="w">  </span><span class="nt">weights_format</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">safetensors</span>
+<span class="w">  </span><span class="c1"># text transforms</span>
+<span class="w">  </span><span class="nt">normalization</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">NFD</span>
+<span class="w">  </span><span class="nt">normalize_whitespace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">  </span><span class="c1"># base configuration of training epochs and LR schedule</span>
+<span class="w">  </span><span class="nt">quit</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">early</span>
+<span class="w">  </span><span class="nt">epochs</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">24</span>
+<span class="w">  </span><span class="nt">lag</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+<span class="w">  </span><span class="nt">lrate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1e-3</span>
+<span class="w">  </span><span class="nt">schedule</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">constant</span>
+<span class="w">  </span><span class="nt">warmup</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">200</span>
+<span class="w">  </span><span class="nt">augment</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">  </span><span class="c1"># effective batch size params</span>
+<span class="w">  </span><span class="nt">batch_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">32</span>
+<span class="w">  </span><span class="nt">accumulate_grad_batches</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="w">  </span><span class="c1"># codec definition</span>
+<span class="w">  </span><span class="c1"># codec: null  # creates a codec automatically</span>
+<span class="w">  </span><span class="nt">codec</span><span class="p">:</span>
+<span class="w">    </span><span class="s">&#39;a&#39;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">1</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="s">&#39;b&#39;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">22</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="s">&#39;c&#39;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">23</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">24</span><span class="p p-Indicator">]</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The YAML keys correspond to the Python parameter names of the click
+options, not the CLI flag names. For instance, the <code class="docutils literal notranslate"><span class="pre">--output</span></code> flag maps
+to the <code class="docutils literal notranslate"><span class="pre">checkpoint_path</span></code> key, and <code class="docutils literal notranslate"><span class="pre">--sched-patience</span></code> maps to
+<code class="docutils literal notranslate"><span class="pre">rop_patience</span></code>.</p>
+</div>
+</section>
+<section id="model-conversion">
+<h2>Model Conversion<a class="headerlink" href="#model-conversion" title="Link to this heading">¶</a></h2>
+<p>At the end of a successful training run, kraken will automatically convert the
+best performing checkpoint into a weights file in the format specified by
+<code class="docutils literal notranslate"><span class="pre">--weights-format</span></code> (default: <code class="docutils literal notranslate"><span class="pre">safetensors</span></code>).</p>
+<p>If you need to convert a checkpoint manually, you can use the <code class="docutils literal notranslate"><span class="pre">ketos</span> <span class="pre">convert</span></code>
+command.</p>
+</section>
+<section id="command-line-options">
+<h2>Command Line Options<a class="headerlink" href="#command-line-options" title="Link to this heading">¶</a></h2>
+<section id="train">
+<h3>train<a class="headerlink" href="#train" title="Link to this heading">¶</a></h3>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>-B, --batch-size INTEGER        batch sample size
+--pad INTEGER                   Left and right padding around lines
+-o, --output PATH               Directory to save checkpoints into.
+--weights-format TEXT           Output weights format.
+-s, --spec TEXT                 VGSL spec of the network to train. CTC
+                                layer will be added automatically.
+-i, --load PATH                 Load existing file to continue training
+--resume PATH                   Load a checkpoint to continue training
+-F, --freq FLOAT                Model saving and report generation
+                                frequency in epochs during training. If
+                                frequency is &gt;1 it must be an integer,
+                                i.e. running validation every n-th epoch.
+-q, --quit [early, fixed, aneal]
+                                Stop condition for training. Set to `early`
+                                for early stopping or `fixed` for fixed
+                                number of epochs
+-N, --epochs INTEGER            Number of epochs to train for
+--min-epochs INTEGER            Minimal number of epochs to train for when
+                                using early stopping.
+--lag INTEGER                   Number of evaluations (--report frequency)
+                                to wait before stopping training without
+                                improvement
+--min-delta FLOAT               Minimum improvement between epochs to reset
+                                early stopping.
+--optimizer [Adam, SGD, RMSprop, Lamb, AdamW]
+                                Select optimizer
+-r, --lrate FLOAT               Learning rate
+-m, --momentum FLOAT            Momentum
+-w, --weight-decay FLOAT        Weight decay
+--gradient-clip-val FLOAT       Gradient clip value
+--accumulate-grad-batches INTEGER
+                                Number of batches to accumulate gradient
+                                across.
+--warmup INTEGER                Number of steps to ramp up to `lrate`
+                                initial learning rate.
+--freeze-backbone INTEGER       Number of samples to keep the backbone
+                                (everything but last layer) frozen.
+--schedule [constant, 1cycle, exponential, step, reduceonplateau, cosine, cosine_warm_restarts]
+                                Set learning rate scheduler. For 1cycle,
+                                cycle length is determined by the `--epoch`
+                                option.
+-g, --gamma FLOAT               Decay factor for exponential, step, and
+                                reduceonplateau learning rate schedules
+-ss, --step-size INTEGER        Number of validation runs between learning
+                                rate decay for exponential and step LR
+                                schedules
+--sched-patience INTEGER        Minimal number of validation runs between
+                                LR reduction for reduceonplateau LR
+                                schedule.
+--cos-max INTEGER               Epoch of minimal learning rate for cosine
+                                LR scheduler.
+--cos-min-lr FLOAT              Minimal final learning rate for cosine LR
+                                scheduler.
+-p, --partition FLOAT           Ground truth data partition ratio between
+                                train/validation set
+-u, --normalization [NFD, NFKD, NFC, NFKC]
+                                Ground truth normalization
+-n, --normalize-whitespace / --no-normalize-whitespace
+                                Normalizes unicode whitespace
+-c, --codec UNPROCESSED         Load a codec JSON definition (invalid if
+                                loading existing model)
+--resize [add, union, both, new, fail]
+                                Codec/output layer resizing option. If set
+                                to `union` code points will be added, `new`
+                                will set the layer to match exactly the
+                                training data, `fail` will abort if
+                                training data and model codec do not
+                                match.
+--reorder / --no-reorder        Reordering of code points to display order
+--base-dir [L, R, auto]         Set base text direction.  This should be
+                                set to the direction used during the
+                                creation of the training data. If set to
+                                `auto` it will be overridden by any
+                                explicit value given in the input files.
+-t, --training-data FILENAME   File(s) with paths to training data
+-e, --evaluation-data FILENAME
+                                File(s) with paths to evaluation data.
+                                Overrides the `-p` parameter
+-f, --format-type [path, xml, alto, page, binary]
+                                Sets the training data format. In ALTO and
+                                PageXML mode all data is extracted from
+                                xml files containing both line definitions
+                                and a link to source images. In `path`
+                                mode arguments are image files sharing a
+                                prefix up to the last extension with
+                                `.gt.txt` text files containing the
+                                transcription. In binary mode files are
+                                datasets files containing pre-extracted
+                                text lines.
+--augment / --no-augment        Enable image augmentation
+--logger [tensorboard]          Logger used by PyTorch Lightning to track
+                                metrics such as loss and accuracy.
+--log-dir PATH                  Path to directory where the logger will
+                                store the logs. If not set, a directory
+                                will be created in the current working
+                                directory.
+--legacy-polygons               Use the legacy polygon extractor.
+</pre></div>
+</div>
+</section>
+</section>
+<section id="evaluation">
+<h2>Evaluation<a class="headerlink" href="#evaluation" title="Link to this heading">¶</a></h2>
+<p>To evaluate a trained model, use the <code class="docutils literal notranslate"><span class="pre">ketos</span> <span class="pre">test</span></code> command. You need to
+provide the model (either a checkpoint or a weights file) and the test data.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span><span class="nb">test</span><span class="w"> </span>-m<span class="w"> </span>model_best.safetensors<span class="w"> </span>-e<span class="w"> </span>test_manifest.txt
+</pre></div>
+</div>
+<p>This will output a report with the character error rate, word error rate , and
+per-script accuracy metrics, as well as character confusion statistics.</p>
+<section id="test">
+<h3>test<a class="headerlink" href="#test" title="Link to this heading">¶</a></h3>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>-B, --batch-size INTEGER        Batch sample size
+-m, --model PATH                Model to evaluate
+-e, --test-data FILENAME       File(s) with paths to evaluation data.
+-f, --format-type [path, xml, alto, page, binary]
+                                Sets the training data format. In ALTO and
+                                PageXML mode all data is extracted from
+                                xml files containing both line definitions
+                                and a link to source images. In `path`
+                                mode arguments are image files sharing a
+                                prefix up to the last extension with
+                                `.gt.txt` text files containing the
+                                transcription. In binary mode files are
+                                datasets files containing pre-extracted
+                                text lines.
+--pad INTEGER                   Left and right padding around lines
+--reorder / --no-reorder        Reordering of code points to display order
+--base-dir [L, R, auto]         Set base text direction.  This should be
+                                set to the direction used during the
+                                creation of the training data. If set to
+                                `auto` it will be overridden by any
+                                explicit value given in the input files.
+-u, --normalization [NFD, NFKD, NFC, NFKC]
+                                Ground truth normalization
+-n, --normalize-whitespace / --no-normalize-whitespace
+                                Normalizes unicode whitespace
+--no-legacy-polygons            Force disable the legacy polygon extractor.
+</pre></div>
+</div>
+</section>
+</section>
+<section id="pretraining">
+<h2>Pretraining<a class="headerlink" href="#pretraining" title="Link to this heading">¶</a></h2>
+<p>kraken supports unsupervised pretraining of recognition models using a
+wav2vec2-style contrastive learning approach. Given a set of text line images
+(without transcriptions), the model learns useful representations by predicting
+masked portions of the input from context. This can improve performance when
+labeled data is scarce.</p>
+<p>To pretrain a model:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>pretrain<span class="w"> </span>-t<span class="w"> </span>line_images_manifest.txt
+</pre></div>
+</div>
+<p>The pretrained model is saved as a checkpoint which can then be used as a
+starting point for supervised fine-tuning with <code class="docutils literal notranslate"><span class="pre">ketos</span> <span class="pre">train</span> <span class="pre">--load</span></code>.</p>
+<p>The key pretraining-specific parameters control the masking strategy:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">--mask-width</span></code>: Width of masks at the scale of the subsampled tensor
+(default: 4). With 4x subsampling in the convolutional layers, a mask width
+of 3 results in an effective mask width of 12 pixels.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--mask-probability</span></code>: Probability of each position being the start of a
+mask (default: 0.5).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--num-negatives</span></code>: Number of negative samples for the contrastive loss
+(default: 100).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--logit-temp</span></code>: Temperature for the contrastive loss logits (default: 0.1).</p></li>
+</ul>
+<p>Pretraining experiment file example:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">precision</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">32-true</span>
+<span class="nt">device</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">auto</span>
+<span class="nt">num_workers</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">32</span>
+<span class="nt">num_threads</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="nt">pretrain</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">training_data</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pretrain_lines.lst</span>
+<span class="w">  </span><span class="nt">evaluation_data</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pretrain_val.lst</span>
+<span class="w">  </span><span class="nt">format_type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">binary</span>
+<span class="w">  </span><span class="nt">checkpoint_path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pretrain_checkpoints</span>
+<span class="w">  </span><span class="nt">batch_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">64</span>
+<span class="w">  </span><span class="nt">epochs</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">100</span>
+<span class="w">  </span><span class="nt">lrate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1e-6</span>
+<span class="w">  </span><span class="nt">schedule</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cosine</span>
+<span class="w">  </span><span class="nt">cos_t_max</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">100</span>
+<span class="w">  </span><span class="nt">cos_min_lr</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1e-7</span>
+<span class="w">  </span><span class="nt">warmup</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">32000</span>
+<span class="w">  </span><span class="nt">weight_decay</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.01</span>
+<span class="w">  </span><span class="nt">augment</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">  </span><span class="nt">mask_width</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">4</span>
+<span class="w">  </span><span class="nt">mask_prob</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.5</span>
+<span class="w">  </span><span class="nt">num_negatives</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">100</span>
+<span class="w">  </span><span class="nt">logit_temp</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.1</span>
+</pre></div>
+</div>
+<section id="pretrain">
+<h3>pretrain<a class="headerlink" href="#pretrain" title="Link to this heading">¶</a></h3>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>-B, --batch-size INTEGER        batch sample size
+--pad INTEGER                   Left and right padding around lines
+-o, --output PATH               Output checkpoint path
+-s, --spec TEXT                 VGSL spec of the network to train.
+-i, --load PATH                 Load existing file to continue training
+-F, --freq FLOAT                Model saving and report generation
+                                frequency in epochs during training. If
+                                frequency is &gt;1 it must be an integer,
+                                i.e. running validation every n-th epoch.
+-q, --quit [early, fixed, aneal]
+                                Stop condition for training. Set to `early`
+                                for early stopping or `fixed` for fixed
+                                number of epochs
+-N, --epochs INTEGER            Number of epochs to train for
+--min-epochs INTEGER            Minimal number of epochs to train for when
+                                using early stopping.
+--lag INTEGER                   Number of evaluations (--report frequency)
+                                to wait before stopping training without
+                                improvement
+--min-delta FLOAT               Minimum improvement between epochs to reset
+                                early stopping. Default is scales the
+                                delta by the best loss
+--optimizer [Adam, SGD, RMSprop, Lamb, AdamW]
+                                Select optimizer
+-r, --lrate FLOAT               Learning rate
+-m, --momentum FLOAT            Momentum
+-w, --weight-decay FLOAT        Weight decay
+--gradient-clip-val FLOAT       Gradient clip value
+--accumulate-grad-batches INTEGER
+                                Number of batches to accumulate gradient
+                                across.
+--warmup FLOAT                  Number of samples to ramp up to `lrate`
+                                initial learning rate.
+--schedule [constant, 1cycle, exponential, step, reduceonplateau, cosine, cosine_warm_restarts]
+                                Set learning rate scheduler. For 1cycle,
+                                cycle length is determined by the `--epoch`
+                                option.
+-g, --gamma FLOAT               Decay factor for exponential, step, and
+                                reduceonplateau learning rate schedules
+-ss, --step-size INTEGER        Number of validation runs between learning
+                                rate decay for exponential and step LR
+                                schedules
+--sched-patience INTEGER        Minimal number of validation runs between
+                                LR reduction for reduceonplateau LR
+                                schedule.
+--cos-max INTEGER               Epoch of minimal learning rate for cosine
+                                LR scheduler.
+--cos-min-lr FLOAT              Minimal final learning rate for cosine LR
+                                scheduler.
+-p, --partition FLOAT           Ground truth data partition ratio between
+                                train/validation set
+-t, --training-data FILENAME   File(s) with additional paths to training
+                                data
+-e, --evaluation-data FILENAME
+                                File(s) with paths to evaluation data.
+                                Overrides the `-p` parameter
+-f, --format-type [path, xml, alto, page, binary]
+                                Sets the training data format. In ALTO and
+                                PageXML mode all data is extracted from
+                                xml files containing both line definitions
+                                and a link to source images. In `path`
+                                mode arguments are image files sharing a
+                                prefix up to the last extension with
+                                `.gt.txt` text files containing the
+                                transcription. In binary mode files are
+                                datasets files containing pre-extracted
+                                text lines.
+--augment / --no-augment        Enable image augmentation
+-mw, --mask-width INTEGER       Width of sampled masks at scale of the
+                                sampled tensor, e.g. 4X subsampling in
+                                convolutional layers with mask width 3
+                                results in an effective mask width of 12.
+-mp, --mask-probability FLOAT   Probability of a particular position being
+                                the start position of a mask.
+-nn, --num-negatives INTEGER    Number of negative samples for the
+                                contrastive loss.
+-lt, --logit-temp FLOAT         Multiplicative factor for the logits used
+                                in contrastive loss.
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/kraken.png" alt="Logo of kraken"/>
+            </a></p>
+  <div>
+    <h3><a href="../index.html">Table of Contents</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">Recognition Model Training</a><ul>
+<li><a class="reference internal" href="#changes-since-6-0">Changes Since 6.0</a></li>
+<li><a class="reference internal" href="#data-preparation">Data Preparation</a></li>
+<li><a class="reference internal" href="#use-cases">Use Cases</a><ul>
+<li><a class="reference internal" href="#training-from-scratch">Training from Scratch</a></li>
+<li><a class="reference internal" href="#fine-tuning">Fine-tuning</a></li>
+<li><a class="reference internal" href="#resuming-training">Resuming Training</a></li>
+<li><a class="reference internal" href="#freezing-the-backbone">Freezing the Backbone</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#early-stopping">Early Stopping</a></li>
+<li><a class="reference internal" href="#learning-rate-schedules">Learning Rate Schedules</a></li>
+<li><a class="reference internal" href="#experiment-files">Experiment Files</a></li>
+<li><a class="reference internal" href="#model-conversion">Model Conversion</a></li>
+<li><a class="reference internal" href="#command-line-options">Command Line Options</a><ul>
+<li><a class="reference internal" href="#train">train</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#evaluation">Evaluation</a><ul>
+<li><a class="reference internal" href="#test">test</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#pretraining">Pretraining</a><ul>
+<li><a class="reference internal" href="#pretrain">pretrain</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+  </div><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">User Guide</a><ul>
+      <li>Previous: <a href="inference.html" title="previous chapter">Inference with kraken</a></li>
+      <li>Next: <a href="training_segmentation.html" title="next chapter">Segmentation Model Training</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+<h3>Versions</h3>
+<ul>
+  <li><a href="../../2.0.0/index.html">2.0.0</a></li>
+  <li><a href="../../3.0/index.html">3.0</a></li>
+  <li><a href="../../4.0/index.html">4.0</a></li>
+  <li><a href="../../4.1/index.html">4.1</a></li>
+  <li><a href="../../4.2.0/index.html">4.2.0</a></li>
+  <li><a href="../../4.3.0/index.html">4.3.0</a></li>
+  <li><a href="../../5.0.0/index.html">5.0.0</a></li>
+  <li><a href="../../5.1/index.html">5.1</a></li>
+  <li><a href="../../5.2/index.html">5.2</a></li>
+  <li><a href="../../5.3.0/index.html">5.3.0</a></li>
+  <li><a href="../../6.0.0/index.html">6.0.0</a></li>
+  <li><a href="training_recognition.html">7.0</a></li>
+</ul>
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2015-2026, Benjamin Kiessling.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/user_guide/training_recognition.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
