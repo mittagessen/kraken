@@ -19,6 +19,7 @@ kraken.containers
 Container classes replacing the old dictionaries returned by kraken's
 functional blocks.
 """
+import copy
 from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass
 from typing import (TYPE_CHECKING, Any, Literal, Optional, Union)
@@ -107,6 +108,45 @@ class BaselineLine(ocr_line):
     baseline: Optional[list[tuple[int, int]]] = None
     boundary: Optional[list[tuple[int, int]]] = None
 
+    def to_bbox(self,
+                text_direction: Literal['horizontal-lr', 'horizontal-rl',
+                                        'vertical-lr', 'vertical-rl'] = 'horizontal-lr'
+                ) -> 'BBoxLine':
+        """
+        Casts this baseline line record into an axis-aligned
+        :class:`BBoxLine`.
+
+        The bounding box is the min/max extent of the bounding polygon
+        (``boundary``). If ``boundary`` is not set, the ``baseline`` polyline
+        is used instead. All shared :class:`ocr_line` fields are carried
+        over.
+
+        Args:
+            text_direction: Principal orientation / reading direction to
+                            assign to the returned :class:`BBoxLine`.
+                            :class:`BaselineLine` does not carry an
+                            orientation itself, so the caller must supply
+                            one (typically the enclosing
+                            :class:`Segmentation`'s ``text_direction``).
+
+        Returns:
+            A new :class:`BBoxLine`. This instance is not modified.
+        """
+        pts = self.boundary if self.boundary else self.baseline
+        xs = [p[0] for p in pts]
+        ys = [p[1] for p in pts]
+        bbox = (min(xs), min(ys), max(xs), max(ys))
+        return BBoxLine(id=self.id,
+                        text=self.text,
+                        base_dir=self.base_dir,
+                        imagename=self.imagename,
+                        tags=self.tags,
+                        split=self.split,
+                        regions=self.regions,
+                        language=self.language,
+                        bbox=bbox,
+                        text_direction=text_direction)
+
 
 @dataclass
 class BBoxLine(ocr_line):
@@ -125,6 +165,67 @@ class BBoxLine(ocr_line):
     type: str = 'bbox'
     bbox: Optional[tuple[int, int, int, int]] = None
     text_direction: Literal['horizontal-lr', 'horizontal-rl', 'vertical-lr', 'vertical-rl'] = 'horizontal-lr'
+
+    def to_baseline(self, topline: Optional[bool] = False) -> 'BaselineLine':
+        """
+        Casts this bounding box line record into a :class:`BaselineLine`.
+
+        The ``boundary`` of the returned line is the four corners of
+        ``bbox`` as a closed 5-point polygon. The synthesized ``baseline``
+        is a two-point segment along the reading axis, inset 25% of the
+        bbox extent along the perpendicular axis so it sits inside the
+        selected quadrant rather than on a bbox edge. Endpoint order
+        matches the reading direction encoded in ``self.text_direction``.
+
+        Args:
+            topline: Baseline placement convention:
+
+                     - ``False`` (default, standard baseline): lower
+                       quadrant; bottom for horizontal, right for
+                       ``vertical-rl``, left for ``vertical-lr``.
+                     - ``True`` (hanging baseline): upper quadrant; top
+                       for horizontal, left for ``vertical-rl``, right
+                       for ``vertical-lr``.
+                     - ``None`` (centerline): centered along the
+                       perpendicular axis.
+
+        Returns:
+            A new :class:`BaselineLine`. This instance is not modified.
+
+        """
+        x0, y0, x1, y1 = self.bbox
+        w, h = x1 - x0, y1 - y0
+        td = self.text_direction
+        if td.startswith('horizontal'):
+            if topline is None:
+                y = y0 + h // 2
+            elif topline:
+                y = y0 + h // 4
+            else:
+                y = y0 + (3 * h) // 4
+            if td == 'horizontal-lr':
+                baseline = [(x0, y), (x1, y)]
+            else:
+                baseline = [(x1, y), (x0, y)]
+        else:
+            if topline is None:
+                x = x0 + w // 2
+            elif topline:
+                x = x0 + (3 * w) // 4 if td == 'vertical-lr' else x0 + w // 4
+            else:
+                x = x0 + w // 4 if td == 'vertical-lr' else x0 + (3 * w) // 4
+            baseline = [(x, y0), (x, y1)]
+        boundary = [(x0, y0), (x1, y0), (x1, y1), (x0, y1), (x0, y0)]
+        return BaselineLine(id=self.id,
+                            text=self.text,
+                            base_dir=self.base_dir,
+                            imagename=self.imagename,
+                            tags=self.tags,
+                            split=self.split,
+                            regions=self.regions,
+                            language=self.language,
+                            baseline=baseline,
+                            boundary=boundary)
 
 
 @dataclass
@@ -200,6 +301,57 @@ class Segmentation:
                         regs[k] = [Region(**reg) for reg in v]
                     self.regions = regs
                     break
+
+    def to_bbox(self) -> 'Segmentation':
+        """
+        Returns a new :class:`Segmentation` of type ``'bbox'``.
+
+        If this segmentation is already of type ``'bbox'`` a deep copy is
+        returned so the caller always gets an independent instance.
+        Otherwise each contained :class:`BaselineLine` is cast via
+        :meth:`BaselineLine.to_bbox`, passing this segmentation's
+        ``text_direction`` through. ``regions``, ``line_orders``, and
+        all other fields pass through unchanged (deep-copied).
+        """
+        if self.type == 'bbox':
+            return copy.deepcopy(self)
+        new_lines = [ln.to_bbox(text_direction=self.text_direction)
+                     for ln in (self.lines or [])]
+        return Segmentation(type='bbox',
+                            imagename=self.imagename,
+                            text_direction=self.text_direction,
+                            script_detection=self.script_detection,
+                            lines=new_lines,
+                            regions=copy.deepcopy(self.regions),
+                            line_orders=copy.deepcopy(self.line_orders),
+                            language=copy.deepcopy(self.language))
+
+    def to_baselines(self, topline: Optional[bool] = False) -> 'Segmentation':
+        """
+        Returns a new :class:`Segmentation` of type ``'baselines'``.
+
+        If this segmentation is already of type ``'baselines'`` a deep copy
+        is returned so the caller always gets an independent instance.
+        Otherwise each contained :class:`BBoxLine` is cast via
+        :meth:`BBoxLine.to_baseline`. ``regions``, ``line_orders``, and
+        all other fields pass through unchanged (deep-copied).
+
+        Args:
+            topline: Baseline placement convention passed through to
+                     :meth:`BBoxLine.to_baseline` for each contained line.
+        """
+        if self.type == 'baselines':
+            return copy.deepcopy(self)
+        new_lines = [ln.to_baseline(topline=topline)
+                     for ln in (self.lines or [])]
+        return Segmentation(type='baselines',
+                            imagename=self.imagename,
+                            text_direction=self.text_direction,
+                            script_detection=self.script_detection,
+                            lines=new_lines,
+                            regions=copy.deepcopy(self.regions),
+                            line_orders=copy.deepcopy(self.line_orders),
+                            language=copy.deepcopy(self.language))
 
 
 class ocr_record(ABC):
