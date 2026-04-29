@@ -201,12 +201,15 @@ def boundary_tracing(region):
         list of coordinates of pixels in the boundary.
     """
 
-    # creating the binary image
+    # creating the binary image with 1px zero padding on every side so that
+    # neighborhood lookups never run off the array (negative indices would
+    # otherwise wrap around to the opposite edge).
     coords = region.coords
+    mins = np.amin(coords, axis=0)
     maxs = np.amax(coords, axis=0)
-    binary = np.zeros((maxs[0] + 2, maxs[1] + 2))
-    x = coords[:, 1]
-    y = coords[:, 0]
+    binary = np.zeros((maxs[0] - mins[0] + 3, maxs[1] - mins[1] + 3))
+    y = coords[:, 0] - mins[0] + 1
+    x = coords[:, 1] - mins[1] + 1
     binary[tuple([y, x])] = 1
 
     # initialization
@@ -241,7 +244,7 @@ def boundary_tracing(region):
         if (np.all(current == start) and np.all(backtrack == backtrack_start)):
             break
 
-    return np.array(boundary)
+    return np.array(boundary) + [mins[0] - 1, mins[1] - 1]
 
 
 def _extend_boundaries(baselines, bin_bl_map):
