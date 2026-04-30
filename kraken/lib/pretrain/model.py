@@ -31,7 +31,7 @@ arXiv:2112.08692 (2021).
 import re
 import logging
 from itertools import chain
-from typing import TYPE_CHECKING, Optional, Union
+from typing import Optional
 
 import lightning as L
 import torch
@@ -45,15 +45,13 @@ from lightning.pytorch.utilities.memory import (garbage_collection_cuda,
 from torch.optim import lr_scheduler
 
 from kraken.configs import VGSLPreTrainingConfig
-from kraken.lib.vgsl import layers
+from kraken.lib.vgsl import TorchVGSLModel, layers
 from kraken.models import BaseModel
 from kraken.lib.codec import PytorchCodec
 from kraken.train import VGSLRecognitionDataModule
+from kraken.train.base import KrakenTrainerModule
 from kraken.train.utils import configure_optimizer_and_lr_scheduler
 from kraken.lib.dataset import ImageInputTransforms
-
-if TYPE_CHECKING:
-    from os import PathLike
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +103,12 @@ class PretrainDataModule(VGSLRecognitionDataModule):
             self.hparams.data_config.codec = PytorchCodec(' ')
 
 
-class RecognitionPretrainModel(L.LightningModule):
+class RecognitionPretrainModel(KrakenTrainerModule):
+
+    _task = 'recognition'
+    _model_class = TorchVGSLModel
+    _config_class = VGSLPreTrainingConfig
+
     def __init__(self,
                  config: VGSLPreTrainingConfig,
                  model: Optional[BaseModel] = None):
@@ -206,15 +209,8 @@ class RecognitionPretrainModel(L.LightningModule):
                      logger=True)
             return loss
 
-    def on_load_checkpoint(self, checkpoint):
-        """
-        Reconstruct the model from the spec here and not in setup() as
-        otherwise the weight loading will fail.
-        """
+    def _build_net_from_checkpoint(self, checkpoint):
         from kraken.models import create_model
-        if not isinstance(checkpoint['hyper_parameters']['config'], VGSLPreTrainingConfig):
-            raise ValueError('Checkpoint is not a recognition model.')
-
         data_config = checkpoint['datamodule_hyper_parameters']['data_config']
         # Handle both config objects and serialized dicts.
         if isinstance(data_config, dict):
@@ -225,13 +221,17 @@ class RecognitionPretrainModel(L.LightningModule):
             codec = getattr(data_config, 'codec', None)
         if codec is not None and hasattr(codec, 'c2l'):
             codec = codec.c2l
-        self.net = create_model('TorchVGSLModel',
-                                model_type=['recognition'],
-                                legacy_polygons=legacy_polygons,
-                                seg_type=checkpoint['_seg_type'],
-                                one_channel_mode=checkpoint['_one_channel_mode'],
-                                vgsl=checkpoint['_module_config'].spec,
-                                codec=codec)
+        return create_model('TorchVGSLModel',
+                            model_type=['recognition'],
+                            legacy_polygons=legacy_polygons,
+                            seg_type=checkpoint['_seg_type'],
+                            one_channel_mode=checkpoint['_one_channel_mode'],
+                            vgsl=checkpoint['_module_config'].spec,
+                            codec=codec)
+
+    def _post_load_checkpoint(self, checkpoint):
+        # _configure_net_components() handles batch/channels/height/width
+        # via _init_pretrain_components, so the base default is bypassed.
         self._configure_net_components()
 
     def _configure_net_components(self) -> None:
@@ -279,29 +279,19 @@ class RecognitionPretrainModel(L.LightningModule):
                 self.net.init_weights()
             self._configure_net_components()
 
-    def on_save_checkpoint(self, checkpoint):
-        """
-        Save hyperparameters a second time so we can set parameters that
-        shouldn't be overwritten in on_load_checkpoint.
-        """
-        checkpoint['_module_config'] = self.hparams.config
+    def _save_checkpoint_extras(self, checkpoint):
         checkpoint['_one_channel_mode'] = self.trainer.datamodule.train_set.dataset.im_mode
         checkpoint['_seg_type'] = self.trainer.datamodule.train_set.dataset.seg_type
 
+    def _append_validation_metrics(self, checkpoint):
+        # Pretraining uses contrastive cross-entropy and does not log val_*
+        # metrics in a form to persist on the model.
+        return None
+
     @classmethod
-    def load_from_weights(cls,
-                          path: Union[str, 'PathLike'],
-                          config: VGSLPreTrainingConfig) -> 'RecognitionPretrainModel':
-        """
-        Initializes the module from a model weights file.
-        """
-        from kraken.models import load_models
-        models = load_models(path, tasks=['recognition'])
-        if len(models) != 1:
-            raise ValueError(f'Found {len(models)} recognition models in model file.')
-        if hasattr(models[0], 'spec'):
-            config.spec = models[0].spec
-        return cls(config=config, model=models[0])
+    def _post_load_weights(cls, model, config):
+        if hasattr(model, 'spec'):
+            config.spec = model.spec
 
     def configure_optimizers(self):
         return configure_optimizer_and_lr_scheduler(self.hparams.config,

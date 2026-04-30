@@ -22,7 +22,7 @@ import lightning as L
 
 
 from functools import partial
-from typing import Optional, Union, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
 from collections import Counter
 from torch.optim import lr_scheduler
 from lightning.pytorch.callbacks import EarlyStopping
@@ -41,12 +41,13 @@ from kraken.lib.dataset import (ArrowIPCRecognitionDataset, GroundTruthDataset,
                                 ImageInputTransforms, PolygonGTDataset,
                                 collate_sequences)
 from kraken.lib.exceptions import KrakenEncodeException, KrakenInputException
+from kraken.lib.vgsl import TorchVGSLModel
+from kraken.train.base import KrakenTrainerModule
 from kraken.train.utils import validation_worker_init_fn, configure_optimizer_and_lr_scheduler, RecognitionTestMetrics
 
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from os import PathLike
     from kraken.models import BaseModel
 
 __all__ = ['VGSLRecognitionDataModule', 'VGSLRecognitionModel']
@@ -227,7 +228,11 @@ class VGSLRecognitionDataModule(L.LightningDataModule):
                           worker_init_fn=validation_worker_init_fn)
 
 
-class VGSLRecognitionModel(L.LightningModule):
+class VGSLRecognitionModel(KrakenTrainerModule):
+
+    _task = 'recognition'
+    _model_class = TorchVGSLModel
+    _config_class = VGSLRecognitionTrainingConfig
 
     def __init__(self,
                  config: VGSLRecognitionTrainingConfig,
@@ -532,53 +537,21 @@ class VGSLRecognitionModel(L.LightningModule):
             self.test_cer_case_insensitive = CharErrorRate()
             self.test_wer = WordErrorRate()
 
-    def on_load_checkpoint(self, checkpoint):
-        """
-        Reconstruct the model from the spec here and not in setup() as
-        otherwise the weight loading will fail.
-        """
+    def _build_net_from_checkpoint(self, checkpoint):
         from kraken.models import create_model
-        if not isinstance(checkpoint['hyper_parameters']['config'], VGSLRecognitionTrainingConfig):
-            raise ValueError('Checkpoint is not a recognition model.')
         data_config = checkpoint['datamodule_hyper_parameters']['data_config']
-        self.net = create_model('TorchVGSLModel',
-                                model_type=['recognition'],
-                                legacy_polygons=data_config.legacy_polygons,
-                                seg_type=checkpoint['_seg_type'],
-                                one_channel_mode=checkpoint['_one_channel_mode'],
-                                vgsl=checkpoint['_module_config'].spec,
-                                codec=data_config.codec.c2l)
+        return create_model('TorchVGSLModel',
+                            model_type=['recognition'],
+                            legacy_polygons=data_config.legacy_polygons,
+                            seg_type=checkpoint['_seg_type'],
+                            one_channel_mode=checkpoint['_one_channel_mode'],
+                            vgsl=checkpoint['_module_config'].spec,
+                            codec=data_config.codec.c2l)
 
-        self.batch, self.channels, self.height, self.width = self.net.input
-
-    def on_save_checkpoint(self, checkpoint):
-        """
-        Save hyperparameters a second time so we can set parameters that
-        shouldn't be overwritten in on_load_checkpoint.
-        """
+    def _save_checkpoint_extras(self, checkpoint):
         self.hparams.config.spec = self.net.spec
-        checkpoint['_module_config'] = self.hparams.config
         checkpoint['_one_channel_mode'] = self.trainer.datamodule.train_set.dataset.im_mode
         checkpoint['_seg_type'] = self.trainer.datamodule.train_set.dataset.seg_type
-        # populate validation metrics
-        metrics = {k: v.item() if hasattr(v, 'item') else v
-                   for k, v in self.trainer.callback_metrics.items()
-                   if k.startswith('val_')}
-        if metrics:
-            self.net.user_metadata['metrics'].append((self.current_epoch, metrics))
-
-    @classmethod
-    def load_from_weights(cls,
-                          path: Union[str, 'PathLike'],
-                          config: VGSLRecognitionTrainingConfig) -> 'VGSLRecognitionModel':
-        """
-        Initializes the module from a model weights file.
-        """
-        from kraken.models import load_models
-        models = load_models(path, tasks=['recognition'])
-        if len(models) != 1:
-            raise ValueError(f'Found {len(models)} recognition models in model file.')
-        return cls(config=config, model=models[0])
 
     def configure_callbacks(self):
         callbacks = []

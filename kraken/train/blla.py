@@ -37,12 +37,13 @@ from kraken.lib.segmentation_metrics import (interpolate_polyline,
                                              compute_detection_metrics,
                                              aggregate_detection_metrics)
 from kraken.configs import BLLASegmentationTrainingConfig, BLLASegmentationTrainingDataConfig
+from kraken.lib.vgsl import TorchVGSLModel
+from kraken.train.base import KrakenTrainerModule
 from kraken.train.utils import configure_optimizer_and_lr_scheduler, SegmentationTestMetrics
 
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
-    from os import PathLike
     from kraken.models import BaseModel
     from kraken.containers import Segmentation
 
@@ -222,7 +223,11 @@ class BLLASegmentationDataModule(L.LightningDataModule):
                           collate_fn=_seg_collate_fn)
 
 
-class BLLASegmentationModel(L.LightningModule):
+class BLLASegmentationModel(KrakenTrainerModule):
+
+    _task = 'segmentation'
+    _model_class = TorchVGSLModel
+    _config_class = BLLASegmentationTrainingConfig
 
     def __init__(self,
                  config: BLLASegmentationTrainingConfig,
@@ -632,63 +637,29 @@ class BLLASegmentationModel(L.LightningModule):
             canonical = self.net.user_metadata['class_mapping']
             self.bl_cls_names = {v: k for k, v in canonical['baselines'].items()}
 
-    def on_load_checkpoint(self, checkpoint):
-        """
-        Reconstruct the model from the spec here and not in setup() as
-        otherwise the weight loading will fail.
-        """
+    def _build_net_from_checkpoint(self, checkpoint):
         from kraken.models import create_model
-        if not isinstance(checkpoint['_module_config'], BLLASegmentationTrainingConfig):
-            raise ValueError('Checkpoint is not a segmentation model.')
-
         data_config = checkpoint['datamodule_hyper_parameters']['data_config']
-        full_class_mapping = {'aux': {'_start_separator': 0, '_end_separator': 1},
-                              'baselines': data_config.line_class_mapping,
-                              'regions': data_config.region_class_mapping}
-        self.net = create_model('TorchVGSLModel',
-                                vgsl=checkpoint['_module_config'].spec,
-                                model_type=['segmentation'],
-                                topline=data_config.topline,
-                                one_channel_mode=checkpoint['_one_channel_mode'],
-                                class_mapping=full_class_mapping)
+        self._full_class_mapping = {'aux': {'_start_separator': 0, '_end_separator': 1},
+                                    'baselines': data_config.line_class_mapping,
+                                    'regions': data_config.region_class_mapping}
+        return create_model('TorchVGSLModel',
+                            vgsl=checkpoint['_module_config'].spec,
+                            model_type=['segmentation'],
+                            topline=data_config.topline,
+                            one_channel_mode=checkpoint['_one_channel_mode'],
+                            class_mapping=self._full_class_mapping)
 
-        self.batch, self.channels, self.height, self.width = self.net.input
-
-        # store full (potentially many-to-one) mapping for test dataset construction
-        self._full_class_mapping = full_class_mapping
-        self.net.user_metadata['_full_class_mapping'] = full_class_mapping
-        # restore canonical (one-to-one) mapping in user_metadata for inference/export
+    def _post_load_checkpoint(self, checkpoint):
+        super()._post_load_checkpoint(checkpoint)
+        self.net.user_metadata['_full_class_mapping'] = self._full_class_mapping
         if '_canonical_class_mapping' in checkpoint:
             self.net.user_metadata['class_mapping'] = checkpoint['_canonical_class_mapping']
 
-    def on_save_checkpoint(self, checkpoint):
-        """
-        Save hyperparameters a second time so we can set parameters that
-        shouldn't be overwritten in on_load_checkpoint.
-        """
+    def _save_checkpoint_extras(self, checkpoint):
         self.hparams.config.spec = self.net.spec
-        checkpoint['_module_config'] = self.hparams.config
         checkpoint['_one_channel_mode'] = self.trainer.datamodule.train_set.dataset.im_mode
         checkpoint['_canonical_class_mapping'] = self.net.user_metadata['class_mapping']
-        # populate validation metrics
-        metrics = {k: v.item() if hasattr(v, 'item') else v
-                   for k, v in self.trainer.callback_metrics.items()
-                   if k.startswith('val_')}
-        if metrics:
-            self.net.user_metadata['metrics'].append((self.current_epoch, metrics))
-
-    @classmethod
-    def load_from_weights(cls,
-                          path: Union[str, 'PathLike'],
-                          config: BLLASegmentationTrainingConfig) -> 'BLLASegmentationModel':
-        """
-        Initializes the module from a model weights file.
-        """
-        from kraken.models import load_models
-        models = load_models(path, tasks=['segmentation'])
-        if len(models) != 1:
-            raise ValueError(f'Found {len(models)} segmentation models in model file.')
-        return cls(config=config, model=models[0])
 
     def configure_callbacks(self):
         callbacks = []

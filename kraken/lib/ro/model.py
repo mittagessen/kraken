@@ -19,7 +19,7 @@ Adapted from:
 """
 import logging
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Literal, Optional, Union
+from typing import TYPE_CHECKING, Literal, Optional
 
 import numpy as np
 import lightning as L
@@ -34,10 +34,10 @@ from kraken.configs import ROTrainingConfig, ROTrainingDataConfig
 from kraken.lib.dataset import PageWiseROSet, PairWiseROSet
 from kraken.lib.ro.layers import ROMLP
 from kraken.lib.segmentation import _greedy_order_decoder
+from kraken.train.base import KrakenTrainerModule
 from kraken.train.utils import configure_optimizer_and_lr_scheduler
 
 if TYPE_CHECKING:
-    from os import PathLike
     from torch.nn import Module
     from kraken.models import BaseModel
 
@@ -128,7 +128,12 @@ class RODataModule(L.LightningDataModule):
         return self.class_mapping
 
 
-class ROModel(L.LightningModule):
+class ROModel(KrakenTrainerModule):
+
+    _task = 'reading_order'
+    _model_class = ROMLP
+    _config_class = ROTrainingConfig
+
     def __init__(self,
                  config: ROTrainingConfig,
                  model: Optional['BaseModel'] = None) -> None:
@@ -162,19 +167,6 @@ class ROModel(L.LightningModule):
 
         self.val_losses = MeanMetric()
         self.val_spearman = MeanMetric()
-
-    @classmethod
-    def load_from_weights(cls,
-                          path: Union[str, 'PathLike'],
-                          config: ROTrainingConfig) -> 'ROModel':
-        """
-        Initializes the module from a model weights file.
-        """
-        from kraken.models import load_models
-        models = load_models(path, tasks=['reading_order'])
-        if len(models) != 1:
-            raise ValueError(f'Found {len(models)} reading order models in model file.')
-        return cls(config=config, model=models[0])
 
     def forward(self, x):
         return F.sigmoid(self.net(x))
@@ -222,31 +214,12 @@ class ROModel(L.LightningModule):
                  logger=True)
         return loss
 
-    def on_load_checkpoint(self, checkpoint):
-        """
-        Reconstruct the model here and not in setup() as otherwise the weight
-        loading will fail.
-        """
+    def _build_net_from_checkpoint(self, checkpoint):
         from kraken.models import create_model
-        if not isinstance(checkpoint['hyper_parameters']['config'], ROTrainingConfig):
-            raise ValueError('Checkpoint is not a reading order model.')
         data_config = checkpoint['datamodule_hyper_parameters']['data_config']
-        self.net = create_model('ROMLP',
-                                class_mapping=data_config.class_mapping,
-                                level=data_config.level)
-
-    def on_save_checkpoint(self, checkpoint):
-        """
-        Save hyperparameters a second time so we can set parameters that
-        shouldn't be overwritten in on_load_checkpoint.
-        """
-        checkpoint['_module_config'] = self.hparams.config
-        # populate validation metrics
-        metrics = {k: v.item() if hasattr(v, 'item') else v
-                   for k, v in self.trainer.callback_metrics.items()
-                   if k.startswith('val_')}
-        if metrics:
-            self.net.user_metadata['metrics'].append((self.current_epoch, metrics))
+        return create_model('ROMLP',
+                            class_mapping=data_config.class_mapping,
+                            level=data_config.level)
 
     def setup(self, stage: Optional[str] = None):
         if stage in [None, 'fit']:
