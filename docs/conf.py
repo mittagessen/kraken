@@ -75,3 +75,4 @@ htmlhelp_basename = 'krakendoc'
 
 smv_branch_whitelist = r'main'
 smv_tag_whitelist = r'^[2-9]\.\d+(\.0)?$'
+smv_remote_whitelist = r'^origin$'
