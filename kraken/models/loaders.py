@@ -68,7 +68,7 @@ def load_safetensors(path: Union[str, PathLike], tasks: Optional[Sequence[_T_tas
     """
     from torch import nn
     from safetensors import safe_open, SafetensorError
-    from safetensors.torch import load_model
+    from safetensors.torch import load_file
     models = nn.ModuleDict()
     skipped_prefixes = []
     inst_ver = Version(importlib.metadata.version('kraken'))
@@ -123,11 +123,24 @@ def load_safetensors(path: Union[str, PathLike], tasks: Optional[Sequence[_T_tas
                 raise ValueError(f'No model metadata found in {path}.')
     except SafetensorError as e:
         raise ValueError(f'Invalid safetensors file {path}: {e}') from e
-    # load weights into models with strict=False to allow dtype mismatches
-    # between saved weights and model parameters (e.g. bfloat16 weights
-    # into a float32 model). PyTorch's load_state_dict handles the
-    # conversion internally via copy_().
-    missing, unexpected = load_model(models, path, strict=False)
+    
+    state_dict = load_file(path)
+    tied_groups: dict = {}
+    for name, t in models.state_dict().items():
+        if t.numel() == 0:
+            continue
+        tied_groups.setdefault((t.device, t.data_ptr(), tuple(t.shape), t.dtype), []).append(name)
+    for group in tied_groups.values():
+        if len(group) < 2:
+            continue
+        present = [n for n in group if n in state_dict]
+        if not present:
+            continue
+        src = state_dict[present[0]]
+        for name in group:
+            state_dict.setdefault(name, src)
+    missing, unexpected = models.load_state_dict(state_dict, strict=False)
+
     # filter out keys belonging to models that were skipped during filtering
     unexpected = [k for k in unexpected if not any(k.startswith(p + '.') for p in skipped_prefixes)]
     if missing or unexpected:
