@@ -362,13 +362,13 @@ def compute_confusions(algn1: Sequence[str], algn2: Sequence[str]):
     for u, v in zip(algn1, algn2):
         counts[(u, v)] += 1
     for k, v in counts.items():
-        if k[0] == '':
-            dels += v
+        if k[0] == '':  # If there is nothing in algn1, it means it's an insertion in algn2
+            ins += v
         else:
             script = _get_script(k[0])
             scripts[script] += v
-            if k[1] == '':
-                ins[script] += v
+            if k[1] == '':  # Reverse: nothing in k[1] means deletion from k[0]
+                dels[script] += v
             elif k[0] != k[1]:
                 subs[script] += v
     return counts, scripts, ins, dels, subs
