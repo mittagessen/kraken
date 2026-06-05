@@ -41,7 +41,7 @@ dependencies = [
     "jinja2~=3.1.6",
     "python-bidi~=0.6.6",
     "torchvision>=0.5.0",
-    "torch>=2.4.0,<=2.10",
+    "torch>=2.4.0,<=2.12",
     "scikit-learn~=1.7.2",
     "scikit-image~=0.25.2",
     "shapely~=2.1.2",
