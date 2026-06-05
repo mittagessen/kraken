@@ -129,15 +129,6 @@ class ImageInputTransforms(transforms.Compose):
                 return v2.Grayscale(num_output_channels=1)
             return partial(F_t.pil_to_mode, mode=self._mode)
 
-        def resize_transform(im):
-            oh, ow = self._scale
-            h, w = im.height, im.width
-            if oh == 0:
-                oh = int(h * ow / w)
-            elif ow == 0:
-                ow = int(w * oh / h)
-            return v2.functional.resize(im, [oh, ow], interpolation=v2.InterpolationMode.LANCZOS, antialias=True)
-
         self.transforms.append(mode_transform())
 
         if self._force_binarization:
@@ -151,7 +142,7 @@ class ImageInputTransforms(transforms.Compose):
                 if self._scale[0] > 0 and self._scale[1] > 0:
                     self.transforms.append(v2.Resize(self._scale, interpolation=v2.InterpolationMode.LANCZOS, antialias=True))
                 else:
-                    self.transforms.append(resize_transform)
+                    self.transforms.append(partial(F_t.pil_fixed_resize, scale=self._scale))
         if self._pad:
             self.transforms.append(v2.Pad(self._pad, fill=255))
         self.transforms.append(v2.PILToTensor())
