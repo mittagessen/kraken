@@ -362,42 +362,84 @@ def process_pipeline(subcommands, input, batch_input, suffix, verbose, format_ty
 
     # parse pdfs
     if format_type == 'pdf':
-        import pyvips
+        import sys as _sys
+        new_input = []
+        num_pages = 0
+
+        def _get_pdf_backend():
+            """Select PDF backend: pypdfium2 on Windows, pyvips elsewhere."""
+            if _sys.platform == 'win32':
+                try:
+                    import pypdfium2 as pdfium
+                    return 'pypdfium2', pdfium
+                except ImportError:
+                    pass
+            try:
+                import pyvips
+                return 'pyvips', pyvips
+            except ImportError:
+                pass
+            raise click.ClickException('No PDF backend available. '
+                                       'Install pypdfium2 (pip install kraken[pdf]) or pyvips.')
+
+        backend_name, backend = _get_pdf_backend()
 
         if not batch_input:
             logger.warning('PDF inputs not added with batch option. Manual output filename will be ignored and `-o` utilized.')
-        new_input = []
-        num_pages = 0
-        for (fpath, _) in input:
-            doc = pyvips.Image.new_from_file(fpath, dpi=300, n=-1, access="sequential")
-            if 'n-pages' in doc.get_fields():
-                num_pages += doc.get('n-pages')
+
+        if backend_name == 'pypdfium2':
+            for (fpath, _) in input:
+                pdf_doc = backend.PdfDocument(fpath)
+                num_pages += len(pdf_doc)
+                pdf_doc.close()
+        else:
+            for (fpath, _) in input:
+                doc = backend.Image.new_from_file(fpath, dpi=300, n=-1, access="sequential")
+                if 'n-pages' in doc.get_fields():
+                    num_pages += doc.get('n-pages')
 
         with KrakenProgressBar() as progress:
             pdf_parse_task = progress.add_task('Extracting PDF pages', total=num_pages, visible=True if not ctx.meta['verbose'] else False)
             for (fpath, _) in input:
                 try:
-                    doc = pyvips.Image.new_from_file(fpath, dpi=300, n=-1, access="sequential")
-                    if 'n-pages' not in doc.get_fields():
-                        logger.warning('{fpath} does not contain pages. Skipping.')
-                        continue
-                    n_pages = doc.get('n-pages')
+                    if backend_name == 'pypdfium2':
+                        pdf_doc = backend.PdfDocument(fpath)
+                        n_pages = len(pdf_doc)
+                        dest_dict = {'idx': -1, 'src': fpath, 'uuid': None}
+                        for i in range(n_pages):
+                            dest_dict['idx'] += 1
+                            dest_dict['uuid'] = f'_{uuid.uuid4()}'
+                            fd, filename = tempfile.mkstemp(suffix='.png')
+                            os.close(fd)
+                            page = pdf_doc[i]
+                            bitmap = page.render(scale=300/72)
+                            pil_image = bitmap.to_pil()
+                            pil_image.save(filename)
+                            new_input.append((filename, pdf_format.format(**dest_dict) + suffix))
+                            progress.update(pdf_parse_task, advance=1)
+                        pdf_doc.close()
+                    else:
+                        doc = backend.Image.new_from_file(fpath, dpi=300, n=-1, access="sequential")
+                        if 'n-pages' not in doc.get_fields():
+                            logger.warning('{fpath} does not contain pages. Skipping.')
+                            continue
+                        n_pages = doc.get('n-pages')
 
-                    dest_dict = {'idx': -1, 'src': fpath, 'uuid': None}
-                    for i in range(0, n_pages):
-                        dest_dict['idx'] += 1
-                        dest_dict['uuid'] = f'_{uuid.uuid4()}'
-                        fd, filename = tempfile.mkstemp(suffix='.png')
-                        os.close(fd)
-                        doc = pyvips.Image.new_from_file(fpath, dpi=300, page=i, access="sequential")
-                        logger.info(f'Saving temporary image {fpath}:{dest_dict["idx"]} to {filename}')
-                        doc.write_to_file(filename)
-                        new_input.append((filename, pdf_format.format(**dest_dict) + suffix))
-                        progress.update(pdf_parse_task, advance=1)
-                except pyvips.error.Error:
+                        dest_dict = {'idx': -1, 'src': fpath, 'uuid': None}
+                        for i in range(0, n_pages):
+                            dest_dict['idx'] += 1
+                            dest_dict['uuid'] = f'_{uuid.uuid4()}'
+                            fd, filename = tempfile.mkstemp(suffix='.png')
+                            os.close(fd)
+                            doc = backend.Image.new_from_file(fpath, dpi=300, page=i, access="sequential")
+                            logger.info(f'Saving temporary image {fpath}:{dest_dict["idx"]} to {filename}')
+                            doc.write_to_file(filename)
+                            new_input.append((filename, pdf_format.format(**dest_dict) + suffix))
+                            progress.update(pdf_parse_task, advance=1)
+                except Exception as e:
                     num_pages -= n_pages
                     progress.update(pdf_parse_task, total=num_pages)
-                    logger.warning(f'{fpath} is not a PDF file. Skipping.')
+                    logger.warning(f'{fpath} is not a PDF file. Skipping. ({e})')
         input = new_input
         ctx.meta['steps'].insert(0, ProcessingStep(id=f'_{uuid.uuid4()}',
                                                    category='preprocessing',
@@ -798,7 +840,7 @@ def get(ctx, model_id):
         download_task = progress.add_task('Processing', total=0, visible=True if not ctx.meta['verbose'] else False)
         model_dir = get_model(model_id,
                               callback=lambda total, advance: progress.update(download_task, total=total, advance=advance))
-    model_candidates = list(filter(lambda x: x.suffix in ['.mlmodel', '.safetensors'], model_dir.iterdir()))
+    model_candidates = list(filter(lambda x: x.suffix.lower() in ['.mlmodel', '.safetensors'], model_dir.iterdir()))
     message(f'Model dir: {model_dir} (model files: {", ".join(x.name for x in model_candidates)})')
 
 

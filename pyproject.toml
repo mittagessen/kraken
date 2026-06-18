@@ -20,6 +20,7 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: Apache Software License",
     "Operating System :: POSIX",
+    "Operating System :: Microsoft :: Windows",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -59,7 +60,10 @@ dependencies = [
 
 [project.optional-dependencies]
 test = ["hocr-spec", "pytest"]
-pdf = ["pyvips"]
+pdf = [
+    "pyvips; sys_platform != 'win32'",
+    "pypdfium2>=4; sys_platform == 'win32'",
+]
 docs = [
     "sphinx<9",
     "sphinx-autoapi",
