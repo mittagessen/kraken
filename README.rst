@@ -23,18 +23,18 @@ kraken's main features are:
 Installation
 ============
 
-Kraken can be run on Linux or Mac OS X (both x64 and ARM). Installation is
-through the on-board *pip* utility. To not pollute the global state of your
-distribution's package manager it is recommended to use virtual environments.
-If you do not have a setup or do not wish to handle virtual environments
-yourself you can use `pipx`.
+Kraken can be run on Linux, Mac OS X (both x64 and ARM), and Windows (64-bit).
+Installation is through the on-board *pip* utility. To not pollute the global
+state of your distribution's package manager it is recommended to use virtual
+environments. If you do not have a setup or do not wish to handle virtual
+environments yourself you can use `pipx`.
 
 .. code-block:: console
 
    $ sudo apt install pipx
    $ pipx install kraken
 
-kraken works both on Linux and Mac OS X and with any python interpreter between
+kraken works on Linux, Mac OS X, and Windows with any python interpreter between
 3.10 and 3.13. It is possible the installation fails because `pipx` defaults to
 an unsupported interpreter version. In that case you need to install a
 compatible interpreter version such as 3.11 and then specify this version
@@ -44,6 +44,26 @@ explicitly:
 
    $ sudo apt install python3.13-full
    $ pipx install --python python3.13 kraken
+
+Windows notes
+--------------
+
+On Windows, set the ``PYTHONUTF8`` environment variable to ``1`` to enable
+Python UTF-8 Mode (PEP 686). This is required because one of kraken's
+dependencies (``htrmopo``) opens files without an explicit ``encoding``
+parameter, which defaults to the Windows system codepage (cp1252) and crashes
+on UTF-8 content.
+
+.. code-block:: powershell
+
+   # PowerShell — set for current user (persists across sessions)
+   [System.Environment]::SetEnvironmentVariable("PYTHONUTF8", "1", "User")
+
+   # Or set for the current session only
+   $env:PYTHONUTF8 = "1"
+
+This fixes ``kraken list``, ``kraken get``, ``kraken show``, and the
+``✓`` character output in command results.
 
 
 Installation using pip
@@ -63,7 +83,8 @@ or by running pip in the git repository:
   $ pip install .
 
 If you want direct PDF and multi-image TIFF/JPEG2000 support it is necessary to
-install the `pdf` extras package for PyPi:
+install the `pdf` extras package for PyPi. On Linux/macOS this uses pyvips;
+on Windows it uses pypdfium2:
 
 .. code-block:: console
 
