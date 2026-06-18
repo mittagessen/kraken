@@ -5,11 +5,15 @@ on:
 
 jobs:
   lint_and_test:
-    name: Runs the linter and tests
-    runs-on: ubuntu-latest
+    name: Runs the linter and tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
+        os: [ubuntu-latest]
         python-version: ['3.10', '3.11', '3.12', '3.13']
+        include:
+          - os: windows-latest
+            python-version: '3.13'
 
     steps:
       - uses: actions/checkout@v4
