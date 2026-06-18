@@ -38,8 +38,19 @@ from kraken.lib.exceptions import KrakenInvalidModelException
 root_logger = logging.getLogger()
 level = root_logger.getEffectiveLevel()
 root_logger.setLevel(logging.ERROR)
-from coremltools.models import MLModel, datatypes  # NOQA
-from coremltools.models.neural_network import NeuralNetworkBuilder  # NOQA
+import sys as _sys
+if _sys.platform == 'win32':
+    try:
+        from coremltools.models import MLModel, datatypes  # NOQA
+        from coremltools.models.neural_network import NeuralNetworkBuilder  # NOQA
+    except Exception:
+        from kraken.lib.exceptions import KrakenInvalidModelException as _Exc
+        raise _Exc('coremltools is not fully supported on Windows. '
+                    'Model loading works but saving is limited. '
+                    'For full functionality, use Linux or macOS.')
+else:
+    from coremltools.models import MLModel, datatypes  # NOQA
+    from coremltools.models.neural_network import NeuralNetworkBuilder  # NOQA
 root_logger.setLevel(level)
 
 # all tensors are ordered NCHW, the "feature" dimension is C, so the output of
@@ -510,8 +521,9 @@ class TorchVGSLModel(nn.Module,
 
                 self._line_extraction_pool = _InProcessPool()
             else:
-                from torch.multiprocessing import Pool
-                self._line_extraction_pool = Pool(self._inf_config.num_line_workers)
+                import multiprocessing as _mp
+                _ctx = _mp.get_context('spawn')
+                self._line_extraction_pool = _ctx.Pool(self._inf_config.num_line_workers)
             import weakref
             weakref.finalize(self, self._line_extraction_pool.terminate)
 

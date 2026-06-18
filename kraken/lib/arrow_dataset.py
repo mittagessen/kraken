@@ -22,7 +22,7 @@ import json
 import tempfile
 from collections import Counter
 from functools import partial
-from multiprocessing import Pool
+from multiprocessing import get_context
 from typing import TYPE_CHECKING, Literal, Callable, Optional, Union
 
 import numpy as np
@@ -261,7 +261,8 @@ def build_binary_dataset(files: Optional[list[Union[str, 'PathLike', 'Segmentati
 
                 if num_workers and num_workers > 1:
                     logger.info(f'Spinning up processing pool with {num_workers} workers.')
-                    with Pool(num_workers) as pool:
+                    _ctx = get_context('spawn')
+                    with _ctx.Pool(num_workers) as pool:
                         for page_lines, im_mode in pool.imap_unordered(extract_fn, docs):
                             if page_lines:
                                 line_cache.extend(page_lines)
