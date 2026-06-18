@@ -19,6 +19,8 @@ kraken.ketos.repo
 Command line driver for publishing models to the model repository.
 """
 import re
+import json
+import shutil
 import logging
 
 import click
@@ -246,7 +248,10 @@ def publish(ctx, metadata, access_token, doi, private, model):
 
         model_path = model_path.resolve()
         tmpdir = Path(tmpdir)
-        (tmpdir / model_path.name).resolve().symlink_to(model_path)
+        try:
+            (tmpdir / model_path.name).resolve().symlink_to(model_path)
+        except OSError:
+            shutil.copy2(model_path, tmpdir / model_path.name)
         if rec_models:
             # v0 metadata only supports recognition models
             nn_rec = rec_models[0]
@@ -260,7 +265,7 @@ def publish(ctx, metadata, access_token, doi, private, model):
             }
             if frontmatter.get('metrics'):
                 v0_metadata['accuracy'] = 100 - frontmatter['metrics']['cer']
-            with open(tmpdir / 'metadata.json', 'w') as fo:
+            with open(tmpdir / 'metadata.json', 'w', encoding='utf-8') as fo:
                 json.dump(v0_metadata, fo)
         kwargs = {'model': tmpdir,
                   'model_card': f'---\n{yaml.dump(frontmatter)}---\n{content}',

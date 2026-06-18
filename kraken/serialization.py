@@ -254,7 +254,7 @@ def serialize(results: 'Segmentation',
         loader = PackageLoader('kraken', 'templates')
     elif template_source == 'custom':
         def _load_template(name):
-            return open(template, 'r').read(), name, lambda: True
+            return open(template, 'r', encoding='utf-8').read(), name, lambda: True
         loader = FunctionLoader(_load_template)
 
     env = Environment(loader=loader,

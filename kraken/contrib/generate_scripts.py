@@ -11,7 +11,7 @@ uri = 'http://www.unicode.org/Public/UNIDATA/Scripts.txt'
 
 re = regex.compile(r'^(?P<start>[0-9A-F]{4,6})(..(?P<end>[0-9A-F]{4,6}))?\s+; (?P<name>[A-Za-z]+)')
 
-with open('scripts.json', 'w') as fp, request.urlopen(uri) as req:
+with open('scripts.json', 'w', encoding='utf-8') as fp, request.urlopen(uri) as req:
     d = []
     for line in req:
         line = line.decode('utf-8')

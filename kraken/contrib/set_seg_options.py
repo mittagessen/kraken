@@ -48,7 +48,7 @@ def cli(bounding_region, topline, pad, output_identifiers, output_format, model)
             print(f'  {k}\t{v}')
 
         if output_identifiers:
-            with open(output_identifiers, 'r') as fp:
+            with open(output_identifiers, 'r', encoding='utf-8') as fp:
                 new_cls_map = json.load(fp)
             print('-> Updating class maps')
             if 'baselines' in new_cls_map:

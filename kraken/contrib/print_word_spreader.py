@@ -263,7 +263,7 @@ for root, dirs, files in os.walk(args.inputDir):
     for file_name in files:
         if file_name.endswith(EXTENSIONS):
             print(file_name)
-            with open(os.path.join(args.inputDir, file_name)) as file:  # Use file to refer to the file
+            with open(os.path.join(args.inputDir, file_name), encoding='utf-8') as file:  # Use file to refer to the file
                 try:
                     tree = etree.parse(file)
                     find_xhtml_body = etree.ETXPath("//{%s}body" % XHTML_NAMESPACE)

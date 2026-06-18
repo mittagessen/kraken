@@ -42,7 +42,7 @@ def cli(format_type, model, legacy_polygons, files):
                     for idx, (im, box) in enumerate(segmentation.extract_polygons(open_image(bounds.imagename), bounds, legacy=legacy_polygons)):
                         click.echo('.', nl=False)
                         im.save('{}.{}.jpg'.format(splitext(bounds.imagename)[0], idx))
-                        with open('{}.{}.gt.txt'.format(splitext(bounds.imagename)[0], idx), 'w') as fp:
+                        with open('{}.{}.gt.txt'.format(splitext(bounds.imagename)[0], idx), 'w', encoding='utf-8') as fp:
                             fp.write(box.text)
             else:
                 with pa.memory_map(doc, 'rb') as source:
@@ -55,7 +55,7 @@ def cli(format_type, model, legacy_polygons, files):
                         sample = ds_table.column('lines')[idx].as_py()
                         im = Image.open(io.BytesIO(sample['im'])).convert('RGB')
                         im.save('{}.{}.jpg'.format(splitext(doc)[0], idx))
-                        with open('{}.{}.gt.txt'.format(splitext(doc)[0], idx), 'w') as fp:
+                        with open('{}.{}.gt.txt'.format(splitext(doc)[0], idx), 'w', encoding='utf-8') as fp:
                             fp.write(sample['text'])
             click.echo()
     else:
