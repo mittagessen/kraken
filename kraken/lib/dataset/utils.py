@@ -340,8 +340,8 @@ def compute_confusions(algn1: Sequence[str], algn2: Sequence[str]):
 
     Returns:
         A tuple (counts, scripts, ins, dels, subs) with `counts` being per-character
-        confusions, `scripts` per-script counts, `ins` a dict with per script
-        insertions, `del` an integer of the number of deletions, `subs` per
+        confusions, `scripts` per-script counts, `ins` an integer of the number
+        of insertions, `dels` a dict with per script deletions, `subs` per
         script substitutions.
     """
     counts: dict[tuple[str, str], int] = Counter()
@@ -355,10 +355,10 @@ def compute_confusions(algn1: Sequence[str], algn2: Sequence[str]):
                 return n
         return 'Unknown'
 
-    scripts: dict[tuple[str, str], int] = Counter()
-    ins: dict[tuple[str, str], int] = Counter()
-    dels: int = 0
-    subs: dict[tuple[str, str], int] = Counter()
+    scripts: dict[str, int] = Counter()
+    ins: int = 0
+    dels: dict[str, int] = Counter()
+    subs: dict[str, int] = Counter()
     for u, v in zip(algn1, algn2):
         counts[(u, v)] += 1
     for k, v in counts.items():

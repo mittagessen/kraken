@@ -80,7 +80,7 @@ class RecognitionTestMetrics(TestMetrics):
     confusions: Counter
     scripts: Counter
     insertions: int
-    deletes: int
+    deletes: Counter
     substitutions: Counter
 
 

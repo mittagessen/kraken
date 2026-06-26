@@ -277,8 +277,8 @@ def render_report(model: str,
                   word_accuracy: float,
                   char_confusions: 'Counter',
                   scripts: 'Counter',
-                  insertions: 'Counter',
-                  deletions: int,
+                  insertions: int,
+                  deletions: 'Counter',
                   substitutions: 'Counter') -> str:
     """
     Renders an accuracy report.
@@ -289,9 +289,9 @@ def render_report(model: str,
         char_confusions: dictionary mapping a tuple (gt, pred) to a
                                 number of occurrences.
         scripts: dictionary counting character per script.
-        insertions: dictionary counting insertion operations per Unicode
-                           script
-        deletions: Number of deletions
+        insertions: Number of insertions
+        deletions: dictionary counting deletion operations per Unicode
+                          script
         substitutions: dictionary counting substitution operations per
                               Unicode script.
 
@@ -306,13 +306,13 @@ def render_report(model: str,
               'character_accuracy': char_accuracy * 100,
               'character_CI_accucary': char_CI_accucary * 100,
               'word_accuracy': word_accuracy * 100,
-              'insertions': sum(insertions.values()),
-              'deletions': deletions,
+              'insertions': insertions,
+              'deletions': sum(deletions.values()),
               'substitutions': sum(substitutions.values()),
               'scripts': sorted([{'script': k,
                                   'count': v,
-                                  'errors': insertions[k] + substitutions[k],
-                                  'accuracy': 100 * (v - (insertions[k] + substitutions[k])) / v} for k, v in scripts.items()],
+                                  'errors': deletions[k] + substitutions[k],
+                                  'accuracy': 100 * (v - (deletions[k] + substitutions[k])) / v} for k, v in scripts.items()],
                                 key=lambda x: x['accuracy'],
                                 reverse=True),
               'counts': sorted([{'correct': make_printable(k[0]),
