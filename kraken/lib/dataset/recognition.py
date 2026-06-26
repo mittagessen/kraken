@@ -175,8 +175,8 @@ class ArrowIPCRecognitionDataset(Dataset):
         if self._split_filter and metadata['counts'][self._split_filter] == 0:
             logger.warning(f'No explicit split for "{self._split_filter}" in dataset {file} (with splits {metadata["counts"].items()}).')
             return
-        # centerline normalize raw bbox dataset
-        if self.seg_type == 'bbox' and metadata['image_type'] == 'raw':
+        # centerline normalize raw bbox dataset (transforms may not be assigned yet)
+        if self.seg_type == 'bbox' and metadata['image_type'] == 'raw' and self.transforms is not None:
             self.transforms.valid_norm = True
 
         legacy_polygons = metadata.get('legacy_polygons', True)
