@@ -24,6 +24,7 @@ import lightning as L
 from functools import partial
 from typing import Optional, TYPE_CHECKING
 from collections import Counter
+from collections.abc import Callable
 from torch.optim import lr_scheduler
 from lightning.pytorch.callbacks import EarlyStopping
 from torchmetrics.text import CharErrorRate, WordErrorRate
@@ -36,6 +37,7 @@ from kraken.containers import Segmentation
 from kraken.configs import (RecognitionInferenceConfig,
                             VGSLRecognitionTrainingConfig,
                             VGSLRecognitionTrainingDataConfig)
+from kraken.lib import functional_im_transforms as F_t
 from kraken.lib.dataset import compute_confusions, global_align
 from kraken.lib.dataset import (ArrowIPCRecognitionDataset, GroundTruthDataset,
                                 ImageInputTransforms, PolygonGTDataset,
@@ -363,12 +365,24 @@ class VGSLRecognitionModel(KrakenTrainerModule):
         self.algn_gt: list[str] = []
         self.algn_pred: list[str] = []
 
+        # mirror the ground truth normalization onto predictions (reordering
+        # excluded as the network already emits in display order)
+        data_config = self.trainer.datamodule.hparams.data_config
+        self._pred_transforms: list[Callable[[str], str]] = []
+        if data_config.normalization:
+            self._pred_transforms.append(partial(F_t.text_normalize,
+                                                  normalization=data_config.normalization))
+        if data_config.normalize_whitespace:
+            self._pred_transforms.append(F_t.text_whitespace_normalize)
+
     def test_step(self, batch, batch_idx, test_dataloader=0):
         preds, olens = self.net.forward(batch['image'], batch['seq_lens'])
         preds = preds.squeeze(2)
         self.characters += Counter(''.join(batch['target']))
         for pred, target in zip([self.net.codec.decode(locs) for locs in RecognitionInferenceConfig().decoder(preds, olens)], batch['target']):
             pred_str = ''.join(x[0] for x in pred)
+            for func in self._pred_transforms:
+                pred_str = func(pred_str)
             c, algn1, algn2 = global_align(target, pred_str)
             self.errors += c
             self.algn_gt.extend(algn1)
