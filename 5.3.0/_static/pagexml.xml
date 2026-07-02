@@ -1,0 +1,21 @@
+<PcGts xmlns="http://schema.primaresearch.org/PAGE/gts/pagecontent/2019-07-15" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://schema.primaresearch.org/PAGE/gts/pagecontent/2019-07-15 http://schema.primaresearch.org/PAGE/gts/pagecontent/2019-07-15/pagecontent.xsd">
+	<Metadata>...</Metadata>
+	<Page imageFilename="filename.jpg"...><!-- relative path to an image file from the location of the XML document -->
+		<TextRegion id="block_N"
+			    custom="structure {type:region_type;}"><!-- region type is a free text field-->
+			<Coords points="10,20 500,20 400,200, 500,300, 10,300 5,80"/><!-- polygon for region boundary -->
+			<TextLine id="line_K">
+				<Baseline points="80,200 100,210, 400,198"/><!-- required for baseline segmentation training -->
+				<TextEquiv><Unicode>text text text</Unicode></TextEquiv><!-- only TextEquiv tags immediately below the TextLine tag are parsed for recognition training -->
+				<Word>
+				...
+			</TextLine>
+			....
+		</TextRegion>
+		<TextRegion id="textblock_M"><!-- for lines not contained in any region. TextRegions without a type are automatically assigned the 'text' type which can be filtered out for training. -->
+			<Coords points="0,0 0,{{ page.size[1] }} {{ page.size[0] }},{{ page.size[1] }} {{ page.size[0] }},0"/>
+			<TextLine>...</TextLine><!-- same as above -->
+			....
+                </TextRegion>
+	</Page>
+</PcGts>

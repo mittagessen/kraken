@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>kraken &#8212; kraken  documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=27fed22d" />
+    <link rel="stylesheet" type="text/css" href="_static/graphviz.css?v=4ae1632d" />
+    <link rel="stylesheet" type="text/css" href="_static/custom.css?v=89a84cc7" />
+    <script src="_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="_static/doctools.js?v=9bcbadda"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="canonical" href="kraken.re/index.html" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Introduction to Automatic Text Recognition" href="introduction_to_atr.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="kraken">
+<h1>kraken<a class="headerlink" href="#kraken" title="Link to this heading">¶</a></h1>
+<div class="toctree-wrapper compound">
+</div>
+<p>kraken is an open-source, turn-key automatic text recognition (ATR) system
+optimized for historical and non-Latin script writing. Designed as a universal
+text recognizer for the humanities, it directly addresses the unique challenges
+of digitizing historical documents.</p>
+<p>Highly adaptable and trainable, kraken excels in scenarios often overlooked by
+general-purpose ATR engines. It is particularly well-suited for the long tail
+of digitization, supporting low-resource languages and diverse,
+non-conventional scripts common in humanities research.</p>
+<p>kraken offers two primary interfaces for its functionality:</p>
+<ul class="simple">
+<li><p>A flexible and customizable <strong>command-line interface</strong>, intended for most users, enabling chainable workflows implementing the recognition pipeline.</p></li>
+<li><p>A comprehensive <strong>API</strong>, designed for developers building custom workflows, integrating kraken into other projects, or requiring fine-grained control over the ATR process.</p></li>
+</ul>
+<p>This documentation is structured to guide you through kraken’s capabilities:</p>
+<ul class="simple">
+<li><p>The <a class="reference internal" href="introduction_to_atr.html"><span class="doc">Introduction to Automatic Text Recognition</span></a> is a basic primer on the core concepts intended for readers without prior ATR or machine learning experience.</p></li>
+<li><p>The <a class="reference internal" href="getting_started.html"><span class="doc">Getting Started</span></a> guide provides a concise introduction to installation and basic usage.</p></li>
+<li><p>The <a class="reference internal" href="user_guide/index.html"><span class="doc">User Guide</span></a> offers detailed information on utilizing the CLI tools for various tasks and an introduction to the python API.</p></li>
+<li><p>The <a class="reference internal" href="api/index.html"><span class="doc">Python API</span></a> serves as a comprehensive reference for integrating kraken into your python projects.</p></li>
+</ul>
+</section>
+<section id="features">
+<h1>Features<a class="headerlink" href="#features" title="Link to this heading">¶</a></h1>
+<p>kraken’s main features are:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Fully trainable layout analysis, reading order, and character recognition.</p></li>
+<li><p><a class="reference external" href="https://en.wikipedia.org/wiki/Right-to-left">Right-to-Left</a>, <a class="reference external" href="https://en.wikipedia.org/wiki/Bi-directional_text">BiDi</a>, and Top-to-Bottom
+script support</p></li>
+<li><p><a class="reference external" href="https://www.loc.gov/standards/alto/">ALTO</a>, PageXML, abbyyXML, and hOCR
+output</p></li>
+<li><p>Word bounding boxes and character cuts</p></li>
+<li><p>Public repository of model files via <a class="reference external" href="https://zenodo.org/communities/ocr_models/records">HTRMoPo</a></p></li>
+<li><p>Configurable recognition through a network specification language and a plugin system</p></li>
+</ul>
+</div></blockquote>
+</section>
+<section id="integrations">
+<h1>Integrations<a class="headerlink" href="#integrations" title="Link to this heading">¶</a></h1>
+<p>Through its API, kraken has also been integrated into various frontend applications and larger processing suites that offer graphical user interfaces or scaffolding for large-scale digitization:</p>
+<ul class="simple">
+<li><p><a class="reference external" href="https://www.escriptorium.fr/">eScriptorium</a>: A web-based platform for annotating, transcribing, and training ATR models, tightly integrating kraken.</p></li>
+<li><p><a class="reference external" href="https://ocr4all.org/">OCR4all</a>: A comprehensive ATR framework designed for historical documents, offering a user-friendly interface for various ATR tasks.</p></li>
+<li><p><a class="reference external" href="https://ocr-d.de/">OCR-D suite</a>: A collection of tools for ATR-related tasks, aiming to build a full-stack ATR workflow for historical prints.</p></li>
+<li><p><a class="reference external" href="https://arkindex.teklia.com/">arkindex by Teklia</a>: A platform for large-scale document analysis and indexing with kraken support through a plugin.</p></li>
+</ul>
+</section>
+<section id="community-support">
+<h1>Community &amp; Support<a class="headerlink" href="#community-support" title="Link to this heading">¶</a></h1>
+<p>kraken is an open-source project driven by community contributions. We warmly
+welcome feedback, pull requests, bug reports, and feature suggestions on our
+<a class="reference external" href="https://github.com/mittagessen/kraken">github repository</a>.</p>
+<p>If you are looking for help, want to discuss features, or need support regarding
+integrations (particularly with <strong>eScriptorium</strong>), please join our community
+chat: <a class="reference external" href="https://app.gitter.im/#/room/#escripta_escriptorium:gitter.im">eScriptorium Gitter Channel</a></p>
+</section>
+<section id="license">
+<h1>License<a class="headerlink" href="#license" title="Link to this heading">¶</a></h1>
+<p><code class="docutils literal notranslate"><span class="pre">kraken</span></code> is provided under the terms and conditions of the <a class="reference external" href="https://github.com/mittagessen/kraken/blob/main/LICENSE">Apache 2.0
+License</a>.</p>
+</section>
+<section id="funding">
+<h1>Funding<a class="headerlink" href="#funding" title="Link to this heading">¶</a></h1>
+<p>kraken is developed at <a class="reference external" href="https://inria.fr">Inria</a> and the <a class="reference external" href="https://www.ephe.psl.eu">École Pratique des
+Hautes Études</a>, <a class="reference external" href="https://www.psl.eu">Université PSL</a>.</p>
+<div class="twocol docutils container">
+<div class="leftside docutils container">
+<a class="reference internal image-reference" href="https://raw.githubusercontent.com/mittagessen/kraken/main/docs/_static/normal-reproduction-low-resolution.jpg"><img alt="Co-financed by the European Union" src="https://raw.githubusercontent.com/mittagessen/kraken/main/docs/_static/normal-reproduction-low-resolution.jpg" style="width: 100px;" />
+</a>
+</div>
+<div class="rightside docutils container">
+<p>This project was funded in part by the European Union (ATRIUM, project
+number 101132163). This project was funded in part by the European
+Union (ERC, MiDRASH, project number 101071829). This project was
+partially funded through the RESILIENCE project, funded from the
+European Union’s Horizon 2020 Framework Programme for Research and
+Innovation.</p>
+</div>
+</div>
+<div class="twocol docutils container">
+<div class="leftside docutils container">
+<a class="reference internal image-reference" href="https://projet.biblissima.fr/sites/default/files/2021-11/biblissima-baseline-sombre-ia.png"><img alt="Received funding from the Programme d’investissements d’Avenir" src="https://projet.biblissima.fr/sites/default/files/2021-11/biblissima-baseline-sombre-ia.png" style="width: 300px;" />
+</a>
+</div>
+<div class="rightside docutils container">
+<p>Ce travail a bénéficié d’une aide de l’État gérée par l’Agence Nationale de la
+Recherche au titre du Programme d’Investissements d’Avenir portant la référence
+ANR-21-ESRE-0005 (Biblissima+).</p>
+</div>
+</div>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="#">
+              <img class="logo" src="_static/kraken.png" alt="Logo of kraken"/>
+            </a></p><h3>Useful Links</h3>
+<ul>
+  <li><a href="https://kraken.re">The Kraken Website</a></li>
+  <li><a href="https://pypi.python.org/pypi/kraken">kraken @ PyPI</a></li>
+  <li><a href="https://github.com/mittagessen/kraken">kraken @ github</a></li>
+  <li><a href="https://github.com/mittagessen/kraken/issues">Issue Tracker</a></li>
+</ul><h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="introduction_to_atr.html">Introduction to Automatic Text Recognition</a></li>
+<li class="toctree-l1"><a class="reference internal" href="getting_started.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/index.html">User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api/index.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="changelog.html">Changelog</a></li>
+</ul>
+
+
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+<h3>Versions</h3>
+<ul>
+  <li><a href="../2.0.0/index.html">2.0.0</a></li>
+  <li><a href="../3.0/index.html">3.0</a></li>
+  <li><a href="../4.0/index.html">4.0</a></li>
+  <li><a href="../4.1/index.html">4.1</a></li>
+  <li><a href="../4.2.0/index.html">4.2.0</a></li>
+  <li><a href="../4.3.0/index.html">4.3.0</a></li>
+  <li><a href="../5.0.0/index.html">5.0.0</a></li>
+  <li><a href="../5.1/index.html">5.1</a></li>
+  <li><a href="../5.2/index.html">5.2</a></li>
+  <li><a href="../5.3.0/index.html">5.3.0</a></li>
+  <li><a href="../6.0.0/index.html">6.0.0</a></li>
+  <li><a href="index.html">7.0</a></li>
+  <li><a href="../main/index.html">main</a></li>
+</ul>
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2015-2026, Benjamin Kiessling.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="_sources/index.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
