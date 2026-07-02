@@ -32,6 +32,8 @@ class TestPageSeg(unittest.TestCase):
         with Image.open(resources / 'bw.png') as im:
             seg = segment(im)
             self.assertEqual(seg.type, 'bbox')
+            self.assertEqual(seg.imagename, im.filename, msg='imagename not '
+                             'populated from source image filename')
             # test if line count is roughly correct
             self.assertAlmostEqual(len(seg.lines), 30, msg='Segmentation differs '
                                    'wildly from true line count', delta=5)

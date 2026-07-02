@@ -356,6 +356,8 @@ def segment(im: PIL.Image.Image,
         logger.error(f'Image {im_str} is not bi-level')
         raise KrakenInputException(f'Image {im_str} is not bi-level')
 
+    imagename = getattr(im, 'filename', None)
+
     # rotate input image for vertical lines
     if text_direction.startswith('horizontal'):
         angle = 0
@@ -381,7 +383,7 @@ def segment(im: PIL.Image.Image,
     if ccs > np.dot(*im.size) / (30 * 30):
         logger.warning(f'Too many connected components for a page image: {ccs}')
         return Segmentation(text_direction=text_direction,
-                            imagename=getattr(im, 'filename', None),
+                            imagename=imagename,
                             type='bbox',
                             regions=None,
                             line_orders=None,
@@ -414,7 +416,7 @@ def segment(im: PIL.Image.Image,
     except ValueError:
         logger.warning(f'Exception in column finder (probably empty image) for {im_str}')
         return Segmentation(text_direction=text_direction,
-                            imagename=getattr(im, 'filename', None),
+                            imagename=imagename,
                             type='bbox',
                             regions=None,
                             line_orders=None,
@@ -444,7 +446,7 @@ def segment(im: PIL.Image.Image,
     lines = [BBoxLine(id=f'_{uuid.uuid4()}', bbox=line) for line in rotate_lines(lines, 360 - angle, offset).tolist()]
 
     return Segmentation(text_direction=text_direction,
-                        imagename=getattr(im, 'filename', None),
+                        imagename=imagename,
                         type='bbox',
                         regions=None,
                         line_orders=None,
