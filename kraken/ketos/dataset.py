@@ -35,10 +35,19 @@ from .util import _validate_manifests
 @click.option('-F', '--files', show_default=True, default=None, multiple=True,
               callback=_validate_manifests, type=click.File(mode='r', lazy=True),
               help='File(s) with additional paths to training data.')
+@click.option('--linetype', type=click.Choice(['baselines', 'bbox']), default=None,
+              help='Selects the type of line data extracted from `xml`, `alto`, '
+                   'or `page` sources. `baselines` (the default) extracts '
+                   'polygon-dewarped line images, `bbox` extracts plain bounding '
+                   'box crops. Has no effect on `path` input, which is always '
+                   'extracted as bbox.')
 @click.option('--force-type', type=click.Choice(['bbox', 'baseline']), default=None, show_default=True,
-              help='Forces the dataset type to a specific value. Can be used to '
-                   '"convert" a line strip-type collection to a baseline-style '
-                   'dataset, e.g. to disable centerline normalization.')
+              help='Forces the dataset type recorded in the metadata to a '
+                   'specific value without changing how lines are extracted. Can '
+                   'be used to relabel a `path`-derived (line strip) dataset as '
+                   'baseline-style, e.g. to disable centerline normalization. To '
+                   'change how lines are extracted from XML sources use '
+                   '`--linetype` instead.')
 @click.option('--skip-empty-lines/--keep-empty-lines', show_default=True, default=True,
               help='Whether to keep or skip empty text lines. Text-less '
                    'datasets are useful for unsupervised pretraining but '
@@ -51,7 +60,7 @@ from .util import _validate_manifests
 @click.option('--legacy-polygons', show_default=True, default=False, is_flag=True,
               help='Use the old polygon extractor.')
 @click.argument('ground_truth', nargs=-1, type=click.Path(exists=True, dir_okay=False))
-def compile(ctx, output, format_type, files, force_type, skip_empty_lines,
+def compile(ctx, output, format_type, files, linetype, force_type, skip_empty_lines,
             recordbatch_size, ground_truth, legacy_polygons):
     """
     Precompiles a binary dataset from a collection of XML files.
@@ -86,6 +95,7 @@ def compile(ctx, output, format_type, files, force_type, skip_empty_lines,
                                            output_file=output,
                                            format_type=format_type,
                                            num_workers=ctx.meta['num_workers'],
+                                           linetype=linetype,
                                            force_type=force_type,
                                            recordbatch_size=recordbatch_size,
                                            skip_empty_lines=skip_empty_lines,

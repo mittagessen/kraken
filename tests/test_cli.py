@@ -207,6 +207,40 @@ class TestCLIRecognition(unittest.TestCase):
             finally:
                 os.unlink(fp.name)
 
+    def test_ocr_xml_input_auto_linetype(self):
+        """
+        Tests recognition on XML input with the linetype derived from the
+        model.
+        """
+        xml = resources / '170025120000003,0074-lite.xml'
+        with tempfile.NamedTemporaryFile(suffix='.txt', delete=False) as fp:
+            try:
+                result = self.runner.invoke(cli, ['-f', 'xml', '-i', str(xml), fp.name,
+                                                  'ocr', '-m', str(self.model)])
+                self.assertEqual(result.exit_code, 0, msg=result.output)
+                with open(fp.name, 'r') as f:
+                    content = f.read()
+                self.assertGreater(len(content.strip()), 0)
+            finally:
+                os.unlink(fp.name)
+
+    def test_ocr_xml_input_explicit_linetype(self):
+        """
+        Tests recognition on XML input with an explicit linetype override.
+        """
+        xml = resources / '170025120000003,0074-lite.xml'
+        with tempfile.NamedTemporaryFile(suffix='.txt', delete=False) as fp:
+            try:
+                result = self.runner.invoke(cli, ['-f', 'xml', '-i', str(xml), fp.name,
+                                                  'ocr', '-m', str(self.model),
+                                                  '--linetype', 'baselines'])
+                self.assertEqual(result.exit_code, 0, msg=result.output)
+                with open(fp.name, 'r') as f:
+                    content = f.read()
+                self.assertGreater(len(content.strip()), 0)
+            finally:
+                os.unlink(fp.name)
+
     def test_ocr_missing_model_fails(self):
         """
         Tests that ocr fails gracefully when model file doesn't exist.

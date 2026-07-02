@@ -64,6 +64,18 @@ class TestKrakenArrowCompilation(unittest.TestCase):
                                  format_type='xml')
             _validate_ds(self, tmp_file.name, 4, 0, 'kraken_recognition_baseline')
 
+    def test_build_xml_bbox_dataset(self):
+        """
+        `--linetype bbox` actually extracts bounding-box crops from XML
+        sources (not just relabeling baseline-extracted data).
+        """
+        with tempfile.NamedTemporaryFile() as tmp_file:
+            build_binary_dataset(files=[self.xml],
+                                 output_file=tmp_file.name,
+                                 format_type='xml',
+                                 linetype='bbox')
+            _validate_ds(self, tmp_file.name, 4, 0, 'kraken_recognition_bbox')
+
     def test_build_seg_dataset(self):
         with tempfile.NamedTemporaryFile() as tmp_file:
             build_binary_dataset(files=[self.seg],
@@ -89,6 +101,22 @@ class TestKrakenArrowCompilation(unittest.TestCase):
                                  format_type='xml',
                                  skip_empty_lines=False)
             _validate_ds(self, tmp_file.name, 5, 1, 'kraken_recognition_baseline')
+
+    def test_force_type_mismatch_warning(self):
+        """
+        Forcing a dataset type that contradicts the actually extracted line
+        type logs a warning.
+        """
+        with tempfile.NamedTemporaryFile() as tmp_file:
+            build_binary_dataset(files=[self.xml],
+                                 output_file=tmp_file.name,
+                                 format_type='xml',
+                                 linetype='bbox',
+                                 force_type='kraken_recognition_baseline')
+            _validate_ds(self, tmp_file.name, 4, 0, 'kraken_recognition_baseline')
+        mismatch_warnings = [r for r in self.caplog.records
+                             if r.levelname == 'WARNING' and 'Forcing dataset type' in r.message]
+        self.assertEqual(len(mismatch_warnings), 1)
 
     @fixture(autouse=True)
     def caplog_fixture(self, caplog):

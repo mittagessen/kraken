@@ -32,8 +32,8 @@ from torch.utils.data import DataLoader, Subset, random_split
 
 from kraken.lib.xml import XMLPage
 from kraken.lib.codec import PytorchCodec
-from kraken.lib.util import make_printable
-from kraken.containers import Segmentation
+from kraken.lib.util import make_printable, parse_gt_path
+from kraken.containers import BBoxLine, Segmentation
 from kraken.configs import (RecognitionInferenceConfig,
                             VGSLRecognitionTrainingConfig,
                             VGSLRecognitionTrainingDataConfig)
@@ -76,6 +76,8 @@ class VGSLRecognitionDataModule(L.LightningDataModule):
                 logger.warning('Internal binary dataset splits are enabled but using non-binary dataset files. Will be ignored.')
                 data_config.binary_dataset_split = False
 
+            linetype = data_config.linetype or 'baselines'
+
             def _parse_xml_set(ds_type, dataset) -> list[dict[str, Segmentation]]:
                 if not dataset:
                     return None
@@ -83,7 +85,7 @@ class VGSLRecognitionDataModule(L.LightningDataModule):
                 data = []
                 for pos, file in enumerate(dataset):
                     try:
-                        data.append({'page': XMLPage(file, filetype=data_config.format_type).to_container()})
+                        data.append({'page': XMLPage(file, filetype=data_config.format_type, linetype=linetype).to_container()})
                     except Exception as e:
                         logger.warning(f'Failed to parse {file}: {e}')
                 return data
@@ -91,14 +93,35 @@ class VGSLRecognitionDataModule(L.LightningDataModule):
             training_data = _parse_xml_set('training', all_files[0])
             evaluation_data = _parse_xml_set('evaluation', all_files[1])
             test_data = _parse_xml_set('test', all_files[2])
-            DatasetClass = partial(PolygonGTDataset, legacy_polygons=data_config.legacy_polygons)
+            if linetype == 'baselines':
+                DatasetClass = partial(PolygonGTDataset, legacy_polygons=data_config.legacy_polygons)
+        elif data_config.format_type == 'path':
+            if data_config.binary_dataset_split:
+                logger.warning('Internal binary dataset splits are enabled but using non-binary dataset files. Will be ignored.')
+                data_config.binary_dataset_split = False
+
+            def _parse_path_set(ds_type, dataset) -> list[dict[str, BBoxLine]]:
+                if not dataset:
+                    return None
+                logger.info(f'Parsing {len(dataset) if dataset else 0} line image-text pairs for {ds_type} data')
+                data = []
+                for file in dataset:
+                    try:
+                        data.append({'line': parse_gt_path(file)})
+                    except Exception as e:
+                        logger.warning(f'Failed to parse {file}: {e}')
+                return data
+
+            training_data = _parse_path_set('training', all_files[0])
+            evaluation_data = _parse_path_set('evaluation', all_files[1])
+            test_data = _parse_path_set('test', all_files[2])
         elif data_config.format_type == 'binary':
             DatasetClass = ArrowIPCRecognitionDataset
             training_data = [{'file': file} for file in all_files[0]] if all_files[0] else None
             evaluation_data = [{'file': file} for file in all_files[1]] if all_files[1] else None
             test_data = [{'file': file} for file in all_files[2]] if all_files[2] else None
         else:
-            raise ValueError(f'format_type {data_config.format_type} not in [xml, page, alto, binary].')
+            raise ValueError(f'format_type {data_config.format_type} not in [xml, page, alto, path, binary].')
 
         if training_data and evaluation_data:
             train_set = self._build_dataset(DatasetClass, training_data, augmentation=data_config.augment)
@@ -118,6 +141,19 @@ class VGSLRecognitionDataModule(L.LightningDataModule):
             self.test_set = Subset(test_set, range(len(test_set)))
         else:
             raise ValueError('Invalid specification of training/evaluation/test data.')
+
+        # For path and binary data the line type is determined by the data
+        # itself. An explicit linetype overrides it after the fact, flipping
+        # centerline normalization and the seg_type recorded on the model.
+        if data_config.linetype and data_config.format_type in ['path', 'binary']:
+            datasets = {subset.dataset for subset in (getattr(self, 'train_set', None),
+                                                      getattr(self, 'val_set', None),
+                                                      getattr(self, 'test_set', None)) if subset is not None}
+            for dataset in datasets:
+                if dataset.seg_type != data_config.linetype:
+                    logger.warning(f'Overriding automatically determined segmentation type '
+                                   f'{dataset.seg_type} with {data_config.linetype}.')
+                    dataset.seg_type = data_config.linetype
 
     def _build_dataset(self,
                        DatasetClass,

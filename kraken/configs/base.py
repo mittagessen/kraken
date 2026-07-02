@@ -168,8 +168,12 @@ class RecognitionTrainingDataConfig(TrainingDataConfig):
 
         binary_dataset_split (bool, defaults to False):
             Flag to retrieve fixed splits from binary datasets.
-        format_type (Literal['alto', 'page', 'xml', 'binary'], defaults to 'xml'):
+        format_type (Literal['alto', 'page', 'xml', 'path', 'binary'], defaults to 'xml'):
             Format of the training data.
+        linetype (Optional[Literal['baselines', 'bbox']], defaults to None):
+            Line type of the training data. If None the type is selected
+            automatically: 'baselines' for XML data, 'bbox' for path data, and
+            the type recorded in the metadata for binary datasets.
         codec: (Union[dict[str, Sequence[int]], Sequence[str], str], defaults to None):
             Codec mapping one or more Unicode code points to one or more
             integers.
@@ -177,6 +181,7 @@ class RecognitionTrainingDataConfig(TrainingDataConfig):
     def __init__(self, **kwargs):
         self.binary_dataset_split = kwargs.pop('binary_dataset_split', False)
         self.format_type = kwargs.pop('format_type', 'xml')
+        self.linetype = kwargs.pop('linetype', None)
         self.codec = kwargs.pop('codec', None)
         super().__init__(**kwargs)
 
@@ -203,6 +208,9 @@ class RecognitionInferenceConfig(Config):
             Number of worker processes to extract lines from images.
         no_legacy_polygons (bool, defaults to False):
             disables the fast path for polygonal line extraction
+        linetype (Optional[Literal['baselines', 'bbox']], defaults to None):
+            Line type used when parsing XML input files. If None the type is
+            derived from the recognition model's `seg_type`.
         text_direction (Literal['horizontal-tb', 'vertical-lr', 'vertical-rl'], defaults to 'horizontal-tb'):
             Sets the orientation of bounding box segmentation data
 
@@ -223,6 +231,7 @@ class RecognitionInferenceConfig(Config):
         self.padding = kwargs.pop('padding', 16)
         self.num_line_workers = kwargs.pop('num_line_workers', 2)
         self.no_legacy_polygons = kwargs.pop('no_legacy_polygons', False)
+        self.linetype = kwargs.pop('linetype', None)
         self.decoder = kwargs.pop('decoder', kraken.lib.ctc_decoder.greedy_decoder)
         self.bidi_reordering = kwargs.pop('bidi_reordering', True)
         self.text_direction = kwargs.pop('text_direction', 'horizontal-tb')

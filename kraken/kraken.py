@@ -182,7 +182,7 @@ def segmenter(legacy, model, config, input, output) -> None:
     message('\u2713', fg='green')
 
 
-def recognizer(model, no_segmentation, config, input, output) -> None:
+def recognizer(model, no_segmentation, config, linetype, input, output) -> None:
 
     import dataclasses
     import json
@@ -199,7 +199,7 @@ def recognizer(model, no_segmentation, config, input, output) -> None:
 
     if ctx.meta['first_process']:
         if ctx.meta['input_format_type'] != 'image':
-            doc = get_input_parser(ctx.meta['input_format_type'])(input)
+            doc = get_input_parser(ctx.meta['input_format_type'])(input, linetype=linetype)
             ctx.meta['base_image'] = doc.imagename
             if doc.base_dir and config.bidi_reordering is True:
                 message(f'Setting base text direction for BiDi reordering to {doc.base_dir} (from XML input file)')
@@ -577,6 +577,10 @@ def segment(ctx, **kwargs):
               is_flag=True,
               default=False,
               help="Force disable the legacy polygon extractor")
+@click.option('--linetype',
+              type=click.Choice(['baselines', 'bbox']),
+              help='Forces the line type used when parsing XML input. If not '
+              'set the type the recognition model has been trained on is used.')
 def ocr(ctx, **kwargs):
     """
     Recognizes text in line images.
@@ -606,22 +610,31 @@ def ocr(ctx, **kwargs):
     if not location:
         raise click.BadParameter(f'No model path for {params["model"]} found')
 
+    # set output mode
+    ctx.meta['text_direction'] = params['text_direction']
+    from kraken.tasks import RecognitionTaskModel
+    model = RecognitionTaskModel.load_model(location)
+
+    if config.linetype and model.seg_type and config.linetype != model.seg_type:
+        logger.warning(f'Model trained on segmentation type {model.seg_type} will be '
+                       f'applied to XML input parsed as type {config.linetype}. '
+                       'This will likely result in severely degraded performance')
+    linetype = config.linetype or model.seg_type or 'baselines'
+
     ctx.meta['steps'].append(ProcessingStep(id=f'_{uuid.uuid4()}',
                                             category='processing',
                                             description='Text line recognition',
                                             settings={'text_direction': config.text_direction,
                                                       'models': params['model'],
                                                       'pad': config.padding,
+                                                      'linetype': linetype,
                                                       'bidi_reordering': config.bidi_reordering}))
 
-    # set output mode
-    ctx.meta['text_direction'] = params['text_direction']
-    from kraken.tasks import RecognitionTaskModel
-    model = RecognitionTaskModel.load_model(location)
     return partial(recognizer,
                    model=model,
                    no_segmentation=params['no_segmentation'],
-                   config=config)
+                   config=config,
+                   linetype=linetype)
 
 
 @click.command('show')

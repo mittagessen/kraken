@@ -126,6 +126,10 @@ logger = logging.getLogger('kraken')
               'sharing a prefix up to the last extension with `.gt.txt` text files '
               'containing the transcription. In binary mode files are datasets '
               'files containing pre-extracted text lines.')
+@click.option('--linetype', type=click.Choice(['baselines', 'bbox']),
+              help='Forces the line type of the training data. If not set the '
+              'type is determined automatically: baselines for XML data, bbox '
+              'for path data, and the recorded type for binary datasets.')
 @click.option('--augment/--no-augment',
               help='Enable image augmentation')
 @click.option('--logger', 'pl_logger', type=click.Choice(['tensorboard', 'wandb']),
@@ -268,6 +272,10 @@ def train(ctx, **kwargs):
               'sharing a prefix up to the last extension with `.gt.txt` text files '
               'containing the transcription. In binary mode files are datasets '
               'files containing pre-extracted text lines.')
+@click.option('--linetype', type=click.Choice(['baselines', 'bbox']),
+              help='Forces the line type of the test data. If not set the type '
+              'the model has been trained on is used for XML data, bbox for '
+              'path data, and the recorded type for binary datasets.')
 @click.option('--pad', 'padding', type=int, help='Left and right padding around lines')
 @click.option('--reorder/--no-reorder', 'bidi_reordering', help='Reordering of code points to display order')
 @click.option('--base-dir', type=click.Choice(['L', 'R', 'auto']), default='auto', help='Set base text '
@@ -330,6 +338,11 @@ def test(ctx, **kwargs):
         params['legacy_polygons'] = True
     else:
         params['legacy_polygons'] = False
+
+    # evaluate XML data with the line type the model has been trained on
+    # unless explicitly overridden
+    if params.get('linetype') is None and params['format_type'] in ('xml', 'alto', 'page'):
+        params['linetype'] = model.net.seg_type
 
     dm_config = VGSLRecognitionTrainingDataConfig(**params)
     data_module = VGSLRecognitionDataModule(dm_config)

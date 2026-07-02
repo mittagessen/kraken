@@ -111,6 +111,7 @@ def build_binary_dataset(files: Optional[list[Union[str, 'PathLike', 'Segmentati
                          num_workers: int = 0,
                          ignore_splits: bool = True,
                          random_split: Optional[tuple[float, float, float]] = None,
+                         linetype: Optional[Literal['baselines', 'bbox']] = None,
                          force_type: Optional[Literal['kraken_recognition_bbox', 'kraken_recognition_baseline']] = None,
                          recordbatch_size: int = 100,
                          skip_empty_lines: bool = True,
@@ -133,8 +134,18 @@ def build_binary_dataset(files: Optional[list[Union[str, 'PathLike', 'Segmentati
                        files.
         random_split: Serializes a random split into the dataset with the
                        proportions (train, val, test).
-        force_type: Forces a dataset type. Can be `kraken_recognition_baseline`
-                    or `kraken_recognition_bbox`.
+        linetype: Type of line data to extract from `xml`, `alto`, or `page`
+                  sources. `baselines` extracts polygon-dewarped line images
+                  (the default), `bbox` extracts plain axis-aligned bounding
+                  box crops. Has no effect on `path` (always `bbox`) or
+                  pre-parsed `Segmentation` input.
+        force_type: Forces the dataset type recorded in the output file's
+                    metadata, without changing how lines are extracted. Can be
+                    used e.g. to relabel a `path`-derived (line strip) dataset
+                    as `kraken_recognition_baseline` to disable centerline
+                    normalization during training. To change how lines are
+                    actually extracted from `xml`/`alto`/`page` sources, use
+                    `linetype` instead.
         recordbatch_size: Minimum number of records per RecordBatch written to
                           the output file. Larger batches require more
                           transient memory but slightly improve reading
@@ -148,8 +159,10 @@ def build_binary_dataset(files: Optional[list[Union[str, 'PathLike', 'Segmentati
     logger.info('Parsing XML files')
     extract_fn = partial(_extract_line, skip_empty_lines=skip_empty_lines, legacy_polygons=legacy_polygons)
     parse_fn = None
+    effective_linetype = None
     if format_type in ['xml', 'alto', 'page']:
-        parse_fn = XMLPage
+        effective_linetype = linetype or 'baselines'
+        parse_fn = partial(XMLPage, linetype=effective_linetype)
     elif format_type == 'path':
         if not ignore_splits:
             logger.warning('ignore_splits is False and format_type is path. Will not serialize splits.')
@@ -209,10 +222,18 @@ def build_binary_dataset(files: Optional[list[Union[str, 'PathLike', 'Segmentati
             char = '\t' + char
         logger.info(f'{char}\t{v}')
 
-    if force_type:
-        ds_type = force_type
+    if format_type == 'path':
+        natural_type = 'kraken_recognition_bbox'
+    elif format_type in ['xml', 'alto', 'page']:
+        natural_type = 'kraken_recognition_baseline' if effective_linetype == 'baselines' else 'kraken_recognition_bbox'
     else:
-        ds_type = 'kraken_recognition_baseline' if format_type != 'path' else 'kraken_recognition_bbox'
+        natural_type = 'kraken_recognition_baseline'
+
+    if force_type and force_type != natural_type:
+        logger.warning(f'Forcing dataset type to {force_type} while the line data '
+                       f'extracted is of type {natural_type}. The recorded metadata '
+                       'will not match the actual line image content.')
+    ds_type = force_type or natural_type
 
     metadata = {'lines': {'type': ds_type,
                           'alphabet': alphabet,

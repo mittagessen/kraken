@@ -150,6 +150,7 @@ Transcribes text from the segmented lines.
     * *Values < 1.0*: Sharpen the probability distribution.
     * *Values > 1.0*: Smoothes out the distribution.
 * ``--no-legacy-polygons``: Disables the legacy fast-path polygon extractor.
+* ``--linetype <type>``: Forces XML input to be parsed as ``baselines`` or ``bbox`` lines. By default the type the recognition model has been trained on is used.
 * ``-B, --batch-size <int>``: Number of lines processed per recognition forward pass.
 * ``--num-line-workers <int>``: Number of CPU workers for parallel line extraction/pre-processing.
 

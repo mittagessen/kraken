@@ -46,6 +46,19 @@ This will create a file named ``training_data.arrow`` that can be used for
 training. The manifest would then contain the path to this ``.arrow`` file.
 When using compiled datasets, set ``format_type`` to ``binary``.
 
+.. note::
+   By default, lines extracted from ALTO/PageXML sources are dewarped along
+   their baseline polygon. Pass ``--linetype bbox`` to instead extract plain
+   axis-aligned bounding box crops (the same representation used for `path`
+   mode input). This changes the actual image content written into the
+   dataset and is recorded automatically in its metadata.
+
+   ``--force-type`` is a different, narrower option: it only overwrites the
+   recorded metadata type *after* extraction, without changing how lines were
+   extracted. Its main use is relabeling a `path`-derived (line strip) dataset
+   as baseline-style when the line strips where produced by your own extraction
+   algorithm.
+
 .. _`eScriptorium`: https://www.escriptorium.fr/
 
 Use Cases
@@ -325,6 +338,11 @@ train
                                     transcription. In binary mode files are
                                     datasets files containing pre-extracted
                                     text lines.
+    --linetype [baselines, bbox]    Forces the line type of the training data.
+                                    If not set the type is determined
+                                    automatically: baselines for XML data,
+                                    bbox for path data, and the recorded type
+                                    for binary datasets.
     --augment / --no-augment        Enable image augmentation
     --logger [tensorboard]          Logger used by PyTorch Lightning to track
                                     metrics such as loss and accuracy.
@@ -366,6 +384,11 @@ test
                                     transcription. In binary mode files are
                                     datasets files containing pre-extracted
                                     text lines.
+    --linetype [baselines, bbox]    Forces the line type of the test data. If
+                                    not set the type the model has been
+                                    trained on is used for XML data, bbox for
+                                    path data, and the recorded type for
+                                    binary datasets.
     --pad INTEGER                   Left and right padding around lines
     --reorder / --no-reorder        Reordering of code points to display order
     --base-dir [L, R, auto]         Set base text direction.  This should be
@@ -509,6 +532,11 @@ pretrain
                                     transcription. In binary mode files are
                                     datasets files containing pre-extracted
                                     text lines.
+    --linetype [baselines, bbox]    Forces the line type of the training data.
+                                    If not set the type is determined
+                                    automatically: baselines for XML data,
+                                    bbox for path data, and the recorded type
+                                    for binary datasets.
     --augment / --no-augment        Enable image augmentation
     -mw, --mask-width INTEGER       Width of sampled masks at scale of the
                                     sampled tensor, e.g. 4X subsampling in

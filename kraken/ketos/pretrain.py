@@ -144,6 +144,10 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
               'sharing a prefix up to the last extension with `.gt.txt` text files '
               'containing the transcription. In binary mode files are datasets '
               'files containing pre-extracted text lines.')
+@click.option('--linetype', type=click.Choice(['baselines', 'bbox']),
+              help='Forces the line type of the training data. If not set the '
+              'type is determined automatically: baselines for XML data, bbox '
+              'for path data, and the recorded type for binary datasets.')
 @click.option('--augment/--no-augment',
               help='Enable image augmentation')
 @click.option('-mw',

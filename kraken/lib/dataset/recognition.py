@@ -645,9 +645,7 @@ class GroundTruthDataset(Dataset):
         try:
             logger.debug(f'Attempting to load {item[0]}')
             im, bbox = item[0]
-            flat_box = [x for point in bbox for x in point]
-            xmin, xmax = min(flat_box[::2]), max(flat_box[::2])
-            ymin, ymax = min(flat_box[1::2]), max(flat_box[1::2])
+            xmin, ymin, xmax, ymax = bbox
             im = open_image(im)
             im = im.crop((xmin, ymin, xmax, ymax))
             im = self.transforms(im)
