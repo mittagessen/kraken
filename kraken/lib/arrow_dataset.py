@@ -73,7 +73,7 @@ def _extract_line(xml_record, skip_empty_lines: bool = True, legacy_polygons: bo
             continue
         fp = io.BytesIO()
         line_im.save(fp, format='png')
-        lines.append({'text': line.text, 'im': fp.getvalue()})
+        lines.append({'text': line.text, 'im': fp.getvalue(), 'language': line.language})
     return lines, im.mode
 
 
@@ -89,7 +89,7 @@ def _extract_path_line(xml_record, skip_empty_lines: bool = True):
         im = im.convert('1')
     fp = io.BytesIO()
     im.save(fp, format='png')
-    line = {'text': xml_record['lines'][0]['text'], 'im': fp.getvalue()}
+    line = {'text': xml_record['lines'][0]['text'], 'im': fp.getvalue(), 'language': None}
     return [line], im.mode
 
 
@@ -242,6 +242,7 @@ def build_binary_dataset(files: Optional[list[Union[str, 'PathLike', 'Segmentati
                           'splits': ['train', 'eval', 'test'],
                           'im_mode': '1',
                           'legacy_polygons': legacy_polygons,
+                          'languages': Counter(),
                           'counts': Counter({'all': 0,
                                              'train': 0,
                                              'validation': 0,
@@ -251,10 +252,13 @@ def build_binary_dataset(files: Optional[list[Union[str, 'PathLike', 'Segmentati
                           }
                 }
 
-    ty = pa.struct([('text', pa.string()), ('im', pa.binary())])
+    ty = pa.struct([('text', pa.string()), ('im', pa.binary()), ('language', pa.list_(pa.string()))])
     schema = pa.schema([('lines', ty), ('train', pa.bool_()), ('validation', pa.bool_()), ('test', pa.bool_())])
 
     def _make_record_batch(line_cache):
+        for line in line_cache:
+            if line.get('language'):
+                metadata['lines']['languages'].update(line['language'])
         ar = pa.array(line_cache, type=ty)
         if random_split:
             indices = np.random.choice(4, len(line_cache), p=(0.0,) + random_split)
