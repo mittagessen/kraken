@@ -371,8 +371,10 @@ class VGSLRecognitionModel(KrakenTrainerModule):
         for offset in batch['target_lens']:
             targets.append(''.join([x[0] for x in self._val_codec.decode([(x, 0, 0, 0) for x in batch['target'][idx:idx + offset]])]))
             idx += offset
+        pred_strs = []
         for pred, target in zip([self.net.codec.decode(locs) for locs in RecognitionInferenceConfig().decoder(preds, olens)], targets):
             pred_str = ''.join(x[0] for x in pred)
+            pred_strs.append(pred_str)
             self.val_cer.update(pred_str, target)
             self.val_wer.update(pred_str, target)
 
@@ -380,7 +382,7 @@ class VGSLRecognitionModel(KrakenTrainerModule):
            self.trainer.state.stage != 'sanity_check' and \
            self.hparams.config.batch_size * batch_idx < 16 and \
            getattr(self.logger.experiment, 'add_image', None) is not None:
-            for i in range(self.hparams.config.batch_size):
+            for i in range(min(self.hparams.config.batch_size, len(targets))):
                 count = self.hparams.config.batch_size * batch_idx + i
                 if count < 16:
                     self.logger.experiment.add_image(f'Validation #{count}, target: {targets[i]}',
@@ -388,7 +390,7 @@ class VGSLRecognitionModel(KrakenTrainerModule):
                                                      self.global_step,
                                                      dataformats="CHW")
                     self.logger.experiment.add_text(f'Validation #{count}, target: {targets[i]}',
-                                                    pred[i],
+                                                    pred_strs[i],
                                                     self.global_step)
 
     def on_validation_epoch_end(self):
