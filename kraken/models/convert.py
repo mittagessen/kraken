@@ -1,9 +1,10 @@
+import json
 import logging
 import importlib
 
 from pathlib import Path
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, Optional, Union
 from kraken.models.loaders import load_models
 
 if TYPE_CHECKING:
@@ -11,16 +12,18 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-__all__ = ['convert_models', 'load_from_checkpoint']
+__all__ = ['convert_models', 'load_from_checkpoint',
+           'find_checkpoint_module', 'find_weights_archs']
 
 
-def load_from_checkpoint(path):
+def _register_safe_globals() -> None:
     import torch.serialization
     from collections import defaultdict
 
     from kraken.containers import BaselineLine, BBoxLine, Region, Segmentation
+    from kraken.lib.codec import PytorchCodec
 
-    safe_globals = [defaultdict, Segmentation, BaselineLine, BBoxLine, Region]
+    safe_globals = [defaultdict, Segmentation, BaselineLine, BBoxLine, Region, PytorchCodec]
     for ep in importlib.metadata.entry_points(group='kraken.configs'):
         try:
             safe_globals.append(ep.load())
@@ -37,8 +40,53 @@ def load_from_checkpoint(path):
             logger.debug(f'Lightning module {entry_point.name} failed for {path}: {e}')
             errors.append((entry_point.name, e))
             continue
-    error_details = '\n'.join(f'  {name}: {err}' for name, err in errors)
-    raise ValueError(f'No lightning module found for checkpoint {path}. Tried:\n{error_details}')
+        if type(config) is config_cls:
+            return cls
+        if isinstance(config, config_cls):
+            candidates.append(cls)
+    if candidates:
+        # third-party config subclasses: most-derived _config_class wins
+        return max(candidates, key=lambda c: len(c._config_class.__mro__))
+    raise ValueError(f'No registered lightning module matches the configuration '
+                     f'class {type(config).__name__} in {path}.')
+
+
+def find_weights_archs(path: Union[str, 'PathLike']) -> Optional[set[str]]:
+    """
+    Returns the set of recognition arch names matching the models in a weights
+    file, determined by matching the safetensors `kraken_meta` per-model
+    `_model` class names against the `_model_class` of each registered
+    `kraken.recognition_archs` entry.
+
+    Returns:
+        The set of matching arch names, or None when the architecture cannot
+        be determined (non-safetensors file, missing metadata, or unknown
+        model classes).
+    """
+    if Path(path).suffix != '.safetensors':
+        return None
+    try:
+        from safetensors import safe_open
+        with safe_open(path, framework='pt') as f:
+            metadata = f.metadata()
+        model_map = json.loads((metadata or {}).get('kraken_meta', 'null'))
+    except Exception as e:
+        logger.debug(f'Failed to read weights metadata from {path}: {e}')
+        return None
+    if not model_map:
+        return None
+    model_names = {entry.get('_model') for entry in model_map.values() if isinstance(entry, dict)}
+    archs = set()
+    for ep in importlib.metadata.entry_points(group='kraken.recognition_archs'):
+        model_class = getattr(ep.load(), '_model_class', None)
+        if model_class is not None and model_class.__name__ in model_names:
+            archs.add(ep.name)
+    return archs or None
+
+
+def load_from_checkpoint(path):
+    module = find_checkpoint_module(path)
+    return module.load_from_checkpoint(path, weights_only=True, map_location='cpu')
 
 
 def convert_models(paths: Iterable[Union[str, 'PathLike']],
