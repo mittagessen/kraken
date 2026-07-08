@@ -98,12 +98,18 @@ convert = "kraken.ketos.weights:convert"
 TorchVGSLModel = "kraken.lib.vgsl:TorchVGSLModel"
 Wav2Vec2Mask = "kraken.lib.pretrain:Wav2Vec2Mask"
 ROMLP = "kraken.lib.ro:ROMLP"
+PPOCRv6Model = "kraken.lib.ppocr:PPOCRv6Model"
 
 [project.entry-points."kraken.lightning_modules"]
 blla = "kraken.train:BLLASegmentationModel"
 vgsl = "kraken.train:VGSLRecognitionModel"
+ppocrv6 = "kraken.train:PPOCRv6RecognitionModel"
 pretrain = "kraken.lib.pretrain:RecognitionPretrainModel"
 ro = "kraken.lib.ro:ROModel"
+
+[project.entry-points."kraken.recognition_archs"]
+vgsl = "kraken.train:VGSLRecognitionModel"
+ppocrv6 = "kraken.train:PPOCRv6RecognitionModel"
 
 [project.entry-points."kraken.loaders"]
 safetensors = "kraken.models:load_safetensors"
@@ -127,6 +133,8 @@ ROTrainingDataConfig = "kraken.configs.ro:ROTrainingDataConfig"
 ROTrainingConfig = "kraken.configs.ro:ROTrainingConfig"
 VGSLPreTrainingDataConfig = "kraken.configs.pretrain:VGSLPreTrainingDataConfig"
 VGSLPreTrainingConfig = "kraken.configs.pretrain:VGSLPreTrainingConfig"
+PPOCRv6RecognitionTrainingDataConfig = "kraken.configs.ppocr:PPOCRv6RecognitionTrainingDataConfig"
+PPOCRv6RecognitionTrainingConfig = "kraken.configs.ppocr:PPOCRv6RecognitionTrainingConfig"
 
 [project.entry-points."kraken.tasks"]
 segmentation = "kraken.tasks:SegmentationTaskModel"
