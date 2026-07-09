@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Union
 
 from kraken.lib.bidi import get_display
 from kraken.models import load_models
-from kraken.lib.vgsl import TorchVGSLModel
+from kraken.models.ctc import CTCRecognitionInferenceMixin
 from kraken.containers import Segmentation, BaselineOCRRecord
 from kraken.configs import RecognitionInferenceConfig
 
@@ -46,8 +46,9 @@ class ForcedAlignmentTaskModel(nn.Module):
             raise ValueError(f'No recognition model in model list {models}.')
         if len(models) > 1:
             logger.warning('More than one recognition model in model collection. Using first model.')
-        if not isinstance(models[0], TorchVGSLModel):
-            raise ValueError('Forced alignment is only supported by TorchVGSLModel networks.')
+        if not isinstance(models[0], CTCRecognitionInferenceMixin) or getattr(models[0], 'codec', None) is None:
+            raise ValueError('Forced alignment is only supported by CTC sequence recognizers '
+                             'with a codec.')
 
         self.net = models[0]
         self.one_channel_mode = self.net.one_channel_mode
