@@ -15,7 +15,7 @@
 """
 Common base class for kraken LightningModule trainers.
 """
-from typing import TYPE_CHECKING, Any, ClassVar, Union
+from typing import TYPE_CHECKING, Any, ClassVar, Optional, Union
 
 import lightning as L
 
@@ -29,8 +29,15 @@ __all__ = ['KrakenTrainerModule']
 class KrakenTrainerModule(L.LightningModule):
 
     _task: ClassVar[str]
+    # name this trainer registers under in the `kraken.<task>_archs` entry
+    # point group and selects with `--arch`; None for auxiliary modules that
+    # are not user-selectable.
+    _arch: ClassVar[Optional[str]] = None
     _model_class: ClassVar[type]
     _config_class: ClassVar[type]
+    # data-side classes the ketos CLI instantiates for this trainer
+    _data_config_class: ClassVar[Optional[type]] = None
+    _data_module_class: ClassVar[Optional[type]] = None
 
     @classmethod
     def load_from_weights(cls,

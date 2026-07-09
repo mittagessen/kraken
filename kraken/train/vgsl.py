@@ -278,8 +278,11 @@ class VGSLRecognitionDataModule(L.LightningDataModule):
 class VGSLRecognitionModel(KrakenTrainerModule):
 
     _task = 'recognition'
+    _arch = 'vgsl'
     _model_class = TorchVGSLModel
     _config_class = VGSLRecognitionTrainingConfig
+    _data_config_class = VGSLRecognitionTrainingDataConfig
+    _data_module_class = VGSLRecognitionDataModule
 
     def __init__(self,
                  config: VGSLRecognitionTrainingConfig,

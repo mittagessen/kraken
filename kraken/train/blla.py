@@ -226,8 +226,11 @@ class BLLASegmentationDataModule(L.LightningDataModule):
 class BLLASegmentationModel(KrakenTrainerModule):
 
     _task = 'segmentation'
+    _arch = 'blla'
     _model_class = TorchVGSLModel
     _config_class = BLLASegmentationTrainingConfig
+    _data_config_class = BLLASegmentationTrainingDataConfig
+    _data_module_class = BLLASegmentationDataModule
 
     def __init__(self,
                  config: BLLASegmentationTrainingConfig,

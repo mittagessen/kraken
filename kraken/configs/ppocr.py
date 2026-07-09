@@ -39,17 +39,15 @@ class PPOCRv6RecognitionTrainingConfig(TrainingConfig):
             Model size, one of ``tiny``, ``small``, or ``medium``.
         height (int, defaults to 96):
             Input line height.
-        compile (bool, defaults to True):
-            Compile the training forward pass with static shapes; every batch
-            is padded to the data config's ``max_width``.
         resize (Literal['fail', 'new', 'union'], defaults to 'fail'):
             Codec/output layer resizing option when fine-tuning a loaded model.
+
+    The training forward pass is always compiled with static shapes; every
+    batch is padded to the data config's ``max_width``.
     """
     def __init__(self, **kwargs):
         self.variant = kwargs.pop('variant', 'small')
         self.height = kwargs.pop('height', 96)
-        # pop before Config.__init__ maps `compile` to its `compile_config` field
-        self.compile = kwargs.pop('compile', True)
         self.resize = kwargs.pop('resize', 'fail')
 
         kwargs.setdefault('optimizer', 'AdamW+Muon')
@@ -71,10 +69,10 @@ class PPOCRv6RecognitionTrainingDataConfig(VGSLRecognitionTrainingDataConfig):
     Training data configuration for PP-OCRv6 recognition models.
 
     Args:
-        max_width (int, defaults to 4096):
+        max_width (int, defaults to 2560):
             Maximum line width in pixels after height normalization. Longer
             lines are dropped.
     """
     def __init__(self, **kwargs):
-        self.max_width = kwargs.pop('max_width', 4096)
+        self.max_width = kwargs.pop('max_width', 2560)
         super().__init__(**kwargs)
