@@ -129,20 +129,20 @@ def _user_supplied_params(ctx: click.Context) -> dict[str, Any]:
 def _arch_names(task: str) -> list[str]:
     """
     Lists the architecture names registered for `task` in the
-    ``kraken.<task>_archs`` entry point group without importing them, for use
+    ``kraken.archs.<task>`` entry point group without importing them, for use
     in a ``click.Choice`` at module load time.
     """
     import importlib.metadata
-    return sorted(ep.name for ep in importlib.metadata.entry_points(group=f'kraken.{task}_archs'))
+    return sorted(ep.name for ep in importlib.metadata.entry_points(group=f'kraken.archs.{task}'))
 
 
 def _resolve_arch(task: str, arch: str) -> type:
     """
     Loads the trainer module class registered as `arch` for `task` in the
-    ``kraken.<task>_archs`` entry point group.
+    ``kraken.archs.<task>`` entry point group.
     """
     import importlib.metadata
-    eps = importlib.metadata.entry_points(group=f'kraken.{task}_archs', name=arch)
+    eps = importlib.metadata.entry_points(group=f'kraken.archs.{task}', name=arch)
     if not eps:
         raise click.BadParameter(f'Unknown {task} architecture {arch!r}. Available: '
                                  f'{", ".join(_arch_names(task)) or "(none)"}',

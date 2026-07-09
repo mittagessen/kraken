@@ -107,11 +107,11 @@ ppocrv6 = "kraken.train:PPOCRv6RecognitionModel"
 pretrain = "kraken.lib.pretrain:RecognitionPretrainModel"
 ro = "kraken.lib.ro:ROModel"
 
-[project.entry-points."kraken.recognition_archs"]
+[project.entry-points."kraken.archs.recognition"]
 vgsl = "kraken.train:VGSLRecognitionModel"
 ppocrv6 = "kraken.train:PPOCRv6RecognitionModel"
 
-[project.entry-points."kraken.segmentation_archs"]
+[project.entry-points."kraken.archs.segmentation"]
 blla = "kraken.train:BLLASegmentationModel"
 
 [project.entry-points."kraken.loaders"]

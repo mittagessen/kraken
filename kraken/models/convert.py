@@ -51,12 +51,18 @@ def _register_safe_globals() -> None:
                      f'class {type(config).__name__} in {path}.')
 
 
-def find_weights_archs(path: Union[str, 'PathLike']) -> Optional[set[str]]:
+def find_weights_archs(path: Union[str, 'PathLike'],
+                       task: Optional[str] = None) -> Optional[set[str]]:
     """
-    Returns the set of recognition arch names matching the models in a weights
+    Returns the set of architecture names matching the models in a weights
     file, determined by matching the safetensors `kraken_meta` per-model
     `_model` class names against the `_model_class` of each registered
-    `kraken.recognition_archs` entry.
+    architecture entry point.
+
+    Architectures are drawn from the `kraken.archs.<task>` entry point groups:
+    only `task`'s when given, otherwise every `kraken.archs.*` group, so the
+    result may span tasks when families share a model class (VGSL recognition
+    and BLLA segmentation both use `TorchVGSLModel`).
 
     Returns:
         The set of matching arch names, or None when the architecture cannot
@@ -76,11 +82,17 @@ def find_weights_archs(path: Union[str, 'PathLike']) -> Optional[set[str]]:
     if not model_map:
         return None
     model_names = {entry.get('_model') for entry in model_map.values() if isinstance(entry, dict)}
+    if task is not None:
+        groups = [f'kraken.archs.{task}']
+    else:
+        groups = [g for g in importlib.metadata.entry_points().groups
+                  if g.startswith('kraken.archs.')]
     archs = set()
-    for ep in importlib.metadata.entry_points(group='kraken.recognition_archs'):
-        model_class = getattr(ep.load(), '_model_class', None)
-        if model_class is not None and model_class.__name__ in model_names:
-            archs.add(ep.name)
+    for group in groups:
+        for ep in importlib.metadata.entry_points(group=group):
+            model_class = getattr(ep.load(), '_model_class', None)
+            if model_class is not None and model_class.__name__ in model_names:
+                archs.add(ep.name)
     return archs or None
 
 

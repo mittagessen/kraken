@@ -29,7 +29,7 @@ __all__ = ['KrakenTrainerModule']
 class KrakenTrainerModule(L.LightningModule):
 
     _task: ClassVar[str]
-    # name this trainer registers under in the `kraken.<task>_archs` entry
+    # name this trainer registers under in the `kraken.archs.<task>` entry
     # point group and selects with `--arch`; None for auxiliary modules that
     # are not user-selectable.
     _arch: ClassVar[Optional[str]] = None
