@@ -19,6 +19,8 @@ kraken.lib.ppocr
 PP-OCRv6 text recognition models.
 """
 from .model import PPOCRv6Model
-from .network import MODEL_VARIANTS, PPOCRv6Recognizer, build_recognizer
+from .network import (MODEL_VARIANTS, PPOCRv6Recognizer, PPOCRv6Variant,
+                     build_recognizer)
 
-__all__ = ['MODEL_VARIANTS', 'PPOCRv6Model', 'PPOCRv6Recognizer', 'build_recognizer']
+__all__ = ['MODEL_VARIANTS', 'PPOCRv6Model', 'PPOCRv6Recognizer',
+           'PPOCRv6Variant', 'build_recognizer']

@@ -18,13 +18,17 @@ kraken.lib.ppocr.backbone
 
 The PPLCNetV4 recognition backbone used by PP-OCRv6.
 """
-from typing import Tuple, Union
+from typing import Literal, Tuple, Union
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-__all__ = ['PPLCNetV4', 'NET_CONFIG_REC']
+__all__ = ['PPLCNetV4', 'NET_CONFIG_REC', 'PPOCRv6Variant']
+
+
+# The available PP-OCRv6 recognition size variants.
+PPOCRv6Variant = Literal['tiny', 'small', 'medium']
 
 
 # Per-variant stage configuration for the recognition backbone.
@@ -280,24 +284,23 @@ class PPLCNetV4(nn.Module):
 
     Args:
         model_size: one of ``tiny``, ``small`` or ``medium``.
-        in_channels: number of input channels (3 for RGB line images, 1 for
-            grayscale).
 
-    The forward pass collapses the feature height to 1 and halves the width,
-    returning a ``(N, out_channels, 1, W')`` tensor suitable for an Im2Seq +
-    CTC head.
+    Input line images are always 3-channel (RGB). The forward pass collapses
+    the feature height to 1 and halves the width, returning a
+    ``(N, out_channels, 1, W')`` tensor suitable for an Im2Seq + CTC head.
     """
 
-    def __init__(self, model_size='small', in_channels=3):
+    def __init__(self, model_size: PPOCRv6Variant = 'small'):
         super().__init__()
         if model_size not in NET_CONFIG_REC:
             raise ValueError(f'model_size must be one of {list(NET_CONFIG_REC)}, got {model_size!r}')
         cfg = NET_CONFIG_REC[model_size]
         stem_mid, stem_out = cfg['stem']
+        # line images are always 3-channel (RGB)
         if cfg['stem_type'] == 'branch':
-            self.conv1 = StemBlock(in_channels, stem_mid, stem_out)
+            self.conv1 = StemBlock(3, stem_mid, stem_out)
         else:
-            self.conv1 = _SimpleStem(in_channels, stem_mid, stem_out)
+            self.conv1 = _SimpleStem(3, stem_mid, stem_out)
 
         def make_stage(name):
             return nn.Sequential(*[LCNetV4Block(in_c, out_c, s, k, se, expand_ratio=2)
