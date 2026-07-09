@@ -111,6 +111,9 @@ ro = "kraken.lib.ro:ROModel"
 vgsl = "kraken.train:VGSLRecognitionModel"
 ppocrv6 = "kraken.train:PPOCRv6RecognitionModel"
 
+[project.entry-points."kraken.segmentation_archs"]
+blla = "kraken.train:BLLASegmentationModel"
+
 [project.entry-points."kraken.loaders"]
 safetensors = "kraken.models:load_safetensors"
 coreml = "kraken.models:load_coreml"
