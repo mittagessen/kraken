@@ -28,7 +28,7 @@ from lightning.fabric import Fabric
 
 from kraken.models.base import RecognitionBaseModel
 from kraken.lib.codec import PytorchCodec
-from kraken.lib.vgsl.rpred import VGSLRecognitionInference
+from kraken.models.ctc import CTCRecognitionInferenceMixin
 
 from .network import PPOCRv6Variant, build_recognizer
 
@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 __all__ = ['PPOCRv6Model']
 
 
-class PPOCRv6Model(nn.Module, VGSLRecognitionInference, RecognitionBaseModel):
+class PPOCRv6Model(nn.Module, CTCRecognitionInferenceMixin, RecognitionBaseModel):
     """
     A kraken recognition model wrapping a PP-OCRv6 CTC network.
 

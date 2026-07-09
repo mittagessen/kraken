@@ -13,7 +13,13 @@
 # or implied. See the License for the specific language governing
 # permissions and limitations under the License.
 """
-VGSL recognition inference subclass
+kraken.models.ctc
+~~~~~~~~~~~~~~~~~~
+
+Shared CTC recognition inference mixin.
+
+Provides the per-frame CTC decoding machinery: emission-matrix handling,
+position scaling, and batched line inference.
 """
 import torch
 import logging
@@ -33,7 +39,7 @@ if TYPE_CHECKING:
     from kraken.containers import Segmentation
 
 
-__all__ = ['VGSLRecognitionInference']
+__all__ = ['CTCRecognitionInferenceMixin']
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +54,7 @@ def _extract_line(im, segmentation, line_idx, legacy: bool = False):
         return None, line_idx
 
 
-class VGSLRecognitionInference:
+class CTCRecognitionInferenceMixin:
     def __init__(self):
         super().__init__()
 

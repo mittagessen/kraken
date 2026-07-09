@@ -29,7 +29,7 @@ from lightning.fabric import Fabric
 
 from kraken.lib.vgsl import layers
 from kraken.models import BaseModel
-from kraken.lib.vgsl.rpred import VGSLRecognitionInference
+from kraken.models.ctc import CTCRecognitionInferenceMixin
 from kraken.lib.vgsl.spred import VGSLSegmentationInference
 from kraken.configs import Config, RecognitionInferenceConfig, SegmentationInferenceConfig
 from kraken.lib.codec import PytorchCodec
@@ -77,7 +77,7 @@ class VGSLBlock:
 
 class TorchVGSLModel(nn.Module,
                      BaseModel,
-                     VGSLRecognitionInference,
+                     CTCRecognitionInferenceMixin,
                      VGSLSegmentationInference):
     """
     Class building a torch module from a VSGL spec.
