@@ -31,13 +31,13 @@ from typing import TYPE_CHECKING, Any, Literal, Optional, Union
 
 from PIL import Image
 from ctypes import c_char
-from torchvision.transforms import InterpolationMode
 from torchvision.transforms import v2
 from torch.utils.data import Dataset
 
 from kraken.containers import BaselineLine, BBoxLine, Segmentation
 from kraken.lib import functional_im_transforms as F_t
 from kraken.lib.codec import PytorchCodec
+from kraken.lib.dataset.augment import DefaultAugmenter
 from kraken.lib.exceptions import KrakenEncodeException, KrakenInputException
 from kraken.lib.segmentation import extract_polygons
 from kraken.lib.util import is_bitonal, open_image
@@ -53,37 +53,6 @@ __all__ = ['DefaultAugmenter',
 import logging
 
 logger = logging.getLogger(__name__)
-
-
-class DefaultAugmenter():
-    def __init__(self):
-        self._blur = v2.RandomChoice([
-            v2.GaussianBlur(kernel_size=3, sigma=(0.1, 1.0)),
-            v2.GaussianBlur(kernel_size=5, sigma=(0.1, 2.0)),
-        ])
-        self._deform = v2.RandomChoice([
-            v2.RandomPerspective(distortion_scale=0.2, p=1.0, fill=0.0),
-            v2.RandomRotation(degrees=3,
-                              interpolation=InterpolationMode.BILINEAR,
-                              fill=0.0),
-            v2.RandomAffine(degrees=0,
-                            translate=(0.04, 0.04),
-                            scale=(0.9, 1.1),
-                            shear=(-3.0, 3.0),
-                            interpolation=InterpolationMode.BILINEAR,
-                            fill=0.0),
-        ])
-        self._dropout = v2.RandomErasing(p=1.0,
-                                         scale=(0.2, 0.2),
-                                         value=0.0)
-        self._augment = v2.RandomApply([v2.Compose([
-            v2.RandomApply([self._dropout], p=0.2),
-            v2.RandomApply([self._blur], p=0.2),
-            v2.RandomApply([self._deform], p=0.2),
-        ])], p=0.5)
-
-    def __call__(self, image: torch.Tensor, index: int) -> torch.Tensor:
-        return self._augment(image).clamp(0.0, 1.0)
 
 
 class ArrowIPCRecognitionDataset(Dataset):
