@@ -26,19 +26,71 @@ from threadpoolctl import threadpool_limits
 
 from kraken.registry import OPTIMIZERS, SCHEDULERS, STOPPERS
 
-from .util import _expand_gt, _validate_manifests, message
+from .util import (_arch_names, _expand_gt, _resolve_module_class,
+                   _user_supplied_params, _validate_manifests, message)
 
 logging.captureWarnings(True)
 logger = logging.getLogger('kraken')
 
 
+# option names on train/test that do not map to config-class fields
+_NON_CONFIG_PARAMS = frozenset({'arch', 'load', 'resume', 'ground_truth',
+                                'training_data', 'evaluation_data', 'test_data',
+                                'test_set', 'model', 'base_dir', 'pl_logger',
+                                'log_dir', 'no_legacy_polygons'})
+
+
+def _check_arch_options(ctx: click.Context,
+                        arch: str,
+                        explicit: dict,
+                        config_cls: type,
+                        data_config_cls: type) -> None:
+    """
+    Rejects explicitly set options that are not fields of the selected
+    architecture's training or data config.
+    """
+    from click.core import ParameterSource
+
+    known = set(vars(config_cls())) | set(vars(data_config_cls())) | _NON_CONFIG_PARAMS
+    for name in sorted(explicit.keys() - known):
+        opt = next((param for param in ctx.command.params if param.name == name), None)
+        flag = opt.opts[-1] if opt else name
+        hint = ' (set in the --config file)' if ctx.get_parameter_source(name) is ParameterSource.DEFAULT_MAP else ''
+        raise click.BadOptionUsage(name, f'Option {flag}{hint} is not supported by architecture {arch!r}.')
+
+
+def _config_kwargs(ctx: click.Context, explicit: dict) -> dict:
+    """
+    Builds the config class kwargs from the run-level context values plus the
+    explicitly set options, leaving everything else at the config defaults.
+    """
+    cfg_kwargs = {k: v for k, v in ctx.meta.items() if k != 'ketos_user_config'}
+    cfg_kwargs.update({k: v for k, v in explicit.items() if k not in _NON_CONFIG_PARAMS})
+    return cfg_kwargs
+
+
 @click.command('train')
 @click.pass_context
+@click.option('--arch', type=click.Choice(_arch_names('recognition')), default='vgsl',
+              help='Recognition architecture family to train. Auto-detected from '
+                   '--load/--resume artifacts; only needed when training from scratch. '
+                   'Defaults shown by --help for shared options are those of the vgsl '
+                   'family; other families apply their own defaults to any option not '
+                   'explicitly set.')
 @click.option('-B', '--batch-size', type=int, help='batch sample size')
 @click.option('--pad', 'padding', type=int, help='Left and right padding around lines')
 @click.option('-o', '--output', 'checkpoint_path', default='model', help='Directory to save checkpoints into.')
 @click.option('--weights-format', default='safetensors', help='Output weights format.')
-@click.option('-s', '--spec', help='VGSL spec of the network to train. CTC layer will be added automatically.')
+@click.option('-s', '--spec', help='[vgsl] VGSL spec of the network to train. CTC layer will be added automatically.')
+@click.option('--variant', type=click.Choice(['tiny', 'small', 'medium']),
+              help='[ppocrv6] Model size. (ppocrv6 default: small)')
+@click.option('--height', type=int,
+              help='[ppocrv6] Input line height. (ppocrv6 default: 96)')
+@click.option('--max-width', 'max_width', type=click.IntRange(min=1),
+              help='[ppocrv6] Maximum line width in pixels after height-normalization. '
+                   'The training forward pass is compiled with static shapes, so every '
+                   'batch is padded to exactly this width and wider lines are dropped. '
+                   '(ppocrv6 default: 2560)')
 @click.option('-i', '--load', type=click.Path(exists=True, readable=True), help='Load existing file to continue training')
 @click.option('--resume', type=click.Path(exists=True, readable=True), help='Load a checkpoint to continue training')
 @click.option('-F', '--freq',
@@ -72,7 +124,7 @@ logger = logging.getLogger('kraken')
 @click.option('--gradient-clip-val', type=float, help='Gradient clip value')
 @click.option('--accumulate-grad-batches', type=int, help='Number of batches to accumulate gradient across.')
 @click.option('--warmup', type=int, help='Number of steps to ramp up to `lrate` initial learning rate.')
-@click.option('--freeze-backbone', type=int, help='Number of samples to keep the backbone (everything but last layer) frozen.')
+@click.option('--freeze-backbone', type=int, help='[vgsl] Number of samples to keep the backbone (everything but last layer) frozen.')
 @click.option('--schedule',
               type=click.Choice(SCHEDULERS),
               help='Set learning rate scheduler. For 1cycle, cycle length is determined by the `--epoch` option.')
@@ -141,19 +193,20 @@ logger = logging.getLogger('kraken')
 def train(ctx, **kwargs):
     """
     Trains a model from image-text pairs.
-    """
-    params = ctx.meta.copy()
-    params.update(ctx.params)
 
-    resume = params.pop('resume', None)
-    load = params.pop('load', None)
-    training_data = params.pop('training_data', [])
-    ground_truth = list(params.pop('ground_truth', []))
+    The architecture is selected with `--arch`. Options left unset take the
+    selected architecture's defaults.
+    """
+    p = ctx.params
+    explicit = _user_supplied_params(ctx)
+
+    resume = p['resume']
+    load = p['load']
 
     if sum(map(bool, [resume, load])) > 1:
         raise click.BadOptionUsage('load', 'load/resume options are mutually exclusive.')
 
-    if params.get('pl_logger') == 'tensorboard':
+    if p['pl_logger'] == 'tensorboard':
         try:
             import tensorboard  # NOQA
         except ImportError:
@@ -164,39 +217,56 @@ def train(ctx, **kwargs):
     from lightning.pytorch.callbacks import ModelCheckpoint
 
     from kraken.models.convert import convert_models
-    from kraken.train import (KrakenTrainer, VGSLRecognitionModel,
-                              VGSLRecognitionDataModule)
+    from kraken.train import KrakenTrainer
     from kraken.train.utils import KrakenOnExceptionCheckpoint
-    from kraken.configs import VGSLRecognitionTrainingConfig, VGSLRecognitionTrainingDataConfig
 
-    if (codec := params.get('codec')) is not None and not isinstance(codec, dict):
+    module_cls = _resolve_module_class(ctx, explicit, 'recognition', artifact=resume or load)
+    arch = module_cls._arch
+    config_cls = module_cls._config_class
+    data_config_cls = module_cls._data_config_class
+    dm_cls = module_cls._data_module_class
+
+    _check_arch_options(ctx, arch, explicit, config_cls, data_config_cls)
+
+    cfg_kwargs = _config_kwargs(ctx, explicit)
+
+    if (codec := cfg_kwargs.get('codec')) is not None and not isinstance(codec, dict):
         with open(codec, 'rb') as fp:
-            params['codec'] = json.load(fp)
+            cfg_kwargs['codec'] = json.load(fp)
 
-    # disable automatic partition when given evaluation set explicitly
-    if params['evaluation_data']:
-        params['partition'] = 1
-
-    # merge training_data into ground_truth list
-    if training_data:
-        ground_truth.extend(training_data)
-
-    params['training_data'] = ground_truth
+    # merge training_data manifests into ground_truth list
+    ground_truth = list(p['ground_truth'])
+    if p['training_data']:
+        ground_truth.extend(p['training_data'])
 
     if len(ground_truth) == 0:
         raise click.UsageError('No training data was provided to the train command. Use `-t` or the `ground_truth` argument.')
 
-    if params['bidi_reordering'] and params['base_dir'] != 'auto':
-        params['bidi_reordering'] = params['base_dir']
+    cfg_kwargs['training_data'] = ground_truth
 
-    if params['freq'] > 1:
-        val_check_interval = {'check_val_every_n_epoch': int(params['freq'])}
+    # disable automatic partition when given evaluation set explicitly
+    if p['evaluation_data']:
+        cfg_kwargs['evaluation_data'] = p['evaluation_data']
+        cfg_kwargs['partition'] = 1
+
+    dm_config = data_config_cls(**cfg_kwargs)
+    m_config = config_cls(**cfg_kwargs)
+
+    if dm_config.bidi_reordering and p['base_dir'] != 'auto':
+        dm_config.bidi_reordering = p['base_dir']
+
+    if resume and (ignored := sorted(explicit.keys() - _NON_CONFIG_PARAMS)):
+        logger.warning('Resuming from a checkpoint restores its full training state; '
+                       f'explicitly set hyperparameters {ignored} are ignored.')
+
+    if m_config.freq > 1:
+        val_check_interval = {'check_val_every_n_epoch': int(m_config.freq)}
     else:
-        val_check_interval = {'val_check_interval': params['freq']}
+        val_check_interval = {'val_check_interval': m_config.freq}
 
-    cbs = [KrakenOnExceptionCheckpoint(dirpath=params.get('checkpoint_path'),
+    cbs = [KrakenOnExceptionCheckpoint(dirpath=p['checkpoint_path'],
                                        filename='checkpoint_abort')]
-    checkpoint_callback = ModelCheckpoint(dirpath=Path(params.pop('checkpoint_path')),
+    checkpoint_callback = ModelCheckpoint(dirpath=Path(p['checkpoint_path']),
                                           save_top_k=10,
                                           monitor='val_metric',
                                           mode='max',
@@ -204,25 +274,22 @@ def train(ctx, **kwargs):
                                           filename='checkpoint_{epoch:02d}-{val_metric:.4f}')
     cbs.append(checkpoint_callback)
 
-    dm_config = VGSLRecognitionTrainingDataConfig(**params)
-    m_config = VGSLRecognitionTrainingConfig(**params)
-
     if resume:
-        data_module = VGSLRecognitionDataModule.load_from_checkpoint(resume, weights_only=False)
+        data_module = dm_cls.load_from_checkpoint(resume, weights_only=False)
     else:
-        data_module = VGSLRecognitionDataModule(dm_config)
+        data_module = dm_cls(dm_config)
 
     trainer = KrakenTrainer(accelerator=ctx.meta['accelerator'],
                             devices=ctx.meta['device'],
                             precision=ctx.meta['precision'],
-                            max_epochs=params['epochs'] if params['quit'] == 'fixed' else -1,
-                            min_epochs=params['min_epochs'],
+                            max_epochs=m_config.epochs if m_config.quit == 'fixed' else -1,
+                            min_epochs=m_config.min_epochs,
                             enable_progress_bar=True if not ctx.meta['verbose'] else False,
                             deterministic=ctx.meta['deterministic'],
                             enable_model_summary=False,
-                            accumulate_grad_batches=params['accumulate_grad_batches'],
+                            accumulate_grad_batches=m_config.accumulate_grad_batches,
                             callbacks=cbs,
-                            gradient_clip_val=params['gradient_clip_val'],
+                            gradient_clip_val=m_config.gradient_clip_val,
                             num_sanity_val_steps=0,
                             **val_check_interval)
 
@@ -230,15 +297,15 @@ def train(ctx, **kwargs):
         if load:
             message(f'Loading from checkpoint {load}.')
             if load.endswith('ckpt'):
-                model = VGSLRecognitionModel.load_from_checkpoint(load, config=m_config, weights_only=False)
+                model = module_cls.load_from_checkpoint(load, config=m_config, weights_only=False)
             else:
-                model = VGSLRecognitionModel.load_from_weights(load, config=m_config)
+                model = module_cls.load_from_weights(load, config=m_config)
         elif resume:
             message(f'Resuming from checkpoint {resume}.')
-            model = VGSLRecognitionModel.load_from_checkpoint(resume, weights_only=False)
+            model = module_cls.load_from_checkpoint(resume, weights_only=False)
         else:
             message('Initializing new model.')
-            model = VGSLRecognitionModel(m_config)
+            model = module_cls(m_config)
 
     try:
         with threadpool_limits(limits=ctx.meta['num_threads']):
@@ -247,19 +314,23 @@ def train(ctx, **kwargs):
             else:
                 trainer.fit(model, data_module)
     except ValueError as e:
-        if e.args[0].startswith('Training data and model codec alphabets mismatch') and params['resize'] == 'fail':
+        if e.args[0].startswith('Training data and model codec alphabets mismatch') and getattr(m_config, 'resize', 'fail') == 'fail':
             raise click.BadOptionUsage('resize', 'Mismatched training data for loaded model. Set option `--resize` to `new` or `add`')
         else:
             raise e
 
     score = checkpoint_callback.best_model_score.item()
-    weight_path = Path(checkpoint_callback.best_model_path).with_name(f'best_{score:.4f}.{params.get("weights_format")}')
-    opath = convert_models([checkpoint_callback.best_model_path], weight_path, weights_format=params['weights_format'])
+    weight_path = Path(checkpoint_callback.best_model_path).with_name(f'best_{score:.4f}.{m_config.weights_format}')
+    opath = convert_models([checkpoint_callback.best_model_path], weight_path, weights_format=m_config.weights_format)
     message(f'Converting best model {checkpoint_callback.best_model_path} (score: {score:.4f}) to weights file {opath}')
 
 
 @click.command('test')
 @click.pass_context
+@click.option('--arch', type=click.Choice(_arch_names('recognition')), default='vgsl',
+              help='Recognition architecture family of the tested model. '
+                   'Auto-detected from the model file; only needed for artifacts '
+                   'without architecture metadata.')
 @click.option('-B', '--batch-size', type=int, help='Batch sample size')
 @click.option('-m', '--model', type=click.Path(exists=True, readable=True), help='Model to evaluate')
 @click.option('-e', '--test-data', 'test_data', multiple=True,
@@ -292,31 +363,31 @@ def test(ctx, **kwargs):
     """
     Evaluate on a test set.
     """
-    params = ctx.meta.copy()
-    params.update(ctx.params)
+    p = ctx.params
+    explicit = _user_supplied_params(ctx)
 
-    model = params.pop('model')
-    no_legacy_polygons = params.pop('no_legacy_polygons')
+    model = p['model']
     if not model:
         raise click.UsageError('No model to evaluate given.')
 
-    test_data = params.pop('test_data', [])
-    test_set = list(params.pop('test_set', []))
-
-    # merge test_data into test_set list
-    if test_data:
-        test_set.extend(test_data)
-
-    params['test_data'] = test_set
-
-    if params['bidi_reordering'] and params['base_dir'] != 'auto':
-        params['bidi_reordering'] = params['base_dir']
-
-    from kraken.lib import vgsl  # NOQA
-    from kraken.train import (KrakenTrainer, VGSLRecognitionModel,
-                              VGSLRecognitionDataModule)
-    from kraken.configs import VGSLRecognitionTrainingDataConfig, VGSLRecognitionTrainingConfig
+    from kraken.train import KrakenTrainer
     from kraken.serialization import render_report
+
+    module_cls = _resolve_module_class(ctx, explicit, 'recognition', artifact=model)
+    arch = module_cls._arch
+    config_cls = module_cls._config_class
+    data_config_cls = module_cls._data_config_class
+    dm_cls = module_cls._data_module_class
+
+    _check_arch_options(ctx, arch, explicit, config_cls, data_config_cls)
+
+    cfg_kwargs = _config_kwargs(ctx, explicit)
+
+    # merge test_data manifests into test_set list
+    test_set = list(p['test_set'])
+    if p['test_data']:
+        test_set.extend(p['test_data'])
+    cfg_kwargs['test_data'] = test_set
 
     trainer = KrakenTrainer(accelerator=ctx.meta['accelerator'],
                             devices=ctx.meta['device'],
@@ -326,26 +397,27 @@ def test(ctx, **kwargs):
                             enable_model_summary=False,
                             num_sanity_val_steps=0)
 
-    m_config = VGSLRecognitionTrainingConfig(**params)
+    m_config = config_cls(**cfg_kwargs)
     with trainer.init_module(empty_init=False):
         message(f'Loading from {model}.')
         if model.endswith('ckpt'):
-            model = VGSLRecognitionModel.load_from_checkpoint(model, config=m_config)
+            model = module_cls.load_from_checkpoint(model, config=m_config)
         else:
-            model = VGSLRecognitionModel.load_from_weights(model, m_config)
+            model = module_cls.load_from_weights(model, m_config)
 
-    if not no_legacy_polygons and model.net.use_legacy_polygons:
-        params['legacy_polygons'] = True
-    else:
-        params['legacy_polygons'] = False
+    dm_config = data_config_cls(**cfg_kwargs)
+
+    if dm_config.bidi_reordering and p['base_dir'] != 'auto':
+        dm_config.bidi_reordering = p['base_dir']
+
+    dm_config.legacy_polygons = (not p['no_legacy_polygons']) and getattr(model.net, 'use_legacy_polygons', False)
 
     # evaluate XML data with the line type the model has been trained on
     # unless explicitly overridden
-    if params.get('linetype') is None and params['format_type'] in ('xml', 'alto', 'page'):
-        params['linetype'] = model.net.seg_type
+    if dm_config.linetype is None and dm_config.format_type in ('xml', 'alto', 'page'):
+        dm_config.linetype = getattr(model.net, 'seg_type', None)
 
-    dm_config = VGSLRecognitionTrainingDataConfig(**params)
-    data_module = VGSLRecognitionDataModule(dm_config)
+    data_module = dm_cls(dm_config)
 
     with threadpool_limits(limits=ctx.meta['num_threads']):
         test_metrics = trainer.test(model, data_module)

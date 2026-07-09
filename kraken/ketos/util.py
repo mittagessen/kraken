@@ -94,12 +94,110 @@ def _load_config(ctx: click.Context,
     if path:
         try:
             conf = yaml.safe_load(path)
+            # keep the raw config so commands can tell experiment file values
+            # from seeded defaults (both are ParameterSource.DEFAULT_MAP).
+            ctx.meta['ketos_user_config'] = conf or {}
             # Update the default_map.
             if ctx.default_map is None:
                 ctx.default_map = {}
             ctx.default_map = _recursive_update(ctx.default_map, conf, ctx.command)
         except FileNotFoundError:
             logger.critical(f"No configuration file {path} found.")
+
+
+def _user_supplied_params(ctx: click.Context) -> dict[str, Any]:
+    """
+    Returns the subset of ``ctx.params`` the user set explicitly, on the
+    command line/environment or in the subcommand's section of the `--config`
+    file. Options left at their defaults are excluded so per-architecture
+    config classes can apply their own defaults.
+    """
+    from click.core import ParameterSource
+
+    explicit_sources = (ParameterSource.COMMANDLINE,
+                        ParameterSource.ENVIRONMENT,
+                        ParameterSource.PROMPT)
+    yaml_keys = set((ctx.meta.get('ketos_user_config') or {}).get(ctx.info_name) or {})
+    explicit = {}
+    for name, value in ctx.params.items():
+        source = ctx.get_parameter_source(name)
+        if source in explicit_sources or (source is ParameterSource.DEFAULT_MAP and name in yaml_keys):
+            explicit[name] = value
+    return explicit
+
+
+def _arch_names(task: str) -> list[str]:
+    """
+    Lists the architecture names registered for `task` in the
+    ``kraken.<task>_archs`` entry point group without importing them, for use
+    in a ``click.Choice`` at module load time.
+    """
+    import importlib.metadata
+    return sorted(ep.name for ep in importlib.metadata.entry_points(group=f'kraken.{task}_archs'))
+
+
+def _resolve_arch(task: str, arch: str) -> type:
+    """
+    Loads the trainer module class registered as `arch` for `task` in the
+    ``kraken.<task>_archs`` entry point group.
+    """
+    import importlib.metadata
+    eps = importlib.metadata.entry_points(group=f'kraken.{task}_archs', name=arch)
+    if not eps:
+        raise click.BadParameter(f'Unknown {task} architecture {arch!r}. Available: '
+                                 f'{", ".join(_arch_names(task)) or "(none)"}',
+                                 param_hint='arch')
+    return tuple(eps)[0].load()
+
+
+def _resolve_module_class(ctx: click.Context,
+                          explicit: dict,
+                          task: str,
+                          artifact=None) -> type:
+    """
+    Resolves the trainer module class for `task`, using `--arch` or, when an
+    `artifact` (checkpoint or weights file) is given, the architecture detected
+    in it. `--arch` is thus only required when training from scratch. Raises if
+    an explicit `--arch` conflicts with `artifact` or `artifact` is not a
+    trainable model for `task`.
+    """
+    arch = ctx.params['arch']
+    arch_explicit = 'arch' in explicit
+
+    if artifact and str(artifact).endswith('.ckpt'):
+        from kraken.models.convert import find_checkpoint_module
+        try:
+            module_cls = find_checkpoint_module(artifact)
+        except Exception as e:
+            if arch_explicit:
+                logger.warning(f'Could not determine architecture of {artifact} ({e}); '
+                               f'trusting --arch {arch}.')
+                return _resolve_arch(task, arch)
+            raise click.UsageError(f'Could not determine the model architecture of {artifact} '
+                                   f'({e}). Pass --arch explicitly.')
+        detected = getattr(module_cls, '_arch', None)
+        if detected is None or getattr(module_cls, '_task', None) != task:
+            raise click.UsageError(f'{artifact} is a {module_cls.__name__} checkpoint, not a '
+                                   f'trainable {task} model.')
+        if arch_explicit and arch != detected:
+            raise click.BadOptionUsage('arch', f'--arch {arch} conflicts with the {detected!r} '
+                                               f'model found in {artifact}.')
+        return module_cls
+    elif artifact:
+        from kraken.models.convert import find_weights_archs
+        detected = find_weights_archs(artifact, task=task)
+        if detected is None:
+            logger.info(f'Could not determine architecture from {artifact}; assuming --arch {arch}.')
+        elif arch_explicit:
+            if arch not in detected:
+                raise click.BadOptionUsage('arch', f'--arch {arch} conflicts with the '
+                                                   f'{sorted(detected)} model(s) in {artifact}.')
+        elif len(detected) == 1:
+            arch = next(iter(detected))
+        else:
+            raise click.UsageError(f'{artifact} contains models of multiple architectures '
+                                   f'{sorted(detected)}. Pass --arch to select one.')
+    return _resolve_arch(task, arch)
 
 
 def _validate_merging(ctx, param, value):
