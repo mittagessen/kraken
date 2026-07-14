@@ -480,19 +480,17 @@ class PPOCRv6RecognitionModel(KrakenTrainerModule):
 
     def _build_net_from_checkpoint(self, checkpoint):
         from kraken.models import create_model
-        codec = checkpoint.get('_codec')
-        if codec is None:
-            raise ValueError('Checkpoint is missing PP-OCRv6 reconstruction metadata.')
+        data_config = checkpoint['datamodule_hyper_parameters']['data_config']
         config = checkpoint['_module_config']
         return create_model('PPOCRv6Model',
                             model_type=['recognition'],
                             variant=config.variant,
-                            num_classes=PytorchCodec(codec).max_label + 1,
+                            num_classes=data_config.codec.max_label + 1,
                             height=config.height,
-                            codec=codec,
-                            seg_type=checkpoint.get('_seg_type'),
-                            one_channel_mode=checkpoint.get('_one_channel_mode'),
-                            legacy_polygons=checkpoint.get('_legacy_polygons', False))
+                            codec=data_config.codec.c2l,
+                            seg_type=checkpoint['_seg_type'],
+                            one_channel_mode=checkpoint['_one_channel_mode'],
+                            legacy_polygons=data_config.legacy_polygons)
 
     def _post_load_checkpoint(self, checkpoint):
         super()._post_load_checkpoint(checkpoint)
@@ -502,10 +500,8 @@ class PPOCRv6RecognitionModel(KrakenTrainerModule):
             self.nrtr_head = self._build_nrtr_head(self.net.num_classes)
 
     def _save_checkpoint_extras(self, checkpoint):
-        checkpoint['_codec'] = self.net.codec.c2l if self.net.codec is not None else None
-        checkpoint['_seg_type'] = self.net.seg_type
-        checkpoint['_one_channel_mode'] = self.net.one_channel_mode
-        checkpoint['_legacy_polygons'] = self.net.use_legacy_polygons
+        checkpoint['_one_channel_mode'] = self.trainer.datamodule.train_set.dataset.im_mode
+        checkpoint['_seg_type'] = self.trainer.datamodule.train_set.dataset.seg_type
 
     def configure_callbacks(self):
         callbacks = []
