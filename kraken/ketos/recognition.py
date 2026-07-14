@@ -87,10 +87,7 @@ def _config_kwargs(ctx: click.Context, explicit: dict) -> dict:
 @click.option('--height', type=int,
               help='[ppocrv6] Input line height. (ppocrv6 default: 96)')
 @click.option('--max-width', 'max_width', type=click.IntRange(min=1),
-              help='[ppocrv6] Maximum line width in pixels after height-normalization. '
-                   'The training forward pass is compiled with static shapes, so every '
-                   'batch is padded to exactly this width and wider lines are dropped. '
-                   '(ppocrv6 default: 2560)')
+              help='[ppocrv6] Maximum line width in pixels after height-normalization. (ppocrv6 default: 2560)')
 @click.option('-i', '--load', type=click.Path(exists=True, readable=True), help='Load existing file to continue training')
 @click.option('--resume', type=click.Path(exists=True, readable=True), help='Load a checkpoint to continue training')
 @click.option('-F', '--freq',

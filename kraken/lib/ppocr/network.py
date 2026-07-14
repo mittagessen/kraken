@@ -29,7 +29,12 @@ from .backbone import PPLCNetV4, PPOCRv6Variant
 from .necks import build_neck
 from .heads import CTCHead
 
-__all__ = ['MODEL_VARIANTS', 'PPOCRv6Variant', 'PPOCRv6Recognizer', 'build_recognizer']
+__all__ = ['MODEL_VARIANTS', 'PPOCRv6Variant', 'PPOCRv6Recognizer',
+           'WIDTH_SUBSAMPLING', 'build_recognizer']
+
+
+# total width subsampling of the recognizer (stem stride 4 × final pooling 2)
+WIDTH_SUBSAMPLING = 8
 
 
 # Architecture hyper-parameters for each PP-OCRv6 recognition variant.

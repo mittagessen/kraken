@@ -39,8 +39,9 @@ from kraken.configs import (PPOCRv6RecognitionTrainingConfig,
                             RecognitionInferenceConfig)
 from kraken.lib import functional_im_transforms as F_t
 from kraken.lib.dataset import compute_confusions, global_align, collate_sequences
-from kraken.lib.exceptions import KrakenEncodeException, KrakenInputException
+from kraken.lib.exceptions import KrakenEncodeException
 from kraken.lib.ppocr import MODEL_VARIANTS, PPOCRv6Model
+from kraken.lib.ppocr.network import WIDTH_SUBSAMPLING
 from kraken.lib.ppocr.nrtr import NRTRHead
 from kraken.train.base import KrakenTrainerModule
 from kraken.train.optim import MuonWithAuxAdam, get_parameter_groups
@@ -57,21 +58,14 @@ __all__ = ['PPOCRv6RecognitionDataModule', 'PPOCRv6RecognitionModel']
 
 def collate_static_width(batch, max_width: int):
     """
-    Static-shape collation: drops samples wider than `max_width` and pads the
-    batch to exactly `max_width` so every batch has an identical shape.
+    Static-shape collation: pads the batch to exactly `max_width` so every
+    batch has an identical shape. Samples not fitting `max_width` are already
+    rejected at the dataset level.
     """
-    kept = []
-    for sample in batch:
-        if sample['image'].shape[-1] > max_width:
-            logger.warning(f'Dropping line of width {sample["image"].shape[-1]} '
-                           f'exceeding --max-width {max_width}.')
-        else:
-            kept.append(sample)
-    if not kept:
-        raise KrakenInputException(f'All lines in batch are wider than max_width '
-                                   f'({max_width}). Increase --max-width.')
-    out = collate_sequences(kept)
+    out = collate_sequences(batch)
     width = out['image'].shape[-1]
+    if width > max_width:
+        raise ValueError(f'Batch of width {width} exceeds max_width ({max_width}).')
     if width < max_width:
         out['image'] = F.pad(out['image'], (0, max_width - width))
     return out
@@ -81,12 +75,20 @@ class PPOCRv6RecognitionDataModule(VGSLRecognitionDataModule):
     """
     Recognition datamodule for PP-OCRv6 models.
 
-    Identical to the VGSL datamodule except for collation: for static-shape
-    compilation every batch is padded to ``max_width``.
+    Identical to the VGSL datamodule except for static shapes: every batch is
+    padded to ``max_width`` and samples that are wider or whose targets do not
+    fit into the subsampled output sequence are rejected at the dataset level.
     """
 
     def __init__(self, data_config: PPOCRv6RecognitionTrainingDataConfig):
         super().__init__(data_config)
+
+    def _build_dataset(self, DatasetClass, training_data, **kwargs):
+        return super()._build_dataset(DatasetClass,
+                                      training_data,
+                                      max_width=self.hparams.data_config.max_width,
+                                      subsampling=WIDTH_SUBSAMPLING,
+                                      **kwargs)
 
     @property
     def _collate_fn(self) -> Callable:
@@ -184,6 +186,8 @@ class PPOCRv6RecognitionModel(KrakenTrainerModule):
         self._bos = self._eos = None
         # label-smoothed CE over NRTR tokens, PAD (0) ignored
         self.nrtr_criterion = nn.CrossEntropyLoss(ignore_index=0, label_smoothing=0.1)
+        # replaced by a compiled wrapper in setup()
+        self._gtc_loss_fn = self._gtc_loss
 
     def on_fit_start(self):
         # silence the benign AccumulateGrad stream-mismatch warning from
@@ -304,9 +308,15 @@ class PPOCRv6RecognitionModel(KrakenTrainerModule):
             # Hand the finalised codec back to the datamodule.
             self.trainer.datamodule.hparams.data_config.codec = self.net.codec
 
+            # fixed NRTR target length: longest repeat-free target fitting the
+            # CTC output width plus BOS/EOS
             max_width = self.trainer.datamodule.hparams.data_config.max_width
-            self._nrtr_pad_len = max_width // 8
+            self._nrtr_pad_len = max_width // WIDTH_SUBSAMPLING + 2
+            if self._nrtr_pad_len > (max_len := self.nrtr_head.positional_encoding.pe.shape[1]):
+                raise ValueError(f'max_width {max_width} exceeds the NRTR decoder '
+                                 f'capacity ({max_len} tokens).')
             self.net.nn.forward_train = torch.compile(self.net.nn.forward_train, dynamic=False)
+            self._gtc_loss_fn = torch.compile(self._gtc_loss, dynamic=False)
         elif stage == 'test':
             if self.net is None:
                 raise ValueError('No network to test; load a model before testing.')
@@ -339,23 +349,27 @@ class PPOCRv6RecognitionModel(KrakenTrainerModule):
                             one_channel_mode=one_channel_mode,
                             legacy_polygons=False)
 
+    def _gtc_loss(self, feat, tgt):
+        # auxiliary NRTR decoder shares the backbone feature
+        logits = self.nrtr_head(feat, tgt[:, :-1])          # (N, T-1, V)
+        return self.nrtr_criterion(logits.reshape(-1, logits.shape[-1]),
+                                   tgt[:, 1:].reshape(-1))
+
     def _nrtr_targets(self, target, target_lens, device):
-        # build [BOS, c1, ..., cn, EOS] per sample, right-padded with 0 (PAD)
-        seqs, idx = [], 0
-        for n in target_lens.tolist():
-            labels = target[idx:idx + n].to(device)
-            seqs.append(torch.cat([torch.full((1,), self._bos, dtype=torch.long, device=device),
-                                   labels.long(),
-                                   torch.full((1,), self._eos, dtype=torch.long, device=device)]))
-            idx += n
-        # pad to a fixed token length (PAD=0 is ignored by the CE); never truncate.
-        max_t = max(max(s.numel() for s in seqs), self._nrtr_pad_len)
-        padded = torch.zeros(len(seqs), max_t, dtype=torch.long, device=device)
-        for i, s in enumerate(seqs):
-            padded[i, :s.numel()] = s
+        # build [BOS, c1, ..., cn, EOS] per sample, right-padded with 0 (PAD,
+        # ignored by the CE) to a fixed token length for static compilation.
+        # The dataset guarantees targets fit within the label budget.
+        target = target.to(device).long()
+        target_lens = target_lens.to(device)
+        rows = torch.arange(target_lens.numel(), device=device)
+        starts = target_lens.cumsum(0) - target_lens
+        cols = torch.arange(target.numel(), device=device) - starts.repeat_interleave(target_lens) + 1
+        padded = torch.zeros(target_lens.numel(), self._nrtr_pad_len, dtype=torch.long, device=device)
+        padded[:, 0] = self._bos
+        padded[rows.repeat_interleave(target_lens), cols] = target
+        padded[rows, target_lens + 1] = self._eos
         return padded
 
-    # ----------------------------------------------------------- training step
     def training_step(self, batch, batch_idx):
         logits, out_lens, feat = self.net.nn.forward_train(batch['image'], batch['seq_lens'])
         # CTC: logits (N, C, 1, W) -> log-softmax over class dim, drop height,
@@ -368,9 +382,7 @@ class PPOCRv6RecognitionModel(KrakenTrainerModule):
 
         # GTC: auxiliary NRTR decoder shares the backbone feature.
         tgt = self._nrtr_targets(batch['target'], batch['target_lens'], feat.device)
-        nrtr_logits = self.nrtr_head(feat, tgt[:, :-1])          # (N, T-1, V)
-        nrtr_loss = self.nrtr_criterion(nrtr_logits.reshape(-1, nrtr_logits.shape[-1]),
-                                        tgt[:, 1:].reshape(-1))
+        nrtr_loss = self._gtc_loss_fn(feat, tgt)
         loss = ctc_loss + nrtr_loss
         self.log('train_gtc_loss', nrtr_loss, on_step=True, on_epoch=True,
                  batch_size=bs, sync_dist=True)
@@ -379,7 +391,6 @@ class PPOCRv6RecognitionModel(KrakenTrainerModule):
                  batch_size=bs, sync_dist=True)
         return loss
 
-    # --------------------------------------------------------- validation step
     def validation_step(self, batch, batch_idx):
         logits, out_lens = self.net(batch['image'], batch['seq_lens'])
         preds = logits.softmax(1).squeeze(2)  # (N, C, W)
@@ -411,7 +422,6 @@ class PPOCRv6RecognitionModel(KrakenTrainerModule):
         self.val_cer.reset()
         self.val_wer.reset()
 
-    # --------------------------------------------------------------- test loop
     def on_test_epoch_start(self):
         self.errors = 0
         self.characters = Counter()
@@ -507,7 +517,6 @@ class PPOCRv6RecognitionModel(KrakenTrainerModule):
 
         return callbacks
 
-    # ------------------------------------------------------------- optimizers
     @property
     def _uses_muon(self) -> bool:
         return self.hparams.config.optimizer == 'AdamW+Muon'
@@ -522,8 +531,6 @@ class PPOCRv6RecognitionModel(KrakenTrainerModule):
                                                         len_train_set=len(self.trainer.datamodule.train_set),
                                                         loss_tracking_mode='max')
 
-        # Muon for hidden 2-D linear weights, AdamW for everything else (incl.
-        # the auxiliary NRTR head).
         if cfg.schedule not in ('cosine', 'constant'):
             raise ValueError(f'Learning rate schedule {cfg.schedule!r} is not supported with the '
                              'AdamW+Muon optimizer. Use `cosine` or `constant`, or select a '

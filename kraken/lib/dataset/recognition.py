@@ -55,6 +55,24 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def _check_sample_fit(im, target, max_width: Optional[int], subsampling: Optional[int]):
+    """
+    Raises a ValueError if a transformed sample is wider than `max_width` or
+    its minimal CTC alignment (all labels plus a blank between repeated
+    labels) does not fit into the subsampled width.
+    """
+    if max_width and im.shape[-1] > max_width:
+        raise ValueError(f'Sample width {im.shape[-1]} exceeds max_width {max_width}')
+    if subsampling:
+        if isinstance(target, str):
+            repeats = sum(a == b for a, b in zip(target, target[1:]))
+        else:
+            repeats = int((target[1:] == target[:-1]).sum())
+        if len(target) + repeats > im.shape[-1] // subsampling:
+            raise ValueError(f'Minimal CTC alignment length {len(target) + repeats} exceeds '
+                             f'output sequence length {im.shape[-1] // subsampling}')
+
+
 class ArrowIPCRecognitionDataset(Dataset):
     """
     Dataset for training a recognition model from a precompiled dataset in
@@ -67,7 +85,9 @@ class ArrowIPCRecognitionDataset(Dataset):
                  reorder: Union[bool, Literal['L', 'R']] = True,
                  im_transforms: Callable[[Any], torch.Tensor] = v2.Identity(),
                  augmentation: bool = False,
-                 split_filter: Optional[str] = None) -> None:
+                 split_filter: Optional[str] = None,
+                 max_width: Optional[int] = None,
+                 subsampling: Optional[int] = None) -> None:
         """
         Creates a dataset for a polygonal (baseline) transcription model.
 
@@ -86,12 +106,20 @@ class ArrowIPCRecognitionDataset(Dataset):
                           are sampled, if set to `train`, `validation`, or
                           `test` only rows with the appropriate flag set in the
                           file will be considered.
+            max_width: Maximum sample width after transformation. Wider
+                       samples are treated as invalid and resampled.
+            subsampling: Width subsampling factor of the network. Samples
+                         whose encoded target cannot be CTC-aligned within
+                         the subsampled width are treated as invalid and
+                         resampled.
         """
         self.alphabet: Counter = Counter()
         self.text_transforms: list[Callable[[str], str]] = []
         self.failed_samples = set()
         self.transforms = im_transforms
         self.aug = None
+        self.max_width = max_width
+        self.subsampling = subsampling
         self._split_filter = split_filter
         self._num_lines = 0
         self.arrow_table = None
@@ -255,6 +283,8 @@ class ArrowIPCRecognitionDataset(Dataset):
                     self._im_mode.value = im_mode
 
             text = self._apply_text_transform(sample)
+            target = self.codec.encode(text) if self.codec is not None else text
+            _check_sample_fit(im, target, self.max_width, self.subsampling)
         except Exception:
             self.failed_samples.add(index)
             idx = np.random.randint(0, len(self))
@@ -262,7 +292,7 @@ class ArrowIPCRecognitionDataset(Dataset):
             logger.info(f'Failed. Replacing with sample {idx}')
             return self[idx]
 
-        return {'image': im, 'target': self.codec.encode(text) if self.codec is not None else text}
+        return {'image': im, 'target': target}
 
     def __len__(self) -> int:
         return self._num_lines
@@ -285,7 +315,9 @@ class PolygonGTDataset(Dataset):
                  reorder: Union[bool, Literal['L', 'R']] = True,
                  im_transforms: Callable[[Any], torch.Tensor] = v2.Identity(),
                  augmentation: bool = False,
-                 legacy_polygons: bool = False) -> None:
+                 legacy_polygons: bool = False,
+                 max_width: Optional[int] = None,
+                 subsampling: Optional[int] = None) -> None:
         """
         Creates a dataset for a polygonal (baseline) transcription model.
 
@@ -299,6 +331,12 @@ class PolygonGTDataset(Dataset):
             im_transforms: Function taking an PIL.Image and returning a tensor
                            suitable for forward passes.
             augmentation: Enables augmentation.
+            max_width: Maximum sample width after transformation. Wider
+                       samples are treated as invalid and resampled.
+            subsampling: Width subsampling factor of the network. Samples
+                         whose encoded target cannot be CTC-aligned within
+                         the subsampled width are treated as invalid and
+                         resampled.
         """
         self._images: Union[list[Image.Image], list[torch.Tensor]] = []
         self._gt: list[str] = []
@@ -309,6 +347,8 @@ class PolygonGTDataset(Dataset):
         self.skip_empty_lines = skip_empty_lines
         self.failed_samples = set()
         self.legacy_polygons = legacy_polygons
+        self.max_width = max_width
+        self.subsampling = subsampling
 
         self.seg_type = 'baselines'
         # built text transformations
@@ -447,6 +487,7 @@ class PolygonGTDataset(Dataset):
             if self.aug:
                 im = self.aug(image=im, index=index)
 
+            _check_sample_fit(im, item[1], self.max_width, self.subsampling)
             return {'image': im, 'target': item[1]}
         except Exception:
             self.failed_samples.add(index)
@@ -477,7 +518,9 @@ class GroundTruthDataset(Dataset):
                  skip_empty_lines: bool = True,
                  reorder: Union[bool, str] = True,
                  im_transforms: Callable[[Any], torch.Tensor] = v2.Identity(),
-                 augmentation: bool = False) -> None:
+                 augmentation: bool = False,
+                 max_width: Optional[int] = None,
+                 subsampling: Optional[int] = None) -> None:
         """
         Reads a list of image-text pairs and creates a ground truth set.
 
@@ -499,6 +542,12 @@ class GroundTruthDataset(Dataset):
             im_transforms: Function taking an PIL.Image and returning a
                            tensor suitable for forward passes.
             augmentation: Enables augmentation.
+            max_width: Maximum sample width after transformation. Wider
+                       samples are treated as invalid and resampled.
+            subsampling: Width subsampling factor of the network. Samples
+                         whose encoded target cannot be CTC-aligned within
+                         the subsampled width are treated as invalid and
+                         resampled.
         """
         self._images = []  # type:  Union[list[Image], list[torch.Tensor]]
         self._gt = []  # type:  list[str]
@@ -508,6 +557,8 @@ class GroundTruthDataset(Dataset):
         self.skip_empty_lines = skip_empty_lines
         self.aug = None
         self.failed_samples = set()
+        self.max_width = max_width
+        self.subsampling = subsampling
 
         self.seg_type = 'bbox'
         # built text transformations
@@ -632,6 +683,7 @@ class GroundTruthDataset(Dataset):
                     self._im_mode.value = im_mode
             if self.aug:
                 im = self.aug(image=im, index=index)
+            _check_sample_fit(im, item[1], self.max_width, self.subsampling)
             return {'image': im, 'target': item[1]}
         except Exception:
             self.failed_samples.add(index)
