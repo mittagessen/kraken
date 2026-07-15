@@ -6,11 +6,11 @@ Forced alignment of CTC output.
 """
 import torch
 from torch import nn
-from bidi.algorithm import get_display
 from dataclasses import replace, dataclass
 
 from typing import TYPE_CHECKING, Union
 
+from kraken.lib.bidi import get_display
 from kraken.models import load_models
 from kraken.lib.vgsl import TorchVGSLModel
 from kraken.containers import Segmentation, BaselineOCRRecord

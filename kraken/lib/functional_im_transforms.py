@@ -21,11 +21,11 @@ from pathlib import Path
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, Literal, Optional, Union
 
-import bidi.algorithm as bd
 import regex
 import torch
 from PIL.Image import Resampling
 
+from kraken.lib.bidi import get_display
 from kraken.lib.lineest import CenterNormalizer, dewarp
 
 if TYPE_CHECKING:
@@ -91,7 +91,7 @@ def text_whitespace_normalize(text: str) -> str:
 
 
 def text_reorder(text: str, base_dir: Optional[Literal['L', 'R']] = None) -> str:
-    return bd.get_display(text, base_dir=base_dir)
+    return get_display(text, base_dir=base_dir)
 
 
 def default_split(x: Union['PathLike', str]) -> str:

@@ -24,7 +24,7 @@ from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass
 from typing import (TYPE_CHECKING, Any, Literal, Optional, Union)
 
-import bidi.algorithm as bd
+from kraken.lib.bidi import get_display_map
 import numpy as np
 
 from kraken.lib.segmentation import compute_polygon_section, precompute_polygon_sections
@@ -580,32 +580,10 @@ class BaselineOCRRecord(ocr_record, BaselineLine):
         """
         Reorder the record using the BiDi algorithm.
         """
-        storage = bd.get_empty_storage()
-
-        if base_dir not in ('L', 'R'):
-            base_level = bd.get_base_level(self._prediction)
-        else:
-            base_level = {'L': 0, 'R': 1}[base_dir]
-
-        storage['base_level'] = base_level
-        storage['base_dir'] = ('L', 'R')[base_level]
-        bd.get_embedding_levels(self._prediction, storage)
-        bd.explicit_embed_and_overrides(storage)
-        bd.resolve_weak_types(storage)
-        bd.resolve_neutral_types(storage, False)
-        bd.resolve_implicit_levels(storage, False)
-        for i, j in enumerate(zip(self._prediction, self._cuts, self._confidences)):
-            storage['chars'][i]['record'] = j
-        bd.reorder_resolved_levels(storage, False)
-        bd.apply_mirroring(storage, False)
-        prediction = ''
-        cuts = []
-        confidences = []
-        for ch in storage['chars']:
-            # code point may have been mirrored
-            prediction = prediction + ch['ch']
-            cuts.append(ch['record'][1])
-            confidences.append(ch['record'][2])
+        prediction, order = get_display_map(self._prediction,
+                                            base_dir if base_dir in ('L', 'R') else None)
+        cuts = [self._cuts[idx] for idx in order]
+        confidences = [self._confidences[idx] for idx in order]
         line = BaselineLine(id=self.id,
                             baseline=self.baseline,
                             boundary=self.boundary,
@@ -756,33 +734,10 @@ class BBoxOCRRecord(ocr_record, BBoxLine):
             return self._reorder(base_dir)
 
     def _reorder(self, base_dir: Optional[Literal['L', 'R']] = None) -> 'BBoxOCRRecord':
-        storage = bd.get_empty_storage()
-
-        if base_dir not in ('L', 'R'):
-            base_level = bd.get_base_level(self.prediction)
-        else:
-            base_level = {'L': 0, 'R': 1}[base_dir]
-
-        storage['base_level'] = base_level
-        storage['base_dir'] = ('L', 'R')[base_level]
-
-        bd.get_embedding_levels(self.prediction, storage)
-        bd.explicit_embed_and_overrides(storage)
-        bd.resolve_weak_types(storage)
-        bd.resolve_neutral_types(storage, False)
-        bd.resolve_implicit_levels(storage, False)
-        for i, j in enumerate(zip(self.prediction, self.cuts, self.confidences)):
-            storage['chars'][i]['record'] = j
-        bd.reorder_resolved_levels(storage, False)
-        bd.apply_mirroring(storage, False)
-        prediction = ''
-        cuts = []
-        confidences = []
-        for ch in storage['chars']:
-            # code point may have been mirrored
-            prediction = prediction + ch['ch']
-            cuts.append(ch['record'][1])
-            confidences.append(ch['record'][2])
+        prediction, order = get_display_map(self.prediction,
+                                            base_dir if base_dir in ('L', 'R') else None)
+        cuts = [self.cuts[idx] for idx in order]
+        confidences = [self.confidences[idx] for idx in order]
         # carry over whole line information
         line = BBoxLine(id=self.id,
                         bbox=self.bbox,

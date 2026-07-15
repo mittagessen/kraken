@@ -28,8 +28,8 @@ from dataclasses import replace, dataclass
 from typing import TYPE_CHECKING, Literal, Optional
 
 import torch
-from bidi.algorithm import get_display
 from kraken import rpred
+from kraken.lib.bidi import get_display
 from kraken.lib.util import open_image
 from kraken.containers import BaselineOCRRecord, Segmentation
 

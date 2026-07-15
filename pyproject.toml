@@ -39,7 +39,6 @@ dependencies = [
     "protobuf>=3.0.0",
     "coremltools~=9.0",
     "jinja2~=3.1.6",
-    "python-bidi~=0.6.6",
     "torchvision>=0.5.0",
     "torch>=2.4.0,<=2.12",
     "scikit-learn~=1.7.2",
