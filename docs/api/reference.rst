@@ -53,6 +53,7 @@ most cases, it is recommended to use the high-level API instead.
 .. autoapimodule:: kraken.ketos.train
 .. autoapimodulesummary:: kraken.lib
 .. autoapimodule:: kraken.lib.dataset
+.. autoapimodule:: kraken.lib.bidi
 .. autoapimodule:: kraken.lib.codec
 .. autoapimodule:: kraken.lib.exceptions
 .. autoapimodule:: kraken.lib.segmentation
