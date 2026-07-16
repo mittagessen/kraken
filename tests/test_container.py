@@ -230,23 +230,30 @@ class TestSegmentationCasts(unittest.TestCase):
             self.assertIsInstance(ln, BaselineLine)
             self.assertEqual(ln.boundary[0], ln.boundary[-1])
 
-    def test_to_baselines_topline_true(self):
+    def test_to_baselines_delegates_topline(self):
         """
-        ``topline=True`` places the baseline in the upper quadrant.
+        ``Segmentation.to_baselines`` forwards the topline parameter to the
+        line-level conversion (full placement matrix in BASELINE_CASES).
         """
-        seg = self._make_bbox_seg()  # horizontal-rl
-        out = seg.to_baselines(topline=True)
-        # h = 40, h//4 = 10 → y = 30 + 10 = 40 on first line
-        self.assertEqual(out.lines[0].baseline, [(100, 40), (10, 40)])
-
-    def test_to_baselines_topline_none(self):
-        """
-        ``topline=None`` places the baseline at the center.
-        """
-        seg = self._make_bbox_seg()
-        out = seg.to_baselines(topline=None)
-        # h//2 = 20 → y = 50 on first line
-        self.assertEqual(out.lines[0].baseline, [(100, 50), (10, 50)])
+        vertical_seg = Segmentation(
+            type='bbox',
+            imagename='page.png',
+            text_direction='vertical-rl',
+            script_detection=False,
+            lines=[BBoxLine(id='l1', bbox=(10, 20, 110, 70), text_direction='vertical-rl')],
+        )
+        cases = [
+            # h = 40, h//4 = 10 → y = 30 + 10 = 40 on first line
+            ('topline', self._make_bbox_seg(), True, [(100, 40), (10, 40)]),
+            # h//2 = 20 → y = 50 on first line
+            ('centerline', self._make_bbox_seg(), None, [(100, 50), (10, 50)]),
+            # vertical-rl lower quadrant → right edge inset: x = 10 + (3*100)//4 = 85
+            ('vertical_baseline', vertical_seg, False, [(85, 20), (85, 70)]),
+        ]
+        for desc, seg, topline, expected in cases:
+            with self.subTest(desc):
+                out = seg.to_baselines(topline=topline)
+                self.assertEqual(out.lines[0].baseline, expected)
 
     def test_passthrough_fields(self):
         """
@@ -262,48 +269,32 @@ class TestSegmentationCasts(unittest.TestCase):
         self.assertEqual(list(out.regions.keys()), list(seg.regions.keys()))
         self.assertEqual(out.regions['text'][0].id, 'r1')
 
-    def test_identity_case_baselines_deep_copy(self):
+    def test_casts_produce_independent_segmentations(self):
         """
-        Casting a baselines Segmentation to baselines deep-copies everything.
+        Identity and cross-type casts return Segmentations sharing no mutable
+        state with the source.
         """
-        seg = self._make_baselines_seg()
-        out = seg.to_baselines()
-        self.assertIsNot(out, seg)
-        self.assertEqual(out.type, 'baselines')
-        self.assertIsNot(out.lines, seg.lines)
-        self.assertEqual(len(out.lines), len(seg.lines))
-        for orig, new in zip(seg.lines, out.lines):
-            self.assertIsNot(orig, new)
-            self.assertEqual(orig.baseline, new.baseline)
-            self.assertEqual(orig.boundary, new.boundary)
-        self.assertIsNot(out.regions, seg.regions)
-        self.assertIsNot(out.regions['text'], seg.regions['text'])
-        self.assertIsNot(out.regions['text'][0], seg.regions['text'][0])
-        self.assertIsNot(out.line_orders, seg.line_orders)
-        self.assertEqual(out.line_orders, seg.line_orders)
-
-    def test_identity_case_bbox_deep_copy(self):
-        """
-        Casting a bbox Segmentation to bbox deep-copies everything.
-        """
-        seg = self._make_bbox_seg()
-        out = seg.to_bbox()
-        self.assertIsNot(out, seg)
-        self.assertIsNot(out.lines, seg.lines)
-        for orig, new in zip(seg.lines, out.lines):
-            self.assertIsNot(orig, new)
-            self.assertEqual(orig.bbox, new.bbox)
-
-    def test_conversion_path_produces_independent_lines(self):
-        """
-        Cross-type conversion also returns an independent Segmentation.
-        """
-        seg = self._make_baselines_seg()
-        out = seg.to_bbox()
-        self.assertIsNot(out.lines, seg.lines)
-        for orig, new in zip(seg.lines, out.lines):
-            self.assertIsNot(orig, new)
-        self.assertIsNot(out.regions, seg.regions)
+        cases = [('baselines_identity', self._make_baselines_seg(), 'to_baselines'),
+                 ('bbox_identity', self._make_bbox_seg(), 'to_bbox'),
+                 ('cross_type', self._make_baselines_seg(), 'to_bbox')]
+        for desc, seg, cast in cases:
+            with self.subTest(desc):
+                out = getattr(seg, cast)()
+                self.assertIsNot(out, seg)
+                self.assertIsNot(out.lines, seg.lines)
+                self.assertEqual(len(out.lines), len(seg.lines))
+                for orig, new in zip(seg.lines, out.lines):
+                    self.assertIsNot(orig, new)
+                    if type(orig) is type(new):
+                        for f in ('baseline', 'boundary') if isinstance(orig, BaselineLine) else ('bbox',):
+                            self.assertEqual(getattr(orig, f), getattr(new, f))
+                self.assertIsNot(out.regions, seg.regions)
+                if seg.regions:
+                    self.assertIsNot(out.regions['text'], seg.regions['text'])
+                    self.assertIsNot(out.regions['text'][0], seg.regions['text'][0])
+                if seg.line_orders:
+                    self.assertIsNot(out.line_orders, seg.line_orders)
+                    self.assertEqual(out.line_orders, seg.line_orders)
 
     def test_empty_lines(self):
         """
@@ -320,17 +311,3 @@ class TestSegmentationCasts(unittest.TestCase):
         self.assertEqual(out.type, 'bbox')
         self.assertEqual(out.lines, [])
 
-    def test_bbox_to_baselines_vertical(self):
-        """
-        Vertical-rl bbox Segmentation produces baselines on the right edge.
-        """
-        seg = Segmentation(
-            type='bbox',
-            imagename='page.png',
-            text_direction='vertical-rl',
-            script_detection=False,
-            lines=[BBoxLine(id='l1', bbox=(10, 20, 110, 70), text_direction='vertical-rl')],
-        )
-        out = seg.to_baselines(topline=False)
-        # vertical-rl lower quadrant → right edge inset: x = 10 + (3*100)//4 = 85
-        self.assertEqual(out.lines[0].baseline, [(85, 20), (85, 70)])

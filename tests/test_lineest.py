@@ -20,21 +20,15 @@ class TestLineest(unittest.TestCase):
     def setUp(self):
         self.lnorm = lineest.CenterNormalizer()
 
-    def test_dewarp_bw(self):
+    def test_dewarp(self):
         """
-        Test dewarping of a single line in B/W
+        Test dewarping of a single line in B/W and grayscale
         """
-        with Image.open(resources / '000236.png') as im:
-            o = lineest.dewarp(self.lnorm, im.convert('1'))
-            self.assertEqual(self.lnorm.target_height, o.size[1])
-
-    def test_dewarp_gray(self):
-        """
-        Test dewarping of a single line in grayscale
-        """
-        with Image.open(resources / '000236.png') as im:
-            o = lineest.dewarp(self.lnorm, im.convert('L'))
-            self.assertEqual(self.lnorm.target_height, o.size[1])
+        for mode in ('1', 'L'):
+            with self.subTest(mode=mode):
+                with Image.open(resources / '000236.png') as im:
+                    o = lineest.dewarp(self.lnorm, im.convert(mode))
+                    self.assertEqual(self.lnorm.target_height, o.size[1])
 
     def test_dewarp_fail_color(self):
         """
@@ -46,7 +40,8 @@ class TestLineest(unittest.TestCase):
 
     def test_dewarp_bw_undewarpable(self):
         """
-        Test dewarping of an undewarpable line.
+        Test dewarping of an undewarpable line. Regression guard for a past
+        crash; only the output height is asserted.
         """
         with Image.open(resources / 'ONB_ibn_19110701_010.tif_line_1548924556947_449.png') as im:
             o = lineest.dewarp(self.lnorm, im)

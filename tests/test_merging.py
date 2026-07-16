@@ -61,169 +61,57 @@ class TestMerging(TestCase):
         with self.assertRaises(ValueError):
             self._run_setup(model, data_module)
 
-    def test_merging_new(self):
-        """ Asserts that new, which only takes into account new data, works as intended """
-        model, data_module = self._get_model_and_data(resize='new')
-        self._run_setup(model, data_module)
-        self.assertEqual(
-            model.net.codec.encode("1").shape, (0, ),
-            "1 is unknown to the original model and the second dataset, produces nothing"
-        )
-        self.assertEqual(
-            model.net.codec.encode("9").shape, (1, ),
-            "9 is known to the new dataset and should be encoded through `new`"
-        )
-        self.assertEqual(
-            model.net.codec.encode("x").shape, (0, ),
-            "x is known to the loaded model and shouldn't be encoded through `new`"
-        )
-
-    def test_merging_union(self):
-        """ Asserts that union, which only takes into account new the original codec and the new data,
-            works as intended
+    def test_merging(self):
         """
-        model, data_module = self._get_model_and_data(resize='union')
-        self._run_setup(model, data_module)
-        self.assertEqual(
-            model.net.codec.encode("1").shape, (0, ),
-            "1 is unknown to the original model and the second dataset, produces nothing"
-        )
-        self.assertEqual(
-            model.net.codec.encode("9").shape, (1, ),
-            "9 is known to the new dataset and should be encoded through `new`"
-        )
-        self.assertEqual(
-            model.net.codec.encode("x").shape, (1, ),
-            "x is known to the loaded model and should be encoded through `new`"
-        )
-
-    def test_merging_union_with_nfd(self):
-        """ Asserts that union, which only takes into account new the original codec and the new data,
-            works as intended
+        Asserts codec merging semantics of the `new` and `union` resize modes,
+        with and without NFD normalization, over binary and XML datasets. Each
+        case fine-tunes a fresh copy of the base model and probes the merged
+        codec.
         """
-        model, data_module = self._get_model_and_data(resize='union', normalization='NFD')
-        self._run_setup(model, data_module)
-        self.assertEqual(
-            model.net.codec.encode("1").shape, (0, ),
-            "1 is unknown to the original model and the second dataset, produces nothing"
-        )
-        self.assertEqual(
-            model.net.codec.encode("9").shape, (1, ),
-            "9 is known to the new dataset and should be encoded through `union`"
-        )
-        self.assertEqual(
-            model.net.codec.encode("x").shape, (1, ),
-            "x is known to the loaded model and should be encoded through `union`"
-        )
-        self.assertEqual(
-            model.net.codec.encode("ẽ").shape, (0, ),
-            "ẽ (unnormalized) should not work in `union` mode because it should be split in two"
-        )
-        self.assertEqual(
-            model.net.codec.encode(normalize("NFD", "ẽ")).shape, (2, ),
-            "ẽ should work in `union` mode because it should be split in two and is in the training data"
-        )
-        self.assertEqual(
-            model.net.codec.encode(normalize("NFD", "Ũ")).shape, (2, ),
-            "Ũ should work in `union` mode because it should be split in two and is in the training data and the "
-            "original model"
-        )
-
-    def test_merging_new_with_NFD(self):
-        """ Asserts that new, which only takes into account new data, works as intended """
-        model, data_module = self._get_model_and_data(resize='new', normalization='NFD')
-        self._run_setup(model, data_module)
-        self.assertEqual(
-            model.net.codec.encode("1").shape, (0, ),
-            "1 is unknown to the original model and the second dataset, produces nothing"
-        )
-        self.assertEqual(
-            model.net.codec.encode("9").shape, (1, ),
-            "9 is known to the new dataset and should be encoded through `new`"
-        )
-        self.assertEqual(
-            model.net.codec.encode("x").shape, (0, ),
-            "x is only known to the loaded model and shouldn't be encoded through `new`"
-        )
-        self.assertEqual(
-            model.net.codec.encode("ẽ").shape, (0, ),
-            "ẽ (unnormalized) should not work in `new` mode because it should be split in two"
-        )
-        self.assertEqual(
-            model.net.codec.encode(normalize("NFD", "ẽ")).shape, (2, ),
-            "ẽ should work in `new` mode because it should be split in two and is in the training data"
-        )
-        self.assertEqual(
-            model.net.codec.encode(normalize("NFD", "Ũ")).shape, (1, ),
-            "Ũ should not work in `union` mode because it should be split in two and U is only in the original model"
-        )
-
-    def test_merging_new_with_NFD_two_different_kind_of_dataset(self):
-        """ Asserts that new, which only takes into account new data, works as intended, including with XML Dataset """
-        model, data_module = self._get_model_and_data(
-            resize='new', normalization='NFD', format_type='xml', data=xml_data
-        )
-        self._run_setup(model, data_module)
-        self.assertEqual(
-            model.net.codec.encode("1").shape, (0, ),
-            "1 is unknown to the original model and the second dataset, produces nothing"
-        )
-        self.assertEqual(
-            model.net.codec.encode("9").shape, (1, ),
-            "9 is known to the new dataset and should be encoded through `new`"
-        )
-        self.assertEqual(
-            model.net.codec.encode("x").shape, (0, ),
-            "x is known to the loaded model and shouldn't be encoded through `new`"
-        )
-        self.assertEqual(
-            model.net.codec.encode("ẽ").shape, (0, ),
-            "ẽ (unnormalized) should not work in `new` mode because it should be split in two"
-        )
-        self.assertEqual(
-            model.net.codec.encode(normalize("NFD", "ẽ")).shape, (2, ),
-            "ẽ should work in `new` mode because it should be split in two and is in the training data"
-        )
-        self.assertEqual(
-            model.net.codec.encode(normalize("NFD", "Ũ")).shape, (1, ),
-            "Ũ should not work in `new` mode because it should be split in two and U is only in the original model"
-        )
-        self.assertEqual(
-            model.net.codec.encode(normalize("NFD", "ã")).shape, (2, ),
-            "ã should work in `new` mode because it should be split in two"
-        )
-
-    def test_merging_union_with_NFD_two_different_kind_of_dataset(self):
-        """ Asserts that union works as intended, including with XML Dataset """
-        model, data_module = self._get_model_and_data(
-            resize='union', normalization='NFD', format_type='xml', data=xml_data
-        )
-        self._run_setup(model, data_module)
-        self.assertEqual(
-            model.net.codec.encode("1").shape, (0, ),
-            "1 is unknown to the original model and the second dataset, produces nothing"
-        )
-        self.assertEqual(
-            model.net.codec.encode("9").shape, (1, ),
-            "9 is known to the new dataset and should be encoded through `union`"
-        )
-        self.assertEqual(
-            model.net.codec.encode("x").shape, (1, ),
-            "x is known to the loaded model and should be encoded through `union`"
-        )
-        self.assertEqual(
-            model.net.codec.encode("ẽ").shape, (0, ),
-            "ẽ (unnormalized) should not work in `union`+NFD mode because it should be split in two"
-        )
-        self.assertEqual(
-            model.net.codec.encode(normalize("NFD", "ẽ")).shape, (2, ),
-            "ẽ should work in `union` mode because it should be split in two and is in the training data"
-        )
-        self.assertEqual(
-            model.net.codec.encode(normalize("NFD", "Ũ")).shape, (2, ),
-            "Ũ should work in `union` mode because it should be split in two and U is in the original model"
-        )
-        self.assertEqual(
-            model.net.codec.encode(normalize("NFD", "ã")).shape, (2, ),
-            "ã should work in `union` mode because it should be split in two"
-        )
+        cases = [
+            ('new', dict(resize='new'),
+             [("1", 0, "1 is unknown to the original model and the second dataset, produces nothing"),
+              ("9", 1, "9 is known to the new dataset and should be encoded through `new`"),
+              ("x", 0, "x is known to the loaded model and shouldn't be encoded through `new`")]),
+            ('union', dict(resize='union'),
+             [("1", 0, "1 is unknown to the original model and the second dataset, produces nothing"),
+              ("9", 1, "9 is known to the new dataset and should be encoded through `union`"),
+              ("x", 1, "x is known to the loaded model and should be encoded through `union`")]),
+            ('union_nfd', dict(resize='union', normalization='NFD'),
+             [("1", 0, "1 is unknown to the original model and the second dataset, produces nothing"),
+              ("9", 1, "9 is known to the new dataset and should be encoded through `union`"),
+              ("x", 1, "x is known to the loaded model and should be encoded through `union`"),
+              ("ẽ", 0, "ẽ (unnormalized) should not work in `union` mode because it should be split in two"),
+              (normalize("NFD", "ẽ"), 2, "ẽ should work in `union` mode because it should be split in two and is in the training data"),
+              (normalize("NFD", "Ũ"), 2, "Ũ should work in `union` mode because it should be split in two and is in the training data and the original model")]),
+            ('new_nfd', dict(resize='new', normalization='NFD'),
+             [("1", 0, "1 is unknown to the original model and the second dataset, produces nothing"),
+              ("9", 1, "9 is known to the new dataset and should be encoded through `new`"),
+              ("x", 0, "x is only known to the loaded model and shouldn't be encoded through `new`"),
+              ("ẽ", 0, "ẽ (unnormalized) should not work in `new` mode because it should be split in two"),
+              (normalize("NFD", "ẽ"), 2, "ẽ should work in `new` mode because it should be split in two and is in the training data"),
+              (normalize("NFD", "Ũ"), 1, "Ũ should not work in `new` mode because it should be split in two and U is only in the original model")]),
+            ('new_nfd_xml', dict(resize='new', normalization='NFD', format_type='xml', data=xml_data),
+             [("1", 0, "1 is unknown to the original model and the second dataset, produces nothing"),
+              ("9", 1, "9 is known to the new dataset and should be encoded through `new`"),
+              ("x", 0, "x is known to the loaded model and shouldn't be encoded through `new`"),
+              ("ẽ", 0, "ẽ (unnormalized) should not work in `new` mode because it should be split in two"),
+              (normalize("NFD", "ẽ"), 2, "ẽ should work in `new` mode because it should be split in two and is in the training data"),
+              (normalize("NFD", "Ũ"), 1, "Ũ should not work in `new` mode because it should be split in two and U is only in the original model"),
+              (normalize("NFD", "ã"), 2, "ã should work in `new` mode because it should be split in two")]),
+            ('union_nfd_xml', dict(resize='union', normalization='NFD', format_type='xml', data=xml_data),
+             [("1", 0, "1 is unknown to the original model and the second dataset, produces nothing"),
+              ("9", 1, "9 is known to the new dataset and should be encoded through `union`"),
+              ("x", 1, "x is known to the loaded model and should be encoded through `union`"),
+              ("ẽ", 0, "ẽ (unnormalized) should not work in `union`+NFD mode because it should be split in two"),
+              (normalize("NFD", "ẽ"), 2, "ẽ should work in `union` mode because it should be split in two and is in the training data"),
+              (normalize("NFD", "Ũ"), 2, "Ũ should work in `union` mode because it should be split in two and U is in the original model"),
+              (normalize("NFD", "ã"), 2, "ã should work in `union` mode because it should be split in two")]),
+        ]
+        for name, kwargs, probes in cases:
+            with self.subTest(name):
+                model, data_module = self._get_model_and_data(**kwargs)
+                self._run_setup(model, data_module)
+                for probe, expected_len, msg in probes:
+                    self.assertEqual(model.net.codec.encode(probe).shape,
+                                     (expected_len, ), msg)

@@ -2,6 +2,8 @@
 
 import unittest
 import warnings
+
+import pytest
 from pathlib import Path
 
 from kraken.align import forced_align
@@ -13,6 +15,7 @@ thisfile = Path(__file__).resolve().parent
 resources = thisfile / 'resources'
 
 
+@pytest.mark.legacy
 class TestKrakenAlign(unittest.TestCase):
     """
     Tests for the legacy forced alignment module (`kraken.align.forced_align`).
@@ -23,11 +26,14 @@ class TestKrakenAlign(unittest.TestCase):
         `kraken.tasks.ForcedAlignmentTaskModel` instead. See `test_tasks.py`
         for tests of the replacement API.
     """
+    @classmethod
+    def setUpClass(cls):
+        cls.doc = resources / '170025120000003,0074.xml'
+        cls.bls = xml.XMLPage(cls.doc).to_container()
+        cls.model = load_any(resources / 'overfit.mlmodel')
+
     def setUp(self):
         warnings.filterwarnings('ignore', category=DeprecationWarning, message='.*deprecated.*kraken 8.*')
-        self.doc = resources / '170025120000003,0074.xml'
-        self.bls = xml.XMLPage(self.doc).to_container()
-        self.model = load_any(resources / 'overfit.mlmodel')
 
     def test_forced_align_deprecation_warning(self):
         """

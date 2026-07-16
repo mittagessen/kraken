@@ -29,13 +29,14 @@ class TestBaselineSet(unittest.TestCase):
     """
     Tests for the BaselineSet segmentation dataset class
     """
-    def setUp(self):
-        self.doc = xml.XMLPage(resources / '170025120000003,0074.xml').to_container()
-        self.transforms = ImageInputTransforms(batch=1,
-                                               height=200,
-                                               width=100,
-                                               channels=1,
-                                               pad=0)
+    @classmethod
+    def setUpClass(cls):
+        cls.doc = xml.XMLPage(resources / '170025120000003,0074.xml').to_container()
+        cls.transforms = ImageInputTransforms(batch=1,
+                                              height=200,
+                                              width=100,
+                                              channels=1,
+                                              pad=0)
 
     def test_baselineset_simple_xml(self):
         """
@@ -249,86 +250,29 @@ class TestBaselineSet(unittest.TestCase):
         self.assertEqual(ds.targets[0]['baselines'], {})
         self.assertEqual(ds.targets[0]['regions'], {})
 
-    def test_baselineset_invalid_missing_aux(self):
+    def test_baselineset_invalid_class_mapping(self):
         """
-        Test that missing 'aux' key raises ValueError.
+        Test that malformed class mappings raise ValueError.
         """
-        class_mapping = {
-            'baselines': {'$par': 2},
-            'regions': {'$par': 3},
-        }
-        with raises(ValueError):
-            BaselineSet(class_mapping=class_mapping, im_transforms=self.transforms)
-
-    def test_baselineset_invalid_missing_baselines(self):
-        """
-        Test that missing 'baselines' key raises ValueError.
-        """
-        class_mapping = {
-            'aux': {'_start_separator': 0, '_end_separator': 1},
-            'regions': {'$par': 2},
-        }
-        with raises(ValueError):
-            BaselineSet(class_mapping=class_mapping, im_transforms=self.transforms)
-
-    def test_baselineset_invalid_missing_regions(self):
-        """
-        Test that missing 'regions' key raises ValueError.
-        """
-        class_mapping = {
-            'aux': {'_start_separator': 0, '_end_separator': 1},
-            'baselines': {'$par': 2},
-        }
-        with raises(ValueError):
-            BaselineSet(class_mapping=class_mapping, im_transforms=self.transforms)
-
-    def test_baselineset_invalid_missing_start_separator(self):
-        """
-        Test that missing '_start_separator' in aux raises ValueError.
-        """
-        class_mapping = {
-            'aux': {'_end_separator': 1},
-            'baselines': {'$par': 2},
-            'regions': {'$par': 3},
-        }
-        with raises(ValueError):
-            BaselineSet(class_mapping=class_mapping, im_transforms=self.transforms)
-
-    def test_baselineset_invalid_missing_end_separator(self):
-        """
-        Test that missing '_end_separator' in aux raises ValueError.
-        """
-        class_mapping = {
-            'aux': {'_start_separator': 0},
-            'baselines': {'$par': 2},
-            'regions': {'$par': 3},
-        }
-        with raises(ValueError):
-            BaselineSet(class_mapping=class_mapping, im_transforms=self.transforms)
-
-    def test_baselineset_invalid_negative_value(self):
-        """
-        Test that negative index values raise ValueError.
-        """
-        class_mapping = {
-            'aux': {'_start_separator': 0, '_end_separator': 1},
-            'baselines': {'$par': -1},
-            'regions': {'$par': 2},
-        }
-        with raises(ValueError):
-            BaselineSet(class_mapping=class_mapping, im_transforms=self.transforms)
-
-    def test_baselineset_invalid_non_integer_value(self):
-        """
-        Test that non-integer index values raise ValueError.
-        """
-        class_mapping = {
-            'aux': {'_start_separator': 0, '_end_separator': 1},
-            'baselines': {'$par': 2.5},
-            'regions': {'$par': 3},
-        }
-        with raises(ValueError):
-            BaselineSet(class_mapping=class_mapping, im_transforms=self.transforms)
+        aux = {'_start_separator': 0, '_end_separator': 1}
+        cases = [('missing_aux',
+                  {'baselines': {'$par': 2}, 'regions': {'$par': 3}}),
+                 ('missing_baselines',
+                  {'aux': aux, 'regions': {'$par': 2}}),
+                 ('missing_regions',
+                  {'aux': aux, 'baselines': {'$par': 2}}),
+                 ('missing_start_separator',
+                  {'aux': {'_end_separator': 1}, 'baselines': {'$par': 2}, 'regions': {'$par': 3}}),
+                 ('missing_end_separator',
+                  {'aux': {'_start_separator': 0}, 'baselines': {'$par': 2}, 'regions': {'$par': 3}}),
+                 ('negative_value',
+                  {'aux': aux, 'baselines': {'$par': -1}, 'regions': {'$par': 2}}),
+                 ('non_integer_value',
+                  {'aux': aux, 'baselines': {'$par': 2.5}, 'regions': {'$par': 3}})]
+        for desc, class_mapping in cases:
+            with self.subTest(desc):
+                with raises(ValueError):
+                    BaselineSet(class_mapping=class_mapping, im_transforms=self.transforms)
 
 
 class TestInputTransforms(unittest.TestCase):
@@ -387,46 +331,22 @@ class TestInputTransforms(unittest.TestCase):
                                  'valid_norm': False,
                                  'force_binarization': False}
 
-    def test_imageinputtransforms_simple(self):
+    def test_imageinputtransforms(self):
         """
-        Simple ImageInputTransforms instantiation.
+        ImageInputTransforms instantiation over channel/centerline
+        normalization configurations.
         """
-        tf = ImageInputTransforms(**self.simple_inst)
-        for k, v in self.simple_inst.items():
-            self.assertEqual(getattr(tf, k), v)
-        self.assertFalse(tf.centerline_norm)
-        check_output(self, self.simple_inst, self.im, tf(self.im))
-
-    def test_imageinputtransforms_simple_rgb(self):
-        """
-        Simple RGB ImageInputTransforms instantiation.
-        """
-        tf = ImageInputTransforms(**self.simple_inst_rgb)
-        for k, v in self.simple_inst_rgb.items():
-            self.assertEqual(getattr(tf, k), v)
-        self.assertFalse(tf.centerline_norm)
-        check_output(self, self.simple_inst_rgb, self.im, tf(self.im))
-
-    def test_imageinputtransforms_norm_rgb(self):
-        """
-        RGB ImageInputTransforms instantiation with centerline normalization
-        valid (but not enabled).
-        """
-        tf = ImageInputTransforms(**self.simple_inst_norm_rgb)
-        for k, v in self.simple_inst_norm_rgb.items():
-            self.assertEqual(getattr(tf, k), v)
-        self.assertFalse(tf.centerline_norm)
-        check_output(self, self.simple_inst_norm_rgb, self.im, tf(self.im))
-
-    def test_imageinputtransforms_simple_norm(self):
-        """
-        ImageInputTransforms instantiation with centerline normalization valid.
-        """
-        tf = ImageInputTransforms(**self.simple_inst_norm)
-        for k, v in self.simple_inst_norm.items():
-            self.assertEqual(getattr(tf, k), v)
-        self.assertTrue(tf.centerline_norm)
-        check_output(self, self.simple_inst_norm, self.im, tf(self.im))
+        cases = [('simple', self.simple_inst, False),
+                 ('simple_rgb', self.simple_inst_rgb, False),
+                 ('norm_rgb', self.simple_inst_norm_rgb, False),
+                 ('simple_norm', self.simple_inst_norm, True)]
+        for desc, config, centerline_norm in cases:
+            with self.subTest(desc):
+                tf = ImageInputTransforms(**config)
+                for k, v in config.items():
+                    self.assertEqual(getattr(tf, k), v)
+                self.assertEqual(tf.centerline_norm, centerline_norm)
+                check_output(self, config, self.im, tf(self.im))
 
     def test_imageinputtransforms_channel_height(self):
         """

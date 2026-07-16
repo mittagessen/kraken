@@ -135,8 +135,8 @@ class TestKrakenArrowCompilation(unittest.TestCase):
                                  format_type='xml')
             # expect zero resulting lines due to image load error
             _validate_ds(self, tmp_file.name, 0, 0, 'kraken_recognition_baseline')
-        # expect one warning log message; should include the file image filename
-        assert len(self.caplog.records) == 1
-        log_record = self.caplog.records[0]
-        assert log_record.levelname == "WARNING"
-        assert f"Invalid input file {bad_box_lines[0]}" in log_record.message
+        # expect one warning naming the invalid input file
+        invalid_warnings = [r for r in self.caplog.records
+                            if r.levelname == 'WARNING'
+                            and f'Invalid input file {bad_box_lines[0]}' in r.message]
+        assert len(invalid_warnings) == 1

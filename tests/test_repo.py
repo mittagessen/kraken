@@ -1,26 +1,31 @@
 # -*- coding: utf-8 -*-
-import shutil
-import tempfile
+import socket
 import unittest
-from pathlib import Path
+
+import pytest
 
 from kraken import repo
 
-thisfile = Path(__file__).resolve().parent
-resources = thisfile / 'resources'
+
+def _zenodo_reachable(timeout=2.0):
+    try:
+        socket.create_connection(('zenodo.org', 443), timeout=timeout).close()
+        return True
+    except OSError:
+        return False
 
 
+@pytest.mark.network
 class TestRepo(unittest.TestCase):
     """
-    Testing our wrappers around HTRMoPo
+    Testing our wrappers around HTRMoPo. These tests query the live Zenodo
+    repository.
     """
 
-    def setUp(self):
-        self.temp_model = tempfile.TemporaryDirectory()
-        self.temp_path = Path(self.temp_model.name)
-
-    def tearDown(self):
-        shutil.rmtree(self.temp_model.name)
+    @classmethod
+    def setUpClass(cls):
+        if not _zenodo_reachable():
+            raise unittest.SkipTest('zenodo.org is not reachable')
 
     def test_listing(self):
         """

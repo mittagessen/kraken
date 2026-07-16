@@ -24,11 +24,26 @@ class TestKetosTraining(unittest.TestCase):
         manifest.write_text('\n'.join(str(p) for p in entries) + '\n')
         return manifest
 
-    def _run_ketos(self, args):
+    def _run_ketos_train(self, args, out_dir, tasks, model_class):
+        """
+        Runs a ketos training command and verifies the converted best model:
+        exactly one weights file, loadable, containing a model of the
+        expected class and task type.
+        """
+        from kraken.models import load_models
+
         result = self.runner.invoke(ketos_cli, args)
         self.assertEqual(result.exit_code, 0, result.output)
+        weights = list(Path(out_dir).glob('best_*.safetensors'))
+        self.assertEqual(len(weights), 1,
+                         f'Expected exactly one best model in {out_dir}, found {weights}')
+        models = load_models(weights[0], tasks=tasks)
+        self.assertGreater(len(models), 0)
+        self.assertIsInstance(models[0], model_class)
 
     def test_ketos_train_recognition_smoke(self):
+        from kraken.lib.vgsl import TorchVGSLModel
+
         xml = RESOURCES / '170025120000003,0074-lite.xml'
         manifest = self._write_manifest([xml], 'rec_train.lst')
         out_dir = self.tmp_path / 'rec_out'
@@ -48,9 +63,11 @@ class TestKetosTraining(unittest.TestCase):
             '-t', str(manifest),
             '-e', str(manifest),
         ]
-        self._run_ketos(args)
+        self._run_ketos_train(args, out_dir, ['recognition'], TorchVGSLModel)
 
     def test_ketos_train_segmentation_smoke(self):
+        from kraken.lib.vgsl import TorchVGSLModel
+
         xml = RESOURCES / '170025120000003,0074-lite.xml'
         manifest = self._write_manifest([xml], 'seg_train.lst')
         out_dir = self.tmp_path / 'seg_out'
@@ -69,9 +86,11 @@ class TestKetosTraining(unittest.TestCase):
             '-t', str(manifest),
             '-e', str(manifest),
         ]
-        self._run_ketos(args)
+        self._run_ketos_train(args, out_dir, ['segmentation'], TorchVGSLModel)
 
     def test_ketos_train_reading_order_smoke(self):
+        from kraken.lib.ro import ROMLP
+
         xml = RESOURCES / 'page' / 'explicit_ro.xml'
         manifest = self._write_manifest([xml], 'ro_train.lst')
         out_dir = self.tmp_path / 'ro_out'
@@ -89,4 +108,4 @@ class TestKetosTraining(unittest.TestCase):
             '-t', str(manifest),
             '-e', str(manifest),
         ]
-        self._run_ketos(args)
+        self._run_ketos_train(args, out_dir, ['reading_order'], ROMLP)

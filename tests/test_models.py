@@ -4,6 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import pytest
 from pytest import raises
 
 from kraken.lib import models
@@ -13,6 +14,7 @@ thisfile = Path(__file__).resolve().parent
 resources = thisfile / 'resources'
 
 
+@pytest.mark.legacy
 class TestModels(unittest.TestCase):
     """
     Testing legacy model loading routines (`kraken.lib.models.load_any`).

@@ -37,69 +37,23 @@ class TestLayers(unittest.TestCase):
         o = do(torch.randn(1, 2, 32, 64))
         self.assertEqual(o[0].shape, (1, 2, 32, 64))
 
-    def test_forward_rnn_layer_x(self):
+    def test_rnn_layer(self):
         """
-        Test unidirectional RNN layer in x-dimension.
+        Test RNN layer output shapes over direction, axis, and summarization.
         """
-        rnn = layers.TransposedSummarizingRNN(10, 2, 'f', False, False)
-        o = rnn(torch.randn(1, 10, 32, 64))
-        self.assertEqual(o[0].shape, (1, 2, 32, 64))
-
-    def test_forward_rnn_layer_y(self):
-        """
-        Test unidirectional RNN layer in y-dimension.
-        """
-        rnn = layers.TransposedSummarizingRNN(10, 2, 'f', True, False)
-        o = rnn(torch.randn(1, 10, 32, 64))
-        self.assertEqual(o[0].shape, (1, 2, 32, 64))
-
-    def test_forward_rnn_layer_x_summarize(self):
-        """
-        Test unidirectional summarizing RNN layer in x-dimension.
-        """
-        rnn = layers.TransposedSummarizingRNN(10, 2, 'f', False, True)
-        o = rnn(torch.randn(1, 10, 32, 64))
-        self.assertEqual(o[0].shape, (1, 2, 32, 1))
-
-    def test_forward_rnn_layer_y_summarize(self):
-        """
-        Test unidirectional summarizing RNN layer in y-dimension.
-        """
-        rnn = layers.TransposedSummarizingRNN(10, 2, 'f', True, True)
-        o = rnn(torch.randn(1, 10, 32, 64))
-        self.assertEqual(o[0].shape, (1, 2, 1, 64))
-
-    def test_bidi_rnn_layer_x(self):
-        """
-        Test bidirectional RNN layer in x-dimension.
-        """
-        rnn = layers.TransposedSummarizingRNN(10, 2, 'b', False, False)
-        o = rnn(torch.randn(1, 10, 32, 64))
-        self.assertEqual(o[0].shape, (1, 4, 32, 64))
-
-    def test_bidi_rnn_layer_y(self):
-        """
-        Test bidirectional RNN layer in y-dimension.
-        """
-        rnn = layers.TransposedSummarizingRNN(10, 2, 'b', True, False)
-        o = rnn(torch.randn(1, 10, 32, 64))
-        self.assertEqual(o[0].shape, (1, 4, 32, 64))
-
-    def test_bidi_rnn_layer_x_summarize(self):
-        """
-        Test bidirectional summarizing RNN layer in x-dimension.
-        """
-        rnn = layers.TransposedSummarizingRNN(10, 2, 'b', False, True)
-        o = rnn(torch.randn(1, 10, 32, 64))
-        self.assertEqual(o[0].shape, (1, 4, 32, 1))
-
-    def test_bidi_rnn_layer_y_summarize(self):
-        """
-        Test bidirectional summarizing RNN layer in y-dimension.
-        """
-        rnn = layers.TransposedSummarizingRNN(10, 2, 'b', True, True)
-        o = rnn(torch.randn(1, 10, 32, 64))
-        self.assertEqual(o[0].shape, (1, 4, 1, 64))
+        cases = [('f', False, False, (1, 2, 32, 64)),
+                 ('f', True, False, (1, 2, 32, 64)),
+                 ('f', False, True, (1, 2, 32, 1)),
+                 ('f', True, True, (1, 2, 1, 64)),
+                 ('b', False, False, (1, 4, 32, 64)),
+                 ('b', True, False, (1, 4, 32, 64)),
+                 ('b', False, True, (1, 4, 32, 1)),
+                 ('b', True, True, (1, 4, 1, 64))]
+        for direction, transpose, summarize, expected in cases:
+            with self.subTest(direction=direction, transpose=transpose, summarize=summarize):
+                rnn = layers.TransposedSummarizingRNN(10, 2, direction, transpose, summarize)
+                o = rnn(torch.randn(1, 10, 32, 64))
+                self.assertEqual(o[0].shape, expected)
 
     def test_linsoftmax(self):
         """
@@ -125,37 +79,22 @@ class TestLayers(unittest.TestCase):
         o = conv(torch.randn(1, 5, 24, 12))
         self.assertEqual(o[0].shape, (1, 12, 24, 12))
 
-    def test_actconv2d_sigmoid_logits_train(self):
+    def test_actconv2d_sigmoid_logits(self):
         """
-        Sigmoid output layers return logits in train mode.
-        """
-        conv = layers.ActConv2D(5, 12, (3, 3), (1, 1), 's')
-        conv.train()
-        o = conv(torch.randn(1, 5, 24, 12))
-        self.assertFalse(0 <= o[0].min() <= 1)
-        self.assertFalse(0 <= o[0].max() <= 1)
-
-    def test_actconv2d_sigmoid_logits_eval(self):
-        """
-        Sigmoid output layers return logits in eval mode.
+        Sigmoid output layers return unsquashed logits, identically in train
+        and eval mode. Weights are fixed so a squashed output would land in
+        [0, 1] while logits are exactly the bias value.
         """
         conv = layers.ActConv2D(5, 12, (3, 3), (1, 1), 's')
-        conv.eval()
-        o = conv(torch.randn(1, 5, 24, 12))
-        self.assertFalse(0 <= o[0].min() <= 1)
-        self.assertFalse(0 <= o[0].max() <= 1)
-
-    def test_actconv2d_sigmoid_mode_invariant(self):
-        """
-        Sigmoid output layers are mode-invariant (no train/eval activation switch).
-        """
-        conv = layers.ActConv2D(5, 12, (3, 3), (1, 1), 's')
+        torch.nn.init.zeros_(conv.co.weight)
+        torch.nn.init.constant_(conv.co.bias, 10.)
         x = torch.randn(1, 5, 24, 12)
         conv.train()
         train_o = conv(x)[0]
         conv.eval()
         eval_o = conv(x)[0]
         self.assertTrue(torch.allclose(train_o, eval_o))
+        self.assertGreater(train_o.min().item(), 1)
 
     def test_actconv2d_tanh(self):
         """
@@ -184,76 +123,32 @@ class TestLayers(unittest.TestCase):
         self.assertLessEqual(0, o[0].min())
         self.assertLessEqual(0, o[0].max())
 
-    def test_linsoftmax_resize_add(self):
+    def test_output_layer_resize(self):
         """
-        Tests resizing of a fully connected layer.
+        Tests resizing of fully connected and convolutional output layers
+        with pure growth, pure deletion, and both combined.
         """
-        lin = layers.LinSoftmax(20, 10)
-        w_cp = lin.lin.weight.clone()
-        b_cp = lin.lin.bias.clone()
-        lin.resize(25)
-        self.assertTrue(w_cp.eq(lin.lin.weight[:10, :]).all())
-        self.assertTrue(b_cp.eq(lin.lin.bias[:10]).all())
-        self.assertTrue(lin.lin.weight.shape[0] == 25)
-        self.assertTrue(lin.lin.bias.shape[0] == 25)
-
-    def test_linsoftmax_resize_remove(self):
-        """
-        Tests resizing of a fully connected layer.
-        """
-        lin = layers.LinSoftmax(20, 10)
-        w_cp = lin.lin.weight.clone()
-        b_cp = lin.lin.bias.clone()
-        lin.resize(5, (1, 5, 6, 7, 9))
-        self.assertTrue(w_cp[(0, 2, 3, 4, 8), :].eq(lin.lin.weight).all())
-        self.assertTrue(b_cp[(0, 2, 3, 4, 8),].eq(lin.lin.bias).all())
-
-    def test_linsoftmax_resize_both(self):
-        """
-        Tests resizing of a fully connected layer.
-        """
-        lin = layers.LinSoftmax(20, 10)
-        w_cp = lin.lin.weight.clone()
-        b_cp = lin.lin.bias.clone()
-        lin.resize(25, (1, 5, 6, 7, 9))
-        self.assertTrue(w_cp[(0, 2, 3, 4, 8), :].eq(lin.lin.weight[:5, :]).all())
-        self.assertTrue(b_cp[(0, 2, 3, 4, 8),].eq(lin.lin.bias[:5]).all())
-        self.assertTrue(lin.lin.weight.shape[0] == 25)
-        self.assertTrue(lin.lin.bias.shape[0] == 25)
-
-    def test_conv_resize_add(self):
-        """
-        Tests resizing of a convolutional output layer.
-        """
-        conv = layers.ActConv2D(20, 10, (1, 1), (1, 1))
-        w_cp = conv.co.weight.clone()
-        b_cp = conv.co.bias.clone()
-        conv.resize(25)
-        self.assertTrue(w_cp.eq(conv.co.weight[:10, :]).all())
-        self.assertTrue(b_cp.eq(conv.co.bias[:10]).all())
-        self.assertTrue(conv.co.weight.shape[0] == 25)
-        self.assertTrue(conv.co.bias.shape[0] == 25)
-
-    def test_conv_resize_remove(self):
-        """
-        Tests resizing of a convolutional output layer.
-        """
-        conv = layers.ActConv2D(20, 10, (1, 1), (1, 1))
-        w_cp = conv.co.weight.clone()
-        b_cp = conv.co.bias.clone()
-        conv.resize(5, (1, 5, 6, 7, 9))
-        self.assertTrue(w_cp[(0, 2, 3, 4, 8), :].eq(conv.co.weight).all())
-        self.assertTrue(b_cp[(0, 2, 3, 4, 8),].eq(conv.co.bias).all())
-
-    def test_conv_resize_both(self):
-        """
-        Tests resizing of a convolutional output layer.
-        """
-        conv = layers.ActConv2D(20, 10, (1, 1), (1, 1))
-        w_cp = conv.co.weight.clone()
-        b_cp = conv.co.bias.clone()
-        conv.resize(25, (1, 5, 6, 7, 9))
-        self.assertTrue(w_cp[(0, 2, 3, 4, 8), :].eq(conv.co.weight[:5, :]).all())
-        self.assertTrue(b_cp[(0, 2, 3, 4, 8),].eq(conv.co.bias[:5]).all())
-        self.assertTrue(conv.co.weight.shape[0] == 25)
-        self.assertTrue(conv.co.bias.shape[0] == 25)
+        kept = (0, 2, 3, 4, 8)
+        deleted = (1, 5, 6, 7, 9)
+        factories = [('linsoftmax', lambda: layers.LinSoftmax(20, 10), 'lin'),
+                     ('conv', lambda: layers.ActConv2D(20, 10, (1, 1), (1, 1)), 'co')]
+        scenarios = [('add', 25, None),
+                     ('remove', 5, deleted),
+                     ('both', 25, deleted)]
+        for layer_name, factory, attr in factories:
+            for scenario, new_size, del_indices in scenarios:
+                with self.subTest(layer=layer_name, scenario=scenario):
+                    layer = factory()
+                    mod = getattr(layer, attr)
+                    w_cp = mod.weight.clone()
+                    b_cp = mod.bias.clone()
+                    if del_indices is None:
+                        layer.resize(new_size)
+                        self.assertTrue(w_cp.eq(mod.weight[:10, :]).all())
+                        self.assertTrue(b_cp.eq(mod.bias[:10]).all())
+                    else:
+                        layer.resize(new_size, del_indices)
+                        self.assertTrue(w_cp[kept, :].eq(mod.weight[:len(kept), :]).all())
+                        self.assertTrue(b_cp[kept,].eq(mod.bias[:len(kept)]).all())
+                    self.assertEqual(mod.weight.shape[0], new_size)
+                    self.assertEqual(mod.bias.shape[0], new_size)

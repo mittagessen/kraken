@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import json
-import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -8,6 +7,8 @@ from pathlib import Path
 import numpy as np
 from click.testing import CliRunner
 from PIL import Image
+
+from helpers import temp_output
 
 from kraken.kraken import cli
 
@@ -21,14 +22,9 @@ class TestCLI(unittest.TestCase):
     """
 
     def setUp(self):
-        self.temp = tempfile.NamedTemporaryFile(delete=False)
         self.runner = CliRunner()
         self.color_img = resources / 'input.webp'
         self.bw_img = resources / 'input_bw.png'
-
-    def tearDown(self):
-        self.temp.close()
-        os.unlink(self.temp.name)
 
     def test_binarize_color(self):
         """
@@ -73,49 +69,40 @@ class TestCLISegmentation(unittest.TestCase):
         """
         Tests baseline segmentation with native JSON output.
         """
-        with tempfile.NamedTemporaryFile(suffix='.json', delete=False) as fp:
-            try:
-                result = self.runner.invoke(cli, ['-i', str(self.bw_img), fp.name, 'segment', '-bl'])
-                self.assertEqual(result.exit_code, 0, msg=result.output)
-                with open(fp.name, 'r') as f:
-                    data = json.load(f)
-                self.assertIn('type', data)
-                self.assertEqual(data['type'], 'baselines')
-                self.assertIn('lines', data)
-                self.assertGreater(len(data['lines']), 0)
-            finally:
-                os.unlink(fp.name)
+        with temp_output(suffix='.json') as fname:
+            result = self.runner.invoke(cli, ['-i', str(self.bw_img), fname, 'segment', '-bl'])
+            self.assertEqual(result.exit_code, 0, msg=result.output)
+            with open(fname, 'r') as f:
+                data = json.load(f)
+            self.assertIn('type', data)
+            self.assertEqual(data['type'], 'baselines')
+            self.assertIn('lines', data)
+            self.assertGreater(len(data['lines']), 0)
 
     def test_segment_baseline_alto_output(self):
         """
         Tests baseline segmentation with ALTO XML serialization.
         """
-        with tempfile.NamedTemporaryFile(suffix='.xml', delete=False) as fp:
-            try:
-                result = self.runner.invoke(cli, ['-a', '-i', str(self.bw_img), fp.name, 'segment', '-bl'])
-                self.assertEqual(result.exit_code, 0, msg=result.output)
-                with open(fp.name, 'r') as f:
-                    content = f.read()
-                self.assertIn('alto', content.lower())
-                self.assertNotIn('<fileName>None</fileName>', content)
-                self.assertIn(self.bw_img.name, content)
-            finally:
-                os.unlink(fp.name)
+        with temp_output(suffix='.xml') as fname:
+            result = self.runner.invoke(cli, ['-a', '-i', str(self.bw_img), fname, 'segment', '-bl'])
+            self.assertEqual(result.exit_code, 0, msg=result.output)
+            with open(fname, 'r') as f:
+                content = f.read()
+            self.assertIn('alto', content.lower())
+            self.assertNotIn('<fileName>None</fileName>', content)
+            self.assertIn(self.bw_img.name, content)
 
     def test_segment_baseline_text_direction(self):
         """
         Tests that the text direction option is accepted.
         """
-        with tempfile.NamedTemporaryFile(suffix='.json', delete=False) as fp:
-            try:
-                result = self.runner.invoke(cli, ['-i', str(self.bw_img), fp.name,
-                                                  'segment', '-bl', '-d', 'horizontal-rl'])
-                self.assertEqual(result.exit_code, 0, msg=result.output)
-                with open(fp.name, 'r') as f:
-                    data = json.load(f)
-                self.assertEqual(data['text_direction'], 'horizontal-rl')
-            finally:
-                os.unlink(fp.name)
+        with temp_output(suffix='.json') as fname:
+            result = self.runner.invoke(cli, ['-i', str(self.bw_img), fname,
+                                              'segment', '-bl', '-d', 'horizontal-rl'])
+            self.assertEqual(result.exit_code, 0, msg=result.output)
+            with open(fname, 'r') as f:
+                data = json.load(f)
+            self.assertEqual(data['text_direction'], 'horizontal-rl')
 
 
 class TestCLIRecognition(unittest.TestCase):
@@ -132,123 +119,66 @@ class TestCLIRecognition(unittest.TestCase):
         """
         Tests recognition in no-segmentation mode (whole image as one line).
         """
-        with tempfile.NamedTemporaryFile(suffix='.txt', delete=False) as fp:
-            try:
-                result = self.runner.invoke(cli, ['-i', str(self.bw_img), fp.name,
-                                                  'ocr', '-m', str(self.model), '-s'])
-                self.assertEqual(result.exit_code, 0, msg=result.output)
-                with open(fp.name, 'r') as f:
-                    content = f.read()
-                self.assertGreater(len(content.strip()), 0)
-            finally:
-                os.unlink(fp.name)
+        with temp_output(suffix='.txt') as fname:
+            result = self.runner.invoke(cli, ['-i', str(self.bw_img), fname,
+                                              'ocr', '-m', str(self.model), '-s'])
+            self.assertEqual(result.exit_code, 0, msg=result.output)
+            with open(fname, 'r') as f:
+                content = f.read()
+            self.assertGreater(len(content.strip()), 0)
 
     def test_ocr_pipeline_segment_then_ocr(self):
         """
         Tests the chained segment -> ocr pipeline.
         """
-        with tempfile.NamedTemporaryFile(suffix='.txt', delete=False) as fp:
-            try:
-                result = self.runner.invoke(cli, ['-i', str(self.bw_img), fp.name,
-                                                  'segment', '-bl',
-                                                  'ocr', '-m', str(self.model)])
-                self.assertEqual(result.exit_code, 0, msg=result.output)
-                with open(fp.name, 'r') as f:
-                    content = f.read()
-                self.assertGreater(len(content.strip()), 0)
-            finally:
-                os.unlink(fp.name)
+        with temp_output(suffix='.txt') as fname:
+            result = self.runner.invoke(cli, ['-i', str(self.bw_img), fname,
+                                              'segment', '-bl',
+                                              'ocr', '-m', str(self.model)])
+            self.assertEqual(result.exit_code, 0, msg=result.output)
+            with open(fname, 'r') as f:
+                content = f.read()
+            self.assertGreater(len(content.strip()), 0)
 
-    def test_ocr_alto_output(self):
+    def test_ocr_output_formats(self):
         """
-        Tests recognition with ALTO XML output format.
+        Tests recognition output serialization for each format flag.
         """
-        with tempfile.NamedTemporaryFile(suffix='.xml', delete=False) as fp:
-            try:
-                result = self.runner.invoke(cli, ['-a', '-i', str(self.bw_img), fp.name,
-                                                  'segment', '-bl',
-                                                  'ocr', '-m', str(self.model)])
-                self.assertEqual(result.exit_code, 0, msg=result.output)
-                with open(fp.name, 'r') as f:
-                    content = f.read()
-                self.assertIn('alto', content.lower())
-            finally:
-                os.unlink(fp.name)
+        cases = [('alto', '-a', '.xml', lambda c: 'alto' in c.lower()),
+                 ('hocr', '-h', '.html', lambda c: 'ocr_page' in c),
+                 ('pagexml', '-x', '.xml', lambda c: 'PcGts' in c)]
+        for name, flag, suffix, marker in cases:
+            with self.subTest(name):
+                with temp_output(suffix=suffix) as fname:
+                    result = self.runner.invoke(cli, [flag, '-i', str(self.bw_img), fname,
+                                                      'segment', '-bl',
+                                                      'ocr', '-m', str(self.model)])
+                    self.assertEqual(result.exit_code, 0, msg=result.output)
+                    with open(fname, 'r') as f:
+                        content = f.read()
+                    self.assertTrue(marker(content), msg=f'format marker missing in {name} output')
 
-    def test_ocr_hocr_output(self):
-        """
-        Tests recognition with hOCR output format.
-        """
-        with tempfile.NamedTemporaryFile(suffix='.html', delete=False) as fp:
-            try:
-                result = self.runner.invoke(cli, ['-h', '-i', str(self.bw_img), fp.name,
-                                                  'segment', '-bl',
-                                                  'ocr', '-m', str(self.model)])
-                self.assertEqual(result.exit_code, 0, msg=result.output)
-                with open(fp.name, 'r') as f:
-                    content = f.read()
-                self.assertIn('ocr_page', content)
-            finally:
-                os.unlink(fp.name)
-
-    def test_ocr_pagexml_output(self):
-        """
-        Tests recognition with PAGE XML output format.
-        """
-        with tempfile.NamedTemporaryFile(suffix='.xml', delete=False) as fp:
-            try:
-                result = self.runner.invoke(cli, ['-x', '-i', str(self.bw_img), fp.name,
-                                                  'segment', '-bl',
-                                                  'ocr', '-m', str(self.model)])
-                self.assertEqual(result.exit_code, 0, msg=result.output)
-                with open(fp.name, 'r') as f:
-                    content = f.read()
-                self.assertIn('PcGts', content)
-            finally:
-                os.unlink(fp.name)
-
-    def test_ocr_xml_input_auto_linetype(self):
+    def test_ocr_xml_input_linetype(self):
         """
         Tests recognition on XML input with the linetype derived from the
-        model.
+        model and with an explicit override.
         """
         xml = resources / '170025120000003,0074-lite.xml'
-        with tempfile.NamedTemporaryFile(suffix='.txt', delete=False) as fp:
-            try:
-                result = self.runner.invoke(cli, ['-f', 'xml', '-i', str(xml), fp.name,
-                                                  'ocr', '-m', str(self.model)])
-                self.assertEqual(result.exit_code, 0, msg=result.output)
-                with open(fp.name, 'r') as f:
-                    content = f.read()
-                self.assertGreater(len(content.strip()), 0)
-            finally:
-                os.unlink(fp.name)
-
-    def test_ocr_xml_input_explicit_linetype(self):
-        """
-        Tests recognition on XML input with an explicit linetype override.
-        """
-        xml = resources / '170025120000003,0074-lite.xml'
-        with tempfile.NamedTemporaryFile(suffix='.txt', delete=False) as fp:
-            try:
-                result = self.runner.invoke(cli, ['-f', 'xml', '-i', str(xml), fp.name,
-                                                  'ocr', '-m', str(self.model),
-                                                  '--linetype', 'baselines'])
-                self.assertEqual(result.exit_code, 0, msg=result.output)
-                with open(fp.name, 'r') as f:
-                    content = f.read()
-                self.assertGreater(len(content.strip()), 0)
-            finally:
-                os.unlink(fp.name)
+        for name, extra in (('auto', []), ('explicit', ['--linetype', 'baselines'])):
+            with self.subTest(name):
+                with temp_output(suffix='.txt') as fname:
+                    result = self.runner.invoke(cli, ['-f', 'xml', '-i', str(xml), fname,
+                                                      'ocr', '-m', str(self.model)] + extra)
+                    self.assertEqual(result.exit_code, 0, msg=result.output)
+                    with open(fname, 'r') as f:
+                        content = f.read()
+                    self.assertGreater(len(content.strip()), 0)
 
     def test_ocr_missing_model_fails(self):
         """
         Tests that ocr fails gracefully when model file doesn't exist.
         """
-        with tempfile.NamedTemporaryFile(suffix='.txt', delete=False) as fp:
-            try:
-                result = self.runner.invoke(cli, ['-i', str(self.bw_img), fp.name,
-                                                  'ocr', '-m', 'nonexistent_model.mlmodel', '-s'])
-                self.assertNotEqual(result.exit_code, 0)
-            finally:
-                os.unlink(fp.name)
+        with temp_output(suffix='.txt') as fname:
+            result = self.runner.invoke(cli, ['-i', str(self.bw_img), fname,
+                                              'ocr', '-m', 'nonexistent_model.mlmodel', '-s'])
+            self.assertNotEqual(result.exit_code, 0)

@@ -1,12 +1,15 @@
 # -*- coding: utf-8 -*-
-import pickle
 import unittest
 import warnings
 from collections import defaultdict
 from pathlib import Path
 
+import pytest
 from PIL import Image
 from pytest import raises
+
+from helpers import (ARABIC_LINE_LOGICAL, load_record_dicts, load_records,
+                     load_segmentation, make_baseline_segmentation)
 
 from kraken.containers import (BaselineLine, BaselineOCRRecord, BBoxLine,
                                Segmentation)
@@ -23,14 +26,11 @@ class TestBBoxRecords(unittest.TestCase):
     """
     def setUp(self):
         # Arabic RTL (pre-constructed records, display_order=False i.e. logical order)
-        with open(resources / 'arabic_bbox_records.pkl', 'rb') as fp:
-            self.arabic_records = pickle.load(fp)
-            self.arabic_record = self.arabic_records[0]
+        self.arabic_records = load_records('arabic_bbox_records.json')
+        self.arabic_record = self.arabic_records[0]
 
         # Latin LTR (pre-constructed records from Segmentation)
-        with open(resources / 'box_rec.pkl', 'rb') as fp:
-            seg = pickle.load(fp)
-            self.latin_record = seg.lines[5]
+        self.latin_record = load_segmentation('box_rec.json').lines[5]
 
     def test_arabic_bbox_record_cuts(self):
         """
@@ -123,15 +123,12 @@ class TestBaselineRecords(unittest.TestCase):
     """
     def setUp(self):
         # Arabic RTL records (dicts, construct with desired display_order)
-        with open(resources / 'arabic_bl_records.pkl', 'rb') as fp:
-            self.arabic_records = pickle.load(fp)
-            self.arabic_record = self.arabic_records[0]
-            self.arabic_short_record = self.arabic_records[6]
+        self.arabic_records = load_record_dicts('arabic_bl_records.json')
+        self.arabic_record = self.arabic_records[0]
+        self.arabic_short_record = self.arabic_records[6]
 
         # Latin LTR (pre-constructed records from Segmentation)
-        with open(resources / 'bl_rec.pkl', 'rb') as fp:
-            seg = pickle.load(fp)
-            self.latin_record = seg.lines[5]
+        self.latin_record = load_segmentation('bl_rec.json').lines[5]
 
     def test_arabic_baseline_record_construction(self):
         """
@@ -163,13 +160,7 @@ class TestBaselineRecords(unittest.TestCase):
         """
         record = BaselineOCRRecord(**self.arabic_record, display_order=True)
         lo = record.logical_order()
-        # expected text in logical (reading) order with explicit Unicode escapes
-        # for combining characters (hamza above U+0654, maddah above U+0653)
-        expected = ('\u0639\u0646\u062f \u0639\u062f\u0645 \u0627\u0644\u0639\u0635\u0628\u0627\u062a '
-                    '\u0627\u0630\u0627 \u0644\u0645 \u064a\u0643\u0646 \u0644\u0644\u0635\u063a\u064a\u0631\u0629 '
-                    '\u0627\u0654\u0645 \u0627\u0654\u064a\u0636\u0627\u064b \u0644\u0645\u0627\u0630 '
-                    '\u0643\u0631. . \u0648\u0644\u0646\u0627 \u0627\u0654\u0646 \u0646\u0642\u0648\u0644 '
-                    '\u0627\u0646 \u0627\u0644\u0627\u0653\u0645')
+        expected = ARABIC_LINE_LOGICAL
         self.assertEqual(lo.prediction, expected)
         self.assertAlmostEqual(lo[:][2], 0.9746356, places=4)
 
@@ -180,11 +171,7 @@ class TestBaselineRecords(unittest.TestCase):
         """
         record = BaselineOCRRecord(**self.arabic_record, display_order=False)
         do = record.display_order()
-        expected = ('\u0639\u0646\u062f \u0639\u062f\u0645 \u0627\u0644\u0639\u0635\u0628\u0627\u062a '
-                    '\u0627\u0630\u0627 \u0644\u0645 \u064a\u0643\u0646 \u0644\u0644\u0635\u063a\u064a\u0631\u0629 '
-                    '\u0627\u0654\u0645 \u0627\u0654\u064a\u0636\u0627\u064b \u0644\u0645\u0627\u0630 '
-                    '\u0643\u0631. . \u0648\u0644\u0646\u0627 \u0627\u0654\u0646 \u0646\u0642\u0648\u0644 '
-                    '\u0627\u0646 \u0627\u0644\u0627\u0653\u0645')
+        expected = ARABIC_LINE_LOGICAL
         self.assertEqual(do.prediction, expected)
         self.assertAlmostEqual(do[:][2], 0.9746356, places=4)
 
@@ -263,6 +250,7 @@ class TestBaselineRecords(unittest.TestCase):
         self.assertAlmostEqual(conf, 0.9998304, places=4)
 
 
+@pytest.mark.legacy
 class TestRecognition(unittest.TestCase):
 
     """
@@ -278,60 +266,57 @@ class TestRecognition(unittest.TestCase):
     """
     def setUp(self):
         warnings.filterwarnings('ignore', category=DeprecationWarning, message='.*deprecated.*kraken 8.*')
-        self.im = Image.open(resources / 'bw.png')
-        self.overfit_line = Image.open(resources / '000236.png')
-        self.model = load_any(resources / 'overfit.mlmodel')
-        self.invalid_box_seg = Segmentation(type='bbox',
-                                            imagename=resources / 'bw.png',
-                                            lines=[BBoxLine(id='foo',
-                                                            bbox=[-1, -1, 10000, 10000])],
-                                            text_direction='horizontal-lr',
-                                            script_detection=False)
-        self.invalid_bl_seg = Segmentation(type='baselines',
-                                           imagename=resources / 'bw.png',
-                                           lines=[BaselineLine(id='bar',
-                                                               tags={'type': 'default'},
-                                                               baseline=[[0, 0], [10000, 0]],
-                                                               boundary=[[-1, -1], [-1, 10000], [10000, 10000], [10000, -1]])],
-                                           text_direction='horizontal-lr',
-                                           script_detection=False)
 
-        self.simple_box_seg = Segmentation(type='bbox',
+    @classmethod
+    def setUpClass(cls):
+        cls.im = Image.open(resources / 'bw.png')
+        cls.overfit_line = Image.open(resources / '000236.png')
+        cls.model = load_any(resources / 'overfit.mlmodel')
+        cls.invalid_box_seg = Segmentation(type='bbox',
                                            imagename=resources / 'bw.png',
                                            lines=[BBoxLine(id='foo',
-                                                           bbox=[0, 0, 2544, 156])],
+                                                           bbox=[-1, -1, 10000, 10000])],
                                            text_direction='horizontal-lr',
                                            script_detection=False)
-        self.simple_bl_seg = Segmentation(type='baselines',
+        cls.invalid_bl_seg = Segmentation(type='baselines',
                                           imagename=resources / 'bw.png',
-                                          lines=[BaselineLine(id='foo',
-                                                              baseline=[[0, 10], [2543, 10]],
-                                                              boundary=[[0, 0], [2543, 0], [2543, 155], [0, 155]])],
+                                          lines=[BaselineLine(id='bar',
+                                                              tags={'type': 'default'},
+                                                              baseline=[[0, 0], [10000, 0]],
+                                                              boundary=[[-1, -1], [-1, 10000], [10000, 10000], [10000, -1]])],
                                           text_direction='horizontal-lr',
                                           script_detection=False)
 
-        self.tagged_box_seg = Segmentation(type='bbox',
-                                           imagename=resources / 'bw.png',
-                                           lines=[BBoxLine(id='foo',
-                                                           bbox=[0, 0, 2544, 156],
-                                                           tags={'type': [{'type': 'foobar'}]}),
-                                                  BBoxLine(id='bar',
-                                                           bbox=[0, 0, 2544, 156],
-                                                           tags={'type': [{'type': 'default'}]})],
-                                           text_direction='horizontal-lr',
-                                           script_detection=True)
-        self.tagged_bl_seg = Segmentation(type='baselines',
+        cls.simple_box_seg = Segmentation(type='bbox',
                                           imagename=resources / 'bw.png',
-                                          lines=[BaselineLine(id='foo',
-                                                              baseline=[[0, 10], [2543, 10]],
-                                                              boundary=[[0, 0], [2543, 0], [2543, 155], [0, 155]],
-                                                              tags={'type': [{'type': 'foobar'}]}),
-                                                 BaselineLine(id='bar',
-                                                              baseline=[[0, 10], [2543, 10]],
-                                                              boundary=[[0, 0], [2543, 0], [2543, 155], [0, 155]],
-                                                              tags={'type': [{'type': 'default'}]})],
+                                          lines=[BBoxLine(id='foo',
+                                                          bbox=[0, 0, 2544, 156])],
+                                          text_direction='horizontal-lr',
+                                          script_detection=False)
+        cls.simple_bl_seg = make_baseline_segmentation()
+
+        cls.tagged_box_seg = Segmentation(type='bbox',
+                                          imagename=resources / 'bw.png',
+                                          lines=[BBoxLine(id='foo',
+                                                          bbox=[0, 0, 2544, 156],
+                                                          tags={'type': [{'type': 'foobar'}]}),
+                                                 BBoxLine(id='bar',
+                                                          bbox=[0, 0, 2544, 156],
+                                                          tags={'type': [{'type': 'default'}]})],
                                           text_direction='horizontal-lr',
                                           script_detection=True)
+        cls.tagged_bl_seg = Segmentation(type='baselines',
+                                         imagename=resources / 'bw.png',
+                                         lines=[BaselineLine(id='foo',
+                                                             baseline=[[0, 10], [2543, 10]],
+                                                             boundary=[[0, 0], [2543, 0], [2543, 155], [0, 155]],
+                                                             tags={'type': [{'type': 'foobar'}]}),
+                                                BaselineLine(id='bar',
+                                                             baseline=[[0, 10], [2543, 10]],
+                                                             boundary=[[0, 0], [2543, 0], [2543, 155], [0, 155]],
+                                                             tags={'type': [{'type': 'default'}]})],
+                                         text_direction='horizontal-lr',
+                                         script_detection=True)
 
     def test_rpred_bbox_outbounds(self):
         """

@@ -31,32 +31,16 @@ class TestBinarization(unittest.TestCase):
         with Image.open(resources / 'bw.png') as im:
             self.assertEqual(im, nlbin(im))
 
-    def test_binarize_no_bw(self):
+    def test_binarize(self):
         """
-        Tests binarization of image formats without a 1bpp mode (JPG).
+        Tests binarization of RGB (JPG/WEBP) and grayscale input images.
         """
-        with Image.open(resources / 'input.jpg') as im:
-            res = nlbin(im)
-            # calculate histogram and check if only pixels of value 0/255 exist
-            self.assertEqual(254, res.histogram().count(0), msg='Output not '
-                             'binarized')
-
-    def test_binarize_webp(self):
-        """
-        Tests binarization of RGB WEBP images.
-        """
-        with Image.open(resources / 'input.webp') as im:
-            res = nlbin(im)
-            # calculate histogram and check if only pixels of value 0/255 exist
-            self.assertEqual(254, res.histogram().count(0), msg='Output not '
-                             'binarized')
-
-    def test_binarize_grayscale(self):
-        """
-        Test binarization of mode 'L' images.
-        """
-        with Image.open(resources / 'input.webp') as im:
-            res = nlbin(im.convert('L'))
-            # calculate histogram and check if only pixels of value 0/255 exist
-            self.assertEqual(254, res.histogram().count(0), msg='Output not '
-                             'binarized')
+        cases = [('jpg', resources / 'input.jpg', None),
+                 ('webp', resources / 'input.webp', None),
+                 ('grayscale', resources / 'input.webp', 'L')]
+        for name, path, mode in cases:
+            with self.subTest(name):
+                with Image.open(path) as im:
+                    res = nlbin(im.convert(mode) if mode else im)
+                    self.assertLessEqual(set(res.getdata()), {0, 255},
+                                         msg='Output not binarized')

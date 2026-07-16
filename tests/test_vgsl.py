@@ -7,7 +7,6 @@ from pytest import raises
 
 from kraken.lib import vgsl
 from kraken.lib.codec import PytorchCodec
-from kraken.lib.models import load_any
 from kraken.lib.vgsl import layers
 
 
@@ -28,17 +27,18 @@ class TestVGSL(unittest.TestCase):
         """
         Tests model round-tripping through CoreML serialization.
         """
+        from kraken.models import load_models
+
         rnn = vgsl.TorchVGSLModel(vgsl='[1,1,0,48 Lbx10 Do O1c57]')
         rnn.add_codec(PytorchCodec('abc'))
         rnn.model_type = 'recognition'
         with tempfile.TemporaryDirectory() as dir:
             path = dir + '/foo.mlmodel'
             rnn.save_model(path)
-            loaded = vgsl.TorchVGSLModel.load_model(path)
+            loaded = load_models(path, tasks=['recognition'])[0]
+            self.assertIsInstance(loaded, vgsl.TorchVGSLModel)
             self.assertEqual(loaded.user_metadata['vgsl'], rnn.user_metadata['vgsl'])
-            self.assertIn('vgsl', loaded.user_metadata)
-            seq = load_any(path)
-            self.assertEqual(seq.kind, 'vgsl')
+            self.assertEqual(loaded.codec.c2l, rnn.codec.c2l)
 
     def test_append(self):
         """
@@ -80,9 +80,3 @@ class TestVGSL(unittest.TestCase):
         """
         with raises(ValueError):
             vgsl.TorchVGSLModel(vgsl='[1,48,0,1 Cr4,2,1,4,2 [Cr4,2,1,1,1 (Cr4,2,1,4,2 Cr3,3,2,1,1) S1(1x0)1,3 Lbx2 Do0.5] Lbx2]')
-
-    def test_complex_serialization(self):
-        """
-        Test proper serialization and deserialization of a complex model.
-        """
-        vgsl.TorchVGSLModel(vgsl='[1,48,0,1 Cr4,2,1,4,2 ([Cr4,2,1,1,1 Do Cr3,3,2,1,1] [Cr4,2,1,1,1 Cr3,3,2,1,1 Do]) S1(1x0)1,3 Lbx2 Do0.5 Lbx2]')

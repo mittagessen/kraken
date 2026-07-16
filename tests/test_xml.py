@@ -52,54 +52,35 @@ class TestXMLParser(unittest.TestCase):
         doc = xml.XMLPage(self.alto_doc, filetype='xml')
         self.assertEqual(doc.filetype, 'alto')
 
-    def test_failure_page_alto_parsing(self):
+    def test_failure_invalid_documents(self):
         """
-        Test that parsing ALTO files with PAGE as format fails.
+        Test that parsing invalid or format-mismatched documents raises ValueError.
         """
-        with raises(ValueError):
-            xml.XMLPage(self.alto_doc, filetype='page')
+        cases = [
+            ('alto_as_page', self.alto_doc, {'filetype': 'page'}),
+            ('page_as_alto', self.page_doc, {'filetype': 'alto'}),
+            ('alto_invalid_image', self.invalid_alto_docs / 'image.xml', {}),
+            ('alto_invalid_measurement_unit', self.invalid_alto_docs / 'mu.xml', {}),
+            ('alto_invalid_dims', self.invalid_alto_docs / 'dims.xml', {}),
+            ('alto_zero_dims_missing_image', self.invalid_alto_docs / 'zero_dims_missing_image.xml', {'filetype': 'alto'}),
+            ('page_invalid_image', self.invalid_page_docs / 'image.xml', {}),
+            ('page_invalid_dims', self.invalid_page_docs / 'dims.xml', {}),
+            ('page_zero_dims_missing_image', self.invalid_page_docs / 'zero_dims_missing_image.xml', {'filetype': 'page'}),
+        ]
+        for desc, path, kwargs in cases:
+            with self.subTest(desc):
+                with raises(ValueError):
+                    xml.XMLPage(path, **kwargs)
 
-    def test_failure_alto_page_parsing(self):
+    def test_zero_dims_fallback_to_image_size(self):
         """
-        Test that parsing PAGE files with ALTO as format fails.
+        Test that zero page dimensions are resolved from the image file.
         """
-        with raises(ValueError):
-            xml.XMLPage(self.page_doc, filetype='alto')
-
-    def test_failure_alto_invalid_image(self):
-        """
-        Test that parsing aborts if image file path is invalid.
-        """
-        with raises(ValueError):
-            xml.XMLPage(self.invalid_alto_docs / 'image.xml')
-
-    def test_failure_alto_invalid_measurement_unit(self):
-        """
-        Test that parsing aborts if measurement unit isn't "pixel"
-        """
-        with raises(ValueError):
-            xml.XMLPage(self.invalid_alto_docs / 'mu.xml')
-
-    def test_failure_alto_invalid_dims(self):
-        """
-        Test that parsing aborts if page dimensions aren't parseable as ints.
-        """
-        with raises(ValueError):
-            xml.XMLPage(self.invalid_alto_docs / 'dims.xml')
-
-    def test_alto_zero_dims_fallback_to_image_size(self):
-        """
-        Test that zero ALTO page dimensions are resolved from the image file.
-        """
-        doc = xml.XMLPage(self.alto_zero_dims_doc, filetype='alto')
-        self.assertEqual(doc.image_size, (123, 45))
-
-    def test_failure_alto_zero_dims_missing_image(self):
-        """
-        Test that parsing aborts if ALTO dimensions are zero and image is missing.
-        """
-        with raises(ValueError):
-            xml.XMLPage(self.invalid_alto_docs / 'zero_dims_missing_image.xml', filetype='alto')
+        for fmt, path in (('alto', self.alto_zero_dims_doc),
+                          ('page', self.page_zero_dims_doc)):
+            with self.subTest(fmt=fmt):
+                doc = xml.XMLPage(path, filetype=fmt)
+                self.assertEqual(doc.image_size, (123, 45))
 
     def test_alto_basedirection(self):
         """
@@ -163,17 +144,20 @@ class TestXMLParser(unittest.TestCase):
 
     def test_alto_split_parsing(self):
         """
-        Test correct parsing of splits.
+        Test correct parsing of splits: TAGREFS pointing at TYPE="split"
+        OtherTags set line.split and are removed from line.tags.
         """
         seg = xml.XMLPage(self.alto_doc).to_container()
-        line_tags = [line.tags for line in seg.lines]
-        self.assertEqual(line_tags, [None, None, {'type': [{'type': 'heading'}]},
-                                     None, None, None, None, None, None, None, None,
-                                     {'label_0': [{'type': 'foo'}], 'label_1': [{'type': 'bar'}]},
-                                     {'label_1': [{'type': 'bar'}, {'type': 'baz'}]},
-                                     None, None, None, None, None, None, None, None, None, None,
-                                     {'language': [{'type': 'eng'}]}, None, None, None, None,
-                                     {'language': [{'type': 'deu'}, {'type': 'eng'}]}, None])
+        line_splits = [line.split for line in seg.lines]
+        expected = [None] * len(seg.lines)
+        expected[2] = 'train'
+        expected[12] = 'test'
+        expected[13] = 'validation'
+        expected[18] = 'train'
+        self.assertEqual(line_splits, expected)
+        for line in seg.lines:
+            if line.tags is not None:
+                self.assertNotIn('split', line.tags)
 
     def test_alto_baseline_linetype(self):
         """
@@ -192,34 +176,6 @@ class TestXMLParser(unittest.TestCase):
         self.assertEqual(len(seg.lines), 31)
         for line in seg.lines:
             self.assertIsInstance(line, BBoxLine)
-
-    def test_failure_page_invalid_image(self):
-        """
-        Test that parsing aborts if image file path is invalid.
-        """
-        with raises(ValueError):
-            xml.XMLPage(self.invalid_page_docs / 'image.xml')
-
-    def test_failure_page_invalid_dims(self):
-        """
-        Test that parsing aborts if page dimensions aren't parseable as ints.
-        """
-        with raises(ValueError):
-            xml.XMLPage(self.invalid_page_docs / 'dims.xml')
-
-    def test_page_zero_dims_fallback_to_image_size(self):
-        """
-        Test that zero PageXML dimensions are resolved from the image file.
-        """
-        doc = xml.XMLPage(self.page_zero_dims_doc, filetype='page')
-        self.assertEqual(doc.image_size, (123, 45))
-
-    def test_failure_page_zero_dims_missing_image(self):
-        """
-        Test that parsing aborts if PageXML dimensions are zero and image is missing.
-        """
-        with raises(ValueError):
-            xml.XMLPage(self.invalid_page_docs / 'zero_dims_missing_image.xml', filetype='page')
 
     def test_page_basedirection(self):
         """
@@ -445,152 +401,99 @@ class TestXMLParser(unittest.TestCase):
 
     # ---- Tests for graceful degradation with missing region coordinates ----
 
-    def test_alto_missing_region_coords_lines_parsed(self):
-        """
-        Test that lines inside an ALTO region without coordinates are still
-        parsed and included in the line list.
-        """
-        doc = xml.XMLPage(self.alto_doc_root / 'missing_coords_ro.xml', filetype='alto')
-        # tl_3 is inside tb_nocoords which has no coordinates
-        self.assertIn('tl_3', doc.lines)
-        # Lines from coordinate-less regions have empty regions list
-        self.assertEqual(doc.lines['tl_3'].regions, [])
+    def _missing_coords_cases(self):
+        return [('alto', dict(doc=self.alto_doc_root / 'missing_coords_ro.xml',
+                              nocoords_line='tl_3',
+                              nocoords_region='tb_nocoords',
+                              regions=['tb_1', 'tb_2'],
+                              other_lines=['tl_1', 'tl_2', 'tl_4'],
+                              ro='og_test')),
+                ('page', dict(doc=self.page_doc_root / 'missing_coords_ro.xml',
+                              nocoords_line='l3',
+                              nocoords_region='r_nocoords',
+                              regions=['r1', 'r2'],
+                              other_lines=['l1', 'l2', 'l4'],
+                              ro='ro_test'))]
 
-    def test_alto_missing_region_coords_region_excluded(self):
+    def test_missing_region_coords_lines_parsed(self):
         """
-        Test that an ALTO region without coordinates is not included in the
-        regions dict.
+        Test that lines inside a region without coordinates are still parsed
+        and included in the line list.
         """
-        doc = xml.XMLPage(self.alto_doc_root / 'missing_coords_ro.xml', filetype='alto')
-        all_region_ids = {r.id for regs in doc.regions.values() for r in regs}
-        self.assertNotIn('tb_nocoords', all_region_ids)
-        # Regions with coordinates are still present
-        self.assertIn('tb_1', all_region_ids)
-        self.assertIn('tb_2', all_region_ids)
+        for fmt, case in self._missing_coords_cases():
+            with self.subTest(fmt=fmt):
+                doc = xml.XMLPage(case['doc'], filetype=fmt)
+                self.assertIn(case['nocoords_line'], doc.lines)
+                # Lines from coordinate-less regions have empty regions list
+                self.assertEqual(doc.lines[case['nocoords_line']].regions, [])
 
-    def test_alto_missing_region_coords_implicit_orders(self):
+    def test_missing_region_coords_region_excluded(self):
         """
-        Test that an ALTO region without coordinates is excluded from implicit
+        Test that a region without coordinates is not included in the regions
+        dict.
+        """
+        for fmt, case in self._missing_coords_cases():
+            with self.subTest(fmt=fmt):
+                doc = xml.XMLPage(case['doc'], filetype=fmt)
+                all_region_ids = {r.id for regs in doc.regions.values() for r in regs}
+                self.assertNotIn(case['nocoords_region'], all_region_ids)
+                # Regions with coordinates are still present
+                for region_id in case['regions']:
+                    self.assertIn(region_id, all_region_ids)
+
+    def test_missing_region_coords_implicit_orders(self):
+        """
+        Test that a region without coordinates is excluded from implicit
         region order but its lines are in the implicit line order.
         """
-        doc = xml.XMLPage(self.alto_doc_root / 'missing_coords_ro.xml', filetype='alto')
-        # Region implicit order should not contain tb_nocoords
-        self.assertNotIn('tb_nocoords', doc.reading_orders['region_implicit']['order'])
-        self.assertIn('tb_1', doc.reading_orders['region_implicit']['order'])
-        self.assertIn('tb_2', doc.reading_orders['region_implicit']['order'])
-        # Line implicit order should still contain tl_3
-        self.assertIn('tl_3', doc.reading_orders['line_implicit']['order'])
+        for fmt, case in self._missing_coords_cases():
+            with self.subTest(fmt=fmt):
+                doc = xml.XMLPage(case['doc'], filetype=fmt)
+                self.assertNotIn(case['nocoords_region'], doc.reading_orders['region_implicit']['order'])
+                for region_id in case['regions']:
+                    self.assertIn(region_id, doc.reading_orders['region_implicit']['order'])
+                self.assertIn(case['nocoords_line'], doc.reading_orders['line_implicit']['order'])
 
-    def test_alto_missing_region_coords_explicit_ro_skips(self):
+    def test_missing_region_coords_explicit_ro_skips(self):
         """
-        Test that an ALTO explicit reading order referencing a region without
+        Test that an explicit reading order referencing a region without
         coordinates skips it gracefully.
         """
-        doc = xml.XMLPage(self.alto_doc_root / 'missing_coords_ro.xml', filetype='alto')
-        # The explicit RO references tb_1, tb_nocoords, tb_2
-        # tb_nocoords should be skipped in both line and region level
-        ro_line = doc.reading_orders['og_test']
-        self.assertEqual(ro_line['level'], 'line')
-        # tl_3 is inside tb_nocoords - since the region is missing, it can't
-        # be expanded, so only lines from tb_1 and tb_2 are present
-        self.assertIn('tl_1', ro_line['order'])
-        self.assertIn('tl_2', ro_line['order'])
-        self.assertIn('tl_4', ro_line['order'])
-        self.assertNotIn('tl_3', ro_line['order'])
+        for fmt, case in self._missing_coords_cases():
+            with self.subTest(fmt=fmt):
+                doc = xml.XMLPage(case['doc'], filetype=fmt)
+                # the explicit RO references both regions with coordinates and
+                # the one without; the latter is skipped at both levels, so its
+                # contained line is never expanded
+                ro_line = doc.reading_orders[case['ro']]
+                self.assertEqual(ro_line['level'], 'line')
+                for line_id in case['other_lines']:
+                    self.assertIn(line_id, ro_line['order'])
+                self.assertNotIn(case['nocoords_line'], ro_line['order'])
 
-        ro_region = doc.reading_orders['og_test:regions']
-        self.assertEqual(ro_region['level'], 'region')
-        self.assertNotIn('tb_nocoords', ro_region['order'])
-        self.assertEqual(ro_region['order'], ['tb_1', 'tb_2'])
+                ro_region = doc.reading_orders[f"{case['ro']}:regions"]
+                self.assertEqual(ro_region['level'], 'region')
+                self.assertNotIn(case['nocoords_region'], ro_region['order'])
+                self.assertEqual(ro_region['order'], case['regions'])
 
-    def test_alto_missing_region_coords_to_container(self):
+    def test_missing_region_coords_to_container(self):
         """
-        Test that to_container() works correctly when some ALTO regions lack
+        Test that to_container() works correctly when some regions lack
         coordinates.
         """
-        doc = xml.XMLPage(self.alto_doc_root / 'missing_coords_ro.xml', filetype='alto')
-        seg = doc.to_container()
-        # All 4 lines should be present
-        self.assertEqual(len(seg.lines), 4)
-        line_ids = [line.id for line in seg.lines]
-        self.assertIn('tl_3', line_ids)
-        # line_orders should contain valid indices
-        for order in seg.line_orders:
-            for idx in order:
-                self.assertIsInstance(idx, int)
-                self.assertGreaterEqual(idx, 0)
-                self.assertLess(idx, len(seg.lines))
-
-    def test_page_missing_region_coords_lines_parsed(self):
-        """
-        Test that lines inside a PageXML region without coordinates are still
-        parsed and included in the line list.
-        """
-        doc = xml.XMLPage(self.page_doc_root / 'missing_coords_ro.xml', filetype='page')
-        # l3 is inside r_nocoords which has no valid coordinates
-        self.assertIn('l3', doc.lines)
-        # Lines from coordinate-less regions have empty regions list
-        self.assertEqual(doc.lines['l3'].regions, [])
-
-    def test_page_missing_region_coords_region_excluded(self):
-        """
-        Test that a PageXML region without coordinates is not included in the
-        regions dict.
-        """
-        doc = xml.XMLPage(self.page_doc_root / 'missing_coords_ro.xml', filetype='page')
-        all_region_ids = {r.id for regs in doc.regions.values() for r in regs}
-        self.assertNotIn('r_nocoords', all_region_ids)
-        self.assertIn('r1', all_region_ids)
-        self.assertIn('r2', all_region_ids)
-
-    def test_page_missing_region_coords_implicit_orders(self):
-        """
-        Test that a PageXML region without coordinates is excluded from
-        implicit region order but its lines are in the implicit line order.
-        """
-        doc = xml.XMLPage(self.page_doc_root / 'missing_coords_ro.xml', filetype='page')
-        self.assertNotIn('r_nocoords', doc.reading_orders['region_implicit']['order'])
-        self.assertIn('r1', doc.reading_orders['region_implicit']['order'])
-        self.assertIn('r2', doc.reading_orders['region_implicit']['order'])
-        # l3 should still be in implicit line order
-        self.assertIn('l3', doc.reading_orders['line_implicit']['order'])
-
-    def test_page_missing_region_coords_explicit_ro_skips(self):
-        """
-        Test that a PageXML explicit reading order referencing a region without
-        coordinates skips it gracefully.
-        """
-        doc = xml.XMLPage(self.page_doc_root / 'missing_coords_ro.xml', filetype='page')
-        # The explicit RO references r1, r_nocoords, r2
-        ro_line = doc.reading_orders['ro_test']
-        self.assertEqual(ro_line['level'], 'line')
-        # r_nocoords is skipped so l3 is not expanded from it
-        self.assertIn('l1', ro_line['order'])
-        self.assertIn('l2', ro_line['order'])
-        self.assertIn('l4', ro_line['order'])
-        self.assertNotIn('l3', ro_line['order'])
-
-        ro_region = doc.reading_orders['ro_test:regions']
-        self.assertEqual(ro_region['level'], 'region')
-        self.assertNotIn('r_nocoords', ro_region['order'])
-        self.assertEqual(ro_region['order'], ['r1', 'r2'])
-
-    def test_page_missing_region_coords_to_container(self):
-        """
-        Test that to_container() works correctly when some PageXML regions
-        lack coordinates.
-        """
-        doc = xml.XMLPage(self.page_doc_root / 'missing_coords_ro.xml', filetype='page')
-        seg = doc.to_container()
-        # All 4 lines should be present
-        self.assertEqual(len(seg.lines), 4)
-        line_ids = [line.id for line in seg.lines]
-        self.assertIn('l3', line_ids)
-        for order in seg.line_orders:
-            for idx in order:
-                self.assertIsInstance(idx, int)
-                self.assertGreaterEqual(idx, 0)
-                self.assertLess(idx, len(seg.lines))
+        for fmt, case in self._missing_coords_cases():
+            with self.subTest(fmt=fmt):
+                doc = xml.XMLPage(case['doc'], filetype=fmt)
+                seg = doc.to_container()
+                self.assertEqual(len(seg.lines), 4)
+                line_ids = [line.id for line in seg.lines]
+                self.assertIn(case['nocoords_line'], line_ids)
+                # line_orders should contain valid indices
+                for order in seg.line_orders:
+                    for idx in order:
+                        self.assertIsInstance(idx, int)
+                        self.assertGreaterEqual(idx, 0)
+                        self.assertLess(idx, len(seg.lines))
 
     def test_page_missing_region_coords_transkribus_ro(self):
         """

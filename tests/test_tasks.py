@@ -6,7 +6,7 @@ These tests cover RecognitionTaskModel, SegmentationTaskModel, and
 ForcedAlignmentTaskModel which are the replacements for the deprecated
 rpred/mm_rpred, blla.segment, and forced_align APIs respectively.
 """
-import pickle
+import dataclasses
 import unittest
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -14,6 +14,9 @@ from unittest.mock import MagicMock
 from PIL import Image
 from pytest import raises
 from difflib import SequenceMatcher
+
+from helpers import (ARABIC_LINE_LOGICAL, load_segmentation,
+                     make_baseline_segmentation)
 
 from kraken.containers import (BaselineLine, BaselineOCRRecord, BBoxLine,
                                BBoxOCRRecord, Segmentation)
@@ -32,32 +35,31 @@ class TestRecognitionTaskModel(unittest.TestCase):
     Tests for RecognitionTaskModel which wraps recognition models for
     line-level text recognition.
     """
-    def setUp(self):
-        self.models = load_models(resources / 'Gallicorpora+_best.safetensors')
-        self.im = Image.open(resources / 'input.webp')
+    @classmethod
+    def setUpClass(cls):
+        cls.models = load_models(resources / 'Gallicorpora+_best.safetensors')
+        cls.im = Image.open(resources / 'input.webp')
 
-        with open(resources / 'bl_rec.pkl', 'rb') as f:
-            self.bl_expected = pickle.load(f)
-        with open(resources / 'box_rec.pkl', 'rb') as f:
-            self.box_expected = pickle.load(f)
+        cls.bl_expected = load_segmentation('bl_rec.json')
+        cls.box_expected = load_segmentation('box_rec.json')
 
-        self.bl_seg = Segmentation(type='baselines',
-                                   imagename=self.bl_expected.imagename,
-                                   lines=[BaselineLine(id=r.id,
-                                                       baseline=r.baseline,
-                                                       boundary=r.boundary,
-                                                       tags=r.tags)
-                                          for r in self.bl_expected.lines],
-                                   text_direction=self.bl_expected.text_direction,
-                                   script_detection=self.bl_expected.script_detection)
-        self.box_seg = Segmentation(type='bbox',
-                                    imagename=self.box_expected.imagename,
-                                    lines=[BBoxLine(id=r.id,
-                                                    bbox=r.bbox,
-                                                    tags=r.tags)
-                                           for r in self.box_expected.lines],
-                                    text_direction=self.box_expected.text_direction,
-                                    script_detection=self.box_expected.script_detection)
+        cls.bl_seg = Segmentation(type='baselines',
+                                  imagename=cls.bl_expected.imagename,
+                                  lines=[BaselineLine(id=r.id,
+                                                      baseline=r.baseline,
+                                                      boundary=r.boundary,
+                                                      tags=r.tags)
+                                         for r in cls.bl_expected.lines],
+                                  text_direction=cls.bl_expected.text_direction,
+                                  script_detection=cls.bl_expected.script_detection)
+        cls.box_seg = Segmentation(type='bbox',
+                                   imagename=cls.box_expected.imagename,
+                                   lines=[BBoxLine(id=r.id,
+                                                   bbox=r.bbox,
+                                                   tags=r.tags)
+                                          for r in cls.box_expected.lines],
+                                   text_direction=cls.box_expected.text_direction,
+                                   script_detection=cls.box_expected.script_detection)
 
     def test_load_model_from_path(self):
         """
@@ -89,7 +91,7 @@ class TestRecognitionTaskModel(unittest.TestCase):
         from the underlying model.
         """
         task = RecognitionTaskModel(self.models)
-        self.assertIn(task.one_channel_mode, (None, '1', 'L'))
+        self.assertEqual(task.one_channel_mode, 'L')
 
     def test_seg_type_attribute(self):
         """
@@ -97,7 +99,7 @@ class TestRecognitionTaskModel(unittest.TestCase):
         the underlying model.
         """
         task = RecognitionTaskModel(self.models)
-        self.assertIn(task.seg_type, (None, 'bbox', 'baseline', 'baselines'))
+        self.assertEqual(task.seg_type, 'baselines')
 
     def test_predict_baseline(self):
         """
@@ -176,16 +178,16 @@ class TestRTLRecognitionTaskModel(unittest.TestCase):
     bidi reordering and display_order/logical_order switching.
     """
 
-    def setUp(self):
-        self.models = load_models(resources / 'all_arabic_scripts.safetensors')
-        self.im = Image.open(resources / 'arabic.webp')
-        with open(resources / 'arabic_seg.pkl', 'rb') as f:
-            full_seg = pickle.load(f)
-        self.arabic_seg = Segmentation(type='baselines',
-                                       imagename=full_seg.imagename,
-                                       lines=[full_seg.lines[0]],
-                                       text_direction='horizontal-lr',
-                                       script_detection=False)
+    @classmethod
+    def setUpClass(cls):
+        cls.models = load_models(resources / 'all_arabic_scripts.safetensors')
+        cls.im = Image.open(resources / 'arabic.webp')
+        full_seg = load_segmentation('arabic_seg.json')
+        cls.arabic_seg = Segmentation(type='baselines',
+                                      imagename=full_seg.imagename,
+                                      lines=[full_seg.lines[0]],
+                                      text_direction='horizontal-lr',
+                                      script_detection=False)
 
     def test_predict_rtl_baseline(self):
         """
@@ -208,11 +210,7 @@ class TestRTLRecognitionTaskModel(unittest.TestCase):
         records = list(task.predict(self.im, self.arabic_seg, config))
         record = records[0]
         self.assertFalse(record._display_order)
-        expected = ('\u0639\u0646\u062f \u0639\u062f\u0645 \u0627\u0644\u0639\u0635\u0628\u0627\u062a '
-                    '\u0627\u0630\u0627 \u0644\u0645 \u064a\u0643\u0646 \u0644\u0644\u0635\u063a\u064a\u0631\u0629 '
-                    '\u0627\u0654\u0645 \u0627\u0654\u064a\u0636\u0627\u064b \u0644\u0645\u0627\u0630 '
-                    '\u0643\u0631. . \u0648\u0644\u0646\u0627 \u0627\u0654\u0646 \u0646\u0642\u0648\u0644 '
-                    '\u0627\u0646 \u0627\u0644\u0627\u0653\u0645')
+        expected = ARABIC_LINE_LOGICAL
         self.assertTrue(SequenceMatcher(isjunk=None, a=record.prediction, b=expected).ratio() > 0.9,
                         msg='RTL bidi prediction differs from expected by more than one character')
 
@@ -269,12 +267,17 @@ class TestSegmentationTaskModel(unittest.TestCase):
     layout analysis and reading order determination.
     """
 
+    @classmethod
+    def setUpClass(cls):
+        cls.task = SegmentationTaskModel.load_model()
+        cls.im = Image.open(resources / 'input.webp')
+        cls.result = cls.task.predict(cls.im, SegmentationInferenceConfig())
+
     def test_load_default_model(self):
         """
         Tests loading the default BLLA segmentation model.
         """
-        task = SegmentationTaskModel.load_model()
-        self.assertIsInstance(task, SegmentationTaskModel)
+        self.assertIsInstance(self.task, SegmentationTaskModel)
 
     def test_reject_non_segmentation_models(self):
         """
@@ -290,33 +293,21 @@ class TestSegmentationTaskModel(unittest.TestCase):
         """
         Tests that predict returns a Segmentation container.
         """
-        task = SegmentationTaskModel.load_model()
-        im = Image.open(resources / 'input.webp')
-        config = SegmentationInferenceConfig()
-        result = task.predict(im, config)
-        self.assertIsInstance(result, Segmentation)
+        self.assertIsInstance(self.result, Segmentation)
 
     def test_predict_produces_lines(self):
         """
         Tests that segmentation prediction produces lines.
         """
-        task = SegmentationTaskModel.load_model()
-        im = Image.open(resources / 'input.webp')
-        config = SegmentationInferenceConfig()
-        result = task.predict(im, config)
-        self.assertGreater(len(result.lines), 0)
+        self.assertGreater(len(self.result.lines), 0)
 
     def test_predict_baseline_type(self):
         """
         Tests that the default segmentation model produces baseline-type
         output.
         """
-        task = SegmentationTaskModel.load_model()
-        im = Image.open(resources / 'input.webp')
-        config = SegmentationInferenceConfig()
-        result = task.predict(im, config)
-        self.assertEqual(result.type, 'baselines')
-        for line in result.lines:
+        self.assertEqual(self.result.type, 'baselines')
+        for line in self.result.lines:
             self.assertIsInstance(line, BaselineLine)
 
     def test_merge_segmentations_single(self):
@@ -357,17 +348,12 @@ class TestForcedAlignmentTaskModel(unittest.TestCase):
     transcriptions with recognition model output.
     """
 
-    def setUp(self):
-        self.models = load_models(resources / 'overfit.mlmodel')
-        self.im = Image.open(resources / '000236.png')
-        self.seg = Segmentation(type='baselines',
-                                imagename=resources / '000236.png',
-                                lines=[BaselineLine(id='foo',
-                                                    baseline=[[0, 10], [2543, 10]],
-                                                    boundary=[[0, 0], [2543, 0], [2543, 155], [0, 155]],
-                                                    text='\u0721')],
-                                text_direction='horizontal-lr',
-                                script_detection=False)
+    @classmethod
+    def setUpClass(cls):
+        cls.models = load_models(resources / 'overfit.mlmodel')
+        cls.im = Image.open(resources / '000236.png')
+        cls.seg = make_baseline_segmentation(imagename=resources / '000236.png',
+                                             text='\u0721')
 
     def test_load_model_from_path(self):
         """
@@ -394,14 +380,15 @@ class TestForcedAlignmentTaskModel(unittest.TestCase):
         with raises(ValueError, match='No recognition model'):
             ForcedAlignmentTaskModel([mock_model])
 
-    def test_reject_non_vgsl_models(self):
+    def test_reject_non_ctc_models(self):
         """
         Tests that ForcedAlignmentTaskModel raises ValueError when given
-        non-TorchVGSLModel recognition models.
+        recognition models that do not implement the CTC recognition
+        inference mixin.
         """
         mock_model = MagicMock()
         mock_model.model_type = ['recognition']
-        with raises(ValueError, match='only supported by TorchVGSLModel'):
+        with raises(ValueError, match='only supported by CTC sequence recognizers'):
             ForcedAlignmentTaskModel([mock_model])
 
     def test_predict_enables_logits(self):
@@ -454,18 +441,9 @@ class TestForcedAlignmentTaskModel(unittest.TestCase):
         """
         task = ForcedAlignmentTaskModel(self.models)
         config = RecognitionInferenceConfig()
-        seg = Segmentation(type='baselines',
-                           imagename=resources / '000236.png',
-                           lines=[BaselineLine(id='l1',
-                                               baseline=[[0, 10], [2543, 10]],
-                                               boundary=[[0, 0], [2543, 0], [2543, 155], [0, 155]],
-                                               text='\u0721'),
-                                  BaselineLine(id='l2',
-                                               baseline=[[0, 10], [2543, 10]],
-                                               boundary=[[0, 0], [2543, 0], [2543, 155], [0, 155]],
-                                               text='\u0721')],
-                           text_direction='horizontal-lr',
-                           script_detection=False)
+        seg = make_baseline_segmentation(imagename=resources / '000236.png',
+                                         text='\u0721')
+        seg = dataclasses.replace(seg, lines=seg.lines + [dataclasses.replace(seg.lines[0], id='l2')])
         result = task.predict(self.im, seg, config)
         self.assertEqual(len(result.lines), 2)
 
@@ -485,14 +463,8 @@ class TestForcedAlignmentTaskModel(unittest.TestCase):
         """
         task = ForcedAlignmentTaskModel(self.models)
         config = RecognitionInferenceConfig()
-        seg = Segmentation(type='baselines',
-                           imagename=resources / '000236.png',
-                           lines=[BaselineLine(id='foo',
-                                               baseline=[[0, 10], [2543, 10]],
-                                               boundary=[[0, 0], [2543, 0], [2543, 155], [0, 155]],
-                                               text='ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ')],
-                           text_direction='horizontal-lr',
-                           script_detection=False)
+        seg = make_baseline_segmentation(imagename=resources / '000236.png',
+                                         text='ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ')
         with raises(ValueError):
             task.predict(self.im, seg, config)
 

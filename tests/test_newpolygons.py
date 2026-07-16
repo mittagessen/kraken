@@ -11,10 +11,10 @@ from PIL import Image
 
 from click.testing import CliRunner
 
-from kraken.containers import (
-    BaselineLine,
-    Segmentation,
-)
+import pytest
+
+from helpers import make_baseline_segmentation
+
 from kraken.lib import segmentation
 from kraken.lib.models import load_any
 from kraken.rpred import rpred
@@ -35,31 +35,22 @@ class TestNewPolygons(unittest.TestCase):
     Tests for the new polygon extraction method.
     """
 
+    @classmethod
+    def setUpClass(cls):
+        cls.im = Image.open(resources / "bw.png")
+        cls.old_model_path = str(resources / "overfit.mlmodel")
+        cls.old_model = load_any(cls.old_model_path)
+        cls.new_model_path = str(resources / "overfit_newpoly.mlmodel")
+        cls.new_model = load_any(cls.new_model_path)
+        cls.old_bl_model_path = str(resources / "overfit_bl.safetensors")
+        cls.new_bl_model_path = str(resources / "overfit_bl_newpoly.safetensors")
+        cls.segmented_img = str(resources / "170025120000003,0074-lite.xml")
+        cls.color_img = resources / "input.tif"
+        cls.arrow_data = str(resources / "merge_tests/base.arrow")
+        cls.simple_bl_seg = make_baseline_segmentation()
+
     def setUp(self):
-        self.im = Image.open(resources / "bw.png")
-        self.old_model_path = str(resources / "overfit.mlmodel")
-        self.old_model = load_any(self.old_model_path)
-        self.new_model_path = str(resources / "overfit_newpoly.mlmodel")
-        self.new_model = load_any(self.new_model_path)
-        self.old_bl_model_path = str(resources / "overfit_bl.safetensors")
-        self.new_bl_model_path = str(resources / "overfit_bl_newpoly.safetensors")
-        self.segmented_img = str(resources / "170025120000003,0074-lite.xml")
         self.runner = CliRunner()
-        self.color_img = resources / "input.tif"
-        self.arrow_data = str(resources / "merge_tests/base.arrow")
-        self.simple_bl_seg = Segmentation(
-            type="baselines",
-            imagename=resources / "bw.png",
-            lines=[
-                BaselineLine(
-                    id="foo",
-                    baseline=[[0, 10], [2543, 10]],
-                    boundary=[[0, 0], [2543, 0], [2543, 155], [0, 155]],
-                )
-            ],
-            text_direction="horizontal-lr",
-            script_detection=False,
-        )
 
     @patch("kraken.rpred.extract_polygons", new_callable=mock_extract_polygons)
     def _test_rpred(self, extractor_mock: Mock, *, model, force_no_legacy: bool = False, expect_legacy: bool):
@@ -73,7 +64,7 @@ class TestNewPolygons(unittest.TestCase):
         for cl in extractor_mock.mock_calls:
             self.assertEqual(cl[2]["legacy"], expect_legacy)
 
-    @patch("kraken.lib.vgsl.rpred.extract_polygons", new_callable=mock_extract_polygons)
+    @patch("kraken.models.ctc.extract_polygons", new_callable=mock_extract_polygons)
     def _test_krakencli(self, extractor_mock: Mock, *, args, force_no_legacy: bool = False, expect_legacy: bool,):
         """
         Base recipe for testing kraken_cli with a given polygon extraction method
@@ -128,18 +119,23 @@ class TestNewPolygons(unittest.TestCase):
         self.assertEqual(len(models), 1, f"Expected exactly one best model in {model_dir}, found {models}")
         return str(models[0])
 
+    # TESTS
+
+    @pytest.mark.legacy
     def test_rpred_from_old_model(self):
         """
         Test rpred with old model, check that it uses legacy polygon extraction method
         """
         self._test_rpred(model=self.old_model, force_no_legacy=False, expect_legacy=True)
 
+    @pytest.mark.legacy
     def test_rpred_from_old_model_force_new(self):
         """
         Test rpred with old model, but disabling legacy polygons
         """
         self._test_rpred(model=self.old_model, force_no_legacy=True, expect_legacy=False)
 
+    @pytest.mark.legacy
     def test_rpred_from_new_model(self):
         """
         Test rpred with new model, check that it uses new polygon extraction method
@@ -179,6 +175,24 @@ class TestNewPolygons(unittest.TestCase):
                 expect_legacy=False,
             )
 
+    @patch("kraken.models.ctc.extract_polygons", new_callable=mock_extract_polygons)
+    def test_krakencli_ocr_bbox_model_default(self, extractor_mock: Mock):
+        """
+        Without --linetype, XML input is parsed at the model's line type: a
+        bbox model gets bbox crops and the legacy flag is never applied.
+        """
+        with tempfile.NamedTemporaryFile() as fp:
+            result = self.runner.invoke(kraken_cli,
+                                        ['-f', 'xml', '-i', self.segmented_img, fp.name,
+                                         'ocr', '--num-line-workers', '0', '-m', self.old_model_path])
+            if result.exception:
+                print_exc()
+            self.assertEqual(result.exit_code, 0)
+            extractor_mock.assert_called()
+            for cl in extractor_mock.mock_calls:
+                self.assertEqual(cl[1][1].type, 'bbox')
+                self.assertFalse(cl[2]['legacy'])
+
     def test_ketoscli_test_old_model(self):
         """
         Test `ketos test` with old model, check that it uses legacy polygon extraction method
@@ -206,6 +220,23 @@ class TestNewPolygons(unittest.TestCase):
             expect_legacy=False,
         )
 
+    def test_ketoscli_test_bbox_model_default(self):
+        """
+        Without --linetype, `ketos test` evaluates XML data at the model's
+        line type: a bbox model uses direct bbox crops and polygon extraction
+        never runs.
+        """
+        with patch("kraken.lib.dataset.recognition.extract_polygons", new_callable=mock_extract_polygons) as extractor_mock:
+            result = self.runner.invoke(ketos_cli,
+                                        ['--workers', '0', 'test', '-m', self.old_model_path,
+                                         '-f', 'xml', self.segmented_img])
+            if result.exception:
+                print(result.output)
+                print_exc()
+            self.assertEqual(result.exit_code, 0)
+            extractor_mock.assert_not_called()
+
+    @pytest.mark.slow
     def test_ketoscli_train_new_model(self):
         """
         Test `ketos train` with new model, check that it uses new polygon extraction method
@@ -225,6 +256,7 @@ class TestNewPolygons(unittest.TestCase):
                 expect_legacy=False,
             )
 
+    @pytest.mark.slow
     def test_ketoscli_train_new_model_force_legacy(self):
         """
         Test `ketos train` training new model, check that it uses legacy polygon extraction method if forced
@@ -280,6 +312,7 @@ class TestNewPolygons(unittest.TestCase):
                 expect_legacy=True,
             )
 
+    @pytest.mark.slow
     def test_ketoscli_pretrain_new_model(self):
         """
         Test `ketos pretrain` with new model, check that it uses new polygon extraction method
@@ -298,6 +331,7 @@ class TestNewPolygons(unittest.TestCase):
                 expect_legacy=False,
             )
 
+    @pytest.mark.slow
     def test_ketoscli_pretrain_new_model_force_legacy(self):
         """
         Test `ketos pretrain` with new model, check that it uses legacy polygon extraction method if forced
@@ -370,6 +404,7 @@ class TestNewPolygons(unittest.TestCase):
             self._assertWarnsWhenTrainingArrow(mfp, self.arrow_data, force_legacy=False, expect_warning_msgs=["WARNING Setting dataset legacy polygon status to True based on training set", "the new model will be flagged to use legacy"])
             self._assertWarnsWhenTrainingArrow(mfp2, self.arrow_data, force_legacy=True, expect_not_warning_msgs=["WARNING Setting dataset legacy polygon status to True based on training set", "the new model will be flagged to use legacy"])
 
+    @pytest.mark.slow
     def test_ketos_new_arrow(self):
         """
         Test `ketos compile`, check that it uses new polygon extraction method
@@ -388,6 +423,7 @@ class TestNewPolygons(unittest.TestCase):
             self._assertWarnsWhenTrainingArrow(mfp, dset, force_legacy=False, expect_not_warning_msgs=["WARNING Setting dataset legacy polygon status to False based on training set", "the new model will be flagged to use legacy"])
             self._assertWarnsWhenTrainingArrow(mfp2, dset, force_legacy=True, expect_warning_msgs=["WARNING Setting dataset legacy polygon status to False based on training set", "the new model will be flagged to use new"])
 
+    @pytest.mark.slow
     def test_ketos_new_arrow_force_legacy(self):
         """
         Test `ketos compile`, check that it uses old polygon extraction method
@@ -435,6 +471,7 @@ class TestNewPolygons(unittest.TestCase):
             self._assertWarnsWhenTrainingArrow(mfp, dset, from_model=self.old_model_path, force_legacy=False, expect_not_warning_msgs=["WARNING Setting dataset legacy polygon status to False based on training set"], expect_warning_msgs=["model will be flagged to use new"])
             self._assertWarnsWhenTrainingArrow(mfp2, dset, from_model=self.old_model_path, force_legacy=True, expect_warning_msgs=["WARNING Setting dataset legacy polygon status to False based on training set"], expect_not_warning_msgs=["model will be flagged to use new"])
 
+    @pytest.mark.slow
     def test_ketos_mixed_arrow_train_new(self):
         """
         Test `ketos compile`, on mixed arrow dataset, check that it raises a warning about polygon extraction method only if incoherent
