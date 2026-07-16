@@ -20,6 +20,7 @@ import json
 import torch
 import numpy as np
 import pyarrow as pa
+import pyarrow.compute as pc
 import traceback
 import dataclasses
 import multiprocessing as mp
@@ -38,7 +39,7 @@ from kraken.containers import BaselineLine, BBoxLine, Segmentation
 from kraken.lib import functional_im_transforms as F_t
 from kraken.lib.codec import PytorchCodec
 from kraken.lib.dataset.augment import DefaultAugmenter
-from kraken.lib.exceptions import KrakenEncodeException, KrakenInputException
+from kraken.lib.exceptions import KrakenEncodeException
 from kraken.lib.segmentation import extract_polygons
 from kraken.lib.util import is_bitonal, open_image
 
@@ -122,6 +123,8 @@ class ArrowIPCRecognitionDataset(Dataset):
         self.subsampling = subsampling
         self._split_filter = split_filter
         self._num_lines = 0
+        self._indices = np.empty(0, dtype=np.int64)
+        self._transformed_alphabet: Counter = Counter()
         self.arrow_table = None
         self.codec = None
         self.skip_empty_lines = skip_empty_lines
@@ -183,53 +186,65 @@ class ArrowIPCRecognitionDataset(Dataset):
             self.legacy_polygons_status = "mixed"
 
         self.alphabet.update(metadata['alphabet'])
-        num_lines = metadata['counts'][self._split_filter] if self._split_filter else metadata['counts']['all']
+        # Rows excluded by the split filter or empty-line detection are only
+        # masked out in `self._indices` rather than filtered from the table
+        # itself since pa.Table.filter() copies all selected rows out of the
+        # memory map.
+        mask = np.ones(len(ds_table), dtype=bool)
         if self._split_filter:
-            ds_table = ds_table.filter(ds_table.column(self._split_filter))
+            mask &= ds_table.column(self._split_filter).to_numpy(zero_copy_only=False)
         if self.skip_empty_lines:
             logger.debug('Getting indices of empty lines after text transformation.')
             self.skip_empty_lines = False
-            mask = np.ones(len(ds_table), dtype=bool)
-            for index in range(len(ds_table)):
+            candidates = np.flatnonzero(mask)
+            texts = pc.struct_field(ds_table.column('lines'), 'text').take(candidates)
+            for index, text in zip(candidates, texts.to_pylist()):
                 try:
-                    self._apply_text_transform(ds_table.column('lines')[index].as_py(),)
-                except KrakenInputException:
+                    self._transformed_alphabet.update(self._apply_text_transform(text))
+                except ValueError:
                     mask[index] = False
-                    continue
-            num_lines = np.count_nonzero(mask)
-            logger.debug(f'Filtering out {np.count_nonzero(~mask)} empty lines')
-            if np.any(~mask):
-                ds_table = ds_table.filter(pa.array(mask))
             self.skip_empty_lines = True
+            logger.debug(f'Filtering out {len(candidates) - np.count_nonzero(mask)} empty lines')
+        indices = np.flatnonzero(mask)
         if not self.arrow_table:
             self.arrow_table = ds_table
         else:
+            indices += len(self.arrow_table)
             self.arrow_table = pa.concat_tables([self.arrow_table, ds_table])
-        self._num_lines += num_lines
+        self._indices = np.concatenate([self._indices, indices])
+        self._num_lines += len(indices)
 
     def rebuild_alphabet(self):
         """
         Recomputes the alphabet depending on the given text transformation.
+
+        When `skip_empty_lines` is enabled the alphabet of the transformed
+        text has already been accumulated during empty-line detection in
+        `add()` and is just swapped in here.
         """
+        if self.skip_empty_lines:
+            self.alphabet = self._transformed_alphabet.copy()
+            return
         self.alphabet = Counter()
-        for index in range(len(self)):
+        texts = pc.struct_field(self.arrow_table.column('lines'), 'text').take(self._indices)
+        for text in texts.to_pylist():
             try:
-                text = self._apply_text_transform(self.arrow_table.column('lines')[index].as_py(),)
+                text = self._apply_text_transform(text)
                 self.alphabet.update(text)
-            except KrakenInputException:
+            except ValueError:
                 continue
 
-    def _apply_text_transform(self, sample) -> str:
+    def _apply_text_transform(self, text: str) -> str:
         """
         Applies text transform to a sample.
         """
-        text = sample['text']
+        orig_text = text
         for func in self.text_transforms:
             text = func(text)
         if not text:
-            logger.debug(f'Text line "{sample["text"]}" is empty after transformations')
+            logger.debug(f'Text line "{orig_text}" is empty after transformations')
             if not self.skip_empty_lines:
-                raise KrakenInputException('empty text line')
+                raise ValueError('empty text line')
         return text
 
     def encode(self, codec: Optional[PytorchCodec] = None) -> None:
@@ -239,15 +254,14 @@ class ArrowIPCRecognitionDataset(Dataset):
         if codec:
             self.codec = codec
             logger.info(f'Trying to encode dataset with codec {codec}')
-            for index in range(self._num_lines):
+            texts = pc.struct_field(self.arrow_table.column('lines'), 'text').take(self._indices)
+            for text in texts.to_pylist():
                 try:
-                    text = self._apply_text_transform(
-                        self.arrow_table.column('lines')[index].as_py(),
-                    )
+                    text = self._apply_text_transform(text)
                     self.codec.encode(text)
                 except KrakenEncodeException as e:
                     raise e
-                except KrakenInputException:
+                except ValueError:
                     pass
         else:
             self.codec = PytorchCodec(''.join(self.alphabet.keys()))
@@ -262,7 +276,7 @@ class ArrowIPCRecognitionDataset(Dataset):
         if len(self.failed_samples) == len(self):
             raise ValueError(f'All {len(self)} samples in dataset invalid.')
         try:
-            sample = self.arrow_table.column('lines')[index].as_py()
+            sample = self.arrow_table.column('lines')[int(self._indices[index])].as_py()
             logger.debug(f'Loading sample {index}')
             im = Image.open(io.BytesIO(sample['im']))
             im = self.transforms(im)
@@ -282,7 +296,7 @@ class ArrowIPCRecognitionDataset(Dataset):
                     logger.info(f'Upgrading "im_mode" from {self._im_mode.value} to {im_mode}')
                     self._im_mode.value = im_mode
 
-            text = self._apply_text_transform(sample)
+            text = self._apply_text_transform(sample['text'])
             target = self.codec.encode(text) if self.codec is not None else text
             _check_sample_fit(im, target, self.max_width, self.subsampling)
         except Exception:
