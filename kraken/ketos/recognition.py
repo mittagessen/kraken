@@ -27,7 +27,8 @@ from threadpoolctl import threadpool_limits
 from kraken.registry import OPTIMIZERS, SCHEDULERS, STOPPERS
 
 from .util import (_arch_names, _expand_gt, _resolve_module_class,
-                   _user_supplied_params, _validate_manifests, message)
+                   _user_supplied_params, _validate_manifests,
+                   _validate_pl_logger, message)
 
 logging.captureWarnings(True)
 logger = logging.getLogger('kraken')
@@ -203,11 +204,7 @@ def train(ctx, **kwargs):
     if sum(map(bool, [resume, load])) > 1:
         raise click.BadOptionUsage('load', 'load/resume options are mutually exclusive.')
 
-    if p['pl_logger'] == 'tensorboard':
-        try:
-            import tensorboard  # NOQA
-        except ImportError:
-            raise click.BadOptionUsage('logger', 'tensorboard logger needs the `tensorboard` package installed.')
+    _validate_pl_logger(p['pl_logger'])
 
     import json
 
@@ -288,6 +285,8 @@ def train(ctx, **kwargs):
                             callbacks=cbs,
                             gradient_clip_val=m_config.gradient_clip_val,
                             num_sanity_val_steps=0,
+                            pl_logger=p['pl_logger'],
+                            log_dir=p['log_dir'],
                             **val_check_interval)
 
     with trainer.init_module(empty_init=False if (load or resume) else True):

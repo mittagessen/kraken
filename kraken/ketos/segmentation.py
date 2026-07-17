@@ -25,7 +25,8 @@ from PIL import Image
 from pathlib import Path
 from collections import Counter
 
-from kraken.ketos.util import _expand_gt, _validate_manifests, message, _create_class_map
+from kraken.ketos.util import (_expand_gt, _validate_manifests,
+                               _validate_pl_logger, message, _create_class_map)
 
 from kraken.registry import OPTIMIZERS, SCHEDULERS, STOPPERS
 
@@ -240,11 +241,7 @@ def segtrain(ctx, **kwargs):
     if sum(map(bool, [resume, load])) > 1:
         raise click.BadOptionUsage('load', 'load/resume options are mutually exclusive.')
 
-    if params.get('pl_logger') == 'tensorboard':
-        try:
-            import tensorboard  # NOQA
-        except ImportError:
-            raise click.BadOptionUsage('logger', 'tensorboard logger needs the `tensorboard` package installed.')
+    _validate_pl_logger(params.get('pl_logger'))
 
     # parse line_class_mapping from list into dictionary
     if isinstance(line_cls_map := params.get('line_class_mapping'), list):
@@ -336,6 +333,8 @@ def segtrain(ctx, **kwargs):
                             gradient_clip_val=params['gradient_clip_val'],
                             num_sanity_val_steps=0,
                             use_distributed_sampler=False,
+                            pl_logger=params.get('pl_logger'),
+                            log_dir=params.get('log_dir'),
                             **val_check_interval)
 
     with trainer.init_module(empty_init=False if (load or resume) else True):

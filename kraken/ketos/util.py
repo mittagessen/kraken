@@ -36,6 +36,23 @@ logging.captureWarnings(True)
 logger = logging.getLogger('kraken')
 
 
+def _validate_pl_logger(pl_logger: Optional[str]) -> None:
+    """
+    Verifies that the package backing the selected experiment logger is
+    installed.
+    """
+    if pl_logger == 'tensorboard':
+        try:
+            import tensorboard  # NOQA
+        except ImportError:
+            raise click.BadOptionUsage('logger', 'tensorboard logger needs the `tensorboard` package installed.')
+    elif pl_logger == 'wandb':
+        try:
+            import wandb  # NOQA
+        except ImportError:
+            raise click.BadOptionUsage('logger', 'wandb logger needs the `wandb` package installed.')
+
+
 def _create_class_map(cls_map):
     """
     Converts the list as a parameter

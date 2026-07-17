@@ -26,7 +26,7 @@ from PIL import Image
 
 from kraken.registry import OPTIMIZERS, SCHEDULERS, STOPPERS
 
-from .util import _expand_gt, _validate_manifests, message
+from .util import _expand_gt, _validate_manifests, _validate_pl_logger, message
 
 logging.captureWarnings(True)
 logger = logging.getLogger('kraken')
@@ -188,17 +188,7 @@ def pretrain(ctx, **kwargs):
     if sum(map(bool, [resume, load])) > 1:
         raise click.BadOptionUsage('load', 'load/resume options are mutually exclusive.')
 
-    if params.get('pl_logger') == 'tensorboard':
-        try:
-            import tensorboard  # NOQA
-        except ImportError:
-            raise click.BadOptionUsage('logger', 'tensorboard logger needs the `tensorboard` package installed.')
-
-    if params.get('pl_logger') == 'wandb':
-        try:
-            import wandb  # NOQA
-        except ImportError:
-            raise click.BadOptionUsage('logger', 'wandb logger needs the `wandb` package installed.')
+    _validate_pl_logger(params.get('pl_logger'))
 
     from threadpoolctl import threadpool_limits
     from lightning.pytorch.callbacks import ModelCheckpoint
@@ -260,6 +250,8 @@ def pretrain(ctx, **kwargs):
                             gradient_clip_val=params['gradient_clip_val'],
                             num_sanity_val_steps=0,
                             use_distributed_sampler=False,
+                            pl_logger=params.get('pl_logger'),
+                            log_dir=params.get('log_dir'),
                             **val_check_interval)
 
     with trainer.init_module(empty_init=False if (load or resume) else True):
