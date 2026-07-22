@@ -183,6 +183,7 @@ def load_coreml(path: Union[str, PathLike], tasks: Optional[Sequence[_T_tasks]] 
     except DecodeError as e:
         raise ValueError(f'Failure parsing model protobuf: {e}') from e
 
+    has_kraken_meta = 'kraken_meta' in mlmodel.user_defined_metadata
     try:
         metadata = json.loads(mlmodel.user_defined_metadata.get('kraken_meta', '{}'))
     except json.JSONDecodeError as e:
@@ -195,7 +196,12 @@ def load_coreml(path: Union[str, PathLike], tasks: Optional[Sequence[_T_tasks]] 
     if isinstance(model_type, str):
         model_type = [model_type] if model_type else []
     if not isinstance(model_type, list) or not model_type or not all(isinstance(x, str) and x for x in model_type):
-        raise ValueError(f'Invalid `model_type` metadata in {path}: expected string or list[str], got {type(model_type).__name__}.')
+        if has_kraken_meta:
+            raise ValueError(f'Invalid `model_type` metadata in {path}: expected string or list[str], got {type(model_type).__name__}.')
+        # Models predating the `kraken_meta` metadata block are always text
+        # recognizers as they were created before segmentation models existed.
+        logger.warning(f'No `kraken_meta` metadata in {path}; assuming legacy recognition model.')
+        model_type = ['recognition']
     metadata['model_type'] = model_type
     vgsl_spec = mlmodel.user_defined_metadata.get('vgsl') or metadata.get('vgsl')
     # avoid passing codec/vgsl twice (once in metadata, once as explicit argument)

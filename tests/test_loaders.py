@@ -179,6 +179,24 @@ class TestLoadModels(unittest.TestCase):
             with raises(ValueError, match='model_type'):
                 load_coreml(path)
 
+    def test_load_coreml_legacy_no_kraken_meta(self):
+        """
+        A legacy CoreML model without a `kraken_meta` block loads as a
+        recognition model, reading the codec from the top-level metadata key.
+        """
+        from coremltools.models import MLModel
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / 'legacy.mlmodel'
+            model = MLModel((resources / 'overfit.mlmodel').as_posix())
+            # strip the kraken_meta block, keeping only the top-level vgsl and
+            # codec keys as pre-kraken_meta models did.
+            del model.user_defined_metadata['kraken_meta']
+            model.save(path.as_posix())
+            models = load_coreml(path)
+            self.assertEqual(len(models), 1)
+            self.assertEqual(models[0].model_type, ['recognition'])
+            self.assertTrue(models[0].codec.c2l)
+
 
 class TestVersionCompatibility(unittest.TestCase):
     """
