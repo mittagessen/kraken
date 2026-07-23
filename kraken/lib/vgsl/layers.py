@@ -971,7 +971,16 @@ class GroupNorm(Module):
         t = inputs.dtype
         # XXX: verify that pytorch AMP casts the inputs to float32 correctly at
         # some point.
-        o = self.layer(inputs.type(torch.float32))
+        x = inputs.type(torch.float32)
+
+        W = x.shape[3]
+        if seq_len is None or bool((seq_len >= W).all()):
+            return self.layer(x).type(t), seq_len
+
+        # compute without padding
+        o = torch.zeros_like(x)
+        for i, l in enumerate(seq_len.clamp(min=1, max=W).tolist()):
+            o[i, ..., :l] = self.layer(x[i:i+1, ..., :l])[0]
         return o.type(t), seq_len
 
     def get_shape(self, input: tuple[int, int, int, int]) -> tuple[int, int, int, int]:
