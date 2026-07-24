@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Introduction to Automatic Text Recognition &#8212; kraken  documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=27fed22d" />
+    <link rel="stylesheet" type="text/css" href="_static/graphviz.css?v=4ae1632d" />
+    <link rel="stylesheet" type="text/css" href="_static/custom.css?v=89a84cc7" />
+    <script src="_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="_static/doctools.js?v=9bcbadda"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="canonical" href="kraken.re/introduction_to_atr.html" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Getting Started" href="getting_started.html" />
+    <link rel="prev" title="kraken" href="index.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="introduction-to-automatic-text-recognition">
+<span id="introduction-to-atr"></span><h1>Introduction to Automatic Text Recognition<a class="headerlink" href="#introduction-to-automatic-text-recognition" title="Link to this heading">¶</a></h1>
+<p>Welcome to kraken! If you are coming from the humanities, archiving, or library
+sciences, you might be looking for a way to turn your images of historical
+documents into searchable, analyzable digital text.</p>
+<p>This guide introduces the core concepts of <strong>automatic text recognition (ATR)</strong>
+and <strong>machine learning</strong> as they apply to kraken. We have avoided jargon where
+possible to help you understand what happens “under the hood” without needing a
+background in computer science.</p>
+<section id="the-atr-pipeline-from-image-to-text">
+<h2>The ATR Pipeline: From Image to Text<a class="headerlink" href="#the-atr-pipeline-from-image-to-text" title="Link to this heading">¶</a></h2>
+<p>Automatic text recognition is not a single magical step. It is a <strong>pipeline</strong>,
+a series of distinct tasks that must happen in a specific order. You can think
+of it like an assembly line where the image is the raw material and the digital
+text is the final product.</p>
+<img alt="Diagram of automatic text recognition pipeline steps" class="align-center" src="_images/kraken_workflow.svg" />
+<section id="step-1-layout-analysis-and-reading-order">
+<h3>Step 1: Layout Analysis and Reading Order<a class="headerlink" href="#step-1-layout-analysis-and-reading-order" title="Link to this heading">¶</a></h3>
+<p>Before a computer can read text, it must find where the text is located and
+determine the order in which it should be read. This stage is often called
+segmentation. The software analyzes the page image to identify the structure,
+finding text regions (such as paragraphs, marginalia, or headers) and, most
+importantly, baselines (the imaginary line on which text sits).</p>
+<img alt="Baseline and bounding polygon segmentation" class="align-center" src="_images/blla_output.jpg" />
+<p>Simultaneously, the software must determine the reading order. Historical
+documents often have complex layouts with multiple columns, side notes, or drop
+caps. If the computer does not calculate the correct sequence, for example,
+reading down the left column before starting the right column, the final output
+will be a jumbled “word salad” of disconnected sentences. The result of this
+step isn’t text yet; it is a map of the page containing coordinates for every
+line and the sequence in which they should be processed.</p>
+</section>
+<section id="step-2-line-text-recognition">
+<h3>Step 2: Line Text Recognition<a class="headerlink" href="#step-2-line-text-recognition" title="Link to this heading">¶</a></h3>
+<img alt="Line-wise text recognition" class="align-center" src="_images/text_recognition.svg" />
+<p>Once the lines are found and ordered, kraken “cuts” them out and feeds them
+into the recognizer one by one. The engine looks at the image of a single line
+and predicts the sequence of characters (letters, numbers, punctuation) that
+best matches the visual patterns it sees. The output of this stage is a string
+of raw text for each line.</p>
+</section>
+<section id="step-3-serialization-output-formats">
+<h3>Step 3: Serialization (Output Formats)<a class="headerlink" href="#step-3-serialization-output-formats" title="Link to this heading">¶</a></h3>
+<p>Finally, the text needs to be saved. A simple text file is often not enough
+because it loses the information about where the text was located on the page.
+Instead, kraken uses specialized XML formats common in the digital humanities,
+such as <a class="reference external" href="http://www.primaresearch.org/t/PageXML">PageXML</a> or <a class="reference external" href="http://www.loc.gov/standards/alto/">ALTO</a>. These formats act like a container that
+holds both the text content and the layout coordinates together. This is
+crucial because it allows you to view the text overlaid on the original image
+in viewing software, preserving the link between the visual document and the
+digital data.</p>
+</section>
+</section>
+<section id="machine-learning-concepts-in-kraken">
+<h2>Machine Learning Concepts in kraken<a class="headerlink" href="#machine-learning-concepts-in-kraken" title="Link to this heading">¶</a></h2>
+<p>kraken is a <strong>machine learning</strong> system. Unlike traditional software that
+follows a strict set of programmed rules, kraken “learns” by example.</p>
+<section id="what-is-a-model">
+<h3>What is a Model?<a class="headerlink" href="#what-is-a-model" title="Link to this heading">¶</a></h3>
+<p>Think of a <strong>model</strong> as a “skill” or a “lens” that kraken wears. You generally
+deal with two types of models. A <strong>segmentation model</strong> has the skill of seeing
+layout, such as distinguishing a paragraph from an illustration. A
+<strong>recognition model</strong> has the skill of reading a specific script or typeface,
+such as 17th-century French cursive. You must load the correct model for your
+specific documents. If you use a model trained on modern English to read
+medieval Latin, it will fail, just as an untrained human reader would.</p>
+</section>
+<section id="training-vs-fine-tuning">
+<h3>Training vs. Fine-Tuning<a class="headerlink" href="#training-vs-fine-tuning" title="Link to this heading">¶</a></h3>
+<p>Models acquire these skills through a process called training. <strong>Training from
+scratch</strong> is necessary when there is no existing model that is fairly close to
+what you want to achieve, e.g., if you are working with the Malayalam script
+and no model exists for it. The difficulty of this task depends entirely on
+your goals.</p>
+<p>If you only need to recognize a <strong>specific manuscript</strong> written in a clean,
+uniform hand with a small alphabetic script, training a model from scratch can
+be surprisingly fast, often requiring only a couple of dozen pages of training
+data.</p>
+<p>However, if you want to build a <strong>generalized model</strong>, a model capable of
+reading a wide variety of documents from different hands or time periods within
+a specific scribal culture, the requirements are much higher. This requires a
+careful evaluation of the textual features you want to cover and at least tens
+of thousands of examples to ensure the model learns to generalize across
+different writing styles.</p>
+<p>In many cases, users can rely on <strong>fine-tuning</strong>. This is like taking a
+literate adult and teaching them to read a specific messy handwriting. You take
+an existing model that already knows the basics (e.g., the Latin alphabet) and
+show it a small number of examples from your specific documents. It updates its
+knowledge to specialize in your material, which is much faster than training a
+generalized model from scratch.</p>
+</section>
+<section id="what-is-training-data">
+<h3>What is Training Data?<a class="headerlink" href="#what-is-training-data" title="Link to this heading">¶</a></h3>
+<p>To teach kraken, both from scratch and fine-tuning, you need to provide
+<strong>training data</strong>, often called <strong>ground truth</strong>. This is essentially the
+answer key. For layout training, you provide images alongside the correct “map”
+of lines and regions. For text recognition training, you provide images of text
+lines alongside the exact digital transcription of what those lines say.</p>
+<p>However, simply providing correct data is not enough; the data must also be
+digestible for the machine. While human readers can navigate complex nuances
+easily, machine learning models perform best when tasks are clear and distinct.
+For example, a layout analysis scheme with a hundred different classes that
+require extensive contextual knowledge will require a vast amount of training
+data to learn effectively and may still yield poor results. Similarly, very
+intricate transcription norms can be difficult for the model to reproduce. In
+general, it is often better to simplify your requirements to match the
+capabilities of the technology, using fewer, broader layout categories and
+standardizing transcription rules will usually result in much higher accuracy
+than a highly complex system.</p>
+<p>To assist with this, the <a class="reference external" href="https://htr-united.github.io/">HTR-United</a>
+initiative accumulates training datasets for a variety of historical material
+that you can use for training or as examples for your own data management.</p>
+<p>While primarily intended as a schema for creating ATR transcription norms for
+training generalized recognition models, <a class="reference external" href="https://inria.hal.science/hal-05429033v1">this article</a> explains the general
+considerations in-depth.</p>
+<p>Crucially, this training data is usually stored in the same formats as the
+output: <strong>PageXML</strong> or <strong>ALTO</strong>. The following simplified snippet of an ALTO
+file illustrates how layout coordinates (the baseline and polygon shape) and
+the transcription content are stored together:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;TextLine</span><span class="w"> </span><span class="na">ID=</span><span class="s">&quot;line_1&quot;</span><span class="w"> </span><span class="na">BASELINE=</span><span class="s">&quot;50 100 450 105&quot;</span><span class="nt">&gt;</span>
+<span class="w">   </span><span class="nt">&lt;Shape&gt;</span>
+<span class="w">      </span><span class="nt">&lt;Polygon</span><span class="w"> </span><span class="na">POINTS=</span><span class="s">&quot;50,100 450,105 450,140 50,135&quot;</span><span class="nt">/&gt;</span>
+<span class="w">   </span><span class="nt">&lt;/Shape&gt;</span>
+<span class="w">   </span><span class="nt">&lt;String</span><span class="w"> </span><span class="na">CONTENT=</span><span class="s">&quot;Example of ground truth text.&quot;</span><span class="w"> </span><span class="na">WC=</span><span class="s">&quot;1.0&quot;</span><span class="nt">/&gt;</span>
+<span class="nt">&lt;/TextLine&gt;</span>
+</pre></div>
+</div>
+<p>This means you can generate some initial output with kraken, correct it
+manually using a transcription tool to create perfect ground truth files, and
+then feed those corrected XML files back into kraken to improve segmentation
+and recognition models. If your training data has errors, such as typos in your
+transcription, kraken will learn those errors, so high-quality ground truth is
+the most critical factor for good results.</p>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="index.html">
+              <img class="logo" src="_static/kraken.png" alt="Logo of kraken"/>
+            </a></p>
+  <div>
+    <h3><a href="index.html">Table of Contents</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">Introduction to Automatic Text Recognition</a><ul>
+<li><a class="reference internal" href="#the-atr-pipeline-from-image-to-text">The ATR Pipeline: From Image to Text</a><ul>
+<li><a class="reference internal" href="#step-1-layout-analysis-and-reading-order">Step 1: Layout Analysis and Reading Order</a></li>
+<li><a class="reference internal" href="#step-2-line-text-recognition">Step 2: Line Text Recognition</a></li>
+<li><a class="reference internal" href="#step-3-serialization-output-formats">Step 3: Serialization (Output Formats)</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#machine-learning-concepts-in-kraken">Machine Learning Concepts in kraken</a><ul>
+<li><a class="reference internal" href="#what-is-a-model">What is a Model?</a></li>
+<li><a class="reference internal" href="#training-vs-fine-tuning">Training vs. Fine-Tuning</a></li>
+<li><a class="reference internal" href="#what-is-training-data">What is Training Data?</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+  </div><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="index.html" title="previous chapter">kraken</a></li>
+      <li>Next: <a href="getting_started.html" title="next chapter">Getting Started</a></li>
+  </ul></li>
+</ul>
+</div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+<h3>Versions</h3>
+<ul>
+  <li><a href="../2.0.0/index.html">2.0.0</a></li>
+  <li><a href="../3.0/index.html">3.0</a></li>
+  <li><a href="../4.0/index.html">4.0</a></li>
+  <li><a href="../4.1/index.html">4.1</a></li>
+  <li><a href="../4.2.0/index.html">4.2.0</a></li>
+  <li><a href="../4.3.0/index.html">4.3.0</a></li>
+  <li><a href="../5.0.0/index.html">5.0.0</a></li>
+  <li><a href="../5.1/index.html">5.1</a></li>
+  <li><a href="../5.2/index.html">5.2</a></li>
+  <li><a href="../5.3.0/index.html">5.3.0</a></li>
+  <li><a href="../6.0.0/index.html">6.0.0</a></li>
+  <li><a href="../7.0/introduction_to_atr.html">7.0</a></li>
+  <li><a href="introduction_to_atr.html">main</a></li>
+</ul>
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2015-2026, Benjamin Kiessling.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="_sources/introduction_to_atr.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

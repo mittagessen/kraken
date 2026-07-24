@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Upgrading from 6.0 &#8212; kraken  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=27fed22d" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
+    <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=89a84cc7" />
+    <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="canonical" href="kraken.re/user_guide/migration_6_0.html" />
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Inference with kraken" href="inference.html" />
+    <link rel="prev" title="User Guide" href="index.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="upgrading-from-6-0">
+<span id="migration-6-0"></span><h1>Upgrading from 6.0<a class="headerlink" href="#upgrading-from-6-0" title="Link to this heading">¶</a></h1>
+<p>This page summarizes user-facing behavior changes between kraken <code class="docutils literal notranslate"><span class="pre">6.0</span></code> and
+the <code class="docutils literal notranslate"><span class="pre">7.x</span></code> releases.</p>
+<p>For detailed release notes describing all changes in depth, see the
+<a class="reference internal" href="../changelog.html"><span class="doc">Changelog</span></a>.</p>
+<section id="manifest-option-renames">
+<h2>Manifest Option Renames<a class="headerlink" href="#manifest-option-renames" title="Link to this heading">¶</a></h2>
+<p>Training and evaluation manifest options were renamed across <code class="docutils literal notranslate"><span class="pre">ketos</span></code>
+commands:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">--training-files</span></code> -&gt; <code class="docutils literal notranslate"><span class="pre">--training-data</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--evaluation-files</span></code> -&gt; <code class="docutils literal notranslate"><span class="pre">--evaluation-data</span></code></p></li>
+</ul>
+<p>This affects <code class="docutils literal notranslate"><span class="pre">ketos</span> <span class="pre">train</span></code>, <code class="docutils literal notranslate"><span class="pre">ketos</span> <span class="pre">pretrain</span></code>, <code class="docutils literal notranslate"><span class="pre">ketos</span> <span class="pre">segtrain</span></code>, <code class="docutils literal notranslate"><span class="pre">ketos</span>
+<span class="pre">segtest</span></code>, <code class="docutils literal notranslate"><span class="pre">ketos</span> <span class="pre">rotrain</span></code>, and related contrib scripts.</p>
+<p>If you use YAML experiment files, use <code class="docutils literal notranslate"><span class="pre">training_data</span></code>/<code class="docutils literal notranslate"><span class="pre">evaluation_data</span></code> as
+the key name.</p>
+</section>
+<section id="experiment-files-migration">
+<h2>Experiment Files Migration<a class="headerlink" href="#experiment-files-migration" title="Link to this heading">¶</a></h2>
+<p>Experiment files in YAML format are now the recommended way to express
+non-trivial training configuration, especially class mappings and evaluation
+behavior.</p>
+<p>Pass an experiment file with <code class="docutils literal notranslate"><span class="pre">--config</span></code> before the command name:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>--config<span class="w"> </span>experiments.yml<span class="w"> </span>segtrain
+</pre></div>
+</div>
+<p>Key migration points:</p>
+<ul class="simple">
+<li><p>Use python parameter names (e.g. <code class="docutils literal notranslate"><span class="pre">checkpoint_path</span></code>, <code class="docutils literal notranslate"><span class="pre">evaluation_data</span></code>),
+not legacy CLI flag spellings.</p></li>
+<li><p>Put global options (e.g. <code class="docutils literal notranslate"><span class="pre">precision</span></code>, <code class="docutils literal notranslate"><span class="pre">device</span></code>, <code class="docutils literal notranslate"><span class="pre">num_workers</span></code>,
+<code class="docutils literal notranslate"><span class="pre">num_threads</span></code>) at top-level.</p></li>
+<li><p>Put command-specific options under their command key
+(<code class="docutils literal notranslate"><span class="pre">train</span></code>, <code class="docutils literal notranslate"><span class="pre">segtrain</span></code>, <code class="docutils literal notranslate"><span class="pre">rotrain</span></code>, <code class="docutils literal notranslate"><span class="pre">pretrain</span></code>, etc.).</p></li>
+<li><p>Replace legacy <code class="docutils literal notranslate"><span class="pre">training_files</span></code>/<code class="docutils literal notranslate"><span class="pre">evaluation_files</span></code> keys with
+<code class="docutils literal notranslate"><span class="pre">training_data</span></code>/<code class="docutils literal notranslate"><span class="pre">evaluation_data</span></code>.</p></li>
+<li><p>Replace old segmentation class filtering/merging flags with
+<code class="docutils literal notranslate"><span class="pre">line_class_mapping</span></code>/<code class="docutils literal notranslate"><span class="pre">region_class_mapping</span></code> entries under <code class="docutils literal notranslate"><span class="pre">segtrain</span></code>.</p></li>
+</ul>
+<p>A minimal example for a segmentation training experiment file:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">precision</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">32-true</span>
+<span class="nt">device</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">auto</span>
+<span class="nt">num_workers</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">32</span>
+<span class="nt">num_threads</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="nt">segtrain</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">training_data</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">train.lst</span>
+<span class="w">  </span><span class="nt">evaluation_data</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">val.lst</span>
+<span class="w">  </span><span class="nt">checkpoint_path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">checkpoints</span>
+<span class="w">  </span><span class="nt">weights_format</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">safetensors</span>
+<span class="w">  </span><span class="nt">line_class_mapping</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&#39;*&#39;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">3</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&#39;DefaultLine&#39;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">3</span><span class="p p-Indicator">]</span>
+</pre></div>
+</div>
+<p>You can keep configurations for multiple commands in a single file. kraken
+will pick the parameter block matching the command you run:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">precision</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">32-true</span>
+<span class="nt">device</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">auto</span>
+<span class="nt">num_workers</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">16</span>
+<span class="nt">num_threads</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+
+<span class="nt">train</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">training_data</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rec_train.lst</span>
+<span class="w">  </span><span class="nt">evaluation_data</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rec_val.lst</span>
+<span class="w">  </span><span class="nt">format_type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">xml</span>
+<span class="w">  </span><span class="nt">checkpoint_path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rec_checkpoints</span>
+<span class="w">  </span><span class="nt">weights_format</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">safetensors</span>
+
+<span class="nt">segtrain</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">training_data</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">seg_train.lst</span>
+<span class="w">  </span><span class="nt">evaluation_data</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">seg_val.lst</span>
+<span class="w">  </span><span class="nt">format_type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">xml</span>
+<span class="w">  </span><span class="nt">checkpoint_path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">seg_checkpoints</span>
+<span class="w">  </span><span class="nt">weights_format</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">safetensors</span>
+<span class="w">  </span><span class="nt">line_class_mapping</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&#39;*&#39;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">3</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&#39;DefaultLine&#39;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">3</span><span class="p p-Indicator">]</span>
+</pre></div>
+</div>
+<p>Example usage with the same file:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ketos<span class="w"> </span>--config<span class="w"> </span>experiments.yml<span class="w"> </span>train
+<span class="gp">$ </span>ketos<span class="w"> </span>--config<span class="w"> </span>experiments.yml<span class="w"> </span>segtrain
+</pre></div>
+</div>
+</section>
+<section id="training-outputs-checkpoints-and-weights">
+<h2>Training Outputs, Checkpoints, and Weights<a class="headerlink" href="#training-outputs-checkpoints-and-weights" title="Link to this heading">¶</a></h2>
+<p>For <code class="docutils literal notranslate"><span class="pre">ketos</span> <span class="pre">train</span></code>, <code class="docutils literal notranslate"><span class="pre">ketos</span> <span class="pre">segtrain</span></code>, and <code class="docutils literal notranslate"><span class="pre">ketos</span> <span class="pre">rotrain</span></code>, training now
+produces Lightning checkpoints (<code class="docutils literal notranslate"><span class="pre">.ckpt</span></code>) as the primary artifact instead of
+writing a CoreML weights file directly during training.</p>
+<p>Checkpoint files include the full training state (model weights, optimizer
+state, scheduler state, epoch/step counters, and serialized training config),
+which enables exact continuation of interrupted runs.</p>
+<p>There are now two distinct continuation modes:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">--resume</span></code> restores and continues from the checkpoint’s exact previous
+training state. The checkpoint state is authoritative, even if command-line
+flags or config files specify different values.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--load</span></code> keeps the previous “fine-tune/start new run” behavior. It loads
+weights only and starts a fresh training run using current CLI/config
+hyperparameters.</p></li>
+</ul>
+<p>Because checkpoints include much more than deployable model weights (and may
+execute arbitrary python code), distribute converted weights files, not raw
+checkpoints. Conversion strips training-only state and produces a
+weights artifact suitable for distribution.</p>
+<p>At the end of training, kraken automatically converts the best checkpoint into
+a weights file. You can also convert manually with <code class="docutils literal notranslate"><span class="pre">ketos</span> <span class="pre">convert</span></code>.</p>
+<p>The default weights format is now <code class="docutils literal notranslate"><span class="pre">safetensors</span></code>. Compared to legacy
+<code class="docutils literal notranslate"><span class="pre">coreml</span></code> weights, <code class="docutils literal notranslate"><span class="pre">safetensors</span></code> is a more modern format that supports
+serialization of arbitrary model types, while <code class="docutils literal notranslate"><span class="pre">coreml</span></code> is limited to the core
+model methods implemented in kraken.</p>
+<p>Use <code class="docutils literal notranslate"><span class="pre">--weights-format</span> <span class="pre">coreml</span></code> only when you explicitly need legacy
+compatibility.</p>
+</section>
+<section id="segmentation-class-mapping-workflow">
+<h2>Segmentation Class Mapping Workflow<a class="headerlink" href="#segmentation-class-mapping-workflow" title="Link to this heading">¶</a></h2>
+<p>Segmentation class filtering/merging moved from various CLI flags to explicit
+class mappings <code class="docutils literal notranslate"><span class="pre">line_class_mapping</span></code> / <code class="docutils literal notranslate"><span class="pre">region_class_mapping</span></code> which are no
+longer accessible from the command line but exclusively from the new YAML
+experiment configs</p>
+<ol class="arabic">
+<li><p>Equivalent of <code class="docutils literal notranslate"><span class="pre">--merge-all-*</span></code> (merge all lines/regions into one class)</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">segtrain</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">line_class_mapping</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&#39;*&#39;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">3</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&#39;DefaultLine&#39;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">3</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">region_class_mapping</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&#39;*&#39;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">5</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&#39;Text_Region&#39;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">5</span><span class="p p-Indicator">]</span>
+</pre></div>
+</div>
+<p>Legacy equivalent:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">--merge-all-baselines</span> <span class="pre">DefaultLine</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--merge-all-regions</span> <span class="pre">Text_Region</span></code></p></li>
+</ul>
+</li>
+<li><p>Explicit class merging (selected classes merged by name)</p>
+<p>This maps two specific baseline classes to the same label:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">segtrain</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">line_class_mapping</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&#39;DefaultLine&#39;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">3</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&#39;Running_Title&#39;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">3</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&#39;Marginal_Note&#39;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">4</span><span class="p p-Indicator">]</span>
+</pre></div>
+</div>
+<p>Legacy equivalent:</p>
+<ul class="simple">
+<li><p>Like <code class="docutils literal notranslate"><span class="pre">--merge-baselines</span> <span class="pre">DefaultLine:Running_Title</span></code> while keeping
+<code class="docutils literal notranslate"><span class="pre">Marginal_Note</span></code> separate.</p></li>
+</ul>
+</li>
+<li><p>Filtering (equivalent of <code class="docutils literal notranslate"><span class="pre">--valid-baselines</span></code>)</p>
+<p>To keep only selected baseline classes, define only those classes and do
+not use <code class="docutils literal notranslate"><span class="pre">'*'</span></code> in <code class="docutils literal notranslate"><span class="pre">line_class_mapping</span></code>:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">segtrain</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">line_class_mapping</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&#39;DefaultLine&#39;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">3</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&#39;Marginal_Note&#39;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">4</span><span class="p p-Indicator">]</span>
+</pre></div>
+</div>
+<p>With this configuration, other baseline types are ignored during training.</p>
+</li>
+</ol>
+<p><code class="docutils literal notranslate"><span class="pre">ketos</span> <span class="pre">segtest</span></code> now has a <code class="docutils literal notranslate"><span class="pre">--test-class-mapping-mode</span></code> with <code class="docutils literal notranslate"><span class="pre">full</span></code>,
+<code class="docutils literal notranslate"><span class="pre">canonical</span></code>, and <code class="docutils literal notranslate"><span class="pre">custom</span></code>.</p>
+<p>Mode semantics:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">full</span></code>: Evaluate with the full many-to-one mapping used during training
+(aliases/merged classes preserved). This is the closest equivalent to legacy
+merged-class evaluation behavior. If that full mapping is unavailable (e.g.
+pre-7.0 CoreML weights files), kraken falls back to <code class="docutils literal notranslate"><span class="pre">canonical</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">canonical</span></code>: Evaluate with the model’s one-to-one class mapping (one
+canonical class name per label index), i.e., the classes assigned to the
+final output of the model.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">custom</span></code>: Evaluate with explicitly provided
+<code class="docutils literal notranslate"><span class="pre">line_class_mapping</span></code>/<code class="docutils literal notranslate"><span class="pre">region_class_mapping</span></code> for the test dataset. Use
+this mode to enforce a compatibility mapping, e.g., when the class taxonomy
+of the test set is radically different from the segmentation model.</p></li>
+</ul>
+</section>
+<section id="reading-order-integration">
+<h2>Reading Order Integration<a class="headerlink" href="#reading-order-integration" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">ketos</span> <span class="pre">roadd</span></code> is deprecated in favor of <code class="docutils literal notranslate"><span class="pre">ketos</span> <span class="pre">convert</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ketos</span> <span class="pre">rotrain</span></code> can import class mappings from a segmentation checkpoint
+via <code class="docutils literal notranslate"><span class="pre">--class-mapping-from-ckpt</span></code>.</p></li>
+</ul>
+</section>
+<section id="inference-changes">
+<h2>Inference Changes<a class="headerlink" href="#inference-changes" title="Link to this heading">¶</a></h2>
+<ul>
+<li><p>Global <code class="docutils literal notranslate"><span class="pre">kraken</span> <span class="pre">--precision</span></code> now controls inference precision.</p></li>
+<li><p>The old segment <code class="docutils literal notranslate"><span class="pre">--autocast</span></code> workflow was replaced by precision settings.</p></li>
+<li><p>Recognition is now explicitly batchable and parallelizable:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">ocr</span> <span class="pre">-B/--batch-size</span></code> controls how many line images are sent per forward
+pass.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ocr</span> <span class="pre">--num-line-workers</span></code> controls parallel line extraction/preprocessing
+on CPU (<code class="docutils literal notranslate"><span class="pre">0</span></code> keeps extraction in-process).</p></li>
+</ul>
+<p>This significantly improves throughput and allows effective GPU utilization
+during recognition.</p>
+</li>
+<li><p>The older tag-based multi-model recognition workflow is deprecated, is
+incompatible with this batched pipeline, and is scheduled for removal in
+kraken 8.</p></li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/kraken.png" alt="Logo of kraken"/>
+            </a></p>
+  <div>
+    <h3><a href="../index.html">Table of Contents</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">Upgrading from 6.0</a><ul>
+<li><a class="reference internal" href="#manifest-option-renames">Manifest Option Renames</a></li>
+<li><a class="reference internal" href="#experiment-files-migration">Experiment Files Migration</a></li>
+<li><a class="reference internal" href="#training-outputs-checkpoints-and-weights">Training Outputs, Checkpoints, and Weights</a></li>
+<li><a class="reference internal" href="#segmentation-class-mapping-workflow">Segmentation Class Mapping Workflow</a></li>
+<li><a class="reference internal" href="#reading-order-integration">Reading Order Integration</a></li>
+<li><a class="reference internal" href="#inference-changes">Inference Changes</a></li>
+</ul>
+</li>
+</ul>
+
+  </div><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">User Guide</a><ul>
+      <li>Previous: <a href="index.html" title="previous chapter">User Guide</a></li>
+      <li>Next: <a href="inference.html" title="next chapter">Inference with kraken</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+<h3>Versions</h3>
+<ul>
+  <li><a href="../../2.0.0/index.html">2.0.0</a></li>
+  <li><a href="../../3.0/index.html">3.0</a></li>
+  <li><a href="../../4.0/index.html">4.0</a></li>
+  <li><a href="../../4.1/index.html">4.1</a></li>
+  <li><a href="../../4.2.0/index.html">4.2.0</a></li>
+  <li><a href="../../4.3.0/index.html">4.3.0</a></li>
+  <li><a href="../../5.0.0/index.html">5.0.0</a></li>
+  <li><a href="../../5.1/index.html">5.1</a></li>
+  <li><a href="../../5.2/index.html">5.2</a></li>
+  <li><a href="../../5.3.0/index.html">5.3.0</a></li>
+  <li><a href="../../6.0.0/index.html">6.0.0</a></li>
+  <li><a href="migration_6_0.html">7.0</a></li>
+  <li><a href="../../main/user_guide/migration_6_0.html">main</a></li>
+</ul>
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2015-2026, Benjamin Kiessling.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/user_guide/migration_6_0.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
