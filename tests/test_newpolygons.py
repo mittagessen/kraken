@@ -41,6 +41,8 @@ class TestNewPolygons(unittest.TestCase):
         self.old_model = load_any(self.old_model_path)
         self.new_model_path = str(resources / "overfit_newpoly.mlmodel")
         self.new_model = load_any(self.new_model_path)
+        self.old_bl_model_path = str(resources / "overfit_bl.safetensors")
+        self.new_bl_model_path = str(resources / "overfit_bl_newpoly.safetensors")
         self.segmented_img = str(resources / "170025120000003,0074-lite.xml")
         self.runner = CliRunner()
         self.color_img = resources / "input.tif"
@@ -58,8 +60,6 @@ class TestNewPolygons(unittest.TestCase):
             text_direction="horizontal-lr",
             script_detection=False,
         )
-
-    # RECIPES
 
     @patch("kraken.rpred.extract_polygons", new_callable=mock_extract_polygons)
     def _test_rpred(self, extractor_mock: Mock, *, model, force_no_legacy: bool = False, expect_legacy: bool):
@@ -128,8 +128,6 @@ class TestNewPolygons(unittest.TestCase):
         self.assertEqual(len(models), 1, f"Expected exactly one best model in {model_dir}, found {models}")
         return str(models[0])
 
-    # TESTS
-
     def test_rpred_from_old_model(self):
         """
         Test rpred with old model, check that it uses legacy polygon extraction method
@@ -154,7 +152,7 @@ class TestNewPolygons(unittest.TestCase):
         """
         with tempfile.NamedTemporaryFile() as fp:
             self._test_krakencli(
-                args=['-f', 'xml', '-i', self.segmented_img, fp.name, 'ocr', '-m', self.old_model_path],
+                args=['-f', 'xml', '-i', self.segmented_img, fp.name, 'ocr', '-m', self.old_bl_model_path],
                 force_no_legacy=False,
                 expect_legacy=True,
             )
@@ -165,7 +163,7 @@ class TestNewPolygons(unittest.TestCase):
         """
         with tempfile.NamedTemporaryFile() as fp:
             self._test_krakencli(
-                args=['-f', 'xml', '-i', self.segmented_img, fp.name, 'ocr', '-m', self.old_model_path],
+                args=['-f', 'xml', '-i', self.segmented_img, fp.name, 'ocr', '-m', self.old_bl_model_path],
                 force_no_legacy=True,
                 expect_legacy=False,
             )
@@ -176,7 +174,7 @@ class TestNewPolygons(unittest.TestCase):
         """
         with tempfile.NamedTemporaryFile() as fp:
             self._test_krakencli(
-                args=['-f', 'xml', '-i', self.segmented_img, fp.name, 'ocr', '-m', self.new_model_path],
+                args=['-f', 'xml', '-i', self.segmented_img, fp.name, 'ocr', '-m', self.new_bl_model_path],
                 force_no_legacy=False,
                 expect_legacy=False,
             )
@@ -186,7 +184,7 @@ class TestNewPolygons(unittest.TestCase):
         Test `ketos test` with old model, check that it uses legacy polygon extraction method
         """
         self._test_ketoscli(
-            args=['--workers', '0', 'test', '-m', self.old_model_path, '-f', 'xml', self.segmented_img],
+            args=['--workers', '0', 'test', '-m', self.old_bl_model_path, '-f', 'xml', self.segmented_img],
             expect_legacy=True,
         )
 
@@ -195,7 +193,7 @@ class TestNewPolygons(unittest.TestCase):
         Test `ketos test` with old model, check that it does not use legacy polygon extraction method
         """
         self._test_ketoscli(
-            args=['--workers', '0', 'test', '--no-legacy-polygons', '-m', self.old_model_path, '-f', 'xml', self.segmented_img],
+            args=['--workers', '0', 'test', '--no-legacy-polygons', '-m', self.old_bl_model_path, '-f', 'xml', self.segmented_img],
             expect_legacy=False,
         )
 
@@ -204,7 +202,7 @@ class TestNewPolygons(unittest.TestCase):
         Test `ketos test` with new model, check that it uses new polygon extraction method
         """
         self._test_ketoscli(
-            args=['--workers', '0', 'test', '-m', self.new_model_path, '-f', 'xml', self.segmented_img],
+            args=['--workers', '0', 'test', '-m', self.new_bl_model_path, '-f', 'xml', self.segmented_img],
             expect_legacy=False,
         )
 
