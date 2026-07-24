@@ -22,13 +22,16 @@ def load_from_checkpoint(path):
 
     safe_globals = [defaultdict, Segmentation, BaselineLine, BBoxLine, Region]
     for ep in importlib.metadata.entry_points(group='kraken.configs'):
-        safe_globals.append(ep.load())
+        try:
+            safe_globals.append(ep.load())
+        except Exception as e:
+            logger.debug(f'Config entry point {ep.name} ({ep.value}) failed to load: {e}')
     torch.serialization.add_safe_globals(safe_globals)
 
     errors = []
     for entry_point in importlib.metadata.entry_points(group='kraken.lightning_modules'):
-        module = entry_point.load()
         try:
+            module = entry_point.load()
             return module.load_from_checkpoint(path, weights_only=True, map_location='cpu')
         except Exception as e:
             logger.debug(f'Lightning module {entry_point.name} failed for {path}: {e}')
