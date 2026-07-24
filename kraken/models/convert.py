@@ -31,14 +31,31 @@ def _register_safe_globals() -> None:
             logger.debug(f'Config entry point {ep.name} ({ep.value}) failed to load: {e}')
     torch.serialization.add_safe_globals(safe_globals)
 
-    errors = []
-    for entry_point in importlib.metadata.entry_points(group='kraken.lightning_modules'):
-        try:
-            module = entry_point.load()
-            return module.load_from_checkpoint(path, weights_only=True, map_location='cpu')
-        except Exception as e:
-            logger.debug(f'Lightning module {entry_point.name} failed for {path}: {e}')
-            errors.append((entry_point.name, e))
+
+def find_checkpoint_module(path: Union[str, 'PathLike']) -> type:
+    """
+    Identifies the KrakenTrainerModule subclass that produced a checkpoint
+    without instantiating it, by matching the pickled module configuration
+    against each registered lightning module's `_config_class`.
+
+    Raises:
+        ValueError: when the checkpoint contains no configuration or no
+        registered lightning module matches it.
+    """
+    import torch
+
+    _register_safe_globals()
+    ckpt = torch.load(path, weights_only=True, map_location='cpu', mmap=True)
+    config = ckpt.get('_module_config')
+    if config is None:
+        config = ckpt.get('hyper_parameters', {}).get('config')
+    if config is None:
+        raise ValueError(f'{path} contains no kraken module configuration.')
+    candidates = []
+    for ep in importlib.metadata.entry_points(group='kraken.lightning_modules'):
+        cls = ep.load()
+        config_cls = getattr(cls, '_config_class', None)
+        if config_cls is None:
             continue
         if type(config) is config_cls:
             return cls
