@@ -192,7 +192,8 @@ class VGSLRecognitionDataModule(L.LightningDataModule):
                                           self.trainer.lightning_module.width,
                                           self.trainer.lightning_module.channels,
                                           (self.hparams.data_config.padding, 0),
-                                          valid_norm=seg_type == 'bbox')
+                                          valid_norm=seg_type == 'bbox',
+                                          mask_value=self.hparams.data_config.mask_value)
 
         if stage in ['fit', None]:
             if getattr(self, 'train_set', None) is None or len(self.train_set) == 0:

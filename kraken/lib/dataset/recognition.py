@@ -483,7 +483,8 @@ class PolygonGTDataset(Dataset):
                                                        script_detection=True,
                                                        regions={},
                                                        line_orders=[]),
-                                          legacy=self.legacy_polygons))
+                                          legacy=self.legacy_polygons,
+                                          transparent=True))
             im = self.transforms(im)
             if im.shape[0] == 3:
                 im_mode = b'R'

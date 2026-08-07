@@ -23,6 +23,8 @@ from typing import TYPE_CHECKING, Any, Literal, Optional, Union
 
 import regex
 import torch
+import numpy as np
+from PIL import Image
 from PIL.Image import Resampling
 
 from kraken.lib.bidi import get_display
@@ -41,6 +43,35 @@ def pil_to_mode(im: 'Image.Image', mode: str) -> 'Image.Image':
 def pil_to_bin(im: 'Image.Image') -> 'Image.Image':
     from kraken.binarization import nlbin
     return nlbin(im)
+
+
+def pil_mask_fill(im: 'Image.Image', mask_value: Union[int, Literal['mean']]) -> 'Image.Image':
+    """
+    Replaces transparent pixels in a masked line image.
+
+    Args:
+        im: LA or RGBA line image. Images without an alpha channel are returned unchanged.
+        mask_value: Fill value in the 0-255 image range or `mean` to use the per-channel mean of unmasked pixels.
+    """
+    if im.mode not in ('LA', 'RGBA'):
+        return im
+
+    mode = im.mode[:-1]
+    data = np.asarray(im)
+    # Polygon extraction interpolates color and alpha against zero together, so color is already alpha-weighted.
+    image = data[..., :-1].astype(float)
+    alpha = data[..., -1:].astype(float) / 255
+    image[alpha[..., 0] == 0] = 0
+    if mask_value == 'mean':
+        if not (alpha_sum := alpha.sum()):
+            raise ValueError('Cannot calculate mask mean from a fully transparent image')
+        fill = image.sum(axis=(0, 1)) / alpha_sum
+    else:
+        fill = mask_value
+    image += (1 - alpha) * fill
+    if mode == 'L':
+        image = image[..., 0]
+    return Image.fromarray(np.round(image).clip(0, 255).astype(np.uint8))
 
 
 def dummy(x: Any) -> Any:

@@ -5,6 +5,7 @@ kraken.configs.base
 Base classes for configurations
 """
 import logging
+import numbers
 
 from collections import defaultdict
 
@@ -177,12 +178,28 @@ class RecognitionTrainingDataConfig(TrainingDataConfig):
         codec: (Union[dict[str, Sequence[int]], Sequence[str], str], defaults to None):
             Codec mapping one or more Unicode code points to one or more
             integers.
+        mask_value (Union[int, Literal['mean']], defaults to 0):
+            Replacement value for masked pixels outside baseline polygons in
+            the 0-255 image range. `mean` uses the per-channel mean of the
+            unmasked line image.
     """
     def __init__(self, **kwargs):
         self.binary_dataset_split = kwargs.pop('binary_dataset_split', False)
         self.format_type = kwargs.pop('format_type', 'xml')
         self.linetype = kwargs.pop('linetype', None)
         self.codec = kwargs.pop('codec', None)
+        mask_value = kwargs.pop('mask_value', 0)
+        if isinstance(mask_value, str):
+            mask_value = mask_value.strip().lower()
+            mask_value = {'black': 0, 'white': 255}.get(mask_value, mask_value)
+            if mask_value != 'mean':
+                try:
+                    mask_value = int(mask_value)
+                except ValueError:
+                    raise ValueError('mask_value must be black, white, mean, or an integer between 0 and 255') from None
+        if mask_value != 'mean' and (not isinstance(mask_value, numbers.Integral) or not 0 <= mask_value <= 255):
+            raise ValueError('mask_value must be black, white, mean, or an integer between 0 and 255')
+        self.mask_value = mask_value
         super().__init__(**kwargs)
 
 

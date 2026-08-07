@@ -62,7 +62,7 @@ def _extract_line(xml_record, skip_empty_lines: bool = True, legacy_polygons: bo
                            script_detection=False,
                            line_orders=[])
         try:
-            line_im, line = next(extract_polygons(im, seg, legacy=legacy_polygons))
+            line_im, line = next(extract_polygons(im, seg, legacy=legacy_polygons, transparent=True))
         except KrakenInputException:
             logger.warning(f'Invalid line {idx} in {xml_record.imagename}')
             continue

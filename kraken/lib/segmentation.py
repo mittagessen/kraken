@@ -1423,7 +1423,8 @@ def apply_polygonal_mask(img: Image.Image, polygon: np.ndarray, cval: int = 0) -
 
 def extract_polygons(im: Image.Image,
                      bounds: "Segmentation",
-                     legacy: bool = False) -> Generator[tuple[Image.Image, Union["BBoxLine", "BaselineLine"],], None, None]:
+                     legacy: bool = False,
+                     transparent: bool = False) -> Generator[tuple[Image.Image, Union["BBoxLine", "BaselineLine"],], None, None]:
     """
     Yields the subimages of image im defined in the list of bounding polygons
     with baselines preserving order.
@@ -1433,6 +1434,7 @@ def extract_polygons(im: Image.Image,
         bounds: A Segmentation class containing a bounding box or baseline
                 segmentation.
         legacy: Use the old, slow, and deprecated path
+        transparent: Mask pixels outside baseline polygons with transparency.
 
     Yields:
         The extracted subimage, and the corresponding bounding box or baseline
@@ -1450,6 +1452,8 @@ def extract_polygons(im: Image.Image,
             im = im.convert('L')
         else:
             order = 1
+        if transparent:
+            im = im.convert('LA') if im.mode == 'L' else im.convert('RGB').convert('RGBA')
 
         for line in bounds.lines:
             if line.boundary is None:

@@ -20,7 +20,7 @@ import numbers
 from collections import Counter
 from collections.abc import Sequence
 from functools import partial
-from typing import Any, Union
+from typing import Any, Literal, Union
 
 import torch
 import torch.nn.functional as F
@@ -60,7 +60,8 @@ class ImageInputTransforms(transforms.Compose):
                  pad: Union[int, tuple[int, int], tuple[int, int, int, int]],
                  valid_norm: bool = True,
                  force_binarization: bool = False,
-                 dtype: torch.dtype = torch.float32) -> None:
+                 dtype: torch.dtype = torch.float32,
+                 mask_value: Union[int, Literal['mean']] = 0) -> None:
         """
         Container for image input transforms for recognition and segmentation
         networks.
@@ -77,6 +78,9 @@ class ImageInputTransforms(transforms.Compose):
             force_binarization: Forces binarization of input images using the
                                 nlbin algorithm.
             dtype: Data type of the output tensors.
+            mask_value: Replacement value for transparent polygon masks in the
+                        0-255 image range or `mean` for the per-channel mean of
+                        unmasked pixels.
         """
         super().__init__(None)
 
@@ -86,6 +90,7 @@ class ImageInputTransforms(transforms.Compose):
         self._batch = batch
         self._channels = channels
         self._pad = pad
+        self._mask_value = mask_value
         self._dtype = dtype
 
         self._create_transforms()
@@ -123,6 +128,8 @@ class ImageInputTransforms(transforms.Compose):
                                        'combination with forced binarization.')
 
         self.transforms = []
+
+        self.transforms.append(partial(F_t.pil_mask_fill, mask_value=self._mask_value))
 
         def mode_transform():
             if self._mode == 'L':
@@ -278,6 +285,18 @@ class ImageInputTransforms(transforms.Compose):
     @force_binarization.setter
     def force_binarization(self, force_binarization: bool) -> None:
         self._force_binarization = force_binarization
+        self._create_transforms()
+
+    @property
+    def mask_value(self) -> Union[int, Literal['mean']]:
+        """
+        Replacement value for transparent polygon masks.
+        """
+        return self._mask_value
+
+    @mask_value.setter
+    def mask_value(self, mask_value: Union[int, Literal['mean']]) -> None:
+        self._mask_value = mask_value
         self._create_transforms()
 
 
