@@ -178,10 +178,8 @@ class RecognitionTrainingDataConfig(TrainingDataConfig):
         codec: (Union[dict[str, Sequence[int]], Sequence[str], str], defaults to None):
             Codec mapping one or more Unicode code points to one or more
             integers.
-        mask_value (Union[int, Literal['mean']], defaults to 0):
-            Replacement value for masked pixels outside baseline polygons in
-            the 0-255 image range. `mean` uses the per-channel mean of the
-            unmasked line image.
+        mask_value (Union[int, Literal['mean', 'none']], defaults to 0):
+            Replacement value for masked pixels outside baseline polygons in the 0-255 image range. `mean` uses the per-channel mean of the unmasked line image and `none` removes the mask without replacing pixels.
     """
     def __init__(self, **kwargs):
         self.binary_dataset_split = kwargs.pop('binary_dataset_split', False)
@@ -192,13 +190,13 @@ class RecognitionTrainingDataConfig(TrainingDataConfig):
         if isinstance(mask_value, str):
             mask_value = mask_value.strip().lower()
             mask_value = {'black': 0, 'white': 255}.get(mask_value, mask_value)
-            if mask_value != 'mean':
+            if mask_value not in ('mean', 'none'):
                 try:
                     mask_value = int(mask_value)
                 except ValueError:
-                    raise ValueError('mask_value must be black, white, mean, or an integer between 0 and 255') from None
-        if mask_value != 'mean' and (not isinstance(mask_value, numbers.Integral) or not 0 <= mask_value <= 255):
-            raise ValueError('mask_value must be black, white, mean, or an integer between 0 and 255')
+                    raise ValueError('mask_value must be black, white, mean, none, or an integer between 0 and 255') from None
+        if mask_value not in ('mean', 'none') and (not isinstance(mask_value, numbers.Integral) or not 0 <= mask_value <= 255):
+            raise ValueError('mask_value must be black, white, mean, none, or an integer between 0 and 255')
         self.mask_value = mask_value
         super().__init__(**kwargs)
 

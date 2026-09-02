@@ -61,7 +61,7 @@ class ImageInputTransforms(transforms.Compose):
                  valid_norm: bool = True,
                  force_binarization: bool = False,
                  dtype: torch.dtype = torch.float32,
-                 mask_value: Union[int, Literal['mean']] = 0) -> None:
+                 mask_value: Union[int, Literal['mean', 'none']] = 0) -> None:
         """
         Container for image input transforms for recognition and segmentation
         networks.
@@ -78,9 +78,7 @@ class ImageInputTransforms(transforms.Compose):
             force_binarization: Forces binarization of input images using the
                                 nlbin algorithm.
             dtype: Data type of the output tensors.
-            mask_value: Replacement value for transparent polygon masks in the
-                        0-255 image range or `mean` for the per-channel mean of
-                        unmasked pixels.
+            mask_value: Replacement value for transparent polygon masks in the 0-255 image range, `mean` for the per-channel mean of unmasked pixels, or `none` to remove the mask without replacing pixels.
         """
         super().__init__(None)
 
@@ -288,14 +286,14 @@ class ImageInputTransforms(transforms.Compose):
         self._create_transforms()
 
     @property
-    def mask_value(self) -> Union[int, Literal['mean']]:
+    def mask_value(self) -> Union[int, Literal['mean', 'none']]:
         """
         Replacement value for transparent polygon masks.
         """
         return self._mask_value
 
     @mask_value.setter
-    def mask_value(self, mask_value: Union[int, Literal['mean']]) -> None:
+    def mask_value(self, mask_value: Union[int, Literal['mean', 'none']]) -> None:
         self._mask_value = mask_value
         self._create_transforms()
 

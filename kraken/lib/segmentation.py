@@ -499,6 +499,11 @@ def _rotate(image: _T_pil_or_np,
         # PIL is much faster than scipy
         pdata = tform.params.flatten().tolist()[:6]
         resample = {0: Resampling.NEAREST, 1: Resampling.BILINEAR, 2: Resampling.BICUBIC, 3: Resampling.BICUBIC}.get(order, Resampling.NEAREST)
+        if image.mode in ('LA', 'RGBA'):
+            alpha = image.getchannel('A').transform(output_shape[::-1], Transform.AFFINE, data=pdata, resample=resample, fillcolor=0)
+            image = image.convert(image.mode[:-1]).transform(output_shape[::-1], Transform.AFFINE, data=pdata, resample=resample, fillcolor=cval)
+            image.putalpha(alpha)
+            return tform, image
         return tform, image.transform(output_shape[::-1], Transform.AFFINE, data=pdata, resample=resample, fillcolor=cval)
 
     # params for scipy
@@ -1416,6 +1421,10 @@ def apply_polygonal_mask(img: Image.Image, polygon: np.ndarray, cval: int = 0) -
     Extract the polygonal mask of an image.
     """
     mask = make_polygonal_mask(polygon, img.size)
+    if img.mode in ('LA', 'RGBA'):
+        out = img.copy()
+        out.putalpha(mask)
+        return out
     out = Image.new(img.mode, (img.width, img.height), cval)
     out.paste(img, mask=mask)
     return out
@@ -1489,7 +1498,10 @@ def extract_polygons(im: Image.Image,
                     img = Image.new('L', patch.shape[:2][::-1], 0)
                     ImageDraw.Draw(img).polygon(offset_polygon2, outline=1, fill=1)
                     mask = np.asarray(img, dtype=bool)
-                    patch[np.invert(mask)] = 0
+                    if transparent:
+                        patch[..., -1][np.invert(mask)] = 0
+                    else:
+                        patch[np.invert(mask)] = 0
                     extrema = offset_polygon[(0, -1), :]
                     # scale line image to max 600 pixel width
                     tform, rotated_patch = _rotate(patch, angle, center=extrema[0], scale=1.0, cval=0)
@@ -1543,7 +1555,10 @@ def extract_polygons(im: Image.Image,
                     img = Image.new('L', patch.shape[:2][::-1], 0)
                     ImageDraw.Draw(img).polygon(offset_polygon2, outline=1, fill=1)
                     mask = np.asarray(img, dtype=bool)
-                    patch[np.invert(mask)] = 0
+                    if transparent:
+                        patch[..., -1][np.invert(mask)] = 0
+                    else:
+                        patch[np.invert(mask)] = 0
                     # estimate piecewise transform
                     src_points = np.concatenate((offset_baseline, offset_polygon))
                     dst_points = np.concatenate((offset_bl_dst_pts, offset_pol_dst_pts))
@@ -1629,9 +1644,15 @@ def extract_polygons(im: Image.Image,
                     ]
                     # warp
                     resample = {0: Resampling.NEAREST, 1: Resampling.BILINEAR, 2: Resampling.BICUBIC, 3: Resampling.BICUBIC}.get(order, Resampling.NEAREST)
-                    i = patch.transform((output_shape[1], output_shape[0]), Image.MESH, data=deform_mesh, resample=resample)
+                    if transparent:
+                        alpha = patch.getchannel('A').transform((output_shape[1], output_shape[0]), Image.MESH, data=deform_mesh, resample=resample)
+                        i = patch.convert(patch.mode[:-1]).transform((output_shape[1], output_shape[0]), Image.MESH, data=deform_mesh, resample=resample)
+                        i.putalpha(alpha)
+                    else:
+                        i = patch.transform((output_shape[1], output_shape[0]), Image.MESH, data=deform_mesh, resample=resample)
 
-            yield i.crop(i.getbbox()), line
+            bbox = i.getchannel('A').getbbox() if transparent else i.getbbox()
+            yield i.crop(bbox), line
     else:
         if bounds.text_direction.startswith('vertical'):
             angle = 90

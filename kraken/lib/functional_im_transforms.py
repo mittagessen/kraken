@@ -45,30 +45,31 @@ def pil_to_bin(im: 'Image.Image') -> 'Image.Image':
     return nlbin(im)
 
 
-def pil_mask_fill(im: 'Image.Image', mask_value: Union[int, Literal['mean']]) -> 'Image.Image':
+def pil_mask_fill(im: 'Image.Image', mask_value: Union[int, Literal['mean', 'none']]) -> 'Image.Image':
     """
     Replaces transparent pixels in a masked line image.
 
     Args:
         im: LA or RGBA line image. Images without an alpha channel are returned unchanged.
-        mask_value: Fill value in the 0-255 image range or `mean` to use the per-channel mean of unmasked pixels.
+        mask_value: Fill value in the 0-255 image range, `mean` to use the per-channel mean of unmasked pixels, or `none` to remove the mask without replacing pixels.
     """
     if im.mode not in ('LA', 'RGBA'):
         return im
 
     mode = im.mode[:-1]
+    if mask_value == 'none':
+        return im.convert(mode)
+
     data = np.asarray(im)
-    # Polygon extraction interpolates color and alpha against zero together, so color is already alpha-weighted.
     image = data[..., :-1].astype(float)
     alpha = data[..., -1:].astype(float) / 255
-    image[alpha[..., 0] == 0] = 0
     if mask_value == 'mean':
         if not (alpha_sum := alpha.sum()):
             raise ValueError('Cannot calculate mask mean from a fully transparent image')
-        fill = image.sum(axis=(0, 1)) / alpha_sum
+        fill = (image * alpha).sum(axis=(0, 1)) / alpha_sum
+        image = image * alpha + (1 - alpha) * fill
     else:
-        fill = mask_value
-    image += (1 - alpha) * fill
+        image = image * alpha + (1 - alpha) * mask_value
     if mode == 'L':
         image = image[..., 0]
     return Image.fromarray(np.round(image).clip(0, 255).astype(np.uint8))

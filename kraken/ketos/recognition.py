@@ -183,7 +183,7 @@ def _config_kwargs(ctx: click.Context, explicit: dict) -> dict:
 @click.option('--augment/--no-augment',
               help='Enable image augmentation')
 @click.option('--mask-value',
-              help='Replacement for pixels outside baseline polygons: black, white, mean, or an integer from 0 to 255.')
+              help='Replacement for pixels outside baseline polygons: black, white, mean, none, or an integer from 0 to 255.')
 @click.option('--logger', 'pl_logger', type=click.Choice(['tensorboard', 'wandb']),
               help='Logger used by PyTorch Lightning to track metrics such as loss and accuracy.')
 @click.option('--log-dir', type=click.Path(exists=True, dir_okay=True, writable=True),
@@ -348,7 +348,7 @@ def train(ctx, **kwargs):
               'path data, and the recorded type for binary datasets.')
 @click.option('--pad', 'padding', type=int, help='Left and right padding around lines')
 @click.option('--mask-value',
-              help='Replacement for pixels outside baseline polygons: black, white, mean, or an integer from 0 to 255.')
+              help='Replacement for pixels outside baseline polygons: black, white, mean, none, or an integer from 0 to 255.')
 @click.option('--reorder/--no-reorder', 'bidi_reordering', help='Reordering of code points to display order')
 @click.option('--base-dir', type=click.Choice(['L', 'R', 'auto']), default='auto', help='Set base text '
               'direction.  This should be set to the direction used during the '
