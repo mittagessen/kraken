@@ -421,7 +421,7 @@ class VGSLRecognitionModel(KrakenTrainerModule):
         self._pred_transforms: list[Callable[[str], str]] = []
         if data_config.normalization:
             self._pred_transforms.append(partial(F_t.text_normalize,
-                                                  normalization=data_config.normalization))
+                                                 normalization=data_config.normalization))
         if data_config.normalize_whitespace:
             self._pred_transforms.append(F_t.text_whitespace_normalize)
 
