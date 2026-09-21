@@ -67,6 +67,7 @@ def cli(model, text_direction, repolygonize, topline, height_scale, files):
 
     from kraken import blla
     from kraken.lib import segmentation, vgsl, xml
+    from kraken.lib.dataset.utils import _get_type
     from kraken.lib.util import open_image
 
     loc = {'topline': True,
@@ -90,7 +91,7 @@ def cli(model, text_direction, repolygonize, topline, height_scale, files):
             # reorder lines by type
             lines = defaultdict(list)
             for line in data.lines:
-                lines[line.tags['type'][0]['type']].append(line)
+                lines[_get_type(line.tags)].append(line)
             im = open_image(data.imagename).convert('RGBA')
             for t, ls in lines.items():
                 tmp = Image.new('RGBA', im.size, (0, 0, 0, 0))
@@ -101,7 +102,7 @@ def cli(model, text_direction, repolygonize, topline, height_scale, files):
                         draw.polygon([tuple(x) for x in line.boundary], fill=c, outline=c[:3])
                     if line.baseline:
                         draw.line([tuple(x) for x in line.baseline], fill=bmap, width=2, joint='curve')
-                    draw.text(line.baseline[0], str(idx), fill=(0, 0, 0, 255))
+                        draw.text(line.baseline[0], str(idx), fill=(0, 0, 0, 255))
                 base_image = Image.alpha_composite(im, tmp)
                 base_image.save(f'high_{os.path.basename(doc)}_lines_{slugify(t)}.png')
             for t, regs in data.regions.items():
@@ -125,7 +126,7 @@ def cli(model, text_direction, repolygonize, topline, height_scale, files):
             # reorder lines by type
             lines = defaultdict(list)
             for line in res.lines:
-                lines[line.tags['type']].append(line)
+                lines[_get_type(line.tags)].append(line)
             im = im.convert('RGBA')
             for t, ls in lines.items():
                 tmp = Image.new('RGBA', im.size, (0, 0, 0, 0))
