@@ -91,7 +91,7 @@ def compute_segmentation_map(im: 'Image.Image',
     model.to(device)
 
     batch, channels, height, width = model.input
-    padding = model.user_metadata['hyper_params']['padding'] if 'padding' in model.user_metadata['hyper_params'] else (0, 0)
+    padding = model.user_metadata.get('hyper_params', {}).get('padding', (0, 0))
     # expand padding to 4-tuple (left, right, top, bottom)
     if isinstance(padding, int):
         padding = (padding,) * 4
