@@ -123,7 +123,7 @@ def load_safetensors(path: Union[str, PathLike], tasks: Optional[Sequence[_T_tas
                 raise ValueError(f'No model metadata found in {path}.')
     except SafetensorError as e:
         raise ValueError(f'Invalid safetensors file {path}: {e}') from e
-    
+
     state_dict = load_file(path)
     tied_groups: dict = {}
     for name, t in models.state_dict().items():

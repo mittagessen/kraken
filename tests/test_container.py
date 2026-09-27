@@ -310,4 +310,3 @@ class TestSegmentationCasts(unittest.TestCase):
         out = seg.to_bbox()
         self.assertEqual(out.type, 'bbox')
         self.assertEqual(out.lines, [])
-
