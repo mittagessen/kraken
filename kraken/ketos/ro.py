@@ -242,6 +242,7 @@ def rotrain(ctx, **kwargs):
                             num_sanity_val_steps=0,
                             pl_logger=params.get('pl_logger'),
                             log_dir=params.get('log_dir'),
+                            wandb_project=ctx.meta['wandb_project'],
                             **val_check_interval)
 
     with trainer.init_module(empty_init=False if (load or resume) else True):

@@ -70,6 +70,7 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
               help='Numerical precision to use for training. Default is 32-bit single-point precision.')
 @click.option('--workers', 'num_workers', type=click.IntRange(0), help='Number of data loading worker processes.')
 @click.option('--threads', 'num_threads', type=click.IntRange(1), help='Maximum size of OpenMP/BLAS thread pool.')
+@click.option('--wandb-project', default='kraken', help='Project name used by the wandb logger.')
 @click.option('-s', '--seed', default=None, type=click.INT,
               help='Seed for numpy\'s and torch\'s RNG. Set to a fixed value to '
                    'ensure reproducible random splits of data')
@@ -102,6 +103,7 @@ def cli(ctx, **kwargs):
     ctx.meta['precision'] = params.get('precision')
     ctx.meta['num_workers'] = params.get('num_workers')
     ctx.meta['num_threads'] = params.get('num_threads')
+    ctx.meta['wandb_project'] = params.get('wandb_project')
 
     log.set_logger(logger, level=30 - min(10 * params['verbose'], 20))
 

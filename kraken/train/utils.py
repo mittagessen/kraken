@@ -112,6 +112,7 @@ class KrakenTrainer(L.Trainer):
                  freeze_backbone=-1,
                  pl_logger: Union[L.pytorch.loggers.logger.Logger, str, None] = None,
                  log_dir: Optional['PathLike'] = None,
+                 wandb_project: str = 'kraken',
                  *args,
                  **kwargs):
         kwargs['enable_progress_bar'] = enable_progress_bar
@@ -132,7 +133,7 @@ class KrakenTrainer(L.Trainer):
                 kwargs['logger'] = L.pytorch.loggers.TensorBoardLogger(log_dir)
             elif pl_logger == 'wandb':
                 logger.debug('Creating wandb experiment logger')
-                kwargs['logger'] = L.pytorch.loggers.WandbLogger(project='kraken',
+                kwargs['logger'] = L.pytorch.loggers.WandbLogger(project=wandb_project,
                                                                   save_dir=log_dir,
                                                                   log_model=False)
             else:

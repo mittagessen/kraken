@@ -3,6 +3,7 @@ device: auto
 num_workers: 8
 num_threads: 1
 seed: 42
+wandb_project: kraken
 
 train:
   arch: ppocrv6
