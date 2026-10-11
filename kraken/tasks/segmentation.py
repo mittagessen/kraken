@@ -107,7 +107,7 @@ class SegmentationTaskModel(nn.Module):
         """
         segs = []
         for net in self.seg_models:
-            logger.info(f'Applying model {net}.')
+            logger.info(f'Applying model {type(net).__name__}.')
             net.prepare_for_inference(config)
             segs.append(net.predict(im=im))
         logger.info(f'Merging {len(segs)} segmentations.')
