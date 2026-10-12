@@ -212,7 +212,7 @@ put options into a YAML file and pass it to the ``ketos`` command using the
 
     $ ketos --config experiment.yml train
 
-Global options (``precision``, ``device``, ``workers``, ``threads``, ``seed``,
+Global options (``precision``, ``device``, ``workers``, ``threads``, ``seed``, ``wandb_project``,
 ``deterministic``) are placed at the top level of the YAML file. Subcommand
 options are nested under the subcommand name:
 
@@ -222,6 +222,8 @@ options are nested under the subcommand name:
     device: auto
     num_workers: 32
     num_threads: 1
+    # project name used when logging with wandb (``pl_logger: wandb``)
+    wandb_project: kraken
     train:
       # training data manifests
       training_data:

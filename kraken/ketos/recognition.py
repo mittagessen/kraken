@@ -288,6 +288,7 @@ def train(ctx, **kwargs):
                             num_sanity_val_steps=0,
                             pl_logger=p['pl_logger'],
                             log_dir=p['log_dir'],
+                            wandb_project=ctx.meta['wandb_project'],
                             **val_check_interval)
 
     with trainer.init_module(empty_init=False if (load or resume) else True):
