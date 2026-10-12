@@ -45,7 +45,10 @@ def _validate_pl_logger(pl_logger: Optional[str]) -> None:
         try:
             import tensorboard  # NOQA
         except ImportError:
-            raise click.BadOptionUsage('logger', 'tensorboard logger needs the `tensorboard` package installed.')
+            try:
+                import tensorboardX  # NOQA
+            except ImportError:
+                raise click.BadOptionUsage('logger', 'tensorboard logger needs the `tensorboard` or `tensorboardX` package installed.')
     elif pl_logger == 'wandb':
         try:
             import wandb  # NOQA
