@@ -379,7 +379,7 @@ def segment(im: PIL.Image.Image,
                         break
 
         if 'ro_model' in net.aux_layers or 'ro_model_regions' in net.aux_layers:
-            logger.info(f'Using reading order model(s) found in segmentation model {net}.')
+            logger.info(f'Using reading order model(s) found in segmentation model {type(net).__name__}.')
             flat_regs = [reg for rgs in _regions.values() for reg in rgs]
             line_ro = net.aux_layers.get('ro_model')
             region_ro = net.aux_layers.get('ro_model_regions')
