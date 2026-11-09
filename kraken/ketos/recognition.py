@@ -148,11 +148,7 @@ def _config_kwargs(ctx: click.Context, explicit: dict) -> dict:
 @click.option('-c', '--codec', type=click.UNPROCESSED,
               help='Load a codec JSON definition (invalid if loading existing model)')
 @click.option('--resize',
-              type=click.Choice([
-                  'add', 'union',  # Deprecation: `add` is deprecated, `union` is the new value
-                  'both', 'new',  # Deprecation: `both` is deprecated, `new` is the new value
-                  'fail'
-              ]),
+              type=click.Choice(['union', 'new', 'fail']),
               help='Codec/output layer resizing option. If set to `union` code '
                    'points will be added, `new` will set the layer to match exactly '
                    'the training data, `fail` will abort if training data and model '

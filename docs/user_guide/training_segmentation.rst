@@ -86,6 +86,12 @@ model:
 - ``union``: Add new classes to the existing model.
 - ``new``: Replace the output layer to match exactly the training data classes.
 
+Classes are matched by name against the classes the model outputs. Training
+data classes merged through the class mapping are matched through the first
+name of the merged group. Matching classes reuse the existing output of the
+model, the others are added as new outputs. With ``new`` the outputs of model
+classes not found in the training data are removed.
+
 Resuming Training
 ~~~~~~~~~~~~~~~~~
 
@@ -295,7 +301,7 @@ segtrain
                                     xml files containing both baselines and a
                                     link to source images.
     --augment / --no-augment        Enable image augmentation
-    --resize [add, union, both, new, fail]
+    --resize [union, new, fail]
                                     Output layer resizing option. If set to
                                     `union` new classes will be added, `new`
                                     will set the layer to match exactly the

@@ -360,7 +360,7 @@ train
                                     Normalizes unicode whitespace
     -c, --codec UNPROCESSED         Load a codec JSON definition (invalid if
                                     loading existing model)
-    --resize [add, union, both, new, fail]
+    --resize [union, new, fail]
                                     Codec/output layer resizing option. If set
                                     to `union` code points will be added, `new`
                                     will set the layer to match exactly the

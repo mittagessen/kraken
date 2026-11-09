@@ -202,13 +202,9 @@ def _build_segtest_class_diagnostics(model_mapping, dataset_mapping, dataset_sta
               'containing the baseline information.')
 @click.option('--augment/--no-augment', help='Enable image augmentation')
 @click.option('--resize',
-              type=click.Choice([
-                  'add', 'union',  # Deprecation: `add` is deprecated, `union` is the new value
-                  'both', 'new',  # Deprecation: `both` is deprecated, `new` is the new value
-                  'fail'
-              ]),
-              help='Output layer resizing option. If set to `add` new classes will be '
-                   'added, `both` will set the layer to match exactly '
+              type=click.Choice(['union', 'new', 'fail']),
+              help='Output layer resizing option. If set to `union` new classes will be '
+                   'added, `new` will set the layer to match exactly '
                    'the training data classes, `fail` will abort if training data and model '
                    'classes do not match.')
 @click.option('-tl', '--topline', 'topline', flag_value=True,
