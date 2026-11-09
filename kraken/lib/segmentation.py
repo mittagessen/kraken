@@ -537,24 +537,11 @@ def line_regions(line, regions):
 
 def _ray_intersect_boundaries(ray, direction, aabb):
     """
-    Simplified version of [0] for 2d and AABB anchored at (0,0).
-
-    [0] http://gamedev.stackexchange.com/questions/18436/most-efficient-aabb-vs-ray-collision-algorithms
+    Computes the point where a ray starting inside an AABB anchored at (0,0)
+    exits it.
     """
-    dir_fraction = np.empty(2, dtype=ray.dtype)
-    dir_fraction[direction == 0.0] = np.inf
-    dir_fraction[direction != 0.0] = np.divide(1.0, direction[direction != 0.0])
-
-    t1 = (-ray[0]) * dir_fraction[0]
-    t2 = (aabb[0] - ray[0]) * dir_fraction[0]
-    t3 = (-ray[1]) * dir_fraction[1]
-    t4 = (aabb[1] - ray[1]) * dir_fraction[1]
-
-    tmin = max(min(t1, t2), min(t3, t4))
-    tmax = min(max(t1, t2), max(t3, t4))
-
-    t = min(x for x in [tmin, tmax] if x >= 0)
-    return ray + (direction * t)
+    t = min(((aabb[i] if d > 0 else 0) - ray[i]) / d for i, d in enumerate(direction) if d != 0)
+    return ray + (direction * max(t, 0))
 
 
 def _calc_seam(baseline, polygon, angle, im_feats, bias=150):
