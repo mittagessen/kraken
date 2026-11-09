@@ -53,6 +53,67 @@ logger = logging.getLogger(__name__)
 __all__ = ['BLLASegmentationDataModule', 'BLLASegmentationModel']
 
 
+def _fit_class_mapping(net_mapping: dict[str, dict[str, int]],
+                       data_mapping: dict[str, dict[str, int]],
+                       resize: str) -> tuple[dict[str, dict[str, int]], Optional[int], list[int]]:
+    """
+    Fits the class mapping of a dataset to the canonical class mapping of a
+    pretrained model.
+
+    Args:
+        net_mapping: Canonical class mapping of the model.
+        data_mapping: Class mapping of the dataset.
+        resize: One of `fail`, `union`, or `new`.
+
+    Returns:
+        A tuple (class_mapping, output_size, del_indices) containing the
+        dataset class mapping renumbered to model outputs, the new size of
+        the output layer or None if no resizing is necessary, and the model
+        outputs to delete.
+    """
+    if resize not in ('fail', 'union', 'new'):
+        raise ValueError(f'Invalid resize parameter value {resize}')
+    sections = ('baselines', 'regions')
+    groups = {}
+    for section in sections:
+        groups[section] = {}
+        for name, idx in data_mapping[section].items():
+            groups[section].setdefault(idx, []).append(name)
+    data_names = {s: {names[0] for names in groups[s].values()} for s in sections}
+
+    if resize == 'fail' and any(data_names[s] != net_mapping[s].keys() for s in sections):
+        diff = {s: data_names[s] ^ net_mapping[s].keys() for s in sections}
+        raise ValueError(f'Training data and model class mapping differ (bl: {diff["baselines"]}, regions: {diff["regions"]})')
+
+    num_outputs = max(v for d in net_mapping.values() for v in d.values()) + 1
+    if resize == 'new':
+        keep = set(net_mapping['aux'].values())
+        for s in sections:
+            keep.update(net_mapping[s][name] for name in data_names[s] & net_mapping[s].keys())
+    else:
+        keep = range(num_outputs)
+    remap = {old: new for new, old in enumerate(sorted(keep))}
+    del_indices = [idx for idx in range(num_outputs) if idx not in remap]
+
+    next_idx = len(remap)
+    class_mapping = {'aux': dict(net_mapping['aux'])}
+    for s in sections:
+        class_mapping[s] = {}
+        for names in groups[s].values():
+            if names[0] in net_mapping[s]:
+                idx = remap[net_mapping[s][names[0]]]
+            else:
+                idx = next_idx
+                next_idx += 1
+            class_mapping[s].update((name, idx) for name in names)
+        if resize == 'union':
+            for name, idx in net_mapping[s].items():
+                class_mapping[s].setdefault(name, remap[idx])
+
+    output_size = next_idx if next_idx != num_outputs or del_indices else None
+    return class_mapping, output_size, del_indices
+
+
 def _seg_collate_fn(batch):
     """Custom collate that preserves baselines as a plain list."""
     baselines = [sample.pop('baselines') for sample in batch]
@@ -511,77 +572,18 @@ class BLLASegmentationModel(KrakenTrainerModule):
                                         topline=self.trainer.datamodule.hparams.data_config.topline,
                                         class_mapping=set_class_mapping)
             else:
-                net_class_mapping = self.net.user_metadata['class_mapping']
-                if set_class_mapping['baselines'].keys() != net_class_mapping['baselines'].keys() or \
-                   set_class_mapping['regions'].keys() != net_class_mapping['regions'].keys():
-
-                    bl_diff = set(set_class_mapping['baselines'].keys()).symmetric_difference(set(net_class_mapping['baselines'].keys()))
-                    regions_diff = set(set_class_mapping['regions'].keys()).symmetric_difference(set(net_class_mapping['regions'].keys()))
-
-                    if self.hparams.config.resize == 'fail':
-                        raise ValueError(f'Training data and model class mapping differ (bl: {bl_diff}, regions: {regions_diff}')
-                    elif self.hparams.config.resize == 'union':
-                        new_bls = set_class_mapping['baselines'].keys() - net_class_mapping['baselines'].keys()
-                        new_regions = set_class_mapping['regions'].keys() - net_class_mapping['regions'].keys()
-                        cls_idx = max(max(net_class_mapping['baselines'].values()) if net_class_mapping['baselines'] else -1, # noqa
-                                      max(net_class_mapping['regions'].values()) if net_class_mapping['regions'] else -1) # noqa
-                        logger.info(f'Adding {len(new_bls) + len(new_regions)} missing types to network output layer.')
-                        self.net.resize_output(cls_idx + len(new_bls) + len(new_regions) + 1)
-                        for c in new_bls:
-                            cls_idx += 1
-                            net_class_mapping['baselines'][c] = cls_idx
-                        for c in new_regions:
-                            cls_idx += 1
-                            net_class_mapping['regions'][c] = cls_idx
-                    elif self.hparams.config.resize == 'new':
-                        logger.info('Fitting network exactly to training set.')
-                        new_bls = set_class_mapping['baselines'].keys() - net_class_mapping['baselines'].keys()
-                        new_regions = set_class_mapping['regions'].keys() - net_class_mapping['regions'].keys()
-                        del_bls = net_class_mapping['baselines'].keys() - set_class_mapping['baselines'].keys()
-                        del_regions = net_class_mapping['regions'].keys() - set_class_mapping['regions'].keys()
-
-                        logger.info(f'Adding {len(new_bls) + len(new_regions)} missing '
-                                    f'types and removing {len(del_bls) + len(del_regions)} to network output layer ')
-                        cls_idx = max(max(net_class_mapping['baselines'].values()) if net_class_mapping['baselines'] else -1, # noqa
-                                      max(net_class_mapping['regions'].values()) if net_class_mapping['regions'] else -1) # noqa
-
-                        del_indices = [net_class_mapping['baselines'][x] for x in del_bls]
-                        del_indices.extend(net_class_mapping['regions'][x] for x in del_regions)
-                        self.net.resize_output(cls_idx + len(new_bls) + len(new_regions) - len(del_bls) - len(del_regions) + 1, del_indices)
-
-                        # delete old baseline/region types
-                        cls_idx = min(min(net_class_mapping['baselines'].values()) if net_class_mapping['baselines'] else torch.inf, # noqa
-                                      min(net_class_mapping['regions'].values()) if net_class_mapping['regions'] else torch.inf) # noqa
-
-                        bls = {}
-                        for k, v in sorted(net_class_mapping['baselines'].items(), key=lambda item: item[1]):
-                            if k not in del_bls:
-                                bls[k] = cls_idx
-                                cls_idx += 1
-
-                        regions = {}
-                        for k, v in sorted(net_class_mapping['regions'].items(), key=lambda item: item[1]):
-                            if k not in del_regions:
-                                regions[k] = cls_idx
-                                cls_idx += 1
-
-                        net_class_mapping['baselines'] = bls
-                        net_class_mapping['regions'] = regions
-
-                        # add new baseline/region types
-                        cls_idx -= 1
-                        for c in new_bls:
-                            cls_idx += 1
-                            net_class_mapping['baselines'][c] = cls_idx
-                        for c in new_regions:
-                            cls_idx += 1
-                            net_class_mapping['regions'][c] = cls_idx
-                    else:
-                        raise ValueError(f'invalid resize parameter value {self.resize}')
-                # backfill train_set/val_set mapping if key-equal as the actual
-                # numbering in the train_set might be different
-                self.trainer.datamodule.train_set.dataset.class_mapping = net_class_mapping
-                self.trainer.datamodule.val_set.dataset.class_mapping = net_class_mapping
+                class_mapping, output_size, del_indices = _fit_class_mapping(self.net.user_metadata['class_mapping'],
+                                                                             set_class_mapping,
+                                                                             self.hparams.config.resize)
+                if output_size is not None:
+                    logger.info(f'Resizing network output layer to {output_size} outputs ({len(del_indices)} removed).')
+                    self.net.resize_output(output_size, del_indices)
+                # renumber train_set/val_set mapping to the model outputs
+                self.trainer.datamodule.train_set.dataset.class_mapping = class_mapping
+                self.trainer.datamodule.val_set.dataset.class_mapping = class_mapping
+                # keep data config in sync as checkpoint conversion and resumption rebuild the mapping from it
+                self.trainer.datamodule.hparams.data_config.line_class_mapping = dict(class_mapping['baselines'])
+                self.trainer.datamodule.hparams.data_config.region_class_mapping = dict(class_mapping['regions'])
 
             self.net.user_metadata['metrics'] = []
             # store canonical (one-to-one) class mapping in model metadata for inference
@@ -597,21 +599,21 @@ class BLLASegmentationModel(KrakenTrainerModule):
                 logger.warning(f'Changing baseline location from {from_loc} to {loc[topline]}.')
             self.net.user_metadata['topline'] = topline
 
+            final_mapping = self.trainer.datamodule.train_set.dataset.class_mapping
             logger.info('Training line types:')
-            for k, v in set_class_mapping['baselines'].items():
+            for k, v in final_mapping['baselines'].items():
                 logger.info(f'  {k}\t{v}\t{self.trainer.datamodule.train_set.dataset.class_stats["baselines"][k]}')
             logger.info('Training region types:')
-            for k, v in set_class_mapping['regions'].items():
+            for k, v in final_mapping['regions'].items():
                 logger.info(f'  {k}\t{v}\t{self.trainer.datamodule.train_set.dataset.class_stats["regions"][k]}')
 
             # set model type metadata field and dump class_mapping
             self.net.model_type = ['segmentation']
 
             # set up validation metrics for region+aux channels only
-            final_mapping = self.trainer.datamodule.train_set.dataset.class_mapping
             region_idx = list(final_mapping['regions'].values())
             aux_idx = list(final_mapping['aux'].values())
-            self.val_pixel_idxs = sorted(aux_idx + region_idx)
+            self.val_pixel_idxs = sorted(set(aux_idx + region_idx))
             num_pixel_labels = len(self.val_pixel_idxs)
 
             self.val_px_accuracy = MultilabelAccuracy(average='micro', num_labels=num_pixel_labels)

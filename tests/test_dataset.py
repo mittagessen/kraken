@@ -119,7 +119,7 @@ class TestBaselineSet(unittest.TestCase):
         self.assertEqual(len(ds), 2)
         self.assertEqual(ds.num_classes, 9)
         # merged baselines should have 17 ($par) + 1 ($tip) = 18 lines at index 4
-        self.assertEqual(len(ds.targets[0]['baselines'][4]), 18)
+        self.assertEqual(len(sample['baselines'][4]), 18)
         self.assertEqual(sample['image'].shape, (1, 200, 100))
         self.assertEqual(sample['target'].shape, (ds.num_classes, 200, 100))
 
@@ -141,11 +141,30 @@ class TestBaselineSet(unittest.TestCase):
         self.assertEqual(len(ds), 2)
         self.assertEqual(ds.num_classes, 7)
         # merged baselines: $tip (1) + $pac (25) = 26 lines at index 2
-        self.assertEqual(len(ds.targets[0]['baselines'][2]), 26)
+        self.assertEqual(len(sample['baselines'][2]), 26)
         self.assertNotIn('$par', ds.class_mapping['baselines'])
         self.assertNotIn('$pag', ds.class_mapping['baselines'])
         self.assertEqual(sample['image'].shape, (1, 200, 100))
         self.assertEqual(sample['target'].shape, (ds.num_classes, 200, 100))
+
+    def test_baselineset_replace_class_mapping(self):
+        """
+        Test that targets follow a class mapping replaced after adding pages
+        (as done when fine-tuning a model with a different label numbering).
+        """
+        ds = BaselineSet(class_mapping={'aux': {'_start_separator': 0, '_end_separator': 1},
+                                        'baselines': {'$par': 2, '$tip': 3},
+                                        'regions': {'$par': 4, '$tip': 5}},
+                         im_transforms=self.transforms)
+        ds.add(self.doc)
+        ds.class_mapping = {'aux': {'_start_separator': 0, '_end_separator': 1},
+                            'baselines': {'$tip': 2, '$par': 3},
+                            'regions': {'$tip': 4, '$par': 5}}
+        sample = ds[0]
+        self.assertEqual(len(sample['baselines'][3]), 17)
+        self.assertEqual(len(sample['baselines'][2]), 1)
+        self.assertGreater(sample['target'][3].sum(), sample['target'][2].sum())
+        self.assertGreater(sample['target'][5].sum(), sample['target'][4].sum())
 
     def test_baselineset_merge_and_filter_regions(self):
         """
@@ -165,7 +184,7 @@ class TestBaselineSet(unittest.TestCase):
         self.assertEqual(len(ds), 2)
         self.assertEqual(ds.num_classes, 7)
         # merged regions: $tip (1) + $pac (1) = 2 regions at index 6
-        self.assertEqual(len(ds.targets[0]['regions'][6]), 2)
+        self.assertEqual(len(ds.targets[0]['regions']['$tip']) + len(ds.targets[0]['regions']['$pac']), 2)
         self.assertNotIn('$par', ds.class_mapping['regions'])
         self.assertNotIn('$pag', ds.class_mapping['regions'])
         self.assertEqual(sample['image'].shape, (1, 200, 100))
