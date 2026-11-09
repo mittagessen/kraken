@@ -696,8 +696,8 @@ def _calc_roi(line, bounds, baselines, suppl_obj, p_dir):
         upper_bounds_intersects.append(_ray_intersect_boundaries(point, (p_dir * (-1, 1))[::-1], bounds + 1).astype('int'))
         bottom_bounds_intersects.append(_ray_intersect_boundaries(point, (p_dir * (1, -1))[::-1], bounds + 1).astype('int'))
     # build polygon between baseline and bbox intersects
-    upper_polygon = geom.Polygon(ip_line.tolist() + upper_bounds_intersects)
-    bottom_polygon = geom.Polygon(ip_line.tolist() + bottom_bounds_intersects)
+    upper_polygon = geom.Polygon(ip_line.tolist() + upper_bounds_intersects[::-1])
+    bottom_polygon = geom.Polygon(ip_line.tolist() + bottom_bounds_intersects[::-1])
 
     # select baselines at least partially in each polygon
     side_a = [geom.LineString(upper_bounds_intersects)]
