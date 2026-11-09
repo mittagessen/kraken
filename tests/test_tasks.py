@@ -171,6 +171,22 @@ class TestRecognitionTaskModel(unittest.TestCase):
         self.assertEqual(len(records), 1)
         self.assertEqual(records[0].prediction, '')
 
+    def test_predict_batched_empty_last_line(self):
+        """
+        Tests that a partial batch is not dropped when the last extracted line
+        produces an empty record.
+        """
+        # fresh model as the line extraction pool is cached on the model
+        task = RecognitionTaskModel.load_model(resources / 'Gallicorpora+_best.safetensors')
+        config = RecognitionInferenceConfig(batch_size=16, num_line_workers=0)
+        invalid_line = BaselineLine(id='invalid',
+                                    baseline=[[0, 0], [1, 0]],
+                                    boundary=[[0, 0], [1, 0], [1, 1], [0, 1]])
+        seg = dataclasses.replace(self.bl_seg, lines=self.bl_seg.lines + [invalid_line])
+        records = list(task.predict(self.im, seg, config))
+        self.assertEqual([r.id for r in records], [line.id for line in seg.lines])
+        self.assertEqual(records[-1].prediction, '')
+
 
 class TestRTLRecognitionTaskModel(unittest.TestCase):
     """

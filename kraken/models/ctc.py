@@ -120,7 +120,7 @@ class CTCRecognitionInferenceMixin:
                         else:
                             input_queue.append((ts_im, im, line_idx))
                             # feed the input queue through the network
-                            if len(input_queue) == self._inf_config.batch_size or len(input_queue) == rec_results.count(None):
+                            if len(input_queue) == self._inf_config.batch_size:
                                 for rec, idx in self._line_iter(input_queue, segmentation):
                                     logger.debug(f'Inserting batch result at index {idx}: {rec}')
                                     rec_results[idx] = rec
@@ -128,6 +128,12 @@ class CTCRecognitionInferenceMixin:
                 while next_idx_to_emit < self._len and rec_results[next_idx_to_emit] is not None:
                     yield rec_results[next_idx_to_emit]
                     next_idx_to_emit += 1
+            # flush last partial batch
+            if input_queue:
+                for rec, idx in self._line_iter(input_queue, segmentation):
+                    logger.debug(f'Inserting batch result at index {idx}: {rec}')
+                    rec_results[idx] = rec
+            yield from rec_results[next_idx_to_emit:]
 
     def _recognize_box_lines(self,
                              lines: list[tuple['torch.Tensor', 'Image.Image', int]],
