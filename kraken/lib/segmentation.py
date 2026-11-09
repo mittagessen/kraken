@@ -673,7 +673,7 @@ def _calc_roi(line, bounds, baselines, suppl_obj, p_dir):
     ls = geom.LineString(line)
     ip_line = [line[0]]
     dist = 10
-    while dist < ls.length:
+    while dist < ls.length - 1:
         ip_line.append(np.array(ls.interpolate(dist).coords[0]))
         dist += 10
     ip_line.append(line[-1])
@@ -798,23 +798,19 @@ def calculate_polygonal_environment(im: Image.Image = None,
     for idx, line in enumerate(baselines):
         try:
             end_points = (line[0], line[-1])
-            line = geom.LineString(line)
+            line = np.array(line, dtype=float)
             offset = 8 if topline is not None else 0
-            offset_line = line.parallel_offset(offset, side='left' if topline else 'right')
-            line = np.array(line.coords, dtype=float)
-            offset_line = np.array(offset_line.coords, dtype=float)
 
             # calculate magnitude-weighted average direction vector
             lengths = np.linalg.norm(np.diff(line.T), axis=0)
             p_dir = np.mean(np.diff(line.T) * lengths / lengths.sum(), axis=1)
             p_dir = (p_dir.T / np.sqrt(np.sum(p_dir**2, axis=-1)))
             env_up, env_bottom, ip_line = _calc_roi(line, bounds, baselines[:idx] + baselines[idx + 1:], suppl_obj, p_dir)
-            # clamp offset to ROI depth on the text side, e.g. for lines close to the page edge
-            if offset:
-                env, normal = (env_bottom, np.array((-p_dir[1], p_dir[0]))) if topline else (env_up, np.array((p_dir[1], -p_dir[0])))
-                depth = np.linalg.norm(env - ip_line, axis=1)
-                if depth.min() < offset + 2:
-                    offset_line = ip_line + np.clip(np.minimum(offset, depth - 2), 0, None)[:, None] * normal
+            # offset line toward the text side, clamped to the ROI depth (e.g.
+            # for lines close to the page edge)
+            env, normal = (env_bottom, np.array((-p_dir[1], p_dir[0]))) if topline else (env_up, np.array((p_dir[1], -p_dir[0])))
+            depth = np.linalg.norm(env - ip_line, axis=1)
+            offset_line = ip_line + np.clip(np.minimum(offset, depth - 2), 0, None)[:, None] * normal
 
             polygons.append(_extract_patch(env_up,
                                            env_bottom,
