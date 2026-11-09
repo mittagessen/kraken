@@ -573,8 +573,9 @@ def _calc_seam(baseline, polygon, angle, im_feats, bias=150):
     patch[mask] = MASK_VAL
     patch += (dist_bias * (np.mean(patch[patch != MASK_VAL]) / bias))
     extrema = baseline[(0, -1), :] - (c_min, r_min)
-    # scale line image to max 600 pixel width
-    scale = min(1.0, 600 / (c_max - c_min))
+    # scale line image to max 600 pixel width along the line
+    extent = (c_max - c_min) if abs(np.cos(angle)) >= abs(np.sin(angle)) else (r_max - r_min)
+    scale = min(1.0, 600 / extent)
     tform, rotated_patch = _rotate(patch,
                                    angle,
                                    center=extrema[0],
@@ -729,7 +730,7 @@ def _calc_roi(line, bounds, baselines, suppl_obj, p_dir):
         env_bottom.append(bottom_limit.coords[0])
     env_up = np.array(env_up, dtype='uint')
     env_bottom = np.array(env_bottom, dtype='uint')
-    return env_up, env_bottom
+    return env_up, env_bottom, ip_line
 
 
 def calculate_polygonal_environment(im: Image.Image = None,
@@ -807,7 +808,13 @@ def calculate_polygonal_environment(im: Image.Image = None,
             lengths = np.linalg.norm(np.diff(line.T), axis=0)
             p_dir = np.mean(np.diff(line.T) * lengths / lengths.sum(), axis=1)
             p_dir = (p_dir.T / np.sqrt(np.sum(p_dir**2, axis=-1)))
-            env_up, env_bottom = _calc_roi(line, bounds, baselines[:idx] + baselines[idx + 1:], suppl_obj, p_dir)
+            env_up, env_bottom, ip_line = _calc_roi(line, bounds, baselines[:idx] + baselines[idx + 1:], suppl_obj, p_dir)
+            # clamp offset to ROI depth on the text side, e.g. for lines close to the page edge
+            if offset:
+                env, normal = (env_bottom, np.array((-p_dir[1], p_dir[0]))) if topline else (env_up, np.array((p_dir[1], -p_dir[0])))
+                depth = np.linalg.norm(env - ip_line, axis=1)
+                if depth.min() < offset + 2:
+                    offset_line = ip_line + np.clip(np.minimum(offset, depth - 2), 0, None)[:, None] * normal
 
             polygons.append(_extract_patch(env_up,
                                            env_bottom,
