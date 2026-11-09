@@ -527,8 +527,8 @@ class BLLASegmentationModel(KrakenTrainerModule):
         class_iu = (intersections + smooth) / (unions + smooth)
         mean_iu = torch.mean(class_iu)
 
-        cls_cnt = torch.stack([x['cls_cnt'] for x in self.pages]).sum()
-        freq_iu = torch.sum(cls_cnt / cls_cnt.sum() * class_iu.sum())
+        cls_cnt = torch.stack([x['cls_cnt'] for x in self.pages]).sum(dim=0)
+        freq_iu = torch.sum(cls_cnt / cls_cnt.sum() * class_iu)
 
         # baseline detection metrics
         bl_page_metrics = [x['bl_detection'] for x in self.pages]

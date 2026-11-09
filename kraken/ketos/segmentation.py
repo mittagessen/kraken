@@ -519,21 +519,24 @@ def segtest(ctx, **kwargs):
 
     test_metrics = trainer.test(model, data_module)
 
-    # pixel metrics table (aux + regions only)
-    class_mapping = effective_mapping
+    # pixel metrics table (aux + regions only). Merged classes are listed
+    # under their canonical (first) name with the object counts of all aliases.
     idx_to_name = {}
+    obj_counts = Counter()
     for cat in ('aux', 'regions'):
-        for name, idx in class_mapping[cat].items():
-            idx_to_name[idx] = (cat, name)
-    pixel_idxs = sorted(idx_to_name.keys())
+        for name, idx in effective_mapping[cat].items():
+            idx_to_name.setdefault(idx, (cat, name))
+            if cat != 'aux':
+                obj_counts[idx] += effective_stats[cat].get(name, 0)
 
     table = Table('Category', 'Class Name', 'Pixel Accuracy', 'IOU', 'Object Count')
     class_iu = test_metrics.class_iu.tolist()
     class_pixel_accuracy = test_metrics.class_pixel_accuracy.tolist()
-    for idx in pixel_idxs:
+    # per-class metrics are ordered like the model's test pixel indices
+    for pos, idx in enumerate(model.test_pixel_idxs):
         cat, class_name = idx_to_name[idx]
-        count = f'{data_module.test_set.dataset.class_stats[cat][class_name]}' if cat != 'aux' else 'N/A'
-        table.add_row(cat, class_name, f'{class_pixel_accuracy[idx]:.3f}', f'{class_iu[idx]:.3f}', count)
+        count = f'{obj_counts[idx]}' if cat != 'aux' else 'N/A'
+        table.add_row(cat, class_name, f'{class_pixel_accuracy[pos]:.3f}', f'{class_iu[pos]:.3f}', count)
     console.print(table)
 
     # baseline detection metrics table
