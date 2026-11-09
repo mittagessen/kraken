@@ -712,10 +712,11 @@ def _calc_roi(line, bounds, baselines, suppl_obj, p_dir):
     side_a = unary_union(side_a).buffer(1).boundary
     side_b = unary_union(side_b).buffer(1).boundary
 
-    def _find_closest_point(pt, intersects):
+    def _find_closest_point(pt, bounds_intersect, intersects):
         spt = geom.Point(pt)
+        # ray shorter than the boundary buffer, i.e. point on the page edge
         if intersects.is_empty:
-            raise Exception(f'No intersection with boundaries. Shapely intersection object: {intersects.wkt}')
+            return geom.Point(bounds_intersect)
         if intersects.geom_type == 'MultiPoint':
             return min([p for p in intersects.geoms], key=lambda x: spt.distance(x))
         elif intersects.geom_type == 'Point':
@@ -733,9 +734,9 @@ def _calc_roi(line, bounds, baselines, suppl_obj, p_dir):
     env_bottom = []
     # find orthogonal (to linear regression) intersects with adjacent objects to complete roi
     for point, upper_bounds_intersect, bottom_bounds_intersect in zip(ip_line, upper_bounds_intersects, bottom_bounds_intersects):
-        upper_limit = _find_closest_point(point, geom.LineString(
+        upper_limit = _find_closest_point(point, upper_bounds_intersect, geom.LineString(
             [point, upper_bounds_intersect]).intersection(side_a))
-        bottom_limit = _find_closest_point(point, geom.LineString(
+        bottom_limit = _find_closest_point(point, bottom_bounds_intersect, geom.LineString(
             [point, bottom_bounds_intersect]).intersection(side_b))
         env_up.append(upper_limit.coords[0])
         env_bottom.append(bottom_limit.coords[0])
