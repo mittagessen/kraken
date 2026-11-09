@@ -245,7 +245,10 @@ class SegmentationTaskModel(nn.Module):
             region_order = neural_reading_order(lines=all_regions,
                                                 model=region_ro,
                                                 im_size=im_size,
-                                                class_mapping=seg_class_mapping.get('regions', {}))
+                                                class_mapping=(
+                                                    region_ro.user_metadata.get('class_mapping') or 
+                                                    seg_class_mapping.get('regions', {}))
+                                               )
             if region_order is not None:
                 ordered_regions = [all_regions[i] for i in region_order]
             else:
@@ -255,7 +258,7 @@ class SegmentationTaskModel(nn.Module):
 
         # Order lines within each region if line model present
         if line_ro:
-            line_class_mapping = seg_class_mapping.get('baselines', {})
+            line_class_mapping = line_ro.user_metadata.get('class_mapping') or seg_class_mapping.get('baselines', {})
             ordered_lines = []
             region_line_map = defaultdict(list)
             region_ids = {reg.id for reg in ordered_regions}
