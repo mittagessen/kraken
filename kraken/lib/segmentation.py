@@ -176,16 +176,7 @@ def topsort(order: np.ndarray) -> list[int]:
     return L
 
 
-def moore_neighborhood(current, backtrack):
-    operations = np.array([[-1, 0], [-1, 1], [0, 1], [1, 1], [1, 0], [1, -1],
-                           [0, -1], [-1, -1]])
-    neighbors = (current + operations).astype(int)
-
-    for i, point in enumerate(neighbors):
-        if np.all(point == backtrack):
-            # we return the sorted neighborhood
-            return np.concatenate((neighbors[i:], neighbors[:i]))
-    return 0
+_MOORE_OPS = ((-1, 0), (-1, 1), (0, 1), (1, 1), (1, 0), (1, -1), (0, -1), (-1, -1))
 
 
 def boundary_tracing(region):
@@ -209,7 +200,7 @@ def boundary_tracing(region):
     coords = region.coords
     mins = np.amin(coords, axis=0)
     maxs = np.amax(coords, axis=0)
-    binary = np.zeros((maxs[0] - mins[0] + 3, maxs[1] - mins[1] + 3))
+    binary = np.zeros((maxs[0] - mins[0] + 3, maxs[1] - mins[1] + 3), dtype=np.uint8)
     y = coords[:, 0] - mins[0] + 1
     x = coords[:, 1] - mins[1] + 1
     binary[tuple([y, x])] = 1
@@ -218,7 +209,7 @@ def boundary_tracing(region):
     # starting point is the most upper left point
     idx_start = 0
     while True:  # asserting that the starting point is not isolated
-        start = [y[idx_start], x[idx_start]]
+        start = (int(y[idx_start]), int(x[idx_start]))
         focus_start = binary[start[0] - 1:start[0] + 2, start[1] - 1:start[1] + 2]
         if np.sum(focus_start) > 1:
             break
@@ -226,24 +217,29 @@ def boundary_tracing(region):
 
     # Determining backtrack pixel for the first element
     if (binary[start[0] + 1, start[1]] == 0 and binary[start[0] + 1, start[1] - 1] == 0):
-        backtrack_start = [start[0] + 1, start[1]]
+        backtrack_start = (start[0] + 1, start[1])
     else:
-        backtrack_start = [start[0], start[1] - 1]
+        backtrack_start = (start[0], start[1] - 1)
 
+    # the walk runs on plain python ints as a numpy call per pixel is slow
+    rows = binary.tolist()
     current = start
     backtrack = backtrack_start
     boundary = []
 
     while True:
-        neighbors_current = moore_neighborhood(current, backtrack)
-        y = neighbors_current[:, 0]
-        x = neighbors_current[:, 1]
-        idx = np.argmax(binary[tuple([y, x])])
+        cy, cx = current
+        neighbors = [(cy + dy, cx + dx) for dy, dx in _MOORE_OPS]
+        # sort neighborhood clockwise starting at the backtrack pixel
+        i = neighbors.index(backtrack)
+        neighbors = neighbors[i:] + neighbors[:i]
+        # first foreground pixel in the neighborhood
+        idx = next((k for k, (ny, nx) in enumerate(neighbors) if rows[ny][nx]), 0)
         boundary.append(current)
-        backtrack = neighbors_current[idx - 1]
-        current = neighbors_current[idx]
+        backtrack = neighbors[idx - 1]
+        current = neighbors[idx]
 
-        if (np.all(current == start) and np.all(backtrack == backtrack_start)):
+        if current == start and backtrack == backtrack_start:
             break
 
     return np.array(boundary) + [mins[0] - 1, mins[1] - 1]
