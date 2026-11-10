@@ -23,6 +23,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Literal, Optional, Union, TypeVar, Any
 
 import numpy as np
+import shapely
 import shapely.geometry as geom
 import torch
 import torch.nn.functional as F
@@ -598,13 +599,13 @@ def line_regions(line, regions):
     return regs
 
 
-def _ray_intersect_boundaries(ray, direction, aabb):
+def _ray_intersect_boundaries(rays, direction, aabb):
     """
-    Computes the point where a ray starting inside an AABB anchored at (0,0)
-    exits it.
+    Computes the points where rays starting inside an AABB anchored at (0,0)
+    exit it.
     """
-    t = min(((aabb[i] if d > 0 else 0) - ray[i]) / d for i, d in enumerate(direction) if d != 0)
-    return ray + (direction * max(t, 0))
+    t = np.min([((aabb[i] if d > 0 else 0) - rays[:, i]) / d for i, d in enumerate(direction) if d != 0], axis=0)
+    return rays + direction * np.maximum(t, 0)[:, None]
 
 
 def _calc_seam(baseline, polygon, angle, im_feats, bias=150):
@@ -731,69 +732,45 @@ def _extract_patch(env_up, env_bottom, baseline, offset_baseline, end_points, di
     return polygon
 
 
+def _closest_intersects(pts, bounds_intersects, side):
+    """
+    Returns for each ray pts[i] -> bounds_intersects[i] its intersection with
+    `side` that is closest to pts[i].
+    """
+    inter = shapely.intersection(shapely.linestrings(np.stack([pts, bounds_intersects], axis=1)), side)
+    # ray shorter than the boundary buffer, i.e. point on the page edge
+    empty = shapely.is_empty(inter)
+    invalid = ~empty & ~np.isin(shapely.get_type_id(inter), (0, 4, 7))
+    if invalid.any():
+        raise Exception(f'No intersection with boundaries. Shapely intersection object: {inter[invalid][0].wkt}')
+    out = bounds_intersects.astype(float)
+    out[~empty] = shapely.get_coordinates(shapely.shortest_line(shapely.points(pts[~empty]), inter[~empty]))[1::2]
+    return out
+
+
 def _calc_roi(line, bounds, baselines, suppl_obj, p_dir):
     # interpolate baseline
     ls = geom.LineString(line)
-    ip_line = [line[0]]
-    dist = 10
-    while dist < ls.length - 1:
-        ip_line.append(np.array(ls.interpolate(dist).coords[0]))
-        dist += 10
-    ip_line.append(line[-1])
-    ip_line = np.array(ip_line)
-    upper_bounds_intersects = []
-    bottom_bounds_intersects = []
-    for point in ip_line:
-        upper_bounds_intersects.append(_ray_intersect_boundaries(point, (p_dir * (-1, 1))[::-1], bounds + 1).astype('int'))
-        bottom_bounds_intersects.append(_ray_intersect_boundaries(point, (p_dir * (1, -1))[::-1], bounds + 1).astype('int'))
+    ip_line = np.vstack([line[0],
+                         shapely.get_coordinates(shapely.line_interpolate_point(ls, np.arange(10, ls.length - 1, 10))),
+                         line[-1]])
+    upper_bounds_intersects = _ray_intersect_boundaries(ip_line, (p_dir * (-1, 1))[::-1], bounds + 1).astype('int')
+    bottom_bounds_intersects = _ray_intersect_boundaries(ip_line, (p_dir * (1, -1))[::-1], bounds + 1).astype('int')
     # build polygon between baseline and bbox intersects
-    upper_polygon = geom.Polygon(ip_line.tolist() + upper_bounds_intersects[::-1])
-    bottom_polygon = geom.Polygon(ip_line.tolist() + bottom_bounds_intersects[::-1])
+    upper_polygon = geom.Polygon(np.vstack([ip_line, upper_bounds_intersects[::-1]]))
+    bottom_polygon = geom.Polygon(np.vstack([ip_line, bottom_bounds_intersects[::-1]]))
 
     # select baselines at least partially in each polygon
-    side_a = [geom.LineString(upper_bounds_intersects)]
-    side_b = [geom.LineString(bottom_bounds_intersects)]
+    adj_lines = [geom.LineString(adj_line) for adj_line in baselines + suppl_obj]
+    in_upper = shapely.intersects(upper_polygon, adj_lines)
+    in_bottom = shapely.intersects(bottom_polygon, adj_lines) & ~in_upper
+    side_a = unary_union([geom.LineString(upper_bounds_intersects)] + [x for x, s in zip(adj_lines, in_upper) if s]).buffer(1).boundary
+    side_b = unary_union([geom.LineString(bottom_bounds_intersects)] + [x for x, s in zip(adj_lines, in_bottom) if s]).buffer(1).boundary
 
-    for adj_line in baselines + suppl_obj:
-        adj_line = geom.LineString(adj_line)
-        if upper_polygon.intersects(adj_line):
-            side_a.append(adj_line)
-        elif bottom_polygon.intersects(adj_line):
-            side_b.append(adj_line)
-    side_a = unary_union(side_a).buffer(1).boundary
-    side_b = unary_union(side_b).buffer(1).boundary
-
-    def _find_closest_point(pt, bounds_intersect, intersects):
-        spt = geom.Point(pt)
-        # ray shorter than the boundary buffer, i.e. point on the page edge
-        if intersects.is_empty:
-            return geom.Point(bounds_intersect)
-        if intersects.geom_type == 'MultiPoint':
-            return min([p for p in intersects.geoms], key=lambda x: spt.distance(x))
-        elif intersects.geom_type == 'Point':
-            return intersects
-        elif intersects.geom_type == 'GeometryCollection' and len(intersects.geoms) > 0:
-            t = min([p for p in intersects.geoms], key=lambda x: spt.distance(x))
-            if t == 'Point':
-                return t
-            else:
-                return nearest_points(spt, t)[1]
-        else:
-            raise Exception(f'No intersection with boundaries. Shapely intersection object: {intersects.wkt}')
-
-    env_up = []
-    env_bottom = []
     # find orthogonal (to linear regression) intersects with adjacent objects to complete roi
-    for point, upper_bounds_intersect, bottom_bounds_intersect in zip(ip_line, upper_bounds_intersects, bottom_bounds_intersects):
-        upper_limit = _find_closest_point(point, upper_bounds_intersect, geom.LineString(
-            [point, upper_bounds_intersect]).intersection(side_a))
-        bottom_limit = _find_closest_point(point, bottom_bounds_intersect, geom.LineString(
-            [point, bottom_bounds_intersect]).intersection(side_b))
-        env_up.append(upper_limit.coords[0])
-        env_bottom.append(bottom_limit.coords[0])
-    env_up = np.array(env_up, dtype='uint')
-    env_bottom = np.array(env_bottom, dtype='uint')
-    return env_up, env_bottom, ip_line
+    env_up = _closest_intersects(ip_line, upper_bounds_intersects, side_a)
+    env_bottom = _closest_intersects(ip_line, bottom_bounds_intersects, side_b)
+    return np.array(env_up, dtype='uint'), np.array(env_bottom, dtype='uint'), ip_line
 
 
 def calculate_polygonal_environment(im: Image.Image = None,
