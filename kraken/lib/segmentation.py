@@ -732,12 +732,22 @@ def _extract_patch(env_up, env_bottom, baseline, offset_baseline, end_points, di
     return polygon
 
 
-def _closest_intersects(pts, bounds_intersects, side):
+def _closest_intersects(pts, bounds_intersects, side, near=100):
     """
     Returns for each ray pts[i] -> bounds_intersects[i] its intersection with
     `side` that is closest to pts[i].
     """
-    inter = shapely.intersection(shapely.linestrings(np.stack([pts, bounds_intersects], axis=1)), side)
+    rays = shapely.linestrings(np.stack([pts, bounds_intersects], axis=1))
+    short_rays = shapely.linestrings(np.stack([pts, shapely.get_coordinates(shapely.line_interpolate_point(rays, near))], axis=1))
+    parts = shapely.get_parts(side)
+    ray_idx, part_idx = shapely.STRtree(parts).query(short_rays)
+    near_side = np.full(len(pts), None, dtype=object)
+    shapely.multilinestrings(parts[part_idx], indices=ray_idx, out=near_side)
+    inter = shapely.intersection(rays, near_side)
+    # distance is NaN for rays without crossings or parts close to them
+    redo =~(shapely.distance(shapely.points(pts), inter) <= near) | ~np.isin(shapely.get_type_id(inter), (0, 4, 7))
+    if redo.any():
+        inter[redo] = shapely.intersection(rays[redo], side)
     # ray shorter than the boundary buffer, i.e. point on the page edge
     empty = shapely.is_empty(inter)
     invalid = ~empty & ~np.isin(shapely.get_type_id(inter), (0, 4, 7))
