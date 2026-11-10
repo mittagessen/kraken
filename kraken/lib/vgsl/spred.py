@@ -80,6 +80,8 @@ def vec_lines(heatmap: torch.Tensor,
               suppl_obj: list[np.ndarray] = None,
               topline: Optional[bool] = False,
               raise_on_error: bool = False,
+              device: Optional[torch.device] = None,
+              num_threads: Optional[int] = 1,
               **kwargs) -> list[dict[str, Any]]:
     r"""
     Computes lines from a stack of heatmaps, a class mapping, and scaling
@@ -102,6 +104,9 @@ def vec_lines(heatmap: torch.Tensor,
                  centerline.
         raise_on_error: Raises error instead of logging them when they are
                         not-blocking
+        device: torch device to run the ridge filter on.
+        num_threads: Maximum number of threads for the ridge filter on the
+                     CPU.
 
     Returns:
         A list of dictionaries containing the baselines, bounding polygons, and
@@ -124,7 +129,10 @@ def vec_lines(heatmap: torch.Tensor,
     baselines = []
     for bl_type, idx in cls_map['baselines'].items():
         logger.debug(f'Vectorizing lines of type {bl_type}')
-        baselines.extend([(bl_type, x) for x in vectorize_lines(heatmap[(st_sep, end_sep, idx), :, :], text_direction=text_direction[:-3])])
+        baselines.extend([(bl_type, x) for x in vectorize_lines(heatmap[(st_sep, end_sep, idx), :, :],
+                                                                text_direction=text_direction[:-3],
+                                                                device=device,
+                                                                num_threads=num_threads)])
     logger.debug('Polygonizing lines')
 
     im_feats = gaussian_filter(sobel(scal_im), 0.5)
@@ -200,7 +208,9 @@ class VGSLSegmentationInference:
                           text_direction=self._inf_config.text_direction,
                           suppl_obj=suppl_obj,
                           topline=bool(self.user_metadata.get('topline', False)),
-                          raise_on_error=self._inf_config.raise_on_error)
+                          raise_on_error=self._inf_config.raise_on_error,
+                          device=self._fabric.device,
+                          num_threads=self._inf_config.num_threads)
 
         script_detection = len(rets['cls_map']['baselines']) > 1
 

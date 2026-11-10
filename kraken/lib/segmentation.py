@@ -15,9 +15,11 @@
 """
 Processing for baseline segmenter output
 """
+import math
 import logging
 from collections import defaultdict
 from collections.abc import Sequence, Generator
+from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Literal, Optional, Union, TypeVar, Any
 
 import numpy as np
@@ -31,7 +33,7 @@ from scipy.ndimage import (binary_erosion, distance_transform_cdt,
 from scipy.signal import convolve2d
 from shapely.ops import nearest_points, unary_union
 from shapely.validation import explain_validity
-from skimage import draw, filters
+from skimage import draw
 from skimage.filters import sobel
 from skimage.graph import MCP_Connect
 from skimage.measure import (approximate_polygon, label, regionprops,
@@ -313,8 +315,70 @@ class LineMCP(MCP_Connect):
         return 2 if float_cumcost else 0
 
 
+def _sato_scale(x, sigma, gauss):
+    """
+    Sato tubeness of a single scale as computed by skimage.
+    """
+    sd = sigma / math.sqrt(2)
+    gr, gc = gauss(x, sd, (1, 0)), gauss(x, sd, (0, 1))
+    hrr, hrc, hcc = gauss(gr, sd, (1, 0)), gauss(gr, sd, (0, 1)), gauss(gc, sd, (0, 1))
+    largest = (hrr + hcc) / 2 + (hrc ** 2 + ((hrr - hcc) / 2) ** 2) ** 0.5
+    return sigma ** 2 * largest.clip(min=0)
+
+
+def _gaussian_kernel1d(sigma: float, order: int, radius: int) -> np.ndarray:
+    """
+    Gaussian (order 0) or its first derivative (order 1) flipped for
+    correlation.
+    """
+    x = np.arange(-radius, radius + 1)
+    phi = np.exp(-0.5 / sigma ** 2 * x ** 2)
+    phi /= phi.sum()
+    return (phi if order == 0 else -x / sigma ** 2 * phi)[::-1].copy()
+
+
+def _sato(im: np.ndarray,
+          device: Optional[Union[str, torch.device]] = None,
+          num_threads: Optional[int] = 1) -> np.ndarray:
+    """
+    Sato filter. A fairly verbatim reimplementation of `skimage.filters.sato`
+    but with truncation at 8 std.
+
+    Args:
+        im: 2d array.
+        device: On accelerators != cpu the filter is computed with convolutions
+                on the device, otherwise with scipy.
+        num_threads: Maximum number of threads to compute the scales in on the
+                     CPU
+    """
+    sigmas = range(1, 10, 2)
+    if device is not None and torch.device(device).type != 'cpu':
+        def gauss(t, sd, orders):
+            radius = int(8 * sd + 0.5)
+            for axis, order in enumerate(orders):
+                k = torch.as_tensor(_gaussian_kernel1d(sd, order, radius), device=t.device, dtype=t.dtype)
+                shape, pad = [1, 1, 1, 1], [0, 0]
+                shape[2 + axis], pad[axis] = -1, radius
+                t = F.conv2d(t, k.view(shape), padding=tuple(pad))
+            return t
+
+        x = -torch.as_tensor(im, device=device, dtype=torch.float32)[None, None]
+        out = torch.stack([_sato_scale(x, sigma, gauss) for sigma in sigmas]).amax(0)
+        return out[0, 0].cpu().numpy()
+
+    def gauss(t, sd, orders):
+        return gaussian_filter(t, sd, order=orders, mode='constant', truncate=8)
+
+    x = -im.astype(np.float32, copy=False)
+    num_threads = len(sigmas) if num_threads is None else min(len(sigmas), num_threads)
+    with ThreadPoolExecutor(num_threads) as executor:
+        return np.maximum.reduce(list(executor.map(lambda sigma: _sato_scale(x, sigma, gauss), sigmas)))
+
+
 def vectorize_lines(im: np.ndarray, threshold: float = 0.17, min_length=5,
-                    text_direction: str = 'horizontal', max_endpoints: int = 400):
+                    text_direction: str = 'horizontal', max_endpoints: int = 400,
+                    device: Optional[Union[str, torch.device]] = None,
+                    num_threads: Optional[int] = 1):
     """
     Vectorizes lines from a binarized array.
 
@@ -331,6 +395,9 @@ def vectorize_lines(im: np.ndarray, threshold: float = 0.17, min_length=5,
                              path algorithm creates O(n²) connections between
                              endpoints within connected components, so large
                              endpoint counts cause excessive memory use.
+        device: torch device to run the ridge filter on.
+        num_threads: Maximum number of threads for the ridge filter on the
+                     CPU.
 
     Returns:
         [[x0, y0, ... xn, yn], [xm, ym, ..., xk, yk], ... ]
@@ -343,7 +410,7 @@ def vectorize_lines(im: np.ndarray, threshold: float = 0.17, min_length=5,
     st_map = im[0]
     end_map = im[1]
     bl_map = im[2]
-    bl_map = filters.sato(bl_map, black_ridges=False, mode='constant')
+    bl_map = _sato(bl_map, device=device, num_threads=num_threads)
     bin_bl_map = bl_map > threshold
     line_skel = skeletonize(bin_bl_map)
     # find end points
