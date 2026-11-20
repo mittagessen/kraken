@@ -20,6 +20,7 @@ __all__ = ['build_binary_dataset']
 import io
 import json
 import tempfile
+import warnings
 from collections import Counter
 from functools import partial
 from multiprocessing import Pool
@@ -44,7 +45,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def _extract_line(xml_record, skip_empty_lines: bool = True, legacy_polygons: bool = False):
+def _extract_line(xml_record, skip_empty_lines: bool = True):
     lines = []
     try:
         im = open_image(xml_record.imagename)
@@ -62,7 +63,7 @@ def _extract_line(xml_record, skip_empty_lines: bool = True, legacy_polygons: bo
                            script_detection=False,
                            line_orders=[])
         try:
-            line_im, line = next(extract_polygons(im, seg, legacy=legacy_polygons))
+            line_im, line = next(extract_polygons(im, seg))
         except KrakenInputException:
             logger.warning(f'Invalid line {idx} in {xml_record.imagename}')
             continue
@@ -153,11 +154,15 @@ def build_binary_dataset(files: Optional[list[Union[str, 'PathLike', 'Segmentati
         skip_empty_lines: Do not compile empty text lines into the dataset.
         callback: Function called every time a new recordbatch is flushed into
                   the Arrow IPC file.
-        legacy_polygons: Use legacy polygon extraction code.
+        legacy_polygons: Deprecated and ignored. The legacy polygon
+                         extractor has been removed.
     """
+    if legacy_polygons:
+        warnings.warn('The `legacy_polygons` argument of `build_binary_dataset` is deprecated, ignored, and will be removed with kraken 8.',
+                      DeprecationWarning)
 
     logger.info('Parsing XML files')
-    extract_fn = partial(_extract_line, skip_empty_lines=skip_empty_lines, legacy_polygons=legacy_polygons)
+    extract_fn = partial(_extract_line, skip_empty_lines=skip_empty_lines)
     parse_fn = None
     effective_linetype = None
     if format_type in ['xml', 'alto', 'page']:
@@ -241,7 +246,7 @@ def build_binary_dataset(files: Optional[list[Union[str, 'PathLike', 'Segmentati
                           'image_type': 'raw',
                           'splits': ['train', 'eval', 'test'],
                           'im_mode': '1',
-                          'legacy_polygons': legacy_polygons,
+                          'legacy_polygons': False,
                           'languages': Counter(),
                           'counts': Counter({'all': 0,
                                              'train': 0,

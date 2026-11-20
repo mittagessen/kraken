@@ -94,7 +94,7 @@ class VGSLRecognitionDataModule(L.LightningDataModule):
             evaluation_data = _parse_xml_set('evaluation', all_files[1])
             test_data = _parse_xml_set('test', all_files[2])
             if linetype == 'baselines':
-                DatasetClass = partial(PolygonGTDataset, legacy_polygons=data_config.legacy_polygons)
+                DatasetClass = PolygonGTDataset
         elif data_config.format_type == 'path':
             if data_config.binary_dataset_split:
                 logger.warning('Internal binary dataset splits are enabled but using non-binary dataset files. Will be ignored.')
@@ -203,24 +203,10 @@ class VGSLRecognitionDataModule(L.LightningDataModule):
             train_set = self.train_set.dataset
             val_set = self.val_set.dataset
 
-            self.use_legacy_polygons = False
-
             # existing binary datasets might have been compiled with the legacy polygonizer
-            if self.hparams.data_config.format_type == 'binary' and self.train_set:
-                legacy_train_status = train_set.legacy_polygons_status
-                if val_set.legacy_polygons_status != legacy_train_status:
-                    logger.warning('Train and validation set have different legacy '
-                                   f'polygon status: {legacy_train_status} and '
-                                   f'{val_set.legacy_polygons_status}. Train set '
-                                   'status prevails.')
-                if legacy_train_status == "mixed":
-                    logger.warning('Mixed legacy polygon status in training dataset. Consider recompilation.')
-                    legacy_train_status = False
-                if legacy_train_status != self.hparams.data_config.legacy_polygons:
-                    logger.warning(f'Setting dataset legacy polygon status to {legacy_train_status} based on training set.')
-                else:
-                    logger.info(f'Setting dataset legacy polygon status to {legacy_train_status} based on training set.')
-                self.use_legacy_polygons = legacy_train_status
+            if self.hparams.data_config.format_type == 'binary' and train_set.legacy_polygons_status:
+                logger.warning('Training set contains lines extracted with the removed legacy polygon '
+                               'extractor. Consider recompiling it to match the line extraction during inference.')
 
             train_set.transforms = transforms
             val_set.transforms = transforms
@@ -570,30 +556,7 @@ class VGSLRecognitionModel(KrakenTrainerModule):
                 logger.info(f'Setting seg_type to {train_set.seg_type}.')
                 self.net.seg_type = train_set.seg_type
 
-            data_cfg = self.trainer.datamodule.hparams.data_config
-            use_legacy = self.trainer.datamodule.use_legacy_polygons
-            force_legacy = data_cfg.legacy_polygons
-
-            if data_cfg.format_type != 'binary' and force_legacy:
-                desired_legacy = True
-            elif use_legacy:
-                desired_legacy = True
-            else:
-                desired_legacy = False
-
-            if not self._loaded_model:
-                if data_cfg.format_type != 'binary' and force_legacy:
-                    logger.warning('the new model will be flagged to use legacy')
-                elif data_cfg.format_type == 'binary':
-                    if force_legacy and not use_legacy:
-                        logger.warning('the new model will be flagged to use new')
-                    elif (not force_legacy) and use_legacy:
-                        logger.warning('the new model will be flagged to use legacy')
-
-            if self._loaded_model and (not force_legacy) and self.net.use_legacy_polygons and not desired_legacy:
-                logger.warning('model will be flagged to use new')
-
-            self.net.use_legacy_polygons = desired_legacy
+            self.net.use_legacy_polygons = False
 
             self.trainer.datamodule.hparams.data_config.codec = self.net.codec
         elif stage == 'test':
@@ -606,7 +569,7 @@ class VGSLRecognitionModel(KrakenTrainerModule):
         data_config = checkpoint['datamodule_hyper_parameters']['data_config']
         return create_model('TorchVGSLModel',
                             model_type=['recognition'],
-                            legacy_polygons=data_config.legacy_polygons,
+                            legacy_polygons=False,
                             seg_type=checkpoint['_seg_type'],
                             one_channel_mode=checkpoint['_one_channel_mode'],
                             vgsl=checkpoint['_module_config'].spec,

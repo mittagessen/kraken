@@ -182,7 +182,7 @@ def _config_kwargs(ctx: click.Context, explicit: dict) -> dict:
               help='Logger used by PyTorch Lightning to track metrics such as loss and accuracy.')
 @click.option('--log-dir', type=click.Path(exists=True, dir_okay=True, writable=True),
               help='Path to directory where the logger will store the logs. If not set, a directory will be created in the current working directory.')
-@click.option('--legacy-polygons', is_flag=True, help='Use the legacy polygon extractor.')
+@click.option('--legacy-polygons', is_flag=True, help='Deprecated and ignored.')
 @click.argument('ground_truth', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def train(ctx, **kwargs):
     """
@@ -351,7 +351,7 @@ def train(ctx, **kwargs):
               help='Ground truth normalization')
 @click.option('-n', '--normalize-whitespace/--no-normalize-whitespace',
               help='Normalizes unicode whitespace')
-@click.option('--no-legacy-polygons', show_default=True, default=False, is_flag=True, help='Force disable the legacy polygon extractor.')
+@click.option('--no-legacy-polygons', show_default=True, default=False, is_flag=True, help='Deprecated and ignored.')
 @click.argument('test_set', nargs=-1, callback=_expand_gt, type=click.Path(exists=False, dir_okay=False))
 def test(ctx, **kwargs):
     """
@@ -403,8 +403,6 @@ def test(ctx, **kwargs):
 
     if dm_config.bidi_reordering and p['base_dir'] != 'auto':
         dm_config.bidi_reordering = p['base_dir']
-
-    dm_config.legacy_polygons = (not p['no_legacy_polygons']) and getattr(model.net, 'use_legacy_polygons', False)
 
     # evaluate XML data with the line type the model has been trained on
     # unless explicitly overridden

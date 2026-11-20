@@ -19,6 +19,8 @@ kraken.configs.vgsl
 
 Configurations for VGSL (segmentation and recognition) model training.
 """
+import warnings
+
 from kraken.configs.base import (TrainingConfig,
                                  RecognitionTrainingDataConfig,
                                  SegmentationTrainingDataConfig)
@@ -43,7 +45,8 @@ class VGSLRecognitionTrainingDataConfig(RecognitionTrainingDataConfig):
             Reorder code points according to the Unicode bidirectional
             algorithm. Set to L|R to override default text direction.
         legacy_polygons (bool, defaults to False):
-            Whether to use the slow legacy polygon extractor for training.
+            Deprecated and ignored. The legacy polygon extractor has been
+            removed.
         paddding (int, defaults to 16):
             Padding around start/end of line image.
     """
@@ -52,6 +55,9 @@ class VGSLRecognitionTrainingDataConfig(RecognitionTrainingDataConfig):
         self.normalize_whitespace = kwargs.pop('normalize_whitespace', True)
         self.bidi_reordering = kwargs.pop('bidi_reordering', True)
         self.legacy_polygons = kwargs.pop('legacy_polygons', False)
+        if self.legacy_polygons:
+            warnings.warn('The `legacy_polygons` option is deprecated, ignored, and will be removed with kraken 8.',
+                          DeprecationWarning)
         self.padding = kwargs.pop('padding', 16)
         super().__init__(**kwargs)
 

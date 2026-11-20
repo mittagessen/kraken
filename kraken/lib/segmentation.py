@@ -17,6 +17,7 @@ Processing for baseline segmenter output
 """
 import math
 import logging
+import warnings
 from collections import defaultdict
 from collections.abc import Sequence, Generator
 from concurrent.futures import ThreadPoolExecutor
@@ -40,7 +41,7 @@ from skimage.graph import MCP_Connect
 from skimage.measure import (approximate_polygon, label, regionprops,
                              subdivide_polygon)
 from skimage.morphology import skeletonize
-from skimage.transform import (AffineTransform, PiecewiseAffineTransform, warp)
+from skimage.transform import AffineTransform
 
 
 if TYPE_CHECKING:
@@ -62,27 +63,6 @@ __all__ = ['reading_order',
            'compute_polygon_section',
            'precompute_polygon_sections',
            'extract_polygons']
-
-
-# faster implementation of PiecewiseAffineTransform - see
-# https://github.com/scikit-image/scikit-image/issues/6864 and
-# https://github.com/scikit-image/scikit-image/pull/6963
-class FastPiecewiseAffineTransform(PiecewiseAffineTransform):
-    def __call__(self, coords):
-        coords = np.asarray(coords)
-
-        simplex = self._tesselation.find_simplex(coords)
-
-        affines = np.array(
-            [self.affines[i].params for i in range(len(self._tesselation.simplices))]
-        )[simplex]
-
-        pts = np.c_[coords, np.ones((coords.shape[0], 1))]
-
-        result = np.einsum("ij,ikj->ik", pts, affines)
-        result[simplex == -1, :] = -1
-
-        return result
 
 
 def _reading_order(lines: Sequence[tuple[slice, slice]], text_direction: Literal['lr', 'rl'] = 'lr') -> np.ndarray:
@@ -518,13 +498,12 @@ def _rotate(image: _T_pil_or_np,
             center: Any,
             scale: float,
             cval: int = 0,
-            order: int = 0,
-            use_skimage_warp: bool = False) -> tuple[AffineTransform, _T_pil_or_np]:
+            order: int = 0) -> tuple[AffineTransform, _T_pil_or_np]:
     """
     Rotate an image at an angle with optional scaling
 
     Args:
-        image (PIL.Image.Image or (H, W, C) np.ndarray): Input image
+        image (PIL.Image.Image or (H, W) np.ndarray): Input image
         angle (float): Angle in radians
         center (tuple): unused
         scale (float): x-Axis scaling factor
@@ -537,8 +516,8 @@ def _rotate(image: _T_pil_or_np,
     if isinstance(image, Image.Image):
         rows, cols = image.height, image.width
     else:
-        rows, cols = image.shape[:2]
-        assert len(image.shape) == 3 or len(image.shape) == 2, 'Image must be 2D or 3D'
+        rows, cols = image.shape
+        assert image.ndim == 2, 'Image must be 2D'
 
     tform = AffineTransform(rotation=angle, scale=(1 / scale, 1))
     corners = np.array([
@@ -567,15 +546,10 @@ def _rotate(image: _T_pil_or_np,
 
     # params for scipy
     # swap X and Y axis for scipy
-    pdata = tform.params.copy()[[1, 0, 2], :][:, [1, 0, 2]]
-    # we copy the translation vector
-    offset = pdata[:2, 2].copy()
-    # scipy expects a 3x3 *linear* matrix (to include channel axis), we don't want the channel axis to be modified
-    pdata[:2, 2] = 0
-    if use_skimage_warp:
-        return tform, warp(image, tform, output_shape=output_shape, order=order, cval=cval, clip=False, preserve_range=True)
-    else:
-        return tform, affine_transform(image, pdata, offset=(*offset, 0), output_shape=(*output_shape, *image.shape[2:]), cval=cval, order=order)
+    pdata = tform.params[[1, 0, 2], :][:, [1, 0, 2]]
+    # grid-constant gives the same output as skimage's warp() with
+    # mode='constant' for order=0
+    return tform, affine_transform(image, pdata[:2, :2], offset=pdata[:2, 2], output_shape=output_shape, cval=cval, order=order, mode='grid-constant')
 
 
 def line_regions(line, regions):
@@ -644,8 +618,7 @@ def _calc_seam(baseline, polygon, angle, im_feats, bias=150):
                                    angle,
                                    center=extrema[0],
                                    scale=scale,
-                                   cval=MASK_VAL,
-                                   use_skimage_warp=True)
+                                   cval=MASK_VAL)
     # ensure to cut off padding after rotation
     x_offsets = np.sort(np.around(tform.inverse(extrema)[:, 0]).astype('int'))
     rotated_patch = rotated_patch[:, x_offsets[0]:x_offsets[1] + 1]
@@ -1473,7 +1446,8 @@ def extract_polygons(im: Image.Image,
         im: Input image
         bounds: A Segmentation class containing a bounding box or baseline
                 segmentation.
-        legacy: Use the old, slow, and deprecated path
+        legacy: Deprecated and ignored. The legacy polygon extractor has been
+                removed.
 
     Yields:
         The extracted subimage, and the corresponding bounding box or baseline
@@ -1484,6 +1458,9 @@ def extract_polygons(im: Image.Image,
         * No bounding polygon defined for a baseline.
         * Baseline, bounding polygon, or bounding box extending beyond image extents
     """
+    if legacy:
+        warnings.warn('The `legacy` argument of `extract_polygons` is deprecated, ignored, and will be removed with kraken 8.',
+                      DeprecationWarning)
     if bounds.type == 'baselines':
         # select proper interpolation scheme depending on shape
         if im.mode == '1':
@@ -1509,164 +1486,82 @@ def extract_polygons(im: Image.Image,
             if (baseline < 0).any() or (baseline.max(axis=0)[::-1] >= imshape).any():
                 raise ValueError('Baseline outside of image bounds')
 
-            if legacy:
-                im = np.asarray(im)
-                # Old, slow, and deprecated path
-                # fast path for straight baselines requiring only rotation
-                if len(baseline) == 2:
-                    baseline = baseline.astype(float)
-                    # calculate direction vector
-                    lengths = np.linalg.norm(np.diff(baseline.T), axis=0)
-                    p_dir = np.mean(np.diff(baseline.T) * lengths / lengths.sum(), axis=1)
-                    p_dir = (p_dir.T / np.sqrt(np.sum(p_dir**2, axis=-1)))
-                    angle = np.arctan2(p_dir[1], p_dir[0])
-                    patch = im[r_min:r_max + 1, c_min:c_max + 1].copy()
-                    offset_polygon = pl - (c_min, r_min)
-                    offset_polygon2 = offset_polygon.flatten().tolist()
-                    img = Image.new('L', patch.shape[:2][::-1], 0)
-                    ImageDraw.Draw(img).polygon(offset_polygon2, outline=1, fill=1)
-                    mask = np.asarray(img, dtype=bool)
-                    patch[np.invert(mask)] = 0
-                    extrema = offset_polygon[(0, -1), :]
-                    # scale line image to max 600 pixel width
-                    tform, rotated_patch = _rotate(patch, angle, center=extrema[0], scale=1.0, cval=0)
-                    i = Image.fromarray(rotated_patch.astype('uint8'))
-                # normal slow path with piecewise affine transformation
-                else:
-                    if len(pl) > 50:
-                        pl = approximate_polygon(pl, 2)
-                    full_polygon = subdivide_polygon(pl, preserve_ends=True)
-                    pl = geom.MultiPoint(full_polygon)
+            # fast path for straight baselines requiring only rotation
+            if len(baseline) == 2:
+                baseline = baseline.astype(float)
+                # calculate direction vector
+                lengths = np.linalg.norm(np.diff(baseline.T), axis=0)
+                p_dir = np.mean(np.diff(baseline.T) * lengths / lengths.sum(), axis=1)
+                p_dir = (p_dir.T / np.sqrt(np.sum(p_dir**2, axis=-1)))
+                angle = np.arctan2(p_dir[1], p_dir[0])
+                # crop out bounding box
+                patch = im.crop((c_min, r_min, c_max + 1, r_max + 1))
+                offset_polygon = pl - (c_min, r_min)
+                patch = apply_polygonal_mask(patch, offset_polygon, cval=0)
+                extrema = offset_polygon[(0, -1), :]
+                tform, i = _rotate(patch, angle, center=extrema[0], scale=1.0, cval=0, order=order)
+            # normal slow path with piecewise affine transformation
+            else:
+                if len(pl) > 50:
+                    pl = approximate_polygon(pl, 2)
+                full_polygon = subdivide_polygon(pl, preserve_ends=True)
 
-                    bl = zip(baseline[:-1:], baseline[1::])
-                    bl = [geom.LineString(x) for x in bl]
-                    cum_lens = np.cumsum([0] + [line.length for line in bl])
-                    # distance of intercept from start point and number of line segment
-                    control_pts = []
-                    for point in pl.geoms:
-                        npoint = np.array(point.coords)[0]
-                        line_idx, dist, intercept = min(((idx, line.project(point),
-                                                        np.array(line.interpolate(line.project(point)).coords)) for idx, line in enumerate(bl)),
-                                                        key=lambda x: np.linalg.norm(npoint - x[2]))
-                        # absolute distance from start of line
-                        line_dist = cum_lens[line_idx] + dist
-                        intercept = np.array(intercept)
-                        # side of line the point is at
-                        side = np.linalg.det(np.array([[baseline[line_idx + 1][0] - baseline[line_idx][0],
-                                                        npoint[0] - baseline[line_idx][0]],
-                                                       [baseline[line_idx + 1][1] - baseline[line_idx][1],
-                                                           npoint[1] - baseline[line_idx][1]]]))
-                        side = np.sign(side)
-                        # signed perpendicular distance from the rectified distance
-                        per_dist = side * np.linalg.norm(npoint - intercept)
-                        control_pts.append((line_dist, per_dist))
-                    # calculate baseline destination points
-                    bl_dst_pts = baseline[0] + np.dstack((cum_lens, np.zeros_like(cum_lens)))[0]
-                    # calculate bounding polygon destination points
-                    pol_dst_pts = np.array([baseline[0] + (line_dist, per_dist) for line_dist, per_dist in control_pts])
-                    # extract bounding box patch
-                    c_dst_min, c_dst_max = int(pol_dst_pts[:, 0].min()), int(pol_dst_pts[:, 0].max())
-                    r_dst_min, r_dst_max = int(pol_dst_pts[:, 1].min()), int(pol_dst_pts[:, 1].max())
-                    output_shape = np.around((r_dst_max - r_dst_min + 1, c_dst_max - c_dst_min + 1))
-                    patch = im[r_min:r_max + 1, c_min:c_max + 1].copy()
-                    # offset src points by patch shape
-                    offset_polygon = full_polygon - (c_min, r_min)
-                    offset_baseline = baseline - (c_min, r_min)
-                    # offset dst point by dst polygon shape
-                    offset_bl_dst_pts = bl_dst_pts - (c_dst_min, r_dst_min)
-                    offset_pol_dst_pts = pol_dst_pts - (c_dst_min, r_dst_min)
-                    # mask out points outside bounding polygon
-                    offset_polygon2 = offset_polygon.flatten().tolist()
-                    img = Image.new('L', patch.shape[:2][::-1], 0)
-                    ImageDraw.Draw(img).polygon(offset_polygon2, outline=1, fill=1)
-                    mask = np.asarray(img, dtype=bool)
-                    patch[np.invert(mask)] = 0
-                    # estimate piecewise transform
-                    src_points = np.concatenate((offset_baseline, offset_polygon))
-                    dst_points = np.concatenate((offset_bl_dst_pts, offset_pol_dst_pts))
-                    tform = FastPiecewiseAffineTransform()
-                    tform.estimate(src_points, dst_points)
-                    o = warp(patch, tform.inverse, output_shape=output_shape, preserve_range=True, order=order)
-                    i = Image.fromarray(o.astype('uint8'))
+                # baseline segment vectors
+                diff_bl = np.diff(baseline, axis=0)
+                diff_bl_norms = np.linalg.norm(diff_bl, axis=1)
+                diff_bl_normed = diff_bl / diff_bl_norms[:, None]
 
-            else:  # if not legacy
-                # new, fast, and efficient path
-                # fast path for straight baselines requiring only rotation
-                if len(baseline) == 2:
-                    baseline = baseline.astype(float)
-                    # calculate direction vector
-                    lengths = np.linalg.norm(np.diff(baseline.T), axis=0)
-                    p_dir = np.mean(np.diff(baseline.T) * lengths / lengths.sum(), axis=1)
-                    p_dir = (p_dir.T / np.sqrt(np.sum(p_dir**2, axis=-1)))
-                    angle = np.arctan2(p_dir[1], p_dir[0])
-                    # crop out bounding box
-                    patch = im.crop((c_min, r_min, c_max + 1, r_max + 1))
-                    offset_polygon = pl - (c_min, r_min)
-                    patch = apply_polygonal_mask(patch, offset_polygon, cval=0)
-                    extrema = offset_polygon[(0, -1), :]
-                    tform, i = _rotate(patch, angle, center=extrema[0], scale=1.0, cval=0, order=order)
-                # normal slow path with piecewise affine transformation
-                else:
-                    if len(pl) > 50:
-                        pl = approximate_polygon(pl, 2)
-                    full_polygon = subdivide_polygon(pl, preserve_ends=True)
+                l_poly = len(full_polygon)
+                cum_lens = np.cumsum([0] + np.linalg.norm(diff_bl, axis=1).tolist())
 
-                    # baseline segment vectors
-                    diff_bl = np.diff(baseline, axis=0)
-                    diff_bl_norms = np.linalg.norm(diff_bl, axis=1)
-                    diff_bl_normed = diff_bl / diff_bl_norms[:, None]
+                # calculate baseline destination points :
+                bl_dst_pts = baseline[0] + np.dstack((cum_lens, np.zeros_like(cum_lens)))[0]
 
-                    l_poly = len(full_polygon)
-                    cum_lens = np.cumsum([0] + np.linalg.norm(diff_bl, axis=1).tolist())
+                # calculate bounding polygon destination points :
+                # diff[k, p] = baseline[k] - polygon[p]
+                poly_bl_diff = full_polygon[None, :] - baseline[:-1, None]
+                # local x coordinates of polygon points on baseline segments
+                # x[k, p] = (baseline[k] - polygon[p]) . (baseline[k+1] - baseline[k]) / |baseline[k+1] - baseline[k]|
+                poly_bl_x = np.einsum('kpm,km->kp', poly_bl_diff, diff_bl_normed)
+                # distance to baseline segments
+                poly_bl_segdist = np.maximum(-poly_bl_x, poly_bl_x - diff_bl_norms[:, None])
+                # closest baseline segment index
+                poly_closest_bl = np.argmin((poly_bl_segdist), axis=0)
+                poly_bl_x = poly_bl_x[poly_closest_bl, np.arange(l_poly)]
+                poly_bl_diff = poly_bl_diff[poly_closest_bl, np.arange(l_poly)]
+                # signed distance between polygon points and baseline segments (to get y coordinates)
+                poly_bl_y = np.cross(diff_bl_normed[poly_closest_bl], poly_bl_diff)
+                # final destination points
+                pol_dst_pts = np.array(
+                    [cum_lens[poly_closest_bl] + poly_bl_x, poly_bl_y]
+                ).T + baseline[:1]
 
-                    # calculate baseline destination points :
-                    bl_dst_pts = baseline[0] + np.dstack((cum_lens, np.zeros_like(cum_lens)))[0]
+                # extract bounding box patch
+                c_dst_min, c_dst_max = int(pol_dst_pts[:, 0].min()), int(pol_dst_pts[:, 0].max())
+                r_dst_min, r_dst_max = int(pol_dst_pts[:, 1].min()), int(pol_dst_pts[:, 1].max())
+                output_shape = np.around((r_dst_max - r_dst_min + 1, c_dst_max - c_dst_min + 1))
+                patch = im.crop((c_min, r_min, c_max + 1, r_max + 1))
+                # offset src points by patch shape
+                offset_polygon = full_polygon - (c_min, r_min)
+                offset_baseline = baseline - (c_min, r_min)
+                # offset dst point by dst polygon shape
+                offset_bl_dst_pts = bl_dst_pts - (c_dst_min, r_dst_min)
+                # mask out points outside bounding polygon
+                patch = apply_polygonal_mask(patch, offset_polygon, cval=0)
 
-                    # calculate bounding polygon destination points :
-                    # diff[k, p] = baseline[k] - polygon[p]
-                    poly_bl_diff = full_polygon[None, :] - baseline[:-1, None]
-                    # local x coordinates of polygon points on baseline segments
-                    # x[k, p] = (baseline[k] - polygon[p]) . (baseline[k+1] - baseline[k]) / |baseline[k+1] - baseline[k]|
-                    poly_bl_x = np.einsum('kpm,km->kp', poly_bl_diff, diff_bl_normed)
-                    # distance to baseline segments
-                    poly_bl_segdist = np.maximum(-poly_bl_x, poly_bl_x - diff_bl_norms[:, None])
-                    # closest baseline segment index
-                    poly_closest_bl = np.argmin((poly_bl_segdist), axis=0)
-                    poly_bl_x = poly_bl_x[poly_closest_bl, np.arange(l_poly)]
-                    poly_bl_diff = poly_bl_diff[poly_closest_bl, np.arange(l_poly)]
-                    # signed distance between polygon points and baseline segments (to get y coordinates)
-                    poly_bl_y = np.cross(diff_bl_normed[poly_closest_bl], poly_bl_diff)
-                    # final destination points
-                    pol_dst_pts = np.array(
-                        [cum_lens[poly_closest_bl] + poly_bl_x, poly_bl_y]
-                    ).T + baseline[:1]
-
-                    # extract bounding box patch
-                    c_dst_min, c_dst_max = int(pol_dst_pts[:, 0].min()), int(pol_dst_pts[:, 0].max())
-                    r_dst_min, r_dst_max = int(pol_dst_pts[:, 1].min()), int(pol_dst_pts[:, 1].max())
-                    output_shape = np.around((r_dst_max - r_dst_min + 1, c_dst_max - c_dst_min + 1))
-                    patch = im.crop((c_min, r_min, c_max + 1, r_max + 1))
-                    # offset src points by patch shape
-                    offset_polygon = full_polygon - (c_min, r_min)
-                    offset_baseline = baseline - (c_min, r_min)
-                    # offset dst point by dst polygon shape
-                    offset_bl_dst_pts = bl_dst_pts - (c_dst_min, r_dst_min)
-                    # mask out points outside bounding polygon
-                    patch = apply_polygonal_mask(patch, offset_polygon, cval=0)
-
-                    # estimate piecewise transform by beveling angles
-                    source_envelope, target_envelope = _bevelled_warping_envelope(offset_baseline, offset_bl_dst_pts[0], output_shape)
-                    # mesh for PIL, as (box, quad) tuples : box is (NW, SE) and quad is (NW, SW, SE, NE)
-                    deform_mesh = [
-                        (
-                            (*target_envelope[i], *target_envelope[i + 3]),
-                            (*source_envelope[i], *source_envelope[i + 1], *source_envelope[i + 3], *source_envelope[i + 2])
-                        )
-                        for i in range(0, len(source_envelope) - 3, 2)
-                    ]
-                    # warp
-                    resample = {0: Resampling.NEAREST, 1: Resampling.BILINEAR, 2: Resampling.BICUBIC, 3: Resampling.BICUBIC}.get(order, Resampling.NEAREST)
-                    i = patch.transform((output_shape[1], output_shape[0]), Image.MESH, data=deform_mesh, resample=resample)
+                # estimate piecewise transform by beveling angles
+                source_envelope, target_envelope = _bevelled_warping_envelope(offset_baseline, offset_bl_dst_pts[0], output_shape)
+                # mesh for PIL, as (box, quad) tuples : box is (NW, SE) and quad is (NW, SW, SE, NE)
+                deform_mesh = [
+                    (
+                        (*target_envelope[i], *target_envelope[i + 3]),
+                        (*source_envelope[i], *source_envelope[i + 1], *source_envelope[i + 3], *source_envelope[i + 2])
+                    )
+                    for i in range(0, len(source_envelope) - 3, 2)
+                ]
+                # warp
+                resample = {0: Resampling.NEAREST, 1: Resampling.BILINEAR, 2: Resampling.BICUBIC, 3: Resampling.BICUBIC}.get(order, Resampling.NEAREST)
+                i = patch.transform((output_shape[1], output_shape[0]), Image.MESH, data=deform_mesh, resample=resample)
 
             yield i.crop(i.getbbox()), line
     else:

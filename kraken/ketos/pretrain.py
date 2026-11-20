@@ -116,7 +116,7 @@ Image.MAX_IMAGE_PIXELS = 20000 ** 2
               '--gamma',
               type=float,
               help='Decay factor for exponential, step, and reduceonplateau learning rate schedules')
-@click.option('--legacy-polygons', is_flag=True, help='Use the legacy polygon extractor.')
+@click.option('--legacy-polygons', is_flag=True, help='Deprecated and ignored.')
 @click.option('-ss',
               '--step-size',
               type=int,

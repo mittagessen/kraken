@@ -16,6 +16,7 @@
 Utility functions for data loading and training of VGSL networks.
 """
 import io
+import warnings
 import json
 import torch
 import numpy as np
@@ -345,6 +346,8 @@ class PolygonGTDataset(Dataset):
             im_transforms: Function taking an PIL.Image and returning a tensor
                            suitable for forward passes.
             augmentation: Enables augmentation.
+            legacy_polygons: Deprecated and ignored. The legacy polygon
+                             extractor has been removed.
             max_width: Maximum sample width after transformation. Wider
                        samples are treated as invalid and resampled.
             subsampling: Width subsampling factor of the network. Samples
@@ -360,7 +363,9 @@ class PolygonGTDataset(Dataset):
         self.aug = None
         self.skip_empty_lines = skip_empty_lines
         self.failed_samples = set()
-        self.legacy_polygons = legacy_polygons
+        if legacy_polygons:
+            warnings.warn('The `legacy_polygons` argument of `PolygonGTDataset` is deprecated, ignored, and will be removed with kraken 8.',
+                          DeprecationWarning)
         self.max_width = max_width
         self.subsampling = subsampling
 
@@ -482,8 +487,7 @@ class PolygonGTDataset(Dataset):
                                                                            boundary=item[0][2])],
                                                        script_detection=True,
                                                        regions={},
-                                                       line_orders=[]),
-                                          legacy=self.legacy_polygons))
+                                                       line_orders=[])))
             im = self.transforms(im)
             if im.shape[0] == 3:
                 im_mode = b'R'
