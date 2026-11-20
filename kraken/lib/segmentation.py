@@ -15,12 +15,15 @@
 """
 Processing for baseline segmenter output
 """
+import math
 import logging
 from collections import defaultdict
 from collections.abc import Sequence, Generator
+from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Literal, Optional, Union, TypeVar, Any
 
 import numpy as np
+import shapely
 import shapely.geometry as geom
 import torch
 import torch.nn.functional as F
@@ -31,7 +34,7 @@ from scipy.ndimage import (binary_erosion, distance_transform_cdt,
 from scipy.signal import convolve2d
 from shapely.ops import nearest_points, unary_union
 from shapely.validation import explain_validity
-from skimage import draw, filters
+from skimage import draw
 from skimage.filters import sobel
 from skimage.graph import MCP_Connect
 from skimage.measure import (approximate_polygon, label, regionprops,
@@ -174,16 +177,7 @@ def topsort(order: np.ndarray) -> list[int]:
     return L
 
 
-def moore_neighborhood(current, backtrack):
-    operations = np.array([[-1, 0], [-1, 1], [0, 1], [1, 1], [1, 0], [1, -1],
-                           [0, -1], [-1, -1]])
-    neighbors = (current + operations).astype(int)
-
-    for i, point in enumerate(neighbors):
-        if np.all(point == backtrack):
-            # we return the sorted neighborhood
-            return np.concatenate((neighbors[i:], neighbors[:i]))
-    return 0
+_MOORE_OPS = ((-1, 0), (-1, 1), (0, 1), (1, 1), (1, 0), (1, -1), (0, -1), (-1, -1))
 
 
 def boundary_tracing(region):
@@ -207,7 +201,7 @@ def boundary_tracing(region):
     coords = region.coords
     mins = np.amin(coords, axis=0)
     maxs = np.amax(coords, axis=0)
-    binary = np.zeros((maxs[0] - mins[0] + 3, maxs[1] - mins[1] + 3))
+    binary = np.zeros((maxs[0] - mins[0] + 3, maxs[1] - mins[1] + 3), dtype=np.uint8)
     y = coords[:, 0] - mins[0] + 1
     x = coords[:, 1] - mins[1] + 1
     binary[tuple([y, x])] = 1
@@ -216,7 +210,7 @@ def boundary_tracing(region):
     # starting point is the most upper left point
     idx_start = 0
     while True:  # asserting that the starting point is not isolated
-        start = [y[idx_start], x[idx_start]]
+        start = (int(y[idx_start]), int(x[idx_start]))
         focus_start = binary[start[0] - 1:start[0] + 2, start[1] - 1:start[1] + 2]
         if np.sum(focus_start) > 1:
             break
@@ -224,24 +218,29 @@ def boundary_tracing(region):
 
     # Determining backtrack pixel for the first element
     if (binary[start[0] + 1, start[1]] == 0 and binary[start[0] + 1, start[1] - 1] == 0):
-        backtrack_start = [start[0] + 1, start[1]]
+        backtrack_start = (start[0] + 1, start[1])
     else:
-        backtrack_start = [start[0], start[1] - 1]
+        backtrack_start = (start[0], start[1] - 1)
 
+    # the walk runs on plain python ints as a numpy call per pixel is slow
+    rows = binary.tolist()
     current = start
     backtrack = backtrack_start
     boundary = []
 
     while True:
-        neighbors_current = moore_neighborhood(current, backtrack)
-        y = neighbors_current[:, 0]
-        x = neighbors_current[:, 1]
-        idx = np.argmax(binary[tuple([y, x])])
+        cy, cx = current
+        neighbors = [(cy + dy, cx + dx) for dy, dx in _MOORE_OPS]
+        # sort neighborhood clockwise starting at the backtrack pixel
+        i = neighbors.index(backtrack)
+        neighbors = neighbors[i:] + neighbors[:i]
+        # first foreground pixel in the neighborhood
+        idx = next((k for k, (ny, nx) in enumerate(neighbors) if rows[ny][nx]), 0)
         boundary.append(current)
-        backtrack = neighbors_current[idx - 1]
-        current = neighbors_current[idx]
+        backtrack = neighbors[idx - 1]
+        current = neighbors[idx]
 
-        if (np.all(current == start) and np.all(backtrack == backtrack_start)):
+        if current == start and backtrack == backtrack_start:
             break
 
     return np.array(boundary) + [mins[0] - 1, mins[1] - 1]
@@ -313,8 +312,70 @@ class LineMCP(MCP_Connect):
         return 2 if float_cumcost else 0
 
 
+def _sato_scale(x, sigma, gauss):
+    """
+    Sato tubeness of a single scale as computed by skimage.
+    """
+    sd = sigma / math.sqrt(2)
+    gr, gc = gauss(x, sd, (1, 0)), gauss(x, sd, (0, 1))
+    hrr, hrc, hcc = gauss(gr, sd, (1, 0)), gauss(gr, sd, (0, 1)), gauss(gc, sd, (0, 1))
+    largest = (hrr + hcc) / 2 + (hrc ** 2 + ((hrr - hcc) / 2) ** 2) ** 0.5
+    return sigma ** 2 * largest.clip(min=0)
+
+
+def _gaussian_kernel1d(sigma: float, order: int, radius: int) -> np.ndarray:
+    """
+    Gaussian (order 0) or its first derivative (order 1) flipped for
+    correlation.
+    """
+    x = np.arange(-radius, radius + 1)
+    phi = np.exp(-0.5 / sigma ** 2 * x ** 2)
+    phi /= phi.sum()
+    return (phi if order == 0 else -x / sigma ** 2 * phi)[::-1].copy()
+
+
+def _sato(im: np.ndarray,
+          device: Optional[Union[str, torch.device]] = None,
+          num_threads: Optional[int] = 1) -> np.ndarray:
+    """
+    Sato filter. A fairly verbatim reimplementation of `skimage.filters.sato`
+    but with truncation at 8 std.
+
+    Args:
+        im: 2d array.
+        device: On accelerators != cpu the filter is computed with convolutions
+                on the device, otherwise with scipy.
+        num_threads: Maximum number of threads to compute the scales in on the
+                     CPU
+    """
+    sigmas = range(1, 10, 2)
+    if device is not None and torch.device(device).type != 'cpu':
+        def gauss(t, sd, orders):
+            radius = int(8 * sd + 0.5)
+            for axis, order in enumerate(orders):
+                k = torch.as_tensor(_gaussian_kernel1d(sd, order, radius), device=t.device, dtype=t.dtype)
+                shape, pad = [1, 1, 1, 1], [0, 0]
+                shape[2 + axis], pad[axis] = -1, radius
+                t = F.conv2d(t, k.view(shape), padding=tuple(pad))
+            return t
+
+        x = -torch.as_tensor(im, device=device, dtype=torch.float32)[None, None]
+        out = torch.stack([_sato_scale(x, sigma, gauss) for sigma in sigmas]).amax(0)
+        return out[0, 0].cpu().numpy()
+
+    def gauss(t, sd, orders):
+        return gaussian_filter(t, sd, order=orders, mode='constant', truncate=8)
+
+    x = -im.astype(np.float32, copy=False)
+    num_threads = len(sigmas) if num_threads is None else min(len(sigmas), num_threads)
+    with ThreadPoolExecutor(num_threads) as executor:
+        return np.maximum.reduce(list(executor.map(lambda sigma: _sato_scale(x, sigma, gauss), sigmas)))
+
+
 def vectorize_lines(im: np.ndarray, threshold: float = 0.17, min_length=5,
-                    text_direction: str = 'horizontal', max_endpoints: int = 400):
+                    text_direction: str = 'horizontal', max_endpoints: int = 400,
+                    device: Optional[Union[str, torch.device]] = None,
+                    num_threads: Optional[int] = 1):
     """
     Vectorizes lines from a binarized array.
 
@@ -331,6 +392,9 @@ def vectorize_lines(im: np.ndarray, threshold: float = 0.17, min_length=5,
                              path algorithm creates O(n²) connections between
                              endpoints within connected components, so large
                              endpoint counts cause excessive memory use.
+        device: torch device to run the ridge filter on.
+        num_threads: Maximum number of threads for the ridge filter on the
+                     CPU.
 
     Returns:
         [[x0, y0, ... xn, yn], [xm, ym, ..., xk, yk], ... ]
@@ -343,7 +407,7 @@ def vectorize_lines(im: np.ndarray, threshold: float = 0.17, min_length=5,
     st_map = im[0]
     end_map = im[1]
     bl_map = im[2]
-    bl_map = filters.sato(bl_map, black_ridges=False, mode='constant')
+    bl_map = _sato(bl_map, device=device, num_threads=num_threads)
     bin_bl_map = bl_map > threshold
     line_skel = skeletonize(bin_bl_map)
     # find end points
@@ -535,26 +599,13 @@ def line_regions(line, regions):
     return regs
 
 
-def _ray_intersect_boundaries(ray, direction, aabb):
+def _ray_intersect_boundaries(rays, direction, aabb):
     """
-    Simplified version of [0] for 2d and AABB anchored at (0,0).
-
-    [0] http://gamedev.stackexchange.com/questions/18436/most-efficient-aabb-vs-ray-collision-algorithms
+    Computes the points where rays starting inside an AABB anchored at (0,0)
+    exit it.
     """
-    dir_fraction = np.empty(2, dtype=ray.dtype)
-    dir_fraction[direction == 0.0] = np.inf
-    dir_fraction[direction != 0.0] = np.divide(1.0, direction[direction != 0.0])
-
-    t1 = (-ray[0]) * dir_fraction[0]
-    t2 = (aabb[0] - ray[0]) * dir_fraction[0]
-    t3 = (-ray[1]) * dir_fraction[1]
-    t4 = (aabb[1] - ray[1]) * dir_fraction[1]
-
-    tmin = max(min(t1, t2), min(t3, t4))
-    tmax = min(max(t1, t2), max(t3, t4))
-
-    t = min(x for x in [tmin, tmax] if x >= 0)
-    return ray + (direction * t)
+    t = np.min([((aabb[i] if d > 0 else 0) - rays[:, i]) / d for i, d in enumerate(direction) if d != 0], axis=0)
+    return rays + direction * np.maximum(t, 0)[:, None]
 
 
 def _calc_seam(baseline, polygon, angle, im_feats, bias=150):
@@ -586,8 +637,9 @@ def _calc_seam(baseline, polygon, angle, im_feats, bias=150):
     patch[mask] = MASK_VAL
     patch += (dist_bias * (np.mean(patch[patch != MASK_VAL]) / bias))
     extrema = baseline[(0, -1), :] - (c_min, r_min)
-    # scale line image to max 600 pixel width
-    scale = min(1.0, 600 / (c_max - c_min))
+    # scale line image to max 600 pixel width along the line
+    extent = (c_max - c_min) if abs(np.cos(angle)) >= abs(np.sin(angle)) else (r_max - r_min)
+    scale = min(1.0, 600 / extent)
     tform, rotated_patch = _rotate(patch,
                                    angle,
                                    center=extrema[0],
@@ -680,68 +732,55 @@ def _extract_patch(env_up, env_bottom, baseline, offset_baseline, end_points, di
     return polygon
 
 
+def _closest_intersects(pts, bounds_intersects, side, near=100):
+    """
+    Returns for each ray pts[i] -> bounds_intersects[i] its intersection with
+    `side` that is closest to pts[i].
+    """
+    rays = shapely.linestrings(np.stack([pts, bounds_intersects], axis=1))
+    short_rays = shapely.linestrings(np.stack([pts, shapely.get_coordinates(shapely.line_interpolate_point(rays, near))], axis=1))
+    parts = shapely.get_parts(side)
+    ray_idx, part_idx = shapely.STRtree(parts).query(short_rays)
+    near_side = np.full(len(pts), None, dtype=object)
+    shapely.multilinestrings(parts[part_idx], indices=ray_idx, out=near_side)
+    inter = shapely.intersection(rays, near_side)
+    # distance is NaN for rays without crossings or parts close to them
+    redo =~(shapely.distance(shapely.points(pts), inter) <= near) | ~np.isin(shapely.get_type_id(inter), (0, 4, 7))
+    if redo.any():
+        inter[redo] = shapely.intersection(rays[redo], side)
+    # ray shorter than the boundary buffer, i.e. point on the page edge
+    empty = shapely.is_empty(inter)
+    invalid = ~empty & ~np.isin(shapely.get_type_id(inter), (0, 4, 7))
+    if invalid.any():
+        raise Exception(f'No intersection with boundaries. Shapely intersection object: {inter[invalid][0].wkt}')
+    out = bounds_intersects.astype(float)
+    out[~empty] = shapely.get_coordinates(shapely.shortest_line(shapely.points(pts[~empty]), inter[~empty]))[1::2]
+    return out
+
+
 def _calc_roi(line, bounds, baselines, suppl_obj, p_dir):
     # interpolate baseline
     ls = geom.LineString(line)
-    ip_line = [line[0]]
-    dist = 10
-    while dist < ls.length:
-        ip_line.append(np.array(ls.interpolate(dist).coords[0]))
-        dist += 10
-    ip_line.append(line[-1])
-    ip_line = np.array(ip_line)
-    upper_bounds_intersects = []
-    bottom_bounds_intersects = []
-    for point in ip_line:
-        upper_bounds_intersects.append(_ray_intersect_boundaries(point, (p_dir * (-1, 1))[::-1], bounds + 1).astype('int'))
-        bottom_bounds_intersects.append(_ray_intersect_boundaries(point, (p_dir * (1, -1))[::-1], bounds + 1).astype('int'))
+    ip_line = np.vstack([line[0],
+                         shapely.get_coordinates(shapely.line_interpolate_point(ls, np.arange(10, ls.length - 1, 10))),
+                         line[-1]])
+    upper_bounds_intersects = _ray_intersect_boundaries(ip_line, (p_dir * (-1, 1))[::-1], bounds + 1).astype('int')
+    bottom_bounds_intersects = _ray_intersect_boundaries(ip_line, (p_dir * (1, -1))[::-1], bounds + 1).astype('int')
     # build polygon between baseline and bbox intersects
-    upper_polygon = geom.Polygon(ip_line.tolist() + upper_bounds_intersects[::-1])
-    bottom_polygon = geom.Polygon(ip_line.tolist() + bottom_bounds_intersects[::-1])
+    upper_polygon = geom.Polygon(np.vstack([ip_line, upper_bounds_intersects[::-1]]))
+    bottom_polygon = geom.Polygon(np.vstack([ip_line, bottom_bounds_intersects[::-1]]))
 
     # select baselines at least partially in each polygon
-    side_a = [geom.LineString(upper_bounds_intersects)]
-    side_b = [geom.LineString(bottom_bounds_intersects)]
+    adj_lines = [geom.LineString(adj_line) for adj_line in baselines + suppl_obj]
+    in_upper = shapely.intersects(upper_polygon, adj_lines)
+    in_bottom = shapely.intersects(bottom_polygon, adj_lines) & ~in_upper
+    side_a = unary_union([geom.LineString(upper_bounds_intersects)] + [x for x, s in zip(adj_lines, in_upper) if s]).buffer(1).boundary
+    side_b = unary_union([geom.LineString(bottom_bounds_intersects)] + [x for x, s in zip(adj_lines, in_bottom) if s]).buffer(1).boundary
 
-    for adj_line in baselines + suppl_obj:
-        adj_line = geom.LineString(adj_line)
-        if upper_polygon.intersects(adj_line):
-            side_a.append(adj_line)
-        elif bottom_polygon.intersects(adj_line):
-            side_b.append(adj_line)
-    side_a = unary_union(side_a).buffer(1).boundary
-    side_b = unary_union(side_b).buffer(1).boundary
-
-    def _find_closest_point(pt, intersects):
-        spt = geom.Point(pt)
-        if intersects.is_empty:
-            raise Exception(f'No intersection with boundaries. Shapely intersection object: {intersects.wkt}')
-        if intersects.geom_type == 'MultiPoint':
-            return min([p for p in intersects.geoms], key=lambda x: spt.distance(x))
-        elif intersects.geom_type == 'Point':
-            return intersects
-        elif intersects.geom_type == 'GeometryCollection' and len(intersects.geoms) > 0:
-            t = min([p for p in intersects.geoms], key=lambda x: spt.distance(x))
-            if t == 'Point':
-                return t
-            else:
-                return nearest_points(spt, t)[1]
-        else:
-            raise Exception(f'No intersection with boundaries. Shapely intersection object: {intersects.wkt}')
-
-    env_up = []
-    env_bottom = []
     # find orthogonal (to linear regression) intersects with adjacent objects to complete roi
-    for point, upper_bounds_intersect, bottom_bounds_intersect in zip(ip_line, upper_bounds_intersects, bottom_bounds_intersects):
-        upper_limit = _find_closest_point(point, geom.LineString(
-            [point, upper_bounds_intersect]).intersection(side_a))
-        bottom_limit = _find_closest_point(point, geom.LineString(
-            [point, bottom_bounds_intersect]).intersection(side_b))
-        env_up.append(upper_limit.coords[0])
-        env_bottom.append(bottom_limit.coords[0])
-    env_up = np.array(env_up, dtype='uint')
-    env_bottom = np.array(env_bottom, dtype='uint')
-    return env_up, env_bottom
+    env_up = _closest_intersects(ip_line, upper_bounds_intersects, side_a)
+    env_bottom = _closest_intersects(ip_line, bottom_bounds_intersects, side_b)
+    return np.array(env_up, dtype='uint'), np.array(env_bottom, dtype='uint'), ip_line
 
 
 def calculate_polygonal_environment(im: Image.Image = None,
@@ -809,17 +848,19 @@ def calculate_polygonal_environment(im: Image.Image = None,
     for idx, line in enumerate(baselines):
         try:
             end_points = (line[0], line[-1])
-            line = geom.LineString(line)
+            line = np.array(line, dtype=float)
             offset = 8 if topline is not None else 0
-            offset_line = line.parallel_offset(offset, side='left' if topline else 'right')
-            line = np.array(line.coords, dtype=float)
-            offset_line = np.array(offset_line.coords, dtype=float)
 
             # calculate magnitude-weighted average direction vector
             lengths = np.linalg.norm(np.diff(line.T), axis=0)
             p_dir = np.mean(np.diff(line.T) * lengths / lengths.sum(), axis=1)
             p_dir = (p_dir.T / np.sqrt(np.sum(p_dir**2, axis=-1)))
-            env_up, env_bottom = _calc_roi(line, bounds, baselines[:idx] + baselines[idx + 1:], suppl_obj, p_dir)
+            env_up, env_bottom, ip_line = _calc_roi(line, bounds, baselines[:idx] + baselines[idx + 1:], suppl_obj, p_dir)
+            # offset line toward the text side, clamped to the ROI depth (e.g.
+            # for lines close to the page edge)
+            env, normal = (env_bottom, np.array((-p_dir[1], p_dir[0]))) if topline else (env_up, np.array((p_dir[1], -p_dir[0])))
+            depth = np.linalg.norm(env - ip_line, axis=1)
+            offset_line = ip_line + np.clip(np.minimum(offset, depth - 2), 0, None)[:, None] * normal
 
             polygons.append(_extract_patch(env_up,
                                            env_bottom,
