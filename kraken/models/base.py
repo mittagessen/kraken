@@ -71,7 +71,8 @@ class BaseModel(ABC):
         """
         An auxiliary attribute of text recognition models to determine if they
         have been trained with data produced using the slow legacy polygon
-        extraction implementation.
+        extraction implementation. Informational only as the legacy extractor
+        has been removed.
         """
         return None
 

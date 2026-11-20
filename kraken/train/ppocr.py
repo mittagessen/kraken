@@ -310,7 +310,7 @@ class PPOCRv6RecognitionModel(KrakenTrainerModule):
                 logger.info(f'Setting seg_type to {train_set.seg_type}.')
                 self.net.seg_type = train_set.seg_type
 
-            self.net.use_legacy_polygons = self.trainer.datamodule.use_legacy_polygons
+            self.net.use_legacy_polygons = False
 
             # Hand the finalised codec back to the datamodule.
             self.trainer.datamodule.hparams.data_config.codec = self.net.codec
@@ -498,7 +498,7 @@ class PPOCRv6RecognitionModel(KrakenTrainerModule):
                             codec=data_config.codec.c2l,
                             seg_type=checkpoint['_seg_type'],
                             one_channel_mode=checkpoint['_one_channel_mode'],
-                            legacy_polygons=data_config.legacy_polygons)
+                            legacy_polygons=False)
 
     def _post_load_checkpoint(self, checkpoint):
         super()._post_load_checkpoint(checkpoint)

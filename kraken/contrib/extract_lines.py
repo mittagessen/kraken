@@ -9,7 +9,7 @@ import click
               'link to source images.')
 @click.option('-i', '--model', default=None, show_default=True, type=click.Path(exists=True),
               help='Baseline detection model to use. Overrides format type and expects image files as input.')
-@click.option('--legacy-polygons', is_flag=True, help='Use the legacy polygon extractor.')
+@click.option('--legacy-polygons', is_flag=True, help='Deprecated and ignored.')
 @click.argument('files', nargs=-1)
 def cli(format_type, model, legacy_polygons, files):
     """
@@ -39,7 +39,7 @@ def cli(format_type, model, legacy_polygons, files):
                 data = xml.XMLPage(doc, format_type)
                 if len(data.lines) > 0:
                     bounds = data.to_container()
-                    for idx, (im, box) in enumerate(segmentation.extract_polygons(open_image(bounds.imagename), bounds, legacy=legacy_polygons)):
+                    for idx, (im, box) in enumerate(segmentation.extract_polygons(open_image(bounds.imagename), bounds)):
                         click.echo('.', nl=False)
                         im.save('{}.{}.jpg'.format(splitext(bounds.imagename)[0], idx))
                         with open('{}.{}.gt.txt'.format(splitext(bounds.imagename)[0], idx), 'w') as fp:
@@ -64,7 +64,7 @@ def cli(format_type, model, legacy_polygons, files):
             click.echo(f'Processing {doc} ', nl=False)
             full_im = open_image(doc)
             bounds = blla.segment(full_im, model=net)
-            for idx, (im, box) in enumerate(segmentation.extract_polygons(full_im, bounds, legacy=legacy_polygons)):
+            for idx, (im, box) in enumerate(segmentation.extract_polygons(full_im, bounds)):
                 click.echo('.', nl=False)
                 im.save('{}.{}.jpg'.format(splitext(doc)[0], idx))
             click.echo()

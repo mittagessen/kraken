@@ -576,7 +576,7 @@ def segment(ctx, **kwargs):
               'no_legacy_polygons',
               is_flag=True,
               default=False,
-              help="Force disable the legacy polygon extractor")
+              help="Deprecated and ignored.")
 @click.option('--linetype',
               type=click.Choice(['baselines', 'bbox']),
               help='Forces the line type used when parsing XML input. If not '

@@ -215,16 +215,14 @@ class RecognitionPretrainModel(KrakenTrainerModule):
         data_config = checkpoint['datamodule_hyper_parameters']['data_config']
         # Handle both config objects and serialized dicts.
         if isinstance(data_config, dict):
-            legacy_polygons = data_config.get('legacy_polygons', False)
             codec = data_config.get('codec')
         else:
-            legacy_polygons = getattr(data_config, 'legacy_polygons', False)
             codec = getattr(data_config, 'codec', None)
         if codec is not None and hasattr(codec, 'c2l'):
             codec = codec.c2l
         return create_model('TorchVGSLModel',
                             model_type=['recognition'],
-                            legacy_polygons=legacy_polygons,
+                            legacy_polygons=False,
                             seg_type=checkpoint['_seg_type'],
                             one_channel_mode=checkpoint['_one_channel_mode'],
                             vgsl=checkpoint['_module_config'].spec,

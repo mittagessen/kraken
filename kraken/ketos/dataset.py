@@ -58,7 +58,7 @@ from .util import _validate_manifests
                    'output file. Larger batches require more transient memory '
                    'but slightly improve reading performance.')
 @click.option('--legacy-polygons', show_default=True, default=False, is_flag=True,
-              help='Use the old polygon extractor.')
+              help='Deprecated and ignored.')
 @click.argument('ground_truth', nargs=-1, type=click.Path(exists=True, dir_okay=False))
 def compile(ctx, output, format_type, files, linetype, force_type, skip_empty_lines,
             recordbatch_size, ground_truth, legacy_polygons):

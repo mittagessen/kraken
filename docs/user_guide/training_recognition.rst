@@ -400,7 +400,6 @@ train
                                     store the logs. If not set, a directory
                                     will be created in the current working
                                     directory.
-    --legacy-polygons               Use the legacy polygon extractor.
 
 Evaluation
 ----------
@@ -450,7 +449,6 @@ test
                                     Ground truth normalization
     -n, --normalize-whitespace / --no-normalize-whitespace
                                     Normalizes unicode whitespace
-    --no-legacy-polygons            Force disable the legacy polygon extractor.
 
 Pretraining
 -----------

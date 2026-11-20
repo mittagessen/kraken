@@ -5,6 +5,7 @@ kraken.configs.base
 Base classes for configurations
 """
 import logging
+import warnings
 
 from collections import defaultdict
 
@@ -207,7 +208,8 @@ class RecognitionInferenceConfig(Config):
         num_line_workers (int, defaults to 2):
             Number of worker processes to extract lines from images.
         no_legacy_polygons (bool, defaults to False):
-            disables the fast path for polygonal line extraction
+            Deprecated and ignored. The legacy polygon extractor has been
+            removed.
         linetype (Optional[Literal['baselines', 'bbox']], defaults to None):
             Line type used when parsing XML input files. If None the type is
             derived from the recognition model's `seg_type`.
@@ -231,6 +233,9 @@ class RecognitionInferenceConfig(Config):
         self.padding = kwargs.pop('padding', 16)
         self.num_line_workers = kwargs.pop('num_line_workers', 2)
         self.no_legacy_polygons = kwargs.pop('no_legacy_polygons', False)
+        if self.no_legacy_polygons:
+            warnings.warn('The `no_legacy_polygons` option is deprecated, ignored, and will be removed with kraken 8.',
+                          DeprecationWarning)
         self.linetype = kwargs.pop('linetype', None)
         self.decoder = kwargs.pop('decoder', kraken.lib.ctc_decoder.greedy_decoder)
         self.bidi_reordering = kwargs.pop('bidi_reordering', True)

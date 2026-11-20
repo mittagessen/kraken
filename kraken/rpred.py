@@ -86,6 +86,8 @@ class mm_rpred(object):
                              direction.
             tags_ignore: list of tag key-value pairs to ignore during
                          recognition
+            no_legacy_polygons: Ignored. The legacy polygon extractor has been
+                                removed.
 
         Yields:
             An ocr_record containing the recognized text, absolute character
@@ -179,7 +181,6 @@ class mm_rpred(object):
         self.pad = pad
         self.bounds = bounds
         self.tags_ignore = tags_ignore
-        self.no_legacy_polygons = no_legacy_polygons
 
     def _recognize_box_line(self, line):
         prediction = ''
@@ -194,11 +195,9 @@ class mm_rpred(object):
 
         tag, net = self._resolve_type_to_model(line.tags, self.nets)
 
-        use_legacy_polygons = self._choose_legacy_polygon_extractor(net)
-
         seg = dataclasses.replace(self.bounds, lines=[line])
         try:
-            box, line = next(extract_polygons(self.im, seg, legacy=use_legacy_polygons))
+            box, line = next(extract_polygons(self.im, seg))
         except ValueError as e:
             logger.warning(f'Extracting line failed: {e}')
             return BBoxOCRRecord('', [], [], line)
@@ -270,10 +269,8 @@ class mm_rpred(object):
 
         tag, net = self._resolve_type_to_model(line.tags, self.nets)
 
-        use_legacy_polygons = self._choose_legacy_polygon_extractor(net)
-
         try:
-            box, coords = next(extract_polygons(self.im, seg, legacy=use_legacy_polygons))
+            box, coords = next(extract_polygons(self.im, seg))
         except ValueError as e:
             logger.warning(f'Extracting line failed: {e}')
             return BaselineOCRRecord('', [], [], line)
@@ -329,17 +326,6 @@ class mm_rpred(object):
     def _scale_val(self, val, min_val, max_val):
         return int(round(min(max(((val * self.net_scale) - self.pad) * self.in_scale, min_val), max_val - 1)))
 
-    def _choose_legacy_polygon_extractor(self, net) -> bool:
-        # grouping the checks here to display warnings only once
-        if net.nn.use_legacy_polygons:
-            if self.no_legacy_polygons:
-                warnings.warn('Enforcing use of the new polygon extractor for models trained with old version. Accuracy may be affected.')
-                return False
-            else:
-                warnings.warn('Using legacy polygon extractor, as the model was not trained with the new method. Please retrain your model to get speed improvement.')
-                return True
-        return False
-
 
 def rpred(network: 'TorchSeqRecognizer',
           im: 'Image.Image',
@@ -361,6 +347,8 @@ def rpred(network: 'TorchSeqRecognizer',
         bidi_reordering: Reorder classes in the ocr_record according to the
                          Unicode bidirectional algorithm for correct display.
                          Set to L|R to change base text direction.
+        no_legacy_polygons: Ignored. The legacy polygon extractor has been
+                            removed.
 
     Yields:
         An ocr_record containing the recognized text, absolute character
