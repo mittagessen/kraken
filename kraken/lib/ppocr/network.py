@@ -24,17 +24,22 @@ from typing import Optional, Tuple
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from .backbone import PPLCNetV4, PPOCRv6Variant
 from .necks import build_neck
 from .heads import CTCHead
 
-__all__ = ['MODEL_VARIANTS', 'PPOCRv6Variant', 'PPOCRv6Recognizer',
+__all__ = ['MODEL_VARIANTS', 'PPOCRv6Variant', 'PPOCRv6Recognizer', 'RIGHT_CONTEXT',
            'WIDTH_SUBSAMPLING', 'build_recognizer']
-
 
 # total width subsampling of the recognizer (stem stride 4 × final pooling 2)
 WIDTH_SUBSAMPLING = 8
+
+# Right-hand receptive field (in input pixels) of the outputs of a line past
+# its end, i.e. the padding a line needs so its outputs do not depend on the
+# batch it is in.
+RIGHT_CONTEXT = 56
 
 
 # Architecture hyper-parameters for each PP-OCRv6 recognition variant.
@@ -62,17 +67,12 @@ MODEL_VARIANTS = {
 }
 
 
-@torch.compiler.disable
-def _lengths_and_mask(seq_lens, w_in, w_out, device):
+def _lengths_and_mask(seq_lens, w_out, device):
     """
     Map per-sample input widths to output sequence lengths and a per-timestep
     validity mask (N, W') for masking the neck attention.
-
-    Runs eagerly (``torch.compiler.disable``) to keep the ``w_out / w_in`` ratio
-    out of the compile trace, which otherwise spams value-range warnings.
     """
-    scaled = (seq_lens.to(device=device, dtype=torch.float32) * (w_out / float(w_in))).floor().long()
-    out_lens = scaled.clamp(min=1, max=w_out)
+    out_lens = (seq_lens.to(device) // WIDTH_SUBSAMPLING).clamp(min=1, max=w_out)
     positions = torch.arange(w_out, device=device)
     mask = positions[None, :] < out_lens[:, None]
     return out_lens, mask
@@ -84,7 +84,7 @@ class PPOCRv6Recognizer(nn.Module):
 
     ``forward(image, seq_lens)`` returns ``(logits, out_lens)`` where ``image``
     is ``(N, C, H, W)``, ``logits`` is ``(N, num_classes, 1, W')`` and
-    ``out_lens`` is ``(N,)`` (or ``None``). Class 0 is the CTC blank.
+    ``out_lens`` is ``(N,)``. Class 0 is the CTC blank.
     """
 
     def __init__(self, backbone: nn.Module, neck: nn.Module, head: nn.Module,
@@ -104,14 +104,13 @@ class PPOCRv6Recognizer(nn.Module):
 
         Returns ``(logits (N, num_classes, 1, W'), out_lens, feat (N, C, 1, W'))``.
         """
-        w_in = x.shape[3]
-        feat = self.backbone(x)                # (N, C, 1, W')
+        feat = self.backbone(x, seq_lens)      # (N, C, 1, W')
         w_out = feat.shape[3]
 
         out_lens = None
         mask = None
         if seq_lens is not None:
-            out_lens, mask = _lengths_and_mask(seq_lens, w_in, w_out, feat.device)
+            out_lens, mask = _lengths_and_mask(seq_lens, w_out, feat.device)
 
         seq = self.neck(feat, mask)            # (N, W', Cn)
         logits = self.head(seq)                # (N, W', num_classes)
@@ -120,7 +119,17 @@ class PPOCRv6Recognizer(nn.Module):
 
     def forward(self, x: torch.Tensor,
                 seq_lens: Optional[torch.Tensor] = None
-                ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+                ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Inference forward pass. Right-pads the batch so that every line has
+        at least ``RIGHT_CONTEXT`` pixels of padding, making the outputs of a
+        line independent of the other lines in the batch.
+        """
+        if seq_lens is None:
+            seq_lens = torch.full((x.shape[0],), x.shape[3], dtype=torch.long)
+        pad = int(seq_lens.max()) + RIGHT_CONTEXT - x.shape[3]
+        if pad > 0:
+            x = F.pad(x, (0, pad))
         logits, out_lens, _ = self.forward_train(x, seq_lens)
         return logits, out_lens
 

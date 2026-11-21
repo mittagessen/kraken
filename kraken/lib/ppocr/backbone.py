@@ -165,9 +165,19 @@ class SELayer(nn.Module):
         self.conv2 = nn.Conv2d(channel // reduction, channel, 1)
         self.hardsigmoid = nn.Hardsigmoid()
 
-    def forward(self, x):
+    def forward(self, x, mask=None):
+        """
+        Args:
+            x: feature map ``(N, C, H, W)``.
+            mask: optional ``(N, 1, 1, W)`` validity mask of the columns. If
+                  given, the squeeze averages over the valid columns only so
+                  the gating is independent of the batch padding.
+        """
         identity = x
-        x = x.mean(dim=(2, 3), keepdim=True)
+        if mask is None:
+            x = x.mean(dim=(2, 3), keepdim=True)
+        else:
+            x = (x * mask).sum(dim=(2, 3), keepdim=True) / (mask.sum(dim=3, keepdim=True) * x.shape[2])
         x = self.relu(self.conv1(x))
         x = self.hardsigmoid(self.conv2(x))
         return identity * x
@@ -209,6 +219,7 @@ class LCNetV4Block(nn.Module):
         stride_t = _pair(stride)
         self.has_residual = in_channels == out_channels and stride_t == (1, 1)
         self.use_rep_dw = self.has_residual
+        self.use_se = use_se
 
         token_mixer = nn.Sequential()
         if self.use_rep_dw:
@@ -237,8 +248,10 @@ class LCNetV4Block(nn.Module):
                                           bn_weight_init=compress_bn_init))
         self.channel_mixer = channel_mixer
 
-    def forward(self, x):
-        x = self.token_mixer(x)
+    def forward(self, x, mask=None):
+        x = self.token_mixer[0](x)
+        if self.use_se:
+            x = self.token_mixer.se(x, mask)
         if self.has_residual:
             return x + self.channel_mixer(x)
         return self.channel_mixer(x)
@@ -329,13 +342,24 @@ class PPLCNetV4(nn.Module):
             if m.bias is not None:
                 nn.init.zeros_(m.bias)
 
-    def forward(self, x):
+    def forward(self, x, seq_lens=None):
+        """
+        Args:
+            x: input images ``(N, 3, H, W)``.
+            seq_lens: optional ``(N,)`` unpadded input widths. Restricts the
+                      squeeze-and-excitation pooling to the valid columns.
+        """
         x = self.conv1(x)
-        x = self.blocks2(x)
-        x = self.blocks3(x)
-        x = self.blocks4(x)
-        x = self.blocks5(x)
-        x = self.blocks6(x)
+        mask = None
+        if seq_lens is not None:
+            # valid columns after the stride 4 stem (all later stages preserve
+            # the width)
+            valid = (seq_lens.to(x.device) + 3) // 4
+            mask = torch.arange(x.shape[3], device=x.device)[None, :] < valid[:, None]
+            mask = mask[:, None, None, :].to(x.dtype)
+        for stage in (self.blocks2, self.blocks3, self.blocks4, self.blocks5, self.blocks6):
+            for block in stage:
+                x = block(x, mask)
         h = x.shape[2]
         x = F.avg_pool2d(x, kernel_size=(h, 2))
         return x
