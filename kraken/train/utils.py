@@ -41,6 +41,7 @@ __all__ = ['SegmentationTestMetrics',
            'KrakenTrainer',
            'KrakenOnExceptionCheckpoint',
            'configure_optimizer_and_lr_scheduler',
+           'worker_init_fn',
            'validation_worker_init_fn']
 
 
@@ -94,11 +95,23 @@ def _star_fun(fun, kwargs):
     return None
 
 
+def worker_init_fn(worker_id):
+    """ Decode AVIF images single-threaded in dataloader workers. The workers
+        already provide the parallelism while Pillow would otherwise start
+        one decoder thread per available CPU for each image. """
+    try:
+        from PIL import AvifImagePlugin
+        AvifImagePlugin.DEFAULT_MAX_THREADS = 1
+    except ImportError:
+        pass
+
+
 def validation_worker_init_fn(worker_id):
     """ Fix random seeds so that augmentation always produces the same
         results when validating. Temporarily increase the logging level
         for lightning because otherwise it will display a message
         at info level about the seed being changed. """
+    worker_init_fn(worker_id)
     from lightning.pytorch import seed_everything
     seed_everything(42)
 

@@ -39,7 +39,7 @@ from kraken.lib.segmentation_metrics import (interpolate_polyline,
 from kraken.configs import BLLASegmentationTrainingConfig, BLLASegmentationTrainingDataConfig
 from kraken.lib.vgsl import TorchVGSLModel
 from kraken.train.base import KrakenTrainerModule
-from kraken.train.utils import configure_optimizer_and_lr_scheduler, SegmentationTestMetrics
+from kraken.train.utils import worker_init_fn, configure_optimizer_and_lr_scheduler, SegmentationTestMetrics
 
 from typing import TYPE_CHECKING, Optional
 
@@ -265,7 +265,8 @@ class BLLASegmentationDataModule(L.LightningDataModule):
                           num_workers=self.hparams.data_config.num_workers,
                           shuffle=True,
                           pin_memory=True,
-                          collate_fn=_seg_collate_fn)
+                          collate_fn=_seg_collate_fn,
+                          worker_init_fn=worker_init_fn)
 
     def val_dataloader(self):
         return DataLoader(self.val_set,
@@ -273,7 +274,8 @@ class BLLASegmentationDataModule(L.LightningDataModule):
                           batch_size=1,
                           num_workers=self.hparams.data_config.num_workers,
                           pin_memory=True,
-                          collate_fn=_seg_collate_fn)
+                          collate_fn=_seg_collate_fn,
+                          worker_init_fn=worker_init_fn)
 
     def test_dataloader(self):
         return DataLoader(self.test_set,
@@ -281,7 +283,8 @@ class BLLASegmentationDataModule(L.LightningDataModule):
                           batch_size=1,
                           num_workers=self.hparams.data_config.num_workers,
                           pin_memory=True,
-                          collate_fn=_seg_collate_fn)
+                          collate_fn=_seg_collate_fn,
+                          worker_init_fn=worker_init_fn)
 
 
 class BLLASegmentationModel(KrakenTrainerModule):

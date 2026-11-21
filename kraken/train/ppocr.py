@@ -45,7 +45,7 @@ from kraken.lib.ppocr.network import WIDTH_SUBSAMPLING
 from kraken.lib.ppocr.nrtr import NRTRHead
 from kraken.train.base import KrakenTrainerModule
 from kraken.train.optim import MuonWithAuxAdam, get_parameter_groups
-from kraken.train.utils import validation_worker_init_fn, configure_optimizer_and_lr_scheduler, RecognitionTestMetrics
+from kraken.train.utils import worker_init_fn, validation_worker_init_fn, configure_optimizer_and_lr_scheduler, RecognitionTestMetrics
 from kraken.train.vgsl import VGSLRecognitionDataModule
 
 logger = logging.getLogger(__name__)
@@ -101,7 +101,8 @@ class PPOCRv6RecognitionDataModule(VGSLRecognitionDataModule):
                           persistent_workers=self.hparams.data_config.num_workers > 0,
                           pin_memory=True,
                           shuffle=True,
-                          collate_fn=self._collate_fn)
+                          collate_fn=self._collate_fn,
+                          worker_init_fn=worker_init_fn)
 
     def val_dataloader(self):
         return DataLoader(self.val_set,

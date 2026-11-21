@@ -45,7 +45,7 @@ from kraken.lib.dataset import (ArrowIPCRecognitionDataset, GroundTruthDataset,
 from kraken.lib.exceptions import KrakenEncodeException, KrakenInputException
 from kraken.lib.vgsl import TorchVGSLModel
 from kraken.train.base import KrakenTrainerModule
-from kraken.train.utils import validation_worker_init_fn, configure_optimizer_and_lr_scheduler, RecognitionTestMetrics
+from kraken.train.utils import worker_init_fn, validation_worker_init_fn, configure_optimizer_and_lr_scheduler, RecognitionTestMetrics
 
 logger = logging.getLogger(__name__)
 
@@ -240,7 +240,8 @@ class VGSLRecognitionDataModule(L.LightningDataModule):
                           num_workers=self.hparams.data_config.num_workers,
                           pin_memory=True,
                           shuffle=True,
-                          collate_fn=collate_sequences)
+                          collate_fn=collate_sequences,
+                          worker_init_fn=worker_init_fn)
 
     def val_dataloader(self):
         return DataLoader(self.val_set,
